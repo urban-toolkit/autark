@@ -2,7 +2,8 @@ const path = require('path');
 
 module.exports = {
     entry: {
-        utkmap: path.resolve(__dirname, './src/index.ts')
+        utkmap: path.resolve(__dirname, './src/index.ts'),
+       'utkmap.min': path.resolve(__dirname, './src/index.ts')
     },
     module: {
         rules: [
@@ -16,13 +17,17 @@ module.exports = {
     resolve: {
         extensions: ['.ts', '.js'],
     },
+    plugins: [
+    ],
     output: {
-        path: path.resolve(__dirname, 'dist'),
-        filename: '[name].js',
+        path: path.resolve(__dirname, './dist'),
+        filename: 'index.js',
+        libraryTarget: 'umd'
     },
+    devtool: 'source-map',
     devServer: {
         static: {
-            directory: path.resolve(__dirname, '../dist')
+            directory: path.resolve(__dirname, './dist')
         },
         port: 4000,
         open: true,
