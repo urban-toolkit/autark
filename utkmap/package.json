@@ -1,20 +1,16 @@
 {
   "name": "utkmap",
   "version": "1.0.0",
-  "description": "A redesign of UTK's map component as a standalone lib, using WebGPU.",
-  "private": true,
-  "main": "dist/utkmap.js",
-  "types": "dist/utkmap.d.ts",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "compile": "tsc -w",
-    "lint": "eslint",
-    "dev": "webpack --watch --mode development",
-    "build": "rm -rf dist && webpack --mode production",
-    "check": "npm run lint"
-  },
-  "author": "Marcos Lage (www.ic.uff.br/~mlage)",
   "license": "MIT",
+  "description": "A redesign of UTK's map component as a standalone lib, using WebGPU.",
+  "author": "Marcos Lage (www.ic.uff.br/~mlage)",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "webpack --watch --mode development",
+    "build": "rm -rf dist && webpack --mode production"
+  },
   "devDependencies": {
     "eslint": "^8.57.0",
     "ts-loader": "^9.5.1",
