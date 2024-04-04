@@ -1,2 +1,2 @@
 # utk-v2
-Reimplementation of UTK using WebGPU and DuckDB.
+A redesign of UTK's map component as a standalone lib, using WebGPU.
