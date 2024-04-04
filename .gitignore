@@ -1,6 +1,7 @@
 # UTK Rules
 map/build/
-map/src/*.js 
+map/src/*.js
+map/package-lock.json
 
 # Logs
 logs
