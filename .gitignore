@@ -1,7 +1,9 @@
 # UTK Rules
-map/build/
-map/src/*.js
-map/package-lock.json
+utkmap/build/
+utkmap/src/*.js
+utkmap/package-lock.json
+
+.DS_Store
 
 # Logs
 logs
