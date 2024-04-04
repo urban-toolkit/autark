@@ -1,3 +1,7 @@
+# UTK Rules
+map/build/
+map/src/*.js 
+
 # Logs
 logs
 *.log
