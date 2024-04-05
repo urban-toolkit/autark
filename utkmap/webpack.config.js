@@ -8,7 +8,7 @@ module.exports = {
     module: {
         rules: [
             {
-                test: /\.glsl$/,
+                test: /\.(vs|fs)/,
                 type: 'asset/source',
                 generator: {
                     emit: false,
