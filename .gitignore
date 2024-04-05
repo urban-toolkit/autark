@@ -1,7 +1,7 @@
 # UTK Rules
-utkmap/build/
-utkmap/src/*.js
-utkmap/package-lock.json
+utk*/build/
+utk*/src/*.js
+utk*/package-lock.json
 
 .DS_Store
 
