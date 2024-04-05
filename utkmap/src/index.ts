@@ -1,5 +1,5 @@
-const world = 'world';
+import fShader from './shaders/flat.fs';
 
-export function hello(who: any = world): string {
-  return `Hello ${who}! `;
+export function test() {
+    console.log(fShader);
 }

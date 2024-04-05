@@ -10,28 +10,14 @@ module.exports = {
             {
                 test: /\.ts?$/,
                 use: 'ts-loader',
-                exclude: /node_modules/,
-            },
+                exclude: /node_modules/
+            }
         ],
     },
-    resolve: {
-        extensions: ['.ts', '.js'],
-    },
-    plugins: [
-    ],
     output: {
         path: path.resolve(__dirname, './dist'),
         filename: 'index.js',
         libraryTarget: 'umd'
     },
     devtool: 'source-map',
-    devServer: {
-        static: {
-            directory: path.resolve(__dirname, './dist')
-        },
-        port: 4000,
-        open: true,
-        hot: true,
-        compress: true
-    },
 };
