@@ -1,3 +1,4 @@
 export function test() {
-    console.log("Test");
+    console.log("******");
+    console.log("Test 1");
 }
