@@ -1,3 +1,3 @@
-export function test() {
-    console.log("UTK DB");
+export function utkDb() {
+    return "Hello from the UTK database module";
 }
