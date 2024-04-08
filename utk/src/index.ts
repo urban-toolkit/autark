@@ -1,4 +1,3 @@
-export function test() {
-    console.log("******");
-    console.log("Test 1");
+export function utk() {
+    return "Hello from UTK";
 }
