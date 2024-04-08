@@ -10,9 +10,13 @@ module.exports = {
             {
                 test: /\.ts?$/,
                 use: 'ts-loader',
+                include: [ path.resolve(__dirname, './src')],
                 exclude: /node_modules/
             }
         ],
+    },
+    resolve: {
+        extensions: ['.ts', '.js'],
     },
     output: {
         path: path.resolve(__dirname, './dist'),
