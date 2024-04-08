@@ -1,7 +1,10 @@
 # UTK Rules
-utk*/build/
+utk*/dist/
 utk*/src/*.js
 utk*/package-lock.json
+
+package-lock.json
+demo/*.js
 
 .DS_Store
 

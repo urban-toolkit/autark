@@ -5,34 +5,37 @@
     "description": "Demostration app for The Urban Toolkit.",
     "author": "Marcos Lage (www.ic.uff.br/~mlage)",
     "scripts": {
-        "dev-demo" : "concurrently --kill-others --prefix-colors \"auto,auto\" --names \"dev, dev-server\" \"npm run dev\" \"npm run dev-server\"",
+        "dev-demo": "concurrently --kill-others --prefix-colors \"auto,auto\" --names \"dev, dev-server\" \"npm run dev\" \"npm run dev-server\"",
         "dev": "concurrently --kill-others --prefix-colors \"auto,auto\" --names \"utkmap, utk\" \"npm run dev-utkmap\" \"npm run dev-utk\"",
         "dev-server": "webpack serve --mode development --config ./webpack.config.js",
-
         "dev-utk": "webpack --watch --mode development --config ./utk/webpack.config.js",
         "dev-utkdb": "webpack --watch --mode development --config ./utkdb/webpack.config.js",
         "dev-utkmap": "webpack --watch --mode development --config ./utkmap/webpack.config.js",
         "dev-utkrun": "webpack --watch --mode development --config ./utkrun/webpack.config.js",
-
-        "build-demo" : "npm-run-all --sequential build build-server",
+        "build-demo": "npm-run-all --sequential build build-server",
         "build": "npm-run-all --sequential build-utkmap build-utk",
         "build-server": "webpack serve --mode development --config ./webpack.config.js",
-
         "build-utk": "rm -rf utk/dist  && webpack --mode production --config ./utk/webpack.config.js",
         "build-utkdb": "rm -rf utkdb/dist  && webpack --mode production --config ./utkdb/webpack.config.js",
         "build-utkmap": "rm -rf utkmap/dist && webpack --mode production --config ./utkmap/webpack.config.js",
         "build-utkrun": "rm -rf utkrun/dist && webpack --mode production --config ./utkrun/webpack.config.js"
     },
     "devDependencies": {
-        "npm-run-all": "^4.1.5",
         "concurrently": "^8.2.2",
         "eslint": "^8.57.0",
         "html-webpack-plugin": "^5.6.0",
+        "npm-run-all": "^4.1.5",
         "ts-loader": "^9.5.1",
         "typescript": "^5.4.4",
         "typescript-eslint": "^7.5.0",
         "webpack": "^5.91.0",
         "webpack-cli": "^5.1.4",
         "webpack-dev-server": "^5.0.4"
+    },
+    "dependencies": {
+        "utk": "file:utk",
+        "utkdb": "file:utkdb",
+        "utkmap": "file:utkmap",
+        "utkrun": "file:utkrun"
     }
 }
