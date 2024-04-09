@@ -1,4 +1,4 @@
-import { LayerGeometryType, LayerPhysicalType, RenderStyle } from "./constants";
+import { ILayerData } from "./interfaces";
 
 import Layer from "./layer";
 import PassIndexFlat from "./pass-index-flat";
@@ -11,8 +11,8 @@ export default class TrianglesLayer extends Layer {
 
     protected _pass!: PassIndexFlat;
 
-    constructor(id: string, physical: LayerPhysicalType, renderStyle: RenderStyle, picking: boolean = false) {
-        super(id, LayerGeometryType.TRIGMESH_LAYER, physical, renderStyle, picking);
+    constructor(layerInfo: ILayerData, picking: boolean = false) {
+        super(layerInfo.id, layerInfo.type, layerInfo.physical, layerInfo.renderStyle, picking);
 
         this._positions = new Float32Array([
             1.0, -1.0, 0.0, -1.0, -1.0, 0.0, 0.0, 1.0, 0.0
