@@ -1,7 +1,7 @@
 /// <reference types="@webgpu/types" />
 
-import vertSrc from './shaders/trig.vert.wgsl';
-import fragSrc from './shaders/trig.frag.wgsl';
+import vertSrc from './shaders/index-flat.vert.wgsl';
+import fragSrc from './shaders/index-flat.frag.wgsl';
 
 import Pass from "./pass";
 import Renderer from "./renderer";
@@ -126,7 +126,7 @@ export default class PassIndexFlat extends Pass {
         this.renderer.passEncoder.setVertexBuffer(0, this._positionBuffer);
         this.renderer.passEncoder.setVertexBuffer(1, this._colorBuffer);
         this.renderer.passEncoder.setIndexBuffer(this._indexBuffer, 'uint16');
-        this.renderer.passEncoder.drawIndexed(3, 1);
+        this.renderer.passEncoder.drawIndexed(9);
         this.renderer.passEncoder.end();
     }
 

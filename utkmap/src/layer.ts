@@ -1,32 +1,40 @@
-import { LayerGeometryType, LayerPhysicalType, RenderStyle } from './constants';
+import { ILayerData, ILayerGeometry, ILayerInfo, ILayerThematic } from './interfaces';
 
 import Renderer from './renderer';
 
 export default abstract class Layer {
     // layer id
-    protected _id: string;
-    // layer geometry type
-    protected _type: LayerGeometryType;
-    // physical layer type
-    protected _physical: LayerPhysicalType;
-
-    // render styles available
-    protected _renderStyle: RenderStyle;
+    protected _info!: ILayerInfo;
 
     // picking shader
     protected _picking: boolean;
 
-    get id() {
-        return this._id;
-    }
-
-    constructor(id: string, type: LayerGeometryType, physical: LayerPhysicalType, renderStyle: RenderStyle, picking: boolean = false) {
-        this._id = id;
-        this._type = type;
-        this._physical = physical;
-        this._renderStyle = renderStyle;
+    constructor(layerInfo: ILayerInfo, picking: boolean) {
+        this.loadInfo(layerInfo);
         this._picking = picking;
     }
+
+    get id() {
+        return this._info.id;
+    }
+
+    get info() {
+        return this._info;
+    }
+
+    get picking() {
+        return this._picking;
+    }
+
+    loadInfo(layerInfo: ILayerInfo) {
+        this._info = layerInfo;
+    }
+
+    abstract loadData(layerData: ILayerData): void;
+
+    abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
+
+    abstract loadThematic(layerThematic: ILayerThematic[]): void;
 
     abstract buildRenderPass(renderer: Renderer): void;
 
