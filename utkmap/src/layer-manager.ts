@@ -1,4 +1,4 @@
-import { ILayerData } from "./interfaces";
+import { ILayerData, ILayerInfo } from "./interfaces";
 import { LayerGeometryType } from "./constants";
 
 import Layer from "./layer";
@@ -13,16 +13,16 @@ export default class LayerManager {
         return this._layers;
     }
 
-    createLayer(layerInfo: ILayerData): Layer | null {
+    addLayer(layerInfo: ILayerInfo, layerData: ILayerData): Layer | null {
         let layer = null;
 
         // loads based on type
-        switch (layerInfo.type) {
+        switch (layerInfo.typeGeometry) {
             case LayerGeometryType.TRIGMESH_LAYER:
-                layer = new TrianglesLayer(layerInfo);
+                layer = new TrianglesLayer(layerInfo, layerData);
             break;
             default:
-                console.error(`File ${layerInfo.id}.json has an unknown layer type: ${layerInfo.type}.`);
+                console.error(`File ${layerInfo.id}.json has an unknown layer type: ${layerInfo.typeGeometry}.`);
             break;
         }
 
@@ -33,7 +33,17 @@ export default class LayerManager {
         return null;
     }
 
-    searchByLayerInfo(layerInfo: ILayerData): Layer | null {
+    delLayer(layerInfo: ILayerInfo): void {
+        // searches the layer
+        for (let lId = 0; lId < this._layers.length; lId++) {
+            const lay = this._layers[lId];
+            if (lay.id === layerInfo.id) {
+                this.layers.splice(lId, 1);
+            }
+        }
+    }
+
+    searchByLayerInfo(layerInfo: ILayerInfo): Layer | null {
         // searches the layer
         let layer = null;
         for (const lay of this.layers) {

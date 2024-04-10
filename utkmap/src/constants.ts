@@ -27,4 +27,10 @@ export enum ColorMapInterpolators {
     INTERPOLATE_BLUES = 'interpolateBlues'
 }
 
+export enum ThematicAggregationLevel {
+    AGGREGATION_POINT,
+    AGGREGATION_PRIMITIVE,
+    AGGREGATION_COMPONENT
+}
+
 export type ColorHEX = `#${string}`;
