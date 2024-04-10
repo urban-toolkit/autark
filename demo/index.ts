@@ -13,7 +13,7 @@ async function main() {
     canvas.width = canvas.height = 1024;
     
     const map = new UtkMap(canvas);
-    await map.start();
+    await map.init();
     map.render();
 }
 

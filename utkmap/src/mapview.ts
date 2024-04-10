@@ -13,13 +13,10 @@ export class UtkMap {
     constructor(canvas: HTMLCanvasElement) {
         this._renderer = new Renderer(canvas);
         this._layers = new LayerManager();
-
-        // const layer = new TrianglesLayer('teste.csv', LayerPhysicalType.SURFACE_LAYER, RenderStyle.INDEX_FLAT)
-        // this._layers.push(layer);
     }
 
-    async start() {
-        await this._renderer.start();
+    async init() {
+        await this._renderer.init();
 
         const layerInfo = {
             id: 'teste.csv',

@@ -17,12 +17,14 @@ export enum LayerPhysicalType {
 
 export enum RenderStyle {
     INDEX_FLAT = "INDEX_FLAT",
-    INDXE_FLAT_MAP = "INDEX_FLAT_MAP",
+    INDEX_FLAT_MAP = "INDEX_FLAT_MAP",
     INDEX_SMOOTH = "INDEX_SMOOTH",
     INDEX_SMOOTH_MAP = "INDEX_SMOOTH_MAP",
 }
 
-/**
- * Color type definition
- */
+export enum ColorMapInterpolators {
+    INTERPOLATE_REDS  = 'interpolateReds',
+    INTERPOLATE_BLUES = 'interpolateBlues'
+}
+
 export type ColorHEX = `#${string}`;

@@ -32,17 +32,17 @@ export default class Renderer {
     }
 
     // Start the rendering engine
-    async start() {
-        const api = await this.initializeAPI()
+    async init() {
+        const api = await this.initAPI()
 
         if (api) {
             this.configureContext();
-            this.setFrameAndDepthBuffer();
+            this.configureOutBuffers();
         }
     }
 
     // Initialize WebGPU
-    async initializeAPI(): Promise<boolean> {
+    async initAPI(): Promise<boolean> {
         try {
             // Access to the WebGPU object
             const entry: GPU = navigator.gpu;
@@ -90,8 +90,8 @@ export default class Renderer {
         }
     }
 
-    setFrameAndDepthBuffer() {
-        // Depth texture definition
+    configureOutBuffers() {
+        // Depth buffer definition
         const depthTextureDesc: GPUTextureDescriptor = {
             size: [this.canvas.width, this.canvas.height, 1],
             dimension: '2d',
@@ -129,8 +129,8 @@ export default class Renderer {
             console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
             return;
         }
-
-        this.setFrameAndDepthBuffer();
+        // Frame and depth buffers
+        this.configureOutBuffers();
 
         // Create a new command encoder
         this.commandEncoder = this.device.createCommandEncoder();

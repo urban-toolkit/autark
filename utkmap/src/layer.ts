@@ -16,6 +16,10 @@ export default abstract class Layer {
     // picking shader
     protected _picking: boolean;
 
+    get id() {
+        return this._id;
+    }
+
     constructor(id: string, type: LayerGeometryType, physical: LayerPhysicalType, renderStyle: RenderStyle, picking: boolean = false) {
         this._id = id;
         this._type = type;

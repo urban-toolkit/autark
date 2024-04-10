@@ -7,8 +7,7 @@ import TrianglesLayer from "./layer-triangles";
 export default class LayerManager {
     protected _layers: Layer[] = [];
 
-    constructor() {
-    }
+    constructor() { }
 
     get layers(): Layer[] {
         return this._layers;
@@ -33,4 +32,29 @@ export default class LayerManager {
         }
         return null;
     }
+
+    searchByLayerInfo(layerInfo: ILayerData): Layer | null {
+        // searches the layer
+        let layer = null;
+        for (const lay of this.layers) {
+            if (lay.id === layerInfo.id) {
+                layer = lay;
+                break;
+            }
+        }
+        return layer;
+    }
+
+    searchByLayerId(layerId: string): Layer | null {
+        // searches the layer
+        let layer = null;
+        for (const lay of this.layers) {
+            if (lay.id === layerId) {
+                layer = lay;
+                break;
+            }
+        }
+        return layer;
+    }
+
 }

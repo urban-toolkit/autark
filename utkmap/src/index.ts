@@ -5,3 +5,4 @@ export * from './layer-manager';
 export * from './layer-triangles';
 export * from './renderer';
 export * from './mapview';
+export * from './colormap';
