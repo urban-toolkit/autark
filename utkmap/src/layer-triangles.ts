@@ -2,8 +2,10 @@ import { ILayerData, ILayerGeometry, ILayerInfo, ILayerThematic } from "./interf
 
 import Layer from "./layer";
 import Renderer from "./renderer";
-import PassIndexFlat from "./pass-index-flat";
-import { ThematicAggregationLevel } from "./constants";
+import PipelineTriangleFlat from "./pipeline-triangle-flat";
+import { ColorMapInterpolators, ThematicAggregationLevel } from "./constants";
+import { ColorMap } from "./colormap";
+import { MapStyle } from "./map-style";
 
 export default class TrianglesLayer extends Layer {
     protected _position!: Float32Array;
@@ -11,7 +13,7 @@ export default class TrianglesLayer extends Layer {
     protected _indices!: Uint16Array;
     protected _components: { nPoints: number, nTriangles: number }[] = [];
 
-    protected _pass!: PassIndexFlat;
+    protected _pipeline!: PipelineTriangleFlat;
 
     constructor(layerInfo: ILayerInfo, layerData: ILayerData, picking: boolean = false) {
         super(layerInfo, picking);
@@ -20,7 +22,10 @@ export default class TrianglesLayer extends Layer {
 
     loadData(layerData: ILayerData) {
         this.loadGeometry(layerData.geometry);
-        this.loadThematic(layerData.thematic);
+
+        if(layerData.thematic.length) {
+            this.loadThematic(layerData.thematic);
+        }
     }
 
     loadGeometry(layerGeometry: ILayerGeometry[]): void {
@@ -66,26 +71,22 @@ export default class TrianglesLayer extends Layer {
             }
         }
         this._thematic = new Float32Array(thematic);
-
-        console.log(this._thematic);
     }
 
-    buildRenderPass(renderer: Renderer) {
-        this._pass = new PassIndexFlat(renderer);
-        this._pass.build({
-            positions: this._position,
-            colors: new Float32Array([
-                1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-                1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-                1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-                1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0
-            ]),
-            indices: this._indices
+    buildPipeline(renderer: Renderer) {
+        this._pipeline  = new PipelineTriangleFlat(renderer);
+        this._pipeline.build({
+            position: this._position,
+            thematic: this._thematic,
+            indices:  this._indices
+        }, {
+            color: MapStyle.getColor(this._info.typePhysical),
+            cMap: ColorMap.getColorMap(ColorMapInterpolators.INTERPOLATE_REDS)
         });
     }
 
     setRenderPass() {
-        this._pass.setRenderPass();
+        this._pipeline.setRenderPass();
     }
 
     private aggregateThematicPoint(layerThematic: ILayerThematic): Float32Array {
