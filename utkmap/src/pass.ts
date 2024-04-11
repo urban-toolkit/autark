@@ -29,5 +29,5 @@ export default abstract class Pass {
 
     abstract createShaders(): void;
 
-    abstract setRenderPass(): void;
+    abstract setRenderPass(nElems: number): void;
 }

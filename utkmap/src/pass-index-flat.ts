@@ -126,8 +126,7 @@ export default class PassIndexFlat extends Pass {
         this.renderer.passEncoder.setVertexBuffer(0, this._positionBuffer);
         this.renderer.passEncoder.setVertexBuffer(1, this._colorBuffer);
         this.renderer.passEncoder.setIndexBuffer(this._indexBuffer, 'uint16');
-        this.renderer.passEncoder.drawIndexed(9);
+        this.renderer.passEncoder.drawIndexed(this._indexBuffer.size / Uint16Array.BYTES_PER_ELEMENT);
         this.renderer.passEncoder.end();
     }
-
 }
