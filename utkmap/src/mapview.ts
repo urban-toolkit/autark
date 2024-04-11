@@ -31,25 +31,24 @@ export class UtkMap implements DataApi {
                 position: new Float32Array([
                     0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0
                 ]),
-                thematic: new Float32Array(3),
                 indices: new Uint16Array([
                     0, 1, 2
                 ])
             },
             {
                 position: new Float32Array([
-                    0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0
+                    0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0,
+                    0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0,  0.5, 0.0
                 ]),
-                thematic: new Float32Array(3),
                 indices: new Uint16Array([
-                    0, 1, 2
+                    0, 1, 2,
+                    3, 4, 5
                 ])
             },
             {
                 position: new Float32Array([
                     0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, -0.5, 0.0
                 ]),
-                thematic: new Float32Array(3),
                 indices: new Uint16Array([
                     0, 1, 2
                 ])
@@ -63,17 +62,16 @@ export class UtkMap implements DataApi {
             {
                 aggregation: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
                 values: new Float32Array([
-                    1.0
+                    1.0, 2.0
                 ]),
             },
             {
-                aggregation: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
+                aggregation: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                 values: new Float32Array([
-                    1.0
+                    0.75
                 ]),
             }]
         }
-
 
         this.loadLayer(layerInfo, layerData);
     }
@@ -86,12 +84,23 @@ export class UtkMap implements DataApi {
         }
     }
 
-    updateLayerGeometry(layerGeometry: ILayerGeometry): void {
-        throw new Error('Method not implemented.');
+    updateLayer(layerInfo: ILayerInfo, layerData: ILayerData): void {
+        const layer = this._layers.searchByLayerInfo(layerInfo);
+
+        if (layer) {
+            layer.loadGeometry(layerData.geometry);
+            layer.loadThematic(layerData.thematic);
+            layer.buildRenderPass(this._renderer);
+        }
     }
 
-    updateLayerThematic(layerThematic: ILayerThematic): void {
-        throw new Error('Method not implemented.');
+    updateLayerThematic(layerInfo: ILayerInfo, layerThematic: ILayerThematic[]): void {
+        const layer = this._layers.searchByLayerInfo(layerInfo);
+
+        if (layer) {
+            layer.loadThematic(layerThematic);
+            layer.buildRenderPass(this._renderer);
+        }
     }
 
     render() {
@@ -99,9 +108,9 @@ export class UtkMap implements DataApi {
         this._renderer.beginRender()
 
         // Add layers to render pass
-        const ls = this._layers.layers.forEach(layer => {
+        this._layers.layers.forEach(layer => {
             layer.setRenderPass();
-        });;
+        });
 
         // Ends the render
         this._renderer.endRender();

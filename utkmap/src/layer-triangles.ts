@@ -9,7 +9,7 @@ export default class TrianglesLayer extends Layer {
     protected _position!: Float32Array;
     protected _thematic!: Float32Array;
     protected _indices!: Uint16Array;
-    protected _components: number[]  = [];
+    protected _components: { nPoints: number, nTriangles: number }[] = [];
 
     protected _pass!: PassIndexFlat;
 
@@ -21,55 +21,53 @@ export default class TrianglesLayer extends Layer {
     loadData(layerData: ILayerData) {
         this.loadGeometry(layerData.geometry);
         this.loadThematic(layerData.thematic);
-
-        console.log(this._position);
-        console.log(this._thematic);
-        console.log(this._indices);
     }
 
     loadGeometry(layerGeometry: ILayerGeometry[]): void {
         const position = [];
-        const indices  = [];
+        const indices = [];
 
         for (let id = 0; id < layerGeometry.length; id++) {
             position.push(...layerGeometry[id].position);
 
-            if(layerGeometry[id].indices !== undefined) {
+            if (layerGeometry[id].indices !== undefined) {
                 const fix = layerGeometry[id].indices?.map(a => a + indices.length)
                 indices.push(...<Uint16Array>fix);
-
-                this._components.push(indices.length / 3)
             }
+
+            const component = {
+                nPoints: position.length / 3,
+                nTriangles: indices.length / 3,
+            }
+            this._components.push(component);
         }
 
         this._position = new Float32Array(position);
-        this._indices  = new Uint16Array(indices);
+        this._indices = new Uint16Array(indices);
         this._thematic = new Float32Array(0);
-
-        console.log(this._components);
     }
-    
+
     loadThematic(layerThematic: ILayerThematic[]): void {
         const thematic = [];
-
-        for (let id = 0; id < layerThematic.length; id++) {
-            switch (layerThematic[id].aggregation) {
+        for (let compId = 0; compId < layerThematic.length; compId++) {
+            switch (layerThematic[compId].aggregation) {
                 case ThematicAggregationLevel.AGGREGATION_POINT:
-                    thematic.push(...this.aggregateThematicPoint(layerThematic[id]));
-                break;
+                    thematic.push(...this.aggregateThematicPoint(layerThematic[compId]));
+                    break;
                 case ThematicAggregationLevel.AGGREGATION_PRIMITIVE:
-                    thematic.push(...this.aggregateThematicPrimitive(id, layerThematic[id]));
-                break;
+                    thematic.push(...this.aggregateThematicPrimitive(compId, layerThematic[compId]));
+                    break;
                 case ThematicAggregationLevel.AGGREGATION_COMPONENT:
-                    thematic.push(...this.aggregateThematicComponenet(id, layerThematic[id]));
-                break;
+                    thematic.push(...this.aggregateThematicComponenet(compId, layerThematic[compId]));
+                    break;
                 default:
-                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[id].aggregation}.`);
-                break;
+                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].aggregation}.`);
+                    break;
             }
         }
-
         this._thematic = new Float32Array(thematic);
+
+        console.log(this._thematic);
     }
 
     buildRenderPass(renderer: Renderer) {
@@ -77,6 +75,7 @@ export default class TrianglesLayer extends Layer {
         this._pass.build({
             positions: this._position,
             colors: new Float32Array([
+                1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0,
                 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0,
                 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0,
                 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0
@@ -94,13 +93,20 @@ export default class TrianglesLayer extends Layer {
     }
 
     private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): Float32Array {
-        const thematic = new Float32Array(this._position.length / 3);
+        // component points: start/end indices and number of points 
+        const sPoint = (component > 0 ? this._components[component - 1].nPoints : 0);
+        const ePoint = this._components[component].nPoints;
+        const nPoint = ePoint - sPoint;
 
-        const lower = component > 0 ? component - 1 : 0
+        // component triangles: start/end indices 
+        const sTriangle = (component > 0 ? this._components[component - 1].nTriangles : 0);
+        const eTriangle = this._components[component].nTriangles;
 
-        for(let id = 3 * lower; id < 3 * this._components[component]; id++) {
-            const vid = this._indices[id];
-            const tid = id / 3;
+        const thematic = new Float32Array(nPoint);
+
+        for (let id = 3 * sTriangle; id < 3 * eTriangle; id++) {
+            const vid = this._indices[id] - sPoint;
+            const tid = Math.floor(id / 3) - sTriangle;
 
             thematic[vid] = layerThematic.values[tid];
         }
@@ -109,12 +115,14 @@ export default class TrianglesLayer extends Layer {
     }
 
     private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): Float32Array {
-        const thematic = new Float32Array(this._position.length / 3);
+        const sPoint = (component > 0 ? this._components[component - 1].nPoints : 0);
+        const ePoint = this._components[component].nPoints;
+        const nPoint = ePoint - sPoint;
 
-        const lower = component > 0 ? component - 1 : 0
+        const thematic = new Float32Array(nPoint);
 
-        for(let vid = 0, id = 3 * lower; id < 3 * this._components[component]; vid++, id++) {
-            thematic[id] = layerThematic.values[0];
+        for (let vId = 0; vId < nPoint; vId++) {
+            thematic[vId] = layerThematic.values[0];
         }
 
         return thematic;

@@ -28,9 +28,9 @@ export enum ColorMapInterpolators {
 }
 
 export enum ThematicAggregationLevel {
-    AGGREGATION_POINT,
-    AGGREGATION_PRIMITIVE,
-    AGGREGATION_COMPONENT
+    AGGREGATION_POINT = 'aggregationPoint',
+    AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
+    AGGREGATION_COMPONENT  = 'aggregationComponent'
 }
 
 export type ColorHEX = `#${string}`;

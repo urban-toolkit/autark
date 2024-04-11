@@ -27,7 +27,6 @@ export interface ILayerData {
 export interface ILayerGeometry {
     position: Float32Array;  // coordinate of the points
     normal?: Float32Array;   // normals of the points
-    thematic?: Float32Array; // thematic data of the points
     indices?: Uint16Array;   // ids of the vertices
 }
 

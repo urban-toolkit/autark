@@ -4,8 +4,8 @@ export abstract class DataApi {
 
     abstract loadLayer(layerInfo: ILayerInfo, layerData: ILayerData): void;
 
-    abstract updateLayerGeometry(layerGeometry: ILayerGeometry): void;
+    abstract updateLayer(layerInfo: ILayerInfo, layerData: ILayerData): void;
 
-    abstract updateLayerThematic(layerThematic: ILayerThematic): void;
+    abstract updateLayerThematic(layerInfo: ILayerInfo, layerThematic: ILayerThematic[]): void;
 
 }
