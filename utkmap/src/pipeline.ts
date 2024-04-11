@@ -2,7 +2,7 @@
 
 import Renderer from './renderer';
 
-export default abstract class Pass {
+export default abstract class Pipeline {
     // shaders
     vertModule!: GPUShaderModule;
     fragModule!: GPUShaderModule;
@@ -17,13 +17,16 @@ export default abstract class Pass {
         this.renderer = renderer;
     }
 
-    build(data: any) {
-        this.updateBuffers(data);
+    build(mesh: any, color: any) {
         this.createShaders();
+        this.updateVertexBuffers(mesh);
+        this.updateUniformBuffers(color);
         this.createPipeline();
     }
 
-    abstract updateBuffers(data: any): void;
+    abstract updateVertexBuffers(data: any): void;
+
+    abstract updateUniformBuffers(data: any): void;
 
     abstract createPipeline(): void;
 

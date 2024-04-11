@@ -36,7 +36,7 @@ export default abstract class Layer {
 
     abstract loadThematic(layerThematic: ILayerThematic[]): void;
 
-    abstract buildRenderPass(renderer: Renderer): void;
+    abstract buildPipeline(renderer: Renderer): void;
 
     abstract setRenderPass(): void;
 }

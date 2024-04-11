@@ -15,11 +15,14 @@ export enum LayerPhysicalType {
     BUILDINGS_LAYER = "buildings",
 }
 
+export enum ThematicAggregationLevel {
+    AGGREGATION_POINT = 'aggregationPoint',
+    AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
+    AGGREGATION_COMPONENT  = 'aggregationComponent'
+}
+
 export enum RenderStyle {
-    INDEX_FLAT = "INDEX_FLAT",
-    INDEX_FLAT_MAP = "INDEX_FLAT_MAP",
-    INDEX_SMOOTH = "INDEX_SMOOTH",
-    INDEX_SMOOTH_MAP = "INDEX_SMOOTH_MAP",
+    TRIANGLE_FLAT = "TRIANGLE_FLAT",
 }
 
 export enum ColorMapInterpolators {
@@ -27,10 +30,6 @@ export enum ColorMapInterpolators {
     INTERPOLATE_BLUES = 'interpolateBlues'
 }
 
-export enum ThematicAggregationLevel {
-    AGGREGATION_POINT = 'aggregationPoint',
-    AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
-    AGGREGATION_COMPONENT  = 'aggregationComponent'
-}
-
 export type ColorHEX = `#${string}`;
+export type ColorRGB = {r: number, g: number, b:number, opacity: number}
+export type ColorTEX = number[];

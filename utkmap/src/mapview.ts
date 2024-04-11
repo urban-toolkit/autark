@@ -6,6 +6,7 @@ import { ILayerData, ILayerGeometry, ILayerInfo, ILayerThematic } from './interf
 import Renderer from './renderer';
 import LayerManager from './layer-manager';
 import { DataApi } from './data-api';
+import { MapStyle } from './map-style';
 
 export class UtkMap implements DataApi {
     protected _layers: LayerManager;
@@ -22,8 +23,8 @@ export class UtkMap implements DataApi {
         const layerInfo = {
             id: 'roads.osm',
             typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
-            typePhysical: LayerPhysicalType.SURFACE_LAYER,
-            renderStyle: RenderStyle.INDEX_FLAT
+            typePhysical: LayerPhysicalType.WATER_LAYER,
+            renderStyle: RenderStyle.TRIANGLE_FLAT
         }
 
         const layerData = {
@@ -56,13 +57,13 @@ export class UtkMap implements DataApi {
             thematic: [{
                 aggregation: ThematicAggregationLevel.AGGREGATION_POINT,
                 values: new Float32Array([
-                    1.0, 0.5, 0.5
+                    1.0, 0.5, 0.0
                 ]),
             },
             {
                 aggregation: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
                 values: new Float32Array([
-                    1.0, 2.0
+                    1.0, 0.0
                 ]),
             },
             {
@@ -80,7 +81,7 @@ export class UtkMap implements DataApi {
         const layer = this._layers.addLayer(layerInfo, layerData);
 
         if (layer) {
-            layer.buildRenderPass(this._renderer);
+            layer.buildPipeline(this._renderer);
         }
     }
 
@@ -90,7 +91,7 @@ export class UtkMap implements DataApi {
         if (layer) {
             layer.loadGeometry(layerData.geometry);
             layer.loadThematic(layerData.thematic);
-            layer.buildRenderPass(this._renderer);
+            layer.buildPipeline(this._renderer);
         }
     }
 
@@ -99,13 +100,13 @@ export class UtkMap implements DataApi {
 
         if (layer) {
             layer.loadThematic(layerThematic);
-            layer.buildRenderPass(this._renderer);
+            layer.buildPipeline(this._renderer);
         }
     }
 
     render() {
         // Starts the render
-        this._renderer.beginRender()
+        this._renderer.beginEncoder()
 
         // Add layers to render pass
         this._layers.layers.forEach(layer => {
@@ -113,7 +114,7 @@ export class UtkMap implements DataApi {
         });
 
         // Ends the render
-        this._renderer.endRender();
+        this._renderer.endEncoder();
 
         // Refresh canvas
         requestAnimationFrame(this.render.bind(this));
