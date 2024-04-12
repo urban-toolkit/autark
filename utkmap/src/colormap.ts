@@ -1,18 +1,18 @@
 import * as d3_scale from 'd3-scale-chromatic';
 import * as d3_color from 'd3-color';
 
-import { ColorHEX, ColorMapInterpolators, ColorRGB, ColorTEX } from './constants';
+import { ColorHEX, ColorMapInterpolator, ColorRGB, ColorTEX } from './constants';
 
 export class ColorMap {
 
-    protected static interpolator: (t: number) => string;
+    protected static _interpolator: (t: number) => string;
 
-    public static getColor(value: number, color: ColorMapInterpolators): ColorRGB {
+    public static getColor(value: number, color: ColorMapInterpolator): ColorRGB {
         if (d3_scale[color] != undefined) {
-            ColorMap.interpolator = d3_scale[color];
+            ColorMap._interpolator = d3_scale[color];
 
             const numberPattern = /\d+/g;
-            const rgbStr = ColorMap.interpolator(value).match(numberPattern);
+            const rgbStr = ColorMap._interpolator(value).match(numberPattern);
             if (rgbStr === null) {
                 return {r: 0, g: 0, b: 0, opacity: 1}
             }
@@ -29,7 +29,7 @@ export class ColorMap {
         }
     }
 
-    public static getColorMap(color: ColorMapInterpolators, res = 256): ColorTEX {
+    public static getColorMap(color: ColorMapInterpolator, res = 256): ColorTEX {
 
         const tex: number[] = []
 

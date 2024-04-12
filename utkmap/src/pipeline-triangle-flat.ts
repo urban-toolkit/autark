@@ -26,65 +26,65 @@ export class PipelineTriangleFlat extends Pipeline {
 
     updateVertexBuffers(mesh: any) {
         // vertex data
-        this._positionBuffer = this.renderer.device.createBuffer({
+        this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
             size: mesh.position.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
         
         // vertex data
-        this._thematicBuffer = this.renderer.device.createBuffer({
+        this._thematicBuffer = this._renderer.device.createBuffer({
             label: 'Thematic data buffer',
             size: mesh.thematic.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         // vertex data
-        this._indicesBuffer = this.renderer.device.createBuffer({
+        this._indicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
             size: mesh.indices.byteLength,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
 
-        this.renderer.device.queue.writeBuffer(this._positionBuffer, 0, mesh.position);
-        this.renderer.device.queue.writeBuffer(this._thematicBuffer, 0, mesh.thematic);
-        this.renderer.device.queue.writeBuffer(this._indicesBuffer,  0, mesh.indices );
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, mesh.position);
+        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, mesh.thematic);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer,  0, mesh.indices );
     }
 
     updateUniformBuffers(colors: any) {
         const color = new Float32Array(Object.values(colors.color));
-        this._cBuffer = this.renderer.device.createBuffer({
+        this._cBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
             size: color.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-        this.renderer.device.queue.writeBuffer(this._cBuffer, 0, color);
+        this._renderer.device.queue.writeBuffer(this._cBuffer, 0, color);
 
         const cMap = new Uint8Array(colors.colorMap);
-        this._cMapTexture = this.renderer.device.createTexture({
+        this._cMapTexture = this._renderer.device.createTexture({
             label: 'Colormap texture',
             size: { width: 256, height: 1 },
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
             format: 'rgba8unorm',
         });
-        this._cMapSampler = this.renderer.device.createSampler({
+        this._cMapSampler = this._renderer.device.createSampler({
             label: 'Fixed color buffer',
             magFilter: "linear",
             minFilter: "linear",
             addressModeU: "clamp-to-edge",
             addressModeV: "clamp-to-edge",
         });
-        this.renderer.device.queue.writeTexture({ texture: this._cMapTexture }, cMap, {}, { width: 256, height: 1 });
+        this._renderer.device.queue.writeTexture({ texture: this._cMapTexture }, cMap, {}, { width: 256, height: 1 });
 
         const isColorMap = new Float32Array([colors.isColorMap]);
-        const enableColorMap = this.renderer.device.createBuffer({
+        const enableColorMap = this._renderer.device.createBuffer({
             label: 'Enable colormap on reder',
             size: isColorMap.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-        this.renderer.device.queue.writeBuffer(enableColorMap, 0, isColorMap);
+        this._renderer.device.queue.writeBuffer(enableColorMap, 0, isColorMap);
 
-        this._bindGroupLayout = this.renderer.device.createBindGroupLayout({
+        this._bindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [{
                 binding: 0, // fixed color
                 visibility: GPUShaderStage.FRAGMENT,
@@ -104,7 +104,7 @@ export class PipelineTriangleFlat extends Pipeline {
             }]
         });
 
-        this._bindGroup = this.renderer.device.createBindGroup({
+        this._bindGroup = this._renderer.device.createBindGroup({
             layout: this._bindGroupLayout,
             entries: [{
                 binding: 0,
@@ -127,13 +127,13 @@ export class PipelineTriangleFlat extends Pipeline {
         const vsmDesc = {
             code: vertSrc
         };
-        this.vertModule = this.renderer.device.createShaderModule(vsmDesc);
+        this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
 
         // Fragment shader
         const fsmDesc = {
             code: fragSrc
         };
-        this.fragModule = this.renderer.device.createShaderModule(fsmDesc);
+        this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
     createPipeline() {
@@ -162,14 +162,14 @@ export class PipelineTriangleFlat extends Pipeline {
 
         // Vertex Shader
         const vertex: GPUVertexState = {
-            module: this.vertModule,
+            module: this._vertModule,
             entryPoint: 'main',
             buffers: [positionBufferDesc, thematicBufferDesc]
         };
 
         // Fragment Shader
         const fragment: GPUFragmentState = {
-            module: this.fragModule,
+            module: this._fragModule,
             entryPoint: 'main',
             targets: [{
                 format: 'bgra8unorm'
@@ -196,35 +196,35 @@ export class PipelineTriangleFlat extends Pipeline {
                 this._bindGroupLayout
             ]
         };
-        const layout = this.renderer.device.createPipelineLayout(pipelineLayoutDesc);
+        const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
 
         const pipelineDesc: GPURenderPipelineDescriptor = {
             layout, vertex, fragment, primitive, depthStencil
         };
-        this.pipeline = this.renderer.device.createRenderPipeline(pipelineDesc);
+        this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
     setRenderPass() {
         // Create a new pass commands encoder
-        const passEncoder = this.renderer.commandEncoder.beginRenderPass(this.renderer.renderPassDesc);
+        const passEncoder = this._renderer.commandEncoder.beginRenderPass(this._renderer.renderPassDesc);
 
         // sets the current pipeline
-        passEncoder.setPipeline(this.pipeline);
+        passEncoder.setPipeline(this._pipeline);
 
         // sets the viewport
         passEncoder.setViewport(
             0,
             0,
-            this.renderer.canvas.width,
-            this.renderer.canvas.height,
+            this._renderer.canvas.width,
+            this._renderer.canvas.height,
             0,
             1
         );
         passEncoder.setScissorRect(
             0,
             0,
-            this.renderer.canvas.width,
-            this.renderer.canvas.height
+            this._renderer.canvas.width,
+            this._renderer.canvas.height
         );
 
         // vertex buffers

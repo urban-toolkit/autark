@@ -9,3 +9,4 @@ export * from './colormap';
 export * from './map-style';
 export * from './key-events';
 export * from './constants';
+export * from './geo-utils';

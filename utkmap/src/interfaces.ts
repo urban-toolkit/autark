@@ -1,4 +1,4 @@
-import { ColorHEX, ColorMapInterpolators, LayerGeometryType, LayerPhysicalType, RenderPipeline, ThematicAggregationLevel } from "./constants";
+import { ColorHEX, ColorMapInterpolator, LayerGeometryType, LayerPhysicalType, RenderPipeline, ThematicAggregationLevel } from "./constants";
 
 export interface IMapStyle {
     land : ColorHEX;
@@ -18,12 +18,11 @@ export interface ILayerInfo {
 
 export interface ILayerRenderInfo {
     pipeline: RenderPipeline; // render Pipeline
-    colorMapInterpolator: ColorMapInterpolators; // used colormap
-
     isColorMap?: boolean; // is colormap enabled?
-    isPicking?: boolean; // is picking enabled?
+    colorMapInterpolator: ColorMapInterpolator; // used colormap
     isHighlight?: boolean; // is highlight enabled?
     highlightComps?: number[]; // what components?
+    isPicking?: boolean; // is picking enabled?
 }
 
 export interface ILayerData {
@@ -38,7 +37,7 @@ export interface ILayerGeometry {
 }
 
 export interface ILayerThematic {
-    aggregation: ThematicAggregationLevel,
+    level: ThematicAggregationLevel,
     values: Float32Array;
 }
 

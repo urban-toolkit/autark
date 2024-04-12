@@ -1,5 +1,5 @@
 import { ILayerInfo, ILayerRenderInfo } from "utkmap/src/interfaces"
-import { LayerGeometryType, LayerPhysicalType, RenderPipeline, ColorMapInterpolators, ThematicAggregationLevel } from "utkmap/src/constants"
+import { LayerGeometryType, LayerPhysicalType, RenderPipeline, ColorMapInterpolator, ThematicAggregationLevel } from "utkmap/src/constants"
 
 export const layerInfo: ILayerInfo = {
     id: 'roads.osm',
@@ -9,7 +9,7 @@ export const layerInfo: ILayerInfo = {
 
 export const layerRenderInfo: ILayerRenderInfo = {
     pipeline: RenderPipeline.TRIANGLE_FLAT,
-    colorMapInterpolator: ColorMapInterpolators.INTERPOLATE_BLUES,
+    colorMapInterpolator: ColorMapInterpolator.INTERPOLATOD_BLUES,
     isColorMap: true,
     isPicking: false
 }
@@ -42,19 +42,19 @@ export const layerData = {
         ])
     }],
     thematic: [{
-        aggregation: ThematicAggregationLevel.AGGREGATION_POINT,
+        level: ThematicAggregationLevel.AGGREGATION_POINT,
         values: new Float32Array([
             1.0, 0.5, 0.0
         ]),
     },
     {
-        aggregation: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
+        level: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
         values: new Float32Array([
             1.0, 0.0
         ]),
     },
     {
-        aggregation: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+        level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
         values: new Float32Array([
             0.75
         ]),

@@ -10,7 +10,7 @@ import dark from './styles/dark.json';
 
 export class MapStyle {
     // default color map
-    protected static default: IMapStyle = {
+    protected static _default: IMapStyle = {
         land: '#DFDFDF',
         roads: '#d9b504',
         parks: '#C3D0B2',
@@ -21,12 +21,12 @@ export class MapStyle {
     };
 
     // default color for unknown layers
-    protected static notFound: ColorHEX = "#FFFFFF";
+    protected static _notFound: ColorHEX = "#FFFFFF";
     // default highlight color
-    protected static highlight: ColorHEX = "#FFDD00";
+    protected static _highlight: ColorHEX = "#FFDD00";
 
     // custom style
-    protected static custom: IMapStyle = MapStyle.default;
+    protected static _custom: IMapStyle = MapStyle._default;
 
     /**
      * Get the feature color
@@ -34,8 +34,8 @@ export class MapStyle {
      */
     public static getColor(type: keyof IMapStyle): ColorRGB {
         // uses the default style if available
-        const style = MapStyle.custom || MapStyle.default;
-        const hex = style[type] || MapStyle.notFound; 
+        const style = MapStyle._custom || MapStyle._default;
+        const hex = style[type] || MapStyle._notFound; 
 
         return ColorMap.hexToRgb(hex);
     }
@@ -46,7 +46,7 @@ export class MapStyle {
      */
     // @ts-ignore
     public static setPredefinedStyle(style: string) {
-        let styleObj = MapStyle.default;
+        let styleObj = MapStyle._default;
 
         console.log(light);
 
@@ -57,10 +57,10 @@ export class MapStyle {
             styleObj = dark;
         }
 
-        MapStyle.custom = styleObj;
+        MapStyle._custom = styleObj;
     }
 
     public static getHighlightColor(): ColorRGB {
-        return ColorMap.hexToRgb(MapStyle.highlight);
+        return ColorMap.hexToRgb(MapStyle._highlight);
     }
 }
