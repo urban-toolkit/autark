@@ -32,9 +32,6 @@ export abstract class Pipeline {
         this.updateColorUniforms(color);
         this.updateCameraUniforms(camera);
 
-        console.log(camera.getModelViewMatrix());
-        console.log(camera.getProjectionMatrix());
-
         this.createPipeline();
     }
 
