@@ -2,29 +2,47 @@
 
 export class Renderer {
     // HTML Canvas reference
-    canvas: HTMLCanvasElement;
+    protected _canvas: HTMLCanvasElement;
 
-    // API Data Structures
-    adapter: GPUAdapter | null = null;
-    device!: GPUDevice;
+    // Physical GPU
+    protected _adapter: GPUAdapter | null = null;
+
+    // Logical GPU
+    protected _device!: GPUDevice;
 
     // WebGPU context
-    context!: any;
+    protected _context!: any;
 
     // Frame buffer
-    colorAttachment!: GPURenderPassColorAttachment;
+    protected _colorAttachment!: GPURenderPassColorAttachment;
 
     // Depth buffer
-    depthAttachment!: GPURenderPassDepthStencilAttachment;
+    protected _depthAttachment!: GPURenderPassDepthStencilAttachment;
 
     // Render pass encoder
-    renderPassDesc!: GPURenderPassDescriptor;
+    protected _renderPassDesc!: GPURenderPassDescriptor;
 
     // command encoder
-    commandEncoder!: GPUCommandEncoder;
+    protected _commandEncoder!: GPUCommandEncoder;
 
     constructor(canvas: HTMLCanvasElement) {
-        this.canvas = canvas;
+        this._canvas = canvas;
+    }
+
+    get canvas(): HTMLCanvasElement {
+        return this._canvas;
+    }
+
+    get device(): GPUDevice {
+        return this._device;
+    }
+
+    get renderPassDesc(): GPURenderPassDescriptor {
+        return this._renderPassDesc;
+    }
+
+    get commandEncoder(): GPUCommandEncoder {
+        return this._commandEncoder;
     }
 
     // Start the rendering engine
@@ -47,14 +65,14 @@ export class Renderer {
             }
 
             // Physical Device Adapter
-            this.adapter = await entry.requestAdapter();
-            console.log(this.adapter);
-            if (this.adapter === null) {
+            this._adapter = await entry.requestAdapter();
+            console.log(this._adapter);
+            if (this._adapter === null) {
                 return false;
             }
 
             // Logical Device
-            this.device = await this.adapter.requestDevice();
+            this._device = await this._adapter.requestDevice();
         } catch (e) {
             console.error(e);
             return false;
@@ -65,29 +83,29 @@ export class Renderer {
 
     // Configure the webgpu canvas context
     configureContext() {
-        if (!this.context) {
-            this.context = this.canvas.getContext('webgpu') as any;
+        if (!this._context) {
+            this._context = this._canvas.getContext('webgpu') as any;
         }
 
-        if (this.context) {
+        if (this._context) {
             const canvasConfig: GPUCanvasConfiguration = {
-                device: this.device,
+                device: this._device,
                 format: 'bgra8unorm',
                 usage:
                     GPUTextureUsage.RENDER_ATTACHMENT |
                     GPUTextureUsage.COPY_SRC,
                 alphaMode: 'opaque'
             };
-            this.context.configure(canvasConfig);
+            this._context.configure(canvasConfig);
         }
     }
 
     configureOutBuffers() {
         // Frame buffer definition
-        const colorTexture = this.context.getCurrentTexture();
+        const colorTexture = this._context.getCurrentTexture();
         const colorTextureView = colorTexture.createView();
 
-        this.colorAttachment = {
+        this._colorAttachment = {
             view: colorTextureView,
             clearValue: { r: 0, g: 0, b: 0, a: 1 },
             loadOp: 'clear',
@@ -96,15 +114,15 @@ export class Renderer {
 
         // Depth buffer definition
         const depthTextureDesc: GPUTextureDescriptor = {
-            size: [this.canvas.width, this.canvas.height, 1],
+            size: [this._canvas.width, this._canvas.height, 1],
             dimension: '2d',
             format: 'depth24plus-stencil8',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
         };
-        const depthTexture = this.device.createTexture(depthTextureDesc);
+        const depthTexture = this._device.createTexture(depthTextureDesc);
         const depthTextureView = depthTexture.createView();
 
-        this.depthAttachment = {
+        this._depthAttachment = {
             view: depthTextureView,
             depthClearValue: 1,
             depthLoadOp: 'clear',
@@ -117,7 +135,7 @@ export class Renderer {
 
     // Write commands to send to the GPU
     beginEncoder() {
-        if (!this.context) {
+        if (!this._context) {
             console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
             return;
         }
@@ -125,17 +143,17 @@ export class Renderer {
         this.configureOutBuffers();
 
         // Render pass description
-        this.renderPassDesc = {
-            colorAttachments: [this.colorAttachment],
-            depthStencilAttachment: this.depthAttachment
+        this._renderPassDesc = {
+            colorAttachments: [this._colorAttachment],
+            depthStencilAttachment: this._depthAttachment
         };
 
         // Create a new command encoder
-        this.commandEncoder = this.device.createCommandEncoder();
+        this._commandEncoder = this._device.createCommandEncoder();
     }
 
     endEncoder() {
         // Submit commands
-        this.device.queue.submit([this.commandEncoder.finish()]);
+        this._device.queue.submit([this._commandEncoder.finish()]);
     }
 }

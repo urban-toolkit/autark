@@ -56,7 +56,7 @@ export class TrianglesLayer extends Layer {
     loadThematic(layerThematic: ILayerThematic[]): void {
         const thematic = [];
         for (let compId = 0; compId < layerThematic.length; compId++) {
-            switch (layerThematic[compId].aggregation) {
+            switch (layerThematic[compId].level) {
                 case ThematicAggregationLevel.AGGREGATION_POINT:
                     thematic.push(...this.aggregateThematicPoint(layerThematic[compId]));
                     break;
@@ -67,7 +67,7 @@ export class TrianglesLayer extends Layer {
                     thematic.push(...this.aggregateThematicComponenet(compId, layerThematic[compId]));
                     break;
                 default:
-                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].aggregation}.`);
+                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].level}.`);
                     break;
             }
         }

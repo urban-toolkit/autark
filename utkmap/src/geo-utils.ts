@@ -2,6 +2,7 @@
 export abstract class GeoUtils {
     static res = 256.0;
     static wLevel = 22;
+
     /**
      * Converts from lat, lng to world coordinates
      * @param {number} latitude the latitude of the point

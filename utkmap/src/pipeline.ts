@@ -4,17 +4,17 @@ import { Renderer } from './renderer';
 
 export abstract class Pipeline {
     // shaders
-    vertModule!: GPUShaderModule;
-    fragModule!: GPUShaderModule;
+    protected _vertModule!: GPUShaderModule;
+    protected _fragModule!: GPUShaderModule;
 
     // render pipeline
-    pipeline!: GPURenderPipeline;
+    protected _pipeline!: GPURenderPipeline;
 
     // renderer reference
-    renderer: Renderer;
+    protected _renderer: Renderer;
 
     constructor(renderer: Renderer) {
-        this.renderer = renderer;
+        this._renderer = renderer;
     }
 
     build(mesh: any, color: any) {
