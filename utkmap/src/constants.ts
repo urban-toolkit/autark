@@ -16,9 +16,9 @@ export enum LayerPhysicalType {
 }
 
 export enum ThematicAggregationLevel {
-    AGGREGATION_POINT = 'aggregationPoint',
-    AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
-    AGGREGATION_COMPONENT  = 'aggregationComponent'
+    AGGREGATION_POINT = 'AGGREGATION_POINT',
+    AGGREGATION_PRIMITIVE = 'AGGREGATION_PRIMITIVE',
+    AGGREGATION_COMPONENT = 'AGGREGATION_COMPONENT'
 }
 
 export enum RenderPipeline {
