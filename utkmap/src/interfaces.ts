@@ -1,4 +1,4 @@
-import { ColorHEX, LayerGeometryType, LayerPhysicalType, RenderStyle, ThematicAggregationLevel } from "./constants";
+import { ColorHEX, ColorMapInterpolators, LayerGeometryType, LayerPhysicalType, RenderPipeline, ThematicAggregationLevel } from "./constants";
 
 export interface IMapStyle {
     land : ColorHEX;
@@ -14,8 +14,15 @@ export interface ILayerInfo {
     id: string; // layer id
     typeGeometry: LayerGeometryType; // layer geometry type
     typePhysical: LayerPhysicalType; // layer physical type
-    renderStyle: RenderStyle; // render style
-    highlight?: boolean; // is highlighted?
+}
+
+export interface ILayerRenderInfo {
+    pipeline: RenderPipeline; // render Pipeline
+    colorMapInterpolator: ColorMapInterpolators; // used colormap
+
+    isColorMap?: boolean; // is colormap enabled?
+    isPicking?: boolean; // is picking enabled?
+    isHighlight?: boolean; // is highlight enabled?
     highlightComps?: number[]; // what components?
 }
 

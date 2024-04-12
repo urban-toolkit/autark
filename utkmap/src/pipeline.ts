@@ -1,8 +1,8 @@
 /// <reference types="@webgpu/types" />
 
-import Renderer from './renderer';
+import { Renderer } from './renderer';
 
-export default abstract class Pipeline {
+export abstract class Pipeline {
     // shaders
     vertModule!: GPUShaderModule;
     fragModule!: GPUShaderModule;

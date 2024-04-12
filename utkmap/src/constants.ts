@@ -21,7 +21,7 @@ export enum ThematicAggregationLevel {
     AGGREGATION_COMPONENT  = 'aggregationComponent'
 }
 
-export enum RenderStyle {
+export enum RenderPipeline {
     TRIANGLE_FLAT = "TRIANGLE_FLAT",
 }
 

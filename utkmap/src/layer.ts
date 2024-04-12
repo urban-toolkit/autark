@@ -1,17 +1,16 @@
-import { ILayerData, ILayerGeometry, ILayerInfo, ILayerThematic } from './interfaces';
+import { ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
 
-import Renderer from './renderer';
+import { Renderer } from './renderer';
 
-export default abstract class Layer {
+export abstract class Layer {
     // layer id
     protected _info!: ILayerInfo;
-
     // picking shader
-    protected _picking: boolean;
+    protected _renderInfo!: ILayerRenderInfo;
 
-    constructor(layerInfo: ILayerInfo, picking: boolean) {
+    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
         this.loadInfo(layerInfo);
-        this._picking = picking;
+        this.loadRenderInfo(layerRenderInfo);
     }
 
     get id() {
@@ -22,12 +21,16 @@ export default abstract class Layer {
         return this._info;
     }
 
-    get picking() {
-        return this._picking;
+    get renderInfo() {
+        return this._renderInfo;
     }
 
     loadInfo(layerInfo: ILayerInfo) {
         this._info = layerInfo;
+    }
+
+    loadRenderInfo(layerRenderInfo: ILayerRenderInfo) {
+        this._renderInfo = layerRenderInfo;
     }
 
     abstract loadData(layerData: ILayerData): void;

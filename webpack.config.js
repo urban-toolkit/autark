@@ -15,6 +15,10 @@ module.exports = {
         ],
     },
 
+    resolve: {
+        extensions: ['.ts', '.js'],
+    },
+
     plugins: [new HtmlWebpackPlugin(
         {
             title: 'UTK demo app',

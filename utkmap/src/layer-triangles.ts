@@ -1,22 +1,23 @@
-import { ILayerData, ILayerGeometry, ILayerInfo, ILayerThematic } from "./interfaces";
+import { ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from "./interfaces";
 
-import Layer from "./layer";
-import Renderer from "./renderer";
-import PipelineTriangleFlat from "./pipeline-triangle-flat";
-import { ColorMapInterpolators, ThematicAggregationLevel } from "./constants";
+import { Layer } from "./layer";
 import { ColorMap } from "./colormap";
 import { MapStyle } from "./map-style";
+import { Renderer } from "./renderer";
+import { PipelineTriangleFlat } from "./pipeline-triangle-flat";
+import { ThematicAggregationLevel } from "./constants";
 
-export default class TrianglesLayer extends Layer {
+export class TrianglesLayer extends Layer {
     protected _position!: Float32Array;
     protected _thematic!: Float32Array;
     protected _indices!: Uint16Array;
+    
     protected _components: { nPoints: number, nTriangles: number }[] = [];
 
     protected _pipeline!: PipelineTriangleFlat;
 
-    constructor(layerInfo: ILayerInfo, layerData: ILayerData, picking: boolean = false) {
-        super(layerInfo, picking);
+    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+        super(layerInfo, layerRenderInfo);
         this.loadData(layerData);
     }
 
@@ -81,7 +82,8 @@ export default class TrianglesLayer extends Layer {
             indices:  this._indices
         }, {
             color: MapStyle.getColor(this._info.typePhysical),
-            cMap: ColorMap.getColorMap(ColorMapInterpolators.INTERPOLATE_REDS)
+            colorMap: ColorMap.getColorMap(this._renderInfo.colorMapInterpolator),
+            isColorMap: this._renderInfo.isColorMap
         });
     }
 

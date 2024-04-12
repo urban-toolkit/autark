@@ -4,6 +4,8 @@ import { utkRun } from 'utkrun';
 
 import { UtkMap } from 'utkmap';
 
+import { layerInfo, layerRenderInfo, layerData } from './dataset';
+
 console.log(utk());
 console.log(utkDb());
 console.log(utkRun());
@@ -14,6 +16,9 @@ async function main() {
     
     const map = new UtkMap(canvas);
     await map.init();
+
+    map.loadLayer(layerInfo, layerRenderInfo, layerData);
+
     map.render();
 }
 

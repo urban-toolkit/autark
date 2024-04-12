@@ -3,10 +3,10 @@
 import vertSrc from './shaders/triangles.vert.wgsl';
 import fragSrc from './shaders/triangles.frag.wgsl';
 
-import Pipeline from "./pipeline";
-import Renderer from "./renderer";
+import { Pipeline } from "./pipeline";
+import { Renderer } from "./renderer";
 
-export default class PipelineTriangleFlat extends Pipeline {
+export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
     protected _positionBuffer!: GPUBuffer;
     protected _thematicBuffer!: GPUBuffer;
@@ -60,7 +60,7 @@ export default class PipelineTriangleFlat extends Pipeline {
         });
         this.renderer.device.queue.writeBuffer(this._cBuffer, 0, color);
 
-        const cMap = new Uint8Array(colors.cMap);
+        const cMap = new Uint8Array(colors.colorMap);
         this._cMapTexture = this.renderer.device.createTexture({
             label: 'Colormap texture',
             size: { width: 256, height: 1 },
@@ -76,13 +76,13 @@ export default class PipelineTriangleFlat extends Pipeline {
         });
         this.renderer.device.queue.writeTexture({ texture: this._cMapTexture }, cMap, {}, { width: 256, height: 1 });
 
-        const thematicSize = new Float32Array([0.0]);
-        const showThematic = this.renderer.device.createBuffer({
-            label: 'Show thematic cmap',
-            size: thematicSize.byteLength,
+        const isColorMap = new Float32Array([colors.isColorMap]);
+        const enableColorMap = this.renderer.device.createBuffer({
+            label: 'Enable colormap on reder',
+            size: isColorMap.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-        this.renderer.device.queue.writeBuffer(showThematic, 0, thematicSize);
+        this.renderer.device.queue.writeBuffer(enableColorMap, 0, isColorMap);
 
         this._bindGroupLayout = this.renderer.device.createBindGroupLayout({
             entries: [{
@@ -117,7 +117,7 @@ export default class PipelineTriangleFlat extends Pipeline {
                 resource: this._cMapSampler,
             }, {
                 binding: 3,
-                resource: { buffer: showThematic },
+                resource: { buffer: enableColorMap },
             }],
         });
     }

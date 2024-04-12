@@ -1,10 +1,10 @@
-import { ILayerData, ILayerInfo } from "./interfaces";
+import { ILayerData, ILayerInfo, ILayerRenderInfo } from "./interfaces";
 import { LayerGeometryType } from "./constants";
 
-import Layer from "./layer";
-import TrianglesLayer from "./layer-triangles";
+import { Layer } from "./layer";
+import { TrianglesLayer } from "./layer-triangles";
 
-export default class LayerManager {
+export class LayerManager {
     protected _layers: Layer[] = [];
 
     constructor() { }
@@ -13,13 +13,13 @@ export default class LayerManager {
         return this._layers;
     }
 
-    addLayer(layerInfo: ILayerInfo, layerData: ILayerData): Layer | null {
+    addLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): Layer | null {
         let layer = null;
 
         // loads based on type
         switch (layerInfo.typeGeometry) {
             case LayerGeometryType.TRIGMESH_LAYER:
-                layer = new TrianglesLayer(layerInfo, layerData);
+                layer = new TrianglesLayer(layerInfo, layerRender, layerData);
             break;
             default:
                 console.error(`File ${layerInfo.id}.json has an unknown layer type: ${layerInfo.typeGeometry}.`);

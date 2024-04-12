@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-export default class Renderer {
+export class Renderer {
     // HTML Canvas reference
     canvas: HTMLCanvasElement;
 
