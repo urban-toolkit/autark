@@ -1,3 +1,4 @@
+import { Camera } from './camera';
 import { ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
 
 import { Renderer } from './renderer';
@@ -39,7 +40,7 @@ export abstract class Layer {
 
     abstract loadThematic(layerThematic: ILayerThematic[]): void;
 
-    abstract buildPipeline(renderer: Renderer): void;
+    abstract buildPipeline(renderer: Renderer, camera: Camera): void;
 
     abstract setRenderPass(): void;
 }

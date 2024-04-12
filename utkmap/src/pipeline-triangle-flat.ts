@@ -6,6 +6,9 @@ import fragSrc from './shaders/triangles.frag.wgsl';
 import { Pipeline } from "./pipeline";
 import { Renderer } from "./renderer";
 
+import { IShaderColorData } from './interfaces';
+import { TrianglesLayer } from './layer-triangles';
+
 export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
     protected _positionBuffer!: GPUBuffer;
@@ -17,14 +20,14 @@ export class PipelineTriangleFlat extends Pipeline {
     protected _cMapTexture!: GPUTexture;
     protected _cMapSampler!: GPUSampler;
    
-    protected _bindGroup!: GPUBindGroup;
-    protected _bindGroupLayout!: GPUBindGroupLayout;
+    protected _colorsBindGroup!: GPUBindGroup;
+    protected _colorsBindGroupLayout!: GPUBindGroupLayout;
 
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
-    updateVertexBuffers(mesh: any) {
+    updateVertexBuffers(mesh: TrianglesLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -51,14 +54,20 @@ export class PipelineTriangleFlat extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._indicesBuffer,  0, mesh.indices );
     }
 
-    updateUniformBuffers(colors: any) {
+    updateColorUniforms(colors: IShaderColorData) {
         const color = new Float32Array(Object.values(colors.color));
         this._cBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
             size: color.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-        this._renderer.device.queue.writeBuffer(this._cBuffer, 0, color);
+
+        const isColorMap = new Float32Array([colors.isColorMap ? 1.0 : 0.0]);
+        const enableColorMap = this._renderer.device.createBuffer({
+            label: 'Enable colormap on reder',
+            size: isColorMap.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
 
         const cMap = new Uint8Array(colors.colorMap);
         this._cMapTexture = this._renderer.device.createTexture({
@@ -74,50 +83,45 @@ export class PipelineTriangleFlat extends Pipeline {
             addressModeU: "clamp-to-edge",
             addressModeV: "clamp-to-edge",
         });
+
+        this._renderer.device.queue.writeBuffer(this._cBuffer, 0, color);
+        this._renderer.device.queue.writeBuffer(enableColorMap, 0, isColorMap);
         this._renderer.device.queue.writeTexture({ texture: this._cMapTexture }, cMap, {}, { width: 256, height: 1 });
 
-        const isColorMap = new Float32Array([colors.isColorMap]);
-        const enableColorMap = this._renderer.device.createBuffer({
-            label: 'Enable colormap on reder',
-            size: isColorMap.byteLength,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-        });
-        this._renderer.device.queue.writeBuffer(enableColorMap, 0, isColorMap);
-
-        this._bindGroupLayout = this._renderer.device.createBindGroupLayout({
+        this._colorsBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [{
                 binding: 0, // fixed color
                 visibility: GPUShaderStage.FRAGMENT,
                 buffer: {},
             }, {
-                binding: 1, // cMap texture
+                binding: 1, // show thematic data
+                visibility: GPUShaderStage.FRAGMENT,
+                buffer: {},
+            }, {
+                binding: 2, // cMap texture
                 visibility: GPUShaderStage.FRAGMENT,
                 texture: {},
             }, {
-                binding: 2, // cMap sampler
+                binding: 3, // cMap sampler
                 visibility: GPUShaderStage.FRAGMENT,
                 sampler: {},
-            }, {
-                binding: 3, // show thematic data
-                visibility: GPUShaderStage.FRAGMENT,
-                buffer: {},
             }]
         });
 
-        this._bindGroup = this._renderer.device.createBindGroup({
-            layout: this._bindGroupLayout,
+        this._colorsBindGroup = this._renderer.device.createBindGroup({
+            layout: this._colorsBindGroupLayout,
             entries: [{
                 binding: 0,
                 resource: { buffer: this._cBuffer },
             }, {
                 binding: 1,
-                resource: this._cMapTexture.createView(),
+                resource: { buffer: enableColorMap },
             }, {
                 binding: 2,
-                resource: this._cMapSampler,
+                resource: this._cMapTexture.createView(),
             }, {
                 binding: 3,
-                resource: { buffer: enableColorMap },
+                resource: this._cMapSampler,
             }],
         });
     }
@@ -193,7 +197,8 @@ export class PipelineTriangleFlat extends Pipeline {
         // Uniform Data
         const pipelineLayoutDesc = {
             bindGroupLayouts: [
-                this._bindGroupLayout
+                this._colorsBindGroupLayout,
+                this._matricesBindGroupLayout
             ]
         };
         const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
@@ -234,7 +239,8 @@ export class PipelineTriangleFlat extends Pipeline {
         passEncoder.setIndexBuffer(this._indicesBuffer, 'uint16');
 
         // uniforms buffer
-        passEncoder.setBindGroup(0, this._bindGroup);
+        passEncoder.setBindGroup(0, this._colorsBindGroup);
+        passEncoder.setBindGroup(1, this._matricesBindGroup);
 
         // draw command
         passEncoder.drawIndexed(this._indicesBuffer.size / Uint16Array.BYTES_PER_ELEMENT);

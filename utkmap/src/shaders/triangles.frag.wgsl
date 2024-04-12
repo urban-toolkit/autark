@@ -1,7 +1,7 @@
 @group(0) @binding(0) var<uniform> color : vec4f;
-@group(0) @binding(1) var cMapTex : texture_2d<f32>;
-@group(0) @binding(2) var cMapSampler : sampler;
-@group(0) @binding(3) var<uniform> showThematic : f32;
+@group(0) @binding(1) var<uniform> showThematic : f32;
+@group(0) @binding(2) var cMapTex : texture_2d<f32>;
+@group(0) @binding(3) var cMapSampler : sampler;
 
 @fragment 
 fn main(@location(0) inThematic: f32) -> @location(0) vec4f {

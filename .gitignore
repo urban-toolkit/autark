@@ -3,6 +3,10 @@ utk*/dist/
 utk*/src/*.js
 utk*/package-lock.json
 
+ utkpy/__pycache__
+ utkpy/.ipynb_checkpoints
+ utkpy/.venv
+
 package-lock.json
 demo/*.js
 

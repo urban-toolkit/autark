@@ -29,16 +29,16 @@ export class Camera {
     private viewportHeight: number = 0;
 
     private static defaultParams: ICameraData = {
-        wOrigin: [0, 0, 0],
+        origin: [0, 0, 0],
         direction: {
-            wUp: [0, 1, 0],
-            wEye: [0, 0, 1000],
-            wLookAt: [0, 0, 0]
+            up: [0, 1, 0],
+            eye: [0, 0, 1000],
+            lookAt: [0, 0, 0]
         }
     }
 
     constructor(params: ICameraData = Camera.defaultParams, updateStatusCallback: any = 0) {
-        this.resetCamera(params.wOrigin, params.direction.wUp, params.direction.wLookAt, params.direction.wEye, updateStatusCallback);
+        this.resetCamera(params.origin, params.direction.up, params.direction.lookAt, params.direction.eye, updateStatusCallback);
     }
 
     resetCamera(initialPosition: number[], wUp: number[], wLookAt: number[], wEye: number[], updateStatusCallback: any): void {

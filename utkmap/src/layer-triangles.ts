@@ -6,12 +6,13 @@ import { MapStyle } from "./map-style";
 import { Renderer } from "./renderer";
 import { PipelineTriangleFlat } from "./pipeline-triangle-flat";
 import { ThematicAggregationLevel } from "./constants";
+import { Camera } from "./camera";
 
 export class TrianglesLayer extends Layer {
     protected _position!: Float32Array;
     protected _thematic!: Float32Array;
     protected _indices!: Uint16Array;
-    
+
     protected _components: { nPoints: number, nTriangles: number }[] = [];
 
     protected _pipeline!: PipelineTriangleFlat;
@@ -21,10 +22,22 @@ export class TrianglesLayer extends Layer {
         this.loadData(layerData);
     }
 
+    get position(): Float32Array {
+        return this._position;
+    }
+
+    get thematic(): Float32Array {
+        return this._thematic;
+    }
+
+    get indices(): Uint16Array {
+        return this._indices;
+    }
+
     loadData(layerData: ILayerData) {
         this.loadGeometry(layerData.geometry);
 
-        if(layerData.thematic.length) {
+        if (layerData.thematic.length) {
             this.loadThematic(layerData.thematic);
         }
     }
@@ -74,16 +87,12 @@ export class TrianglesLayer extends Layer {
         this._thematic = new Float32Array(thematic);
     }
 
-    buildPipeline(renderer: Renderer) {
-        this._pipeline  = new PipelineTriangleFlat(renderer);
-        this._pipeline.build({
-            position: this._position,
-            thematic: this._thematic,
-            indices:  this._indices
-        }, {
+    buildPipeline(renderer: Renderer, camera: Camera) {
+        this._pipeline = new PipelineTriangleFlat(renderer);
+        this._pipeline.build(this, camera, {
             color: MapStyle.getColor(this._info.typePhysical),
             colorMap: ColorMap.getColorMap(this._renderInfo.colorMapInterpolator),
-            isColorMap: this._renderInfo.isColorMap
+            isColorMap: <boolean>this._renderInfo.isColorMap
         });
     }
 

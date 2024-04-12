@@ -37,7 +37,7 @@ export class UtkMap {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
 
         if (layer) {
-            layer.buildPipeline(this._renderer);
+            layer.buildPipeline(this._renderer, this._camera);
         }
     }
 
@@ -46,7 +46,7 @@ export class UtkMap {
         
         if (layer) {
             layer.loadRenderInfo(layerRenderInfo);
-            layer.buildPipeline(this._renderer);
+            layer.buildPipeline(this._renderer, this._camera);
         }
     }
 
@@ -56,7 +56,7 @@ export class UtkMap {
         if (layer) {
             layer.loadGeometry(layerData.geometry);
             layer.loadThematic(layerData.thematic);
-            layer.buildPipeline(this._renderer);
+            layer.buildPipeline(this._renderer, this._camera);
         }
     }
 
@@ -65,7 +65,7 @@ export class UtkMap {
 
         if (layer) {
             layer.loadThematic(layerThematic);
-            layer.buildPipeline(this._renderer);
+            layer.buildPipeline(this._renderer, this._camera);
         }
     }
 

@@ -1,4 +1,6 @@
-import { ColorHEX, ColorMapInterpolator, LayerGeometryType, LayerPhysicalType, RenderPipeline, ThematicAggregationLevel } from "./constants";
+import { Color } from "d3-color";
+import { ColorHEX, ColorMapInterpolator, ColorRGB, ColorTEX, LayerGeometryType, LayerPhysicalType, RenderPipeline, ThematicAggregationLevel } from "./constants";
+import { ColorMap } from "./colormap";
 
 export interface IMapStyle {
     land: ColorHEX;
@@ -41,12 +43,18 @@ export interface ILayerThematic {
     values: Float32Array; // data values
 }
 
+export interface IShaderColorData {
+    color: ColorRGB,     // fixed color used in the layer
+    colorMap: ColorTEX   // colormap texture used to show thematic values
+    isColorMap: boolean, // is colormap active? 
+}
+
 export interface ICameraData {
-    wOrigin: number[]; // camera position and look at
-    direction: { 
-        wUp: number[]
-        wEye: number[],
-        wLookAt: number[],
+    origin: number[]; // camera position and look at
+    direction: {
+        up: number[]
+        eye: number[],
+        lookAt: number[],
     } // default: right: 0, 0, 1000. lookAt: 0, 0, 0. up: 0, 1, 0
 }
 
