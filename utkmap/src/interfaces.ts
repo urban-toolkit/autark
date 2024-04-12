@@ -1,12 +1,12 @@
 import { ColorHEX, ColorMapInterpolator, LayerGeometryType, LayerPhysicalType, RenderPipeline, ThematicAggregationLevel } from "./constants";
 
 export interface IMapStyle {
-    land : ColorHEX;
+    land: ColorHEX;
     roads: ColorHEX;
     parks: ColorHEX;
     water: ColorHEX;
-    sky  : ColorHEX;
-    surface  : ColorHEX;
+    sky: ColorHEX;
+    surface: ColorHEX;
     buildings: ColorHEX;
 }
 
@@ -37,7 +37,16 @@ export interface ILayerGeometry {
 }
 
 export interface ILayerThematic {
-    level: ThematicAggregationLevel,
-    values: Float32Array;
+    level: ThematicAggregationLevel, // aggregation level
+    values: Float32Array; // data values
+}
+
+export interface ICameraData {
+    wOrigin: number[]; // camera position and look at
+    direction: { 
+        wUp: number[]
+        wEye: number[],
+        wLookAt: number[],
+    } // default: right: 0, 0, 1000. lookAt: 0, 0, 0. up: 0, 1, 0
 }
 

@@ -1,22 +1,23 @@
 /// <reference types="@webgpu/types" />
 
-import { ILayerData, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
+import { ICameraData, ILayerData, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
 
+import { Camera } from './camera';
 import { Renderer } from './renderer';
-import { LayerManager } from './layer-manager';
 import { KeyEvents } from './key-events';
+import { LayerManager } from './layer-manager';
 
 export class UtkMap {
+    protected _camera: Camera;
     protected _renderer: Renderer;
+    protected _keyEvents: KeyEvents;
     protected _layerManager: LayerManager;
 
-    protected _keyEvents: KeyEvents;
-
     constructor(canvas: HTMLCanvasElement) {
+        this._camera = new Camera();
         this._renderer = new Renderer(canvas);
-        this._layerManager = new LayerManager();
-
         this._keyEvents = new KeyEvents(this);
+        this._layerManager = new LayerManager();
     }
 
     get layerManager() {
@@ -26,6 +27,10 @@ export class UtkMap {
     async init() {
         await this._renderer.init();
         this._keyEvents.bindEvents();
+    }
+
+    loadCamera(params: ICameraData) {
+        this._camera = new Camera(params, /*this._updateStatusCallback*/);
     }
 
     loadLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {

@@ -1,5 +1,5 @@
 
-export abstract class GeoUtils {
+export class GeoUtils {
     static res = 256.0;
     static wLevel = 22;
 
