@@ -8,6 +8,7 @@ import { Renderer } from "./renderer";
 
 import { IShaderColorData } from './interfaces';
 import { TrianglesLayer } from './layer-triangles';
+import { Camera } from './camera';
 
 export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
@@ -209,7 +210,11 @@ export class PipelineTriangleFlat extends Pipeline {
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
-    setRenderPass() {
+    setRenderPass(camera: Camera) {
+        //  update camera
+        // camera.update();
+        // this.updateCameraUniforms(camera);
+
         // Create a new pass commands encoder
         const passEncoder = this._renderer.commandEncoder.beginRenderPass(this._renderer.renderPassDesc);
 
@@ -236,14 +241,14 @@ export class PipelineTriangleFlat extends Pipeline {
         passEncoder.setVertexBuffer(0, this._positionBuffer);
         passEncoder.setVertexBuffer(1, this._thematicBuffer);
         // primitive indices buffer
-        passEncoder.setIndexBuffer(this._indicesBuffer, 'uint16');
+        passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');
 
         // uniforms buffer
         passEncoder.setBindGroup(0, this._colorsBindGroup);
         passEncoder.setBindGroup(1, this._matricesBindGroup);
 
         // draw command
-        passEncoder.drawIndexed(this._indicesBuffer.size / Uint16Array.BYTES_PER_ELEMENT);
+        passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
         passEncoder.end();
     }
 }

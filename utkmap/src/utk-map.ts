@@ -30,7 +30,7 @@ export class UtkMap {
     }
 
     loadCamera(params: ICameraData) {
-        this._camera = new Camera(params, /*this._updateStatusCallback*/);
+        this._camera = new Camera(params);
     }
 
     loadLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
@@ -75,7 +75,7 @@ export class UtkMap {
 
         // Add layers to render pass
         this._layerManager.layers.forEach(layer => {
-            layer.setRenderPass();
+            layer.setRenderPass(this._camera);
         });
 
         // Ends the render
