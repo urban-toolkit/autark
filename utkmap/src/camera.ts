@@ -37,18 +37,16 @@ export class Camera {
         }
     }
 
-    constructor(params: ICameraData = Camera.defaultParams, updateStatusCallback: any = 0) {
-        this.resetCamera(params.origin, params.direction.up, params.direction.lookAt, params.direction.eye, updateStatusCallback);
+    constructor(params: ICameraData = Camera.defaultParams) {
+        this.resetCamera(params.origin, params.direction.up, params.direction.lookAt, params.direction.eye);
     }
 
-    resetCamera(initialPosition: number[], wUp: number[], wLookAt: number[], wEye: number[], updateStatusCallback: any): void {
+    resetCamera(initialPosition: number[], wUp: number[], wLookAt: number[], wEye: number[]): void {
         this.wEyeDir = vec3.create();
         this.fovy = 45 * Math.PI / 180.0;
         this.mProjectionMatrix = mat4.create();
         this.mViewMatrix = mat4.create();
         this.mModelMatrix = mat4.create();
-
-        this._updateStatusCallback = updateStatusCallback;
 
         // z-values start from here are in meters
         this.wNear = 1;
@@ -196,8 +194,6 @@ export class Camera {
         // TODO: get the aspect ratio from canvas?
         // mat4.ortho(this.mProjectionMatrix, -4500, 4500, -4500, 4500, -1500, this.wFar);
         mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
-
-        this._updateStatusCallback("camera", { position: [this.wOrigin[0], this.wOrigin[1], this.wEye[2] / 1000], direction: { right: [this.wEye[0], this.wEye[1], this.wEye[2]], lookAt: [this.wLookAt[0], this.wLookAt[1], this.wLookAt[2]], up: [this.wUp[0], this.wUp[1], this.wUp[2]] } });
     }
 
     loadPosition(state: any): void {

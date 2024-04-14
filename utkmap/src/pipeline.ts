@@ -74,5 +74,5 @@ export abstract class Pipeline {
 
     abstract createShaders(): void;
 
-    abstract setRenderPass(nElems: number): void;
+    abstract setRenderPass(camera: Camera): void;
 }

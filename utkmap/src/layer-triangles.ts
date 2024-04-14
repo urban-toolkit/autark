@@ -11,7 +11,7 @@ import { Camera } from "./camera";
 export class TrianglesLayer extends Layer {
     protected _position!: Float32Array;
     protected _thematic!: Float32Array;
-    protected _indices!: Uint16Array;
+    protected _indices!: Uint32Array;
 
     protected _components: { nPoints: number, nTriangles: number }[] = [];
 
@@ -30,7 +30,7 @@ export class TrianglesLayer extends Layer {
         return this._thematic;
     }
 
-    get indices(): Uint16Array {
+    get indices(): Uint32Array {
         return this._indices;
     }
 
@@ -51,7 +51,7 @@ export class TrianglesLayer extends Layer {
 
             if (layerGeometry[id].indices !== undefined) {
                 const fix = layerGeometry[id].indices?.map(a => a + indices.length)
-                indices.push(...<Uint16Array>fix);
+                indices.push(...<Uint32Array>fix);
             }
 
             const component = {
@@ -62,8 +62,10 @@ export class TrianglesLayer extends Layer {
         }
 
         this._position = new Float32Array(position);
-        this._indices = new Uint16Array(indices);
+        this._indices = new Uint32Array(indices);
         this._thematic = new Float32Array(0);
+
+        console.log(this);
     }
 
     loadThematic(layerThematic: ILayerThematic[]): void {
@@ -96,8 +98,8 @@ export class TrianglesLayer extends Layer {
         });
     }
 
-    setRenderPass() {
-        this._pipeline.setRenderPass();
+    setRenderPass(camera: Camera) {
+        this._pipeline.setRenderPass(camera);
     }
 
     private aggregateThematicPoint(layerThematic: ILayerThematic): Float32Array {

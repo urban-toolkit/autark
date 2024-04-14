@@ -42,5 +42,5 @@ export abstract class Layer {
 
     abstract buildPipeline(renderer: Renderer, camera: Camera): void;
 
-    abstract setRenderPass(): void;
+    abstract setRenderPass(camera: Camera): void;
 }
