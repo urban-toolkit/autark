@@ -6,15 +6,15 @@ import { TrianglesLayer } from './layer-triangles';
 import { Renderer } from './renderer';
 
 export abstract class Pipeline {
+    // renderer reference
+    protected _renderer: Renderer;
+
     // shaders
     protected _vertModule!: GPUShaderModule;
     protected _fragModule!: GPUShaderModule;
 
     // render pipeline
     protected _pipeline!: GPURenderPipeline;
-
-    // renderer reference
-    protected _renderer: Renderer;
 
     // Transformation matrices uniform buffer
     protected _matricesBuffer!: GPUBuffer;
@@ -74,5 +74,5 @@ export abstract class Pipeline {
 
     abstract createShaders(): void;
 
-    abstract setRenderPass(camera: Camera): void;
+    abstract renderPass(): void;
 }

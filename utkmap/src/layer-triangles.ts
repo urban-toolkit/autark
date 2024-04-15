@@ -98,8 +98,12 @@ export class TrianglesLayer extends Layer {
         });
     }
 
-    setRenderPass(camera: Camera) {
-        this._pipeline.setRenderPass(camera);
+    updateCamera(camera: Camera): void {
+        this._pipeline.updateCameraUniforms(camera);
+    }
+
+    renderPass() {
+        this._pipeline.renderPass();
     }
 
     private aggregateThematicPoint(layerThematic: ILayerThematic): Float32Array {

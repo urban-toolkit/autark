@@ -4,26 +4,17 @@ export class Renderer {
     // HTML Canvas reference
     protected _canvas: HTMLCanvasElement;
 
-    // Physical GPU
-    protected _adapter: GPUAdapter | null = null;
-
     // Logical GPU
     protected _device!: GPUDevice;
 
     // WebGPU context
-    protected _context!: any;
+    protected _context!: GPUCanvasContext;
 
     // Frame buffer
-    protected _colorAttachment!: GPURenderPassColorAttachment;
+    protected _frameBuffer!: GPURenderPassColorAttachment;
 
     // Depth buffer
-    protected _depthAttachment!: GPURenderPassDepthStencilAttachment;
-
-    // Render pass encoder
-    protected _renderPassDesc!: GPURenderPassDescriptor;
-
-    // command encoder
-    protected _commandEncoder!: GPUCommandEncoder;
+    protected _depthBuffer!: GPURenderPassDepthStencilAttachment;
 
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
@@ -37,26 +28,30 @@ export class Renderer {
         return this._device;
     }
 
-    get renderPassDesc(): GPURenderPassDescriptor {
-        return this._renderPassDesc;
+    get context(): GPUCanvasContext {
+        return this._context;
     }
 
-    get commandEncoder(): GPUCommandEncoder {
-        return this._commandEncoder;
+    get frameBuffer(): GPURenderPassColorAttachment {
+        return this._frameBuffer;
+    }
+
+    get depthBuffer(): GPURenderPassDepthStencilAttachment {
+        return this._depthBuffer;
     }
 
     // Start the rendering engine
     async init() {
-        const api = await this.initAPI()
+        const api = await this.initWebGPU()
 
         if (api) {
             this.configureContext();
-            this.configureOutBuffers();
+            this.configureFrameAndDepth();
         }
     }
 
     // Initialize WebGPU
-    async initAPI(): Promise<boolean> {
+    async initWebGPU(): Promise<boolean> {
         try {
             // Access to the WebGPU object
             const entry: GPU = navigator.gpu;
@@ -65,14 +60,14 @@ export class Renderer {
             }
 
             // Physical Device Adapter
-            this._adapter = await entry.requestAdapter();
-            console.log(this._adapter);
-            if (this._adapter === null) {
+            const adapter = await entry.requestAdapter();
+            console.log(adapter);
+            if (adapter === null) {
                 return false;
             }
 
             // Logical Device
-            this._device = await this._adapter.requestDevice();
+            this._device = await adapter.requestDevice();
         } catch (e) {
             console.error(e);
             return false;
@@ -100,12 +95,12 @@ export class Renderer {
         }
     }
 
-    configureOutBuffers() {
+    configureFrameAndDepth() {
         // Frame buffer definition
         const colorTexture = this._context.getCurrentTexture();
         const colorTextureView = colorTexture.createView();
 
-        this._colorAttachment = {
+        this._frameBuffer = {
             view: colorTextureView,
             clearValue: { r: 0, g: 0, b: 0, a: 1 },
             loadOp: 'clear',
@@ -122,7 +117,7 @@ export class Renderer {
         const depthTexture = this._device.createTexture(depthTextureDesc);
         const depthTextureView = depthTexture.createView();
 
-        this._depthAttachment = {
+        this._depthBuffer = {
             view: depthTextureView,
             depthClearValue: 1,
             depthLoadOp: 'clear',
@@ -131,29 +126,5 @@ export class Renderer {
             stencilLoadOp: 'clear',
             stencilStoreOp: 'store'
         };
-    }
-
-    // Write commands to send to the GPU
-    beginEncoder() {
-        if (!this._context) {
-            console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
-            return;
-        }
-        // Frame and depth buffers
-        this.configureOutBuffers();
-
-        // Render pass description
-        this._renderPassDesc = {
-            colorAttachments: [this._colorAttachment],
-            depthStencilAttachment: this._depthAttachment
-        };
-
-        // Create a new command encoder
-        this._commandEncoder = this._device.createCommandEncoder();
-    }
-
-    endEncoder() {
-        // Submit commands
-        this._device.queue.submit([this._commandEncoder.finish()]);
     }
 }

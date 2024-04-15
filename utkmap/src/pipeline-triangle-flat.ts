@@ -202,21 +202,36 @@ export class PipelineTriangleFlat extends Pipeline {
                 this._matricesBindGroupLayout
             ]
         };
+        
+        // Pipeline
         const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
-
         const pipelineDesc: GPURenderPipelineDescriptor = {
             layout, vertex, fragment, primitive, depthStencil
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
-    setRenderPass(camera: Camera) {
-        //  update camera
-        // camera.update();
-        // this.updateCameraUniforms(camera);
+    renderPass() {
+        if (!this._renderer.context) {
+            console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
+            return;
+        }
 
+        // udpate current the frame buffer texture
+        const colorTexture = this._renderer.context.getCurrentTexture();
+        const colorTextureView = colorTexture.createView();
+        this._renderer.frameBuffer.view = colorTextureView;
+
+        // Render pass description
+        const renderPassDesc = {
+            colorAttachments: [this._renderer.frameBuffer],
+            depthStencilAttachment: this._renderer.depthBuffer
+        };
+
+        // Create a new command encoder
+        const commandEncoder = this._renderer.device.createCommandEncoder();
         // Create a new pass commands encoder
-        const passEncoder = this._renderer.commandEncoder.beginRenderPass(this._renderer.renderPassDesc);
+        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
@@ -250,5 +265,8 @@ export class PipelineTriangleFlat extends Pipeline {
         // draw command
         passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
         passEncoder.end();
+
+        // Submit commands
+        this._renderer.device.queue.submit([commandEncoder.finish()]);
     }
 }
