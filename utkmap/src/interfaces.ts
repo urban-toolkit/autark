@@ -33,14 +33,14 @@ export interface ILayerData {
 }
 
 export interface ILayerGeometry {
-    position: Float32Array;  // coordinate of the points
-    normal?: Float32Array;   // normals of the points
-    indices?: Uint32Array;   // ids of the vertices
+    position: number[];  // coordinate of the points
+    normal?: number[];   // normals of the points
+    indices?: number[];  // ids of the vertices
 }
 
 export interface ILayerThematic {
     level: ThematicAggregationLevel, // aggregation level
-    values: Float32Array; // data values
+    values: number[]; // data values
 }
 
 export interface IShaderColorData {

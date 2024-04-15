@@ -8,6 +8,7 @@ import { Renderer } from "./renderer";
 
 import { IShaderColorData } from './interfaces';
 import { TrianglesLayer } from './layer-triangles';
+import { Camera } from './camera';
 
 export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
@@ -27,34 +28,34 @@ export class PipelineTriangleFlat extends Pipeline {
         super(renderer);
     }
 
-    updateVertexBuffers(mesh: TrianglesLayer) {
+    buildVertexBuffers(mesh: TrianglesLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
-            size: mesh.position.byteLength,
+            size: mesh.position.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-        
+
         // vertex data
         this._thematicBuffer = this._renderer.device.createBuffer({
             label: 'Thematic data buffer',
-            size: mesh.thematic.byteLength,
+            size: mesh.thematic.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         // vertex data
         this._indicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
-            size: mesh.indices.byteLength,
+            size: mesh.indices.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
 
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, mesh.position);
-        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, mesh.thematic);
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer,  0, mesh.indices );
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
+        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }
 
-    updateColorUniforms(colors: IShaderColorData) {
+    buildColorUniforms(colors: IShaderColorData) {
         const color = new Float32Array(Object.values(colors.color));
         this._cBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
@@ -201,7 +202,7 @@ export class PipelineTriangleFlat extends Pipeline {
                 this._matricesBindGroupLayout
             ]
         };
-        
+
         // Pipeline
         const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
         const pipelineDesc: GPURenderPipelineDescriptor = {
@@ -210,7 +211,7 @@ export class PipelineTriangleFlat extends Pipeline {
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
-    renderPass() {
+    renderPass(camera: Camera) {
         if (!this._renderer.context) {
             console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
             return;
@@ -235,21 +236,27 @@ export class PipelineTriangleFlat extends Pipeline {
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
 
-        // sets the viewport
-        passEncoder.setViewport(
-            0,
-            0,
-            this._renderer.canvas.width,
-            this._renderer.canvas.height,
-            0,
-            1
-        );
-        passEncoder.setScissorRect(
-            0,
-            0,
-            this._renderer.canvas.width,
-            this._renderer.canvas.height
-        );
+        //=============================
+        // uniforms update (create a function)
+        //=============================
+        let mview = camera.getModelViewMatrix();
+        const projc = camera.getProjectionMatrix();
+
+        console.log(mview);
+
+        mview = new Float32Array([
+            1.0, 0, 0, 0,
+            0.0, 2, 0, 0,
+            0.0, 0, 1, 0,
+            0.0, 0, 0.0, 1
+        ]);
+
+        const cameraArray = new Float32Array(2 * 16);
+        cameraArray.set(mview, 0);
+        cameraArray.set(projc, 16);
+        // console.log(cameraArray);
+        this._renderer.device.queue.writeBuffer(this._matricesBuffer, 0, cameraArray);
+        //=============================
 
         // vertex buffers
         passEncoder.setVertexBuffer(0, this._positionBuffer);

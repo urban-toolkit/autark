@@ -37,7 +37,7 @@ export class ToyExample extends UtkData {
             direction: {
                 up: [0, 1, 0],
                 lookAt: [0, 0, 0],
-                eye: [0, 0, -1]
+                eye: [0, 0, 0.5]
             }
         }
 
@@ -49,56 +49,62 @@ export class ToyExample extends UtkData {
 
         this._layerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOD_BLUES,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: true,
             isPicking: false
         }
 
         this._layerData = {
             geometry: [{
-                position: new Float32Array([
+                position: [
                     0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0
-                ]),
-                indices: new Uint32Array([
+                ].map((d, i) => {
+                    return d - this.cameraData.origin[i % 3];
+                }),
+                indices: [
                     0, 1, 2
-                ])
+                ]
             },
             {
-                position: new Float32Array([
+                position: [
                     0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0,
                     0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.5, 0.0
-                ]),
-                indices: new Uint32Array([
+                ].map((d, i) => {
+                    return d - this.cameraData.origin[i % 3];
+                }),
+                indices: [
                     0, 1, 2,
                     3, 4, 5
-                ])
+                ]
             },
             {
-                position: new Float32Array([
+                position: [
                     0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, -0.5, 0.0
-                ]),
-                indices: new Uint32Array([
+                ].map((d, i) => {
+                    return d - this.cameraData.origin[i % 3];
+                }),
+                indices: [
                     0, 1, 2
-                ])
+                ]
             }],
 
             thematic: [{
                 level: ThematicAggregationLevel.AGGREGATION_POINT,
-                values: new Float32Array([
+                values: [
                     1.0, 0.5, 0.0
-                ]),
+                ],
             },
             {
                 level: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
-                values: new Float32Array([
+                values: [
                     1.0, 0.0
-                ]),
+                ],
             },
             {
                 level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                values: new Float32Array([
+                values: [
                     0.75
-                ]),
+                ],
             }]
         }
     }
@@ -132,9 +138,12 @@ export class UtkPyParser extends UtkData {
                 lookAt: camera.direction.lookAt,
             }
         }
+        this._cameraData.origin[2] = 0;
+        this._cameraData.direction.eye[2] = 1000;
+        console.log(this._cameraData);
 
         const jsonData = <any>await DataLoader.getJsonData(this._pathJson);
-        const coordsData = Array.from(<Float32Array>await DataLoader.getBinaryData(this._pathCoords, 'f'));
+        const coordsData = Array.from(<Float64Array>await DataLoader.getBinaryData(this._pathCoords, 'd'));
         const idsData = Array.from(<Uint32Array>await DataLoader.getBinaryData(this._pathIds, 'I'));
 
         this._layerInfo = {
@@ -145,8 +154,8 @@ export class UtkPyParser extends UtkData {
 
         this._layerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOD_BLUES,
-            isColorMap: true,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            isColorMap: false,
             isPicking: false
         }
 
@@ -156,14 +165,15 @@ export class UtkPyParser extends UtkData {
         }
 
         const components = jsonData['data'];
-        console.log(components);
         for (const comps of components) {
             const cStartCount = comps.geometry.coordinates;
             const iStartCount = comps.geometry.indices;
 
             const geo = {
-                position: new Float32Array(coordsData.slice(cStartCount[0], cStartCount[0] + cStartCount[1])),
-                indices: new Uint32Array(idsData.slice(iStartCount[0], iStartCount[0] + iStartCount[1]))
+                position: coordsData.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
+                    return (el - this.cameraData.origin[id%3]) * 0.001;
+                }),
+                indices: idsData.slice(iStartCount[0], iStartCount[0] + iStartCount[1])
             }
 
             this._layerData.geometry.push(geo);

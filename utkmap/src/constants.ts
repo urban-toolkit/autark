@@ -27,7 +27,7 @@ export enum RenderPipeline {
 
 export enum ColorMapInterpolator {
     INTERPOLATOR_REDS  = 'interpolateReds',
-    INTERPOLATOD_BLUES = 'interpolateBlues'
+    INTERPOLATOR_BLUES = 'interpolateBlues'
 }
 
 export type ColorHEX = `#${string}`;

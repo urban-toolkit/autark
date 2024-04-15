@@ -44,5 +44,5 @@ export abstract class Layer {
 
     abstract updateCamera(camera: Camera): void;
 
-    abstract renderPass(): void;
+    abstract renderPass(camera: Camera): void;
 }

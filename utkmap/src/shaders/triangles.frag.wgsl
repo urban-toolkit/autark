@@ -4,7 +4,12 @@
 @group(0) @binding(3) var cMapSampler : sampler;
 
 @fragment 
-fn main(@location(0) inThematic: f32) -> @location(0) vec4f {
+fn main(@location(0) inThematic: f32, @location(1) inMat: vec4<f32>) -> @location(0) vec4f {
+    var debug: f32 = 1.0;
+    if(debug == 0.0) {
+       return inMat;
+    }
+
     if (showThematic > 0) {
         return textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
     }

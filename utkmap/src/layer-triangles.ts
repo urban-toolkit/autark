@@ -9,9 +9,9 @@ import { ThematicAggregationLevel } from "./constants";
 import { Camera } from "./camera";
 
 export class TrianglesLayer extends Layer {
-    protected _position!: Float32Array;
-    protected _thematic!: Float32Array;
-    protected _indices!: Uint32Array;
+    protected _position!: number[];
+    protected _thematic!: number[];
+    protected _indices!: number[];
 
     protected _components: { nPoints: number, nTriangles: number }[] = [];
 
@@ -22,15 +22,15 @@ export class TrianglesLayer extends Layer {
         this.loadData(layerData);
     }
 
-    get position(): Float32Array {
+    get position(): number[] {
         return this._position;
     }
 
-    get thematic(): Float32Array {
+    get thematic(): number[] {
         return this._thematic;
     }
 
-    get indices(): Uint32Array {
+    get indices(): number[] {
         return this._indices;
     }
 
@@ -47,13 +47,16 @@ export class TrianglesLayer extends Layer {
         const indices = [];
 
         for (let id = 0; id < layerGeometry.length; id++) {
-            position.push(...layerGeometry[id].position);
-
+            // fix the index count
             if (layerGeometry[id].indices !== undefined) {
-                const fix = layerGeometry[id].indices?.map(a => a + indices.length)
-                indices.push(...<Uint32Array>fix);
+                const fix = layerGeometry[id].indices?.map(a => a + position.length / 3)
+                indices.push(...(fix as number[]));
             }
 
+            // merges the position data
+            position.push(...layerGeometry[id].position);
+
+            // stores the components
             const component = {
                 nPoints: position.length / 3,
                 nTriangles: indices.length / 3,
@@ -61,9 +64,12 @@ export class TrianglesLayer extends Layer {
             this._components.push(component);
         }
 
-        this._position = new Float32Array(position);
-        this._indices = new Uint32Array(indices);
-        this._thematic = new Float32Array(0);
+        console.log(position);
+        console.log(indices);
+
+        this._position = position;
+        this._indices = indices;
+        this._thematic = [];
 
         console.log(this);
     }
@@ -86,7 +92,7 @@ export class TrianglesLayer extends Layer {
                     break;
             }
         }
-        this._thematic = new Float32Array(thematic);
+        this._thematic = thematic;
     }
 
     buildPipeline(renderer: Renderer, camera: Camera) {
@@ -99,18 +105,18 @@ export class TrianglesLayer extends Layer {
     }
 
     updateCamera(camera: Camera): void {
-        this._pipeline.updateCameraUniforms(camera);
+        this._pipeline.buildCameraUniforms(camera);
     }
 
-    renderPass() {
-        this._pipeline.renderPass();
+    renderPass(camera: Camera) {
+        this._pipeline.renderPass(camera);
     }
 
-    private aggregateThematicPoint(layerThematic: ILayerThematic): Float32Array {
+    private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
         return layerThematic.values;
     }
 
-    private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): Float32Array {
+    private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): number[] {
         // component points: start/end indices and number of points 
         const sPoint = (component > 0 ? this._components[component - 1].nPoints : 0);
         const ePoint = this._components[component].nPoints;
@@ -120,7 +126,7 @@ export class TrianglesLayer extends Layer {
         const sTriangle = (component > 0 ? this._components[component - 1].nTriangles : 0);
         const eTriangle = this._components[component].nTriangles;
 
-        const thematic = new Float32Array(nPoint);
+        const thematic = new Array(nPoint);
 
         for (let id = 3 * sTriangle; id < 3 * eTriangle; id++) {
             const vid = this._indices[id] - sPoint;
@@ -132,12 +138,12 @@ export class TrianglesLayer extends Layer {
         return thematic;
     }
 
-    private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): Float32Array {
+    private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): number[] {
         const sPoint = (component > 0 ? this._components[component - 1].nPoints : 0);
         const ePoint = this._components[component].nPoints;
         const nPoint = ePoint - sPoint;
 
-        const thematic = new Float32Array(nPoint);
+        const thematic = new Array(nPoint);
 
         for (let vId = 0; vId < nPoint; vId++) {
             thematic[vId] = layerThematic.values[0];

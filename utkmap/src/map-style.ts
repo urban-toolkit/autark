@@ -26,7 +26,7 @@ export class MapStyle {
     protected static _highlight: ColorHEX = "#FFDD00";
 
     // custom style
-    protected static _custom: IMapStyle = MapStyle._default;
+    protected static _current: IMapStyle = MapStyle._default;
 
     /**
      * Get the feature color
@@ -34,7 +34,7 @@ export class MapStyle {
      */
     public static getColor(type: keyof IMapStyle): ColorRGB {
         // uses the default style if available
-        const style = MapStyle._custom || MapStyle._default;
+        const style = MapStyle._current;
         const hex = style[type] || MapStyle._notFound; 
 
         return ColorMap.hexToRgb(hex);
@@ -48,8 +48,6 @@ export class MapStyle {
     public static setPredefinedStyle(style: string) {
         let styleObj = MapStyle._default;
 
-        console.log(light);
-
         if (style === 'light') {
             styleObj = light;
         }
@@ -57,7 +55,7 @@ export class MapStyle {
             styleObj = dark;
         }
 
-        MapStyle._custom = styleObj;
+        MapStyle._current = styleObj;
     }
 
     public static getHighlightColor(): ColorRGB {

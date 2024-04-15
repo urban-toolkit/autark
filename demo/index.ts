@@ -10,12 +10,17 @@ console.log(utk());
 console.log(utkDb());
 console.log(utkRun());
 
-async function main() {
-    const data = new ToyExample();
-    data.loadData();
-
-    // const data = new UtkPyParser('manhattan', 'parks');
-    // await data.loadData();
+async function main(ex: string = 'utk') {
+    let data = null;
+    
+    if(ex == 'toy') {
+        data = new ToyExample();
+        data.loadData();
+    }
+    else {
+        data = new UtkPyParser('manhattan', 'parks');
+        await data.loadData();
+    }
 
     const canvas = <HTMLCanvasElement>document.querySelector("#wgpu");
     canvas.width = canvas.height = 1024;
@@ -28,5 +33,5 @@ async function main() {
     map.render();
 }
 
-main();
+main('toy');
 

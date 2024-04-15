@@ -28,26 +28,26 @@ export abstract class Pipeline {
     build(mesh: TrianglesLayer, camera: Camera, color: IShaderColorData) {
         this.createShaders();
 
-        this.updateVertexBuffers(mesh);
-        this.updateColorUniforms(color);
-        this.updateCameraUniforms(camera);
+        this.buildVertexBuffers(mesh);
+        this.buildColorUniforms(color);
+        this.buildCameraUniforms(camera);
 
         this.createPipeline();
     }
 
-    updateCameraUniforms(camera: Camera) {
+    buildCameraUniforms(camera: Camera) {
         const mview = camera.getModelViewMatrix();
         const projc = camera.getProjectionMatrix();
 
-        const mats = new Float32Array( Array.from(mview).concat(Array.from(projc)) );
-        console.log(mats);
+        const cameraArray = new Float32Array(2 * 16);
+        cameraArray.set(mview, 0);
+        cameraArray.set(projc, 16);
+
         this._matricesBuffer = this._renderer.device.createBuffer({
             label: 'Transfomration matrices buffer',
-            size: mats.byteLength,
+            size: cameraArray.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-
-        this._renderer.device.queue.writeBuffer(this._matricesBuffer, 0, mats);
 
         this._matricesBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [{
@@ -67,13 +67,13 @@ export abstract class Pipeline {
 
     };
 
-    abstract updateVertexBuffers(data: TrianglesLayer): void;
+    abstract buildVertexBuffers(data: TrianglesLayer): void;
 
-    abstract updateColorUniforms(data: IShaderColorData): void;
+    abstract buildColorUniforms(data: IShaderColorData): void;
 
     abstract createPipeline(): void;
 
     abstract createShaders(): void;
 
-    abstract renderPass(): void;
+    abstract renderPass(camera: Camera): void;
 }

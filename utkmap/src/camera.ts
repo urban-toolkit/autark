@@ -49,7 +49,7 @@ export class Camera {
         this.mModelMatrix = mat4.create();
 
         // z-values start from here are in meters
-        this.wNear = 1;
+        this.wNear = 0;
         this.wFar = 1e10;
 
         this.groundRes = 1;
@@ -186,18 +186,12 @@ export class Camera {
     }
 
     update(): void {
-        const v = this.mModelMatrix[12] + 0.001;
         // model matrix
-        // this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1 / this.groundRes));
-        this.mModelMatrix[12] = v;
-        // console.log(this.mModelMatrix);
-        // // view matrix
-        // mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
-        // console.log(this.mViewMatrix);
-
-        // // projection matrix
-        // mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
-        // console.log(this.mProjectionMatrix);
+        this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1 / this.groundRes));
+        // view matrix
+        mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
+        // projection matrix
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
     }
 
     loadPosition(state: any): void {

@@ -54,9 +54,14 @@ export class UtkMap {
         const layer = this._layerManager.searchByLayerInfo(layerInfo);
 
         if (layer) {
+            // load data
             layer.loadGeometry(layerData.geometry);
             layer.loadThematic(layerData.thematic);
-            layer.buildPipeline(this._renderer, this._camera);
+            // creates the pipeline
+            layer.buildPipeline(
+                this._renderer, 
+                this._camera
+            );
         }
     }
 
@@ -74,8 +79,7 @@ export class UtkMap {
         this._camera.update();
 
         this._layerManager.layers.forEach(layer => {
-            layer.updateCamera(this._camera);
-            layer.renderPass();
+            layer.renderPass(this._camera);
         });
 
         // Refresh canvas
