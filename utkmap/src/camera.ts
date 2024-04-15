@@ -186,10 +186,10 @@ export class Camera {
     }
 
     update(): void {
-        this.mModelMatrix[12] += 0.001;
-
+        const v = this.mModelMatrix[12] + 0.001;
         // model matrix
         // this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1 / this.groundRes));
+        this.mModelMatrix[12] = v;
         // console.log(this.mModelMatrix);
         // // view matrix
         // mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);

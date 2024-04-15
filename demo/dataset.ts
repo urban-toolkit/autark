@@ -36,8 +36,8 @@ export class ToyExample extends UtkData {
             origin: [0, 0, 0],
             direction: {
                 up: [0, 1, 0],
-                eye: [0, 0, 1000],
-                lookAt: [0, 0, 0]
+                lookAt: [0, 0, 0],
+                eye: [0, 0, -1]
             }
         }
 
