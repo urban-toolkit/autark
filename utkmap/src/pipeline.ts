@@ -40,6 +40,7 @@ export abstract class Pipeline {
         const projc = camera.getProjectionMatrix();
 
         const mats = new Float32Array( Array.from(mview).concat(Array.from(projc)) );
+        console.log(mats);
         this._matricesBuffer = this._renderer.device.createBuffer({
             label: 'Transfomration matrices buffer',
             size: mats.byteLength,

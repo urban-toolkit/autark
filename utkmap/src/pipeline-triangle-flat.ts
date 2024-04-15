@@ -8,7 +8,6 @@ import { Renderer } from "./renderer";
 
 import { IShaderColorData } from './interfaces';
 import { TrianglesLayer } from './layer-triangles';
-import { Camera } from './camera';
 
 export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
@@ -20,7 +19,7 @@ export class PipelineTriangleFlat extends Pipeline {
     protected _cBuffer!: GPUBuffer;
     protected _cMapTexture!: GPUTexture;
     protected _cMapSampler!: GPUSampler;
-   
+
     protected _colorsBindGroup!: GPUBindGroup;
     protected _colorsBindGroupLayout!: GPUBindGroupLayout;
 
