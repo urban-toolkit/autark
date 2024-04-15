@@ -50,7 +50,6 @@ export class Camera {
 
         // z-values start from here are in meters
         this.wNear = 1;
-        // this.wFar = 1e5;
         this.wFar = 1e10;
 
         this.groundRes = 1;
@@ -187,13 +186,18 @@ export class Camera {
     }
 
     update(): void {
+        this.mModelMatrix[12] += 0.001;
+
         // model matrix
-        this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1 / this.groundRes));
-        // view matrix
-        mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
-        // TODO: get the aspect ratio from canvas?
-        // mat4.ortho(this.mProjectionMatrix, -4500, 4500, -4500, 4500, -1500, this.wFar);
-        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
+        // this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1 / this.groundRes));
+        // console.log(this.mModelMatrix);
+        // // view matrix
+        // mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
+        // console.log(this.mViewMatrix);
+
+        // // projection matrix
+        // mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
+        // console.log(this.mProjectionMatrix);
     }
 
     loadPosition(state: any): void {
