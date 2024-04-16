@@ -1,5 +1,7 @@
 /// <reference types="@webgpu/types" />
 
+import { MapStyle } from "./map-style";
+
 export class Renderer {
     // HTML Canvas reference
     protected _canvas: HTMLCanvasElement;
@@ -113,9 +115,10 @@ export class Renderer {
         const colorTexture = this._context.getCurrentTexture();
         const colorTextureView = colorTexture.createView();
 
+        const sky = MapStyle.getColor('sky');
         this._frameBuffer = {
             view: colorTextureView,
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            clearValue: { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 },
             loadOp: 'clear',
             storeOp: 'store'
         };
