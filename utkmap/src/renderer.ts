@@ -18,9 +18,6 @@ export class Renderer {
     // Depth buffer
     protected _depthBuffer!: GPURenderPassDepthStencilAttachment;
 
-    // Render pass descriptor
-    protected _renderPassDesc!: GPURenderPassDescriptor;
-
     // command encoder
     protected _commandEncoder!: GPUCommandEncoder;
 
@@ -31,24 +28,8 @@ export class Renderer {
         this._canvas = canvas;
     }
 
-    get canvas(): HTMLCanvasElement {
-        return this._canvas;
-    }
-
     get device(): GPUDevice {
         return this._device;
-    }
-
-    get context(): GPUCanvasContext {
-        return this._context;
-    }
-
-    get renderPassDesc(): GPURenderPassDescriptor {
-        return this._renderPassDesc;
-    }
-
-    get commandEncoder(): GPUCommandEncoder {
-        return this._commandEncoder;
     }
 
     get passEncoder(): GPURenderPassEncoder {
@@ -156,7 +137,7 @@ export class Renderer {
         this._frameBuffer.view = colorTextureView;
 
         // Render pass description
-        this._renderPassDesc = {
+        const renderPassDesc = {
             colorAttachments: [this._frameBuffer],
             depthStencilAttachment: this._depthBuffer
         };
@@ -165,7 +146,7 @@ export class Renderer {
         this._commandEncoder = this._device.createCommandEncoder();
 
         // Create a new pass commands encoder
-        this._passEncoder = this._commandEncoder.beginRenderPass(this._renderPassDesc);
+        this._passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
 
     }
 

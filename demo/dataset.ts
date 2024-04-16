@@ -1,12 +1,12 @@
-import { ICameraData, ILayerData, ILayerInfo, ILayerRenderInfo } from "utkmap/src/interfaces"
+import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo } from "utkmap/src/interfaces"
 import { LayerGeometryType, LayerPhysicalType, RenderPipeline, ColorMapInterpolator, ThematicAggregationLevel } from "utkmap/src/constants"
 
 import { DataLoader } from './data-loader';
 
 abstract class UtkData {
-    protected _layerInfo!: ILayerInfo;
-    protected _layerData!: ILayerData;
-    protected _layerRenderInfo!: ILayerRenderInfo;
+    protected _layerInfo: ILayerInfo[] = [];
+    protected _layerData: ILayerData[] = [];
+    protected _layerRenderInfo: ILayerRenderInfo[] = [];
     protected _cameraData!: ICameraData;
 
     get layerInfo() {
@@ -41,20 +41,20 @@ export class ToyExample extends UtkData {
             }
         }
 
-        this._layerInfo = {
+        this._layerInfo.push({
             id: 'roads.osm',
             typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
             typePhysical: LayerPhysicalType.WATER_LAYER,
-        }
+        });
 
-        this._layerRenderInfo = {
+        this._layerRenderInfo.push({
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: true,
             isPicking: false
-        }
+        });
 
-        this._layerData = {
+        this._layerData.push({
             geometry: [{
                 position: [
                     0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0
@@ -106,32 +106,38 @@ export class ToyExample extends UtkData {
                     0.75
                 ],
             }]
-        }
+        });
     }
 }
 
-export class UtkPyParser extends UtkData {
-    protected _id: string;
-    protected _pathGram: string;
-    protected _pathJson: string;
-    protected _pathCoords: string;
-    protected _pathIds: string;
+export class UtkPyData extends UtkData {
+    protected _layers: string[];
+    protected _dataFolder: string;
 
-    constructor(path: string = 'manhattan', file: string = 'parks') {
+
+    constructor(dataFolder: string = './manhattan', layers: string[] = ['parks', 'water', 'surface', 'roads']) {
         super();
 
-        this._id = file;
-        this._pathGram = `./${path}/grammar.json`
+        this._layers = layers;
+        this._dataFolder = dataFolder;
+    }
 
-        const base = `./${path}/${file}`;
-        this._pathJson = `${base}.json`;
-        this._pathCoords = `${base}_coordinates.data`;
-        this._pathIds = `${base}_indices.data`;
+    getPhysicalType(layer: string): LayerPhysicalType {
+
+        switch (layer) {
+            case 'parks': return LayerPhysicalType.PARKS_LAYER;
+            case 'water': return LayerPhysicalType.WATER_LAYER;
+            case 'roads': return LayerPhysicalType.ROADS_LAYER;
+            case 'surface': return LayerPhysicalType.SURFACE_LAYER;
+        }
+
+        return LayerPhysicalType.LAND_LAYER;
     }
 
     async loadData() {
-        const gramData: any = await DataLoader.getJsonData(this._pathGram);
-        const camera = gramData['components'][0]['map']['camera']
+        const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
+
+        const camera = grammarData['components'][0]['map']['camera']
         this._cameraData = {
             origin: camera.position,
             direction: {
@@ -141,42 +147,46 @@ export class UtkPyParser extends UtkData {
             }
         }
 
-        const jsonData = <any>await DataLoader.getJsonData(this._pathJson);
-        const coordsData = Array.from(<Float64Array>await DataLoader.getBinaryData(this._pathCoords, 'd'));
-        const idsData = Array.from(<Uint32Array>await DataLoader.getBinaryData(this._pathIds, 'I'));
-
-        this._layerInfo = {
-            id: this._id,
-            typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
-            typePhysical: this._id.includes('parks') ?
-                LayerPhysicalType.PARKS_LAYER : LayerPhysicalType.WATER_LAYER,
-        }
-
-        this._layerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-            isColorMap: false,
-            isPicking: false
-        }
-
-        this._layerData = {
-            geometry: [],
-            thematic: []
-        }
-
-        const components = jsonData['data'];
-        for (const comps of components) {
-            const cStartCount = comps.geometry.coordinates;
-            const iStartCount = comps.geometry.indices;
-
-            const geo = {
-                position: coordsData.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
-                    return el - this.cameraData.origin[id%3];
-                }),
-                indices: idsData.slice(iStartCount[0], iStartCount[0] + iStartCount[1])
+        for (let layer of this._layers) {
+            // load layer json data
+            const layerJson  =  <any>await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
+            // load layer binary data
+            const layerCoord = Array.from(<Float64Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_coordinates.data`, 'd'));
+            const layerIndex = Array.from(<Uint32Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_indices.data`, 'I'));
+    
+            this._layerInfo.push({
+                id: `${layer}.utkpy`,
+                typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
+                typePhysical: this.getPhysicalType(layer)
+            });
+    
+            this._layerRenderInfo.push({
+                pipeline: RenderPipeline.TRIANGLE_FLAT,
+                colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+                isColorMap: false,
+                isPicking: false
+            });
+    
+            const layerData: ILayerData = {
+                geometry: [],
+                thematic: []
             }
-
-            this._layerData.geometry.push(geo);
+    
+            const components = layerJson['data'];
+            for (const comps of components) {
+                const cStartCount = comps.geometry.coordinates;
+                const iStartCount = comps.geometry.indices;
+    
+                const geometry: ILayerGeometry = {
+                    position: layerCoord.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
+                        return el - this.cameraData.origin[id%3];
+                    }),
+                    indices: layerIndex.slice(iStartCount[0], iStartCount[0] + iStartCount[1])
+                }
+    
+                layerData.geometry.push(geometry);
+            }
+            this._layerData.push(layerData)
         }
-    }
+   }
 }

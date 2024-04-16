@@ -4,13 +4,13 @@ import { utkRun } from 'utkrun';
 
 import { UtkMap } from 'utkmap';
 
-import { UtkPyParser, ToyExample } from './dataset';
+import { UtkPyData, ToyExample } from './dataset';
 
 console.log(utk());
 console.log(utkDb());
 console.log(utkRun());
 
-async function main(ex: string = 'utk') {    
+async function main(ex: string = 'utk') {
     const canvas = <HTMLCanvasElement>document.querySelector("#wgpu");
     canvas.width = canvas.height = 1024;
     
@@ -22,22 +22,23 @@ async function main(ex: string = 'utk') {
         data.loadData();
 
         map.loadCamera(data.cameraData);
-        map.loadLayer(data.layerInfo, data.layerRenderInfo, data.layerData);
+        map.loadLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
         map.render();
         }
     else {
-        const parks = new UtkPyParser('manhattan', 'parks');
-        await parks.loadData();
-        const water = new UtkPyParser('manhattan', 'water');
-        await water.loadData();
+        const folder = 'manhattan';
+        const layers = ['parks', 'water','surface'];
 
-        map.loadCamera(parks.cameraData);
-        map.loadLayer(water.layerInfo, water.layerRenderInfo, water.layerData);
-        map.loadLayer(parks.layerInfo, parks.layerRenderInfo, parks.layerData);
+        const utkpy = new UtkPyData(folder, layers);
+        await utkpy.loadData();
+
+        map.loadCamera(utkpy.cameraData);
+        for (let id = 0; id < layers.length; id++) {
+            map.loadLayer(utkpy.layerInfo[id], utkpy.layerRenderInfo[id], utkpy.layerData[id]);
+        }
         map.render();
     }
-
 }
 
-main('to');
+main('utk');
 

@@ -16,7 +16,7 @@ export class MapStyle {
         parks: '#C3D0B2',
         water: '#BED2D7',
         sky: '#ffffff',
-        surface: "#b8b8b8",
+        surface: "#EFEFEF",
         buildings: '#DFDFDF'
     };
 
