@@ -27,17 +27,18 @@ export class UtkMap {
     async init() {
         await this._renderer.init();
         this._keyEvents.bindEvents();
+        this.render();
     }
 
-    loadCamera(params: ICameraData) {
+    createCamera(params: ICameraData) {
         this._camera = new Camera(params);
     }
 
-    loadLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
 
         if (layer) {
-            layer.buildPipeline(this._renderer, this._camera);
+            layer.createPipeline(this._renderer, this._camera);
         }
     }
 
@@ -45,8 +46,7 @@ export class UtkMap {
         const layer = this._layerManager.searchByLayerInfo(layerInfo);
         
         if (layer) {
-            layer.loadRenderInfo(layerRenderInfo);
-            layer.buildPipeline(this._renderer, this._camera);
+            layer.setLayerRenderInfo(layerRenderInfo);
         }
     }
 
@@ -57,11 +57,6 @@ export class UtkMap {
             // load data
             layer.loadGeometry(layerData.geometry);
             layer.loadThematic(layerData.thematic);
-            // creates the pipeline
-            layer.buildPipeline(
-                this._renderer, 
-                this._camera
-            );
         }
     }
 
@@ -70,14 +65,14 @@ export class UtkMap {
 
         if (layer) {
             layer.loadThematic(layerThematic);
-            layer.buildPipeline(this._renderer, this._camera);
         }
     }
 
     render() {
-        // Add layers to render pass
+        // Updates the camera
         this._camera.update();
 
+        // Rnder loop
         this._renderer.start();
         this._layerManager.layers.forEach(layer => {
             layer.renderPass(this._camera);

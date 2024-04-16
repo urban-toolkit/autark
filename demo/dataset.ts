@@ -185,6 +185,12 @@ export class UtkPyData extends UtkData {
                 }
     
                 layerData.geometry.push(geometry);
+                layerData.thematic.push({
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [
+                        Math.random()
+                    ],
+                })
             }
             this._layerData.push(layerData)
         }

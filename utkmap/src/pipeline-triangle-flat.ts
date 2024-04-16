@@ -6,9 +6,11 @@ import fragSrc from './shaders/triangles.frag.wgsl';
 import { Pipeline } from "./pipeline";
 import { Renderer } from "./renderer";
 
-import { IShaderColorData } from './interfaces';
-import { TrianglesLayer } from './layer-triangles';
 import { Camera } from './camera';
+import { MapStyle } from './map-style';
+import { ColorMap } from './colormap';
+
+import { TrianglesLayer } from './layer-triangles';
 
 export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
@@ -17,7 +19,8 @@ export class PipelineTriangleFlat extends Pipeline {
     protected _indicesBuffer!: GPUBuffer;
 
     // Uniforms buffer
-    protected _cBuffer!: GPUBuffer;
+    protected _colorBuffer!: GPUBuffer;
+    protected _useColorMap!: GPUBuffer; 
     protected _cMapTexture!: GPUTexture;
     protected _cMapSampler!: GPUSampler;
 
@@ -28,7 +31,7 @@ export class PipelineTriangleFlat extends Pipeline {
         super(renderer);
     }
 
-    buildVertexBuffers(mesh: TrianglesLayer) {
+    createVertexBuffers(mesh: TrianglesLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -50,27 +53,28 @@ export class PipelineTriangleFlat extends Pipeline {
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
 
+        this.updateVertexBuffers(mesh);
+    }
+
+    updateVertexBuffers(mesh: TrianglesLayer) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }
 
-    buildColorUniforms(colors: IShaderColorData) {
-        const color = new Float32Array(Object.values(colors.color));
-        this._cBuffer = this._renderer.device.createBuffer({
+    createColorUniformBuffers(mesh: TrianglesLayer) {
+        this._colorBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
-            size: color.byteLength,
+            size: 4 * 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
-        const isColorMap = new Float32Array([colors.isColorMap ? 1.0 : 0.0]);
-        const enableColorMap = this._renderer.device.createBuffer({
+        this._useColorMap = this._renderer.device.createBuffer({
             label: 'Enable colormap on reder',
-            size: isColorMap.byteLength,
+            size: 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
-        const cMap = new Uint8Array(colors.colorMap);
         this._cMapTexture = this._renderer.device.createTexture({
             label: 'Colormap texture',
             size: { width: 256, height: 1 },
@@ -84,10 +88,6 @@ export class PipelineTriangleFlat extends Pipeline {
             addressModeU: "clamp-to-edge",
             addressModeV: "clamp-to-edge",
         });
-
-        this._renderer.device.queue.writeBuffer(this._cBuffer, 0, color);
-        this._renderer.device.queue.writeBuffer(enableColorMap, 0, isColorMap);
-        this._renderer.device.queue.writeTexture({ texture: this._cMapTexture }, cMap, {}, { width: 256, height: 1 });
 
         this._colorsBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [{
@@ -113,10 +113,10 @@ export class PipelineTriangleFlat extends Pipeline {
             layout: this._colorsBindGroupLayout,
             entries: [{
                 binding: 0,
-                resource: { buffer: this._cBuffer },
+                resource: { buffer: this._colorBuffer },
             }, {
                 binding: 1,
-                resource: { buffer: enableColorMap },
+                resource: { buffer: this._useColorMap },
             }, {
                 binding: 2,
                 resource: this._cMapTexture.createView(),
@@ -125,6 +125,24 @@ export class PipelineTriangleFlat extends Pipeline {
                 resource: this._cMapSampler,
             }],
         });
+
+        this.updateColorUniformBuffers(mesh);
+    }
+
+    updateColorUniformBuffers(mesh: TrianglesLayer) {
+        const colors = {
+            color: MapStyle.getColor(mesh.layerInfo.typePhysical),
+            colorMap: ColorMap.getColorMap(mesh.layerRenderInfo.colorMapInterpolator),
+            useColorMap: <boolean>mesh.layerRenderInfo.isColorMap
+        }
+
+        const color = new Float32Array(Object.values(colors.color));
+        const useCcolorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
+        const colorMapTexture = new Uint8Array(colors.colorMap);
+
+        this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, color);
+        this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useCcolorMap);
+        this._renderer.device.queue.writeTexture({ texture: this._cMapTexture }, colorMapTexture, {}, { width: 256, height: 1 });
     }
 
     createShaders() {
@@ -211,30 +229,26 @@ export class PipelineTriangleFlat extends Pipeline {
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
-    renderPass(camera: Camera) {
+    renderPass(mesh: TrianglesLayer, camera: Camera) {
         // gets the pass commands encoder
         const passEncoder = this._renderer.passEncoder;
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
 
-        //=============================
-        // uniforms update (create a function)
-        //=============================
-        const mview = new Float32Array(camera.getModelViewMatrix());
-        const projc = new Float32Array(camera.getProjectionMatrix());
+        // updates all data
+        this.updateVertexBuffers(mesh);
+        this.updateColorUniformBuffers(mesh);
+        this.updateCameraUniformBuffers(camera);
 
-        this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, mview);
-        this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
-        //=============================
-
-        // vertex buffers
+        // sets the vertex buffers
         passEncoder.setVertexBuffer(0, this._positionBuffer);
         passEncoder.setVertexBuffer(1, this._thematicBuffer);
-        // primitive indices buffer
+
+        // sets primitive indices buffer
         passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');
 
-        // uniforms buffer
+        // sets the uniform buffers
         passEncoder.setBindGroup(0, this._colorsBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
 

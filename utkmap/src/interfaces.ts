@@ -43,11 +43,6 @@ export interface ILayerThematic {
     values: number[]; // data values
 }
 
-export interface IShaderColorData {
-    color: ColorRGB,     // fixed color used in the layer
-    colorMap: ColorTEX   // colormap texture used to show thematic values
-    isColorMap: boolean, // is colormap active? 
-}
 
 export interface ICameraData {
     origin: number[]; // camera position and look at

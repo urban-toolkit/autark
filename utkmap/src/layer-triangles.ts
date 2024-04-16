@@ -1,12 +1,10 @@
 import { ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from "./interfaces";
 
+import { Camera } from "./camera";
 import { Layer } from "./layer";
-import { ColorMap } from "./colormap";
-import { MapStyle } from "./map-style";
 import { Renderer } from "./renderer";
 import { PipelineTriangleFlat } from "./pipeline-triangle-flat";
 import { ThematicAggregationLevel } from "./constants";
-import { Camera } from "./camera";
 
 export class TrianglesLayer extends Layer {
     protected _position!: number[];
@@ -32,6 +30,11 @@ export class TrianglesLayer extends Layer {
 
     get indices(): number[] {
         return this._indices;
+    }
+
+    createPipeline(renderer: Renderer, camera: Camera) {
+        this._pipeline = new PipelineTriangleFlat(renderer);
+        this._pipeline.build(this, camera);
     }
 
     loadData(layerData: ILayerData) {
@@ -90,21 +93,8 @@ export class TrianglesLayer extends Layer {
         this._thematic = thematic;
     }
 
-    buildPipeline(renderer: Renderer, camera: Camera) {
-        this._pipeline = new PipelineTriangleFlat(renderer);
-        this._pipeline.build(this, camera, {
-            color: MapStyle.getColor(this._info.typePhysical),
-            colorMap: ColorMap.getColorMap(this._renderInfo.colorMapInterpolator),
-            isColorMap: <boolean>this._renderInfo.isColorMap
-        });
-    }
-
-    updateCamera(camera: Camera): void {
-        this._pipeline.buildCameraUniforms(camera);
-    }
-
     renderPass(camera: Camera) {
-        this._pipeline.renderPass(camera);
+        this._pipeline.renderPass(this, camera);
     }
 
     private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
