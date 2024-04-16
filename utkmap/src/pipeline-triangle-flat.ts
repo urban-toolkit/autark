@@ -199,7 +199,7 @@ export class PipelineTriangleFlat extends Pipeline {
         const pipelineLayoutDesc = {
             bindGroupLayouts: [
                 this._colorsBindGroupLayout,
-                this._matricesBindGroupLayout
+                this._cameraBindGroupLayout
             ]
         };
 
@@ -212,26 +212,8 @@ export class PipelineTriangleFlat extends Pipeline {
     }
 
     renderPass(camera: Camera) {
-        if (!this._renderer.context) {
-            console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
-            return;
-        }
-
-        // udpate current the frame buffer texture
-        const colorTexture = this._renderer.context.getCurrentTexture();
-        const colorTextureView = colorTexture.createView();
-        this._renderer.frameBuffer.view = colorTextureView;
-
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer
-        };
-
-        // Create a new command encoder
-        const commandEncoder = this._renderer.device.createCommandEncoder();
-        // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+        // gets the pass commands encoder
+        const passEncoder = this._renderer.passEncoder;
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
@@ -239,23 +221,11 @@ export class PipelineTriangleFlat extends Pipeline {
         //=============================
         // uniforms update (create a function)
         //=============================
-        let mview = camera.getModelViewMatrix();
-        const projc = camera.getProjectionMatrix();
+        const mview = new Float32Array(camera.getModelViewMatrix());
+        const projc = new Float32Array(camera.getProjectionMatrix());
 
-        console.log(mview);
-
-        mview = new Float32Array([
-            1.0, 0, 0, 0,
-            0.0, 2, 0, 0,
-            0.0, 0, 1, 0,
-            0.0, 0, 0.0, 1
-        ]);
-
-        const cameraArray = new Float32Array(2 * 16);
-        cameraArray.set(mview, 0);
-        cameraArray.set(projc, 16);
-        // console.log(cameraArray);
-        this._renderer.device.queue.writeBuffer(this._matricesBuffer, 0, cameraArray);
+        this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, mview);
+        this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
         //=============================
 
         // vertex buffers
@@ -266,13 +236,9 @@ export class PipelineTriangleFlat extends Pipeline {
 
         // uniforms buffer
         passEncoder.setBindGroup(0, this._colorsBindGroup);
-        passEncoder.setBindGroup(1, this._matricesBindGroup);
+        passEncoder.setBindGroup(1, this._cameraBindGroup);
 
         // draw command
         passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
-        passEncoder.end();
-
-        // Submit commands
-        this._renderer.device.queue.submit([commandEncoder.finish()]);
     }
 }

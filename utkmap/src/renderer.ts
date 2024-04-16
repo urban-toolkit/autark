@@ -16,6 +16,15 @@ export class Renderer {
     // Depth buffer
     protected _depthBuffer!: GPURenderPassDepthStencilAttachment;
 
+    // Render pass descriptor
+    protected _renderPassDesc!: GPURenderPassDescriptor;
+
+    // command encoder
+    protected _commandEncoder!: GPUCommandEncoder;
+
+    // command encoder
+    protected _passEncoder!: GPURenderPassEncoder;
+
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
     }
@@ -32,12 +41,16 @@ export class Renderer {
         return this._context;
     }
 
-    get frameBuffer(): GPURenderPassColorAttachment {
-        return this._frameBuffer;
+    get renderPassDesc(): GPURenderPassDescriptor {
+        return this._renderPassDesc;
     }
 
-    get depthBuffer(): GPURenderPassDepthStencilAttachment {
-        return this._depthBuffer;
+    get commandEncoder(): GPUCommandEncoder {
+        return this._commandEncoder;
+    }
+
+    get passEncoder(): GPURenderPassEncoder {
+        return this._passEncoder;
     }
 
     // Start the rendering engine
@@ -126,5 +139,36 @@ export class Renderer {
             stencilLoadOp: 'clear',
             stencilStoreOp: 'store'
         };
+    }
+
+    start() {
+        if (!this._context) {
+            console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
+            return;
+        }
+
+        // udpate current the frame buffer texture
+        const colorTexture = this._context.getCurrentTexture();
+        const colorTextureView = colorTexture.createView();
+        this._frameBuffer.view = colorTextureView;
+
+        // Render pass description
+        this._renderPassDesc = {
+            colorAttachments: [this._frameBuffer],
+            depthStencilAttachment: this._depthBuffer
+        };
+
+        // Create a new command encoder
+        this._commandEncoder = this._device.createCommandEncoder();
+
+        // Create a new pass commands encoder
+        this._passEncoder = this._commandEncoder.beginRenderPass(this._renderPassDesc);
+
+    }
+
+    finish() {
+        // Submit commands
+        this._passEncoder.end();
+        this._device.queue.submit([this._commandEncoder.finish()]);
     }
 }

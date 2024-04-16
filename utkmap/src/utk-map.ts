@@ -78,9 +78,11 @@ export class UtkMap {
         // Add layers to render pass
         this._camera.update();
 
+        this._renderer.start();
         this._layerManager.layers.forEach(layer => {
             layer.renderPass(this._camera);
         });
+        this._renderer.finish();
 
         // Refresh canvas
         requestAnimationFrame(this.render.bind(this));
