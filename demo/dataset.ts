@@ -147,7 +147,9 @@ export class UtkPyData extends UtkData {
             }
         }
 
-        for (let layer of this._layers) {
+        for (let lId = 0; lId < this._layers.length; lId++) {
+            const layer = this._layers[lId];
+
             // load layer json data
             const layerJson  =  <any>await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
             // load layer binary data

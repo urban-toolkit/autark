@@ -30,6 +30,11 @@ export enum ColorMapInterpolator {
     INTERPOLATOR_BLUES = 'interpolateBlues'
 }
 
+export enum MouseStatus {
+    MOUSE_IDLE = "MOUSE_IDLE",
+    MOUSE_DRAG = "MOUSE_DRAG"
+}
+
 export type ColorHEX = `#${string}`;
 export type ColorRGB = {r: number, g: number, b:number, opacity: number}
 export type ColorTEX = number[];

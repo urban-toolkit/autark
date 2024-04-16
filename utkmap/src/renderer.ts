@@ -28,6 +28,10 @@ export class Renderer {
         this._canvas = canvas;
     }
 
+    get canvas(): HTMLCanvasElement {
+        return this._canvas;
+    }
+
     get device(): GPUDevice {
         return this._device;
     }

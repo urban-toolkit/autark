@@ -7,6 +7,10 @@ utk*/package-lock.json
  utkpy/.ipynb_checkpoints
  utkpy/.venv
 
+ __pycache__
+ .ipynb_checkpoints
+ .venv
+
 package-lock.json
 demo/*.js
 

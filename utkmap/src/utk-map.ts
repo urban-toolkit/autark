@@ -5,28 +5,42 @@ import { ICameraData, ILayerData, ILayerInfo, ILayerRenderInfo, ILayerThematic }
 import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { KeyEvents } from './key-events';
+import { MouseEvents } from './mouse-events';
 import { LayerManager } from './layer-manager';
 
 export class UtkMap {
     protected _camera: Camera;
     protected _renderer: Renderer;
     protected _keyEvents: KeyEvents;
+    protected _mouseEvents: MouseEvents;
     protected _layerManager: LayerManager;
 
     constructor(canvas: HTMLCanvasElement) {
         this._camera = new Camera();
         this._renderer = new Renderer(canvas);
         this._keyEvents = new KeyEvents(this);
+        this._mouseEvents = new MouseEvents(this);
         this._layerManager = new LayerManager();
     }
 
-    get layerManager() {
+    get camera(): Camera {
+        return this._camera;
+    }
+
+    get renderer(): Renderer {
+        return this._renderer;
+    }
+
+    get layerManager(): LayerManager {
         return this._layerManager;
     }
 
     async init() {
         await this._renderer.init();
+
         this._keyEvents.bindEvents();
+        this._mouseEvents.bindEvents();
+
         this.render();
     }
 

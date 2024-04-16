@@ -12,7 +12,7 @@
                         "right": [
                             0,
                             0,
-                            2500
+                            3000
                         ],
                         "lookAt": [
                             0,
@@ -27,11 +27,15 @@
                     }
                 },
                 "knots": [
+                    "purebuildings",
                     "puresurface",
                     "pureparks",
-                    "purewater"
+                    "purewater",
+                    "pureroads"
                 ],
                 "interactions": [
+                    "NONE",
+                    "NONE",
                     "NONE",
                     "NONE",
                     "NONE"
@@ -39,6 +43,18 @@
             },
             "plots": [],
             "knots": [
+                {
+                    "id": "purebuildings",
+                    "integration_scheme": [
+                        {
+                            "out": {
+                                "name": "buildings",
+                                "level": "OBJECTS"
+                            }
+                        }
+                    ],
+                    "operation": "NONE"
+                },
                 {
                     "id": "puresurface",
                     "integration_scheme": [
@@ -69,6 +85,18 @@
                         {
                             "out": {
                                 "name": "water",
+                                "level": "OBJECTS"
+                            }
+                        }
+                    ],
+                    "operation": "NONE"
+                },
+                {
+                    "id": "pureroads",
+                    "integration_scheme": [
+                        {
+                            "out": {
+                                "name": "roads",
                                 "level": "OBJECTS"
                             }
                         }
