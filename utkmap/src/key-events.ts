@@ -21,8 +21,8 @@ export class KeyEvents {
             const layers = this._map.layerManager.layers;
 
             for(const layer of layers) {
-                const layerInfo = layer.info;                
-                const renderInfo = layer.renderInfo;
+                const layerInfo = layer.layerInfo;
+                const renderInfo = layer.layerRenderInfo;
 
                 renderInfo.isColorMap = !renderInfo.isColorMap;
                 this._map.updateRenderInfo(layerInfo, renderInfo);

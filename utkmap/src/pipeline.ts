@@ -1,7 +1,7 @@
 /// <reference types="@webgpu/types" />
 
 import { Camera } from './camera';
-import { ICameraData, IShaderColorData } from './interfaces';
+import { Layer } from './layer';
 import { TrianglesLayer } from './layer-triangles';
 import { Renderer } from './renderer';
 
@@ -26,17 +26,17 @@ export abstract class Pipeline {
         this._renderer = renderer;
     }
 
-    build(mesh: TrianglesLayer, camera: Camera, color: IShaderColorData) {
+    build(mesh: TrianglesLayer, camera: Camera) {
         this.createShaders();
 
-        this.buildVertexBuffers(mesh);
-        this.buildColorUniforms(color);
-        this.buildCameraUniforms(camera);
+        this.createVertexBuffers(mesh);
+        this.createColorUniformBuffers(mesh);
+        this.createCameraUniformBuffers(camera);
 
         this.createPipeline();
     }
 
-    buildCameraUniforms(camera: Camera) {
+    createCameraUniformBuffers(camera: Camera) {
         const mview = new Float32Array(camera.getModelViewMatrix());
         const projc = new Float32Array(camera.getProjectionMatrix());
 
@@ -57,7 +57,7 @@ export abstract class Pipeline {
                 binding: 0, // modelview
                 visibility: GPUShaderStage.VERTEX,
                 buffer: {},
-            },{
+            }, {
                 binding: 1, // projection
                 visibility: GPUShaderStage.VERTEX,
                 buffer: {},
@@ -69,21 +69,30 @@ export abstract class Pipeline {
             entries: [{
                 binding: 0,
                 resource: { buffer: this._mviewBuffer },
-            },{
+            }, {
                 binding: 1,
                 resource: { buffer: this._projcBuffer },
             }],
         });
-
     };
 
-    abstract buildVertexBuffers(data: TrianglesLayer): void;
+    updateCameraUniformBuffers(camera: Camera)  {
+        const mview = new Float32Array(camera.getModelViewMatrix());
+        const projc = new Float32Array(camera.getProjectionMatrix());
 
-    abstract buildColorUniforms(data: IShaderColorData): void;
+        this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, mview);
+        this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
+    }
+
+    abstract createVertexBuffers(data: Layer): void;
+
+    abstract updateVertexBuffers(data: Layer): void;
+
+    abstract createColorUniformBuffers(data: Layer): void;
 
     abstract createPipeline(): void;
 
     abstract createShaders(): void;
 
-    abstract renderPass(camera: Camera): void;
+    abstract renderPass(data: Layer, camera: Camera): void;
 }

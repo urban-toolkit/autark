@@ -5,33 +5,33 @@ import { Renderer } from './renderer';
 
 export abstract class Layer {
     // layer id
-    protected _info!: ILayerInfo;
+    protected _layerInfo!: ILayerInfo;
     // picking shader
-    protected _renderInfo!: ILayerRenderInfo;
+    protected _layerRenderInfo!: ILayerRenderInfo;
 
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
-        this.loadInfo(layerInfo);
-        this.loadRenderInfo(layerRenderInfo);
+        this.setLayerInfo(layerInfo);
+        this.setLayerRenderInfo(layerRenderInfo);
     }
 
     get id() {
-        return this._info.id;
+        return this._layerInfo.id;
     }
 
-    get info() {
-        return this._info;
+    get layerInfo() {
+        return this._layerInfo;
     }
 
-    get renderInfo() {
-        return this._renderInfo;
+    get layerRenderInfo() {
+        return this._layerRenderInfo;
     }
 
-    loadInfo(layerInfo: ILayerInfo) {
-        this._info = layerInfo;
+    setLayerInfo(layerInfo: ILayerInfo) {
+        this._layerInfo = layerInfo;
     }
 
-    loadRenderInfo(layerRenderInfo: ILayerRenderInfo) {
-        this._renderInfo = layerRenderInfo;
+    setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
+        this._layerRenderInfo = layerRenderInfo;
     }
 
     abstract loadData(layerData: ILayerData): void;
@@ -40,9 +40,7 @@ export abstract class Layer {
 
     abstract loadThematic(layerThematic: ILayerThematic[]): void;
 
-    abstract buildPipeline(renderer: Renderer, camera: Camera): void;
-
-    abstract updateCamera(camera: Camera): void;
+    abstract createPipeline(renderer: Renderer, camera: Camera): void;
 
     abstract renderPass(camera: Camera): void;
 }

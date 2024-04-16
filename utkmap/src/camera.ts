@@ -61,19 +61,6 @@ export class Camera {
 
         // meter is no longer used in the remaining code
         this.wUp = vec3.fromValues(wUp[0], wUp[1], wUp[2]);
-
-        // ============ manhattan
-        // this.wEye = vec3.fromValues(3373.32275390625, -3327.14892578125, 4355.8701171875);
-        // this.wLookAt = vec3.fromValues(2775.06201171875, -2736.633056640625, 3814.228759765625);
-        // this.wUp = vec3.fromValues(-0.3854859173297882, 0.38049426674842834, 0.8406097292900085);
-        // ============ manhattan
-        // this.wEye = vec3.fromValues(25.537822723388672, 44.76106262207031, 1299.8607177734375);
-        // this.wLookAt = vec3.fromValues(572.3938598632812, -504.5278625488281, 668.0140380859375);
-        // this.wUp = vec3.fromValues(0.4457886517047882, -0.4477752149105072, 0.7750934362411499);
-        // ============ chicago
-        // this.wEye = vec3.fromValues(-18.267929077148438, 759.4937744140625, 3000);
-        // this.wLookAt = vec3.fromValues(-18.316102981567383, 747.6268310546875, 0.023424625396728516);
-        // this.wUp = vec3.fromValues(0.004059492610394955, 0.9999839067459106, -0.0039556859992444515);
     }
 
     getProjectionMatrix(): Float32Array | number[] {
