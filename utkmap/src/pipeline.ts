@@ -17,9 +17,10 @@ export abstract class Pipeline {
     protected _pipeline!: GPURenderPipeline;
 
     // Transformation matrices uniform buffer
-    protected _matricesBuffer!: GPUBuffer;
-    protected _matricesBindGroup!: GPUBindGroup;
-    protected _matricesBindGroupLayout!: GPUBindGroupLayout;
+    protected _mviewBuffer!: GPUBuffer;
+    protected _projcBuffer!: GPUBuffer;
+    protected _cameraBindGroup!: GPUBindGroup;
+    protected _cameraBindGroupLayout!: GPUBindGroupLayout;
 
     constructor(renderer: Renderer) {
         this._renderer = renderer;
@@ -36,32 +37,41 @@ export abstract class Pipeline {
     }
 
     buildCameraUniforms(camera: Camera) {
-        const mview = camera.getModelViewMatrix();
-        const projc = camera.getProjectionMatrix();
+        const mview = new Float32Array(camera.getModelViewMatrix());
+        const projc = new Float32Array(camera.getProjectionMatrix());
 
-        const cameraArray = new Float32Array(2 * 16);
-        cameraArray.set(mview, 0);
-        cameraArray.set(projc, 16);
-
-        this._matricesBuffer = this._renderer.device.createBuffer({
-            label: 'Transfomration matrices buffer',
-            size: cameraArray.byteLength,
+        this._mviewBuffer = this._renderer.device.createBuffer({
+            label: 'ModelView matrix buffer',
+            size: mview.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
-        this._matricesBindGroupLayout = this._renderer.device.createBindGroupLayout({
+        this._projcBuffer = this._renderer.device.createBuffer({
+            label: 'Projection matrix buffer',
+            size: projc.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+
+        this._cameraBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [{
-                binding: 0, // matrices
+                binding: 0, // modelview
+                visibility: GPUShaderStage.VERTEX,
+                buffer: {},
+            },{
+                binding: 1, // projection
                 visibility: GPUShaderStage.VERTEX,
                 buffer: {},
             }]
         });
 
-        this._matricesBindGroup = this._renderer.device.createBindGroup({
-            layout: this._matricesBindGroupLayout,
+        this._cameraBindGroup = this._renderer.device.createBindGroup({
+            layout: this._cameraBindGroupLayout,
             entries: [{
                 binding: 0,
-                resource: { buffer: this._matricesBuffer },
+                resource: { buffer: this._mviewBuffer },
+            },{
+                binding: 1,
+                resource: { buffer: this._projcBuffer },
             }],
         });
 

@@ -64,14 +64,9 @@ export class TrianglesLayer extends Layer {
             this._components.push(component);
         }
 
-        console.log(position);
-        console.log(indices);
-
         this._position = position;
         this._indices = indices;
         this._thematic = [];
-
-        console.log(this);
     }
 
     loadThematic(layerThematic: ILayerThematic[]): void {

@@ -49,7 +49,7 @@ export class Camera {
         this.mModelMatrix = mat4.create();
 
         // z-values start from here are in meters
-        this.wNear = 0;
+        this.wNear = 1;
         this.wFar = 1e10;
 
         this.groundRes = 1;
@@ -77,7 +77,7 @@ export class Camera {
     }
 
     getProjectionMatrix(): Float32Array | number[] {
-        return this.mProjectionMatrix;
+        return Array.from(this.mProjectionMatrix);
     }
 
     getViewMatrix(): Float32Array | number[] {
@@ -86,7 +86,7 @@ export class Camera {
 
     getModelViewMatrix(): Float32Array | number[] {
         const modelViewMatrix = mat4.mul(mat4.create(), this.mViewMatrix, this.mModelMatrix);
-        return modelViewMatrix;
+        return Array.from(modelViewMatrix);
     }
 
     getWorldOrigin(): Float32Array | number[] {

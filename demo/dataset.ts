@@ -33,11 +33,11 @@ export class ToyExample extends UtkData {
 
     async loadData() {
         this._cameraData = {
-            origin: [0, 0, 0],
+            origin: [0, 0, 1],
             direction: {
                 up: [0, 1, 0],
                 lookAt: [0, 0, 0],
-                eye: [0, 0, 0.5]
+                eye: [0, 0, 1]
             }
         }
 
@@ -111,6 +111,7 @@ export class ToyExample extends UtkData {
 }
 
 export class UtkPyParser extends UtkData {
+    protected _id: string;
     protected _pathGram: string;
     protected _pathJson: string;
     protected _pathCoords: string;
@@ -119,6 +120,7 @@ export class UtkPyParser extends UtkData {
     constructor(path: string = 'manhattan', file: string = 'parks') {
         super();
 
+        this._id = file;
         this._pathGram = `./${path}/grammar.json`
 
         const base = `./${path}/${file}`;
@@ -138,18 +140,16 @@ export class UtkPyParser extends UtkData {
                 lookAt: camera.direction.lookAt,
             }
         }
-        this._cameraData.origin[2] = 0;
-        this._cameraData.direction.eye[2] = 1000;
-        console.log(this._cameraData);
 
         const jsonData = <any>await DataLoader.getJsonData(this._pathJson);
         const coordsData = Array.from(<Float64Array>await DataLoader.getBinaryData(this._pathCoords, 'd'));
         const idsData = Array.from(<Uint32Array>await DataLoader.getBinaryData(this._pathIds, 'I'));
 
         this._layerInfo = {
-            id: `parks.osm`,
+            id: this._id,
             typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
-            typePhysical: LayerPhysicalType.PARKS_LAYER,
+            typePhysical: this._id.includes('parks') ?
+                LayerPhysicalType.PARKS_LAYER : LayerPhysicalType.WATER_LAYER,
         }
 
         this._layerRenderInfo = {
@@ -171,7 +171,7 @@ export class UtkPyParser extends UtkData {
 
             const geo = {
                 position: coordsData.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
-                    return (el - this.cameraData.origin[id%3]) * 0.001;
+                    return el - this.cameraData.origin[id%3];
                 }),
                 indices: idsData.slice(iStartCount[0], iStartCount[0] + iStartCount[1])
             }
