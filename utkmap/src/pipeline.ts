@@ -1,8 +1,8 @@
 /// <reference types="@webgpu/types" />
 
-import { Camera } from './camera';
 import { Layer } from './layer';
-import { TrianglesLayer } from './layer-triangles';
+
+import { Camera } from './camera';
 import { Renderer } from './renderer';
 
 export abstract class Pipeline {
@@ -26,12 +26,12 @@ export abstract class Pipeline {
         this._renderer = renderer;
     }
 
-    build(mesh: TrianglesLayer, camera: Camera) {
+    build(mesh: Layer, camera: Camera) {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
-        this.createColorUniformBuffers(mesh);
         this.createCameraUniformBuffers(camera);
+        this.createColorUniformBuffers();
 
         this.createPipeline();
     }
@@ -88,7 +88,7 @@ export abstract class Pipeline {
 
     abstract updateVertexBuffers(data: Layer): void;
 
-    abstract createColorUniformBuffers(data: Layer): void;
+    abstract createColorUniformBuffers(): void;
 
     abstract createPipeline(): void;
 

@@ -8,6 +8,13 @@ module.exports = {
     module: {
         rules: [
             {
+                test: /\.wgsl/,
+                type: 'asset/source',
+                generator: {
+                    emit: false,
+                },
+            },
+            {
                 test: /\.ts?$/,
                 use: 'ts-loader',
                 exclude: /node_modules/

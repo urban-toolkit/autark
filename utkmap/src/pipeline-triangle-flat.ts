@@ -1,7 +1,7 @@
 /// <reference types="@webgpu/types" />
 
-import vertSrc from './shaders/triangles.vert.wgsl';
-import fragSrc from './shaders/triangles.frag.wgsl';
+import trianglesVertexSource from './shaders/triangles.vert.wgsl';
+import trianglesFragmentSource from './shaders/triangles.frag.wgsl';
 
 import { Pipeline } from "./pipeline";
 import { Renderer } from "./renderer";
@@ -52,8 +52,6 @@ export class PipelineTriangleFlat extends Pipeline {
             size: mesh.indices.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
-
-        this.updateVertexBuffers(mesh);
     }
 
     updateVertexBuffers(mesh: TrianglesLayer) {
@@ -62,7 +60,7 @@ export class PipelineTriangleFlat extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }
 
-    createColorUniformBuffers(mesh: TrianglesLayer) {
+    createColorUniformBuffers() {
         this._colorBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
             size: 4 * 4,
@@ -125,8 +123,6 @@ export class PipelineTriangleFlat extends Pipeline {
                 resource: this._cMapSampler,
             }],
         });
-
-        this.updateColorUniformBuffers(mesh);
     }
 
     updateColorUniformBuffers(mesh: TrianglesLayer) {
@@ -148,13 +144,13 @@ export class PipelineTriangleFlat extends Pipeline {
     createShaders() {
         // Vertex shader
         const vsmDesc = {
-            code: vertSrc
+            code: trianglesVertexSource
         };
         this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
 
         // Fragment shader
         const fsmDesc = {
-            code: fragSrc
+            code: trianglesFragmentSource
         };
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }

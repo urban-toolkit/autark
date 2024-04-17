@@ -1,8 +1,9 @@
 export enum LayerGeometryType {
-    POINTSET_LAYER = "POINTSET_LAYER",
-    POLYLINE_LAYER = "POLYLINE_LAYER",
-    TRIGMESH_LAYER = "TRIGMESH_LAYER",
-    UNIFGRID_LAYER = "UNIFGRID_LAYER",
+    POINTSET_LAYER  = "POINTSET_LAYER",
+    POLYLINE_LAYER  = "POLYLINE_LAYER",
+    TRIGMESH_LAYER  = "TRIGMESH_LAYER",
+    UNIFGRID_LAYER  = "UNIFGRID_LAYER",
+    BUILDINGS_LAYER = "BUILDINGS_LAYER",
 }
 
 export enum LayerPhysicalType {
@@ -23,6 +24,7 @@ export enum ThematicAggregationLevel {
 
 export enum RenderPipeline {
     TRIANGLE_FLAT = "TRIANGLE_FLAT",
+    BUILDING_FLAT = "BUILDING_FLAT",
 }
 
 export enum ColorMapInterpolator {
