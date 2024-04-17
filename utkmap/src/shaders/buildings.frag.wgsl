@@ -4,9 +4,9 @@
 @group(0) @binding(3) var cMapSampler : sampler;
 
 @fragment 
-fn main(@location(0) inNormal: vec4f, @location(1) inThematic: f32) -> @location(0) vec4f {
+fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32) -> @location(0) vec4f {
     var light: vec3f = normalize(vec3f(1.0, 0.0, 1.0));
-    var normal: vec3f = normalize(inNormal.xyz);
+    var normal: vec3f = normalize(inNormal);
 
     var diffuse: f32 = max(dot(normal, light) * 0.7, 0.0);
     var ambient: f32 = 0.25;

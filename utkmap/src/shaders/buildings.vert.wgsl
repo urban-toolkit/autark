@@ -3,7 +3,7 @@
 
 struct VSOut {
     @builtin(position) outPosition: vec4<f32>,
-    @location(0) outNormal: vec4<f32>,
+    @location(0) outNormal: vec3<f32>,
     @location(1) outThematic: f32
  };
 
@@ -12,7 +12,7 @@ fn main(@location(0) inPosition: vec3f, @location(1) inNormal: vec3f, @location(
     var vsOut: VSOut;
 
     vsOut.outPosition = projection * modelView * vec4f(inPosition, 1);
-    vsOut.outNormal = vec4f(inNormal, 0);
+    vsOut.outNormal = inNormal;
     vsOut.outThematic = inThematic;
 
     return vsOut;
