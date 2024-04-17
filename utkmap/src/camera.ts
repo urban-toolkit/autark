@@ -1,4 +1,3 @@
-import { GeoUtils } from './geo-utils';
 import { vec2, vec3, mat4 } from 'gl-matrix';
 import { ICameraData } from './interfaces';
 
@@ -227,20 +226,6 @@ export class Camera {
         vec3.normalize(dir, dir);
 
         return dir;
-    }
-
-    screenCoordToLatLng(x: number, y: number): number[] | null {
-        const dir = this.screenCoordToWorldDir(x, y);
-
-        const t = -this.wEye[2] / dir[2];
-        if (t > 0) {
-            const intersectPoint = vec3.scaleAndAdd(vec3.create(), this.wEye, dir, t);
-            const originCoord = GeoUtils.latLng2Coord(this.wOrigin[0], this.wOrigin[1]);
-            const latLng = GeoUtils.coord2LatLng(intersectPoint[0] + originCoord[0], intersectPoint[1] + originCoord[1]);
-
-            return latLng;
-        }
-        return null;
     }
 
     activateBirdsEye() {
