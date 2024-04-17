@@ -1,3 +1,4 @@
+import { MapStyle } from "./map-style";
 import { UtkMap } from "./utk-map";
 
 export class KeyEvents {
@@ -27,6 +28,14 @@ export class KeyEvents {
                 renderInfo.isColorMap = !renderInfo.isColorMap;
                 this._map.updateRenderInfo(layerInfo, renderInfo);
             }
+        }
+
+        if (event.key == "s") {
+            const styles = ['default', 'light', 'dark'];
+            const current = MapStyle.currentStyle;
+            
+            const id = (styles.indexOf(current) + 1) % 3;
+            MapStyle.setPredefinedStyle(styles[id]);
         }
     }
 }

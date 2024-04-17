@@ -2,7 +2,7 @@ import { utk } from 'utk';
 import { utkDb } from 'utkdb';
 import { utkRun } from 'utkrun';
 
-import { UtkMap } from 'utkmap';
+import { MapStyle, UtkMap } from 'utkmap';
 
 import { UtkPyData, ToyExample } from './dataset';
 
