@@ -3,6 +3,7 @@ import { LayerGeometryType } from "./constants";
 
 import { Layer } from "./layer";
 import { TrianglesLayer } from "./layer-triangles";
+import { BuildingsLayer } from "./layer-buildings";
 
 export class LayerManager {
     protected _layers: Layer[] = [];
@@ -21,14 +22,17 @@ export class LayerManager {
             case LayerGeometryType.TRIGMESH_LAYER:
                 layer = new TrianglesLayer(layerInfo, layerRender, layerData);
             break;
+            case LayerGeometryType.BUILDINGS_LAYER:
+                layer = new BuildingsLayer(layerInfo, layerRender, layerData);
+            break;
             default:
                 console.error(`File ${layerInfo.id}.json has an unknown layer type: ${layerInfo.typeGeometry}.`);
             break;
         }
 
         if (layer) { 
-            this._layers.push(<Layer>layer);
-            return <Layer>layer;
+            this._layers.push(layer);
+            return layer;
         }
         return null;
     }

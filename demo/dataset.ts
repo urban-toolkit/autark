@@ -1,5 +1,5 @@
 import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo } from "utkmap/src/interfaces"
-import { LayerGeometryType, LayerPhysicalType, RenderPipeline, ColorMapInterpolator, ThematicAggregationLevel } from "utkmap/src/constants"
+import { LayerGeometryType, LayerPhysicalType, RenderPipeline as RenderPipelineType, ColorMapInterpolator, ThematicAggregationLevel } from "utkmap/src/constants"
 
 import { DataLoader } from './data-loader';
 
@@ -49,7 +49,7 @@ export class ToyExample extends UtkData {
         });
 
         this._layerRenderInfo.push({
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
+            pipeline: RenderPipelineType.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: true,
             isPicking: false
@@ -123,16 +123,43 @@ export class UtkPyData extends UtkData {
         this._dataFolder = dataFolder;
     }
 
+    getGeometryType(layer: string): LayerGeometryType {
+        switch (layer) {
+            case 'parks': return LayerGeometryType.TRIGMESH_LAYER;
+            case 'water': return LayerGeometryType.TRIGMESH_LAYER;
+            case 'roads': return LayerGeometryType.TRIGMESH_LAYER;
+            case 'surface': return LayerGeometryType.TRIGMESH_LAYER;
+            case 'buildings': return LayerGeometryType.BUILDINGS_LAYER;
+        }
+
+        return LayerGeometryType.TRIGMESH_LAYER;
+    }
+
     getPhysicalType(layer: string): LayerPhysicalType {
         switch (layer) {
             case 'parks': return LayerPhysicalType.PARKS_LAYER;
             case 'water': return LayerPhysicalType.WATER_LAYER;
             case 'roads': return LayerPhysicalType.ROADS_LAYER;
             case 'surface': return LayerPhysicalType.SURFACE_LAYER;
+            case 'buildings': return LayerPhysicalType.BUILDINGS_LAYER;
         }
 
         return LayerPhysicalType.LAND_LAYER;
     }
+
+
+    getPipelineType(layer: string): RenderPipelineType {
+        switch (layer) {
+            case 'parks': return RenderPipelineType.TRIANGLE_FLAT;
+            case 'water': return RenderPipelineType.TRIANGLE_FLAT;
+            case 'roads': return RenderPipelineType.TRIANGLE_FLAT;
+            case 'surface': return RenderPipelineType.TRIANGLE_FLAT;
+            case 'buildings': return RenderPipelineType.BUILDING_FLAT;
+        }
+
+        return RenderPipelineType.TRIANGLE_FLAT;
+    }
+
 
     async loadData() {
         const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
@@ -159,12 +186,12 @@ export class UtkPyData extends UtkData {
             this._layerInfo.push({
                 id: `${layer}.utkpy`,
                 zIndex: lId,
-                typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
+                typeGeometry: this.getGeometryType(layer),
                 typePhysical: this.getPhysicalType(layer)
             });
     
             this._layerRenderInfo.push({
-                pipeline: RenderPipeline.TRIANGLE_FLAT,
+                pipeline: this.getPipelineType(layer),
                 colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
                 isColorMap: false,
                 isPicking: false
