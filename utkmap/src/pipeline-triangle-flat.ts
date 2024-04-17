@@ -208,9 +208,9 @@ export class PipelineTriangleFlat extends Pipeline {
 
         // Depth test
         const depthStencil: GPUDepthStencilState = {
-            depthWriteEnabled: true,
-            depthCompare: 'less',
-            format: 'depth24plus-stencil8'
+            depthWriteEnabled: false,
+            depthCompare: 'less-equal',
+            format: 'depth32float'
         };
 
         // Uniform Data

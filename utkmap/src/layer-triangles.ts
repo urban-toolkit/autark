@@ -57,7 +57,13 @@ export class TrianglesLayer extends Layer {
             }
 
             // merges the position data
-            position.push(...layerGeometry[id].position);
+            const pos_zfix = layerGeometry[id].position.map((d, id) => {
+                if(id % 3 === 2) {
+                    d += this._layerInfo.zIndex;
+                }
+                return d;
+            });
+            position.push(...pos_zfix);
 
             // stores the components
             const component = {

@@ -14,6 +14,7 @@ export interface IMapStyle {
 
 export interface ILayerInfo {
     id: string; // layer id
+    zIndex: number, // layer render order
     typeGeometry: LayerGeometryType; // layer geometry type
     typePhysical: LayerPhysicalType; // layer physical type
 }

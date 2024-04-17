@@ -42,7 +42,8 @@ export class ToyExample extends UtkData {
         }
 
         this._layerInfo.push({
-            id: 'roads.osm',
+            id: 'toy.example',
+            zIndex: 0,
             typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
             typePhysical: LayerPhysicalType.WATER_LAYER,
         });
@@ -123,7 +124,6 @@ export class UtkPyData extends UtkData {
     }
 
     getPhysicalType(layer: string): LayerPhysicalType {
-
         switch (layer) {
             case 'parks': return LayerPhysicalType.PARKS_LAYER;
             case 'water': return LayerPhysicalType.WATER_LAYER;
@@ -158,6 +158,7 @@ export class UtkPyData extends UtkData {
     
             this._layerInfo.push({
                 id: `${layer}.utkpy`,
+                zIndex: lId,
                 typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
                 typePhysical: this.getPhysicalType(layer)
             });

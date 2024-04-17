@@ -112,7 +112,7 @@ export class Renderer {
         const depthTextureDesc: GPUTextureDescriptor = {
             size: [this._canvas.width, this._canvas.height, 1],
             dimension: '2d',
-            format: 'depth24plus-stencil8',
+            format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
         };
         const depthTexture = this._device.createTexture(depthTextureDesc);
@@ -122,10 +122,7 @@ export class Renderer {
             view: depthTextureView,
             depthClearValue: 1,
             depthLoadOp: 'clear',
-            depthStoreOp: 'store',
-            stencilClearValue: 0,
-            stencilLoadOp: 'clear',
-            stencilStoreOp: 'store'
+            depthStoreOp: 'store'
         };
     }
 
