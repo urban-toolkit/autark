@@ -18,9 +18,9 @@ export class BuildingsLayer extends TrianglesLayer {
         return this._normal;
     }
 
-    createPipeline(renderer: Renderer, camera: Camera): void {
+    createPipeline(renderer: Renderer): void {
         this._pipeline = new PipelineBuildingFlat(renderer);
-        this._pipeline.build(this, camera);
+        this._pipeline.build(this);
     }
 
     computeNormals(): void {
