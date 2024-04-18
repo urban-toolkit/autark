@@ -17,6 +17,16 @@ export class PipelineBuildingFlat extends PipelineTriangleFlat {
         super(renderer);
     }
 
+    build(mesh: BuildingsLayer) {
+        this.createShaders();
+
+        this.createVertexBuffers(mesh);
+        this.createCameraUniformBuffers();
+        this.createColorUniformBuffers();
+
+        this.createPipeline();
+    }
+
     createVertexBuffers(mesh: BuildingsLayer): void {
         super.createVertexBuffers(mesh);
 
@@ -131,8 +141,8 @@ export class PipelineBuildingFlat extends PipelineTriangleFlat {
             layout, vertex, fragment, primitive, depthStencil, multisample
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
-
     }
+
     renderPass(mesh: BuildingsLayer, camera: Camera): void {
         // gets the pass commands encoder
         const passEncoder = this._renderer.passEncoder;
