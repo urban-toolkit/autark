@@ -36,7 +36,6 @@ export class TrianglesLayer extends Layer {
     }
 
     createPipeline(renderer: Renderer, camera: Camera): void {
-        console.log("TTTTTTTTTTTTTTTT");
         this._pipeline = new PipelineTriangleFlat(renderer);
         this._pipeline.build(this, camera);
     }

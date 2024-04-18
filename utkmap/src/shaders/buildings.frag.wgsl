@@ -11,14 +11,14 @@ fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32) -> @location
     var diffuse: f32 = max(dot(normal, light) * 0.7, 0.0);
     var ambient: f32 = 0.25;
 
-    var color: vec4f = vec4f(0.0, 0.0, 0.0, 1.0);
+    var finalcolor: vec4f = vec4f(0.0, 0.0, 0.0, 1.0);
     if (showThematic > 0) {
-        color = textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
+        finalcolor = textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
     }
     else {
-        color = vec4f(color.r / 255, color.g / 255, color.b / 255, color.a);
+        finalcolor = vec4f(color.r / 255, color.g / 255, color.b / 255, color.a);
     }
 
-    var shade: vec4f = color * (diffuse + ambient);
-    return vec4f(0.6 * shade + 0.4 * color);
+    var shade: vec4f = finalcolor * (diffuse + ambient);
+    return vec4f(0.5 * shade.rgb + 0.5 * finalcolor.rgb, 1.0);
 }

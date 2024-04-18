@@ -30,29 +30,22 @@ export class BuildingsLayer extends TrianglesLayer {
         // fills with invalid
         this._normal = new Array(len).fill(0);
 
-        console.log(this._position);
-        console.log(this._indices);
-
         // iterate over the triangles
         for (let id = 0; id < this._indices.length; id += 3) {
             // vertices of the face
             const idVa = 3 * this._indices[id+0];
             const idVb = 3 * this._indices[id+1];
             const idVc = 3 * this._indices[id+2];
-            console.log(idVa, idVb, idVc);
 
             // coordinates of the vertices of the face
-            const va = this._position.slice(idVa, 3);
-            const vb = this._position.slice(idVb, 3);
-            const vc = this._position.slice(idVc, 3);
-            console.log(va);
-            console.log(vb);
-            console.log(vc);
+            const va: number[] = [];
+            const vb: number[] = [];
+            const vc: number[] = [];
 
-            if(id > 9) {
-                console.log(this._position);
-                console.log(this._indices);
-                return;
+            for (let i = 0; i < 3; i++) {
+                va.push(this._position[idVa + i])
+                vb.push(this._position[idVb + i])
+                vc.push(this._position[idVc + i])
             }
 
             // face vectors
@@ -72,14 +65,16 @@ export class BuildingsLayer extends TrianglesLayer {
 
         // normalization
         for (let vid = 0; vid < this._normal.length; vid += 3) {
-            const nrm = this._normal.slice(vid, 3);
+            const nrm: number[] = []
+            for (let i = 0; i < 3; i++) {
+                nrm.push(this._normal[vid + i]);
+            }
             const size = Math.sqrt(nrm[0] * nrm[0] + nrm[1] * nrm[1] + nrm[2] * nrm[2]);
 
             // divide each coordinate
             for (let i = 0; i < 3; i++) {
-                this._normal[vid + i] /= size;
+                this._normal[vid + i] = this._normal[vid + i] / size;
             }
         }
-
     }
 }

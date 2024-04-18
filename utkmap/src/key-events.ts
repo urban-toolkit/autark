@@ -1,3 +1,4 @@
+import { LayerPhysicalType } from "./constants";
 import { MapStyle } from "./map-style";
 import { UtkMap } from "./utk-map";
 
@@ -24,6 +25,10 @@ export class KeyEvents {
             for(const layer of layers) {
                 const layerInfo = layer.layerInfo;
                 const renderInfo = layer.layerRenderInfo;
+
+                if(layerInfo.typePhysical != LayerPhysicalType.BUILDINGS_LAYER) {
+                    continue;
+                }
 
                 renderInfo.isColorMap = !renderInfo.isColorMap;
                 this._map.updateRenderInfo(layerInfo, renderInfo);
