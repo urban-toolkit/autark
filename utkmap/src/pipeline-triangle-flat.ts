@@ -20,7 +20,7 @@ export class PipelineTriangleFlat extends Pipeline {
 
     // Uniforms buffer
     protected _colorBuffer!: GPUBuffer;
-    protected _useColorMap!: GPUBuffer; 
+    protected _useColorMap!: GPUBuffer;
     protected _cMapTexture!: GPUTexture;
     protected _cMapSampler!: GPUSampler;
 
@@ -202,6 +202,11 @@ export class PipelineTriangleFlat extends Pipeline {
             topology: 'triangle-list'
         };
 
+        // Antialising
+        const multisample: GPUMultisampleState = {
+            count: this._renderer.sampleCount,
+        };
+
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: false,
@@ -220,7 +225,7 @@ export class PipelineTriangleFlat extends Pipeline {
         // Pipeline
         const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
         const pipelineDesc: GPURenderPipelineDescriptor = {
-            layout, vertex, fragment, primitive, depthStencil
+            layout, vertex, fragment, primitive, depthStencil, multisample
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }

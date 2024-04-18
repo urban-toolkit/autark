@@ -24,6 +24,9 @@ export class Renderer {
     // command encoder
     protected _passEncoder!: GPURenderPassEncoder;
 
+    // antalising
+    protected _sampleCount: number = 4;
+
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
     }
@@ -40,13 +43,18 @@ export class Renderer {
         return this._passEncoder;
     }
 
+    get sampleCount(): number {
+        return this._sampleCount;
+    }
+
     // Start the rendering engine
     async init() {
         const api = await this.initWebGPU()
 
         if (api) {
             this.configureContext();
-            this.configureFrameAndDepth();
+            this.configureFrameBuffer();
+            this.configureDepthBuffer();
         }
     }
 
@@ -89,35 +97,51 @@ export class Renderer {
                 usage:
                     GPUTextureUsage.RENDER_ATTACHMENT |
                     GPUTextureUsage.COPY_SRC,
-                alphaMode: 'opaque'
+                alphaMode: 'opaque',
             };
             this._context.configure(canvasConfig);
         }
     }
 
-    configureFrameAndDepth() {
+    configureFrameBuffer() {
         // Frame buffer definition
         const colorTexture = this._context.getCurrentTexture();
         const colorTextureView = colorTexture.createView();
 
+        // Aliasing texture
+        const multiSampleDesc: GPUTextureDescriptor = {
+            size: [this._canvas.width, this._canvas.height, 1],
+            sampleCount: this._sampleCount,
+            format: 'bgra8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        }
+        const multiSampleTexture = this._device.createTexture(multiSampleDesc);
+        const multiSampleTextureView = multiSampleTexture.createView();
+
+        // Framebuffer definition
         const sky = MapStyle.getColor('sky');
-        this._frameBuffer = {
-            view: colorTextureView,
+        this._frameBuffer = {  
+            view: multiSampleTextureView,
+            resolveTarget: colorTextureView,
             clearValue: { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 },
             loadOp: 'clear',
-            storeOp: 'store'
+            storeOp: 'store',
         };
+    }
 
-        // Depth buffer definition
+    configureDepthBuffer() {
+        // Depth textire
         const depthTextureDesc: GPUTextureDescriptor = {
             size: [this._canvas.width, this._canvas.height, 1],
+            sampleCount: this._sampleCount,
             dimension: '2d',
             format: 'depth32float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         };
         const depthTexture = this._device.createTexture(depthTextureDesc);
         const depthTextureView = depthTexture.createView();
 
+        // depth buffer definition
         this._depthBuffer = {
             view: depthTextureView,
             depthClearValue: 1,
@@ -132,10 +156,8 @@ export class Renderer {
             return;
         }
 
-        // udpate current the frame buffer texture
-        const colorTexture = this._context.getCurrentTexture();
-        const colorTextureView = colorTexture.createView();
-        this._frameBuffer.view = colorTextureView;
+        // Configure the frame buffer
+        this.configureFrameBuffer();
 
         // Render pass description
         const renderPassDesc = {
