@@ -32,6 +32,20 @@ export class PipelineBuildingSSAO extends Pipeline {
     // first pass (SSAO)
     protected _pipeline02!: GPURenderPipeline;
 
+    // Output buffers (Pass 01)
+    protected _colorsSharedBuffer!: GPURenderPassColorAttachment;
+    protected _normalsSharedBuffer!: GPURenderPassColorAttachment;
+
+    // Input Bind Groups 
+    protected _texturesPass02BindGroup!: GPUBindGroup;
+    protected _texturesPass02BindGroupLayout!: GPUBindGroupLayout;
+
+
+    // Depth buffer
+    protected _depthBufferPass01!: GPURenderPassDepthStencilAttachment;
+
+    protected _pass02TexturesBindGroup!: GPUBindGroup;
+
     constructor(renderer: Renderer) {
         super(renderer);
     }
@@ -40,11 +54,42 @@ export class PipelineBuildingSSAO extends Pipeline {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
-        this.createCameraUniformBuffers();
-        this.createColorUniformBuffers();
+        this.createCameraUniformBindGroup();
+        this.createColorUniformBindGroup();
+
+        this.createSharedTextures();
+        this.createDepthBufferPass01();
+        this.createTexturesBindGroupPass02();
 
         this.createPipeline01();
         this.createPipeline02();
+    }
+
+    createShaders(): void {
+        // Vertex shader
+        const vsDesc01 = {
+            code: buildingsVS01
+        };
+        this._vertModule01 = this._renderer.device.createShaderModule(vsDesc01);
+
+        // Fragment shader
+        const fsDesc01 = {
+            code: buildingsFS01
+        };
+        this._fragModule01 = this._renderer.device.createShaderModule(fsDesc01);
+
+
+        // Vertex shader
+        const vsDesc02 = {
+            code: buildingsVS02
+        };
+        this._vertModule02 = this._renderer.device.createShaderModule(vsDesc02);
+
+        // Fragment shader
+        const fsDesc02 = {
+            code: buildingsFS02
+        };
+        this._fragModule02 = this._renderer.device.createShaderModule(fsDesc02);
     }
 
     createVertexBuffers(mesh: BuildingsLayer): void {
@@ -84,31 +129,99 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }
 
-    createShaders(): void {
-        // Vertex shader
-        const vsDesc01 = {
-            code: buildingsVS01
+    createSharedTextures() {
+        const colorTextureDesc: GPUTextureDescriptor = {
+            label: 'Shared colors texture',
+            size: [this._renderer.canvas.width, this._renderer.canvas.height],
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            format: 'bgra8unorm',
         };
-        this._vertModule01 = this._renderer.device.createShaderModule(vsDesc01);
+        const colorTexture = this._renderer.device.createTexture(colorTextureDesc);
+        const colorTextureView = colorTexture.createView();
 
-        // Fragment shader
-        const fsDesc01 = {
-            code: buildingsFS01
+        this._colorsSharedBuffer = {
+            view: colorTextureView,
+            clearValue: [0, 0, 0, 1],
+            loadOp: 'clear',
+            storeOp: 'store',
+        }
+
+        const normalsTextureDesc: GPUTextureDescriptor = {
+            label: 'Shared normals texture',
+            size: [this._renderer.canvas.width, this._renderer.canvas.height],
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            format: 'rgba16float',
         };
-        this._fragModule01 = this._renderer.device.createShaderModule(fsDesc01);
+        // GBuffer texture render targets
+        const normalsTexture = this._renderer.device.createTexture(normalsTextureDesc);
+        const normalsTextureView = normalsTexture.createView();
 
+        this._normalsSharedBuffer = {
+            view: normalsTextureView,
+            clearValue: [0.0, 0.0, 1.0, 1.0],
+            loadOp: 'clear',
+            storeOp: 'store',
+        }
+    }
 
-        // Vertex shader
-        const vsDesc02 = {
-            code: buildingsVS02
+    createDepthBufferPass01() {
+        // Depth texture
+        const depthTextureDesc: GPUTextureDescriptor = {
+            label: 'Pass 01 depth texture',
+            size: [this._renderer.canvas.width, this._renderer.canvas.height],
+            format: 'depth32float',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         };
-        this._vertModule02 = this._renderer.device.createShaderModule(vsDesc02);
+        const depthTexture = this._renderer.device.createTexture(depthTextureDesc);
+        const depthTextureView = depthTexture.createView();
 
-        // Fragment shader
-        const fsDesc02 = {
-            code: buildingsFS02
-        };
-        this._fragModule02 = this._renderer.device.createShaderModule(fsDesc02);
+        this._depthBufferPass01 = {
+            view: depthTextureView,
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+        }
+    }
+
+    createTexturesBindGroupPass02() {
+        const texSampler = this._renderer.device.createSampler({
+            label: 'Pass 02 sampler',
+            magFilter: "linear",
+            minFilter: "linear",
+            addressModeU: "clamp-to-edge",
+            addressModeV: "clamp-to-edge",
+        });
+
+        this._texturesPass02BindGroupLayout = this._renderer.device.createBindGroupLayout({
+            entries: [{
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: {},
+            }, {
+                binding: 1,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {},
+            }, {
+                binding: 2,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {},
+            }],
+        });
+
+        this._texturesPass02BindGroup = this._renderer.device.createBindGroup({
+            layout: this._texturesPass02BindGroupLayout,
+            entries: [{
+                binding: 0,
+                resource: texSampler,
+            }, {
+                binding: 1,
+                resource: this._colorsSharedBuffer.view,
+            }, {
+                binding: 2,
+                resource: this._normalsSharedBuffer.view,
+            }
+            ],
+        });
     }
 
     createPipeline01(): void {
@@ -157,8 +270,8 @@ export class PipelineBuildingSSAO extends Pipeline {
             module: this._fragModule01,
             entryPoint: 'main',
             targets: [
-                { format: 'rgba16float' },
-                { format: 'bgra8unorm' }
+                { format: 'bgra8unorm' },
+                { format: 'rgba16float' }
             ]
         };
 
@@ -201,7 +314,7 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         // Fragment Shader
         const fragment: GPUFragmentState = {
-            module: this._fragModule01,
+            module: this._fragModule02,
             entryPoint: 'main',
             targets: [
                 { format: 'bgra8unorm' },
@@ -229,8 +342,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         // Uniform Data
         const pipelineLayoutDesc = {
             bindGroupLayouts: [
-                this._colorsBindGroupLayout,
-                this._cameraBindGroupLayout
+                this._texturesPass02BindGroupLayout,
             ]
         };
 
@@ -243,59 +355,30 @@ export class PipelineBuildingSSAO extends Pipeline {
     }
 
     pass01(mesh: BuildingsLayer, camera: Camera) {
-        // GBuffer texture render targets
-        const gBufferTextureNormals = this._renderer.device.createTexture({
-            size: [this._renderer.canvas.width, this._renderer.canvas.height],
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-            format: 'rgba16float',
-        });
-        const gBufferTextureColor = this._renderer.device.createTexture({
-            size: [this._renderer.canvas.width, this._renderer.canvas.height],
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-            format: 'bgra8unorm',
-        });
-        const depthTexture = this._renderer.device.createTexture({
-            size: [this._renderer.canvas.width, this._renderer.canvas.height],
-            format: 'depth32float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-        });
 
-        const writeGBufferPassDescriptor: GPURenderPassDescriptor = {
-            colorAttachments: [
-                {
-                    view: gBufferTextureNormals.createView(),
-                    clearValue: [0.0, 0.0, 1.0, 1.0],
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                },
-                {
-                    view: gBufferTextureColor.createView(),
-                    clearValue: [0, 0, 0, 1],
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                }
-            ],
-            depthStencilAttachment: {
-                view: depthTexture.createView(),
-                depthClearValue: 1.0,
-                depthLoadOp: 'clear',
-                depthStoreOp: 'store',
-            }
-        };
-    
         // Create a new command encoder
         const commandEncoder = this._renderer.device.createCommandEncoder();
 
+        // create pass textures
+        this.createSharedTextures();
+        this.createDepthBufferPass01();
+
+        // Pass 01 descriptor
+        const passDescriptor: GPURenderPassDescriptor = {
+            colorAttachments: [this._colorsSharedBuffer, this._normalsSharedBuffer],
+            depthStencilAttachment: this._depthBufferPass01
+        };
+
         // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(writeGBufferPassDescriptor);
+        const passEncoder = commandEncoder.beginRenderPass(passDescriptor);
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline01);
 
         // updates all data
         this.updateVertexBuffers(mesh);
-        this.updateColorUniformBuffers(mesh);
-        this.updateCameraUniformBuffers(camera);
+        this.updateColorUniforms(mesh);
+        this.updateCameraUniforms(camera);
 
         // sets the vertex buffers
         passEncoder.setVertexBuffer(0, this._positionBuffer);
@@ -313,25 +396,40 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
         passEncoder.end();
 
-        // Copy the rendering results from the swapchain.
-        // commandEncoder.copyTextureToTexture(
-        //     { texture: outputTexture }, 
-        //     { texture: storedTexture }, 
-        //     {
-        //         width: presentationSize[0],
-        //         height: presentationSize[1],
-        //         depthOrArrayLayers: 1
-        //     }
-        // );
-
         this._renderer.device.queue.submit([commandEncoder.finish()]);
     }
 
     pass02() {
+        // Create a new command encoder
+        const commandEncoder = this._renderer.device.createCommandEncoder();
 
+        // changes buffer behaviour
+        this._renderer.frameBuffer.loadOp = 'load';
+
+        // Render pass description
+        const renderPassDesc = {
+            colorAttachments: [this._renderer.frameBuffer],
+            depthStencilAttachment: this._renderer.depthBuffer
+        };
+
+        // Create a new pass commands encoder
+        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+
+        // sets the current pipeline
+        passEncoder.setPipeline(this._pipeline02);
+
+        // sets the uniform buffers
+        passEncoder.setBindGroup(0, this._texturesPass02BindGroup);
+
+        // draw command
+        passEncoder.draw(4, 1, 0, 0);
+        passEncoder.end();
+
+        this._renderer.device.queue.submit([commandEncoder.finish()]);
     }
 
     renderPass(mesh: BuildingsLayer, camera: Camera): void {
         this.pass01(mesh, camera);
+        this.pass02();
     }
 }

@@ -21,7 +21,7 @@ export abstract class Pipeline {
     protected _colorBuffer!: GPUBuffer;
     protected _useColorMap!: GPUBuffer;
     protected _cMapTexture!: GPUTexture;
-    protected _cMapSampler!: GPUSampler;
+
     protected _colorsBindGroup!: GPUBindGroup;
     protected _colorsBindGroupLayout!: GPUBindGroupLayout;
 
@@ -29,7 +29,7 @@ export abstract class Pipeline {
         this._renderer = renderer;
     }
 
-    createCameraUniformBuffers() {
+    createCameraUniformBindGroup() {
         this._mviewBuffer = this._renderer.device.createBuffer({
             label: 'ModelView matrix buffer',
             size: 16 * 4,
@@ -66,7 +66,7 @@ export abstract class Pipeline {
         });
     };
 
-    updateCameraUniformBuffers(camera: Camera)  {
+    updateCameraUniforms(camera: Camera)  {
         const mview = new Float32Array(camera.getModelViewMatrix());
         const projc = new Float32Array(camera.getProjectionMatrix());
 
@@ -74,7 +74,7 @@ export abstract class Pipeline {
         this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
     }
 
-    createColorUniformBuffers() {
+    createColorUniformBindGroup() {
         this._colorBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
             size: 4 * 4,
@@ -93,7 +93,8 @@ export abstract class Pipeline {
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
             format: 'rgba8unorm',
         });
-        this._cMapSampler = this._renderer.device.createSampler({
+
+        const cMapSampler = this._renderer.device.createSampler({
             label: 'Fixed color buffer',
             magFilter: "linear",
             minFilter: "linear",
@@ -134,12 +135,12 @@ export abstract class Pipeline {
                 resource: this._cMapTexture.createView(),
             }, {
                 binding: 3,
-                resource: this._cMapSampler,
+                resource: cMapSampler,
             }],
         });
     }
 
-    updateColorUniformBuffers(layer: Layer) {
+    updateColorUniforms(layer: Layer) {
         const colors = {
             color: MapStyle.getColor(layer.layerInfo.typePhysical),
             colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),

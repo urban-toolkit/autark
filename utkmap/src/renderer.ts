@@ -21,9 +21,6 @@ export class Renderer {
     // command encoder
     protected _commandEncoder!: GPUCommandEncoder;
 
-    // command encoder
-    protected _passEncoder!: GPURenderPassEncoder;
-
     // antalising
     protected _sampleCount: number = 4;
 
@@ -39,8 +36,12 @@ export class Renderer {
         return this._device;
     }
 
-    get passEncoder(): GPURenderPassEncoder {
-        return this._passEncoder;
+    get frameBuffer():  GPURenderPassColorAttachment {
+        return this._frameBuffer;
+    }
+
+    get depthBuffer():  GPURenderPassDepthStencilAttachment {
+        return this._depthBuffer;
     }
 
     get sampleCount(): number {
@@ -97,7 +98,7 @@ export class Renderer {
                 usage:
                     GPUTextureUsage.RENDER_ATTACHMENT |
                     GPUTextureUsage.COPY_SRC,
-                alphaMode: 'opaque',
+                alphaMode: 'premultiplied',
             };
             this._context.configure(canvasConfig);
         }
@@ -127,7 +128,6 @@ export class Renderer {
             loadOp: 'clear',
             storeOp: 'store',
         };
-
     }
 
     configureDepthBuffer() {
@@ -151,7 +151,7 @@ export class Renderer {
         };
     }
 
-    start() {
+    clear() {
         if (!this._context) {
             console.error("WebGPU cannot be initialized - Canvas does not support WebGPU");
             return;
@@ -160,23 +160,20 @@ export class Renderer {
         // Configure the frame buffer
         this.configureFrameBuffer();
 
+        // Create a new command encoder
+        this._commandEncoder = this._device.createCommandEncoder();
+
         // Render pass description
         const renderPassDesc = {
             colorAttachments: [this._frameBuffer],
             depthStencilAttachment: this._depthBuffer
         };
 
-        // Create a new command encoder
-        this._commandEncoder = this._device.createCommandEncoder();
-
         // Create a new pass commands encoder
-        this._passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
+        const passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
+        passEncoder.end();
 
-    }
-
-    finish() {
-        // Submit commands
-        this._passEncoder.end();
+        // clear pass
         this._device.queue.submit([this._commandEncoder.finish()]);
     }
 }
