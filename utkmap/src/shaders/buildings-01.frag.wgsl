@@ -4,8 +4,8 @@
 @group(0) @binding(3) var cMapSampler : sampler;
 
 struct BufferOut {
-  @location(0) normal : vec4f,
-  @location(1) color  : vec4f,
+    @location(0) color  : vec4f,
+    @location(1) normal : vec4f,
 }
 
 @fragment 
@@ -26,8 +26,8 @@ fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32) -> BufferOut
     var shade: vec4f = finalcolor * (diffuse + ambient);
 
     var output : BufferOut;
-    output.normal = vec4f(normal * 0.5 + 0.5, 1.0);
     output.color  = vec4f(0.5 * shade.rgb + 0.5 * finalcolor.rgb, 1.0);
+    output.normal = vec4f(normal * 0.5 + 0.5, 1.0);
 
     return output;
 }

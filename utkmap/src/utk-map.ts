@@ -87,11 +87,10 @@ export class UtkMap {
         this._camera.update();
 
         // Rnder loop
-        this._renderer.start();
+        this._renderer.clear();
         this._layerManager.layers.forEach(layer => {
             layer.renderPass(this._camera);
         });
-        this._renderer.finish();
 
         // Refresh canvas
         requestAnimationFrame(this.render.bind(this));
