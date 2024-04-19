@@ -4,7 +4,7 @@ import { Camera } from "./camera";
 import { Renderer } from "./renderer";
 
 import { TrianglesLayer } from "./layer-triangles";
-import { PipelineBuildingFlat } from "./pipeline-building-flat";
+import { PipelineBuildingSSAO } from "./pipeline-building-ssao";
 
 export class BuildingsLayer extends TrianglesLayer {
     protected _normal!: number[];
@@ -19,7 +19,7 @@ export class BuildingsLayer extends TrianglesLayer {
     }
 
     createPipeline(renderer: Renderer): void {
-        this._pipeline = new PipelineBuildingFlat(renderer);
+        this._pipeline = new PipelineBuildingSSAO(renderer);
         this._pipeline.build(this);
     }
 
