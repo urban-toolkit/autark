@@ -110,7 +110,7 @@ export class Renderer {
 
         // Aliasing texture
         const multiSampleDesc: GPUTextureDescriptor = {
-            size: [this._canvas.width, this._canvas.height, 1],
+            size: [this._canvas.width, this._canvas.height],
             sampleCount: this._sampleCount,
             format: 'bgra8unorm',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
@@ -127,6 +127,7 @@ export class Renderer {
             loadOp: 'clear',
             storeOp: 'store',
         };
+
     }
 
     configureDepthBuffer() {

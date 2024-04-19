@@ -9,7 +9,7 @@ export * from './layer-triangles';
 export * from './layer';
 export * from './map-style';
 export * from './mouse-events';
-export * from './pipeline-building-flat';
+export * from './pipeline-building-ssao';
 export * from './pipeline-triangle-flat';
 export * from './pipeline';
 export * from './renderer';
