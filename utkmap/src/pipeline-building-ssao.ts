@@ -193,44 +193,10 @@ export class PipelineBuildingSSAO extends Pipeline {
     }
 
     createPipeline02(): void {
-        // Vertex data
-        const positionAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 0,
-            offset: 0,
-            format: 'float32x3'
-        };
-        const normalAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 1,
-            offset: 0,
-            format: 'float32x3'
-        };
-        const thematicAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 2,
-            offset: 0,
-            format: 'float32'
-        };
-
-        const positionBufferDesc: GPUVertexBufferLayout = {
-            attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
-            stepMode: 'vertex'
-        };
-        const normalBufferDesc: GPUVertexBufferLayout = {
-            attributes: [normalAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
-            stepMode: 'vertex'
-        };
-        const thematicBufferDesc: GPUVertexBufferLayout = {
-            attributes: [thematicAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
-            stepMode: 'vertex'
-        };
-
         // Vertex Shader
         const vertex: GPUVertexState = {
-            module: this._vertModule01,
-            entryPoint: 'main',
-            buffers: [positionBufferDesc, normalBufferDesc, thematicBufferDesc]
+            module: this._vertModule02,
+            entryPoint: 'main'
         };
 
         // Fragment Shader
@@ -244,9 +210,8 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         // Rasterization
         const primitive: GPUPrimitiveState = {
-            frontFace: 'cw',
-            cullMode: 'none',
-            topology: 'triangle-list'
+            topology: 'triangle-strip',
+            stripIndexFormat: "uint32"
         };
 
         // Antialising
@@ -347,6 +312,17 @@ export class PipelineBuildingSSAO extends Pipeline {
         // draw command
         passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
         passEncoder.end();
+
+        // Copy the rendering results from the swapchain.
+        // commandEncoder.copyTextureToTexture(
+        //     { texture: outputTexture }, 
+        //     { texture: storedTexture }, 
+        //     {
+        //         width: presentationSize[0],
+        //         height: presentationSize[1],
+        //         depthOrArrayLayers: 1
+        //     }
+        // );
 
         this._renderer.device.queue.submit([commandEncoder.finish()]);
     }
