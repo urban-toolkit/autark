@@ -40,11 +40,8 @@ export class PipelineBuildingSSAO extends Pipeline {
     protected _texturesPass02BindGroup!: GPUBindGroup;
     protected _texturesPass02BindGroupLayout!: GPUBindGroupLayout;
 
-
     // Depth buffer
     protected _depthBufferPass01!: GPURenderPassDepthStencilAttachment;
-
-    protected _pass02TexturesBindGroup!: GPUBindGroup;
 
     constructor(renderer: Renderer) {
         super(renderer);
@@ -68,25 +65,28 @@ export class PipelineBuildingSSAO extends Pipeline {
     createShaders(): void {
         // Vertex shader
         const vsDesc01 = {
+            label: "Buidlings ssao: vertex shader pass 01",
             code: buildingsVS01
         };
         this._vertModule01 = this._renderer.device.createShaderModule(vsDesc01);
 
         // Fragment shader
         const fsDesc01 = {
+            label: "Buidlings ssao: fragment shader pass 01",
             code: buildingsFS01
         };
         this._fragModule01 = this._renderer.device.createShaderModule(fsDesc01);
 
-
         // Vertex shader
         const vsDesc02 = {
+            label: "Buidlings ssao: vertex shader pass 02",
             code: buildingsVS02
         };
         this._vertModule02 = this._renderer.device.createShaderModule(vsDesc02);
 
         // Fragment shader
         const fsDesc02 = {
+            label: "Buidlings ssao: fragment shader pass 02",
             code: buildingsFS02
         };
         this._fragModule02 = this._renderer.device.createShaderModule(fsDesc02);
@@ -141,7 +141,7 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         this._colorsSharedBuffer = {
             view: colorTextureView,
-            clearValue: [0, 0, 0, 1],
+            clearValue: [0.0, 0.0, 0.0, 0.0],
             loadOp: 'clear',
             storeOp: 'store',
         }
@@ -158,7 +158,7 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         this._normalsSharedBuffer = {
             view: normalsTextureView,
-            clearValue: [0.0, 0.0, 1.0, 1.0],
+            clearValue: [0.0, 0.0, 0.0, 0.0],
             loadOp: 'clear',
             storeOp: 'store',
         }
@@ -281,7 +281,7 @@ export class PipelineBuildingSSAO extends Pipeline {
             cullMode: 'none',
             topology: 'triangle-list'
         };
-
+        
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: true,
@@ -317,7 +317,17 @@ export class PipelineBuildingSSAO extends Pipeline {
             module: this._fragModule02,
             entryPoint: 'main',
             targets: [
-                { format: 'bgra8unorm' },
+                {
+                    format: 'bgra8unorm',
+                    blend: {
+                        color: {
+                            srcFactor: 'one',
+                            operation: 'add',
+                            dstFactor: 'one-minus-src-alpha',
+                        },
+                        alpha: {},
+                    }, 
+                },
             ]
         };
 
@@ -359,13 +369,12 @@ export class PipelineBuildingSSAO extends Pipeline {
         // Create a new command encoder
         const commandEncoder = this._renderer.device.createCommandEncoder();
 
-        // create pass textures
-        this.createSharedTextures();
-        this.createDepthBufferPass01();
-
         // Pass 01 descriptor
         const passDescriptor: GPURenderPassDescriptor = {
-            colorAttachments: [this._colorsSharedBuffer, this._normalsSharedBuffer],
+            colorAttachments: [
+                this._colorsSharedBuffer,
+                this._normalsSharedBuffer
+            ],
             depthStencilAttachment: this._depthBufferPass01
         };
 
@@ -422,7 +431,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.setBindGroup(0, this._texturesPass02BindGroup);
 
         // draw command
-        passEncoder.draw(4, 1, 0, 0);
+        passEncoder.draw(6);
         passEncoder.end();
 
         this._renderer.device.queue.submit([commandEncoder.finish()]);

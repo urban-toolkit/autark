@@ -32,6 +32,10 @@ export class Renderer {
         return this._canvas;
     }
 
+    get context(): GPUCanvasContext {
+        return this._context;
+    }
+
     get device(): GPUDevice {
         return this._device;
     }
@@ -98,7 +102,7 @@ export class Renderer {
                 usage:
                     GPUTextureUsage.RENDER_ATTACHMENT |
                     GPUTextureUsage.COPY_SRC,
-                alphaMode: 'premultiplied',
+                alphaMode: 'opaque',
             };
             this._context.configure(canvasConfig);
         }
@@ -145,7 +149,7 @@ export class Renderer {
         // depth buffer definition
         this._depthBuffer = {
             view: depthTextureView,
-            depthClearValue: 1,
+            depthClearValue: 1.0,
             depthLoadOp: 'clear',
             depthStoreOp: 'store'
         };

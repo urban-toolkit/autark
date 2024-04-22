@@ -30,4 +30,7 @@ fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32) -> BufferOut
     output.normal = vec4f(normal * 0.5 + 0.5, 1.0);
 
     return output;
+    // return vec4f(normal * 0.5 + 0.5, 1.0);
+    // return vec4f(0.5 * shade.rgb + 0.5 * finalcolor.rgb, 1.0);
+
 }
