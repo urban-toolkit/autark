@@ -134,7 +134,7 @@ export class PipelineBuildingSSAO extends Pipeline {
             label: 'Shared colors texture',
             size: [this._renderer.canvas.width, this._renderer.canvas.height],
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-            format: 'bgra8unorm',
+            format: 'rgba16float',
         };
         const colorTexture = this._renderer.device.createTexture(colorTextureDesc);
         const colorTextureView = colorTexture.createView();
@@ -270,7 +270,7 @@ export class PipelineBuildingSSAO extends Pipeline {
             module: this._fragModule01,
             entryPoint: 'main',
             targets: [
-                { format: 'bgra8unorm' },
+                { format: 'rgba16float' },
                 { format: 'rgba16float' }
             ]
         };
