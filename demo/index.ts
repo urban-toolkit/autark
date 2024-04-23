@@ -27,6 +27,7 @@ async function main(ex: string = 'utk') {
     if (ex == 'utk') {
         const folder = 'manhattan';
         const layers = ['surface', 'water', 'parks', 'roads', 'buildings'];
+        // const layers = ['buildings'];
 
         const utkpy = new UtkPyData(folder, layers);
         await utkpy.loadData();

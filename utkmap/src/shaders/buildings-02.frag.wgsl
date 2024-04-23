@@ -10,7 +10,7 @@ fn main(@location(0) uvs : vec2<f32>) -> @location(0) vec4f {
 
     var sss = 0.0;
     var n0 = normalize(textureSample(normalTex, texSampler, fuvs ).xyz * 2.0 - 1.0);
-    let num = 65;
+    let num = 32;
     for(var i: i32 = 0; i < num; i = i + 1) 
     {
         var off  = f32(i);
@@ -25,9 +25,10 @@ fn main(@location(0) uvs : vec2<f32>) -> @location(0) vec4f {
         sss = sss + dot(n0,n1);
     }
     let fr = 1.0/f32(num);
-    let cc = 1.0 - clamp( (1.0 - sss * fr) * 520.2, 0.0, 1.0);
+    let cc = clamp( (sss * fr), 0.5, 1.0);
 
     let color = textureSample(colorTex, texSampler, fuvs );
 
     return vec4<f32>( cc * color.rgb, color.a);
+    // return textureSample(normalTex, texSampler, fuvs);
 }
