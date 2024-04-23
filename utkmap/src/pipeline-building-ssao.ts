@@ -132,7 +132,10 @@ export class PipelineBuildingSSAO extends Pipeline {
     createSharedTextures() {
         const colorTextureDesc: GPUTextureDescriptor = {
             label: 'Shared colors texture',
-            size: [this._renderer.canvas.width, this._renderer.canvas.height],
+            size: [
+                2 * this._renderer.canvas.width, 
+                2 * this._renderer.canvas.height
+            ],
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
             format: 'rgba16float',
         };
@@ -148,7 +151,10 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         const normalsTextureDesc: GPUTextureDescriptor = {
             label: 'Shared normals texture',
-            size: [this._renderer.canvas.width, this._renderer.canvas.height],
+            size: [
+                2 * this._renderer.canvas.width, 
+                2 * this._renderer.canvas.height
+            ],
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
             format: 'rgba16float',
         };
@@ -168,7 +174,10 @@ export class PipelineBuildingSSAO extends Pipeline {
         // Depth texture
         const depthTextureDesc: GPUTextureDescriptor = {
             label: 'Pass 01 depth texture',
-            size: [this._renderer.canvas.width, this._renderer.canvas.height],
+            size: [
+                2 * this._renderer.canvas.width, 
+                2 * this._renderer.canvas.height
+            ],
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         };
