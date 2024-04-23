@@ -35,13 +35,12 @@ export class PipelineBuildingSSAO extends Pipeline {
     // Output buffers (Pass 01)
     protected _colorsSharedBuffer!: GPURenderPassColorAttachment;
     protected _normalsSharedBuffer!: GPURenderPassColorAttachment;
+    // Depth buffer
+    protected _depthBufferPass01!: GPURenderPassDepthStencilAttachment;
 
     // Input Bind Groups 
     protected _texturesPass02BindGroup!: GPUBindGroup;
     protected _texturesPass02BindGroupLayout!: GPUBindGroupLayout;
-
-    // Depth buffer
-    protected _depthBufferPass01!: GPURenderPassDepthStencilAttachment;
 
     constructor(renderer: Renderer) {
         super(renderer);
@@ -51,8 +50,8 @@ export class PipelineBuildingSSAO extends Pipeline {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
-        this.createCameraUniformBindGroup();
         this.createColorUniformBindGroup();
+        this.createCameraUniformBindGroup();
 
         this.createSharedTextures();
         this.createDepthBufferPass01();

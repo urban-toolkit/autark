@@ -37,6 +37,20 @@ export class PipelineTriangleFlat extends Pipeline {
         this.createPipeline();
     }
 
+    createShaders() {
+        // Vertex shader
+        const vsmDesc = {
+            code: trianglesVertexSource
+        };
+        this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
+
+        // Fragment shader
+        const fsmDesc = {
+            code: trianglesFragmentSource
+        };
+        this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
+    }
+
     createVertexBuffers(mesh: TrianglesLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
@@ -64,20 +78,6 @@ export class PipelineTriangleFlat extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
-    }
-
-    createShaders() {
-        // Vertex shader
-        const vsmDesc = {
-            code: trianglesVertexSource
-        };
-        this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
-
-        // Fragment shader
-        const fsmDesc = {
-            code: trianglesFragmentSource
-        };
-        this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
     createPipeline() {
