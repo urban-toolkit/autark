@@ -1,8 +1,8 @@
 import { loadDb } from "./config/duckdb";
 
-const QUERY = `
+const QUERY = (pbfFileUrl: string) => `
   CREATE TEMP TABLE parks AS
-    SELECT id, tags FROM ST_READOSM('http://localhost:5173/new-york-latest.osm.pbf') 
+    SELECT id, tags FROM ST_READOSM('${pbfFileUrl}') 
       WHERE kind IN ('way', 'rel') AND
       (
         map_extract(tags, 'leisure')[1] IN ('dog_park', 'park', 'playground', 'recreation_ground') OR
@@ -12,13 +12,13 @@ const QUERY = `
 
   CREATE TEMP TABLE parks_with_nodes_refs AS
     SELECT id, UNNEST(refs) as ref, UNNEST(range(length(refs))) as ref_idx
-      FROM ST_READOSM('http://localhost:5173/new-york-latest.osm.pbf')
+      FROM ST_READOSM('${pbfFileUrl}')
       SEMI JOIN parks USING (id)
         WHERE kind IN ('way', 'rel');
 
   CREATE TEMP TABLE required_nodes_with_geometries AS
     SELECT id, ST_POINT(lon, lat) geometry
-      FROM ST_READOSM('http://localhost:5173/new-york-latest.osm.pbf') nodes
+      FROM ST_READOSM('${pbfFileUrl}') nodes
       SEMI JOIN parks_with_nodes_refs
       ON nodes.id = parks_with_nodes_refs.ref
       WHERE kind = 'node';
@@ -38,7 +38,7 @@ const QUERY = `
   SELECT * FROM parks_linestrings;  
 `;
 
-async function main() {
+export async function getParksGeo(pbfFileUrl: string) {
   const db = await loadDb();
   console.log("database loaded");
 
@@ -49,7 +49,7 @@ async function main() {
   console.log("spatial extesion installed");
 
   console.log("Running query");
-  const response = await conn.query(QUERY);
+  const response = await conn.query(QUERY(pbfFileUrl));
   console.log("Query executed");
 
   const result = response.toArray();
@@ -86,11 +86,3 @@ function downloadJSON(jsonData: string, filename: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-
-document.addEventListener("DOMContentLoaded", async () => {
-  const runQueryButton = document.getElementById("runQueryButton");
-
-  runQueryButton?.addEventListener("click", () => {
-    main().catch(console.error);
-  });
-});
