@@ -1,23 +1,10 @@
 {
-  "name": "utkdb",
+  "name": "demo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "files": [
-    "dist"
-  ],
-  "main": "./dist/utkdb.umd.cjs",
-  "module": "./dist/utkdb.js",
-  "types": "./dist/main.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/utkdb.js",
-      "require": "./dist/utkdb.umd.cjs"
-    }
-  },
   "scripts": {
     "dev": "vite",
-    "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -28,10 +15,10 @@
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.3.3",
     "typescript": "^5.2.2",
-    "vite": "^5.2.0",
-    "vite-plugin-dts": "^4.0.0-beta.1"
+    "vite": "^5.3.4"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.28.1-dev106.0"
+    "utkdb": "file:../utkdb",
+    "utkmap": "file:../utkmap"
   }
 }
