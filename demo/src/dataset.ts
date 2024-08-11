@@ -1,19 +1,13 @@
-import {
-  ICameraData,
-  ILayerData,
-  ILayerGeometry,
-  ILayerInfo,
-  ILayerRenderInfo,
-} from "utkmap";
+import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo } from 'utkmap';
 import {
   LayerGeometryType,
   LayerPhysicalType,
   RenderPipeline as RenderPipelineType,
   ColorMapInterpolator,
   ThematicAggregationLevel,
-} from "utkmap";
+} from 'utkmap';
 
-import { DataLoader } from "./data-loader";
+import { DataLoader } from './data-loader';
 
 abstract class UtkData {
   protected _layerInfo: ILayerInfo[] = [];
@@ -52,7 +46,7 @@ export class ToyExample extends UtkData {
     };
 
     this._layerInfo.push({
-      id: "toy.example",
+      id: 'toy.example',
       zIndex: 0,
       typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
       typePhysical: LayerPhysicalType.WATER_LAYER,
@@ -68,28 +62,23 @@ export class ToyExample extends UtkData {
     this._layerData.push({
       geometry: [
         {
-          position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map(
-            (d, i) => {
-              return d - this.cameraData.origin[i % 3];
-            }
-          ),
+          position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map((d, i) => {
+            return d - this.cameraData.origin[i % 3];
+          }),
           indices: [0, 1, 2],
         },
         {
-          position: [
-            0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, -0.5,
-            0.0, 0.0, 0.0, 0.5, 0.0,
-          ].map((d, i) => {
-            return d - this.cameraData.origin[i % 3];
-          }),
+          position: [0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map(
+            (d, i) => {
+              return d - this.cameraData.origin[i % 3];
+            },
+          ),
           indices: [0, 1, 2, 3, 4, 5],
         },
         {
-          position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, -0.5, 0.0].map(
-            (d, i) => {
-              return d - this.cameraData.origin[i % 3];
-            }
-          ),
+          position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, -0.5, 0.0].map((d, i) => {
+            return d - this.cameraData.origin[i % 3];
+          }),
           indices: [0, 1, 2],
         },
       ],
@@ -118,10 +107,7 @@ export class UtkPyData extends UtkData {
 
   // TODO: vite for all
   // TODO: exportar parks, water, etc como geojson
-  constructor(
-    dataFolder: string = "./manhattan",
-    layers: string[] = ["parks", "water", "surface", "roads"]
-  ) {
+  constructor(dataFolder: string = './manhattan', layers: string[] = ['parks', 'water', 'surface', 'roads']) {
     super();
 
     this._layers = layers;
@@ -130,15 +116,15 @@ export class UtkPyData extends UtkData {
 
   getGeometryType(layer: string): LayerGeometryType {
     switch (layer) {
-      case "parks":
+      case 'parks':
         return LayerGeometryType.TRIGMESH_LAYER;
-      case "water":
+      case 'water':
         return LayerGeometryType.TRIGMESH_LAYER;
-      case "roads":
+      case 'roads':
         return LayerGeometryType.TRIGMESH_LAYER;
-      case "surface":
+      case 'surface':
         return LayerGeometryType.TRIGMESH_LAYER;
-      case "buildings":
+      case 'buildings':
         return LayerGeometryType.BUILDINGS_LAYER;
     }
 
@@ -147,15 +133,15 @@ export class UtkPyData extends UtkData {
 
   getPhysicalType(layer: string): LayerPhysicalType {
     switch (layer) {
-      case "parks":
+      case 'parks':
         return LayerPhysicalType.PARKS_LAYER;
-      case "water":
+      case 'water':
         return LayerPhysicalType.WATER_LAYER;
-      case "roads":
+      case 'roads':
         return LayerPhysicalType.ROADS_LAYER;
-      case "surface":
+      case 'surface':
         return LayerPhysicalType.SURFACE_LAYER;
-      case "buildings":
+      case 'buildings':
         return LayerPhysicalType.BUILDINGS_LAYER;
     }
 
@@ -164,15 +150,15 @@ export class UtkPyData extends UtkData {
 
   getPipelineType(layer: string): RenderPipelineType {
     switch (layer) {
-      case "parks":
+      case 'parks':
         return RenderPipelineType.TRIANGLE_FLAT;
-      case "water":
+      case 'water':
         return RenderPipelineType.TRIANGLE_FLAT;
-      case "roads":
+      case 'roads':
         return RenderPipelineType.TRIANGLE_FLAT;
-      case "surface":
+      case 'surface':
         return RenderPipelineType.TRIANGLE_FLAT;
-      case "buildings":
+      case 'buildings':
         return RenderPipelineType.BUILDING_FLAT;
     }
 
@@ -180,11 +166,9 @@ export class UtkPyData extends UtkData {
   }
 
   async loadData() {
-    const grammarData: any = await DataLoader.getJsonData(
-      `${this._dataFolder}/grammar.json`
-    );
+    const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
 
-    const camera = grammarData["components"][0]["map"]["camera"];
+    const camera = grammarData['components'][0]['map']['camera'];
     this._cameraData = {
       origin: camera.position,
       direction: {
@@ -198,25 +182,13 @@ export class UtkPyData extends UtkData {
       const layer = this._layers[lId];
 
       // load layer json data
-      const layerJson = <any>(
-        await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`)
-      );
+      const layerJson = <any>await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
       // load layer binary data
       const layerCoord = Array.from(
-        <Float64Array>(
-          await DataLoader.getBinaryData(
-            `${this._dataFolder}/${layer}_coordinates.data`,
-            "d"
-          )
-        )
+        <Float64Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_coordinates.data`, 'd'),
       );
       const layerIndex = Array.from(
-        <Uint32Array>(
-          await DataLoader.getBinaryData(
-            `${this._dataFolder}/${layer}_indices.data`,
-            "I"
-          )
-        )
+        <Uint32Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_indices.data`, 'I'),
       );
 
       this._layerInfo.push({
@@ -238,21 +210,16 @@ export class UtkPyData extends UtkData {
         thematic: [],
       };
 
-      const components = layerJson["data"];
+      const components = layerJson['data'];
       for (const comps of components) {
         const cStartCount = comps.geometry.coordinates;
         const iStartCount = comps.geometry.indices;
 
         const geometry: ILayerGeometry = {
-          position: layerCoord
-            .slice(cStartCount[0], cStartCount[0] + cStartCount[1])
-            .map((el, id) => {
-              return el - this.cameraData.origin[id % 3];
-            }),
-          indices: layerIndex.slice(
-            iStartCount[0],
-            iStartCount[0] + iStartCount[1]
-          ),
+          position: layerCoord.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
+            return el - this.cameraData.origin[id % 3];
+          }),
+          indices: layerIndex.slice(iStartCount[0], iStartCount[0] + iStartCount[1]),
         };
 
         layerData.geometry.push(geometry);

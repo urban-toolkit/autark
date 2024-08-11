@@ -17,7 +17,7 @@ export abstract class DataLoader {
           offset += evt.target.result.length;
           callback.add(evt.target.result); // callback for handling read chunk
         } else {
-          console.log("Read error: " + evt.target.error);
+          console.log('Read error: ' + evt.target.error);
           return;
         }
         if (offset >= fileSize) {
@@ -43,8 +43,8 @@ export abstract class DataLoader {
     // Return a new promise.
     const response = await fetch(url, {
       headers: {
-        "Accept-Encoding": "gzip",
-        Accept: "application/json",
+        'Accept-Encoding': 'gzip',
+        Accept: 'application/json',
       },
     });
 
@@ -53,11 +53,11 @@ export abstract class DataLoader {
     }
 
     let json = {};
-    let jsonString = "";
+    let jsonString = '';
 
-    const contentEncoding = response.headers.get("Content-Encoding");
+    const contentEncoding = response.headers.get('Content-Encoding');
 
-    if (contentEncoding && contentEncoding.includes("gzip")) {
+    if (contentEncoding && contentEncoding.includes('gzip')) {
       // if the response is encoded
 
       const blob = await response.blob();
@@ -93,25 +93,25 @@ export abstract class DataLoader {
     // Return a new promise.
     const response = await fetch(url, {
       headers: {
-        "Accept-Encoding": "gzip",
+        'Accept-Encoding': 'gzip',
       },
     });
 
-    if (!response.ok) throw Error("Loading binary data failed");
+    if (!response.ok) throw Error('Loading binary data failed');
 
     const blob = await response.blob();
 
     let arrayResult = await readFile(blob);
 
-    if (type == "f") {
+    if (type == 'f') {
       return new Float32Array(<ArrayBuffer>arrayResult);
     }
 
-    if (type == "d") {
+    if (type == 'd') {
       return new Float64Array(<ArrayBuffer>arrayResult);
     }
 
-    if (type == "I") {
+    if (type == 'I') {
       return new Uint32Array(<ArrayBuffer>arrayResult);
     }
 

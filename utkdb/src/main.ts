@@ -1,4 +1,4 @@
-import { loadDb } from "./config/duckdb";
+import { loadDb } from './config/duckdb';
 
 const QUERY = (pbfFileUrl: string) => `
   CREATE TEMP TABLE parks AS
@@ -40,32 +40,32 @@ const QUERY = (pbfFileUrl: string) => `
 
 export async function getParksGeo(pbfFileUrl: string) {
   const db = await loadDb();
-  console.log("database loaded");
+  console.log('database loaded');
 
   const conn = await db.connect();
-  console.log("connection opened");
+  console.log('connection opened');
 
-  await conn.query("INSTALL spatial; LOAD spatial;");
-  console.log("spatial extesion installed");
+  await conn.query('INSTALL spatial; LOAD spatial;');
+  console.log('spatial extesion installed');
 
-  console.log("Running query");
+  console.log('Running query');
   const response = await conn.query(QUERY(pbfFileUrl));
-  console.log("Query executed");
+  console.log('Query executed');
 
   const result = response.toArray();
   console.log({ result });
 
-  downloadJSON(JSON.stringify(convertBigIntToString(result)), "data.json");
+  downloadJSON(JSON.stringify(convertBigIntToString(result)), 'data.json');
 
   await conn.close();
-  console.log("connection closed");
+  console.log('connection closed');
 }
 
 function convertBigIntToString(data: any[]) {
   return data.map((row) => {
     const newRow: any = {};
     for (const key in row) {
-      if (typeof row[key] === "bigint") {
+      if (typeof row[key] === 'bigint') {
         newRow[key] = row[key].toString();
       } else {
         newRow[key] = row[key];
@@ -76,9 +76,9 @@ function convertBigIntToString(data: any[]) {
 }
 
 function downloadJSON(jsonData: string, filename: string) {
-  const blob = new Blob([jsonData], { type: "application/json" });
+  const blob = new Blob([jsonData], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
