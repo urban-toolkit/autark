@@ -12,7 +12,8 @@
   "exports": {
     ".": {
       "import": "./dist/utkmap.js",
-      "require": "./dist/utkmap.umd.cjs"
+      "require": "./dist/utkmap.umd.cjs",
+      "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
