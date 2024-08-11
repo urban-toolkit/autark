@@ -1,18 +1,12 @@
 /// <reference types="@webgpu/types" />
 
-import {
-  ICameraData,
-  ILayerData,
-  ILayerInfo,
-  ILayerRenderInfo,
-  ILayerThematic,
-} from "./interfaces";
+import { ICameraData, ILayerData, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
 
-import { Camera } from "./camera";
-import { Renderer } from "./renderer";
-import { KeyEvents } from "./key-events";
-import { MouseEvents } from "./mouse-events";
-import { LayerManager } from "./layer-manager";
+import { Camera } from './camera';
+import { Renderer } from './renderer';
+import { KeyEvents } from './key-events';
+import { MouseEvents } from './mouse-events';
+import { LayerManager } from './layer-manager';
 
 export class UtkMap {
   protected _camera: Camera;
@@ -54,16 +48,8 @@ export class UtkMap {
     this._camera = new Camera(params);
   }
 
-  createLayer(
-    layerInfo: ILayerInfo,
-    layerRenderInfo: ILayerRenderInfo,
-    layerData: ILayerData
-  ) {
-    const layer = this._layerManager.addLayer(
-      layerInfo,
-      layerRenderInfo,
-      layerData
-    );
+  createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
 
     if (layer) {
       layer.createPipeline(this._renderer, this._camera);
@@ -88,10 +74,7 @@ export class UtkMap {
     }
   }
 
-  updateLayerThematic(
-    layerInfo: ILayerInfo,
-    layerThematic: ILayerThematic[]
-  ): void {
+  updateLayerThematic(layerInfo: ILayerInfo, layerThematic: ILayerThematic[]): void {
     const layer = this._layerManager.searchByLayerInfo(layerInfo);
 
     if (layer) {

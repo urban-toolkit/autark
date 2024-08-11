@@ -12,21 +12,19 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
-    
-     /* Emit */
-     "declaration": true,
-     "declarationDir": "./dist",
-     "emitDeclarationOnly": true,
-     "outDir": "./dist",
+
+    /* Emit */
+    "declaration": true,
+    "declarationDir": "./dist",
+    "emitDeclarationOnly": true,
+    "outDir": "./dist",
 
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": [
-      "vite-plugin-glsl/ext"
-    ]
+    "types": ["vite-plugin-glsl/ext"]
   },
   "include": ["src"]
 }

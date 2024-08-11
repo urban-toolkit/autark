@@ -1,9 +1,9 @@
 {
-    "land": "#AAAAAA",
-    "roads": "#454545",
-    "parks": "#191b1a",
-    "water": "#191b1a",
-    "sky":  "#000000",
-    "surface": "#AAAAAA",
-    "buildings": "#DFDFDF"
+  "land": "#AAAAAA",
+  "roads": "#454545",
+  "parks": "#191b1a",
+  "water": "#191b1a",
+  "sky": "#000000",
+  "surface": "#AAAAAA",
+  "buildings": "#DFDFDF"
 }

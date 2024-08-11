@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import { MapStyle } from "./map-style";
+import { MapStyle } from './map-style';
 
 export class Renderer {
   // HTML Canvas reference
@@ -92,15 +92,15 @@ export class Renderer {
   // Configure the webgpu canvas context
   configureContext() {
     if (!this._context) {
-      this._context = this._canvas.getContext("webgpu") as any;
+      this._context = this._canvas.getContext('webgpu') as any;
     }
 
     if (this._context) {
       const canvasConfig: GPUCanvasConfiguration = {
         device: this._device,
-        format: "bgra8unorm",
+        format: 'bgra8unorm',
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-        alphaMode: "opaque",
+        alphaMode: 'opaque',
       };
       this._context.configure(canvasConfig);
     }
@@ -115,20 +115,20 @@ export class Renderer {
     const multiSampleDesc: GPUTextureDescriptor = {
       size: [this._canvas.width, this._canvas.height],
       sampleCount: this._sampleCount,
-      format: "bgra8unorm",
+      format: 'bgra8unorm',
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     };
     const multiSampleTexture = this._device.createTexture(multiSampleDesc);
     const multiSampleTextureView = multiSampleTexture.createView();
 
     // Framebuffer definition
-    const sky = MapStyle.getColor("sky");
+    const sky = MapStyle.getColor('sky');
     this._frameBuffer = {
       view: multiSampleTextureView,
       resolveTarget: colorTextureView,
       clearValue: { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 },
-      loadOp: "clear",
-      storeOp: "store",
+      loadOp: 'clear',
+      storeOp: 'store',
     };
   }
 
@@ -137,8 +137,8 @@ export class Renderer {
     const depthTextureDesc: GPUTextureDescriptor = {
       size: [this._canvas.width, this._canvas.height, 1],
       sampleCount: this._sampleCount,
-      dimension: "2d",
-      format: "depth32float",
+      dimension: '2d',
+      format: 'depth32float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
     };
     const depthTexture = this._device.createTexture(depthTextureDesc);
@@ -148,16 +148,14 @@ export class Renderer {
     this._depthBuffer = {
       view: depthTextureView,
       depthClearValue: 1.0,
-      depthLoadOp: "clear",
-      depthStoreOp: "store",
+      depthLoadOp: 'clear',
+      depthStoreOp: 'store',
     };
   }
 
   clear() {
     if (!this._context) {
-      console.error(
-        "WebGPU cannot be initialized - Canvas does not support WebGPU"
-      );
+      console.error('WebGPU cannot be initialized - Canvas does not support WebGPU');
       return;
     }
 

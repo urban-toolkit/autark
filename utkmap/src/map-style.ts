@@ -1,33 +1,33 @@
-import { ColorHEX, ColorRGB } from "./constants";
+import { ColorHEX, ColorRGB } from './constants';
 
-import { ColorMap } from "./colormap";
-import { IMapStyle } from "./interfaces";
+import { ColorMap } from './colormap';
+import { IMapStyle } from './interfaces';
 
 // @ts-ignore
-import light from "./styles/light.json";
+import light from './styles/light.json';
 // @ts-ignore
-import dark from "./styles/dark.json";
+import dark from './styles/dark.json';
 
 export class MapStyle {
   // default color map
   protected static _default: IMapStyle = {
-    land: "#DFDFDF",
-    roads: "#d9b504",
-    parks: "#C3D0B2",
-    water: "#BED2D7",
-    sky: "#ffffff",
-    surface: "#EFEFEF",
-    buildings: "#DFDFDF",
+    land: '#DFDFDF',
+    roads: '#d9b504',
+    parks: '#C3D0B2',
+    water: '#BED2D7',
+    sky: '#ffffff',
+    surface: '#EFEFEF',
+    buildings: '#DFDFDF',
   };
 
   // default color for unknown layers
-  protected static _notFound: ColorHEX = "#FFFFFF";
+  protected static _notFound: ColorHEX = '#FFFFFF';
   // default highlight color
-  protected static _highlight: ColorHEX = "#FFDD00";
+  protected static _highlight: ColorHEX = '#FFDD00';
 
   // custom style
   protected static _current: IMapStyle = MapStyle._default;
-  protected static _currentStyle: string = "default";
+  protected static _currentStyle: string = 'default';
 
   public static get currentStyle(): string {
     return MapStyle._currentStyle;
@@ -52,15 +52,15 @@ export class MapStyle {
   public static setPredefinedStyle(style: string) {
     let styleObj = null;
 
-    if (style === "light") {
+    if (style === 'light') {
       styleObj = light;
-      MapStyle._currentStyle = "light";
-    } else if (style === "dark") {
+      MapStyle._currentStyle = 'light';
+    } else if (style === 'dark') {
       styleObj = dark;
-      MapStyle._currentStyle = "dark";
+      MapStyle._currentStyle = 'dark';
     } else {
       styleObj = MapStyle._default;
-      MapStyle._currentStyle = "default";
+      MapStyle._currentStyle = 'default';
     }
 
     // @ts-ignore
