@@ -1,8 +1,4 @@
-// import { utk } from 'utk';
-// import { utkDb } from 'utkdb';
-// import { utkRun } from 'utkrun';
-
-import { UtkPyData, ToyExample } from './dataset';
+import { UtkPyData, ToyExample, ParksExample } from './dataset';
 
 import { UtkMap } from 'utkmap';
 
@@ -33,7 +29,14 @@ async function main(ex: string = 'utk') {
       map.createLayer(utkpy.layerInfo[id], utkpy.layerRenderInfo[id], utkpy.layerData[id]);
     }
   }
+  if (ex == 'parks') {
+    const data = new ParksExample('http://localhost:5173/other.osm.pbf');
+    await data.loadData();
+
+    map.createCamera(data.cameraData);
+    map.createLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
+  }
   map.render();
 }
 
-main('utk');
+main('parks');

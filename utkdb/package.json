@@ -12,7 +12,8 @@
   "exports": {
     ".": {
       "import": "./dist/utkdb.js",
-      "require": "./dist/utkdb.umd.cjs"
+      "require": "./dist/utkdb.umd.cjs",
+      "types": "./dist/main.d.ts"
     }
   },
   "scripts": {

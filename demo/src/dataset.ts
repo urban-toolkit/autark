@@ -1,3 +1,4 @@
+import earcut from 'earcut';
 import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo } from 'utkmap';
 import {
   LayerGeometryType,
@@ -6,6 +7,7 @@ import {
   ColorMapInterpolator,
   ThematicAggregationLevel,
 } from 'utkmap';
+import { SpatialDb, DbResponse } from 'utkdb';
 
 import { DataLoader } from './data-loader';
 
@@ -62,10 +64,12 @@ export class ToyExample extends UtkData {
     this._layerData.push({
       geometry: [
         {
+          // one park
           position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map((d, i) => {
+            // coordinates (lat, log, z=0)
             return d - this.cameraData.origin[i % 3];
           }),
-          indices: [0, 1, 2],
+          indices: [0, 1, 2], // triangles
         },
         {
           position: [0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map(
@@ -93,6 +97,7 @@ export class ToyExample extends UtkData {
           values: [1.0, 0.0],
         },
         {
+          // use this to color the whole park
           level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
           values: [0.75],
         },
@@ -230,5 +235,92 @@ export class UtkPyData extends UtkData {
       }
       this._layerData.push(layerData);
     }
+  }
+}
+
+export class ParksExample extends UtkData {
+  private pbfFileUrl: string;
+  private db: SpatialDb = new SpatialDb();
+
+  constructor(pbfFileUrl: string) {
+    super();
+    this.pbfFileUrl = pbfFileUrl;
+  }
+
+  async loadData() {
+    this._cameraData = {
+      origin: [0, 0, 1],
+      direction: {
+        up: [0, 1, 0],
+        lookAt: [0, 0, 0],
+        eye: [0, 0, 1],
+      },
+    };
+
+    this._layerInfo.push({
+      // TODO: dont know
+      id: 'test.example',
+      zIndex: 0,
+      typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
+      typePhysical: LayerPhysicalType.WATER_LAYER,
+    });
+
+    this._layerRenderInfo.push({
+      // TODO: dont know
+      pipeline: RenderPipelineType.TRIANGLE_FLAT,
+      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+      isColorMap: true,
+      isPicking: false,
+    });
+
+    await this.db.init();
+    const parks = await this.db.getParks(this.pbfFileUrl);
+    const onePark = parks[0];
+    const triangles = this.convertLinestringToTriangles(onePark.linestring);
+    const positions = this.convertLinestringToPositions(onePark.linestring);
+    console.log({ onePark });
+
+    this._layerData.push({
+      geometry: [
+        {
+          // one park
+          position: positions,
+          indices: triangles,
+        },
+      ],
+      thematic: [
+        {
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [0.75],
+        },
+      ],
+    });
+  }
+
+  private convertLinestringToTriangles(linestring: DbResponse['linestring']): Array<number> {
+    const { coordinates } = linestring;
+    return earcut(coordinates.flat());
+  }
+
+  private convertLinestringToPositions(linestring: DbResponse['linestring']): Array<number> {
+    const coordinates = linestring.coordinates
+      .map((cord) => {
+        const latRad = cord[0] * (Math.PI / 180);
+        const lonRad = cord[1] * (Math.PI / 180);
+
+        // Spherical to Cartesian conversion
+        const radius = 1;
+        const x = radius * Math.cos(latRad) * Math.cos(lonRad);
+        const y = radius * Math.cos(latRad) * Math.sin(lonRad);
+        const z = 0;
+
+        return [x, y, z];
+      })
+      .flat();
+
+    return coordinates.map((d, i) => {
+      // coordinates (lat, log, z=0)
+      return d - this.cameraData.origin[i % 3];
+    });
   }
 }
