@@ -182,6 +182,7 @@ export class UtkPyData extends UtkData {
         lookAt: camera.direction.lookAt,
       },
     };
+    console.log({ camera: this._cameraData });
 
     for (let lId = 0; lId < this._layers.length; lId++) {
       const layer = this._layers[lId];
@@ -235,6 +236,7 @@ export class UtkPyData extends UtkData {
       }
       this._layerData.push(layerData);
     }
+    console.log({ layers: this._layerData });
   }
 }
 
@@ -248,14 +250,20 @@ export class ParksExample extends UtkData {
   }
 
   async loadData() {
+    const grammarData: any = await DataLoader.getJsonData(`./manhattan/grammar.json`);
+
+    const camera = grammarData['components'][0]['map']['camera'];
     this._cameraData = {
-      origin: [0, 0, 1],
+      origin: camera.position,
       direction: {
-        up: [0, 1, 0],
-        lookAt: [0, 0, 0],
-        eye: [0, 0, 1],
+        up: camera.direction.up,
+        eye: camera.direction.right,
+        lookAt: camera.direction.lookAt,
       },
     };
+    console.log({
+      camera: this._cameraData,
+    });
 
     this._layerInfo.push({
       // TODO: dont know
@@ -274,26 +282,31 @@ export class ParksExample extends UtkData {
     });
 
     await this.db.init();
-    const parks = await this.db.getParks(this.pbfFileUrl);
+    const parks = await this.db.getParks({
+      pbfFileUrl: this.pbfFileUrl,
+      coordinateFormat: 'EPSG:3395',
+      boudingBox: {
+        minLat: 40.7,
+        maxLat: 40.9,
+        minLon: -74.0,
+        maxLon: -73.9,
+      },
+    });
+
     const onePark = parks[0];
-    const triangles = this.convertLinestringToTriangles(onePark.linestring);
-    const positions = this.convertLinestringToPositions(onePark.linestring);
     console.log({ onePark });
+    console.log({ positions: this.convertLinestringToPositions(onePark.linestring) });
+    console.log({ triangles: this.convertLinestringToTriangles(onePark.linestring) });
 
     this._layerData.push({
-      geometry: [
-        {
-          // one park
-          position: positions,
-          indices: triangles,
-        },
-      ],
-      thematic: [
-        {
-          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-          values: [0.75],
-        },
-      ],
+      geometry: parks.map((park) => ({
+        position: this.convertLinestringToPositions(park.linestring),
+        indices: this.convertLinestringToTriangles(park.linestring),
+      })),
+      thematic: parks.map((_) => ({
+        level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+        values: [0.75],
+      })),
     });
   }
 
@@ -303,24 +316,11 @@ export class ParksExample extends UtkData {
   }
 
   private convertLinestringToPositions(linestring: DbResponse['linestring']): Array<number> {
-    const coordinates = linestring.coordinates
-      .map((cord) => {
-        const latRad = cord[0] * (Math.PI / 180);
-        const lonRad = cord[1] * (Math.PI / 180);
-
-        // Spherical to Cartesian conversion
-        const radius = 1;
-        const x = radius * Math.cos(latRad) * Math.cos(lonRad);
-        const y = radius * Math.cos(latRad) * Math.sin(lonRad);
-        const z = 0;
-
-        return [x, y, z];
-      })
-      .flat();
-
-    return coordinates.map((d, i) => {
-      // coordinates (lat, log, z=0)
-      return d - this.cameraData.origin[i % 3];
-    });
+    return linestring.coordinates
+      .map((cord) => [cord[0], cord[1], 0])
+      .flat()
+      .map((el, id) => {
+        return el - this.cameraData.origin[id % 3];
+      });
   }
 }

@@ -2,7 +2,7 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { loadDb } from '../config/duckdb';
-import { QUERY_PARKS_LINESTRINGS } from './queries/parks';
+import { LOAD_PBF_ON_TABLE, GET_PARKS_LINESTRINGS } from './queries';
 
 export type DbResponse = {
   metadata: { [key: string]: string };
@@ -10,6 +10,17 @@ export type DbResponse = {
     type: 'LineString';
     coordinates: Array<Array<number>>;
   };
+};
+
+export type GetParksParams = {
+  pbfFileUrl: string;
+  boudingBox?: {
+    minLat: number;
+    maxLat: number;
+    minLon: number;
+    maxLon: number;
+  };
+  coordinateFormat?: string;
 };
 
 export class SpatialDb {
@@ -23,11 +34,12 @@ export class SpatialDb {
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
-  async getParks(pbfFileUrl: string): Promise<Array<DbResponse>> {
+  async getParks(params: GetParksParams): Promise<Array<DbResponse>> {
     if (!this.db || !this.conn) throw new Error('Database not initialized. Please call init() first.');
+    if (!params.coordinateFormat) params.coordinateFormat = 'EPSG:4326';
 
-    const query = QUERY_PARKS_LINESTRINGS(pbfFileUrl);
-    const response = await this.conn.query(query); // TODO: type it and fix any's
+    await this.conn.query(LOAD_PBF_ON_TABLE(params.pbfFileUrl, 'pbf_table', params.boudingBox));
+    const response = await this.conn.query(GET_PARKS_LINESTRINGS('pbf_table', params.coordinateFormat));
 
     return this.parseData(response);
   }

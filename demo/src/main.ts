@@ -30,7 +30,7 @@ async function main(ex: string = 'utk') {
     }
   }
   if (ex == 'parks') {
-    const data = new ParksExample('http://localhost:5173/other.osm.pbf');
+    const data = new ParksExample('http://localhost:5173/manhattan.osm.pbf');
     await data.loadData();
 
     map.createCamera(data.cameraData);
