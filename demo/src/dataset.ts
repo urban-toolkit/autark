@@ -261,53 +261,59 @@ export class ParksExample extends UtkData {
         lookAt: camera.direction.lookAt,
       },
     };
-    console.log({
-      camera: this._cameraData,
-    });
-
-    this._layerInfo.push({
-      // TODO: dont know
-      id: 'test.example',
-      zIndex: 0,
-      typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
-      typePhysical: LayerPhysicalType.WATER_LAYER,
-    });
-
-    this._layerRenderInfo.push({
-      // TODO: dont know
-      pipeline: RenderPipelineType.TRIANGLE_FLAT,
-      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-      isColorMap: true,
-      isPicking: false,
-    });
 
     await this.db.init();
-    const parks = await this.db.getParks({
+    await this.db.loadPbf({
       pbfFileUrl: this.pbfFileUrl,
-      coordinateFormat: 'EPSG:3395',
+      tableName: 'manhattan',
       boudingBox: {
-        minLat: 40.7,
-        maxLat: 40.9,
-        minLon: -74.0,
-        maxLon: -73.9,
+        minLat: 40,
+        maxLat: 41,
+        minLon: -74.1,
+        maxLon: -73.8,
       },
     });
-
-    const onePark = parks[0];
-    console.log({ onePark });
-    console.log({ positions: this.convertLinestringToPositions(onePark.linestring) });
-    console.log({ triangles: this.convertLinestringToTriangles(onePark.linestring) });
-
-    this._layerData.push({
-      geometry: parks.map((park) => ({
-        position: this.convertLinestringToPositions(park.linestring),
-        indices: this.convertLinestringToTriangles(park.linestring),
-      })),
-      thematic: parks.map((_) => ({
-        level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-        values: [0.75],
-      })),
+    await this.db.loadCsv({
+      csvFileUrl: 'http://localhost:5173/data-ignore/nyc_data.csv',
+      tableName: 'nyc_data',
     });
+
+    const layersName = ['parks', 'water', 'buildings', 'roads']; // TODO: add coastlines (or surface)
+    let lId = 0;
+    for (const layerName of layersName) {
+      this._layerInfo.push({
+        id: `${layerName}.utkpy`,
+        zIndex: lId,
+        typeGeometry: this.getGeometryType(layerName),
+        typePhysical: this.getPhysicalType(layerName),
+      });
+
+      this._layerRenderInfo.push({
+        pipeline: this.getPipelineType(layerName),
+        colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+        isColorMap: false,
+        isPicking: false,
+      });
+      lId++;
+
+      const layers = await this.db.getLayer({
+        tableName: 'manhattan',
+        coordinateFormat: 'EPSG:3395',
+        layer: layerName as 'parks' | 'water' | 'buildings' | 'roads',
+      });
+      console.log(layerName, layers[0]);
+
+      this._layerData.push({
+        geometry: layers.map((layer) => ({
+          position: this.convertLinestringToPositions(layer.linestring),
+          indices: this.convertLinestringToTriangles(layer.linestring),
+        })),
+        thematic: layers.map((_) => ({
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [Math.random()],
+        })),
+      });
+    }
   }
 
   private convertLinestringToTriangles(linestring: DbResponse['linestring']): Array<number> {
@@ -322,5 +328,57 @@ export class ParksExample extends UtkData {
       .map((el, id) => {
         return el - this.cameraData.origin[id % 3];
       });
+  }
+
+  // layers
+  getGeometryType(layer: string): LayerGeometryType {
+    switch (layer) {
+      case 'parks':
+        return LayerGeometryType.TRIGMESH_LAYER;
+      case 'water':
+        return LayerGeometryType.TRIGMESH_LAYER;
+      case 'roads':
+        return LayerGeometryType.TRIGMESH_LAYER;
+      case 'surface':
+        return LayerGeometryType.TRIGMESH_LAYER;
+      case 'buildings':
+        return LayerGeometryType.BUILDINGS_LAYER;
+    }
+
+    return LayerGeometryType.TRIGMESH_LAYER;
+  }
+
+  getPhysicalType(layer: string): LayerPhysicalType {
+    switch (layer) {
+      case 'parks':
+        return LayerPhysicalType.PARKS_LAYER;
+      case 'water':
+        return LayerPhysicalType.WATER_LAYER;
+      case 'roads':
+        return LayerPhysicalType.ROADS_LAYER;
+      case 'surface':
+        return LayerPhysicalType.SURFACE_LAYER;
+      case 'buildings':
+        return LayerPhysicalType.BUILDINGS_LAYER;
+    }
+
+    return LayerPhysicalType.LAND_LAYER;
+  }
+
+  getPipelineType(layer: string): RenderPipelineType {
+    switch (layer) {
+      case 'parks':
+        return RenderPipelineType.TRIANGLE_FLAT;
+      case 'water':
+        return RenderPipelineType.TRIANGLE_FLAT;
+      case 'roads':
+        return RenderPipelineType.TRIANGLE_FLAT;
+      case 'surface':
+        return RenderPipelineType.TRIANGLE_FLAT;
+      case 'buildings':
+        return RenderPipelineType.BUILDING_FLAT;
+    }
+
+    return RenderPipelineType.TRIANGLE_FLAT;
   }
 }
