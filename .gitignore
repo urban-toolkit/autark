@@ -148,4 +148,4 @@ dist
 .pnp.*
 
 # .pbf files inside public folder
-**/public/*.pbf
+**/public/data-ignore/*

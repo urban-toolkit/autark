@@ -1,57 +1,58 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
+import { Table } from './shared/interfaces';
 import { loadDb } from '../config/duckdb';
-import { LOAD_PBF_ON_TABLE, GET_PARKS_LINESTRINGS } from './queries';
-
-export type DbResponse = {
-  metadata: { [key: string]: string };
-  linestring: {
-    type: 'LineString';
-    coordinates: Array<Array<number>>;
-  };
-};
-
-export type GetParksParams = {
-  pbfFileUrl: string;
-  boudingBox?: {
-    minLat: number;
-    maxLat: number;
-    minLon: number;
-    maxLon: number;
-  };
-  coordinateFormat?: string;
-};
+import { LoadPbfUseCase, LoadPbfParams } from './use-cases/load-pbf';
+import { GetLayerUseCase, GetLayerParams, Layer } from './use-cases/get-layer';
+import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
+  private tables: Array<Table> = [];
+  private loadPbfUseCase?: LoadPbfUseCase;
+  private getLayerUseCase?: GetLayerUseCase;
+  private loadCsvUseCase?: LoadCsvUseCase;
 
   async init() {
     this.db = await loadDb();
     this.conn = await this.db.connect();
 
+    this.loadPbfUseCase = new LoadPbfUseCase(this.conn);
+    this.getLayerUseCase = new GetLayerUseCase(this.conn);
+    this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
-  async getParks(params: GetParksParams): Promise<Array<DbResponse>> {
-    if (!this.db || !this.conn) throw new Error('Database not initialized. Please call init() first.');
-    if (!params.coordinateFormat) params.coordinateFormat = 'EPSG:4326';
+  async loadPbf(params: LoadPbfParams) {
+    if (!this.db || !this.conn || !this.loadPbfUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
 
-    await this.conn.query(LOAD_PBF_ON_TABLE(params.pbfFileUrl, 'pbf_table', params.boudingBox));
-    const response = await this.conn.query(GET_PARKS_LINESTRINGS('pbf_table', params.coordinateFormat));
-
-    return this.parseData(response);
+    const table = await this.loadPbfUseCase.exec(params);
+    this.tables.push(table);
   }
 
-  private parseData(response: any): DbResponse[] {
-    return response.toArray().map((record: any) => {
-      const metadata = record.tags?.toJSON() || {};
+  async getLayer(params: GetLayerParams): Promise<Array<Layer>> {
+    if (!this.db || !this.conn || !this.getLayerUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
 
-      return {
-        metadata,
-        linestring: JSON.parse(record.linestring),
-      };
-    });
+    const table = this.tables.find((t) => t.name === params.tableName);
+    if (!table) throw new Error(`Table ${params.tableName} not found.`);
+    if (table.type !== 'osm') throw new Error(`Table ${params.tableName} is not an OSM table.`);
+
+    const response = await this.getLayerUseCase.exec(params);
+    this.tables.push(response.table);
+
+    return response.layers;
+  }
+
+  async loadCsv(params: LoadCsvParams) {
+    if (!this.db || !this.conn || !this.loadCsvUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.loadCsvUseCase.exec(params);
+    this.tables.push(table);
+
+    console.log('tables ', this.tables);
   }
 }
