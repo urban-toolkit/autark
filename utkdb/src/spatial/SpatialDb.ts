@@ -5,11 +5,12 @@ import { loadDb } from '../config/duckdb';
 import { LoadPbfUseCase, LoadPbfParams } from './use-cases/load-pbf';
 import { GetLayerUseCase, GetLayerParams, Layer } from './use-cases/get-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
+import { QueryOperation } from '../query-operation';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
-  private tables: Array<Table> = [];
+  public tables: Array<Table> = [];
   private loadPbfUseCase?: LoadPbfUseCase;
   private getLayerUseCase?: GetLayerUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
@@ -52,7 +53,15 @@ export class SpatialDb {
 
     const table = await this.loadCsvUseCase.exec(params);
     this.tables.push(table);
+  }
 
-    console.log('tables ', this.tables);
+  createQuery(tableName: string) {
+    return new QueryOperation(tableName);
+  }
+
+  applyQuery(query: QueryOperation) {
+    const sql = query.getSql();
+    console.log(sql);
+    return this.conn?.query(sql);
   }
 }
