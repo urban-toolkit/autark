@@ -13,7 +13,7 @@ type Params = {
   outputTableName: string;
 };
 
-export const GET_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName }: Params) => {
+export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName }: Params) => {
   const query = getLayerQuery(layer);
 
   return `
