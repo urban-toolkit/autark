@@ -7,7 +7,7 @@ import {
   ColorMapInterpolator,
   ThematicAggregationLevel,
 } from 'utkmap';
-import { SpatialDb, DbResponse } from 'utkdb';
+import { SpatialDb, Layer } from 'utkdb';
 
 import { DataLoader } from './data-loader';
 
@@ -266,19 +266,10 @@ export class ParksExample extends UtkData {
     await this.db.loadPbf({
       pbfFileUrl: this.pbfFileUrl,
       tableName: 'manhattan',
-      boudingBox: {
-        minLat: 40,
-        maxLat: 41,
-        minLon: -74.1,
-        maxLon: -73.8,
-      },
-    });
-    await this.db.loadCsv({
-      csvFileUrl: 'http://localhost:5173/data-ignore/nyc_data.csv',
-      tableName: 'nyc_data',
     });
 
-    const layersName = ['parks', 'water', 'buildings', 'roads']; // TODO: add coastlines (or surface)
+    // const layersName = ['parks', 'water', 'buildings']; // TODO: add coastlines (or surface) and roads
+    const layersName = ['parks'];
     let lId = 0;
     for (const layerName of layersName) {
       this._layerInfo.push({
@@ -296,12 +287,11 @@ export class ParksExample extends UtkData {
       });
       lId++;
 
-      const layers = await this.db.getLayer({
+      const layers = await this.db.loadLayer({
         tableName: 'manhattan',
         coordinateFormat: 'EPSG:3395',
         layer: layerName as 'parks' | 'water' | 'buildings' | 'roads',
       });
-      console.log(layerName, layers[0]);
 
       this._layerData.push({
         geometry: layers.map((layer) => ({
@@ -316,12 +306,12 @@ export class ParksExample extends UtkData {
     }
   }
 
-  private convertLinestringToTriangles(linestring: DbResponse['linestring']): Array<number> {
+  private convertLinestringToTriangles(linestring: Layer['linestring']): Array<number> {
     const { coordinates } = linestring;
     return earcut(coordinates.flat());
   }
 
-  private convertLinestringToPositions(linestring: DbResponse['linestring']): Array<number> {
+  private convertLinestringToPositions(linestring: Layer['linestring']): Array<number> {
     return linestring.coordinates
       .map((cord) => [cord[0], cord[1], 0])
       .flat()

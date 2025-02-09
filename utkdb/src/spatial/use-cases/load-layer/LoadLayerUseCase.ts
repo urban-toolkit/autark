@@ -2,11 +2,11 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { Params, Returns, Layer } from './interfaces';
-import { GET_LAYER_QUERY, GET_LAYER_DESCRIBE_QUERY } from './queries';
+import { LOAD_LAYER_QUERY, GET_LAYER_DESCRIBE_QUERY } from './queries';
 import { LayerTable } from '../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescription } from '../../shared/utils';
 
-export class GetLayerUseCase {
+export class LoadLayerUseCase {
   private conn: AsyncDuckDBConnection;
 
   constructor(conn: AsyncDuckDBConnection) {
@@ -18,7 +18,7 @@ export class GetLayerUseCase {
 
     const layerOutputTableName = `${params.tableName}_${params.layer}`;
 
-    const layerQuery = GET_LAYER_QUERY({
+    const layerQuery = LOAD_LAYER_QUERY({
       layer: params.layer,
       tableName: params.tableName,
       outputFormat: params.coordinateFormat,
