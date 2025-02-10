@@ -14,7 +14,8 @@ utk*/package-lock.json
 package-lock.json
 demo/*.js
 
-.DS_Store
+._DS_Store
+._*
 
 # Logs
 logs

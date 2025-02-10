@@ -372,3 +372,47 @@ export class ParksExample extends UtkData {
     return RenderPipelineType.TRIANGLE_FLAT;
   }
 }
+
+export class ApiExample extends UtkData {
+    private pbfFileUrl: string;
+    private layerNames: string[];
+
+    private db: SpatialDb;
+    
+    constructor(pbfFileUrl: string, layerNames: string[]) {
+        super();
+
+        console.time("Database creation")
+        this.db = new SpatialDb();
+        console.timeEnd("Database creation")
+
+        this.layerNames = layerNames;
+        this.pbfFileUrl = pbfFileUrl;
+    }
+
+    async loadData() {
+        // TODO: Compute default camera info from data.
+        this._cameraData = {
+            "origin": [-8239012.438994927, 4941135.512524911, 1],
+            "direction": {
+                "eye": [0, 0, 3000],
+                "lookAt": [0, 0, 0],
+                "up": [0, 1, 0]
+            }
+        }
+
+        console.log(this.layerNames);
+
+        console.time("this.db.init")
+        await this.db.init();
+        console.timeEnd("this.db.init")
+
+        console.time("this.db.loadPbf")
+        await this.db.loadPbf({
+          pbfFileUrl: this.pbfFileUrl,
+          tableName: 'manhattan'
+        });
+        console.timeEnd("this.db.loadPbf")
+    }
+
+}
