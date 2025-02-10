@@ -1,3 +1,4 @@
+/* eslint-disable no-var */
 export abstract class DataLoader {
   /**
    * Loads a json file
@@ -44,7 +45,8 @@ export abstract class DataLoader {
     const response = await fetch(url, {
       headers: {
         'Accept-Encoding': 'gzip',
-        Accept: 'application/json',
+        'Accept': 'application/json',
+        'Access-Control-Allow-Origin': '*'
       },
     });
 

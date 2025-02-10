@@ -35,10 +35,9 @@ export class TrianglesLayer extends Layer {
     return this._indices;
   }
 
-  createPipeline(renderer: Renderer, camera: Camera): void {
+  createPipeline(renderer: Renderer): void {
     this._pipeline = new PipelineTriangleFlat(renderer);
     this._pipeline.build(this);
-    console.log(camera);
   }
 
   loadData(layerData: ILayerData): void {
