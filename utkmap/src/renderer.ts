@@ -14,12 +14,10 @@ export class Renderer {
 
     // Multisample & depth textures
     protected _multisampleTexture!: GPUTexture;
-    protected _depthTexture!: GPUTexture;
-
-    // Frame buffer
+    protected _colorTexture!: GPUTexture;
     protected _frameBuffer!: GPURenderPassColorAttachment;
 
-    // Depth buffer
+    protected _depthTexture!: GPUTexture;
     protected _depthBuffer!: GPURenderPassDepthStencilAttachment;
 
     // command encoder
@@ -50,6 +48,10 @@ export class Renderer {
 
     get depthBuffer(): GPURenderPassDepthStencilAttachment {
         return this._depthBuffer;
+    }
+
+    get commandEncoder(): GPUCommandEncoder {
+        return this._commandEncoder;
     }
 
     get sampleCount(): number {
@@ -128,9 +130,7 @@ export class Renderer {
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         };
 
-        if( !this._multisampleTexture ){
-            this._multisampleTexture = this._device.createTexture(multiSampleDesc);
-        }
+        this._multisampleTexture = this._device.createTexture(multiSampleDesc);
         const multiSampleTextureView = this._multisampleTexture.createView();
 
         // Framebuffer definition
@@ -153,9 +153,8 @@ export class Renderer {
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         };
-        if( !this._depthTexture ){
-            this._depthTexture = this._device.createTexture(depthTextureDesc);
-        }
+
+        this._depthTexture = this._device.createTexture(depthTextureDesc);
         const depthTextureView = this._depthTexture.createView();
 
         // depth buffer definition
@@ -167,14 +166,15 @@ export class Renderer {
         };
     }
 
-    clear() {
+    start() {
         if (!this._context) {
             console.error("GPU canvas context is null.");
             return;
         }
 
         // Configure the frame buffer
-        this.configureFrameBuffer();
+        this._frameBuffer.loadOp = 'clear';
+        this._frameBuffer.resolveTarget = this._context.getCurrentTexture().createView();
 
         // Create a new command encoder
         this._commandEncoder = this._device.createCommandEncoder();
@@ -188,8 +188,9 @@ export class Renderer {
         // Create a new pass commands encoder
         const passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
         passEncoder.end();
+    }
 
-        // clear pass
+    finish() {
         this._device.queue.submit([this._commandEncoder.finish()]);
     }
 }

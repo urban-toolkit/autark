@@ -183,5 +183,5 @@ export abstract class Pipeline {
 
   abstract updateVertexBuffers(data: Layer): void;
 
-  abstract renderPass(data: Layer, camera: Camera): void;
+  abstract renderPass(camera: Camera): void;
 }
