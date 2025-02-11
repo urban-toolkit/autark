@@ -7,6 +7,7 @@ import {
   ColorMapInterpolator,
   ThematicAggregationLevel,
 } from 'utkmap';
+
 import { SpatialDb, Layer } from 'utkdb';
 
 import { DataLoader } from './data-loader';

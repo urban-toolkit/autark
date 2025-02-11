@@ -103,7 +103,7 @@ export class TrianglesLayer extends Layer {
   }
 
   renderPass(camera: Camera): void {
-    this._pipeline.renderPass(this, camera);
+    this._pipeline.renderPass(camera);
   }
 
   private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {

@@ -20,8 +20,10 @@ async function main(ex: string = 'utk') {
         map.createCamera(data.cameraData);
         map.createLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
     }
+
     if (ex === 'utk') {
         const folder = 'manhattan';
+        // const layers = ['surface', 'water', 'parks'];
         const layers = ['surface', 'water', 'parks', 'roads', 'buildings'];
         // const layers = ['buildings'];
 
@@ -33,6 +35,7 @@ async function main(ex: string = 'utk') {
             map.createLayer(utkpy.layerInfo[id], utkpy.layerRenderInfo[id], utkpy.layerData[id]);
         }
     }
+
     if (ex === 'parks') {
         // pbf extract creation on win, linux and mac
         // https://docs.opentripplanner.org/en/v2.1.0/Preparing-OSM/#cropping-osm-data
@@ -43,6 +46,7 @@ async function main(ex: string = 'utk') {
         map.createCamera(data.cameraData);
         map.createLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
     }
+
     if (ex === 'api') {
         const data = new ApiExample('http://localhost:5173/data/lower-mn.osm.pbf', ['parks']);
         await data.loadData();
@@ -51,4 +55,4 @@ async function main(ex: string = 'utk') {
     map.render()
 }
 
-main('parks');
+main('utk');

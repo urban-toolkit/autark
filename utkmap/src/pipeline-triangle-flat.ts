@@ -34,6 +34,9 @@ export class PipelineTriangleFlat extends Pipeline {
     this.createColorUniformBindGroup();
     this.createCameraUniformBindGroup();
 
+    this.updateVertexBuffers(mesh);
+    this.updateColorUniforms(mesh);
+
     this.createPipeline();
   }
 
@@ -159,9 +162,9 @@ export class PipelineTriangleFlat extends Pipeline {
     this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
   }
 
-  renderPass(mesh: TrianglesLayer, camera: Camera) {
+  renderPass(camera: Camera) {
     // Create a new command encoder
-    const commandEncoder = this._renderer.device.createCommandEncoder();
+    const commandEncoder = this._renderer.commandEncoder;
 
     // changes buffer behaviour
     this._renderer.frameBuffer.loadOp = 'load';
@@ -178,9 +181,7 @@ export class PipelineTriangleFlat extends Pipeline {
     // sets the current pipeline
     passEncoder.setPipeline(this._pipeline);
 
-    // updates all data
-    this.updateVertexBuffers(mesh);
-    this.updateColorUniforms(mesh);
+    // updates camera
     this.updateCameraUniforms(camera);
 
     // sets the vertex buffers
@@ -197,7 +198,5 @@ export class PipelineTriangleFlat extends Pipeline {
     // draw command
     passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
     passEncoder.end();
-
-    this._renderer.device.queue.submit([commandEncoder.finish()]);
   }
 }
