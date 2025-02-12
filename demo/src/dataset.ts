@@ -111,8 +111,6 @@ export class UtkPyData extends UtkData {
   protected _layers: string[];
   protected _dataFolder: string;
 
-  // TODO: vite for all
-  // TODO: exportar parks, water, etc como geojson
   constructor(dataFolder: string = './manhattan', layers: string[] = ['parks', 'water', 'surface', 'roads']) {
     super();
 
@@ -172,6 +170,9 @@ export class UtkPyData extends UtkData {
   }
 
   async loadData() {
+    //--------------------------------------------------------
+    //--------------------------------------------------------
+    console.time(`Loading camera data`)
     const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
 
     const camera = grammarData['components'][0]['map']['camera'];
@@ -183,13 +184,18 @@ export class UtkPyData extends UtkData {
         lookAt: camera.direction.lookAt,
       },
     };
-    console.log({ camera: this._cameraData });
+    console.timeEnd(`Loading camera data`)
+    //--------------------------------------------------------
 
+    //--------------------------------------------------------
+    //--------------------------------------------------------
+    console.time(`Loading layers data`)
     for (let lId = 0; lId < this._layers.length; lId++) {
       const layer = this._layers[lId];
 
       // load layer json data
-      const layerJson = <any>await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
+      const layerJson: unknown = await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
+
       // load layer binary data
       const layerCoord = Array.from(
         <Float64Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_coordinates.data`, 'd'),
@@ -237,7 +243,8 @@ export class UtkPyData extends UtkData {
       }
       this._layerData.push(layerData);
     }
-    console.log({ layers: this._layerData });
+    console.timeEnd(`Loading layers data`)
+    //--------------------------------------------------------    
   }
 }
 

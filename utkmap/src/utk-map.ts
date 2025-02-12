@@ -84,22 +84,37 @@ export class UtkMap {
         }
     }
 
-    render() {
-        console.log("render");
+    draw(fps: number = 60) {
+        let previousDelta = 0;
 
-        // // Updates the camera
+        const update = (currentDelta: number) => {
+            requestAnimationFrame(update);
+            const delta = currentDelta - previousDelta;
+
+            if (fps && delta < 1000 / fps) {
+                return;
+            }
+
+            this.render();
+            previousDelta = currentDelta;
+        }
+
+        requestAnimationFrame(update);
+    }
+
+    private render() {
+        // Updates the camera
         this._camera.update();
 
-        // // Rnder loop
+        // Starts render
         this._renderer.start();
-        
+
+        // Render each layer
         this._layerManager.layers.forEach((layer) => {
             layer.renderPass(this._camera);
         });
 
+        // Finish render
         this._renderer.finish();
-
-        // Refresh canvas
-        requestAnimationFrame(this.render.bind(this));
     }
 }

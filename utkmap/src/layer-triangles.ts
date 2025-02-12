@@ -10,139 +10,145 @@ import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 
 export class TrianglesLayer extends Layer {
-  protected _position!: number[];
-  protected _thematic!: number[];
-  protected _indices!: number[];
+    protected _position!: number[];
+    protected _thematic!: number[];
+    protected _indices!: number[];
 
-  protected _components: { nPoints: number; nTriangles: number }[] = [];
+    protected _components: { nPoints: number; nTriangles: number }[] = [];
 
-  protected _pipeline!: Pipeline;
+    protected _pipeline!: Pipeline;
 
-  constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
-    super(layerInfo, layerRenderInfo);
-    this.loadData(layerData);
-  }
-
-  get position(): number[] {
-    return this._position;
-  }
-
-  get thematic(): number[] {
-    return this._thematic;
-  }
-
-  get indices(): number[] {
-    return this._indices;
-  }
-
-  createPipeline(renderer: Renderer): void {
-    this._pipeline = new PipelineTriangleFlat(renderer);
-    this._pipeline.build(this);
-  }
-
-  loadData(layerData: ILayerData): void {
-    this.loadGeometry(layerData.geometry);
-
-    if (layerData.thematic.length) {
-      this.loadThematic(layerData.thematic);
+    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+        super(layerInfo, layerRenderInfo);
+        this.loadData(layerData);
     }
-  }
 
-  loadGeometry(layerGeometry: ILayerGeometry[]): void {
-    let position: number[] = [];
-    let indices: number[] = [];
+    get position(): number[] {
+        return this._position;
+    }
 
-    for (let id = 0; id < layerGeometry.length; id++) {
-      // fix the index count
-      if (layerGeometry[id].indices !== undefined) {
-        const fix = layerGeometry[id].indices?.map((a) => a + position.length / 3);
-        indices = indices.concat(fix as number[]);
-      }
+    get thematic(): number[] {
+        return this._thematic;
+    }
 
-      // merges the position data
-      const pos_zfix = layerGeometry[id].position.map((d, id) => {
-        if (id % 3 === 2) {
-          d += this._layerInfo.zIndex;
+    get indices(): number[] {
+        return this._indices;
+    }
+
+    createPipeline(renderer: Renderer): void {
+        this._pipeline = new PipelineTriangleFlat(renderer);
+        this._pipeline.build(this);
+    }
+
+    loadData(layerData: ILayerData): void {
+        this.loadGeometry(layerData.geometry);
+
+        if (layerData.thematic.length) {
+            this.loadThematic(layerData.thematic);
         }
-        return d;
-      });
-      position = position.concat(pos_zfix);
-
-      // stores the components
-      const component = {
-        nPoints: position.length / 3,
-        nTriangles: indices.length / 3,
-      };
-      this._components.push(component);
     }
 
-    this._position = position;
-    this._indices = indices;
-    this._thematic = [];
-  }
+    loadGeometry(layerGeometry: ILayerGeometry[]): void {
+        const position: number[] = [];
+        const indices: number[] = [];
 
-  loadThematic(layerThematic: ILayerThematic[]): void {
-    let thematic: number[] = [];
-    for (let compId = 0; compId < layerThematic.length; compId++) {
-      switch (layerThematic[compId].level) {
-        case ThematicAggregationLevel.AGGREGATION_POINT:
-          thematic = thematic.concat(this.aggregateThematicPoint(layerThematic[compId]));
-          break;
-        case ThematicAggregationLevel.AGGREGATION_PRIMITIVE:
-          thematic = thematic.concat(this.aggregateThematicPrimitive(compId, layerThematic[compId]));
-          break;
-        case ThematicAggregationLevel.AGGREGATION_COMPONENT:
-          thematic = thematic.concat(this.aggregateThematicComponenet(compId, layerThematic[compId]));
-          break;
-        default:
-          console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].level}.`);
-          break;
-      }
-    }
-    this._thematic = thematic;
-  }
+        for (let id = 0; id < layerGeometry.length; id++) {
+            // fix the index count
+            layerGeometry[id].indices?.forEach((a) => {
+                const b = a + position.length / 3;
+                indices.push(b);
+            });
 
-  renderPass(camera: Camera): void {
-    this._pipeline.renderPass(camera);
-  }
+            // merges the position data
+            layerGeometry[id].position.forEach((d, id) => {
+                if (id % 3 === 2) {
+                    d += this._layerInfo.zIndex;
+                }
+                position.push(d);
+            });
 
-  private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
-    return layerThematic.values;
-  }
+            // stores the components
+            const component = {
+                nPoints: position.length / 3,
+                nTriangles: indices.length / 3,
+            };
+            this._components.push(component);
+        }
 
-  private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): number[] {
-    // component points: start/end indices and number of points
-    const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
-    const ePoint = this._components[component].nPoints;
-    const nPoint = ePoint - sPoint;
-
-    // component triangles: start/end indices
-    const sTriangle = component > 0 ? this._components[component - 1].nTriangles : 0;
-    const eTriangle = this._components[component].nTriangles;
-
-    const thematic = new Array(nPoint);
-
-    for (let id = 3 * sTriangle; id < 3 * eTriangle; id++) {
-      const vid = this._indices[id] - sPoint;
-      const tid = Math.floor(id / 3) - sTriangle;
-
-      thematic[vid] = layerThematic.values[tid];
+        this._position = position;
+        this._indices = indices;
+        this._thematic = [];
     }
 
-    return thematic;
-  }
+    loadThematic(layerThematic: ILayerThematic[]): void {
+        const thematic: number[] = [];
 
-  private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): number[] {
-    const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
-    const ePoint = this._components[component].nPoints;
-    const nPoint = ePoint - sPoint;
+        for (let compId = 0; compId < layerThematic.length; compId++) {
+            let aggr:number[] = [];
+            
+            switch (layerThematic[compId].level) {
+                case ThematicAggregationLevel.AGGREGATION_POINT:
+                    aggr = this.aggregateThematicPoint(layerThematic[compId]);
+                    break;
+                case ThematicAggregationLevel.AGGREGATION_PRIMITIVE:
+                    aggr = this.aggregateThematicPrimitive(compId, layerThematic[compId]);
+                    break;
+                case ThematicAggregationLevel.AGGREGATION_COMPONENT:
+                    aggr = this.aggregateThematicComponenet(compId, layerThematic[compId]);
+                    break;
+                default:
+                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].level}.`);
+                    break;
+            }
 
-    const thematic = new Array(nPoint);
-
-    for (let vId = 0; vId < nPoint; vId++) {
-      thematic[vId] = layerThematic.values[0];
+            for (let aId = 0; aId < aggr.length; aId++) {
+                thematic.push(aggr[aId]);
+            }
+        }
+        this._thematic = thematic;
     }
 
-    return thematic;
-  }
+    renderPass(camera: Camera): void {
+        this._pipeline.renderPass(camera);
+    }
+
+    private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
+        return layerThematic.values;
+    }
+
+    private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): number[] {
+        // component points: start/end indices and number of points
+        const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
+        const ePoint = this._components[component].nPoints;
+        const nPoint = ePoint - sPoint;
+
+        // component triangles: start/end indices
+        const sTriangle = component > 0 ? this._components[component - 1].nTriangles : 0;
+        const eTriangle = this._components[component].nTriangles;
+
+        const thematic = new Array(nPoint);
+
+        for (let id = 3 * sTriangle; id < 3 * eTriangle; id++) {
+            const vid = this._indices[id] - sPoint;
+            const tid = Math.floor(id / 3) - sTriangle;
+
+            thematic[vid] = layerThematic.values[tid];
+        }
+
+        return thematic;
+    }
+
+    private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): number[] {
+        const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
+        const ePoint = this._components[component].nPoints;
+        const nPoint = ePoint - sPoint;
+
+        const thematic = new Array(nPoint);
+
+        for (let vId = 0; vId < nPoint; vId++) {
+            thematic[vId] = layerThematic.values[0];
+        }
+
+        return thematic;
+    }
 }
