@@ -23,9 +23,8 @@ async function main(ex: string = 'utk') {
 
     if (ex === 'utk') {
         const folder = 'manhattan';
-        // const layers = ['surface', 'water', 'parks'];
         const layers = ['surface', 'water', 'parks', 'roads', 'buildings'];
-        // const layers = ['buildings'];
+        // const layers = ['surface', 'water', 'parks', 'roads'];
 
         const utkpy = new UtkPyData(folder, layers);
         await utkpy.loadData();
@@ -52,7 +51,7 @@ async function main(ex: string = 'utk') {
         await data.loadData();
     }
 
-    map.render()
+    map.draw()
 }
 
 main('utk');
