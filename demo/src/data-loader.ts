@@ -1,4 +1,6 @@
 /* eslint-disable no-var */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export abstract class DataLoader {
   /**
    * Loads a json file
@@ -64,7 +66,7 @@ export abstract class DataLoader {
 
       const blob = await response.blob();
 
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve) => {
         const addFunc = (value: any) => {
           jsonString += value;
         };
@@ -103,7 +105,7 @@ export abstract class DataLoader {
 
     const blob = await response.blob();
 
-    let arrayResult = await readFile(blob);
+    const arrayResult = await readFile(blob);
 
     if (type == 'f') {
       return new Float32Array(<ArrayBuffer>arrayResult);
