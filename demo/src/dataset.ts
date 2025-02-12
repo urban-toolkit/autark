@@ -1,5 +1,13 @@
-import earcut from 'earcut';
-import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, UtkMap } from 'utkmap';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import { 
+    ICameraData, 
+    ILayerData, 
+    ILayerGeometry, 
+    ILayerInfo, 
+    ILayerRenderInfo 
+} from 'utkmap';
+
 import {
     LayerType,
     LayerGeometryType,
@@ -8,9 +16,10 @@ import {
     ThematicAggregationLevel,
 } from 'utkmap';
 
-import { SpatialDb, Layer } from 'utkdb';
+import { SpatialDb } from 'utkdb';
 
 import { DataLoader } from './data-loader';
+
 import { FeatureCollection } from 'geojson';
 
 abstract class UtkData {
@@ -171,7 +180,6 @@ export class UtkPyData extends UtkData {
     }
 
     async loadData() {
-        console.time(`Loading camera data`)
         const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
 
         const camera = grammarData['components'][0]['map']['camera'];
@@ -183,14 +191,12 @@ export class UtkPyData extends UtkData {
                 lookAt: camera.direction.lookAt,
             },
         };
-        console.timeEnd(`Loading camera data`)
 
-        console.time(`Loading layers data`)
         for (let lId = 0; lId < this._layers.length; lId++) {
             const layer = this._layers[lId];
 
             // load layer json data
-            const layerJson: unknown = await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
+            const layerJson = await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
 
             // load layer binary data
             const layerCoord = Array.from(
@@ -219,7 +225,15 @@ export class UtkPyData extends UtkData {
                 thematic: [],
             };
 
-            const components = layerJson['data'];
+            if( layerJson === null || typeof layerJson !== "object" || !('data' in layerJson) ) {
+                return;
+            }
+
+            const components = layerJson.data;
+            if( components === null || !Array.isArray(components) ) {
+                return;
+            }
+
             for (const comps of components) {
                 const cStartCount = comps.geometry.coordinates;
                 const iStartCount = comps.geometry.indices;
@@ -239,92 +253,10 @@ export class UtkPyData extends UtkData {
             }
             this._layerData.push(layerData);
         }
-        console.timeEnd(`Loading layers data`)
     }
 }
 
-export class ParksExample extends UtkData {
-    private pbfFileUrl: string;
-    private db: SpatialDb = new SpatialDb();
-
-    constructor(pbfFileUrl: string) {
-        super();
-        this.pbfFileUrl = pbfFileUrl;
-    }
-
-    async loadData() {
-        const grammarData: any = await DataLoader.getJsonData(`./manhattan/grammar.json`);
-
-        const camera = grammarData['components'][0]['map']['camera'];
-        this._cameraData = {
-            origin: camera.position,
-            direction: {
-                up: camera.direction.up,
-                eye: camera.direction.right,
-                lookAt: camera.direction.lookAt,
-            },
-        };
-
-        await this.db.init();
-        await this.db.loadPbf({
-            pbfFileUrl: this.pbfFileUrl,
-            tableName: 'manhattan',
-        });
-
-        const layersName = ['parks'];
-        let lId = 0;
-        for (const layerName of layersName) {
-
-            const layers = await this.db.loadLayer({
-                tableName: 'manhattan',
-                coordinateFormat: 'EPSG:3395',
-                layer: layerName as 'surface' | 'water' | 'parks' | 'roads' | 'buildings'
-            });
-
-            this._layerInfo.push({
-                id: `${layerName}.utkpy`,
-                zIndex: lId,
-                typeGeometry: this.getGeometryType(layerName),
-                typeLayer: this.getPhysicalType(layerName),
-            });
-
-            this._layerRenderInfo.push({
-                pipeline: this.getPipelineType(layerName),
-                colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-                isColorMap: false,
-                isPicking: false,
-            });
-            lId++;
-
-            this._layerData.push({
-                geometry: layers.map((layer) => ({
-                    position: this.convertLinestringToPositions(layer.linestring),
-                    indices: this.convertLinestringToTriangles(layer.linestring),
-                })),
-                thematic: layers.map((_) => ({
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [Math.random()],
-                })),
-            });
-        }
-    }
-
-    private convertLinestringToTriangles(linestring: Layer['linestring']): Array<number> {
-        const { coordinates } = linestring;
-        return earcut(coordinates.flat());
-    }
-
-    private convertLinestringToPositions(linestring: Layer['linestring']): Array<number> {
-        return linestring.coordinates
-            .map((cord) => [cord[0], cord[1], 0])
-            .flat()
-            .map((el, id) => {
-                return el - this.cameraData.origin[id % 3];
-            });
-    }
-}
-
-export class ApiExample extends UtkData {
+export class UtkDbExample extends UtkData {
     private pbfFileUrl: string;
     private tableName: string;
     private layerNames: string[];

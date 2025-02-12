@@ -1,8 +1,8 @@
-import { UtkPyData, ToyExample, ParksExample, ApiExample as UtkDb } from './dataset';
+import { UtkPyData, ToyExample, UtkDbExample } from './dataset';
 
 import { UtkMap } from 'utkmap';
 
-async function main(ex: string = 'utk') {
+async function legacy(ex: string = 'utk') {
     const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
     canvas.width = canvas.height = 1024;
 
@@ -31,17 +31,6 @@ async function main(ex: string = 'utk') {
         }
     }
 
-    if (ex === 'parks') {
-        // pbf extract creation on win, linux and mac
-        // https://docs.opentripplanner.org/en/v2.1.0/Preparing-OSM/#cropping-osm-data
-
-        const data = new ParksExample('http://localhost:5173/data/lower-mn.osm.pbf');
-        await data.loadData();
-
-        map.createCamera(data.cameraData);
-        map.createLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
-    }
-
     map.draw()
 }
 
@@ -52,7 +41,7 @@ async function run() {
     const map = new UtkMap(canvas);
     await map.init();
 
-    const db = new UtkDb('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', ['parks', 'water']);
+    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', ['parks', 'water']);
     await db.loadData();
 
     const layers = await db.exportLayers();
@@ -67,4 +56,4 @@ async function run() {
 
 run();
 
-// main("utk")
+// legacy("utk")
