@@ -6,6 +6,7 @@ import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
 import { ColorMap } from './colormap';
+import { IMapStyle } from './interfaces';
 
 export abstract class Pipeline {
   // renderer reference
@@ -158,7 +159,7 @@ export abstract class Pipeline {
 
   updateColorUniforms(layer: Layer) {
     const colors = {
-      color: MapStyle.getColor(layer.layerInfo.typePhysical),
+      color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof IMapStyle),
       colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
       useColorMap: <boolean>layer.layerRenderInfo.isColorMap,
     };

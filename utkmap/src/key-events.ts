@@ -1,4 +1,4 @@
-import { LayerPhysicalType } from './constants';
+import { LayerType } from './constants';
 import { MapStyle } from './map-style';
 import { UtkMap } from './utk-map';
 
@@ -26,7 +26,7 @@ export class KeyEvents {
         const layerInfo = layer.layerInfo;
         const renderInfo = layer.layerRenderInfo;
 
-        if (layerInfo.typePhysical != LayerPhysicalType.BUILDINGS_LAYER) {
+        if (layerInfo.typeLayer != LayerType.PHYSICAL_BUILDINGS) {
           continue;
         }
 

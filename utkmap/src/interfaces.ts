@@ -2,7 +2,7 @@ import {
   ColorHEX,
   ColorMapInterpolator,
   LayerGeometryType,
-  LayerPhysicalType,
+  LayerType,
   RenderPipeline,
   ThematicAggregationLevel,
 } from './constants';
@@ -21,7 +21,7 @@ export interface ILayerInfo {
   id: string; // layer id
   zIndex: number; // layer render order
   typeGeometry: LayerGeometryType; // layer geometry type
-  typePhysical: LayerPhysicalType; // layer physical type
+  typeLayer: LayerType; // layer physical type
 }
 
 export interface ILayerRenderInfo {
