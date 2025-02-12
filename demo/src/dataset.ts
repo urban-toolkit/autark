@@ -1,426 +1,376 @@
 import earcut from 'earcut';
-import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo } from 'utkmap';
+import { ICameraData, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, UtkMap } from 'utkmap';
 import {
-  LayerGeometryType,
-  LayerPhysicalType,
-  RenderPipeline as RenderPipelineType,
-  ColorMapInterpolator,
-  ThematicAggregationLevel,
+    LayerType,
+    LayerGeometryType,
+    RenderPipeline as RenderPipelineType,
+    ColorMapInterpolator,
+    ThematicAggregationLevel,
 } from 'utkmap';
 
 import { SpatialDb, Layer } from 'utkdb';
 
 import { DataLoader } from './data-loader';
+import { FeatureCollection } from 'geojson';
 
 abstract class UtkData {
-  protected _layerInfo: ILayerInfo[] = [];
-  protected _layerData: ILayerData[] = [];
-  protected _layerRenderInfo: ILayerRenderInfo[] = [];
-  protected _cameraData!: ICameraData;
+    protected _layerInfo: ILayerInfo[] = [];
+    protected _layerData: ILayerData[] = [];
+    protected _layerRenderInfo: ILayerRenderInfo[] = [];
+    protected _cameraData!: ICameraData;
 
-  get layerInfo() {
-    return this._layerInfo;
-  }
+    get layerInfo() {
+        return this._layerInfo;
+    }
 
-  get layerRenderInfo() {
-    return this._layerRenderInfo;
-  }
+    get layerRenderInfo() {
+        return this._layerRenderInfo;
+    }
 
-  get layerData() {
-    return this._layerData;
-  }
+    get layerData() {
+        return this._layerData;
+    }
 
-  get cameraData() {
-    return this._cameraData;
-  }
+    get cameraData() {
+        return this._cameraData;
+    }
 
-  abstract loadData(): void;
+    getGeometryType(layer: string): LayerGeometryType {
+        switch (layer) {
+            case 'parks':
+                return LayerGeometryType.TRIGMESH_LAYER;
+            case 'water':
+                return LayerGeometryType.TRIGMESH_LAYER;
+            case 'roads':
+                return LayerGeometryType.TRIGMESH_LAYER;
+            case 'surface':
+                return LayerGeometryType.TRIGMESH_LAYER;
+            case 'buildings':
+                return LayerGeometryType.BUILDINGS_LAYER;
+        }
+
+        return LayerGeometryType.TRIGMESH_LAYER;
+    }
+
+    getPhysicalType(layer: string): LayerType {
+        switch (layer) {
+            case 'parks':
+                return LayerType.PHYSICAL_PARKS;
+            case 'water':
+                return LayerType.PHYSICAL_WATER;
+            case 'roads':
+                return LayerType.PHYSICAL_ROADS;
+            case 'surface':
+                return LayerType.PHYSICAL_SURFACE;
+            case 'buildings':
+                return LayerType.PHYSICAL_BUILDINGS;
+        }
+
+        return LayerType.PHYSICAL_SURFACE;
+    }
+
+    getPipelineType(layer: string): RenderPipelineType {
+        switch (layer) {
+            case 'parks':
+                return RenderPipelineType.TRIANGLE_FLAT;
+            case 'water':
+                return RenderPipelineType.TRIANGLE_FLAT;
+            case 'roads':
+                return RenderPipelineType.TRIANGLE_FLAT;
+            case 'surface':
+                return RenderPipelineType.TRIANGLE_FLAT;
+            case 'buildings':
+                return RenderPipelineType.BUILDING_FLAT;
+        }
+
+        return RenderPipelineType.TRIANGLE_FLAT;
+    }
+
+    abstract loadData(): void;
 }
 
 export class ToyExample extends UtkData {
-  async loadData() {
-    this._cameraData = {
-      origin: [0, 0, 1],
-      direction: {
-        up: [0, 1, 0],
-        lookAt: [0, 0, 0],
-        eye: [0, 0, 1],
-      },
-    };
-
-    this._layerInfo.push({
-      id: 'toy.example',
-      zIndex: 0,
-      typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
-      typePhysical: LayerPhysicalType.WATER_LAYER,
-    });
-
-    this._layerRenderInfo.push({
-      pipeline: RenderPipelineType.TRIANGLE_FLAT,
-      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-      isColorMap: true,
-      isPicking: false,
-    });
-
-    this._layerData.push({
-      geometry: [
-        {
-          // one park
-          position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map((d, i) => {
-            // coordinates (lat, log, z=0)
-            return d - this.cameraData.origin[i % 3];
-          }),
-          indices: [0, 1, 2], // triangles
-        },
-        {
-          position: [0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map(
-            (d, i) => {
-              return d - this.cameraData.origin[i % 3];
+    async loadData() {
+        this._cameraData = {
+            origin: [0, 0, 1],
+            direction: {
+                up: [0, 1, 0],
+                lookAt: [0, 0, 0],
+                eye: [0, 0, 1],
             },
-          ),
-          indices: [0, 1, 2, 3, 4, 5],
-        },
-        {
-          position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, -0.5, 0.0].map((d, i) => {
-            return d - this.cameraData.origin[i % 3];
-          }),
-          indices: [0, 1, 2],
-        },
-      ],
+        };
 
-      thematic: [
-        {
-          level: ThematicAggregationLevel.AGGREGATION_POINT,
-          values: [1.0, 0.5, 0.0],
-        },
-        {
-          level: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
-          values: [1.0, 0.0],
-        },
-        {
-          // use this to color the whole park
-          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-          values: [0.75],
-        },
-      ],
-    });
-  }
+        this._layerInfo.push({
+            id: 'toy.example',
+            zIndex: 0,
+            typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
+            typeLayer: LayerType.PHYSICAL_WATER,
+        });
+
+        this._layerRenderInfo.push({
+            pipeline: RenderPipelineType.TRIANGLE_FLAT,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            isColorMap: true,
+            isPicking: false,
+        });
+
+        this._layerData.push({
+            geometry: [
+                {
+                    // one park
+                    position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map((d, i) => {
+                        // coordinates (lat, log, z=0)
+                        return d - this.cameraData.origin[i % 3];
+                    }),
+                    indices: [0, 1, 2], // triangles
+                },
+                {
+                    position: [0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.5, 0.0].map(
+                        (d, i) => {
+                            return d - this.cameraData.origin[i % 3];
+                        },
+                    ),
+                    indices: [0, 1, 2, 3, 4, 5],
+                },
+                {
+                    position: [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, -0.5, 0.0].map((d, i) => {
+                        return d - this.cameraData.origin[i % 3];
+                    }),
+                    indices: [0, 1, 2],
+                },
+            ],
+
+            thematic: [
+                {
+                    level: ThematicAggregationLevel.AGGREGATION_POINT,
+                    values: [1.0, 0.5, 0.0],
+                },
+                {
+                    level: ThematicAggregationLevel.AGGREGATION_PRIMITIVE,
+                    values: [1.0, 0.0],
+                },
+                {
+                    // use this to color the whole park
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [0.75],
+                },
+            ],
+        });
+    }
 }
 
 export class UtkPyData extends UtkData {
-  protected _layers: string[];
-  protected _dataFolder: string;
+    protected _layers: string[];
+    protected _dataFolder: string;
 
-  constructor(dataFolder: string = './manhattan', layers: string[] = ['parks', 'water', 'surface', 'roads']) {
-    super();
+    constructor(dataFolder: string = './manhattan', layers: string[] = ['parks', 'water', 'surface', 'roads']) {
+        super();
 
-    this._layers = layers;
-    this._dataFolder = dataFolder;
-  }
-
-  getGeometryType(layer: string): LayerGeometryType {
-    switch (layer) {
-      case 'parks':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'water':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'roads':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'surface':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'buildings':
-        return LayerGeometryType.BUILDINGS_LAYER;
+        this._layers = layers;
+        this._dataFolder = dataFolder;
     }
 
-    return LayerGeometryType.TRIGMESH_LAYER;
-  }
+    async loadData() {
+        console.time(`Loading camera data`)
+        const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
 
-  getPhysicalType(layer: string): LayerPhysicalType {
-    switch (layer) {
-      case 'parks':
-        return LayerPhysicalType.PARKS_LAYER;
-      case 'water':
-        return LayerPhysicalType.WATER_LAYER;
-      case 'roads':
-        return LayerPhysicalType.ROADS_LAYER;
-      case 'surface':
-        return LayerPhysicalType.SURFACE_LAYER;
-      case 'buildings':
-        return LayerPhysicalType.BUILDINGS_LAYER;
-    }
-
-    return LayerPhysicalType.LAND_LAYER;
-  }
-
-  getPipelineType(layer: string): RenderPipelineType {
-    switch (layer) {
-      case 'parks':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'water':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'roads':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'surface':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'buildings':
-        return RenderPipelineType.BUILDING_FLAT;
-    }
-
-    return RenderPipelineType.TRIANGLE_FLAT;
-  }
-
-  async loadData() {
-    //--------------------------------------------------------
-    //--------------------------------------------------------
-    console.time(`Loading camera data`)
-    const grammarData: any = await DataLoader.getJsonData(`${this._dataFolder}/grammar.json`);
-
-    const camera = grammarData['components'][0]['map']['camera'];
-    this._cameraData = {
-      origin: camera.position,
-      direction: {
-        up: camera.direction.up,
-        eye: camera.direction.right,
-        lookAt: camera.direction.lookAt,
-      },
-    };
-    console.timeEnd(`Loading camera data`)
-    //--------------------------------------------------------
-
-    //--------------------------------------------------------
-    //--------------------------------------------------------
-    console.time(`Loading layers data`)
-    for (let lId = 0; lId < this._layers.length; lId++) {
-      const layer = this._layers[lId];
-
-      // load layer json data
-      const layerJson: unknown = await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
-
-      // load layer binary data
-      const layerCoord = Array.from(
-        <Float64Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_coordinates.data`, 'd'),
-      );
-      const layerIndex = Array.from(
-        <Uint32Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_indices.data`, 'I'),
-      );
-
-      this._layerInfo.push({
-        id: `${layer}.utkpy`,
-        zIndex: lId,
-        typeGeometry: this.getGeometryType(layer),
-        typePhysical: this.getPhysicalType(layer),
-      });
-
-      this._layerRenderInfo.push({
-        pipeline: this.getPipelineType(layer),
-        colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-        isColorMap: false,
-        isPicking: false,
-      });
-
-      const layerData: ILayerData = {
-        geometry: [],
-        thematic: [],
-      };
-
-      const components = layerJson['data'];
-      for (const comps of components) {
-        const cStartCount = comps.geometry.coordinates;
-        const iStartCount = comps.geometry.indices;
-
-        const geometry: ILayerGeometry = {
-          position: layerCoord.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
-            return el - this.cameraData.origin[id % 3];
-          }),
-          indices: layerIndex.slice(iStartCount[0], iStartCount[0] + iStartCount[1]),
+        const camera = grammarData['components'][0]['map']['camera'];
+        this._cameraData = {
+            origin: camera.position,
+            direction: {
+                up: camera.direction.up,
+                eye: camera.direction.right,
+                lookAt: camera.direction.lookAt,
+            },
         };
+        console.timeEnd(`Loading camera data`)
 
-        layerData.geometry.push(geometry);
-        layerData.thematic.push({
-          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-          values: [Math.random()],
-        });
-      }
-      this._layerData.push(layerData);
+        console.time(`Loading layers data`)
+        for (let lId = 0; lId < this._layers.length; lId++) {
+            const layer = this._layers[lId];
+
+            // load layer json data
+            const layerJson: unknown = await DataLoader.getJsonData(`${this._dataFolder}/${layer}.json`);
+
+            // load layer binary data
+            const layerCoord = Array.from(
+                <Float64Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_coordinates.data`, 'd'),
+            );
+            const layerIndex = Array.from(
+                <Uint32Array>await DataLoader.getBinaryData(`${this._dataFolder}/${layer}_indices.data`, 'I'),
+            );
+
+            this._layerInfo.push({
+                id: `${layer}.utkpy`,
+                zIndex: lId,
+                typeGeometry: this.getGeometryType(layer),
+                typeLayer: this.getPhysicalType(layer),
+            });
+
+            this._layerRenderInfo.push({
+                pipeline: this.getPipelineType(layer),
+                colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+                isColorMap: false,
+                isPicking: false,
+            });
+
+            const layerData: ILayerData = {
+                geometry: [],
+                thematic: [],
+            };
+
+            const components = layerJson['data'];
+            for (const comps of components) {
+                const cStartCount = comps.geometry.coordinates;
+                const iStartCount = comps.geometry.indices;
+
+                const geometry: ILayerGeometry = {
+                    position: layerCoord.slice(cStartCount[0], cStartCount[0] + cStartCount[1]).map((el, id) => {
+                        return el - this.cameraData.origin[id % 3];
+                    }),
+                    indices: layerIndex.slice(iStartCount[0], iStartCount[0] + iStartCount[1]),
+                };
+
+                layerData.geometry.push(geometry);
+                layerData.thematic.push({
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [Math.random()],
+                });
+            }
+            this._layerData.push(layerData);
+        }
+        console.timeEnd(`Loading layers data`)
     }
-    console.timeEnd(`Loading layers data`)
-    //--------------------------------------------------------    
-  }
 }
 
 export class ParksExample extends UtkData {
-  private pbfFileUrl: string;
-  private db: SpatialDb = new SpatialDb();
-
-  constructor(pbfFileUrl: string) {
-    super();
-    this.pbfFileUrl = pbfFileUrl;
-  }
-
-  async loadData() {
-    const grammarData: any = await DataLoader.getJsonData(`./manhattan/grammar.json`);
-
-    const camera = grammarData['components'][0]['map']['camera'];
-    this._cameraData = {
-      origin: camera.position,
-      direction: {
-        up: camera.direction.up,
-        eye: camera.direction.right,
-        lookAt: camera.direction.lookAt,
-      },
-    };
-
-    await this.db.init();
-    await this.db.loadPbf({
-      pbfFileUrl: this.pbfFileUrl,
-      tableName: 'manhattan',
-    });
-
-    // const layersName = ['parks', 'water', 'buildings']; // TODO: add coastlines (or surface) and roads
-    const layersName = ['parks'];
-    let lId = 0;
-    for (const layerName of layersName) {
-      this._layerInfo.push({
-        id: `${layerName}.utkpy`,
-        zIndex: lId,
-        typeGeometry: this.getGeometryType(layerName),
-        typePhysical: this.getPhysicalType(layerName),
-      });
-
-      this._layerRenderInfo.push({
-        pipeline: this.getPipelineType(layerName),
-        colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-        isColorMap: false,
-        isPicking: false,
-      });
-      lId++;
-
-      const layers = await this.db.loadLayer({
-        tableName: 'manhattan',
-        coordinateFormat: 'EPSG:3395',
-        layer: layerName as 'parks' | 'water' | 'buildings' | 'roads',
-      });
-
-      this._layerData.push({
-        geometry: layers.map((layer) => ({
-          position: this.convertLinestringToPositions(layer.linestring),
-          indices: this.convertLinestringToTriangles(layer.linestring),
-        })),
-        thematic: layers.map((_) => ({
-          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-          values: [Math.random()],
-        })),
-      });
-    }
-  }
-
-  private convertLinestringToTriangles(linestring: Layer['linestring']): Array<number> {
-    const { coordinates } = linestring;
-    return earcut(coordinates.flat());
-  }
-
-  private convertLinestringToPositions(linestring: Layer['linestring']): Array<number> {
-    return linestring.coordinates
-      .map((cord) => [cord[0], cord[1], 0])
-      .flat()
-      .map((el, id) => {
-        return el - this.cameraData.origin[id % 3];
-      });
-  }
-
-  // layers
-  getGeometryType(layer: string): LayerGeometryType {
-    switch (layer) {
-      case 'parks':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'water':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'roads':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'surface':
-        return LayerGeometryType.TRIGMESH_LAYER;
-      case 'buildings':
-        return LayerGeometryType.BUILDINGS_LAYER;
-    }
-
-    return LayerGeometryType.TRIGMESH_LAYER;
-  }
-
-  getPhysicalType(layer: string): LayerPhysicalType {
-    switch (layer) {
-      case 'parks':
-        return LayerPhysicalType.PARKS_LAYER;
-      case 'water':
-        return LayerPhysicalType.WATER_LAYER;
-      case 'roads':
-        return LayerPhysicalType.ROADS_LAYER;
-      case 'surface':
-        return LayerPhysicalType.SURFACE_LAYER;
-      case 'buildings':
-        return LayerPhysicalType.BUILDINGS_LAYER;
-    }
-
-    return LayerPhysicalType.LAND_LAYER;
-  }
-
-  getPipelineType(layer: string): RenderPipelineType {
-    switch (layer) {
-      case 'parks':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'water':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'roads':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'surface':
-        return RenderPipelineType.TRIANGLE_FLAT;
-      case 'buildings':
-        return RenderPipelineType.BUILDING_FLAT;
-    }
-
-    return RenderPipelineType.TRIANGLE_FLAT;
-  }
-}
-
-export class ApiExample extends UtkData {
     private pbfFileUrl: string;
-    private layerNames: string[];
+    private db: SpatialDb = new SpatialDb();
 
-    private db: SpatialDb;
-    
-    constructor(pbfFileUrl: string, layerNames: string[]) {
+    constructor(pbfFileUrl: string) {
         super();
-
-        console.time("Database creation")
-        this.db = new SpatialDb();
-        console.timeEnd("Database creation")
-
-        this.layerNames = layerNames;
         this.pbfFileUrl = pbfFileUrl;
     }
 
     async loadData() {
-        // TODO: Compute default camera info from data.
+        const grammarData: any = await DataLoader.getJsonData(`./manhattan/grammar.json`);
+
+        const camera = grammarData['components'][0]['map']['camera'];
         this._cameraData = {
-            "origin": [-8239012.438994927, 4941135.512524911, 1],
-            "direction": {
-                "eye": [0, 0, 3000],
-                "lookAt": [0, 0, 0],
-                "up": [0, 1, 0]
-            }
-        }
+            origin: camera.position,
+            direction: {
+                up: camera.direction.up,
+                eye: camera.direction.right,
+                lookAt: camera.direction.lookAt,
+            },
+        };
 
-        console.log(this.layerNames);
-
-        console.time("this.db.init")
         await this.db.init();
-        console.timeEnd("this.db.init")
-
-        console.time("this.db.loadPbf")
         await this.db.loadPbf({
-          pbfFileUrl: this.pbfFileUrl,
-          tableName: 'manhattan'
+            pbfFileUrl: this.pbfFileUrl,
+            tableName: 'manhattan',
         });
-        console.timeEnd("this.db.loadPbf")
+
+        const layersName = ['parks'];
+        let lId = 0;
+        for (const layerName of layersName) {
+
+            const layers = await this.db.loadLayer({
+                tableName: 'manhattan',
+                coordinateFormat: 'EPSG:3395',
+                layer: layerName as 'surface' | 'water' | 'parks' | 'roads' | 'buildings'
+            });
+
+            this._layerInfo.push({
+                id: `${layerName}.utkpy`,
+                zIndex: lId,
+                typeGeometry: this.getGeometryType(layerName),
+                typeLayer: this.getPhysicalType(layerName),
+            });
+
+            this._layerRenderInfo.push({
+                pipeline: this.getPipelineType(layerName),
+                colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+                isColorMap: false,
+                isPicking: false,
+            });
+            lId++;
+
+            this._layerData.push({
+                geometry: layers.map((layer) => ({
+                    position: this.convertLinestringToPositions(layer.linestring),
+                    indices: this.convertLinestringToTriangles(layer.linestring),
+                })),
+                thematic: layers.map((_) => ({
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [Math.random()],
+                })),
+            });
+        }
     }
 
+    private convertLinestringToTriangles(linestring: Layer['linestring']): Array<number> {
+        const { coordinates } = linestring;
+        return earcut(coordinates.flat());
+    }
+
+    private convertLinestringToPositions(linestring: Layer['linestring']): Array<number> {
+        return linestring.coordinates
+            .map((cord) => [cord[0], cord[1], 0])
+            .flat()
+            .map((el, id) => {
+                return el - this.cameraData.origin[id % 3];
+            });
+    }
+}
+
+export class ApiExample extends UtkData {
+    private pbfFileUrl: string;
+    private tableName: string;
+    private layerNames: string[];
+    private projection: string;
+
+    private db: SpatialDb;
+
+    constructor(pbfFileUrl: string, tableName: string, layerNames: string[], projection: string = 'EPSG:3395') {
+        super();
+
+        this.db = new SpatialDb();
+
+        this.pbfFileUrl = pbfFileUrl;
+        this.tableName = tableName;
+        this.layerNames = layerNames;
+        this.projection = projection;
+    }
+
+    async loadData() {
+        // DB Initialization
+        await this.db.init();
+
+        // PBF data loading
+        await this.db.loadPbf({
+            pbfFileUrl: this.pbfFileUrl,
+            tableName: this.tableName
+        });
+
+        // Filter layers from PBF file
+        for (const layerName of this.layerNames) {
+            await this.db.loadLayer({
+                tableName: this.tableName,
+                coordinateFormat: this.projection,
+                layer: layerName as 'surface' | 'parks' | 'water' | 'roads' | 'buildings',
+            });
+        }
+    }
+
+    async exportLayers(): Promise<{ name: string, data: FeatureCollection }[]> {
+        const data = [];
+
+        for (const layerName of this.layerNames) {
+            const json = await this.db.getLayerGeoJSON(`${this.tableName}_${layerName}`);
+            data.push({ name: layerName, data: JSON.parse(json) });
+        }
+
+        return data;
+    }
 }

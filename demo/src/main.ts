@@ -1,4 +1,4 @@
-import { UtkPyData, ToyExample, ParksExample, ApiExample } from './dataset';
+import { UtkPyData, ToyExample, ParksExample, ApiExample as UtkDb } from './dataset';
 
 import { UtkMap } from 'utkmap';
 
@@ -6,12 +6,8 @@ async function main(ex: string = 'utk') {
     const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
     canvas.width = canvas.height = 1024;
 
-    console.time("UtMap initialization")
-    //----------------------------------------
     const map = new UtkMap(canvas);
     await map.init();
-    //----------------------------------------
-    console.timeEnd("UtMap initialization")
 
     if (ex === 'toy') {
         const data = new ToyExample();
@@ -46,12 +42,29 @@ async function main(ex: string = 'utk') {
         map.createLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
     }
 
-    if (ex === 'api') {
-        const data = new ApiExample('http://localhost:5173/data/lower-mn.osm.pbf', ['parks']);
-        await data.loadData();
-    }
-
     map.draw()
 }
 
-main('utk');
+async function run() {
+    const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
+    canvas.width = canvas.height = 1024;
+
+    const map = new UtkMap(canvas);
+    await map.init();
+
+    const db = new UtkDb('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', ['parks', 'water']);
+    await db.loadData();
+
+    const layers = await db.exportLayers();
+
+    for (const json of layers) {
+        const type = db.getPhysicalType(json.name);
+        map.loadLayerGeoJson(json.data, json.name, type);
+    }
+
+    map.draw();
+}
+
+run();
+
+// main("utk")

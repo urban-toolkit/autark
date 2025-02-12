@@ -1,6 +1,6 @@
 import { LayerTable } from '../../shared/interfaces';
 
-export type LayerType = 'parks' | 'water' | 'buildings' | 'coastlines' | 'roads';
+export type LayerType = 'surface' | 'water' | 'parks' | 'roads' | 'buildings';
 
 export interface Params {
   layer: LayerType;
