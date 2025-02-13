@@ -41,6 +41,7 @@ async function run() {
     const map = new UtkMap(canvas);
     await map.init();
 
+    // https://docs.opentripplanner.org/en/v2.1.0/Preparing-OSM/#cropping-osm-data
     const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', ['parks', 'water']);
     await db.loadData();
 
