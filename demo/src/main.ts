@@ -56,4 +56,19 @@ async function run() {
 
 run();
 
-// legacy("utk")
+// TODO LIST
+
+// Buildings
+// Roads
+// Coastline
+// def get_overpass_filters(layer_type):
+// osm.py - linha 1292
+
+// Load de geojson fora do OSM como uma layer.
+// Ex: Bairros
+// Tratar os GeoJsons gerais (atualmente só estamos lendo lista de linestrings)
+
+// Load csv (que passe pelos parques/bairros)
+// Join parques/bairros (count, média)
+
+// Thematic data API
