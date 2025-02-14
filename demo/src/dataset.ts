@@ -293,18 +293,6 @@ export class UtkDbExample extends UtkData {
                 layer: obj.toString() as 'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings',
             });
         }
-
-        // Load de geojson como uma layer.
-        // Bairros
-
-        // Load csv (que passe pelos parques/bairros)
-        // Join parques/bairros (count, média)
-
-        // Buildings
-        // Roads
-        // Coastline
-
-        // Thematic data API
     }
 
     async exportLayers(): Promise<{ name: string, data: FeatureCollection }[]> {
