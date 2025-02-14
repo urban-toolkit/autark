@@ -8,12 +8,15 @@ export enum LayerGeometryType {
 }
 
 export enum LayerType {
-    PHYSICAL_SURFACE = 'surface',
-    PHYSICAL_PARKS = 'parks',
-    PHYSICAL_WATER = 'water',
-    PHYSICAL_ROADS = 'roads',
-    PHYSICAL_BUILDINGS = 'buildings',
-    THEMATIC = 'thematic'
+    OSM_SURFACE = 'surface',
+    OSM_COASTLINE = 'coastline',
+    OSM_PARKS = 'parks',
+    OSM_WATER = 'water',
+    OSM_ROADS = 'roads',
+    OSM_BUILDINGS = 'buildings',
+    //
+    PHYSICAL_GEOJSON = 'physical_geojson',
+    THEMATIC_GEOJSON = 'thematic_geojson'
 }
 
 export enum ThematicAggregationLevel {

@@ -1,6 +1,6 @@
 import { UtkPyData, ToyExample, UtkDbExample } from './dataset';
 
-import { UtkMap } from 'utkmap';
+import { LayerType, UtkMap } from 'utkmap';
 
 async function legacy(ex: string = 'utk') {
     const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
@@ -20,7 +20,6 @@ async function legacy(ex: string = 'utk') {
     if (ex === 'utk') {
         const folder = 'manhattan';
         const layers = ['surface', 'water', 'parks', 'roads', 'buildings'];
-        // const layers = ['surface', 'water', 'parks', 'roads'];
 
         const utkpy = new UtkPyData(folder, layers);
         await utkpy.loadData();
@@ -42,14 +41,14 @@ async function run() {
     await map.init();
 
     // https://docs.opentripplanner.org/en/v2.1.0/Preparing-OSM/#cropping-osm-data
-    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', ['parks', 'water']);
+    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', [LayerType.OSM_PARKS, LayerType.OSM_WATER]);
     await db.loadData();
 
     const layers = await db.exportLayers();
+    const origin = [-8239012.438994927, 4941135.512524911, 1]; //TODO: await.db.getOrigin();
 
     for (const json of layers) {
-        const type = db.getPhysicalType(json.name);
-        map.loadLayerGeoJson(json.data, json.name, type);
+        map.loadGeoJsonLayer(json.data, origin, json.name as LayerType);
     }
 
     map.draw();

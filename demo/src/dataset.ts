@@ -64,18 +64,18 @@ abstract class UtkData {
     getPhysicalType(layer: string): LayerType {
         switch (layer) {
             case 'parks':
-                return LayerType.PHYSICAL_PARKS;
+                return LayerType.OSM_PARKS;
             case 'water':
-                return LayerType.PHYSICAL_WATER;
+                return LayerType.OSM_WATER;
             case 'roads':
-                return LayerType.PHYSICAL_ROADS;
+                return LayerType.OSM_ROADS;
             case 'surface':
-                return LayerType.PHYSICAL_SURFACE;
+                return LayerType.OSM_SURFACE;
             case 'buildings':
-                return LayerType.PHYSICAL_BUILDINGS;
+                return LayerType.OSM_BUILDINGS;
         }
 
-        return LayerType.PHYSICAL_SURFACE;
+        return LayerType.OSM_SURFACE;
     }
 
     getPipelineType(layer: string): RenderPipelineType {
@@ -113,7 +113,7 @@ export class ToyExample extends UtkData {
             id: 'toy.example',
             zIndex: 0,
             typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
-            typeLayer: LayerType.PHYSICAL_WATER,
+            typeLayer: LayerType.OSM_WATER,
         });
 
         this._layerRenderInfo.push({
@@ -259,20 +259,20 @@ export class UtkPyData extends UtkData {
 export class UtkDbExample extends UtkData {
     private pbfFileUrl: string;
     private tableName: string;
-    private layerNames: string[];
+    private layerTypes: string[];
     private projection: string;
 
     private db: SpatialDb;
 
-    constructor(pbfFileUrl: string, tableName: string, layerNames: string[], projection: string = 'EPSG:3395') {
+    constructor(pbfFileUrl: string, tableName: string, layers: LayerType[], projection: string = 'EPSG:3395') {
         super();
 
         this.db = new SpatialDb();
 
         this.pbfFileUrl = pbfFileUrl;
         this.tableName = tableName;
-        this.layerNames = layerNames;
         this.projection = projection;
+        this.layerTypes = layers;
     }
 
     async loadData() {
@@ -286,19 +286,31 @@ export class UtkDbExample extends UtkData {
         });
 
         // Filter layers from PBF file
-        for (const layerName of this.layerNames) {
+        for (const obj of this.layerTypes) {
             await this.db.loadLayer({
                 tableName: this.tableName,
                 coordinateFormat: this.projection,
-                layer: layerName as 'surface' | 'parks' | 'water' | 'roads' | 'buildings',
+                layer: obj.toString() as 'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings',
             });
         }
+
+        // Load de geojson como uma layer.
+        // Bairros
+
+        // Load csv (que passe pelos parques/bairros)
+        // Join parques/bairros (count, média)
+
+        // Buildings
+        // Roads
+        // Coastline
+
+        // Thematic data API
     }
 
     async exportLayers(): Promise<{ name: string, data: FeatureCollection }[]> {
         const data = [];
 
-        for (const layerName of this.layerNames) {
+        for (const layerName of this.layerTypes) {
             const json = await this.db.getLayerGeoJSON(`${this.tableName}_${layerName}`);
             data.push({ name: layerName, data: JSON.parse(json) });
         }

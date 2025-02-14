@@ -63,50 +63,16 @@ export class UtkMap {
         this.render();
     }
 
-    loadLayerGeoJson(geojson: FeatureCollection, layerName: string, typeLayer: LayerType , typeGeometry: LayerGeometryType = LayerGeometryType.TRIGMESH_LAYER) {
-        // check if is a building layer
-        const isBuilding = (typeGeometry === LayerGeometryType.BUILDINGS_LAYER);
+    loadGeoJsonLayer(geojson: FeatureCollection, origin: number[], typeLayer: LayerType) {
 
-        // TODO: Compute from layer data
-        const cameraData = {
-            "origin": [-8239012.438994927, 4941135.512524911, 1],
-            "direction": {
-                "eye": [0, 0, 3000],
-                "lookAt": [0, 0, 0],
-                "up": [0, 1, 0]
-            }
-        }
-
-        if(isBuilding) {
-            // TODO
-            return;
-        }
-        else {
-            const layerInfo: ILayerInfo = {
-                id: `${layerName}`,
-                zIndex: this.layerManager.length + 1,
-                typeGeometry: typeGeometry,
-                typeLayer: typeLayer,
-            };
-    
-            const layerRenderInfo = {
-                pipeline: isBuilding ? RenderPipeline.BUILDING_FLAT : RenderPipeline.TRIANGLE_FLAT,
-                colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-                isColorMap: false,
-                isPicking: false,
-            };
-
-            const mesh = Triangulator.createTrianglesLayerMesh(geojson, cameraData.origin);
-
-            const layerData = {
-                geometry: mesh,
-                thematic: [{
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [Math.random()],
-                }],
-            };
-
-            this.createLayer(layerInfo, layerRenderInfo, layerData);
+        switch (typeLayer) {
+            case LayerType.OSM_WATER:
+            case LayerType.OSM_PARKS:
+                this.createTrianglesLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.TRIGMESH_LAYER)
+            break;
+        
+            default:
+                break;
         }
     }
 
@@ -180,5 +146,33 @@ export class UtkMap {
 
         // Finish render
         this._renderer.finish();
+    }
+
+    private createTrianglesLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+        const layerInfo: ILayerInfo = {
+            id: `${typeLayer.toString()}`,
+            zIndex: this.layerManager.length + 1,
+            typeGeometry: typeGeometry,
+            typeLayer: typeLayer,
+        };
+
+        const layerRenderInfo: ILayerRenderInfo = {
+            pipeline: RenderPipeline.TRIANGLE_FLAT,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            isColorMap: false,
+            isPicking: false,
+        };
+
+        const mesh = Triangulator.createTrianglesLayerMesh(geojson, origin);
+
+        const layerData = {
+            geometry: mesh,
+            thematic: [{
+                level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                values: [Math.random()],
+            }],
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 }

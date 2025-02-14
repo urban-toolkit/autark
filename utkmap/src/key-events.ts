@@ -26,7 +26,7 @@ export class KeyEvents {
         const layerInfo = layer.layerInfo;
         const renderInfo = layer.layerRenderInfo;
 
-        if (layerInfo.typeLayer != LayerType.PHYSICAL_BUILDINGS) {
+        if (layerInfo.typeLayer != LayerType.OSM_BUILDINGS) {
           continue;
         }
 
