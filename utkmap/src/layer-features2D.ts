@@ -9,7 +9,7 @@ import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 
-export class TrianglesLayer extends Layer {
+export class Features2DLayer extends Layer {
     protected _position!: number[];
     protected _thematic!: number[];
     protected _indices!: number[];
@@ -36,6 +36,7 @@ export class TrianglesLayer extends Layer {
     }
 
     createPipeline(renderer: Renderer): void {
+        // TODO: USE OTHER PIPELINES
         this._pipeline = new PipelineTriangleFlat(renderer);
         this._pipeline.build(this);
     }

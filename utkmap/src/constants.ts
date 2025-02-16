@@ -1,10 +1,6 @@
 export enum LayerGeometryType {
-    TRIGMESH_LAYER = 'TRIGMESH_LAYER',
-    BUILDINGS_LAYER = 'BUILDINGS_LAYER',
-    // TODO
-    POINTSET_LAYER = 'POINTSET_LAYER',
-    POLYLINE_LAYER = 'POLYLINE_LAYER',
-    UNIFGRID_LAYER = 'UNIFGRID_LAYER',
+    FEATURES_2D = 'features2d',
+    FEATURES_3D = 'features3d',
 }
 
 export enum LayerType {
@@ -15,19 +11,19 @@ export enum LayerType {
     OSM_ROADS = 'roads',
     OSM_BUILDINGS = 'buildings',
     //
-    PHYSICAL_GEOJSON = 'physical_geojson',
-    THEMATIC_GEOJSON = 'thematic_geojson'
+    PHYSICAL_GEOJSON = 'physicalGeojson',
+    THEMATIC_GEOJSON = 'thematicGeojson'
 }
 
 export enum ThematicAggregationLevel {
-    AGGREGATION_POINT = 'AGGREGATION_POINT',
-    AGGREGATION_PRIMITIVE = 'AGGREGATION_PRIMITIVE',
-    AGGREGATION_COMPONENT = 'AGGREGATION_COMPONENT',
+    AGGREGATION_POINT = 'aggreagationPoint',
+    AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
+    AGGREGATION_COMPONENT = 'aggregationComponent',
 }
 
 export enum RenderPipeline {
-    TRIANGLE_FLAT = 'TRIANGLE_FLAT',
-    BUILDING_FLAT = 'BUILDING_FLAT',
+    TRIANGLE_FLAT = 'triangleFlat',
+    TRIANGLE_SSAO = 'triangleSsao',
 }
 
 export enum ColorMapInterpolator {
@@ -36,8 +32,8 @@ export enum ColorMapInterpolator {
 }
 
 export enum MouseStatus {
-    MOUSE_IDLE = 'MOUSE_IDLE',
-    MOUSE_DRAG = 'MOUSE_DRAG',
+    MOUSE_IDLE = 'mouseIdle',
+    MOUSE_DRAG = 'mouseDrag',
 }
 
 export type ColorHEX = `#${string}`;

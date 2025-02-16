@@ -64,19 +64,29 @@ export class UtkMap {
     }
 
     loadGeoJsonLayer(geojson: FeatureCollection, origin: number[], typeLayer: LayerType) {
-
         switch (typeLayer) {
+            case LayerType.OSM_SURFACE:
+            case LayerType.OSM_COASTLINE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
-                this.createTrianglesLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.TRIGMESH_LAYER)
+                this.createFeaturesLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
             break;
-        
+
+            // case LayerType.OSM_ROADS:
+            //     this.createRoadsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
+            // break
+
+            case LayerType.OSM_BUILDINGS:
+                this.createBuildingsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_3D);
+            break
+
             default:
-                break;
+                console.error(`Geojson data has an unknown layer type: ${typeLayer}.`);
+            break;
         }
     }
 
-    createCamera(params: ICameraData) {
+    updateCamera(params: ICameraData) {
         this._camera = new Camera(params);
     }
 
@@ -148,7 +158,7 @@ export class UtkMap {
         this._renderer.finish();
     }
 
-    private createTrianglesLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createFeaturesLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,
@@ -163,10 +173,8 @@ export class UtkMap {
             isPicking: false,
         };
 
-        const mesh = Triangulator.createTrianglesLayerMesh(geojson, origin);
-
         const layerData = {
-            geometry: mesh,
+            geometry: Triangulator.createFeaturesLayerMesh(geojson, origin),
             thematic: [{
                 level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                 values: [Math.random()],
@@ -175,4 +183,57 @@ export class UtkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
+
+    // private createRoadsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    //     const layerInfo: ILayerInfo = {
+    //         id: `${typeLayer.toString()}`,
+    //         zIndex: this.layerManager.length + 1,
+    //         typeGeometry: typeGeometry,
+    //         typeLayer: typeLayer,
+    //     };
+
+    //     const layerRenderInfo: ILayerRenderInfo = {
+    //         pipeline: RenderPipeline.TRIANGLE_FLAT,
+    //         colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+    //         isColorMap: false,
+    //         isPicking: false,
+    //     };
+
+    //     const layerData = {
+    //         geometry: Triangulator.createRoadsLayerMesh(geojson, origin),
+    //         thematic: [{
+    //             level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+    //             values: [Math.random()],
+    //         }],
+    //     };
+
+    //     this.createLayer(layerInfo, layerRenderInfo, layerData);
+    // }
+
+    private createBuildingsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+        const layerInfo: ILayerInfo = {
+            id: `${typeLayer.toString()}`,
+            zIndex: this.layerManager.length + 1,
+            typeGeometry: typeGeometry,
+            typeLayer: typeLayer,
+        };
+
+        const layerRenderInfo: ILayerRenderInfo = {
+            pipeline: RenderPipeline.TRIANGLE_SSAO,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            isColorMap: false,
+            isPicking: false,
+        };
+
+        const layerData = {
+            geometry: Triangulator.createBuildingsLayerMesh(geojson, origin),
+            thematic: [{
+                level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                values: [Math.random()],
+            }],
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    }
+
 }
