@@ -11,7 +11,7 @@ import {
 import {
     LayerType,
     LayerGeometryType,
-    RenderPipeline as RenderPipelineType,
+    RenderPipeline,
     ColorMapInterpolator,
     ThematicAggregationLevel,
 } from 'utkmap';
@@ -47,18 +47,15 @@ abstract class UtkData {
     getGeometryType(layer: string): LayerGeometryType {
         switch (layer) {
             case 'parks':
-                return LayerGeometryType.TRIGMESH_LAYER;
             case 'water':
-                return LayerGeometryType.TRIGMESH_LAYER;
             case 'roads':
-                return LayerGeometryType.TRIGMESH_LAYER;
             case 'surface':
-                return LayerGeometryType.TRIGMESH_LAYER;
+                return LayerGeometryType.FEATURES_2D;
             case 'buildings':
-                return LayerGeometryType.BUILDINGS_LAYER;
+                return LayerGeometryType.FEATURES_3D;
         }
 
-        return LayerGeometryType.TRIGMESH_LAYER;
+        return LayerGeometryType.FEATURES_2D;
     }
 
     getPhysicalType(layer: string): LayerType {
@@ -78,21 +75,18 @@ abstract class UtkData {
         return LayerType.OSM_SURFACE;
     }
 
-    getPipelineType(layer: string): RenderPipelineType {
+    getPipelineType(layer: string): RenderPipeline {
         switch (layer) {
             case 'parks':
-                return RenderPipelineType.TRIANGLE_FLAT;
             case 'water':
-                return RenderPipelineType.TRIANGLE_FLAT;
             case 'roads':
-                return RenderPipelineType.TRIANGLE_FLAT;
             case 'surface':
-                return RenderPipelineType.TRIANGLE_FLAT;
+                return RenderPipeline.TRIANGLE_FLAT;
             case 'buildings':
-                return RenderPipelineType.BUILDING_FLAT;
+                return RenderPipeline.TRIANGLE_SSAO;
         }
 
-        return RenderPipelineType.TRIANGLE_FLAT;
+        return RenderPipeline.TRIANGLE_FLAT;
     }
 
     abstract loadData(): void;
@@ -112,12 +106,12 @@ export class ToyExample extends UtkData {
         this._layerInfo.push({
             id: 'toy.example',
             zIndex: 0,
-            typeGeometry: LayerGeometryType.TRIGMESH_LAYER,
+            typeGeometry: LayerGeometryType.FEATURES_2D,
             typeLayer: LayerType.OSM_WATER,
         });
 
         this._layerRenderInfo.push({
-            pipeline: RenderPipelineType.TRIANGLE_FLAT,
+            pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: true,
             isPicking: false,

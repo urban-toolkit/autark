@@ -2,8 +2,8 @@ import { ILayerData, ILayerInfo, ILayerRenderInfo } from './interfaces';
 import { LayerGeometryType } from './constants';
 
 import { Layer } from './layer';
-import { TrianglesLayer } from './layer-triangles';
-import { BuildingsLayer } from './layer-buildings';
+import { Features2DLayer } from './layer-features2D';
+import { Features3DLayer } from './layer-features3D';
 
 export class LayerManager {
     protected _layers: Layer[] = [];
@@ -23,14 +23,14 @@ export class LayerManager {
 
         // loads based on type
         switch (layerInfo.typeGeometry) {
-            case LayerGeometryType.TRIGMESH_LAYER:
-                layer = new TrianglesLayer(layerInfo, layerRender, layerData);
+            case LayerGeometryType.FEATURES_2D:
+                layer = new Features2DLayer(layerInfo, layerRender, layerData);
                 break;
-            case LayerGeometryType.BUILDINGS_LAYER:
-                layer = new BuildingsLayer(layerInfo, layerRender, layerData);
+            case LayerGeometryType.FEATURES_3D:
+                layer = new Features3DLayer(layerInfo, layerRender, layerData);
                 break;
             default:
-                console.error(`File ${layerInfo.id}.json has an unknown layer type: ${layerInfo.typeGeometry}.`);
+                console.error(`File ${layerInfo.id}.json has an unknown layer geometry: ${layerInfo.typeGeometry}.`);
                 break;
         }
 
