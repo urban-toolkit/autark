@@ -39,24 +39,52 @@ export abstract class Triangulator {
         const mesh: ILayerGeometry[] = [];
         const collection: Feature[] = geojson['features'];
 
-        console.log(collection);
-
         for (const feature of collection) {
             const { coordinates } = <LineString>feature.geometry;
             const props = feature.properties;
 
-            if (props === null || props['building:part'] === 'yes') {
+            // unavailable building info
+            if (props === null) {
                 continue;
             }
 
-            const height = props['height'];
-            const minHeight = 0;
+            // do not need to draw using the outline
+            if ('building' in props && 'building:part' in props) {
+                console.log('skipped -------------')
+                console.log(props);
+                console.log('---------------------')
+                console.log('')
+                continue;
+            }
+
+            if (props['building'] === 'roof' || props['building:part'] === 'roof') {
+                console.log('roof -------------')
+                continue;
+            }
+
+            if (!('height' in props)) {
+                console.log('no height- --')
+                console.log(props);
+                console.log('---------------------')
+                console.log('')
+            }
+
+            if ('building:part' in props && !('min_height' in props)) {
+                console.log('no min_height- ------')
+                console.log(props);
+                console.log('---------------------')
+                console.log('')    
+                continue;
+            }
+
+            const height = props['height'] * 0.75;
+            const minHeight = !('min_height' in props) ? 0 : props['min_height'] * 0.75;
 
             // number of vertices
             const nVertsOnFeature = coordinates.length;
 
             // floor ----------------------------------------------------------------------
-            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], minHeight / 2 ])
+            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], minHeight ])
                 .flat()
                 .map((el, id: number) => {
                     return el - origin[id % 3];
@@ -64,7 +92,7 @@ export abstract class Triangulator {
 
             // roof ----------------------------------------------------------------------
             const flatCoordsRoof = flatCoords.map((el: number, id: number) => {
-                return (id % 3 == 2 ? (height / 2) : el);
+                return (id % 3 === 2 ? height : el);
             });
             for (let eId = 0; eId < flatCoordsRoof.length; eId++) {
                 flatCoords.push(flatCoordsRoof[eId]);
@@ -93,10 +121,6 @@ export abstract class Triangulator {
                 position: flatCoords,
                 indices: flatIdsRoof
             });
-
-            // if (mesh.length == 100) {
-            //     return mesh;
-            // }
         }
 
         return mesh;

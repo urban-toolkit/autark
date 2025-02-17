@@ -45,7 +45,7 @@ async function run() {
     await db.loadData();
 
     const layers = await db.exportLayers();
-    const origin = [-8239012.438994927, 4941135.512524911, 1]; //TODO: await.db.getOrigin();
+    const origin = [-8239012.438994927, 4941135.512524911, 0]; //TODO: await.db.getOrigin();
 
     for (const json of layers) {
         map.loadGeoJsonLayer(json.data, origin, json.name as LayerType);
