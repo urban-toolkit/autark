@@ -34,25 +34,22 @@ export abstract class Triangulator {
         const mesh: ILayerGeometry[] = [];
         const collection: Feature[] = geojson['features'];
 
-        const debug = []; 
-
         for (const feature of collection) {
             const { coordinates } = <LineString>feature.geometry;
 
+            // Check consistency ----------------------------------------------------------
             // make the orientation consistent
             const rawCoords = Triangulator.outlineFix(coordinates);
+            // number of vertices
+            const nVertsOnFeature = rawCoords.length;
 
             // checks if is a valid feature
-            if (!this.isValidBuilding(feature)) {
-                continue;
-            }
+            if (!Triangulator.isValidBuilding(feature)) { continue; }
 
             // get the heights
             const heightInfo = Triangulator.getBuildingHeight(feature);
             if (!heightInfo.length) { continue; }
-
-            // number of vertices
-            const nVertsOnFeature = rawCoords.length;
+            // ----------------------------------------------------------------------------
 
             // floor ----------------------------------------------------------------------
             const flatCoords = rawCoords.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]])
@@ -61,8 +58,9 @@ export abstract class Triangulator {
                     return el - origin[id % 3];
                 });
             const flatIds = earcut(rawCoords.flat());
+            // ----------------------------------------------------------------------------
 
-            // roof ----------------------------------------------------------------------
+            // roof -----------------------------------------------------------------------
             const flatCoordsRoof = flatCoords.map((el: number, id: number) => {
                 return (id % 3 === 2 ? heightInfo[1] : el);
             });
@@ -71,37 +69,32 @@ export abstract class Triangulator {
             }
 
             const flatIdsRoof = earcut(rawCoords.flat()).map((el: number) => el + nVertsOnFeature);
-            flatIds.forEach((el: number) => flatIdsRoof.push(el));
+            flatIdsRoof.forEach((el: number) => flatIds.push(el));
+            // ----------------------------------------------------------------------------
 
             // walls ----------------------------------------------------------------------
-            const flatCoordsWall = [];
-
             for (let eId = 0; eId < nVertsOnFeature; eId++) {
                 // current
-                flatCoordsWall.push(flatCoords[3 * eId + 0]);
-                flatCoordsWall.push(flatCoords[3 * eId + 1]);
-                flatCoordsWall.push(flatCoords[3 * eId + 2]);
+                flatCoords.push(flatCoords[3 * eId + 0]);
+                flatCoords.push(flatCoords[3 * eId + 1]);
+                flatCoords.push(flatCoords[3 * eId + 2]);
                 
                 // next
-                flatCoordsWall.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 0]);
-                flatCoordsWall.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 1]);
-                flatCoordsWall.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 2]);
+                flatCoords.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 0]);
+                flatCoords.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 1]);
+                flatCoords.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 2]);
             }
 
             for (let eId = 0; eId < nVertsOnFeature; eId++) {
                 // current
-                flatCoordsWall.push(flatCoordsRoof[3 * eId + 0]);
-                flatCoordsWall.push(flatCoordsRoof[3 * eId + 1]);
-                flatCoordsWall.push(flatCoordsRoof[3 * eId + 2]);
+                flatCoords.push(flatCoordsRoof[3 * eId + 0]);
+                flatCoords.push(flatCoordsRoof[3 * eId + 1]);
+                flatCoords.push(flatCoordsRoof[3 * eId + 2]);
                 
                 // next
-                flatCoordsWall.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 0]);
-                flatCoordsWall.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 1]);
-                flatCoordsWall.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 2]);
-            }
-
-            for (let eId = 0; eId < flatCoordsWall.length; eId++) {
-                flatCoords.push(flatCoordsWall[eId]);
+                flatCoords.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 0]);
+                flatCoords.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 1]);
+                flatCoords.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 2]);
             }
 
             for (let vId = 0; vId < 2 * nVertsOnFeature - 1; vId+=2) {
@@ -111,15 +104,15 @@ export abstract class Triangulator {
                 const v2 = v0 + 2 * nVertsOnFeature;
                 const v3 = v1 + 2 * nVertsOnFeature;
 
-                flatIdsRoof.push(...[v0, v1, v2, v2, v1, v3]);
+                flatIds.push(...[v0, v1, v2, v2, v1, v3]);
             }
+            // ----------------------------------------------------------------------------
 
+            // Add feature to mesh list
             mesh.push({
                 position: flatCoords,
-                indices: flatIdsRoof
+                indices: flatIds
             });
-
-            debug.push(feature);
         }
 
         return mesh;
@@ -159,22 +152,18 @@ export abstract class Triangulator {
 
         // skip the roofs for now
         if (props['building'] === 'roof' || props['building:part'] === 'roof') {
-            console.error("roof definition.")
             return false;
         }
 
         // skip 2D building definitions
         if ('building' in props) {
-            console.error("building outline for 2D rendering")
             return false;
         }
 
+        // building for 3D rendering
         if ('building:part' in props) {
             return true;
         }
-
-        console.error("CHECK--------")
-        console.log(props);
 
         return true;
     }
@@ -222,7 +211,6 @@ export abstract class Triangulator {
 
         return [z_SCALE * min_height, z_SCALE * height];
     }
-
 
     // static createRoadsLayerMesh(geojson: FeatureCollection, origin: number[]): ILayerGeometry[] {
     //     return [];
