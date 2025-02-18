@@ -49,8 +49,8 @@ export class Features3DLayer extends Features2DLayer {
       }
 
       // face vectors
-      const ab = [vb[0] - va[0], vb[1] - va[1], vb[2] - va[2]];
-      const ac = [vc[0] - va[0], vc[1] - va[1], vc[2] - va[2]];
+      const ab = [va[0] - vb[0], va[1] - vb[1], va[2] - vb[2]];
+      const ac = [va[0] - vc[0], va[1] - vc[1], va[2] - vc[2]];
 
       // cross product
       const cross = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
