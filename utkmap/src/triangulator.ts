@@ -1,10 +1,10 @@
 import earcut from 'earcut';
 
 import { ILayerGeometry } from "./interfaces";
-import { Feature, FeatureCollection, LineString, Position } from 'geojson';
+import { Feature, FeatureCollection, LineString } from 'geojson';
+import { AABB } from './util';
 
-
-export abstract class Triangulator {
+export class Triangulator {
 
     static createFeaturesLayerMesh(geojson: FeatureCollection, origin: number[]): ILayerGeometry[] {
         const mesh: ILayerGeometry[] = [];
@@ -32,32 +32,25 @@ export abstract class Triangulator {
 
     static createBuildingsLayerMesh(geojson: FeatureCollection, origin: number[]): ILayerGeometry[] {
         const mesh: ILayerGeometry[] = [];
-        const collection: Feature[] = geojson['features'];
+        const collection: Feature[] = this.groupBuildings(geojson);
 
         for (const feature of collection) {
             const { coordinates } = <LineString>feature.geometry;
 
-            // Check consistency ----------------------------------------------------------
-            // make the orientation consistent
-            const rawCoords = Triangulator.outlineFix(coordinates);
             // number of vertices
-            const nVertsOnFeature = rawCoords.length;
-
-            // checks if is a valid feature
-            if (!Triangulator.isValidBuilding(feature)) { continue; }
+            const nVertsOnFeature = coordinates.length;
 
             // get the heights
             const heightInfo = Triangulator.getBuildingHeight(feature);
             if (!heightInfo.length) { continue; }
-            // ----------------------------------------------------------------------------
 
             // floor ----------------------------------------------------------------------
-            const flatCoords = rawCoords.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]])
+            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]])
                 .flat()
                 .map((el, id: number) => {
                     return el - origin[id % 3];
                 });
-            const flatIds = earcut(rawCoords.flat());
+            const flatIds = earcut(coordinates.flat());
             // ----------------------------------------------------------------------------
 
             // roof -----------------------------------------------------------------------
@@ -68,7 +61,7 @@ export abstract class Triangulator {
                 flatCoords.push(flatCoordsRoof[eId]);
             }
 
-            const flatIdsRoof = earcut(rawCoords.flat()).map((el: number) => el + nVertsOnFeature);
+            const flatIdsRoof = earcut(coordinates.flat()).map((el: number) => el + nVertsOnFeature);
             flatIdsRoof.forEach((el: number) => flatIds.push(el));
             // ----------------------------------------------------------------------------
 
@@ -78,11 +71,11 @@ export abstract class Triangulator {
                 flatCoords.push(flatCoords[3 * eId + 0]);
                 flatCoords.push(flatCoords[3 * eId + 1]);
                 flatCoords.push(flatCoords[3 * eId + 2]);
-                
+
                 // next
-                flatCoords.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 0]);
-                flatCoords.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 1]);
-                flatCoords.push(flatCoords[3 * ( (eId + 1) % nVertsOnFeature ) + 2]);
+                flatCoords.push(flatCoords[3 * ((eId + 1) % nVertsOnFeature) + 0]);
+                flatCoords.push(flatCoords[3 * ((eId + 1) % nVertsOnFeature) + 1]);
+                flatCoords.push(flatCoords[3 * ((eId + 1) % nVertsOnFeature) + 2]);
             }
 
             for (let eId = 0; eId < nVertsOnFeature; eId++) {
@@ -90,14 +83,14 @@ export abstract class Triangulator {
                 flatCoords.push(flatCoordsRoof[3 * eId + 0]);
                 flatCoords.push(flatCoordsRoof[3 * eId + 1]);
                 flatCoords.push(flatCoordsRoof[3 * eId + 2]);
-                
+
                 // next
-                flatCoords.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 0]);
-                flatCoords.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 1]);
-                flatCoords.push(flatCoordsRoof[3 * ( (eId + 1) % nVertsOnFeature ) + 2]);
+                flatCoords.push(flatCoordsRoof[3 * ((eId + 1) % nVertsOnFeature) + 0]);
+                flatCoords.push(flatCoordsRoof[3 * ((eId + 1) % nVertsOnFeature) + 1]);
+                flatCoords.push(flatCoordsRoof[3 * ((eId + 1) % nVertsOnFeature) + 2]);
             }
 
-            for (let vId = 0; vId < 2 * nVertsOnFeature - 1; vId+=2) {
+            for (let vId = 0; vId < 2 * nVertsOnFeature - 1; vId += 2) {
                 const v0 = (2 * nVertsOnFeature) + vId;
                 const v1 = (2 * nVertsOnFeature) + vId + 1;
 
@@ -118,54 +111,105 @@ export abstract class Triangulator {
         return mesh;
     }
 
-    private static outlineFix(coordinates: Position[]): Position[] {
+    static groupBuildings(geojson: FeatureCollection): Feature[] {
+        const aabb = new AABB();
+        aabb.build(geojson);
 
-        let len = coordinates.length;
+        const features = [];
 
-        if ( coordinates[0][0] === coordinates[len - 1][0] && coordinates[0][1] === coordinates[len - 1][1]) {
-            coordinates.pop();
-            len -= 1;
+        for (const box of aabb.boxes) {
+            let group = box[1].feats;
+
+            // checks if is a valid feature
+            group = Triangulator.removeRedundancy(group);
+
+            // make the orientation consistent
+            group = Triangulator.makeConsistent(group);
+
+            // add to the features list
+            features.push(...group);
         }
 
-        const x2 = coordinates[0][0] - coordinates[len -1][0];
-        const y2 = coordinates[0][1] - coordinates[len -1][1];
-
-        const x1 = coordinates[0][0] - coordinates[1][0];
-        const y1 = coordinates[0][1] - coordinates[1][1];
-
-        // x1y2 - x2y1
-        if( Math.sign(x1*y2 - x2*y1) >= 0 ) {
-            return coordinates.reverse();
-        }
-        else {
-            return coordinates;
-        }
+        return features;
     }
 
-    private static isValidBuilding(feature: Feature): boolean {
-        const props = feature.properties;
+    private static removeRedundancy(features: Feature[]): Feature[] {
 
-        // unavailable building info
-        if (props === null) {
-            return false;
-        }
+        const filterd = features.filter( (feat: Feature) => {
+            if (feat.properties === null) {
+                return false;
+            }
+    
+            if (feat.properties['building'] === 'roof' || feat.properties['building:part'] === 'roof') {
+                return false;
+            }
 
-        // skip the roofs for now
-        if (props['building'] === 'roof' || props['building:part'] === 'roof') {
-            return false;
-        }
-
-        // skip 2D building definitions
-        if ('building' in props) {
-            return false;
-        }
-
-        // building for 3D rendering
-        if ('building:part' in props) {
             return true;
+        });
+
+        const outline = filterd.filter((feat: Feature) => {
+            if (feat.properties === null) {
+                return false;
+            }
+
+            return ('building' in feat.properties);
+        });
+
+        if ( outline.length > 1) {
+            console.log(outline);
         }
 
-        return true;
+        return filterd;
+
+
+
+        // const props = feature.properties;
+
+        // // unavailable building info
+
+        // // skip the roofs for now
+        // if (props['building'] === 'roof' || props['building:part'] === 'roof') {
+        //     return false;
+        // }
+
+        // // skip 2D building definitions
+        // if ('building' in props) {
+        //     return false;
+        // }
+
+        // // building for 3D rendering
+        // if ('building:part' in props) {
+        //     return true;
+        // }
+
+        // return true;
+    }
+
+
+    private static makeConsistent(features: Feature[]): Feature[] {
+
+        return features;
+
+        // let len = coordinates.length;
+
+        // if (coordinates[0][0] === coordinates[len - 1][0] && coordinates[0][1] === coordinates[len - 1][1]) {
+        //     coordinates.pop();
+        //     len -= 1;
+        // }
+
+        // const x2 = coordinates[0][0] - coordinates[len - 1][0];
+        // const y2 = coordinates[0][1] - coordinates[len - 1][1];
+
+        // const x1 = coordinates[0][0] - coordinates[1][0];
+        // const y1 = coordinates[0][1] - coordinates[1][1];
+
+        // // x1y2 - x2y1
+        // if (Math.sign(x1 * y2 - x2 * y1) >= 0) {
+        //     return coordinates.reverse();
+        // }
+        // else {
+        //     return coordinates;
+        // }
     }
 
     private static getBuildingHeight(feature: Feature): number[] {
@@ -191,8 +235,8 @@ export abstract class Triangulator {
             height = FLOOR_HEIGHT * props['building:levels'];
         }
         else {
-            console.error(`Cannot compute height.`);
-            console.log(props);
+            // console.error(`Cannot compute height.`);
+            // console.log(props);
 
             return [];
         }

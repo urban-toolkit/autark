@@ -30,5 +30,4 @@ fn main(@location(0) uvs : vec2<f32>) -> @location(0) vec4f {
     let color = textureSample(colorTex, texSampler, fuvs );
 
     return vec4<f32>( cc * color.rgb, color.a);
-    // return textureSample(normalTex, texSampler, fuvs);
 }
