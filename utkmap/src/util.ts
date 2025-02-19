@@ -1,7 +1,6 @@
 import { booleanOverlap } from "@turf/boolean-overlap";
 import { Feature, LineString, FeatureCollection } from "geojson";
 
-
 export class Box2D {
     public xmin: number = 0;
     public xmax: number = 0;

@@ -8,17 +8,15 @@ export class Triangulator {
 
     static createFeaturesLayerMesh(geojson: FeatureCollection, origin: number[]): ILayerGeometry[] {
         const mesh: ILayerGeometry[] = [];
+
+        // translate based on origin
+        this.translateFeatures(geojson, origin);
         const collection: Feature[] = geojson['features'];
 
         for (const feature of collection) {
             const { coordinates } = <LineString>feature.geometry;
 
-            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], 0])
-                .flat()
-                .map((el: number, id: number) => {
-                    return el - origin[id % 3];
-                });
-
+            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
             const flatIds = earcut(coordinates.flat())
 
             mesh.push({
@@ -32,6 +30,9 @@ export class Triangulator {
 
     static createBuildingsLayerMesh(geojson: FeatureCollection, origin: number[]): ILayerGeometry[] {
         const mesh: ILayerGeometry[] = [];
+
+        // translate based on origin
+        this.translateFeatures(geojson, origin);
         const collection: Feature[] = this.groupBuildings(geojson);
 
         for (const feature of collection) {
@@ -45,11 +46,7 @@ export class Triangulator {
             if (!heightInfo.length) { continue; }
 
             // floor ----------------------------------------------------------------------
-            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]])
-                .flat()
-                .map((el, id: number) => {
-                    return el - origin[id % 3];
-                });
+            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]]).flat();
             const flatIds = earcut(coordinates.flat());
             // ----------------------------------------------------------------------------
 
@@ -124,13 +121,31 @@ export class Triangulator {
             group = Triangulator.removeRedundancy(group);
 
             // make the orientation consistent
-            group = Triangulator.makeConsistent(group);
+            group = Triangulator.adjustGeometry(group);
 
             // add to the features list
             features.push(...group);
+
+            if(features.length > 10) {
+                return features;
+            }
         }
 
         return features;
+    }
+
+    private static translateFeatures(geojson: FeatureCollection, origin: number[]) {
+        const collection = geojson['features'];
+
+        for (const feature of collection) {
+            const { coordinates } = <LineString>feature.geometry;
+
+            for(let cId=0; cId < coordinates.length; cId++) {
+                const coords = coordinates[cId];
+                coords[0] -= origin[0];
+                coords[1] -= origin[1];
+            }
+        }
     }
 
     private static removeRedundancy(features: Feature[]): Feature[] {
@@ -144,22 +159,27 @@ export class Triangulator {
                 return false;
             }
 
+            if ( !('height' in feat.properties) && !('levels' in feat.properties) && !('building:levels' in feat.properties) ) {
+                return false;
+            }
+
             return true;
         });
 
         const outline = filterd.filter((feat: Feature) => {
-            if (feat.properties === null) {
-                return false;
-            }
+            return true;
+            // if (feat.properties === null) {
+            //     return false;
+            // }
 
-            return ('building' in feat.properties);
+            // return ( ('building' in feat.properties) && !('building:part' in feat.properties));
         });
 
         if ( outline.length > 1) {
             console.log(outline);
         }
 
-        return filterd;
+        return outline;
 
 
 
@@ -186,7 +206,7 @@ export class Triangulator {
     }
 
 
-    private static makeConsistent(features: Feature[]): Feature[] {
+    private static adjustGeometry(features: Feature[]): Feature[] {
 
         return features;
 
@@ -233,12 +253,6 @@ export class Triangulator {
         }
         else if ('building:levels' in props) {
             height = FLOOR_HEIGHT * props['building:levels'];
-        }
-        else {
-            // console.error(`Cannot compute height.`);
-            // console.log(props);
-
-            return [];
         }
 
         // min height computation
