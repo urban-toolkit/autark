@@ -16,10 +16,9 @@ export abstract class Triangulator {
             }
 
             // removes the last vertex if duplicated
-            let len = coordinates.length;
+            const len = coordinates.length;
             if (coordinates[0][0] === coordinates[len - 1][0] && coordinates[0][1] === coordinates[len - 1][1]) {
                 coordinates.pop();
-                len -= 1;
             }
         }
 
