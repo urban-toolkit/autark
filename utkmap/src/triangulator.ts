@@ -225,8 +225,4 @@ export class Triangulator {
 
         return [z_SCALE * min_height, z_SCALE * height];
     }
-
-    // static createRoadsLayerMesh(geojson: FeatureCollection, origin: number[]): ILayerGeometry[] {
-    //     return [];
-    // }
 }
