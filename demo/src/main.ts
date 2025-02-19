@@ -1,37 +1,6 @@
-import { UtkPyData, ToyExample, UtkDbExample } from './dataset';
-
 import { LayerType, UtkMap } from 'utkmap';
 
-async function legacy(ex: string = 'utk') {
-    const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
-    canvas.width = canvas.height = 1024;
-
-    const map = new UtkMap(canvas);
-    await map.init();
-
-    if (ex === 'toy') {
-        const data = new ToyExample();
-        data.loadData();
-
-        map.updateCamera(data.cameraData);
-        map.createLayer(data.layerInfo[0], data.layerRenderInfo[0], data.layerData[0]);
-    }
-
-    if (ex === 'utk') {
-        const folder = 'manhattan';
-        const layers = ['surface', 'water', 'parks', 'roads', 'buildings'];
-
-        const utkpy = new UtkPyData(folder, layers);
-        await utkpy.loadData();
-
-        map.updateCamera(utkpy.cameraData);
-        for (let id = 0; id < layers.length; id++) {
-            map.createLayer(utkpy.layerInfo[id], utkpy.layerRenderInfo[id], utkpy.layerData[id]);
-        }
-    }
-
-    map.draw()
-}
+import { UtkDbExample } from './dataset';
 
 async function run() {
     const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
@@ -55,13 +24,13 @@ async function run() {
 }
 
 run();
-// legacy();
 
 // TODO LIST
 
-// Buildings
 // Roads
 // Coastline
+
+// CHECK
 // def get_overpass_filters(layer_type):
 // osm.py - linha 1292
 

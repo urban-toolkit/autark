@@ -1,4 +1,4 @@
-import { lineToPolygon, booleanDisjoint } from "@turf/turf";
+import { intersect, featureCollection, polygon } from "@turf/turf";
 import { Feature, LineString, FeatureCollection } from "geojson";
 
 export class Box2D {
@@ -46,11 +46,13 @@ export class Box2D {
 
         for (let nId = 0; nId < box.feats.length; nId++) {
             const pLine = <LineString>box.feats[nId].geometry;
+            const pCoords = pLine.coordinates;
 
             for (let fId = 0; fId < this.feats.length; fId++) {
-                const tLine = <LineString>this.feats[fId].geometry;;
+                const tLine = <LineString>this.feats[fId].geometry;
+                const tCoords = tLine.coordinates;
 
-                if (!booleanDisjoint(lineToPolygon(pLine), lineToPolygon(tLine))) {
+                if ( intersect(featureCollection([polygon([pCoords]), polygon([tCoords])])) !== null){
                     return true;
                 }
             }
@@ -88,7 +90,6 @@ export class AABB {
     build(geojson: FeatureCollection) {
         const collection: Feature[] = geojson['features'];
 
-        let c = 0;
         for (const feature of collection) {
             const newBox = new Box2D(feature);
             const overlapIds = this.overlaps(newBox);
