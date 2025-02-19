@@ -1,8 +1,10 @@
 import earcut from 'earcut';
+import { booleanClockwise } from '@turf/boolean-clockwise';
 
-import { ILayerGeometry } from "./interfaces";
-import { Feature, FeatureCollection, LineString } from 'geojson';
 import { AABB } from './util';
+import { ILayerGeometry } from "./interfaces";
+
+import { Feature, FeatureCollection, LineString } from 'geojson';
 
 export class Triangulator {
 
@@ -125,10 +127,6 @@ export class Triangulator {
 
             // add to the features list
             features.push(...group);
-
-            if(features.length > 10) {
-                return features;
-            }
         }
 
         return features;
@@ -150,7 +148,7 @@ export class Triangulator {
 
     private static removeRedundancy(features: Feature[]): Feature[] {
 
-        const filterd = features.filter( (feat: Feature) => {
+        const filtered = features.filter( (feat: Feature) => {
             if (feat.properties === null) {
                 return false;
             }
@@ -166,70 +164,28 @@ export class Triangulator {
             return true;
         });
 
-        const outline = filterd.filter((feat: Feature) => {
-            return true;
-            // if (feat.properties === null) {
-            //     return false;
-            // }
-
-            // return ( ('building' in feat.properties) && !('building:part' in feat.properties));
-        });
-
-        if ( outline.length > 1) {
-            console.log(outline);
-        }
-
-        return outline;
-
-
-
-        // const props = feature.properties;
-
-        // // unavailable building info
-
-        // // skip the roofs for now
-        // if (props['building'] === 'roof' || props['building:part'] === 'roof') {
-        //     return false;
-        // }
-
-        // // skip 2D building definitions
-        // if ('building' in props) {
-        //     return false;
-        // }
-
-        // // building for 3D rendering
-        // if ('building:part' in props) {
-        //     return true;
-        // }
-
-        // return true;
+        return filtered;
     }
-
 
     private static adjustGeometry(features: Feature[]): Feature[] {
 
+        for (const feature of features) {
+            let { coordinates } = <LineString>feature.geometry;
+
+            // makes the linestrings orientation consistent
+            if ( booleanClockwise(coordinates) ){
+                coordinates = coordinates.reverse();
+            }
+
+            // removes the last vertex if duplicated
+            let len = coordinates.length;
+            if (coordinates[0][0] === coordinates[len - 1][0] && coordinates[0][1] === coordinates[len - 1][1]) {
+                coordinates.pop();
+                len -= 1;
+            }
+        }
+
         return features;
-
-        // let len = coordinates.length;
-
-        // if (coordinates[0][0] === coordinates[len - 1][0] && coordinates[0][1] === coordinates[len - 1][1]) {
-        //     coordinates.pop();
-        //     len -= 1;
-        // }
-
-        // const x2 = coordinates[0][0] - coordinates[len - 1][0];
-        // const y2 = coordinates[0][1] - coordinates[len - 1][1];
-
-        // const x1 = coordinates[0][0] - coordinates[1][0];
-        // const y1 = coordinates[0][1] - coordinates[1][1];
-
-        // // x1y2 - x2y1
-        // if (Math.sign(x1 * y2 - x2 * y1) >= 0) {
-        //     return coordinates.reverse();
-        // }
-        // else {
-        //     return coordinates;
-        // }
     }
 
     private static getBuildingHeight(feature: Feature): number[] {
