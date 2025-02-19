@@ -4,7 +4,7 @@ export * from './constants';
 export * from './interfaces';
 export * from './key-events';
 export * from './layer-manager';
-export * from './layer-features3D';
+export * from './layer-buildings';
 export * from './layer-features2D';
 export * from './layer';
 export * from './map-style';

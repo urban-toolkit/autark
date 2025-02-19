@@ -35,7 +35,8 @@ export interface ILayerRenderInfo {
 
 export interface ILayerData {
   geometry: ILayerGeometry[]; // list of geometries
-  thematic: ILayerThematic[]; // list of thematic data
+  components: ILayerComponent[]; // list of components
+  thematic?: ILayerThematic[]; // list of thematic data
 }
 
 export interface ILayerGeometry {
@@ -47,6 +48,11 @@ export interface ILayerGeometry {
 export interface ILayerThematic {
   level: ThematicAggregationLevel; // aggregation level
   values: number[]; // data values
+}
+
+export interface ILayerComponent {
+    nPoints: number;
+    nTriangles: number;
 }
 
 export interface ICameraData {

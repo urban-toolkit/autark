@@ -1,4 +1,4 @@
-import { booleanOverlap } from "@turf/boolean-overlap";
+import { lineToPolygon, booleanDisjoint } from "@turf/turf";
 import { Feature, LineString, FeatureCollection } from "geojson";
 
 export class Box2D {
@@ -15,12 +15,12 @@ export class Box2D {
         this.xmin = coordinates[0][0];
         this.xmax = coordinates[0][0];
         this.ymin = coordinates[0][1];
-        this.ymin = coordinates[0][1];
+        this.ymax = coordinates[0][1];
 
         this.add(feature);
     }
 
-    add(feature: Feature) {
+    private add(feature: Feature) {
         const { coordinates } = <LineString>feature.geometry;
 
         for (let vId = 0; vId < coordinates.length; vId++) {
@@ -29,7 +29,7 @@ export class Box2D {
             this.xmin = this.xmin > v[0] ? v[0] : this.xmin;
             this.xmax = this.xmax < v[0] ? v[0] : this.xmax;
             this.ymin = this.ymin > v[1] ? v[1] : this.ymin;
-            this.ymax = this.ymax < v[1] ? v[1] : this.ymax;;
+            this.ymax = this.ymax < v[1] ? v[1] : this.ymax;
         }
 
         this.feats.push(feature);
@@ -40,16 +40,17 @@ export class Box2D {
             box.xmax < this.xmin ||
             box.ymin > this.ymax ||
             box.ymax < this.ymin) {
+
             return false;
         }
 
         for (let nId = 0; nId < box.feats.length; nId++) {
-            const pFeat = box.feats[nId];
+            const pLine = <LineString>box.feats[nId].geometry;
 
             for (let fId = 0; fId < this.feats.length; fId++) {
-                const tFeat = this.feats[fId];
+                const tLine = <LineString>this.feats[fId].geometry;;
 
-                if (booleanOverlap(pFeat, tFeat)) {
+                if (!booleanDisjoint(lineToPolygon(pLine), lineToPolygon(tLine))) {
                     return true;
                 }
             }
@@ -64,20 +65,20 @@ export class Box2D {
         this.ymin = this.ymin > box.ymin ? box.ymin : this.ymin;
         this.ymax = this.ymax < box.ymax ? box.ymax : this.ymax;
 
-        box.feats.forEach( (e: Feature) => this.feats.push(e) );
+        this.feats.push(...box.feats);
     }
 }
 
 export class AABB {
-    protected _uniqueCount = 0;
+    protected _boxCount = 0;
     protected _boxes: Map<number, Box2D>;
 
     constructor() {
         this._boxes = new Map<number, Box2D>;
     }
 
-    get uniqueCount(): number {
-        return this._uniqueCount;
+    get boxCount(): number {
+        return this._boxCount;
     }
 
     get boxes(): Map<number, Box2D> {
@@ -87,38 +88,44 @@ export class AABB {
     build(geojson: FeatureCollection) {
         const collection: Feature[] = geojson['features'];
 
+        let c = 0;
         for (const feature of collection) {
             const newBox = new Box2D(feature);
-            const overlapId = this.overlaps(newBox);
+            const overlapIds = this.overlaps(newBox);
 
-            if (overlapId < 0) { 
-                this._boxes.set(this._uniqueCount, newBox);
-        
+            if (overlapIds.length === 0) {
+                this._boxes.set(this._boxCount, newBox);
+
                 // new building
-                this._uniqueCount += 1;
+                this._boxCount += 1;
             }
             else {
-                const box = this._boxes.get(overlapId);
+                for (let oId = 0; oId < overlapIds.length; oId++) {
+                    const overId = overlapIds[oId];
+                    const box = this._boxes.get(overId);
 
-                if (!box) {
-                    console.log('AABB: Invalid box.');
-                    continue;
+                    if (!box) {
+                        console.log('AABB: Invalid box.');
+                        continue;
+                    }
+
+                    box.expand(newBox);
                 }
-
-                box.expand(newBox);
             }
         }
 
         console.log(this._boxes);
     }
 
-    private overlaps(box: Box2D): number {
+    private overlaps(box: Box2D): number[] {
+        const overIds = [];
+
         for (const cBox of this._boxes) {
-            if ( cBox[1].overlaps(box) ) {
-                return cBox[0];
+            if (cBox[1].overlaps(box)) {
+                overIds.push(cBox[0]);
             }
         }
 
-        return -1;
+        return overIds;
     }
 }

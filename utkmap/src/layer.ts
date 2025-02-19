@@ -1,5 +1,5 @@
 import { Camera } from './camera';
-import { ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
+import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
 
 import { Renderer } from './renderer';
 
@@ -8,6 +8,8 @@ export abstract class Layer {
   protected _layerInfo!: ILayerInfo;
   // picking shader
   protected _layerRenderInfo!: ILayerRenderInfo;
+  // uniforms dirty
+  protected _renderInfoIsDirty: boolean = false;
 
   constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
     this.setLayerInfo(layerInfo);
@@ -32,11 +34,19 @@ export abstract class Layer {
 
   setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
     this._layerRenderInfo = layerRenderInfo;
+
+    this.makeLayerInfoDirty();
+  }
+
+  makeLayerInfoDirty() {
+    this._renderInfoIsDirty = true;
   }
 
   abstract loadData(layerData: ILayerData): void;
 
   abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
+
+  abstract loadComponent(layerComponent: ILayerComponent[]): void;
 
   abstract loadThematic(layerThematic: ILayerThematic[]): void;
 

@@ -5,7 +5,7 @@ import { Renderer } from './renderer';
 import { Features2DLayer } from './layer-features2D';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 
-export class Features3DLayer extends Features2DLayer {
+export class BuildingsLayer extends Features2DLayer {
   protected _normal!: number[];
 
   constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {

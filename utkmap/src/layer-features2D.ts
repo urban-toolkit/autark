@@ -1,4 +1,4 @@
-import { ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
+import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
 import { ThematicAggregationLevel } from './constants';
 
 import { Layer } from './layer';
@@ -14,7 +14,7 @@ export class Features2DLayer extends Layer {
     protected _thematic!: number[];
     protected _indices!: number[];
 
-    protected _components: { nPoints: number; nTriangles: number }[] = [];
+    protected _components: ILayerComponent[] = [];
 
     protected _pipeline!: Pipeline;
 
@@ -43,8 +43,9 @@ export class Features2DLayer extends Layer {
 
     loadData(layerData: ILayerData): void {
         this.loadGeometry(layerData.geometry);
+        this.loadComponent(layerData.components);
 
-        if (layerData.thematic.length) {
+        if (layerData.thematic && layerData.thematic.length) {
             this.loadThematic(layerData.thematic);
         }
     }
@@ -67,18 +68,29 @@ export class Features2DLayer extends Layer {
                 }
                 position.push(d);
             });
-
-            // stores the components
-            const component = {
-                nPoints: position.length / 3,
-                nTriangles: indices.length / 3,
-            };
-            this._components.push(component);
         }
 
         this._position = position;
         this._indices = indices;
-        this._thematic = [];
+    }
+
+    loadComponent(layerComponents: ILayerComponent[]): void {
+        this._components = [];
+        
+        const accum = { nPoints: 0, nTriangles: 0 };
+        for (let cId = 0; cId < layerComponents.length; cId++) {
+            const comp = layerComponents[cId];
+            
+            accum.nPoints += comp.nPoints;
+            accum.nTriangles += comp.nTriangles;
+
+            this._components.push({
+                nPoints: accum.nPoints,
+                nTriangles: accum.nTriangles
+            });
+        }
+
+        console.log(this._components);
     }
 
     loadThematic(layerThematic: ILayerThematic[]): void {
@@ -106,10 +118,17 @@ export class Features2DLayer extends Layer {
                 thematic.push(aggr[aId]);
             }
         }
+
+        console.assert(thematic.length === this._position.length / 3);
         this._thematic = thematic;
     }
 
     renderPass(camera: Camera): void {
+        if (this._renderInfoIsDirty) {
+            this._pipeline.updateColorUniforms(this);
+            this._renderInfoIsDirty = false;
+        }
+
         this._pipeline.renderPass(camera);
     }
 

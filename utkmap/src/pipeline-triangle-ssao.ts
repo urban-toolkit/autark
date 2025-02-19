@@ -10,7 +10,7 @@ import { Camera } from './camera';
 import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
-import { Features3DLayer } from './layer-features3D';
+import { BuildingsLayer } from './layer-buildings';
 
 export class PipelineBuildingSSAO extends Pipeline {
     // Vertex buffers
@@ -46,7 +46,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         super(renderer);
     }
 
-    build(mesh: Features3DLayer) {
+    build(mesh: BuildingsLayer) {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -94,7 +94,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._fragModule02 = this._renderer.device.createShaderModule(fsDesc02);
     }
 
-    createVertexBuffers(mesh: Features3DLayer): void {
+    createVertexBuffers(mesh: BuildingsLayer): void {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -126,7 +126,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         this.updateVertexBuffers(mesh);
     }
 
-    updateVertexBuffers(mesh: Features3DLayer): void {
+    updateVertexBuffers(mesh: BuildingsLayer): void {
         this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, new Float32Array(mesh.normal));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));

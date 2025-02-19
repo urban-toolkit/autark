@@ -3,7 +3,7 @@ import { LayerGeometryType } from './constants';
 
 import { Layer } from './layer';
 import { Features2DLayer } from './layer-features2D';
-import { Features3DLayer } from './layer-features3D';
+import { BuildingsLayer } from './layer-buildings';
 
 export class LayerManager {
     protected _layers: Layer[] = [];
@@ -27,7 +27,7 @@ export class LayerManager {
                 layer = new Features2DLayer(layerInfo, layerRender, layerData);
                 break;
             case LayerGeometryType.FEATURES_3D:
-                layer = new Features3DLayer(layerInfo, layerRender, layerData);
+                layer = new BuildingsLayer(layerInfo, layerRender, layerData);
                 break;
             default:
                 console.error(`File ${layerInfo.id}.json has an unknown layer geometry: ${layerInfo.typeGeometry}.`);
