@@ -33,6 +33,7 @@ export abstract class TriangulatorBuildings extends Triangulator {
 
                 // get the heights
                 const heightInfo = TriangulatorBuildings.computeBuildingHeights(feature);
+                if (!heightInfo.length) { continue; }
 
                 // floor ----------------------------------------------------------------------
                 const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]]).flat();
@@ -100,10 +101,6 @@ export abstract class TriangulatorBuildings extends Triangulator {
 
             // add component to components list
             comps.push(component);
-
-            // if (comps.length === 1) {
-            //     return [mesh, comps];
-            // }
         }
 
         return [mesh, comps];

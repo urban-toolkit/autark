@@ -89,8 +89,6 @@ export class Features2DLayer extends Layer {
                 nTriangles: accum.nTriangles
             });
         }
-
-        console.log(this._components);
     }
 
     loadThematic(layerThematic: ILayerThematic[]): void {
