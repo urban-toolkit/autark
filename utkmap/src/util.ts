@@ -105,17 +105,12 @@ export class AABB {
                     const overId = overlapIds[oId];
                     const box = this._boxes.get(overId);
 
-                    if (!box) {
-                        console.log('AABB: Invalid box.');
-                        continue;
+                    if (box) {
+                        box.expand(newBox);
                     }
-
-                    box.expand(newBox);
                 }
             }
         }
-
-        console.log(this._boxes);
     }
 
     private overlaps(box: Box2D): number[] {
