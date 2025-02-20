@@ -63,8 +63,8 @@ function getLayerQuery(layer: string): (t: string) => string {
       return GET_WATER;
     case 'buildings':
       return GET_BUILDINGS;
-    case 'coastlines':
-      return GET_COASTLINES;
+    case 'coastline':
+      return GET_COASTLINE;
     case 'roads':
       return GET_ROADS;
     default:
@@ -104,8 +104,8 @@ const GET_BUILDINGS = (tableName: string) => `
       );
 `;
 
-const GET_COASTLINES = (tableName: string) => `
-  CREATE TEMP TABLE coastlines AS
+const GET_COASTLINE = (tableName: string) => `
+  CREATE TEMP TABLE coastline AS
     SELECT id, tags FROM ${tableName}
       WHERE kind IN ('way') AND
       (

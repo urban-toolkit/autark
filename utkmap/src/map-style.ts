@@ -13,6 +13,7 @@ export class MapStyle {
         roads: '#d9b504',
         parks: '#C3D0B2',
         water: '#BED2D7',
+        coastline: '#BED2D7',
         sky: '#ffffff',
         surface: '#EFEFEF',
         buildings: '#DFDFDF',
