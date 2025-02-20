@@ -5,7 +5,7 @@ export enum LayerGeometryType {
 
 export enum LayerType {
     OSM_SURFACE = 'surface',
-    OSM_COASTLINE = 'coastline',
+    OSM_COASTLINE = 'coastlines',
     OSM_PARKS = 'parks',
     OSM_WATER = 'water',
     OSM_ROADS = 'roads',

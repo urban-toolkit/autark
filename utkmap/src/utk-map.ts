@@ -28,6 +28,7 @@ import { LayerManager } from './layer-manager';
 
 import { TriangulatorFeatures2D } from './triangulator-features2D';
 import { TriangulatorBuildings } from './triangulator-buildings';
+import { TriangulatorRoads } from './triangulator-roads';
 
 export class UtkMap {
     protected _camera!: Camera;
@@ -76,9 +77,9 @@ export class UtkMap {
                 this.createFeatures2DLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
             break;
 
-            // case LayerType.OSM_ROADS:
-            //     this.createRoadsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
-            // break
+            case LayerType.OSM_ROADS:
+                this.createRoadsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
+            break
 
             case LayerType.OSM_BUILDINGS:
                 this.createBuildingsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_3D);
@@ -210,6 +211,37 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
+    private createRoadsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+        const layerInfo: ILayerInfo = {
+            id: `${typeLayer.toString()}`,
+            zIndex: this.layerManager.length + 1,
+            typeGeometry: typeGeometry,
+            typeLayer: typeLayer,
+        };
+
+        const layerRenderInfo: ILayerRenderInfo = {
+            pipeline: RenderPipeline.TRIANGLE_FLAT,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            isColorMap: false,
+            isPicking: false,
+        };
+
+        const layerMesh = TriangulatorRoads.buildMesh(geojson, origin);
+
+        const layerData = {
+            geometry: layerMesh[0],
+            components: layerMesh[1],
+            thematic: layerMesh[1].map((_e:ILayerComponent, id: number) => {
+                return {
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [id / (layerMesh[1].length - 1)]
+                }
+            })
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    }
+
     private createBuildingsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
@@ -240,32 +272,4 @@ export class UtkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
-
-
-    // private createRoadsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
-    //     const layerInfo: ILayerInfo = {
-    //         id: `${typeLayer.toString()}`,
-    //         zIndex: this.layerManager.length + 1,
-    //         typeGeometry: typeGeometry,
-    //         typeLayer: typeLayer,
-    //     };
-
-    //     const layerRenderInfo: ILayerRenderInfo = {
-    //         pipeline: RenderPipeline.TRIANGLE_FLAT,
-    //         colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
-    //         isColorMap: false,
-    //         isPicking: false,
-    //     };
-
-    //     const layerData = {
-    //         geometry: Triangulator.createRoadsLayerMesh(geojson, origin),
-    //         thematic: [{
-    //             level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-    //             values: [Math.random()],
-    //         }],
-    //     };
-
-    //     this.createLayer(layerInfo, layerRenderInfo, layerData);
-    // }
-
 }

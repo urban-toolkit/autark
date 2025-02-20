@@ -6,9 +6,8 @@ import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
 import { AABB } from "./util";
 
-export abstract class TriangulatorBuildings extends Triangulator {
-
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+export class TriangulatorBuildings extends Triangulator {
+    static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 

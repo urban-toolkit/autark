@@ -119,7 +119,7 @@ export class UtkDbExample extends UtkData {
             await this.db.loadLayer({
                 tableName: this.tableName,
                 coordinateFormat: this.projection,
-                layer: obj.toString() as 'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings',
+                layer: obj.toString() as 'surface' | 'coastlines' | 'parks' | 'water' | 'roads' | 'buildings',
             });
         }
     }

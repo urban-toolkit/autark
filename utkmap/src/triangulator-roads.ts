@@ -1,11 +1,12 @@
 import earcut from "earcut";
+import { lineOffset } from '@turf/turf';
 
 import { FeatureCollection, Feature, LineString } from "geojson";
 
-import { ILayerComponent, ILayerGeometry } from "./interfaces";
+import { ILayerGeometry, ILayerComponent } from "./interfaces";
 import { Triangulator } from "./triangulator";
 
-export abstract class TriangulatorFeatures2D extends Triangulator {
+export class TriangulatorRoads extends Triangulator {
 
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
@@ -18,10 +19,15 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         collection = Triangulator.fixFeatureGeometry(collection);
 
         for (const feature of collection) {
-            const { coordinates } = <LineString>feature.geometry;
+            const base = <LineString>feature.geometry;
 
-            const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
-            const flatIds = earcut(coordinates.flat())
+            const top = lineOffset(base, 1, { units: "meters"}).geometry.coordinates;
+            const bot = lineOffset(base,-1, { units: "meters"}).geometry.coordinates;
+
+            bot.forEach((cord: number[]) => top.push(cord));
+
+            const flatIds = earcut(top.flat())
+            const flatCoords = top.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
 
             mesh.push({
                 position: flatCoords,
@@ -35,5 +41,6 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         }
 
         return [mesh, comps];
-    }
+    };
+
 }

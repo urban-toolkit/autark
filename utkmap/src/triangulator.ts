@@ -14,12 +14,6 @@ export abstract class Triangulator {
             if ( booleanClockwise(coordinates) ){
                 coordinates = coordinates.reverse();
             }
-
-            // removes the last vertex if duplicated
-            const len = coordinates.length;
-            if (coordinates[0][0] === coordinates[len - 1][0] && coordinates[0][1] === coordinates[len - 1][1]) {
-                coordinates.pop();
-            }
         }
 
         return features;
@@ -39,5 +33,7 @@ export abstract class Triangulator {
         }
     }
 
-    abstract buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent];
+    static buildMesh(_geojson: FeatureCollection, _origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+        return [[], []]
+    };
 }

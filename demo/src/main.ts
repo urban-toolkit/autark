@@ -4,13 +4,13 @@ import { UtkDbExample } from './dataset';
 
 async function run() {
     const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
-    canvas.width = canvas.height = 1024;
+    canvas.width = canvas.height = 1280;
 
     const map = new UtkMap(canvas);
     await map.init();
 
     // https://docs.opentripplanner.org/en/v2.1.0/Preparing-OSM/#cropping-osm-data
-    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', [LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_BUILDINGS]);
+    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', [LayerType.OSM_COASTLINE, LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_BUILDINGS]);
     await db.loadData();
 
     const layers = await db.exportLayers();
