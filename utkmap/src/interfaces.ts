@@ -12,6 +12,7 @@ export interface IMapStyle {
   roads: ColorHEX;
   parks: ColorHEX;
   water: ColorHEX;
+  coastline: ColorHEX;
   sky: ColorHEX;
   surface: ColorHEX;
   buildings: ColorHEX;

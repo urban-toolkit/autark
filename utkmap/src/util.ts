@@ -48,9 +48,21 @@ export class Box2D {
             const pLine = <LineString>box.feats[nId].geometry;
             const pCoords = pLine.coordinates;
 
+            const plen = pCoords.length;
+            if (pCoords[0][0] !== pCoords[plen -1][0] || pCoords[0][1] !== pCoords[plen -1][1]) {
+                pCoords.push(pCoords[0]);
+            }
+            if (pCoords.length < 4) { continue; }
+
             for (let fId = 0; fId < this.feats.length; fId++) {
                 const tLine = <LineString>this.feats[fId].geometry;
                 const tCoords = tLine.coordinates;
+
+                const tlen = tCoords.length;
+                if (tCoords[0][0] !== tCoords[tlen -1][0] || tCoords[0][1] !== tCoords[tlen -1][1]) {
+                    tCoords.push(tCoords[0]);
+                }
+                if (tCoords.length < 4) { continue; }
 
                 if ( intersect(featureCollection([polygon([pCoords]), polygon([tCoords])])) !== null){
                     return true;
