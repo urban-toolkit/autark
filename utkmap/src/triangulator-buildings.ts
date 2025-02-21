@@ -115,10 +115,11 @@ export class TriangulatorBuildings extends Triangulator {
             let group = box[1].feats;
 
             // checks if is a valid feature
-            group = TriangulatorBuildings.removeRedundancy(group);
+            group = TriangulatorBuildings.removeInvalidBuildingParts(group);
 
             // make the orientation consistent
-            group = Triangulator.fixFeatureGeometry(group);
+            group = Triangulator.closeFeatures(group);
+            group = Triangulator.fixOrientation(group);
 
             // empty group
             if (group.length === 0) {
@@ -132,7 +133,7 @@ export class TriangulatorBuildings extends Triangulator {
         return features;
     }
 
-    private static removeRedundancy(features: Feature[]): Feature[] {
+    private static removeInvalidBuildingParts(features: Feature[]): Feature[] {
 
         const filtered = features.filter((feat: Feature) => {
             if (feat.properties === null) {

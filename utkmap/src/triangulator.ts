@@ -5,20 +5,26 @@ import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
 export abstract class Triangulator {
 
-    protected static fixFeatureGeometry(features: Feature[]): Feature[] {
-
+    protected static fixOrientation(features: Feature[]): Feature[] {
         for (const feature of features) {
             let { coordinates } = <LineString>feature.geometry;
-
-            // fix the linestring
-            const len = coordinates.length;
-            if (coordinates[0][0] !== coordinates[len - 1][0] || coordinates[0][1] !== coordinates[len - 1][1]) {
-                coordinates.push(coordinates[0]);
-            }
 
             // makes the linestrings orientation consistent
             if ( booleanClockwise(coordinates) ){
                 coordinates = coordinates.reverse();
+            }
+        }
+
+        return features;
+    }
+
+    protected static closeFeatures(features: Feature[]): Feature[] {
+        for (const feature of features) {
+            const { coordinates } = <LineString>feature.geometry;
+            // fix the linestring
+            const len = coordinates.length;
+            if (coordinates[0][0] !== coordinates[len - 1][0] || coordinates[0][1] !== coordinates[len - 1][1]) {
+                coordinates.push(coordinates[0]);
             }
         }
 

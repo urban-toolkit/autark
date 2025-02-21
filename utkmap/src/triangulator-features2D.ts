@@ -15,7 +15,9 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         Triangulator.translateFeatures(geojson, origin);
 
         let collection: Feature[] = geojson['features'];
-        collection = Triangulator.fixFeatureGeometry(collection);
+
+        collection = Triangulator.closeFeatures(collection);
+        collection = Triangulator.fixOrientation(collection);
 
         for (const feature of collection) {
             const { coordinates } = <LineString>feature.geometry;

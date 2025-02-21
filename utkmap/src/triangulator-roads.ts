@@ -16,7 +16,9 @@ export class TriangulatorRoads extends Triangulator {
         Triangulator.translateFeatures(geojson, origin);
 
         let collection: Feature[] = geojson['features'];
-        collection = Triangulator.fixFeatureGeometry(collection);
+
+        collection = Triangulator.closeFeatures(collection);
+        collection = Triangulator.fixOrientation(collection);
 
         for (const feature of collection) {
             const base = <LineString>feature.geometry;

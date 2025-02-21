@@ -82,6 +82,7 @@ export class UtkMap {
             break;
 
             case LayerType.OSM_ROADS:
+                console.log(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
                 this.createRoadsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
             break
 
