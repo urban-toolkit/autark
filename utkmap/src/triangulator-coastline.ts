@@ -38,40 +38,7 @@ export abstract class TriangulatorCoastline extends Triangulator {
                 continue;
             }
 
-            // merged geometry
-            const merge: Position[] = [];
-            const { coordinates } = <LineString>groups[gId][0].geometry;
-
-            merge.push(...coordinates);
-            groups[gId].splice(0, 1);
-
-            // for each feature of the group
-            const cnt = groups[gId].length;
-
-            for (let cId = 0; cId < cnt; cId++) {
-                const mFrst  = merge[0];
-                const mLast  = merge[merge.length - 1];
-
-                for (let fId = 0; fId < groups[gId].length; fId++) {
-                    const { coordinates } = <LineString>groups[gId][fId].geometry;
-
-                    const cFrst  = coordinates[0];
-                    const cLast  = coordinates[coordinates.length - 1];
-
-                    if (cFrst[0] === mLast[0] && cFrst[1] === mLast[1]) {
-                        merge.push(...coordinates);
-                        groups[gId].splice(fId, 1);
-                        break;
-                    }
-                    if (cLast[0] === mFrst[0] && cLast[1] === mFrst[1]) {
-                        merge.unshift(...coordinates);
-                        groups[gId].splice(fId, 1);
-                        break;
-                    }
-                }
-            }
-            // closes the polygon
-            merge.push(merge[0]);
+            const merge = this.mergeGroupGeometry(groups[gId]);
 
             const coast = polygon([merge]);
             const dif = difference(featureCollection([box, coast]));
@@ -101,6 +68,45 @@ export abstract class TriangulatorCoastline extends Triangulator {
         }
 
         return [mesh, comps];
+    }
+
+    static mergeGroupGeometry(group: Feature[]): Position[] {
+            // merged geometry
+            const merge: Position[] = [];
+            const { coordinates } = <LineString>group[0].geometry;
+
+            merge.push(...coordinates);
+            group.splice(0, 1);
+
+            // for each feature of the group
+            const cnt = group.length;
+
+            for (let cId = 0; cId < cnt; cId++) {
+                const mFrst  = merge[0];
+                const mLast  = merge[merge.length - 1];
+
+                for (let fId = 0; fId < group.length; fId++) {
+                    const { coordinates } = <LineString>group[fId].geometry;
+
+                    const cFrst  = coordinates[0];
+                    const cLast  = coordinates[coordinates.length - 1];
+
+                    if (cFrst[0] === mLast[0] && cFrst[1] === mLast[1]) {
+                        merge.push(...coordinates);
+                        group.splice(fId, 1);
+                        break;
+                    }
+                    if (cLast[0] === mFrst[0] && cLast[1] === mFrst[1]) {
+                        merge.unshift(...coordinates);
+                        group.splice(fId, 1);
+                        break;
+                    }
+                }
+            }
+            // closes the polygon
+            merge.push(merge[0]);
+
+            return merge;
     }
 
     static groupParts(geojson: FeatureCollection): Feature[][] {
