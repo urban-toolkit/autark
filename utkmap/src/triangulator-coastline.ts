@@ -9,7 +9,7 @@ import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
 export abstract class TriangulatorCoastline extends Triangulator {
 
-    static  buildMesh2(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
@@ -17,17 +17,46 @@ export abstract class TriangulatorCoastline extends Triangulator {
         Triangulator.translateFeatures(geojson, origin);
         const groups: Feature[][] = this.groupParts(geojson);
 
-        console.log(groups);
+        // merged geometry
+        const merge: Position[][] = [];
 
-        // for (let gId = 0; gId < groups.length; gId++) {
-        //     // creates a new componenet
-        //     const component: ILayerComponent = {
-        //         nPoints: 0,
-        //         nTriangles: 0
-        //     };
+        // iterate over groups
+        for (let gId = 0; gId < groups.length; gId++) {
+            // creates a new componenet
+            const component: ILayerComponent = {
+                nPoints: 0,
+                nTriangles: 0
+            };
 
+            // for each feature of the group
+            for (const feature of groups[gId]) {
+                const { coordinates } = <LineString>feature.geometry;
 
-        // }
+                const frst  = coordinates[0];
+                const last  = coordinates[coordinates.length - 1];
+    
+                if (frst[0] === last[0] && frst[1] === last[1]) {
+                    console.log("skip for now. Closed linestring.")
+                    continue;
+                }
+    
+                let found = false;
+                for (const parts of merge) {
+                    if (parts[0][0] === last[0] && parts[0][1] === last[1]) {
+                        parts.unshift(...coordinates);
+                        found = true;
+    
+                        break;
+                    }
+                    if (parts[parts.length - 1][0] === frst[0] && parts[parts.length - 1][1] === frst[1]) {
+                        parts.push(...coordinates);
+                        found = true;
+    
+                        break;
+                    }
+                }
+            }
+        }
 
         return [mesh, comps];
     }
@@ -55,8 +84,7 @@ export abstract class TriangulatorCoastline extends Triangulator {
         return features;
     }
 
-
-    static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static buildMesh2(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 

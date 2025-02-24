@@ -33,7 +33,7 @@ class Box2D {
             this.ymax = this.ymax < v[1] ? v[1] : this.ymax;
         }
 
-        this.feats.push(feature);
+        this.feats = Array.from(new Set([feature, ...this.feats]));
     }
 
     overlaps(box: Box2D) {
@@ -84,7 +84,7 @@ class Box2D {
         this.ymin = this.ymin > box.ymin ? box.ymin : this.ymin;
         this.ymax = this.ymax < box.ymax ? box.ymax : this.ymax;
 
-        this.feats.push(...box.feats);
+        this.feats = Array.from(new Set([...box.feats, ...this.feats]))
     }
 }
 
@@ -123,10 +123,16 @@ export class AABB {
             else {
                 for (let oId = 0; oId < overlapIds.length; oId++) {
                     const overId = overlapIds[oId];
-                    const box = this._boxes.get(overId);
 
-                    if (box) {
-                        box.expand(newBox);
+                    const box = this._boxes.get(overId);
+                    if (!box) { continue; }
+
+                    newBox.expand(box);
+                    
+                    if(oId === 0) {
+                        this._boxes.set(overId, newBox);
+                    } else {
+                        this._boxes.delete(overId);
                     }
                 }
             }
