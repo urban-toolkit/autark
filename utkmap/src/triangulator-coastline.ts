@@ -1,12 +1,60 @@
 import earcut from "earcut";
 
-import { FeatureCollection, Feature, LineString, Position, Polygon } from "geojson";
+import { difference, featureCollection, multiPolygon, polygon } from "@turf/turf";
+import { FeatureCollection, Feature, LineString, Position } from "geojson";
 
-import { ILayerComponent, ILayerGeometry } from "./interfaces";
+import { AABB } from "./aabb";
 import { Triangulator } from "./triangulator";
-import { difference, featureCollection, multiPolygon, polygon, polygonToLine } from "@turf/turf";
+import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
 export abstract class TriangulatorCoastline extends Triangulator {
+
+    static  buildMesh2(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+        const mesh: ILayerGeometry[] = [];
+        const comps: ILayerComponent[] = [];
+
+        // translate based on origin
+        Triangulator.translateFeatures(geojson, origin);
+        const groups: Feature[][] = this.groupParts(geojson);
+
+        console.log(groups);
+
+        // for (let gId = 0; gId < groups.length; gId++) {
+        //     // creates a new componenet
+        //     const component: ILayerComponent = {
+        //         nPoints: 0,
+        //         nTriangles: 0
+        //     };
+
+
+        // }
+
+        return [mesh, comps];
+    }
+
+    static groupParts(geojson: FeatureCollection): Feature[][] {
+        const fixed = Triangulator.fixOrientation(geojson.features);
+
+        // builds the AABB
+        const aabb = new AABB();
+        aabb.buildFeatureBoxes(fixed);
+
+        const features = [];
+        for (const box of aabb.boxes) {
+            const group = box[1].feats;
+
+            // empty group
+            if (group.length === 0) {
+                continue;
+            }
+
+            // add to the features list
+            features.push([...group]);
+        }
+
+        return features;
+    }
+
 
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
@@ -15,9 +63,9 @@ export abstract class TriangulatorCoastline extends Triangulator {
         // translate based on origin
         Triangulator.translateFeatures(geojson, origin);
 
+        const merge: Position[][] = [];
         const collection: Feature[] = geojson['features'];
 
-        const merge: Position[][] = [];
         for (const feature of collection) {
             const { coordinates } = <LineString>feature.geometry;
 

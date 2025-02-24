@@ -201,6 +201,10 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorFeatures2D.buildMesh(geojson, origin);
+        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Feature 2D Layer mesh');
+            return;
+        }
 
         const layerData = {
             geometry: layerMesh[0],
@@ -232,6 +236,10 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorCoastline.buildMesh(geojson, origin);
+        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Coastline Layer mesh');
+            return;
+        }
 
         const layerData = {
             geometry: layerMesh[0],
@@ -264,6 +272,10 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorRoads.buildMesh(geojson, origin);
+        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Roads Layer mesh');
+            return;
+        }
 
         const layerData = {
             geometry: layerMesh[0],
@@ -295,6 +307,10 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorBuildings.buildMesh(geojson, origin);
+        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Building Layer mesh');
+            return;
+        }
 
         const layerData = {
             geometry: layerMesh[0],

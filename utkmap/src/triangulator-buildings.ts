@@ -4,7 +4,7 @@ import { FeatureCollection, Feature, LineString } from "geojson";
 
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
-import { AABB } from "./util";
+import { AABB } from "./aabb";
 
 export class TriangulatorBuildings extends Triangulator {
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
@@ -106,20 +106,20 @@ export class TriangulatorBuildings extends Triangulator {
     }
 
     static groupBuildings(geojson: FeatureCollection): Feature[][] {
+        // checks if is a valid feature
+        let filtered = TriangulatorBuildings.removeInvalidBuildingParts(geojson.features);
+
+        // make the orientation consistent
+        filtered = Triangulator.closeFeatures(filtered);
+        filtered = Triangulator.fixOrientation(filtered);
+
+        // builds the AABB
         const aabb = new AABB();
-        aabb.build(geojson);
+        aabb.buildFeatureBoxes(filtered);
 
         const features = [];
-
         for (const box of aabb.boxes) {
-            let group = box[1].feats;
-
-            // checks if is a valid feature
-            group = TriangulatorBuildings.removeInvalidBuildingParts(group);
-
-            // make the orientation consistent
-            group = Triangulator.closeFeatures(group);
-            group = Triangulator.fixOrientation(group);
+            const group = box[1].feats;
 
             // empty group
             if (group.length === 0) {

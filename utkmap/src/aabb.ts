@@ -1,7 +1,7 @@
-import { intersect, featureCollection, polygon } from "@turf/turf";
+import { booleanEqual, booleanIntersects, lineToPolygon, point } from "@turf/turf";
 import { Feature, LineString, FeatureCollection } from "geojson";
 
-export class Box2D {
+class Box2D {
     public xmin: number = 0;
     public xmax: number = 0;
     public ymin: number = 0;
@@ -10,6 +10,7 @@ export class Box2D {
     public feats: Feature[] = [];
 
     constructor(feature: Feature) {
+
         const { coordinates } = <LineString>feature.geometry;
 
         this.xmin = coordinates[0][0];
@@ -46,26 +47,30 @@ export class Box2D {
 
         for (let nId = 0; nId < box.feats.length; nId++) {
             const pLine = <LineString>box.feats[nId].geometry;
-            const pCoords = pLine.coordinates;
 
-            const plen = pCoords.length;
-            if (pCoords[0][0] !== pCoords[plen -1][0] || pCoords[0][1] !== pCoords[plen -1][1]) {
-                pCoords.push(pCoords[0]);
-            }
-            if (pCoords.length < 4) { continue; }
+            const pLast = pLine.coordinates[pLine.coordinates.length - 1];
+            const pFirst = pLine.coordinates[0];
 
             for (let fId = 0; fId < this.feats.length; fId++) {
                 const tLine = <LineString>this.feats[fId].geometry;
-                const tCoords = tLine.coordinates;
 
-                const tlen = tCoords.length;
-                if (tCoords[0][0] !== tCoords[tlen -1][0] || tCoords[0][1] !== tCoords[tlen -1][1]) {
-                    tCoords.push(tCoords[0]);
+                const tLast = tLine.coordinates[tLine.coordinates.length - 1];
+                const tFirst = tLine.coordinates[0];
+
+                if (booleanEqual(point(pFirst), point(pLast)) &&
+                    booleanEqual(point(tFirst), point(tLast))) {
+                    if (booleanIntersects(lineToPolygon(pLine), lineToPolygon(tLine))) {
+                        return true;
+                    }
                 }
-                if (tCoords.length < 4) { continue; }
-
-                if ( intersect(featureCollection([polygon([pCoords]), polygon([tCoords])])) !== null){
-                    return true;
+                else {
+                    if (booleanEqual(point(tFirst), point(pFirst))  ||
+                        booleanEqual(point(tFirst), point(pLast ))  ||
+                        booleanEqual(point(tLast ), point(pFirst))  ||
+                        booleanEqual(point(tLast ), point(pLast )) 
+                    ) {
+                        return true;
+                    }
                 }
             }
         }
@@ -99,16 +104,19 @@ export class AABB {
         return this._boxes;
     }
 
-    build(geojson: FeatureCollection) {
+    buildGeoJsonBoxes(geojson: FeatureCollection) {
         const collection: Feature[] = geojson['features'];
+        this.buildFeatureBoxes(collection);
+    }
 
+    buildFeatureBoxes(collection: Feature[]) {
         for (const feature of collection) {
             const newBox = new Box2D(feature);
+
             const overlapIds = this.overlaps(newBox);
 
             if (overlapIds.length === 0) {
                 this._boxes.set(this._boxCount, newBox);
-
                 // new building
                 this._boxCount += 1;
             }
