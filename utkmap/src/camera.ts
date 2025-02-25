@@ -21,8 +21,6 @@ export class Camera {
   protected mViewMatrix: mat4 = mat4.create();
   protected mModelMatrix: mat4 = mat4.create();
 
-  protected _updateStatusCallback: any;
-
   // view resolution
   private viewportWidth: number = 0;
   private viewportHeight: number = 0;
@@ -31,7 +29,7 @@ export class Camera {
     origin: [0, 0, 0],
     direction: {
       up: [0, 1, 0],
-      eye: [0, 0, 1000],
+      eye: [0, 0, 5000],
       lookAt: [0, 0, 0],
     },
   };
@@ -112,7 +110,7 @@ export class Camera {
   }
 
   setPosition(x: number, y: number): void {
-    let newEye = [x - this.wOrigin[0], y - this.wOrigin[1]];
+    const newEye = [x - this.wOrigin[0], y - this.wOrigin[1]];
     vec3.add(this.wEye, this.wEye, [newEye[0] - this.wEye[0], newEye[1] - this.wEye[1], 0]);
     vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, this.wEyeLength);
   }
@@ -185,7 +183,7 @@ export class Camera {
     mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
   }
 
-  loadPosition(state: any): void {
+  loadPosition(state: string): void {
     const stateObj = JSON.parse(state);
 
     const oData: number[] = Object.values(stateObj.wOrigin);
