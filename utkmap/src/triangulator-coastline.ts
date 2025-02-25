@@ -8,7 +8,7 @@ import { Triangulator } from "./triangulator";
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
 // TODO: Get Bounding Box from DuckDB
-const BOX_SIZE = -1800;
+const BOX_SIZE = 1400;
 const box = polygon([
     [
         [-BOX_SIZE,-BOX_SIZE],
@@ -40,8 +40,8 @@ export abstract class TriangulatorCoastline extends Triangulator {
 
             const merge = this.mergeGroupGeometry(groups[gId]);
 
-            const coast = polygon([merge]);
-            const dif = difference(featureCollection([box, coast]));
+            const coastlinePast = polygon([merge]);
+            const dif = difference(featureCollection([box, coastlinePast]));
     
             if (dif === null || dif instanceof multiPolygon) {
                 console.error("Box and costline difference is null.");
@@ -103,8 +103,25 @@ export abstract class TriangulatorCoastline extends Triangulator {
                     }
                 }
             }
-            // closes the polygon
-            merge.push(merge[0]);
+
+            const mFrst  = merge[0];
+            const mLast  = merge[merge.length - 1];
+            if (mFrst[0] !== mLast[0] || mFrst[1] !== mLast[1] )  {
+                const vec = [
+                    -mLast[1] + mFrst[1],
+                    -mFrst[0] + mLast[0]
+                ];
+                const pos = [
+                    0.5 * ( mFrst[0] + mLast[0] ), 
+                    0.5 * ( mFrst[1] + mLast[1] )
+                ];
+                const delta = 2 * BOX_SIZE;
+                
+                // adds a very distant vertex
+                merge.push([pos[0] + delta * vec[0], pos[1] + delta * vec[1]]);
+                // closes the polygon
+                merge.push(merge[0]);
+            }
 
             return merge;
     }

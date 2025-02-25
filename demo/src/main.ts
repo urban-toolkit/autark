@@ -13,8 +13,7 @@ async function run() {
     // bbox: -74.0217296397,40.6989916231,-74.0005168092,40.7131479624
     // command: osmium extract --strategy complete_ways --bbox -74.0217296397,40.6989916231,-74.0005168092,40.7131479624 new-york-latest.osm.pbf -o lower-mn.osm.pbf
 
-    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', [LayerType.OSM_COASTLINE]);
-    // const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', [LayerType.OSM_COASTLINE, LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_BUILDINGS]);
+    const db = new UtkDbExample('http://localhost:5173/data/lower-mn.osm.pbf', 'manhattan', [LayerType.OSM_COASTLINE, LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_BUILDINGS]);
     await db.loadData();
 
     const layers = await db.exportLayers();
@@ -32,7 +31,6 @@ run();
 // TODO LIST
 
 // Roads
-// Coastline
 
 // CHECK
 // def get_overpass_filters(layer_type):
@@ -46,3 +44,4 @@ run();
 // Join parques/bairros (count, média)
 
 // Thematic data API
+// Tests
