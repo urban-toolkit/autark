@@ -1,0 +1,1 @@
+export const DEFALT_COORDINATE_FORMAT = 'EPSG:4326';

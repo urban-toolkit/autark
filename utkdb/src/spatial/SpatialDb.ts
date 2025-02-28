@@ -1,78 +1,95 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Table } from './shared/interfaces';
+import { CsvTable, OsmTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
-import { LoadPbfUseCase, LoadPbfParams } from './use-cases/load-pbf';
-import { LoadLayerUseCase, GetLayerParams, Layer } from './use-cases/load-layer';
+import { LoadOsmFromPbfUseCase, LoadOsmFromPbfParams } from './use-cases/load-osm-from-pbf';
+import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
 import { QueryOperation } from '../query-operation';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
+import { FeatureCollection } from 'geojson';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
   public tables: Array<Table> = [];
-  private loadPbfUseCase?: LoadPbfUseCase;
-  private loadLayerUseCase?: LoadLayerUseCase;
+  private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
+  private loadLayerUseCase?: LoadLayerUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
 
   async init() {
     this.db = await loadDb();
     this.conn = await this.db.connect();
 
-    this.loadPbfUseCase = new LoadPbfUseCase(this.conn);
-    this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
+    this.loadOsmFromPbfUseCase = new LoadOsmFromPbfUseCase(this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
+    this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
-  async loadPbf(params: LoadPbfParams) {
-    if (!this.db || !this.conn || !this.loadPbfUseCase)
+  // LOAD's methods
+  async loadOsm(params: LoadOsmFromPbfParams): Promise<OsmTable> {
+    if (!this.db || !this.conn || !this.loadOsmFromPbfUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadPbfUseCase.exec(params);
+    const table = await this.loadOsmFromPbfUseCase.exec(params);
     this.tables.push(table);
+
+    if (params.autoLoadLayers) {
+      for (const layer of params.autoLoadLayers.layers) {
+        await this.loadLayer({
+          osmInputTableName: table.name,
+          coordinateFormat: params.autoLoadLayers.coordinateFormat,
+          layer: layer,
+        });
+      }
+    }
+
+    return table;
   }
 
-  async loadLayer(params: GetLayerParams): Promise<Array<Layer>> {
-    if (!this.db || !this.conn || !this.loadLayerUseCase)
-      throw new Error('Database not initialized. Please call init() first.');
-
-    const table = this.tables.find((t) => t.name === params.tableName);
-    if (!table) throw new Error(`Table ${params.tableName} not found.`);
-    if (table.type !== 'osm') throw new Error(`Table ${params.tableName} is not an OSM table.`);
-
-    const response = await this.loadLayerUseCase.exec(params);
-    this.tables.push(response.table);
-
-    return response.layers;
-  }
-
-  // TODO: create geojson type
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getLayerGeoJSON(tableName: string): Promise<any> {
-    if (!this.db || !this.conn || !this.loadLayerUseCase)
-      throw new Error('Database not initialized. Please call init() first.');
-
-    const table = this.tables.find((t) => t.name === tableName);
-    if (!table) throw new Error(`Table ${tableName} not found.`);
-    if (table.type !== 'layer') throw new Error(`Table ${tableName} is not a Layer table.`);
-
-    return this.getLayerGeojsonUseCase?.exec(tableName);
-  }
-
-  async loadCsv(params: LoadCsvParams) {
+  // TODO: transform geometry columns in a point on duckdb
+  async loadCsv(params: LoadCsvParams): Promise<CsvTable> {
     if (!this.db || !this.conn || !this.loadCsvUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadCsvUseCase.exec(params);
     this.tables.push(table);
+
+    return table;
   }
 
+  async loadLayer(params: GetLayerParams): Promise<Table> {
+    if (!this.db || !this.conn || !this.loadLayerUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const osmTable = this.tables.find((t) => t.name === params.osmInputTableName);
+    if (!osmTable) throw new Error(`Table ${params.osmInputTableName} not found.`);
+    if (osmTable.type !== 'osm') throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
+
+    const table = await this.loadLayerUseCase.exec(params);
+    this.tables.push(table);
+
+    return table;
+  }
+
+  // GETTER'S
+  async getLayer(layerTableName: string): Promise<FeatureCollection> {
+    if (!this.db || !this.conn || !this.getLayerGeojsonUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const layerTable = this.tables.find((t) => t.name === layerTableName);
+    if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
+    if (layerTable.type !== 'layer') throw new Error(`Table ${layerTableName} is not a Layer table.`);
+
+    return this.getLayerGeojsonUseCase.exec(layerTableName);
+  }
+
+  // CUSTOM QUERIES
   createQuery(tableName: string) {
-    return new QueryOperation(tableName);
+    return new QueryOperation(tableName, this.tables);
   }
 
   applyQuery(query: QueryOperation) {

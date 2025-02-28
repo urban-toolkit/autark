@@ -5,7 +5,7 @@ export class FilterUseCase {
     if (filters.length === 0) return '';
     const filterString = filters
       .map((filter) => {
-        return `${filter.table}.${filter.column} = '${filter.value}'`;
+        return `${filter.table.name}.${filter.column} = '${filter.value}'`;
       })
       .join(' AND ');
 
