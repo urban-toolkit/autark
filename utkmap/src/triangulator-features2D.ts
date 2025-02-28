@@ -23,7 +23,7 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
             const { coordinates } = <LineString>feature.geometry;
 
             const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
-            const flatIds = earcut(coordinates.flat())
+            const flatIds = earcut(coordinates.flat());
 
             mesh.push({
                 position: flatCoords,
