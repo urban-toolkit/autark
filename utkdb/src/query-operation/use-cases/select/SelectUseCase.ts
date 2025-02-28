@@ -5,7 +5,7 @@ export class SelectUseCase {
     if (selects.length === 0) return `SELECT *`;
     const selectString = selects
       .map((select) => {
-        return select.columns.map((column) => `${select.table}.${column}`).join(', ');
+        return select.columns.map((column) => `${select.table.name}.${column}`).join(', ');
       })
       .join(', ');
 

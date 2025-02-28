@@ -1,15 +1,25 @@
-import { QueryParams } from './shared/interfaces';
+import { Table } from '../shared/interfaces';
+import { ColumnNotFoundError, TableNotFoundError, UnsupportedOperationError } from './shared/errors';
+import { FilterParams, JoinParams, QueryParams, SelectParams } from './shared/interfaces';
+import { tableHasColumn } from './shared/utils';
 import { SelectUseCase, FilterUseCase, JoinUseCase } from './use-cases';
 
+// TODO: filter's and select just support csv tables. Extend after MVP
 export class QueryOperation {
   private queryParams: QueryParams;
   private selectUseCase: SelectUseCase;
   private filterUseCase: FilterUseCase;
   private joinUseCase: JoinUseCase;
+  private tables: Array<Table>;
 
-  constructor(tableName: string) {
+  constructor(tableName: string, tables: Array<Table>) {
+    this.tables = tables;
+
+    const table = tables.find((table) => table.name === tableName);
+    if (!table) throw new TableNotFoundError(tableName);
+
     this.queryParams = {
-      table: tableName,
+      table,
       filters: [],
       selects: [],
       joins: [],
@@ -19,25 +29,37 @@ export class QueryOperation {
     this.joinUseCase = new JoinUseCase();
   }
 
-  filter(params: { table?: string; column: string; value: string }): QueryOperation {
+  // TODO: just support string filter. Extend after MVP
+  filter(params: FilterParams): QueryOperation {
+    const table = this.validateAndGetFilterTable(params);
+
     this.queryParams.filters.push({
-      table: params.table || this.queryParams.table,
+      table,
       column: params.column,
       value: params.value,
     });
     return this;
   }
 
-  select(params: { table?: string; columns: Array<string> }): QueryOperation {
+  select(params: SelectParams): QueryOperation {
+    const table = this.validateAndGetSelectTable(params);
+
     this.queryParams.selects.push({
-      table: params.table || this.queryParams.table,
+      table,
       columns: params.columns,
     });
     return this;
   }
 
-  join(params: { tableRoot: string; tableJoin: string; columnRoot: string; columnJoin: string }): QueryOperation {
-    this.queryParams.joins.push(params);
+  join(params: JoinParams): QueryOperation {
+    const { tableJoin, tableRoot } = this.validateAndGetJoinTables(params);
+
+    this.queryParams.joins.push({
+      tableRoot,
+      columnRoot: params.columnRoot,
+      tableJoin,
+      columnJoin: params.columnJoin,
+    });
     return this;
   }
 
@@ -49,5 +71,55 @@ export class QueryOperation {
       ${this.filterUseCase.exec(this.queryParams.filters)}
       ;
       `;
+  }
+
+  private validateAndGetFilterTable(params: FilterParams): Table {
+    const table =
+      (params.tableName && this.tables.find((table) => table.name === params.tableName)) || this.queryParams.table;
+    if (!table) throw new TableNotFoundError(params.tableName as string);
+
+    if (table.type !== 'csv')
+      throw new UnsupportedOperationError(table, 'filter', 'Only CSV tables are supported for now on filter method');
+
+    const hasColumn = tableHasColumn(table, params.column);
+    if (!hasColumn) throw new ColumnNotFoundError(table, params.column);
+
+    return table;
+  }
+
+  private validateAndGetSelectTable(params: SelectParams): Table {
+    const table =
+      (params.tableName && this.tables.find((table) => table.name === params.tableName)) || this.queryParams.table;
+    if (!table) throw new TableNotFoundError(params.tableName as string);
+
+    if (table.type !== 'csv')
+      throw new UnsupportedOperationError(table, 'select', 'Only CSV tables are supported for now on select method');
+
+    const notFoundColumns = params.columns.filter((column) => !tableHasColumn(table, column));
+    if (notFoundColumns.length > 0) {
+      throw new ColumnNotFoundError(table, notFoundColumns.join(', '));
+    }
+
+    return table;
+  }
+
+  private validateAndGetJoinTables(params: JoinParams): { tableRoot: Table; tableJoin: Table } {
+    let tableRoot: Table | undefined;
+    if (params.tableRootName === this.queryParams.table.name) {
+      tableRoot = this.queryParams.table;
+    } else {
+      tableRoot = this.queryParams.joins.find((join) => join.tableJoin.name === params.tableRootName)?.tableJoin;
+    }
+    if (!tableRoot) throw new TableNotFoundError(params.tableRootName);
+    if (!tableHasColumn(tableRoot, params.columnRoot)) throw new ColumnNotFoundError(tableRoot, params.columnRoot);
+
+    const tableJoin = this.tables.find((table) => table.name === params.tableJoinName);
+    if (!tableJoin) throw new TableNotFoundError(params.tableJoinName);
+    if (!tableHasColumn(tableJoin, params.columnJoin)) throw new ColumnNotFoundError(tableJoin, params.columnJoin);
+
+    return {
+      tableJoin,
+      tableRoot,
+    };
   }
 }

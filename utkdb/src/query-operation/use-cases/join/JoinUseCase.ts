@@ -6,7 +6,7 @@ export class JoinUseCase {
     const joinString = joins
       .map((join) => {
         const joinType = join.joinType ? `${join.joinType} JOIN` : 'JOIN';
-        return `${joinType} ${join.tableJoin} ON ${join.tableRoot}.${join.columnRoot} = ${join.tableJoin}.${join.columnJoin}`;
+        return `${joinType} ${join.tableJoin.name} ON ${join.tableRoot.name}.${join.columnRoot} = ${join.tableJoin.name}.${join.columnJoin}`;
       })
       .join(' ');
     return joinString;

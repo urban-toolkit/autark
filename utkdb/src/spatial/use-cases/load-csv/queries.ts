@@ -11,3 +11,38 @@ export const LOAD_CSV_ON_TABLE_QUERY = (csvFileUrl: string, tableName: string, d
         DESCRIBE ${tableName};
   `;
 };
+
+interface LoadCsvOnTableWithCoordinatesParams {
+  csvFileUrl: string;
+  tableName: string;
+  delimiter: string;
+  latColumnName: string;
+  longColumnName: string;
+  coordinateFormat: string;
+}
+export const LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY = ({
+  csvFileUrl,
+  tableName,
+  delimiter,
+  latColumnName,
+  longColumnName,
+  coordinateFormat,
+}: LoadCsvOnTableWithCoordinatesParams) => {
+  return `
+    CREATE TABLE ${tableName} AS
+      SELECT
+          *,
+          ST_SetSRID(
+              ST_Point(CAST("${latColumnName}" AS DOUBLE), CAST("${longColumnName}" AS DOUBLE)),
+              ${coordinateFormat}
+          ) AS geoPoint
+      FROM READ_CSV(
+          '${csvFileUrl}',
+          delim='${delimiter}',
+          HEADER=TRUE,
+          AUTO_DETECT=TRUE
+      );
+
+    DESCRIBE ${tableName};
+  `;
+};
