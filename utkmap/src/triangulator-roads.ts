@@ -15,20 +15,22 @@ export class TriangulatorRoads extends Triangulator {
         // translate based on origin
         Triangulator.translateFeatures(geojson, origin);
 
-        let collection: Feature[] = geojson['features'];
-
-        collection = Triangulator.closeFeatures(collection);
-        collection = Triangulator.fixOrientation(collection);
+        const collection: Feature[] = geojson['features'];
 
         for (const feature of collection) {
+            if(['cycleway', 'footway', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'].includes(feature.properties?.highway)) {
+                continue;
+            }
+
             const base = <LineString>feature.geometry;
 
-            const top = lineOffset(base, 1, { units: "meters"}).geometry.coordinates;
-            const bot = lineOffset(base,-1, { units: "meters"}).geometry.coordinates;
+            const top = lineOffset(base, 200, {units: "kilometers"}).geometry.coordinates;
+            const bot = lineOffset(base,-200, {units: "kilometers"}).geometry.coordinates;
 
-            bot.forEach((cord: number[]) => top.push(cord));
+            bot.forEach((cord: number[]) => top.unshift(cord));
+            top.push(top[0]);
 
-            const flatIds = earcut(top.flat())
+            const flatIds = earcut(top.flat());
             const flatCoords = top.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
 
             mesh.push({
