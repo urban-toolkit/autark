@@ -223,6 +223,8 @@ await spatialDb.loadOsm({
   const geojson = await spatialDb.getLayer('my_layer_table');
   ```
 
+---
+
 ### 🔍 `createQuery(tableName: string): QueryOperation`
 
 - **Purpose:**
