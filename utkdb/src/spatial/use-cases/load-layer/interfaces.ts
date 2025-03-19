@@ -1,11 +1,10 @@
-import { LayerTable } from '../../shared/interfaces';
-
 export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings';
 
 export interface Params {
+  osmInputTableName: string;
+  outputTableName?: string;
   layer: LayerType;
   coordinateFormat?: string;
-  tableName: string;
 }
 
 export interface Layer {
@@ -14,9 +13,4 @@ export interface Layer {
     type: 'LineString';
     coordinates: Array<Array<number>>;
   };
-}
-
-export interface Returns {
-  table: LayerTable;
-  layers: Array<Layer>;
 }
