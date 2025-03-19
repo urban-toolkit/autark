@@ -4,7 +4,7 @@ import { Params } from './interfaces';
 import { CsvTable } from '../../../shared/interfaces';
 import { LOAD_CSV_ON_TABLE_QUERY, LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
-import { DEFALT_COORDINATE_FORMAT } from '../../consts';
+import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 
 export class LoadCsvUseCase {
   private conn: AsyncDuckDBConnection;

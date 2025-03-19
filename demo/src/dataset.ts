@@ -109,6 +109,8 @@ export class UtkDbExample extends UtkData {
       },
     });
 
+    /* Code i was using to test some method implementation's
+
     console.log('begin of load csv (take a while because its heavy)');
     await this.db.loadCsv({
       csvFileUrl: 'http://localhost:5173/data-ignore/311_Service_Requests_from_2010_to_Present_20250228.csv',
@@ -121,6 +123,22 @@ export class UtkDbExample extends UtkData {
     });
     console.log('end of load csv');
     console.log('tables: ', this.db.tables);
+
+    // parks
+    console.log('start spatial join');
+    const parkLayerTable = `${this.tableName}_parks`;
+    const query = this.db.createQuery(parkLayerTable).spatialJoin({
+      tableRootName: parkLayerTable,
+      tableJoinName: 'service_requests',
+      spatialPredicate: 'NEAR',
+      nearDistance: 0.01,
+      joinType: 'LEFT',
+    });
+    await this.db.loadQuery(query, 'my_new_layer_table');
+    console.log('end spatial join');
+
+    console.log('tables: ', this.db.tables);
+    */
   }
 
   async exportLayers(): Promise<{ name: string; data: FeatureCollection }[]> {
@@ -128,6 +146,7 @@ export class UtkDbExample extends UtkData {
 
     for (const layerName of this.layerTypes) {
       const geojson = await this.db.getLayer(`${this.tableName}_${layerName}`);
+      console.log({ geojson });
       data.push({ name: layerName, data: geojson });
     }
 

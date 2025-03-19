@@ -1,3 +1,5 @@
+import { DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
+
 export const LOAD_CSV_ON_TABLE_QUERY = (csvFileUrl: string, tableName: string, delimiter: string) => {
   return `
         CREATE TABLE ${tableName} AS
@@ -33,10 +35,10 @@ export const LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY = ({
       SELECT
           *,
           ST_Transform(
-              ST_Point(CAST("${longColumnName}" AS DOUBLE), CAST("${latColumnName}" AS DOUBLE)),
+              ST_Point(CAST(${latColumnName} AS DOUBLE), CAST(${longColumnName} AS DOUBLE)),
               'EPSG:4326',
               '${coordinateFormat}'
-          ) AS geoPoint
+          ) AS ${DEFAULT_GEO_COLUMN_NAME}
       FROM READ_CSV(
           '${csvFileUrl}',
           delim='${delimiter}',

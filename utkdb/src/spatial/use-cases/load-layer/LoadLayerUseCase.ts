@@ -5,7 +5,7 @@ import { Params } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
 import { LayerTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
-import { DEFALT_COORDINATE_FORMAT } from '../../consts';
+import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 
 export class LoadLayerUseCase {
   private conn: AsyncDuckDBConnection;

@@ -19,11 +19,20 @@ export interface Join {
   joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
 }
 
+export interface SpatialJoin {
+  tableRoot: Table;
+  tableJoin: Table;
+  spatialPredicate?: 'INTERSECT' | 'NEAR';
+  joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+  nearDistance?: number;
+}
+
 export interface QueryParams {
   table: Table;
   filters: Array<Filter>;
   selects: Array<Select>;
   joins: Array<Join>;
+  spatialJoins: Array<SpatialJoin>;
 }
 
 export interface FilterParams {
@@ -42,10 +51,13 @@ export interface JoinParams {
   tableJoinName: string;
   columnRoot: string;
   columnJoin: string;
+  joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
 }
 
-export interface LayerSpatialJoin {
-  layerTableName: string;
-  joinTableName: string;
-  // TODO: end just after fix csv load
+export interface SpatialJoinParams {
+  tableRootName: string;
+  tableJoinName: string;
+  spatialPredicate?: 'INTERSECT' | 'NEAR';
+  joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+  nearDistance?: number;
 }

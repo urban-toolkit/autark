@@ -1,8 +1,14 @@
+import { DEFAULT_GEO_COLUMN_NAME } from '../shared/consts';
 import { Table } from '../shared/interfaces';
-import { ColumnNotFoundError, TableNotFoundError, UnsupportedOperationError } from './shared/errors';
-import { FilterParams, JoinParams, QueryParams, SelectParams } from './shared/interfaces';
+import {
+  ColumnNotFoundError,
+  TableNotFoundError,
+  TableShouldBeMainTable,
+  UnsupportedOperationError,
+} from './shared/errors';
+import { FilterParams, JoinParams, QueryParams, SelectParams, SpatialJoinParams } from './shared/interfaces';
 import { tableHasColumn } from './shared/utils';
-import { SelectUseCase, FilterUseCase, JoinUseCase } from './use-cases';
+import { SelectUseCase, FilterUseCase, JoinUseCase, SpatialJoinUseCase } from './use-cases';
 
 // TODO: filter's and select just support csv tables. Extend after MVP
 export class QueryOperation {
@@ -10,6 +16,7 @@ export class QueryOperation {
   private selectUseCase: SelectUseCase;
   private filterUseCase: FilterUseCase;
   private joinUseCase: JoinUseCase;
+  private spatialJoinUseCase: SpatialJoinUseCase;
   private tables: Array<Table>;
 
   constructor(tableName: string, tables: Array<Table>) {
@@ -23,10 +30,12 @@ export class QueryOperation {
       filters: [],
       selects: [],
       joins: [],
+      spatialJoins: [],
     };
     this.selectUseCase = new SelectUseCase();
     this.filterUseCase = new FilterUseCase();
     this.joinUseCase = new JoinUseCase();
+    this.spatialJoinUseCase = new SpatialJoinUseCase();
   }
 
   // TODO: just support string filter. Extend after MVP
@@ -59,6 +68,20 @@ export class QueryOperation {
       columnRoot: params.columnRoot,
       tableJoin,
       columnJoin: params.columnJoin,
+      joinType: params.joinType,
+    });
+    return this;
+  }
+
+  spatialJoin(params: SpatialJoinParams): QueryOperation {
+    const { tableRoot, tableJoin } = this.validateAndGetSpatialJoinTables(params);
+
+    this.queryParams.spatialJoins.push({
+      tableRoot,
+      tableJoin,
+      spatialPredicate: params.spatialPredicate || 'INTERSECT',
+      joinType: params.joinType,
+      nearDistance: params.nearDistance,
     });
     return this;
   }
@@ -66,11 +89,16 @@ export class QueryOperation {
   getSql(): string {
     return `
       ${this.selectUseCase.exec(this.queryParams.selects)}
-      from ${this.queryParams.table}
+      from ${this.queryParams.table.name}
       ${this.joinUseCase.exec(this.queryParams.joins)}
+      ${this.spatialJoinUseCase.exec(this.queryParams.spatialJoins)}
       ${this.filterUseCase.exec(this.queryParams.filters)}
       ;
       `;
+  }
+
+  getMainTable(): Table {
+    return this.queryParams.table;
   }
 
   private validateAndGetFilterTable(params: FilterParams): Table {
@@ -121,5 +149,35 @@ export class QueryOperation {
       tableJoin,
       tableRoot,
     };
+  }
+
+  private validateAndGetSpatialJoinTables(params: SpatialJoinParams): { tableRoot: Table; tableJoin: Table } {
+    if (this.queryParams.table.name !== params.tableRootName) throw new TableShouldBeMainTable(params.tableRootName);
+    const table = this.queryParams.table;
+
+    if (table.type !== 'layer')
+      throw new UnsupportedOperationError(
+        table,
+        'spatialJoin',
+        'Only Layer tables are supported for now on spatialJoin method as tableRoot',
+      );
+
+    const tableJoin = this.tables.find((table) => table.name === params.tableJoinName);
+    if (!tableJoin) throw new TableNotFoundError(params.tableJoinName);
+    if (tableJoin.type !== 'csv')
+      throw new UnsupportedOperationError(
+        tableJoin,
+        'spatialJoin',
+        'Only CSV tables with geometryColumns params passed are supported for now on spatialJoin method as joinTableName',
+      );
+
+    const hasGeometryColumn = tableHasColumn(tableJoin, DEFAULT_GEO_COLUMN_NAME);
+    if (!hasGeometryColumn)
+      throw new ColumnNotFoundError(tableJoin, DEFAULT_GEO_COLUMN_NAME, 'You should pass geometryColumns on loadCsv.');
+
+    if (params.spatialPredicate === 'NEAR' && !params.nearDistance)
+      throw new UnsupportedOperationError(tableJoin, 'spatialJoin', 'You should pass nearDistance on NEAR joinType');
+
+    return { tableRoot: table, tableJoin };
   }
 }
