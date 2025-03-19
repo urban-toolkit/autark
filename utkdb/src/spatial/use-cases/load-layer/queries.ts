@@ -2,10 +2,6 @@
 
 import { LayerType } from './interfaces';
 
-export const GET_LAYER_DESCRIBE_QUERY = (layerTableName: string) => `
-  DESCRIBE ${layerTableName};
-`;
-
 type Params = {
   tableName: string;
   layer: LayerType;
@@ -51,7 +47,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
       ON ${layer}_with_nodes_refs.ref = nodes.id
       GROUP BY 1, 2;
 
-    SELECT * FROM ${outputTableName};  
+    DESCRIBE ${outputTableName};
   `;
 };
 
