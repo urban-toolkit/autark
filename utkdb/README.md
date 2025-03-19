@@ -8,8 +8,7 @@
 - [Usage](#usage)
   - [Method Summary Table](#method-summary-table)
   - [Detailed Method Documentation](#detailed-method-documentation)
-- [TODOs](#todos)
-- [Notes & Warnings](#notes--warnings)
+- [TODOs](#to-dos)
 
 ## Installation
 
