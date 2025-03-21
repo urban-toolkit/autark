@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { Params } from './interfaces';

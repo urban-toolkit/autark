@@ -155,7 +155,7 @@ export class QueryOperation {
     if (this.queryParams.table.name !== params.tableRootName) throw new TableShouldBeMainTable(params.tableRootName);
     const table = this.queryParams.table;
 
-    if (table.type !== 'layer')
+    if (table.type !== 'layer' && table.type !== 'custom-layer')
       throw new UnsupportedOperationError(
         table,
         'spatialJoin',
