@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { CsvTable, LayerTable, OsmTable, Table } from '../shared/interfaces';
+import { CsvTable, CustomLayerTable, LayerTable, OsmTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
 import { LoadOsmFromPbfUseCase, LoadOsmFromPbfParams } from './use-cases/load-osm-from-pbf';
 import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
@@ -9,6 +9,7 @@ import { QueryOperation } from '../query-operation';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
 import { LoadQueryUseCase } from './use-cases/load-query';
+import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -18,6 +19,7 @@ export class SpatialDb {
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
   private loadQueryUseCase?: LoadQueryUseCase;
+  private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
 
   async init() {
@@ -28,6 +30,7 @@ export class SpatialDb {
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
     this.loadQueryUseCase = new LoadQueryUseCase(this.conn);
+    this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
@@ -91,6 +94,16 @@ export class SpatialDb {
     return table;
   }
 
+  async loadCustomLayer(params: LoadCustomLayerParams): Promise<CustomLayerTable> {
+    if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.loadCustomLayerUseCase.exec(params);
+    this.tables.push(table);
+
+    return table;
+  }
+
   // GETTER'S
   async getLayer(layerTableName: string): Promise<FeatureCollection> {
     if (!this.db || !this.conn || !this.getLayerGeojsonUseCase)
@@ -98,7 +111,8 @@ export class SpatialDb {
 
     const layerTable = this.tables.find((t) => t.name === layerTableName);
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
-    if (layerTable.type !== 'layer') throw new Error(`Table ${layerTableName} is not a Layer table.`);
+    if (layerTable.type !== 'layer' && layerTable.type !== 'custom-layer')
+      throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
     return this.getLayerGeojsonUseCase.exec(layerTable);
   }

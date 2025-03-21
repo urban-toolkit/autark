@@ -109,7 +109,14 @@ export class UtkDbExample extends UtkData {
       },
     });
 
-    /* Code i was using to test some method implementation's
+    /*
+    console.log('start load custom layer');
+    await this.db.loadCustomLayer({
+      geojsonFileUrl: 'http://localhost:5173/data-ignore/manhattan_neighborhood.geojson',
+      outputTableName: 'geojson_table',
+      coordinateFormat: this.projection,
+    });
+    console.log('end load custom layer');
 
     console.log('begin of load csv (take a while because its heavy)');
     await this.db.loadCsv({
@@ -124,20 +131,20 @@ export class UtkDbExample extends UtkData {
     console.log('end of load csv');
     console.log('tables: ', this.db.tables);
 
-    // parks
     console.log('start spatial join');
-    const parkLayerTable = `${this.tableName}_parks`;
-    const query = this.db.createQuery(parkLayerTable).spatialJoin({
-      tableRootName: parkLayerTable,
+    const query = this.db.createQuery('geojson_table').spatialJoin({
+      tableRootName: 'geojson_table',
       tableJoinName: 'service_requests',
-      spatialPredicate: 'NEAR',
-      nearDistance: 0.01,
-      joinType: 'LEFT',
+      spatialPredicate: 'INTERSECT',
     });
-    await this.db.loadQuery(query, 'my_new_layer_table');
-    console.log('end spatial join');
+    console.log({ query: query.getSql() });
 
+    await this.db.loadQuery(query, 'my_new_layer');
+    console.log('end spatial join');
     console.log('tables: ', this.db.tables);
+
+    const geojsonAfterJoin = await this.db.getLayer('my_new_layer');
+    console.log('geojsonAfterJoin: ', geojsonAfterJoin);
     */
   }
 
