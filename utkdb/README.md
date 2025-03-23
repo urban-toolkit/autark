@@ -316,11 +316,19 @@ Here are some planned improvements and features to be implemented in the future:
 
 ### Features
 
+- [] Checar se join espacial está funcionando
+  > pode ser problema de estar invertido o lat/long?
+- [] Refatorar sistema de "layers", para os dados ficarem mais bem estruturados
+  > onde fica a geometria? e as propriedades? tentar dar uma unificada nesses formatos, tanto no normal quanto no custom
+- [] Depois desse refactoring, tentar ajeitar os "selects" do OperationQuery
+  > ser fácil de selecionar só os atributos importantes (até se estiverem dentro de um "map")
+- [] Get de bouding box no carregamento do OpenStreetMap, passando a projeção
+- [] Ler Urbane
 - [] Load custom layers from a geojson`.
 - [] Drop tables method, for performance.
 - [] Multipolygon > mais desafiador, pensar melhor o que precisa fazer para suportar esse tipo de estrutura, tanto nos `inputs` quanto nos `outputs`.
 
 ### Bug fixes
 
-- [] Load of roads.
+- [] Load of roads (vindo informação demais).
 - [] Buldings parece estar pegando "coisas demais", uns pontos meio sem sentidos. Analisar se tem um problema na query.

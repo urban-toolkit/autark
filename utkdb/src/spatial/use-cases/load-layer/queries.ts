@@ -30,16 +30,14 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
     CREATE TABLE ${outputTableName} AS
       SELECT
           ${layer}.id,
-          ${layer}.tags,
-          ST_AsGeoJSON(
-            ST_Transform(
-              ST_MakeLine(
-              list(nodes.geometry ORDER BY ref_idx ASC)
-              ),
-              'EPSG:4326',
-              '${outputFormat}'
-            )
-          ) linestring
+          ${layer}.tags properties,
+          ST_Transform(
+            ST_MakeLine(
+            list(nodes.geometry ORDER BY ref_idx ASC)
+            ),
+            'EPSG:4326',
+            '${outputFormat}'
+          ) geometry
       FROM ${layer}
       JOIN ${layer}_with_nodes_refs
       ON ${layer}.id = ${layer}_with_nodes_refs.id

@@ -1,4 +1,3 @@
-import { DEFAULT_GEO_COLUMN_NAME } from '../shared/consts';
 import { Table } from '../shared/interfaces';
 import {
   ColumnNotFoundError,
@@ -6,15 +5,15 @@ import {
   TableShouldBeMainTable,
   UnsupportedOperationError,
 } from './shared/errors';
-import { FilterParams, JoinParams, QueryParams, SelectParams, SpatialJoinParams } from './shared/interfaces';
+import { WhereParams, JoinParams, QueryParams, SelectParams, SpatialJoinParams } from './shared/interfaces';
 import { tableHasColumn } from './shared/utils';
-import { SelectUseCase, FilterUseCase, JoinUseCase, SpatialJoinUseCase } from './use-cases';
+import { SelectUseCase, WhereUseCase, JoinUseCase, SpatialJoinUseCase } from './use-cases';
 
 // TODO: filter's and select just support csv tables. Extend after MVP
 export class QueryOperation {
   private queryParams: QueryParams;
   private selectUseCase: SelectUseCase;
-  private filterUseCase: FilterUseCase;
+  private whereUseCase: WhereUseCase;
   private joinUseCase: JoinUseCase;
   private spatialJoinUseCase: SpatialJoinUseCase;
   private tables: Array<Table>;
@@ -27,22 +26,23 @@ export class QueryOperation {
 
     this.queryParams = {
       table,
-      filters: [],
+      wheres: [],
       selects: [],
       joins: [],
       spatialJoins: [],
     };
     this.selectUseCase = new SelectUseCase();
-    this.filterUseCase = new FilterUseCase();
+    this.whereUseCase = new WhereUseCase();
     this.joinUseCase = new JoinUseCase();
     this.spatialJoinUseCase = new SpatialJoinUseCase();
   }
 
-  // TODO: just support string filter. Extend after MVP
-  filter(params: FilterParams): QueryOperation {
-    const table = this.validateAndGetFilterTable(params);
+  // TODO: just support string filter.
+  // TODO: support filter for properties
+  where(params: WhereParams): QueryOperation {
+    const table = this.validateAndGetWhereTable(params);
 
-    this.queryParams.filters.push({
+    this.queryParams.wheres.push({
       table,
       column: params.column,
       value: params.value,
@@ -88,11 +88,11 @@ export class QueryOperation {
 
   getSql(): string {
     return `
-      ${this.selectUseCase.exec(this.queryParams.selects)}
+      ${this.selectUseCase.exec(this.queryParams.selects, this.queryParams)}
       from ${this.queryParams.table.name}
       ${this.joinUseCase.exec(this.queryParams.joins)}
       ${this.spatialJoinUseCase.exec(this.queryParams.spatialJoins)}
-      ${this.filterUseCase.exec(this.queryParams.filters)}
+      ${this.whereUseCase.exec(this.queryParams.wheres)}
       ;
       `;
   }
@@ -101,32 +101,32 @@ export class QueryOperation {
     return this.queryParams.table;
   }
 
-  private validateAndGetFilterTable(params: FilterParams): Table {
-    const table =
-      (params.tableName && this.tables.find((table) => table.name === params.tableName)) || this.queryParams.table;
+  private validateAndGetWhereTable(params: WhereParams): Table {
+    const table = this.tables.find((table) => table.name === params.tableName);
     if (!table) throw new TableNotFoundError(params.tableName as string);
-
-    if (table.type !== 'csv')
-      throw new UnsupportedOperationError(table, 'filter', 'Only CSV tables are supported for now on filter method');
 
     const hasColumn = tableHasColumn(table, params.column);
     if (!hasColumn) throw new ColumnNotFoundError(table, params.column);
+
+    const whereAlreadyExists = this.queryParams.wheres.find((where) => where.table.name === table.name);
+    if (whereAlreadyExists)
+      throw new UnsupportedOperationError(table, 'where', 'Table already have a where on operation');
 
     return table;
   }
 
   private validateAndGetSelectTable(params: SelectParams): Table {
-    const table =
-      (params.tableName && this.tables.find((table) => table.name === params.tableName)) || this.queryParams.table;
+    const table = this.tables.find((table) => table.name === params.tableName);
     if (!table) throw new TableNotFoundError(params.tableName as string);
-
-    if (table.type !== 'csv')
-      throw new UnsupportedOperationError(table, 'select', 'Only CSV tables are supported for now on select method');
 
     const notFoundColumns = params.columns.filter((column) => !tableHasColumn(table, column));
     if (notFoundColumns.length > 0) {
       throw new ColumnNotFoundError(table, notFoundColumns.join(', '));
     }
+
+    const selectAlreadyExists = this.queryParams.selects.find((select) => select.table.name === table.name);
+    if (selectAlreadyExists)
+      throw new UnsupportedOperationError(table, 'select', 'Table already selected on operation');
 
     return table;
   }
@@ -164,16 +164,13 @@ export class QueryOperation {
 
     const tableJoin = this.tables.find((table) => table.name === params.tableJoinName);
     if (!tableJoin) throw new TableNotFoundError(params.tableJoinName);
-    if (tableJoin.type !== 'csv')
+    const hasGeometry = tableJoin.columns.find((column) => column.type === 'GEOMETRY');
+    if (!hasGeometry)
       throw new UnsupportedOperationError(
         tableJoin,
         'spatialJoin',
-        'Only CSV tables with geometryColumns params passed are supported for now on spatialJoin method as joinTableName',
+        'Your join table should have a geometry column to use spatialJoin',
       );
-
-    const hasGeometryColumn = tableHasColumn(tableJoin, DEFAULT_GEO_COLUMN_NAME);
-    if (!hasGeometryColumn)
-      throw new ColumnNotFoundError(tableJoin, DEFAULT_GEO_COLUMN_NAME, 'You should pass geometryColumns on loadCsv.');
 
     if (params.spatialPredicate === 'NEAR' && !params.nearDistance)
       throw new UnsupportedOperationError(tableJoin, 'spatialJoin', 'You should pass nearDistance on NEAR joinType');

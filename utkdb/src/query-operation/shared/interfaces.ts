@@ -1,6 +1,6 @@
 import { Table } from '../../shared/interfaces';
 
-export interface Filter {
+export interface Where {
   table: Table;
   column: string;
   value: string;
@@ -29,20 +29,20 @@ export interface SpatialJoin {
 
 export interface QueryParams {
   table: Table;
-  filters: Array<Filter>;
+  wheres: Array<Where>;
   selects: Array<Select>;
   joins: Array<Join>;
   spatialJoins: Array<SpatialJoin>;
 }
 
-export interface FilterParams {
-  tableName?: string;
+export interface WhereParams {
+  tableName: string;
   column: string;
   value: string;
 }
 
 export interface SelectParams {
-  tableName?: string;
+  tableName: string;
   columns: Array<string>;
 }
 

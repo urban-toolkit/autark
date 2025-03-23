@@ -15,7 +15,7 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   columns: Column[],
   coordinateFormat: string,
 ) => {
-  const geoColumn = columns.find((col) => col.name === 'geom');
+  const geoColumn = columns.find((col) => col.type === 'GEOMETRY');
   if (!geoColumn) {
     throw new Error("Could not find geometry column in feature collection's");
   }
@@ -25,15 +25,13 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   return `
     CREATE TABLE ${outputTableName} AS
     SELECT
-      ST_AsGeoJSON(
-        ST_Transform(
+      ST_Transform(
         ${geoColumn.name},
         'EPSG:4326',
-        '${coordinateFormat}'
-        )
-      ) AS linestring,
-      ${nonGeoColumns.map((col) => col.name).join(', ')},
-      map() AS tags
+        '${coordinateFormat}',
+        always_xy := true
+      ) AS geometry,
+      CAST(json_object(${nonGeoColumns.map((col) => `"${col.name}", "${col.name}"`).join(', ')}) AS JSON) AS properties
     FROM ${featureCollectionTableName};
 
     DROP TABLE ${featureCollectionTableName};

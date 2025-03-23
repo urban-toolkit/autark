@@ -9,6 +9,7 @@ export const LOAD_PBF_ON_TABLE_QUERY = (pbfFileUrl: string, tableName: string, b
         DESCRIBE ${tableName};
   `;
 
+  // TODO: remove it (deprecated, probably not working)
   const { minLat, minLon, maxLat, maxLon } = boudingBox;
   return `
         CREATE TABLE ${tableName} AS

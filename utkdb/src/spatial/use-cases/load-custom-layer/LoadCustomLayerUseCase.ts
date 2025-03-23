@@ -45,8 +45,6 @@ export class LoadCustomLayerUseCase {
     outputTableName: string,
     coordinateFormat: string,
   ) {
-    console.log({ coordinateFormat });
-
     const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(
       geojsonFileUrl,
       `${outputTableName}_feature_collection`,
