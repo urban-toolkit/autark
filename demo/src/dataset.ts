@@ -78,19 +78,17 @@ abstract class UtkData {
 
 export class UtkDbExample extends UtkData {
   private pbfFileUrl: string;
-  private tableName: string;
   private layerTypes: string[];
   private projection: string;
 
   private db: SpatialDb;
 
-  constructor(pbfFileUrl: string, tableName: string, layers: LayerType[], projection: string = 'EPSG:3395') {
+  constructor(pbfFileUrl: string, layers: LayerType[], projection: string = 'EPSG:3395') {
     super();
 
     this.db = new SpatialDb();
 
     this.pbfFileUrl = pbfFileUrl;
-    this.tableName = tableName;
     this.projection = projection;
     this.layerTypes = layers;
   }
@@ -102,12 +100,18 @@ export class UtkDbExample extends UtkData {
     // Loading layers
     await this.db.loadOsm({
       pbfFileUrl: this.pbfFileUrl,
-      outputTableName: this.tableName,
+      outputTableName: 'table_osm',
       autoLoadLayers: {
         coordinateFormat: this.projection,
         layers: this.layerTypes as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
       },
     });
+
+    await this.db.loadCustomLayer({
+        geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+        outputTableName: 'table_mnt_neighs',
+        coordinateFormat: this.projection,
+      });
 
     /*
     --- join neighborhood with csv ---
@@ -178,7 +182,7 @@ export class UtkDbExample extends UtkData {
     const data = [];
 
     for (const layerName of this.layerTypes) {
-      const geojson = await this.db.getLayer(`${this.tableName}_${layerName}`);
+      const geojson = await this.db.getLayer(`${'table_osm'}_${layerName}`);
       data.push({ name: layerName, data: geojson });
     }
 
