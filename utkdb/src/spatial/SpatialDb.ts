@@ -10,6 +10,8 @@ import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
 import { LoadQueryUseCase } from './use-cases/load-query';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
+import { SpatialJoinParams } from './use-cases/spatial-join/interfaces';
+import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -21,6 +23,7 @@ export class SpatialDb {
   private loadQueryUseCase?: LoadQueryUseCase;
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
+  private spatialJoinUseCase?: SpatialJoinUseCase;
 
   async init() {
     this.db = await loadDb();
@@ -32,6 +35,7 @@ export class SpatialDb {
     this.loadQueryUseCase = new LoadQueryUseCase(this.conn);
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
+    this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
@@ -118,6 +122,16 @@ export class SpatialDb {
   }
 
   // CUSTOM QUERIES
+  async spatialJoin(params: SpatialJoinParams): Promise<Table> {
+    if (!this.db || !this.conn || !this.spatialJoinUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.spatialJoinUseCase.exec(params, this.tables);
+    this.tables.push(table);
+
+    return table;
+  }
+
   createQuery(tableName: string): QueryOperation {
     return new QueryOperation(tableName, this.tables);
   }

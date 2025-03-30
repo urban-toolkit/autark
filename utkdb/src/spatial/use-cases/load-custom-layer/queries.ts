@@ -31,7 +31,7 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
         '${coordinateFormat}',
         always_xy := true
       ) AS geometry,
-      CAST(json_object(${nonGeoColumns.map((col) => `"${col.name}", "${col.name}"`).join(', ')}) AS JSON) AS properties
+      CAST(json_object(${nonGeoColumns.map((col) => `'${col.name}', ${col.name}`).join(', ')}) AS JSON) AS properties
     FROM ${featureCollectionTableName};
 
     DROP TABLE ${featureCollectionTableName};

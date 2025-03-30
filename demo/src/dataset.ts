@@ -110,8 +110,7 @@ export class UtkDbExample extends UtkData {
     });
 
     /*
-    --- join neighborhood with csv ---
-    console.log('start load custom layer');
+   
     await this.db.loadCustomLayer({
       geojsonFileUrl: 'http://localhost:5173/data-ignore/manhattan_neighborhood.geojson',
       outputTableName: 'geojson_table',
@@ -132,22 +131,29 @@ export class UtkDbExample extends UtkData {
     });
     console.log('end loading csv');
 
-    console.log('start spatial join');
-    const query = this.db.createQuery('geojson_table').spatialJoin({
+    console.log('making join');
+
+    await this.db.spatialJoin({
       tableRootName: 'geojson_table',
       tableJoinName: `csv_table`,
       spatialPredicate: 'INTERSECT',
+      outputTableName: 'my_new_layer',
+      joinType: 'INNER',
+      groupBy: {
+        selectColumns: [
+          {
+            tableName: 'csv_table',
+            column: 'Agency Name',
+            aggregateFn: 'count',
+          },
+        ],
+      },
     });
-
-    await this.db.loadQuery(query, 'my_new_layer');
-    console.log('end spatial join');
-    console.log('tables: ', this.db.tables);
+    console.log('end join');
 
     const geojsonAfterJoin = await this.db.getLayer('my_new_layer');
-    console.log('geojsonAfterJoin: ', geojsonAfterJoin);
+    console.log('geojsonAfterJoin: ', geojsonAfterJoin);    
     */
-
-    /*
     --- Join neighborhood with parks ---
     console.log('start load custom layer');
     await this.db.loadCustomLayer({
