@@ -102,8 +102,10 @@ export class UtkDbExample extends UtkData {
   }
 
   async loadTest() {
-    /*
-      --- join neighborhood with csv ---
+    
+      // DB Initialization
+      await this.db.init();  
+    
       await this.db.loadCustomLayer({
         geojsonFileUrl: 'http://localhost:5173/data-ignore/manhattan_neighborhood.geojson',
         outputTableName: 'geojson_table',
@@ -146,7 +148,8 @@ export class UtkDbExample extends UtkData {
 
       const geojsonAfterJoin = await this.db.getLayer('my_new_layer');
       console.log('geojsonAfterJoin: ', geojsonAfterJoin);    
-    */
+    
+   /*
         --- Join neighborhood with parks ---
         console.log('start load custom layer');
         await this.db.loadCustomLayer({
