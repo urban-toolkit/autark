@@ -25,7 +25,13 @@ async function runDbMapIntegration() {
     await map.init();
 
     const db = new DbMapIntegration();
-    await db.loadOsmData();
+    await db.init()
+
+    await db.loadOsm();
+    await db.loadCustomLayer();
+
+    // await db.LoadCsv();
+    // await db.spatialJoin();
 
     const layers = await db.exportLayers();
     const origin = [-8239012.438994927, 4941135.512524911, 0]; //TODO: await.db.getOrigin(); // db.getBoundingBox();
@@ -39,8 +45,8 @@ async function runDbMapIntegration() {
 
 async function runDbStandalone() {
     const db = new DbStandalone();
-    await db.initDb();
-    await db.spatialJoinTest();
+    await db.init();
+    await db.spatialJoin();
 }
 
 //Set to true to run the map integration demo

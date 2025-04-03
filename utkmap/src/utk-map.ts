@@ -74,6 +74,7 @@ export class UtkMap {
             case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
+            case LayerType.CUSTOM_LAYER:
                 this.createFeatures2DLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
             break;
 
@@ -185,6 +186,9 @@ export class UtkMap {
     }
 
     private createFeatures2DLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+        console.log("()()()()()()(()()")
+        console.log(geojson);
+        
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,

@@ -2,20 +2,20 @@ import { LayerType } from 'utkmap';
 import { SpatialDb } from 'utkdb';
 
 export class DbStandalone {
-    private projection: string;
-    private db: SpatialDb;
+    protected projection: string;
+    protected db: SpatialDb;
 
     constructor(projection: string = 'EPSG:3395') {
         this.db = new SpatialDb();
         this.projection = projection;
     }
 
-    async initDb() {
+    public async init() {
         // DB Initialization
         await this.db.init();
     }
 
-    async osmLoadTest(pbfFileUrl: string = 'http://localhost:5173/data/lower-mn.osm.pbf', osmLayers: LayerType[] = [LayerType.OSM_COASTLINE, LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_ROADS, LayerType.OSM_BUILDINGS], osmTable: string = 'table_osm') {
+    public async loadOsm(pbfFileUrl: string = 'http://localhost:5173/data/lower-mn.osm.pbf', osmLayers: LayerType[] = [LayerType.OSM_COASTLINE, LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_ROADS, LayerType.OSM_BUILDINGS], osmTable: string = 'table_osm') {
         // Loading osm layers
         await this.db.loadOsm({
             pbfFileUrl: pbfFileUrl,
@@ -27,7 +27,7 @@ export class DbStandalone {
         });
     }
 
-    async customLayerLoadTest(geoJsonUrl = 'http://localhost:5173/data/mnt_neighs.geojson', geojsonTable = 'geojson_table') {
+    public async loadCustomLayer(geoJsonUrl = 'http://localhost:5173/data/mnt_neighs.geojson', geojsonTable = 'custom_layer_geojson') {
         await this.db.loadCustomLayer({
             geojsonFileUrl: geoJsonUrl,
             outputTableName: geojsonTable,
@@ -35,7 +35,7 @@ export class DbStandalone {
         });
     }
 
-    async csvLoadTest(csvFileUrl = 'http://localhost:5173/data/noise_sample.csv', csvTable = 'csv_table') {
+    public async LoadCsv(csvFileUrl = 'http://localhost:5173/data/noise_sample.csv', csvTable = 'csv') {
         await this.db.loadCsv({
             csvFileUrl: csvFileUrl,
             outputTableName: csvTable,
@@ -47,10 +47,7 @@ export class DbStandalone {
         });
     }
 
-    async spatialJoinTest(tableRootName: string = 'geojson_table', tableJoinName: string = 'csv_table', outputTableName: string = 'join_layer') {  
-        await this.customLayerLoadTest();
-        await this.csvLoadTest();
-
+    public async spatialJoin(tableRootName: string = 'custom_layer_geojson', tableJoinName: string = 'csv', outputTableName: string = 'join_layer') {  
         await this.db.spatialJoin({
             tableRootName: tableRootName,
             tableJoinName: tableJoinName,
@@ -67,9 +64,20 @@ export class DbStandalone {
                 ],
             },
         });
+    }
 
-        const geojsonAfterJoin = await this.db.getLayer(outputTableName);
-        console.log('geojsonAfterJoin: ', geojsonAfterJoin);
+    public async logTables() {
+        console.log(`Tables in the database:`);
+        console.log('---------------------');
+        console.log(this.db.tables);
+    }
+
+    public async logLayer(layerName: string) {
+        const geojson = await this.db.getLayer(layerName);
+        
+        console.log(`${layerName} layer:`);
+        console.log('---------------------');
+        console.log(geojson);
     }
 }
 

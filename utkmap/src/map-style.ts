@@ -17,6 +17,7 @@ export class MapStyle {
         sky: '#ffffff',
         surface: '#EFEFEF',
         buildings: '#DFDFDF',
+        geojson: '#DFDFDF',
     };
 
     // default color for unknown layers
