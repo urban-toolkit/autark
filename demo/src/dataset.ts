@@ -102,54 +102,53 @@ export class UtkDbExample extends UtkData {
   }
 
   async loadTest() {
-    
-      // DB Initialization
-      await this.db.init();  
-    
-      await this.db.loadCustomLayer({
-        geojsonFileUrl: 'http://localhost:5173/data-ignore/manhattan_neighborhood.geojson',
-        outputTableName: 'geojson_table',
+    // DB Initialization
+    await this.db.init();
+
+    await this.db.loadCustomLayer({
+      geojsonFileUrl: 'http://localhost:5173/data-ignore/manhattan_neighborhood.geojson',
+      outputTableName: 'geojson_table',
+      coordinateFormat: this.projection,
+    });
+    console.log('end load custom layer');
+    console.log('tables: ', this.db.tables);
+
+    console.log('Loading csv');
+    await this.db.loadCsv({
+      csvFileUrl: 'http://localhost:5173/data-ignore/csv_leve.csv',
+      outputTableName: 'csv_table',
+      geometryColumns: {
+        latColumnName: 'Latitude',
+        longColumnName: 'Longitude',
         coordinateFormat: this.projection,
-      });
-      console.log('end load custom layer');
-      console.log('tables: ', this.db.tables);
+      },
+    });
+    console.log('end loading csv');
 
-      console.log('Loading csv');
-      await this.db.loadCsv({
-        csvFileUrl: 'http://localhost:5173/data-ignore/csv_leve.csv',
-        outputTableName: 'csv_table',
-        geometryColumns: {
-          latColumnName: 'Latitude',
-          longColumnName: 'Longitude',
-          coordinateFormat: this.projection,
-        },
-      });
-      console.log('end loading csv');
+    console.log('making join');
 
-      console.log('making join');
+    await this.db.spatialJoin({
+      tableRootName: 'geojson_table',
+      tableJoinName: `csv_table`,
+      spatialPredicate: 'INTERSECT',
+      outputTableName: 'my_new_layer',
+      joinType: 'INNER',
+      groupBy: {
+        selectColumns: [
+          {
+            tableName: 'csv_table',
+            column: 'Agency Name',
+            aggregateFn: 'count',
+          },
+        ],
+      },
+    });
+    console.log('end join');
 
-      await this.db.spatialJoin({
-        tableRootName: 'geojson_table',
-        tableJoinName: `csv_table`,
-        spatialPredicate: 'INTERSECT',
-        outputTableName: 'my_new_layer',
-        joinType: 'INNER',
-        groupBy: {
-          selectColumns: [
-            {
-              tableName: 'csv_table',
-              column: 'Agency Name',
-              aggregateFn: 'count',
-            },
-          ],
-        },
-      });
-      console.log('end join');
+    const geojsonAfterJoin = await this.db.getLayer('my_new_layer');
+    console.log('geojsonAfterJoin: ', geojsonAfterJoin);
 
-      const geojsonAfterJoin = await this.db.getLayer('my_new_layer');
-      console.log('geojsonAfterJoin: ', geojsonAfterJoin);    
-    
-   /*
+    /*
         --- Join neighborhood with parks ---
         console.log('start load custom layer');
         await this.db.loadCustomLayer({
@@ -189,6 +188,13 @@ export class UtkDbExample extends UtkData {
         layers: this.osmLayer as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
       },
     });
+
+    console.log('getting bouding box');
+    const bbox = await this.db.getBoundingBox({
+      tableName: this.osmTable,
+      coordinateFormat: this.projection,
+    });
+    console.log('bbox: ', bbox);
 
     // Loading custom layers
     await this.db.loadCustomLayer({
