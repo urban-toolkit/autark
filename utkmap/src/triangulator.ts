@@ -31,6 +31,7 @@ export abstract class Triangulator {
         return features;
     }
 
+    // TODO: remove this function
     protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
         const collection = geojson['features'];
 
