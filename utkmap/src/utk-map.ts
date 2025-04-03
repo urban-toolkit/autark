@@ -186,9 +186,6 @@ export class UtkMap {
     }
 
     private createFeatures2DLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
-        console.log("()()()()()()(()()")
-        console.log(geojson);
-        
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,

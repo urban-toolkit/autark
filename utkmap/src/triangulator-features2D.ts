@@ -11,103 +11,83 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
-        // translate based on origin
-        Triangulator.translateFeatures(geojson, origin);
-
         let collection: Feature[] = geojson['features'];
 
+        // TODO: add support for any geojson
         collection = Triangulator.closeFeatures(collection);
         collection = Triangulator.fixOrientation(collection);
 
+        let triangulations: { flatCoords: number[], flatIds: number[] }[] = [];
+
         for (const feature of collection) {
             if (feature.geometry.type === 'LineString') {
-                const triangulation = TriangulatorFeatures2D.lineSringToMesh(feature);
+                triangulations = TriangulatorFeatures2D.lineStringToMesh(feature, origin);
 
-                mesh.push({
-                    position: triangulation.flatCoords,
-                    indices: triangulation.flatIds
-                });
-    
-                comps.push({
-                    nPoints: triangulation.flatCoords.length / 3,
-                    nTriangles: triangulation.flatIds.length / 3
-                });
             } else if (feature.geometry.type === 'MultiLineString') {
-                const triangulations = TriangulatorFeatures2D.multiLineSringToMesh(feature);
+                triangulations = TriangulatorFeatures2D.multiLineStringToMesh(feature, origin);
 
-                for (const triangulation of triangulations) {
-                    mesh.push({
-                        position: triangulation.flatCoords,
-                        indices: triangulation.flatIds
-                    });
-
-                    comps.push({
-                        nPoints: triangulation.flatCoords.length / 3,
-                        nTriangles: triangulation.flatIds.length / 3
-                    });
-                }
             } else if (feature.geometry.type === 'Polygon') {
-                const triangulation = TriangulatorFeatures2D.polygonToMesh(feature);
+                triangulations = TriangulatorFeatures2D.polygonToMesh(feature, origin);
 
-                mesh.push({
-                    position: triangulation.flatCoords,
-                    indices: triangulation.flatIds
-                });
-    
-                comps.push({
-                    nPoints: triangulation.flatCoords.length / 3,
-                    nTriangles: triangulation.flatIds.length / 3
-                });
             } else if (feature.geometry.type === 'MultiPolygon') {
-                const triangulations = TriangulatorFeatures2D.multiPolygonToMesh(feature);
+                triangulations = TriangulatorFeatures2D.multiPolygonToMesh(feature, origin);
 
-                for (const triangulation of triangulations) {
-                    mesh.push({
-                        position: triangulation.flatCoords,
-                        indices: triangulation.flatIds
-                    });
-
-                    comps.push({
-                        nPoints: triangulation.flatCoords.length / 3,
-                        nTriangles: triangulation.flatIds.length / 3
-                    });
-                }
             }
             else {
                 console.warn('Unsupported geometry type:', feature.geometry.type);
                 continue;
             }
-        }
 
+            for (const triangulation of triangulations) {
+                mesh.push({
+                    position: triangulation.flatCoords,
+                    indices: triangulation.flatIds
+                });
+
+                comps.push({
+                    nPoints: triangulation.flatCoords.length / 3,
+                    nTriangles: triangulation.flatIds.length / 3
+                });
+            }
+
+        }
         return [mesh, comps];
     }
 
-    static lineSringToMesh(feature: Feature): {flatCoords: number[], flatIds: number[]} {
+    static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
 
-        const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
-        const flatIds = earcut(coordinates.flat());
+        const moveCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-        return {flatCoords, flatIds};
+        console.log(coordinates)
+
+        const flatIds = earcut(moveCoords);
+
+        return [{ flatCoords, flatIds }];
     }
 
-    static multiLineSringToMesh(feature: Feature): {flatCoords: number[], flatIds: number[]}[] {
-        const meshes = [];
+    static multiLineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
 
+        const meshes = [];
         for (const lineString of coordinates) {
-            const flatCoords = lineString.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
-            const flatIds = earcut(lineString.flat());
 
-            meshes.push({flatCoords, flatIds});
+            const moveCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+            const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
+
+            const flatIds = earcut(moveCoords.flat());
+
+            meshes.push({ flatCoords, flatIds });
         }
 
         return meshes;
     }
 
-    static polygonToMesh(feature: Feature): {flatCoords: number[], flatIds: number[]} {
+    static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
 
+        // copy the coordinates
         const coords = coordinates[0].map((cord: number[]) => cord);
 
         const holes = [];
@@ -116,13 +96,15 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
             coordinates[i].forEach((cord: number[]) => coords.push(cord));
         }
 
-        const flatCoords = coords.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
-        const flatIds = earcut(coords.flat());
+        const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+        const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-        return {flatCoords, flatIds};
+        const flatIds = earcut(moveCoords.flat());
+
+        return [{ flatCoords, flatIds }];
     }
 
-    static multiPolygonToMesh(feature: Feature): {flatCoords: number[], flatIds: number[]}[] {
+    static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const meshes = [];
 
         console.log('MultiPolygon');
@@ -139,10 +121,12 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
                 polygon[i].forEach((cord: number[]) => coords.push(cord));
             }
 
-            const flatCoords = coords.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
-            const flatIds = earcut(coords.flat());
+            const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+            const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-            meshes.push({flatCoords, flatIds});
+            const flatIds = earcut(moveCoords.flat());
+
+            meshes.push({ flatCoords, flatIds });
         }
 
         return meshes;

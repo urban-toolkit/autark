@@ -28,7 +28,7 @@ async function runDbMapIntegration() {
     await db.init()
 
     await db.loadOsm();
-    await db.loadCustomLayer();
+    // await db.loadCustomLayer();
 
     // await db.LoadCsv();
     // await db.spatialJoin();
