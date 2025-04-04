@@ -27,7 +27,7 @@ export class DbStandalone {
         });
     }
 
-    public async loadCustomLayer(geoJsonUrl = 'http://localhost:5173/data/mnt_neighs.geojson', geojsonTable = 'custom_layer_geojson') {
+    public async loadCustomLayer(geoJsonUrl = 'http://localhost:5173/data/mnt_neighs.geojson', geojsonTable = 'custom2DLayer') {
         await this.db.loadCustomLayer({
             geojsonFileUrl: geoJsonUrl,
             outputTableName: geojsonTable,

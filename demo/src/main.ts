@@ -28,16 +28,19 @@ async function runDbMapIntegration() {
     await db.init()
 
     await db.loadOsm();
-    // await db.loadCustomLayer();
+    await db.loadCustomLayer();
 
     // await db.LoadCsv();
     // await db.spatialJoin();
 
     const layers = await db.exportLayers();
-    const origin = [-8239012.438994927, 4941135.512524911, 0]; //TODO: await.db.getOrigin(); // db.getBoundingBox();
+
+    // TODO: Get origin from db
+    const origin = [-8239012.438994927, 4941135.512524911, 0];
 
     for (const json of layers) {
-        map.loadGeoJsonLayer(json.data, origin, json.name.split('_')[2] as LayerType);
+        // TODO: Change to layer type
+        map.loadGeoJsonLayer(json.data, origin, (json.name.split('_')[2] || json.name) as LayerType);
     }
 
     map.draw();
@@ -58,3 +61,9 @@ if(MAP_DEMO) {
 else {
     runDbStandalone();
 }
+
+// TODO:
+// 1. await.db.getOrigin(); // db.getBoundingBox();
+// 2. source: osm, csv, geojson
+// 3. layerType: osm (water, parks, etc), csv/geojson (custom2DLayer)
+// 
