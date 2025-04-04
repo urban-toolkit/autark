@@ -13,13 +13,12 @@ export class DbMapIntegration extends DbStandalone {
 
         const data = [];
         for (const layerData of this.db.tables) {
-            // TODO: OSM Type?
-            if (layerData.type !== 'layer') {
+            if (layerData.type !== 'custom-layer') {
                 continue;
             }
 
-            const osmGeojson = await this.db.getLayer(layerData.name);
-            data.push({ name: layerData.name, data: osmGeojson });
+            const geojson = await this.db.getLayer(layerData.name);
+            data.push({ name: layerData.name, data: geojson });
         }
 
         return data;

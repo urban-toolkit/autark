@@ -16,7 +16,7 @@ export interface IMapStyle {
   sky: ColorHEX;
   surface: ColorHEX;
   buildings: ColorHEX;
-  geojson: ColorHEX;
+  custom2DLayer: ColorHEX;
 }
 
 export interface ILayerInfo {

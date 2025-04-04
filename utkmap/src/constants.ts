@@ -11,7 +11,7 @@ export enum LayerType {
     OSM_ROADS = 'roads',
     OSM_BUILDINGS = 'buildings',
     //
-    CUSTOM_LAYER = 'geojson',
+    CUSTOM_2DLAYER = 'custom2DLayer',
 }
 
 export enum ThematicAggregationLevel {
