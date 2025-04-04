@@ -5,5 +5,6 @@
   "water": "#191b1a",
   "sky": "#000000",
   "surface": "#AAAAAA",
-  "buildings": "#DFDFDF"
+  "buildings": "#DFDFDF",
+  "geojson":  "#DFDFDF"
 }
