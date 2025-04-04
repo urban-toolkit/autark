@@ -17,42 +17,51 @@ import { DbStandalone } from './dbStandalone';
 import { DbMapIntegration } from './dbMapIntegration';
 
 async function runDbMapIntegration() {
-  const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
-  canvas.width = canvas.height = 1280;
+    const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
+    canvas.width = canvas.height = 1280;
 
-  const map = new UtkMap(canvas);
-  await map.init();
+    const map = new UtkMap(canvas);
+    await map.init();
 
-  const db = new DbMapIntegration();
-  await db.init();
+    const db = new DbMapIntegration();
+    await db.init();
 
-  await db.loadOsm();
-  // await db.loadCustomLayer();
+    await db.loadOsm();
+    await db.loadCustomLayer();
 
-  // await db.LoadCsv();
-  // await db.spatialJoin();
+    // await db.LoadCsv();
+    // await db.spatialJoin();
 
-  const layers = await db.exportLayers();
-  const origin = [-8239012.438994927, 4941135.512524911, 0]; //TODO: await.db.getOrigin(); // db.getBoundingBox();
+    const layers = await db.exportLayers();
 
-  for (const json of layers) {
-    map.loadGeoJsonLayer(json.data, origin, json.name.split('_')[2] as LayerType);
-  }
+    // TODO: Get origin from db
+    const origin = [-8239012.438994927, 4941135.512524911, 0];
 
-  map.draw();
+    for (const json of layers) {
+        // TODO: Change to layer type
+        map.loadGeoJsonLayer(json.data, origin, (json.name.split('_')[2] || json.name) as LayerType);
+    }
+
+    map.draw();
 }
 
 async function runDbStandalone() {
-  const db = new DbStandalone();
-  await db.init();
-  await db.spatialJoin();
+    const db = new DbStandalone();
+    await db.init();
+    await db.spatialJoin();
 }
 
 //Set to true to run the map integration demo
 const MAP_DEMO = true;
 
 if (MAP_DEMO) {
-  runDbMapIntegration();
+    runDbMapIntegration();
 } else {
-  runDbStandalone();
+    runDbStandalone();
 }
+
+// TODO:
+// 1. await.db.getOrigin(); // db.getBoundingBox(); // OK!
+// 2. source: osm, csv, geojson
+// 3. layerType: osm (water, parks, etc), csv/geojson (custom2DLayer)
+// 4. Crop data on db?

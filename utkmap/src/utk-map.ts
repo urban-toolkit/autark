@@ -74,7 +74,7 @@ export class UtkMap {
             case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
-            case LayerType.CUSTOM_LAYER:
+            case LayerType.CUSTOM_2DLAYER:
                 this.createFeatures2DLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
             break;
 

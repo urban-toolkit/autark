@@ -6,5 +6,5 @@
   "sky": "#FFFFFF",
   "surface": "#F6F6F4",
   "buildings": "#DFDFDF",
-  "geojson":  "#DFDFDF"
+  "custom2DLayer":  "#DFDFDF"
 }

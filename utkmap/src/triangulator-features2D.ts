@@ -60,8 +60,6 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         const moveCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
         const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-        console.log(coordinates)
-
         const flatIds = earcut(moveCoords);
 
         return [{ flatCoords, flatIds }];
@@ -73,10 +71,10 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         const meshes = [];
         for (const lineString of coordinates) {
 
-            const moveCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+            const moveCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
             const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-            const flatIds = earcut(moveCoords.flat());
+            const flatIds = earcut(moveCoords);
 
             meshes.push({ flatCoords, flatIds });
         }
@@ -96,19 +94,16 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
             coordinates[i].forEach((cord: number[]) => coords.push(cord));
         }
 
-        const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+        const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
         const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-        const flatIds = earcut(moveCoords.flat());
+        const flatIds = earcut(moveCoords);
 
         return [{ flatCoords, flatIds }];
     }
 
     static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const meshes = [];
-
-        console.log('MultiPolygon');
-        console.log(feature);
 
         const { coordinates } = <MultiPolygon>feature.geometry;
 
@@ -121,10 +116,10 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
                 polygon[i].forEach((cord: number[]) => coords.push(cord));
             }
 
-            const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+            const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
             const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
-            const flatIds = earcut(moveCoords.flat());
+            const flatIds = earcut(moveCoords);
 
             meshes.push({ flatCoords, flatIds });
         }
