@@ -15,7 +15,17 @@ export class DbStandalone {
         await this.db.init();
     }
 
-    public async loadOsm(pbfFileUrl: string = 'http://localhost:5173/data/lower-mn.osm.pbf', osmLayers: LayerType[] = [LayerType.OSM_COASTLINE, LayerType.OSM_PARKS, LayerType.OSM_WATER, LayerType.OSM_ROADS, LayerType.OSM_BUILDINGS], osmTable: string = 'table_osm') {
+    public async loadOsm(
+        pbfFileUrl: string = 'http://localhost:5173/data/lower-mn.osm.pbf',
+        osmLayers: LayerType[] = [
+            LayerType.OSM_COASTLINE,
+            LayerType.OSM_PARKS,
+            LayerType.OSM_WATER,
+            LayerType.OSM_ROADS,
+            LayerType.OSM_BUILDINGS,
+        ],
+        osmTable: string = 'table_osm',
+    ) {
         // Loading osm layers
         await this.db.loadOsm({
             pbfFileUrl: pbfFileUrl,
@@ -35,6 +45,14 @@ export class DbStandalone {
         });
     }
 
+    public async loadBoundingBox(osmTable: string = 'table_osm') {
+        const boudingBox = await this.db.getBoundingBox({
+            tableName: osmTable,
+            coordinateFormat: this.projection,
+        });
+        console.log('boudingBox: ', boudingBox);
+    }
+
     public async LoadCsv(csvFileUrl = 'http://localhost:5173/data/noise_sample.csv', csvTable = 'csv') {
         await this.db.loadCsv({
             csvFileUrl: csvFileUrl,
@@ -47,7 +65,11 @@ export class DbStandalone {
         });
     }
 
-    public async spatialJoin(tableRootName: string = 'custom_layer_geojson', tableJoinName: string = 'csv', outputTableName: string = 'join_layer') {  
+    public async spatialJoin(
+        tableRootName: string = 'custom_layer_geojson',
+        tableJoinName: string = 'csv',
+        outputTableName: string = 'join_layer',
+    ) {
         await this.db.spatialJoin({
             tableRootName: tableRootName,
             tableJoinName: tableJoinName,
@@ -74,13 +96,12 @@ export class DbStandalone {
 
     public async logLayer(layerName: string) {
         const geojson = await this.db.getLayer(layerName);
-        
+
         console.log(`${layerName} layer:`);
         console.log('---------------------');
         console.log(geojson);
     }
 }
-
 
 /*
 --- Join neighborhood with parks ---
