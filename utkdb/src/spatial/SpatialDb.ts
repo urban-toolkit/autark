@@ -12,6 +12,8 @@ import { LoadQueryUseCase } from './use-cases/load-query';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
 import { SpatialJoinParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
+import { GetBoundingBoxUseCase } from './use-cases/get-bounding-box/GetBoundingBoxUseCase';
+import { GetBoundingBoxParams, BoundingBox } from './use-cases/get-bounding-box/interfaces';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -24,6 +26,7 @@ export class SpatialDb {
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
+  private getBoundingBoxUseCase?: GetBoundingBoxUseCase;
 
   async init() {
     this.db = await loadDb();
@@ -36,6 +39,7 @@ export class SpatialDb {
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
+    this.getBoundingBoxUseCase = new GetBoundingBoxUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
@@ -140,5 +144,16 @@ export class SpatialDb {
     const sql = query.getSql();
     console.log(sql);
     return this.conn?.query(sql);
+  }
+
+  async getBoundingBox(params: GetBoundingBoxParams): Promise<BoundingBox> {
+    if (!this.db || !this.conn || !this.getBoundingBoxUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = this.tables.find((t) => t.name === params.tableName);
+    if (!table) throw new Error(`Table ${params.tableName} not found.`);
+    if (table.type !== 'osm') throw new Error(`Table ${params.tableName} is not an OSM table.`);
+
+    return this.getBoundingBoxUseCase.exec(params);
   }
 }
