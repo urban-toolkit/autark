@@ -12,13 +12,15 @@ import { LoadQueryUseCase } from './use-cases/load-query';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
 import { SpatialJoinParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
-import { GetBoundingBoxUseCase } from './use-cases/get-bounding-box/GetBoundingBoxUseCase';
-import { GetBoundingBoxParams, BoundingBox } from './use-cases/get-bounding-box/interfaces';
+import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase';
+import { GetBoundingBoxUseCase } from './shared/use-cases/get-bounding-box/GetBoundingBoxUseCase';
+import { BoundingBox } from './shared/use-cases/get-bounding-box/interfaces';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
   public tables: Array<Table> = [];
+  private osmBoudingBox?: BoundingBox;
   private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
@@ -27,6 +29,7 @@ export class SpatialDb {
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
   private getBoundingBoxUseCase?: GetBoundingBoxUseCase;
+  private dropTableUseCase?: DropTableUseCase;
 
   async init() {
     this.db = await loadDb();
@@ -40,12 +43,13 @@ export class SpatialDb {
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.getBoundingBoxUseCase = new GetBoundingBoxUseCase(this.conn);
+    this.dropTableUseCase = new DropTableUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
   // LOAD's methods
-  async loadOsm(params: LoadOsmFromPbfParams): Promise<OsmTable> {
-    if (!this.db || !this.conn || !this.loadOsmFromPbfUseCase)
+  async loadOsm(params: LoadOsmFromPbfParams): Promise<void> {
+    if (!this.db || !this.conn || !this.loadOsmFromPbfUseCase || !this.dropTableUseCase || !this.getBoundingBoxUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadOsmFromPbfUseCase.exec(params);
@@ -59,9 +63,15 @@ export class SpatialDb {
           layer: layer,
         });
       }
-    }
 
-    return table;
+      this.osmBoudingBox = await this.getBoundingBoxUseCase.exec({
+        tableName: table.name,
+        coordinateFormat: params.autoLoadLayers.coordinateFormat,
+      });
+
+      await this.dropTableUseCase.exec({ tableName: table.name });
+      this.tables = this.tables.filter((t) => t.name !== table.name);
+    }
   }
 
   async loadCsv(params: LoadCsvParams): Promise<CsvTable> {
@@ -125,6 +135,11 @@ export class SpatialDb {
     return this.getLayerGeojsonUseCase.exec(layerTable);
   }
 
+  getOsmBoundingBox(): BoundingBox {
+    if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsm() first.');
+    return this.osmBoudingBox;
+  }
+
   // CUSTOM QUERIES
   async spatialJoin(params: SpatialJoinParams): Promise<Table> {
     if (!this.db || !this.conn || !this.spatialJoinUseCase)
@@ -144,16 +159,5 @@ export class SpatialDb {
     const sql = query.getSql();
     console.log(sql);
     return this.conn?.query(sql);
-  }
-
-  async getBoundingBox(params: GetBoundingBoxParams): Promise<BoundingBox> {
-    if (!this.db || !this.conn || !this.getBoundingBoxUseCase)
-      throw new Error('Database not initialized. Please call init() first.');
-
-    const table = this.tables.find((t) => t.name === params.tableName);
-    if (!table) throw new Error(`Table ${params.tableName} not found.`);
-    if (table.type !== 'osm') throw new Error(`Table ${params.tableName} is not an OSM table.`);
-
-    return this.getBoundingBoxUseCase.exec(params);
   }
 }
