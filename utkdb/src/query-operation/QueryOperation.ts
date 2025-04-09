@@ -1,4 +1,5 @@
 import { Table } from '../shared/interfaces';
+import { isLayerType } from '../spatial/use-cases/load-layer/interfaces';
 import {
   ColumnNotFoundError,
   TableNotFoundError,
@@ -155,7 +156,7 @@ export class QueryOperation {
     if (this.queryParams.table.name !== params.tableRootName) throw new TableShouldBeMainTable(params.tableRootName);
     const table = this.queryParams.table;
 
-    if (table.type !== 'layer' && table.type !== 'custom-layer')
+    if (!isLayerType(table.type))
       throw new UnsupportedOperationError(
         table,
         'spatialJoin',

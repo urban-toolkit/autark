@@ -31,7 +31,8 @@ export class LoadCustomLayerUseCase {
       );
 
       return {
-        type: 'custom-layer',
+        source: 'geojson',
+        type: 'custom2DLayer',
         columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
         name: outputTableName,
       };

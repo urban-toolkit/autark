@@ -27,7 +27,8 @@ export class LoadLayerUseCase {
     const describeTableResponse = await this.conn.query(layerQuery);
 
     return {
-      type: 'layer',
+      source: 'osm',
+      type: params.layer,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
       name: layerOutputTableName,
     };

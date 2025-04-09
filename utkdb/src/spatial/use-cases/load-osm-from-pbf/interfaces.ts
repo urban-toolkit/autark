@@ -11,6 +11,7 @@ export interface Params {
   };
   autoLoadLayers?: {
     coordinateFormat: string;
+    dropOsmTable: boolean;
     layers: Array<LayerType>;
   };
 }

@@ -17,7 +17,8 @@ export class LoadOsmFromPbfUseCase {
     const tableDescribeResponse = await this.conn.query(loadPbfQuery);
 
     return {
-      type: 'osm',
+      source: 'osm',
+      type: 'pointset',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
     };

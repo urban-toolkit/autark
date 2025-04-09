@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { CsvTable, CustomLayerTable, LayerTable, OsmTable, Table } from '../shared/interfaces';
+import { CsvTable, CustomLayerTable, LayerTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
 import { LoadOsmFromPbfUseCase, LoadOsmFromPbfParams } from './use-cases/load-osm-from-pbf';
 import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
@@ -15,6 +15,7 @@ import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase'
 import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase';
 import { GetBoundingBoxUseCase } from './shared/use-cases/get-bounding-box/GetBoundingBoxUseCase';
 import { BoundingBox } from './shared/use-cases/get-bounding-box/interfaces';
+import { isLayerType } from './use-cases/load-layer/interfaces';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -69,7 +70,7 @@ export class SpatialDb {
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
 
-      await this.dropTableUseCase.exec({ tableName: table.name });
+      if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
       this.tables = this.tables.filter((t) => t.name !== table.name);
     }
   }
@@ -90,7 +91,8 @@ export class SpatialDb {
 
     const osmTable = this.tables.find((t) => t.name === params.osmInputTableName);
     if (!osmTable) throw new Error(`Table ${params.osmInputTableName} not found.`);
-    if (osmTable.type !== 'osm') throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
+    if (!(osmTable.source === 'osm' && osmTable.type === 'pointset'))
+      throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
 
     const table = await this.loadLayerUseCase.exec(params);
     this.tables.push(table);
@@ -129,10 +131,9 @@ export class SpatialDb {
 
     const layerTable = this.tables.find((t) => t.name === layerTableName);
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
-    if (layerTable.type !== 'layer' && layerTable.type !== 'custom-layer')
-      throw new Error(`Table ${layerTableName} is not a Layer table.`);
+    if (!isLayerType(layerTable.type)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
-    return this.getLayerGeojsonUseCase.exec(layerTable);
+    return this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
   }
 
   getOsmBoundingBox(): BoundingBox {

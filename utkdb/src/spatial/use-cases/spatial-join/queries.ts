@@ -1,4 +1,5 @@
 import { Table } from '../../../shared/interfaces';
+import { isLayerType } from '../load-layer/interfaces';
 
 interface Params {
   tableRoot: Table;
@@ -53,7 +54,7 @@ function getSelectString(params: {
     const groupByString = params.groupBy.selectColumns
       .map((column) => {
         if (column.aggregateFn) {
-          if (column.table.type === 'layer' || column.table.type === 'custom-layer') {
+          if (isLayerType(column.table.type)) {
             // Get attributes inside properties
             return `'${column.table.name}.${column.column} ${column.aggregateFn}', ${column.aggregateFn}(map_extract("${column.column}",  ${column.table.name}.properties))`;
           }

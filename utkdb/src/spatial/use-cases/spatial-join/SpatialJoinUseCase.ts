@@ -47,10 +47,11 @@ export class SpatialJoinUseCase {
       `);
 
     return {
+      source: tableRoot.source,
       type: tableRoot.type,
       name: params.outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-    };
+    } as Table;
   }
 
   private addTablesToGroupBy(

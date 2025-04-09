@@ -31,7 +31,8 @@ export class LoadCsvUseCase {
     const describeTableResponse = await this.conn.query(loadCsvQuery);
 
     return {
-      type: 'csv',
+      source: 'csv',
+      type: 'pointset',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
     };

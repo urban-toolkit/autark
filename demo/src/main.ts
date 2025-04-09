@@ -44,6 +44,7 @@ async function runDbMapIntegration() {
   // map.setOrigin(bBox);
 
   for (const json of layers) {
+    console.log({ json });
     map.loadGeoJsonLayer(json.data, origin, (json.name.split('_')[2] || json.name) as LayerType);
     // map.loadGeoJsonLayer(json.data, json.type as LayerType);
   }

@@ -16,9 +16,10 @@ export class LoadQueryUseCase {
     const tableDescribeResponse = await this.conn.query(loadQueryQuery);
 
     return {
+      source: mainTable.source,
       type: mainTable.type,
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-    };
+    } as Table;
   }
 }

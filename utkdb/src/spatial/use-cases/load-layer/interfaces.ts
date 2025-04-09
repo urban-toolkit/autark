@@ -1,4 +1,8 @@
-export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings';
+export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings' | 'custom2DLayer';
+
+export function isLayerType(value: string): value is LayerType {
+  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings'].includes(value);
+}
 
 export interface Params {
   osmInputTableName: string;

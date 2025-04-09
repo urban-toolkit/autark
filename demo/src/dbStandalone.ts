@@ -33,6 +33,7 @@ export class DbStandalone {
       autoLoadLayers: {
         coordinateFormat: this.projection,
         layers: osmLayers as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
+        dropOsmTable: true,
       },
     });
   }
