@@ -1,35 +1,10 @@
-import { Feature, FeatureCollection, LineString } from 'geojson';
-import { booleanClockwise } from '@turf/turf';
-
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
+import { Feature, FeatureCollection, LineString, MultiLineString, MultiPolygon, Polygon } from 'geojson';
+
+import earcut from 'earcut';
+
 export abstract class Triangulator {
-
-    protected static fixOrientation(features: Feature[]): Feature[] {
-        for (const feature of features) {
-            let { coordinates } = <LineString>feature.geometry;
-
-            // makes the linestrings orientation consistent
-            if ( booleanClockwise(coordinates) ){
-                coordinates = coordinates.reverse();
-            }
-        }
-
-        return features;
-    }
-
-    protected static closeFeatures(features: Feature[]): Feature[] {
-        for (const feature of features) {
-            const { coordinates } = <LineString>feature.geometry;
-            // fix the linestring
-            const len = coordinates.length;
-            if (coordinates[0][0] !== coordinates[len - 1][0] || coordinates[0][1] !== coordinates[len - 1][1]) {
-                coordinates.push(coordinates[0]);
-            }
-        }
-
-        return features;
-    }
 
     // TODO: remove this function
     protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
@@ -50,4 +25,77 @@ export abstract class Triangulator {
     static buildMesh(_geojson: FeatureCollection, _origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         return [[], []]
     };
+
+    static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <LineString>feature.geometry;
+
+        const moveCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
+
+        const flatIds = earcut(moveCoords);
+
+        return [{ flatCoords, flatIds }];
+    }
+
+    static multiLineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <MultiLineString>feature.geometry;
+
+        const meshes = [];
+        for (const lineString of coordinates) {
+
+            const moveCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
+
+            const flatIds = earcut(moveCoords);
+
+            meshes.push({ flatCoords, flatIds });
+        }
+
+        return meshes;
+    }
+
+    static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <Polygon>feature.geometry;
+
+        // copy the coordinates
+        const coords = coordinates[0].map((cord: number[]) => cord);
+
+        const holes = [];
+        for (let i = 1; i < coordinates.length; i++) {
+            holes.push(coords.length);
+            coordinates[i].forEach((cord: number[]) => coords.push(cord));
+        }
+
+        const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
+
+        const flatIds = earcut(moveCoords);
+
+        return [{ flatCoords, flatIds }];
+    }
+
+    static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const meshes = [];
+
+        const { coordinates } = <MultiPolygon>feature.geometry;
+
+        for (const polygon of coordinates) {
+            const coords = polygon[0].map((cord: number[]) => cord);
+
+            const holes = [];
+            for (let i = 1; i < polygon.length; i++) {
+                holes.push(coords.length);
+                polygon[i].forEach((cord: number[]) => coords.push(cord));
+            }
+
+            const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
+
+            const flatIds = earcut(moveCoords);
+
+            meshes.push({ flatCoords, flatIds });
+        }
+
+        return meshes;
+    }
 }

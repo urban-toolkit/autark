@@ -11,6 +11,7 @@ import {
 } from './constants';
 
 import { 
+    IBoundingBox,
     ICameraData,
     ILayerComponent,
     ILayerData,
@@ -60,6 +61,23 @@ export class UtkMap {
         return this._layerManager;
     }
 
+    get boundingBox(): IBoundingBox {
+        return this._layerManager.boundingBox;
+    }
+
+    get origin(): number[] {
+        // return [
+        //     (this._layerManager.boundingBox.minLat + this._layerManager.boundingBox.maxLat) / 2,
+        //     (this._layerManager.boundingBox.minLon + this._layerManager.boundingBox.maxLon) / 2,
+        //     0
+        // ];
+        return [
+            -8239012.438994927,
+            4941135.512524911,
+            0
+        ];
+    }
+
     async init() {
         await this._renderer.init();
 
@@ -69,25 +87,25 @@ export class UtkMap {
         this.render();
     }
 
-    loadGeoJsonLayer(geojson: FeatureCollection, origin: number[], typeLayer: LayerType) {
+    loadGeoJsonLayer(geojson: FeatureCollection, typeLayer: LayerType) {
         switch (typeLayer) {
             case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
             case LayerType.CUSTOM_2DLAYER:
-                this.createFeatures2DLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
+                this.createFeatures2DLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
             break;
 
             case LayerType.OSM_COASTLINE:
-                this.createCoastlineLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
+                this.createCoastlineLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
             break;
 
             case LayerType.OSM_ROADS:
-                this.createRoadsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_2D);
+                this.createRoadsLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
             break
 
             case LayerType.OSM_BUILDINGS:
-                this.createBuildingsLayerFromGeojson(geojson, origin, typeLayer, LayerGeometryType.FEATURES_3D);
+                this.createBuildingsLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_3D);
             break
 
             default:
@@ -98,6 +116,10 @@ export class UtkMap {
 
     updateCamera(params: ICameraData) {
         this._camera = new Camera(params);
+    }
+
+    updateBoundingBox(bbox: IBoundingBox) {
+        this._layerManager.boundingBox = bbox
     }
 
     createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
@@ -185,7 +207,7 @@ export class UtkMap {
         this._renderer.finish();
     }
 
-    private createFeatures2DLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createFeatures2DLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,
@@ -200,7 +222,7 @@ export class UtkMap {
             isPicking: false,
         };
 
-        const layerMesh = TriangulatorFeatures2D.buildMesh(geojson, origin);
+        const layerMesh = TriangulatorFeatures2D.buildMesh(geojson, this.origin);
         if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature 2D Layer mesh');
             return;
@@ -220,7 +242,7 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createCoastlineLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createCoastlineLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,
@@ -235,7 +257,7 @@ export class UtkMap {
             isPicking: false,
         };
 
-        const layerMesh = TriangulatorCoastline.buildMesh(geojson, origin);
+        const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin);
         if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Coastline Layer mesh');
             return;
@@ -256,7 +278,7 @@ export class UtkMap {
     }
 
 
-    private createRoadsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createRoadsLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,
@@ -271,7 +293,7 @@ export class UtkMap {
             isPicking: false,
         };
 
-        const layerMesh = TriangulatorRoads.buildMesh(geojson, origin);
+        const layerMesh = TriangulatorRoads.buildMesh(geojson, this.origin);
         if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer mesh');
             return;
@@ -291,7 +313,7 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createBuildingsLayerFromGeojson(geojson: FeatureCollection, origin: number[], typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createBuildingsLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
         const layerInfo: ILayerInfo = {
             id: `${typeLayer.toString()}`,
             zIndex: this.layerManager.length + 1,
@@ -306,7 +328,7 @@ export class UtkMap {
             isPicking: false,
         };
 
-        const layerMesh = TriangulatorBuildings.buildMesh(geojson, origin);
+        const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
         if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Building Layer mesh');
             return;

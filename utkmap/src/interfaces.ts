@@ -65,3 +65,10 @@ export interface ICameraData {
     lookAt: number[];
   };
 }
+
+export interface IBoundingBox {
+    minLat: number;
+    maxLat: number;
+    minLon: number;
+    maxLon: number;
+}

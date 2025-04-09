@@ -1,4 +1,4 @@
-import { ILayerData, ILayerInfo, ILayerRenderInfo } from './interfaces';
+import { IBoundingBox, ILayerData, ILayerInfo, ILayerRenderInfo } from './interfaces';
 import { LayerGeometryType } from './constants';
 
 import { Layer } from './layer';
@@ -6,6 +6,7 @@ import { Features2DLayer } from './layer-features2D';
 import { BuildingsLayer } from './layer-buildings';
 
 export class LayerManager {
+    protected _bbox: IBoundingBox = {minLat: 0, maxLat: 0, minLon: 0, maxLon: 0};
     protected _layers: Layer[] = [];
 
     constructor() { }
@@ -16,6 +17,13 @@ export class LayerManager {
 
     get length(): number {
         return this._layers.length;
+    }
+
+    get boundingBox(): IBoundingBox {
+        return this._bbox;
+    }
+    set boundingBox(bbox: IBoundingBox) {
+        this._bbox = bbox
     }
 
     addLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): Layer | null {

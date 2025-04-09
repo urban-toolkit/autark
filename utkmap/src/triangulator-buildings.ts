@@ -5,6 +5,7 @@ import { FeatureCollection, Feature, LineString } from "geojson";
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
 import { AABB } from "./aabb";
+import { booleanClockwise } from "@turf/turf";
 
 export class TriangulatorBuildings extends Triangulator {
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
@@ -110,8 +111,8 @@ export class TriangulatorBuildings extends Triangulator {
         let filtered = TriangulatorBuildings.removeInvalidBuildingParts(geojson.features);
 
         // make the orientation consistent
-        filtered = Triangulator.closeFeatures(filtered);
-        filtered = Triangulator.fixOrientation(filtered);
+        filtered = TriangulatorBuildings.closeFeatures(filtered);
+        filtered = TriangulatorBuildings.fixOrientation(filtered);
 
         // builds the AABB
         const aabb = new AABB();
@@ -190,6 +191,33 @@ export class TriangulatorBuildings extends Triangulator {
         }
 
         return [z_SCALE * min_height, z_SCALE * height];
+    }
+
+
+    protected static fixOrientation(features: Feature[]): Feature[] {
+        for (const feature of features) {
+            let { coordinates } = <LineString>feature.geometry;
+
+            // makes the linestrings orientation consistent
+            if ( booleanClockwise(coordinates) ){
+                coordinates = coordinates.reverse();
+            }
+        }
+
+        return features;
+    }
+
+    protected static closeFeatures(features: Feature[]): Feature[] {
+        for (const feature of features) {
+            const { coordinates } = <LineString>feature.geometry;
+            // fix the linestring
+            const len = coordinates.length;
+            if (coordinates[0][0] !== coordinates[len - 1][0] || coordinates[0][1] !== coordinates[len - 1][1]) {
+                coordinates.push(coordinates[0]);
+            }
+        }
+
+        return features;
     }
 
 }
