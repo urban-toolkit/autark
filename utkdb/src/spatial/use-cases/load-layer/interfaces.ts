@@ -1,7 +1,7 @@
 export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings' | 'custom2DLayer';
 
 export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings'].includes(value);
+  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'custom2DLayer'].includes(value);
 }
 
 export interface Params {
