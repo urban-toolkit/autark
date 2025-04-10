@@ -12,7 +12,7 @@ export class SpatialJoinUseCase {
     this.conn = conn;
   }
 
-  async exec(params: SpatialJoinParams, tables: Table[]): Promise<Table> {
+  async exec(params: SpatialJoinParams, tables: Table[]): Promise<{ created: boolean; table: Table }> {
     const tableRoot = tables.find((table) => table.name === params.tableRootName);
     if (!tableRoot) throw new TableNotFoundError(params.tableRootName);
 
@@ -28,6 +28,7 @@ export class SpatialJoinUseCase {
     const joinType = params.joinType || 'INNER';
     const spatialPredicate = params.spatialPredicate || 'INTERSECT';
 
+    const outputTableName = (params.output.type === 'CREATE_NEW' ? params.output.tableName : tableRoot.name) as string;
     const query = SPATIAL_JOIN_QUERY({
       tableRoot,
       tableJoin,
@@ -37,21 +38,26 @@ export class SpatialJoinUseCase {
       spatialPredicate,
       groupBy: this.addTablesToGroupBy(params.groupBy, tables),
       nearDistance: params.nearDistance,
+      outputTableName,
     });
+
     console.log({ query });
     const tableDescribeResponse = await this.conn.query(`
-        CREATE TABLE ${params.outputTableName} AS
+        CREATE OR REPLACE TABLE ${outputTableName} AS
         ${query}
 
-        DESCRIBE ${params.outputTableName};
+        DESCRIBE ${outputTableName};
       `);
 
     return {
-      source: tableRoot.source,
-      type: tableRoot.type,
-      name: params.outputTableName,
-      columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-    } as Table;
+      table: {
+        source: tableRoot.source,
+        type: tableRoot.type,
+        name: outputTableName,
+        columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
+      } as Table,
+      created: params.output.type === 'CREATE_NEW',
+    };
   }
 
   private addTablesToGroupBy(

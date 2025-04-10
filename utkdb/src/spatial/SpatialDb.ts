@@ -146,8 +146,9 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.spatialJoinUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.spatialJoinUseCase.exec(params, this.tables);
-    this.tables.push(table);
+    const { created, table } = await this.spatialJoinUseCase.exec(params, this.tables);
+    if (created) this.tables.push(table);
+    else this.tables = this.tables.map((t) => (t.name === table.name ? table : t));
 
     return table;
   }

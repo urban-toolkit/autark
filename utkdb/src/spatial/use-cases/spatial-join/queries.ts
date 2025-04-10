@@ -12,6 +12,7 @@ interface Params {
   groupBy: {
     selectColumns: Array<{ table: Table; column: string; aggregateFn?: string }>;
   } | null;
+  outputTableName: string;
 }
 
 export const SPATIAL_JOIN_QUERY = (params: Params) => {
