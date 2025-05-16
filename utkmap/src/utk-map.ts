@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import { FeatureCollection } from 'geojson';
+import { Feature, FeatureCollection, Polygon } from 'geojson';
 
 import { 
     ColorMapInterpolator, 
@@ -61,21 +61,12 @@ export class UtkMap {
         return this._layerManager;
     }
 
-    get boundingBox(): IBoundingBox {
-        return this._layerManager.boundingBox;
+    get origin(): number[] {
+        return this._layerManager.origin;
     }
 
-    get origin(): number[] {
-        // return [
-        //     (this._layerManager.boundingBox.minLat + this._layerManager.boundingBox.maxLat) / 2,
-        //     (this._layerManager.boundingBox.minLon + this._layerManager.boundingBox.maxLon) / 2,
-        //     0
-        // ];
-        return [
-            -8239012.438994927,
-            4941135.512524911,
-            0
-        ];
+    get boundingBox(): Feature<Polygon> {
+        return this._layerManager.boundingBox;
     }
 
     async init() {
@@ -114,12 +105,15 @@ export class UtkMap {
         }
     }
 
-    updateCamera(params: ICameraData) {
-        this._camera = new Camera(params);
+    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
+        this._layerManager.updateBoundingBoxAndOrigin(bbox);
+
+        console.log(this._layerManager.origin);
+        console.log(this._layerManager.boundingBox);
     }
 
-    updateBoundingBox(bbox: IBoundingBox) {
-        this._layerManager.boundingBox = bbox
+    updateCamera(params: ICameraData) {
+        this._camera = new Camera(params);
     }
 
     createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
@@ -257,7 +251,7 @@ export class UtkMap {
             isPicking: false,
         };
 
-        const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin, this.boundingBox);
         if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Coastline Layer mesh');
             return;

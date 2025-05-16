@@ -5,8 +5,12 @@ import { Layer } from './layer';
 import { Features2DLayer } from './layer-features2D';
 import { BuildingsLayer } from './layer-buildings';
 
+import { Feature, Polygon } from 'geojson';
+import { polygon } from '@turf/turf';
+
 export class LayerManager {
-    protected _bbox: IBoundingBox = {minLat: 0, maxLat: 0, minLon: 0, maxLon: 0};
+    protected _origin: number[] = [];
+    protected _bbox!: Feature<Polygon>;
     protected _layers: Layer[] = [];
 
     constructor() { }
@@ -19,11 +23,46 @@ export class LayerManager {
         return this._layers.length;
     }
 
-    get boundingBox(): IBoundingBox {
+    get origin(): number[] {
+        return this._origin;
+    }
+
+    get boundingBox(): Feature<Polygon> {
         return this._bbox;
     }
-    set boundingBox(bbox: IBoundingBox) {
-        this._bbox = bbox
+
+    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
+        this._origin = [
+            (bbox.maxLat + bbox.minLat) * 0.5,
+            (bbox.maxLon + bbox.minLon) * 0.5,
+            0
+        ];
+
+        console.log('clat', (bbox.maxLat + bbox.minLat) * 0.5, -8239012.438994927);
+        console.log('clon', (bbox.maxLon + bbox.minLon) * 0.5,  4941135.512524911);
+
+        this._origin = [
+            -8239012.438994927,
+             4941135.512524911,
+            0
+        ];
+
+        const xmin = bbox.minLat - this._origin[0];
+        const xmax = bbox.maxLat - this._origin[0];
+        const ymin = bbox.minLon - this._origin[1];
+        const ymax = bbox.maxLon - this._origin[1];
+
+        this._bbox =
+            polygon([
+                [
+                    [xmin, ymin],
+                    [xmin, ymax],
+                    [xmax, ymax],
+                    [xmax, ymin],
+                    [xmin, ymin]
+                ]
+            ]);
+
     }
 
     addLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): Layer | null {
