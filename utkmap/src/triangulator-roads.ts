@@ -1,51 +1,44 @@
-import earcut from "earcut";
+import earcut from 'earcut';
 import { lineOffset } from '@turf/turf';
 
-import { FeatureCollection, Feature, LineString } from "geojson";
+import { FeatureCollection, Feature, LineString } from 'geojson';
 
-import { ILayerGeometry, ILayerComponent } from "./interfaces";
-import { Triangulator } from "./triangulator";
+import { ILayerGeometry, ILayerComponent } from './interfaces';
+import { Triangulator } from './triangulator';
 
 export class TriangulatorRoads extends Triangulator {
+  static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    const mesh: ILayerGeometry[] = [];
+    const comps: ILayerComponent[] = [];
 
-    static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
-        const mesh: ILayerGeometry[] = [];
-        const comps: ILayerComponent[] = [];
+    // translate based on origin
+    Triangulator.translateFeatures(geojson, origin);
 
-        // translate based on origin
-        Triangulator.translateFeatures(geojson, origin);
+    const collection: Feature[] = geojson['features'];
 
-        const collection: Feature[] = geojson['features'];
+    for (const feature of collection) {
+      const base = <LineString>feature.geometry;
 
-        for (const feature of collection) {
-            // TODO: remove this
-            if(['cycleway', 'footway', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'].includes(feature.properties?.highway)) {
-                continue;
-            }
+      const top = lineOffset(base, 200, { units: 'kilometers' }).geometry.coordinates;
+      const bot = lineOffset(base, -200, { units: 'kilometers' }).geometry.coordinates;
 
-            const base = <LineString>feature.geometry;
+      bot.forEach((cord: number[]) => top.unshift(cord));
+      top.push(top[0]);
 
-            const top = lineOffset(base, 200, {units: "kilometers"}).geometry.coordinates;
-            const bot = lineOffset(base,-200, {units: "kilometers"}).geometry.coordinates;
+      const flatIds = earcut(top.flat());
+      const flatCoords = top.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
 
-            bot.forEach((cord: number[]) => top.unshift(cord));
-            top.push(top[0]);
+      mesh.push({
+        position: flatCoords,
+        indices: flatIds,
+      });
 
-            const flatIds = earcut(top.flat());
-            const flatCoords = top.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
+      comps.push({
+        nPoints: flatCoords.length / 3,
+        nTriangles: flatIds.length / 3,
+      });
+    }
 
-            mesh.push({
-                position: flatCoords,
-                indices: flatIds
-            });
-
-            comps.push({
-                nPoints: flatCoords.length / 3,
-                nTriangles: flatIds.length / 3
-            });
-        }
-
-        return [mesh, comps];
-    };
-
+    return [mesh, comps];
+  }
 }
