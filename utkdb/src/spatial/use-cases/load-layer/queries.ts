@@ -112,8 +112,8 @@ const GET_ROADS = (tableName: string) => `
     SELECT id, tags FROM ${tableName}
       WHERE kind IN ('way') AND
       (
-        map_extract(tags, 'highway')[1] IS NOT NULL OR
-        map_extract(tags, 'area')[1] NOT IN ('yes') OR
+        map_extract(tags, 'highway')[1] IS NOT NULL AND
+        map_extract(tags, 'area')[1] IS DISTINCT FROM 'yes' AND
         map_extract(tags, 'highway')[1] NOT IN ('cycleway', 'footway', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway')
       );
 `;
