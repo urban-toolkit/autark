@@ -1,27 +1,16 @@
 import earcut from "earcut";
 
 import { difference, featureCollection, multiPolygon, polygon } from "@turf/turf";
-import { FeatureCollection, Feature, LineString, Position } from "geojson";
+import { FeatureCollection, Feature, LineString, Position, Polygon } from "geojson";
 
 import { AABB } from "./aabb";
 import { Triangulator } from "./triangulator";
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
-// TODO: Get Bounding Box from DuckDB
-const BOX_SIZE = 1400;
-const box = polygon([
-    [
-        [-BOX_SIZE,-BOX_SIZE],
-        [-BOX_SIZE, BOX_SIZE],
-        [ BOX_SIZE, BOX_SIZE],
-        [ BOX_SIZE,-BOX_SIZE],
-        [-BOX_SIZE,-BOX_SIZE],
-    ]
-]);
 
 export abstract class TriangulatorCoastline extends Triangulator {
 
-    static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static override buildMesh(geojson: FeatureCollection, origin: number[], bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
@@ -38,10 +27,12 @@ export abstract class TriangulatorCoastline extends Triangulator {
                 continue;
             }
 
-            const merge = this.mergeGroupGeometry(groups[gId]);
+            const boxSize = bbox.geometry.coordinates[0][2][0] - bbox.geometry.coordinates[0][0][0]
+            const merge = this.mergeGroupGeometry(groups[gId], boxSize);
 
             const coastlinePast = polygon([merge]);
-            const dif = difference(featureCollection([box, coastlinePast]));
+            
+            const dif = difference(featureCollection([bbox, coastlinePast]));
     
             if (dif === null || dif instanceof multiPolygon) {
                 console.error("Box and costline difference is null.");
@@ -70,7 +61,7 @@ export abstract class TriangulatorCoastline extends Triangulator {
         return [mesh, comps];
     }
 
-    static mergeGroupGeometry(group: Feature[]): Position[] {
+    static mergeGroupGeometry(group: Feature[], size: number): Position[] {
             // merged geometry
             const merge: Position[] = [];
             const { coordinates } = <LineString>group[0].geometry;
@@ -115,7 +106,7 @@ export abstract class TriangulatorCoastline extends Triangulator {
                     0.5 * ( mFrst[0] + mLast[0] ), 
                     0.5 * ( mFrst[1] + mLast[1] )
                 ];
-                const delta = 2 * BOX_SIZE;
+                const delta = 2 * size;
                 
                 // adds a very distant vertex
                 merge.push([pos[0] + delta * vec[0], pos[1] + delta * vec[1]]);

@@ -22,7 +22,7 @@ export abstract class Triangulator {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    static buildMesh(_geojson: FeatureCollection, _origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static buildMesh(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {
         return [[], []]
     };
 
@@ -33,9 +33,10 @@ export abstract class Triangulator {
         const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
         const flatIds = earcut(moveCoords);
+        console.log('flatIds', flatIds);
 
         return [{ flatCoords, flatIds }];
-    }
+    } 
 
     static multiLineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;

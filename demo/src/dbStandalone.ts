@@ -20,9 +20,9 @@ export class DbStandalone {
     osmLayers: LayerType[] = [
       LayerType.OSM_COASTLINE,
       LayerType.OSM_PARKS,
-      LayerType.OSM_WATER,
-      LayerType.OSM_ROADS,
-      LayerType.OSM_BUILDINGS,
+    //   LayerType.OSM_WATER,
+    //   LayerType.OSM_ROADS,
+    //   LayerType.OSM_BUILDINGS,
     ],
     osmTable: string = 'table_osm',
   ) {
@@ -40,7 +40,7 @@ export class DbStandalone {
 
   public async loadCustomLayer(
     geoJsonUrl = 'http://localhost:5173/data/mnt_neighs.geojson',
-    geojsonTable = 'custom2DLayer',
+    geojsonTable = 'neighborhoods',
   ) {
     await this.db.loadCustomLayer({
       geojsonFileUrl: geoJsonUrl,
@@ -53,7 +53,7 @@ export class DbStandalone {
     return this.db.getOsmBoundingBox();
   }
 
-  public async LoadCsv(csvFileUrl = 'http://localhost:5173/data/noise_sample.csv', csvTable = 'csv') {
+  public async loadCsv(csvFileUrl = 'http://localhost:5173/data/noise_sample.csv', csvTable = 'noise') {
     await this.db.loadCsv({
       csvFileUrl: csvFileUrl,
       outputTableName: csvTable,
@@ -66,15 +66,16 @@ export class DbStandalone {
   }
 
   public async spatialJoin(
-    tableRootName: string = 'custom_layer_geojson',
-    tableJoinName: string = 'csv',
-    outputTableName: string = 'join_layer',
+    tableRootName: string = 'neighborhoods',
+    tableJoinName: string = 'noise',
   ) {
     await this.db.spatialJoin({
       tableRootName: tableRootName,
       tableJoinName: tableJoinName,
       spatialPredicate: 'INTERSECT',
-      outputTableName: outputTableName,
+      output: {
+        type: 'MODIFY_ROOT',
+        },      
       joinType: 'INNER',
       groupBy: {
         selectColumns: [

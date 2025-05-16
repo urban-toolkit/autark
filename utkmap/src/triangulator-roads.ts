@@ -18,6 +18,7 @@ export class TriangulatorRoads extends Triangulator {
         const collection: Feature[] = geojson['features'];
 
         for (const feature of collection) {
+            // TODO: remove this
             if(['cycleway', 'footway', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'].includes(feature.properties?.highway)) {
                 continue;
             }
