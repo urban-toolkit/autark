@@ -17,10 +17,6 @@ export class TriangulatorRoads extends Triangulator {
     const collection: Feature[] = geojson['features'];
 
     for (const feature of collection) {
-      //if(['cycleway', 'footway', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'].includes(feature.properties?.highway)) {
-      //    continue;
-      //}
-
       const base = <LineString>feature.geometry;
 
       const top = lineOffset(base, 200, { units: 'kilometers' }).geometry.coordinates;

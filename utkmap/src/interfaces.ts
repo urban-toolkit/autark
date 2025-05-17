@@ -67,8 +67,8 @@ export interface ICameraData {
 }
 
 export interface IBoundingBox {
-    minLat: number;
-    maxLat: number;
     minLon: number;
+    minLat: number;
     maxLon: number;
+    maxLat: number;
 }

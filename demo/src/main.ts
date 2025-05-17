@@ -20,14 +20,19 @@ async function runDbMapIntegration() {
     const canvas = <HTMLCanvasElement>document.querySelector('#wgpu');
     canvas.width = canvas.height = 1280;
 
+    console.log('Running map integration demo');
+
     const db = new DbMapIntegration();
     await db.init();
 
     await db.loadOsm();
-    await db.loadCustomLayer();
 
     const layers = await db.exportLayers();
     const bbox = await db.loadOsmBoundingBox();
+
+    console.log('bbox', bbox);
+
+    db.loadOsmBoundingBox()
 
     // await db.loadCsv();
     // await db.spatialJoin();
@@ -35,12 +40,10 @@ async function runDbMapIntegration() {
     const map = new UtkMap(canvas);
     await map.init();
 
-    map.updateBoundingBox(bbox);
+    map.updateBoundingBoxAndOrigin(bbox);
 
     for (const json of layers) {
-        console.log({ json });
-        map.loadGeoJsonLayer(json.data, (json.name.split('_')[2] || json.name) as LayerType);
-        // map.loadGeoJsonLayer(json.data, json.type as LayerType);
+        map.loadGeoJsonLayer(json.data, json.props.type as LayerType);
     }
 
     map.draw();
@@ -62,6 +65,5 @@ if (MAP_DEMO) {
 }
 
 // TODO:
-// 2. source: osm, geojson, csv
-// 3. type: osm (water, parks, etc), geojson (2dLayer), csv (Pointset)
+// 1. Use spatial join result to colorize the neighborhoods layer
 // 4. Crop data on db?
