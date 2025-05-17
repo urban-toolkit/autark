@@ -6,7 +6,13 @@ export class GetBoundingBoxUseCase {
   constructor(private conn: AsyncDuckDBConnection) {}
 
   async exec(params: GetBoundingBoxParams): Promise<BoundingBox> {
-    const result = await this.conn.query(GET_BOUNDING_BOX_QUERY(params));
+    const result = await this.conn.query(
+      GET_BOUNDING_BOX_QUERY({
+        tableName: params.tableName,
+        coordinateFormat: params.coordinateFormat,
+        layers: params.layers,
+      }),
+    );
     const rows = result.toArray();
 
     if (rows.length === 0) {

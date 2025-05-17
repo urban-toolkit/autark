@@ -68,6 +68,7 @@ export class SpatialDb {
       this.osmBoudingBox = await this.getBoundingBoxUseCase.exec({
         tableName: table.name,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
+        layers: params.autoLoadLayers.layers,
       });
 
       if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
