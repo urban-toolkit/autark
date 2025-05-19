@@ -33,7 +33,6 @@ export abstract class Triangulator {
         const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
 
         const flatIds = earcut(moveCoords);
-        console.log('flatIds', flatIds);
 
         return [{ flatCoords, flatIds }];
     } 

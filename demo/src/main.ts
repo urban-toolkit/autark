@@ -32,8 +32,6 @@ async function runDbMapIntegration() {
 
     console.log('bbox', bbox);
 
-    db.loadOsmBoundingBox()
-
     // await db.loadCsv();
     // await db.spatialJoin();
 
