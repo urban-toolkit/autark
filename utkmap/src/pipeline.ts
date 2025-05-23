@@ -165,11 +165,11 @@ export abstract class Pipeline {
     };
 
     const color = new Float32Array(Object.values(colors.color));
-    const useCcolorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
+    const useColorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
     const colorMapTexture = new Uint8Array(colors.colorMap);
 
     this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, color);
-    this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useCcolorMap);
+    this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useColorMap);
     this._renderer.device.queue.writeTexture(
       { texture: this._cMapTexture },
       colorMapTexture,

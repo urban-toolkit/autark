@@ -11,13 +11,14 @@ export class DbMapIntegration extends DbStandalone {
     async exportLayers(): Promise<{ props: Table; data: FeatureCollection }[]> {
         const data = [];
         for (const layerData of this.db.tables) {
-            const geojson = await this.db.getLayer(layerData.name);
-
-            if(layerData.source !== 'osm') {
+            if(layerData.source === 'csv') {
                 continue;
             }
 
+            const geojson = await this.db.getLayer(layerData.name);
             data.push({ props: layerData, data: geojson });
+
+            console.log(geojson);
         }
 
         return data;

@@ -41,7 +41,7 @@ export class SpatialJoinUseCase {
       outputTableName,
     });
 
-    console.log({ query });
+    // console.log({ query });
     const tableDescribeResponse = await this.conn.query(`
         CREATE OR REPLACE TABLE ${outputTableName} AS
         ${query}

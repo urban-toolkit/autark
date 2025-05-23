@@ -103,29 +103,3 @@ export class DbStandalone {
     console.log(geojson);
   }
 }
-
-/*
---- Join neighborhood with parks ---
-console.log('start load custom layer');
-await this.db.loadCustomLayer({
-geojsonFileUrl: 'http://localhost:5173/data-ignore/manhattan_neighborhood.geojson',
-outputTableName: 'geojson_table',
-coordinateFormat: this.projection,
-});
-console.log('end load custom layer');
-console.log('tables: ', this.db.tables);
-
-console.log('start spatial join');
-const query = this.db.createQuery('geojson_table').spatialJoin({
-tableRootName: 'geojson_table',
-tableJoinName: `${this.tableName}_parks`,
-spatialPredicate: 'INTERSECT',
-});
-
-await this.db.loadQuery(query, 'my_new_layer');
-console.log('end spatial join');
-console.log('tables: ', this.db.tables);
-
-const geojsonAfterJoin = await this.db.getLayer('my_new_layer');
-console.log('geojsonAfterJoin: ', geojsonAfterJoin);
-*/

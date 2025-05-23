@@ -10,7 +10,7 @@ struct VSOut {
 fn main(@location(0) inPosition: vec3f, @location(1) inThematic: f32) -> VSOut {
     var vsOut: VSOut;
 
-    vsOut.outPosition = projection * modelView * vec4f(inPosition, 1);    
+    vsOut.outPosition = projection * modelView * vec4f(inPosition, 1);
     vsOut.outThematic = inThematic;
 
     return vsOut;

@@ -38,15 +38,6 @@ export class LayerManager {
             0
         ];
 
-        console.log('clat', (bbox.maxLat + bbox.minLat) * 0.5, -8239012.438994927);
-        console.log('clon', (bbox.maxLon + bbox.minLon) * 0.5,  4941135.512524911);
-
-        // this._origin = [
-        //     -8239012.438994927,
-        //      4941135.512524911,
-        //     0
-        // ];
-
         const xmin = (bbox.minLat - this._origin[0]) * 1.1;
         const xmax = (bbox.maxLat - this._origin[0]) * 1.1;
         const ymin = (bbox.minLon - this._origin[1]) * 1.1;

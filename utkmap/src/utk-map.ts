@@ -2,15 +2,15 @@
 
 import { Feature, FeatureCollection, Polygon } from 'geojson';
 
-import { 
-    ColorMapInterpolator, 
-    LayerGeometryType, 
-    LayerType, 
-    RenderPipeline, 
+import {
+    ColorMapInterpolator,
+    LayerGeometryType,
+    LayerType,
+    RenderPipeline,
     ThematicAggregationLevel
 } from './constants';
 
-import { 
+import {
     IBoundingBox,
     ICameraData,
     ILayerComponent,
@@ -69,13 +69,15 @@ export class UtkMap {
         return this._layerManager.boundingBox;
     }
 
-    async init() {
+    async init(bbox: IBoundingBox) {
         await this._renderer.init();
 
         this._keyEvents.bindEvents();
         this._mouseEvents.bindEvents();
 
         this.render();
+
+        this.updateBoundingBoxAndOrigin(bbox);
     }
 
     loadGeoJsonLayer(geojson: FeatureCollection, typeLayer: LayerType) {
@@ -85,31 +87,28 @@ export class UtkMap {
             case LayerType.OSM_PARKS:
             case LayerType.CUSTOM_2DLAYER:
                 this.createFeatures2DLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
-            break;
+                break;
 
             case LayerType.OSM_COASTLINE:
                 this.createCoastlineLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
-            break;
+                break;
 
             case LayerType.OSM_ROADS:
                 this.createRoadsLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
-            break
+                break
 
             case LayerType.OSM_BUILDINGS:
                 this.createBuildingsLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_3D);
-            break
+                break
 
             default:
                 console.error(`Geojson data has an unknown layer type: ${typeLayer}.`);
-            break;
+                break;
         }
     }
 
     updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
         this._layerManager.updateBoundingBoxAndOrigin(bbox);
-
-        console.log(this._layerManager.origin);
-        console.log(this._layerManager.boundingBox);
     }
 
     updateCamera(params: ICameraData) {
@@ -217,7 +216,7 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorFeatures2D.buildMesh(geojson, this.origin);
-        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature 2D Layer mesh');
             return;
         }
@@ -225,7 +224,7 @@ export class UtkMap {
         const layerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map((_e:ILayerComponent, id: number) => {
+            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                     values: [id / (layerMesh[1].length - 1)]
@@ -252,7 +251,7 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin, this.boundingBox);
-        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Coastline Layer mesh');
             return;
         }
@@ -260,7 +259,7 @@ export class UtkMap {
         const layerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map((_e:ILayerComponent, id: number) => {
+            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                     values: [id / (layerMesh[1].length - 1)]
@@ -288,7 +287,7 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorRoads.buildMesh(geojson, this.origin);
-        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer mesh');
             return;
         }
@@ -296,7 +295,7 @@ export class UtkMap {
         const layerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map((_e:ILayerComponent, id: number) => {
+            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                     values: [id / (layerMesh[1].length - 1)]
@@ -323,7 +322,7 @@ export class UtkMap {
         };
 
         const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
-        if(layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Building Layer mesh');
             return;
         }
@@ -331,7 +330,7 @@ export class UtkMap {
         const layerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map((_e:ILayerComponent, id: number) => {
+            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                     values: [id / (layerMesh[1].length - 1)]
