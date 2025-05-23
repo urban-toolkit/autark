@@ -38,7 +38,7 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
                 });
 
                 comps.push({
-                    nPoints: triangulation.flatCoords.length / 3,
+                    nPoints: triangulation.flatCoords.length / 2,
                     nTriangles: triangulation.flatIds.length / 3
                 });
             }

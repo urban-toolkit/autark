@@ -6,6 +6,11 @@ import earcut from 'earcut';
 
 export abstract class Triangulator {
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    static buildMesh(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {
+        return [[], []]
+    };
+
     // TODO: remove this function
     protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
         const collection = geojson['features'];
@@ -21,18 +26,11 @@ export abstract class Triangulator {
         }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    static buildMesh(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {
-        return [[], []]
-    };
-
     static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
 
-        const moveCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-        const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
-
-        const flatIds = earcut(moveCoords);
+        const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatIds = earcut(flatCoords);
 
         return [{ flatCoords, flatIds }];
     } 
@@ -43,10 +41,8 @@ export abstract class Triangulator {
         const meshes = [];
         for (const lineString of coordinates) {
 
-            const moveCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-            const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
-
-            const flatIds = earcut(moveCoords);
+            const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatIds = earcut(flatCoords);
 
             meshes.push({ flatCoords, flatIds });
         }
@@ -65,11 +61,8 @@ export abstract class Triangulator {
             holes.push(coords.length);
             coordinates[i].forEach((cord: number[]) => coords.push(cord));
         }
-
-        const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-        const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
-
-        const flatIds = earcut(moveCoords);
+        const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatIds = earcut(flatCoords);
 
         return [{ flatCoords, flatIds }];
     }
@@ -88,10 +81,8 @@ export abstract class Triangulator {
                 polygon[i].forEach((cord: number[]) => coords.push(cord));
             }
 
-            const moveCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-            const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1], 0]).flat();
-
-            const flatIds = earcut(moveCoords);
+            const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatIds = earcut(flatCoords);
 
             meshes.push({ flatCoords, flatIds });
         }
