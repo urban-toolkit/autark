@@ -17,8 +17,6 @@ export class DbMapIntegration extends DbStandalone {
 
             const geojson = await this.db.getLayer(layerData.name);
             data.push({ props: layerData, data: geojson });
-
-            console.log(geojson);
         }
 
         return data;

@@ -11,13 +11,11 @@ export class TriangulatorRoads extends Triangulator {
     const mesh: ILayerGeometry[] = [];
     const comps: ILayerComponent[] = [];
 
-    // translate based on origin
-    Triangulator.translateFeatures(geojson, origin);
-
     const collection: Feature[] = geojson['features'];
 
     for (const feature of collection) {
       const base = <LineString>feature.geometry;
+      base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
 
       const top = lineOffset(base, 200, { units: 'kilometers' }).geometry.coordinates;
       const bot = lineOffset(base, -200, { units: 'kilometers' }).geometry.coordinates;
@@ -26,7 +24,7 @@ export class TriangulatorRoads extends Triangulator {
       top.push(top[0]);
 
       const flatIds = earcut(top.flat());
-      const flatCoords = top.map((cord: number[]) => [cord[0], cord[1], 0]).flat();
+      const flatCoords = top.map((cord: number[]) => [cord[0], cord[1]]).flat();
 
       mesh.push({
         position: flatCoords,
@@ -34,7 +32,7 @@ export class TriangulatorRoads extends Triangulator {
       });
 
       comps.push({
-        nPoints: flatCoords.length / 3,
+        nPoints: flatCoords.length / 2,
         nTriangles: flatIds.length / 3,
       });
     }

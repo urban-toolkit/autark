@@ -39,13 +39,8 @@ export abstract class TriangulatorCoastline extends Triangulator {
                 return [mesh, comps];
             }
     
-            const difCoords = <Position[]>dif.geometry.coordinates[0];
-            const difCoordsFlat = difCoords.flat();
-
-            const flatIds = earcut(difCoordsFlat);
-            const flatCoords = difCoords.map(
-                (cord: number[]) => [cord[0], cord[1], 0]
-            ).flat();
+            const flatCoords = (<Position[]>dif.geometry.coordinates[0]).flat();
+            const flatIds = earcut(flatCoords);
     
             mesh.push({
                 position: flatCoords,
@@ -53,7 +48,7 @@ export abstract class TriangulatorCoastline extends Triangulator {
             });
     
             comps.push({
-                nPoints: flatCoords.length / 3,
+                nPoints: flatCoords.length / 2,
                 nTriangles: flatIds.length / 3
             });
         }

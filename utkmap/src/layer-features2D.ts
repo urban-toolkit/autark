@@ -10,6 +10,8 @@ import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 
 export class Features2DLayer extends Layer {
+    protected _dimension: number;
+
     protected _position!: number[];
     protected _thematic!: number[];
     protected _indices!: number[];
@@ -18,8 +20,10 @@ export class Features2DLayer extends Layer {
 
     protected _pipeline!: Pipeline;
 
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
         super(layerInfo, layerRenderInfo);
+        this._dimension = dimension;
+
         this.loadData(layerData);
     }
 
@@ -63,10 +67,22 @@ export class Features2DLayer extends Layer {
 
             // merges the position data
             layerGeometry[id].position.forEach((d, id) => {
-                if (id % 3 === 2) {
-                    d += this._layerInfo.zIndex;
+                if (this._dimension === 2) {
+                    position.push(d);
+
+                    if (id % 2 === 1) {
+                        const z = this._layerInfo.zIndex;
+                        position.push(z);
+                    }
                 }
-                position.push(d);
+
+                if (this._dimension === 3) {
+                    if (id % 3 === 2) {
+                        d += this._layerInfo.zIndex;
+                    }
+
+                    position.push(d);
+                }
             });
         }
 

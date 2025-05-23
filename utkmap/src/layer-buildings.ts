@@ -9,7 +9,7 @@ export class BuildingsLayer extends Features2DLayer {
   protected _normal!: number[];
 
   constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
-    super(layerInfo, layerRenderInfo, layerData);
+    super(layerInfo, layerRenderInfo, layerData, 3);
     this.computeNormals();
   }
 
