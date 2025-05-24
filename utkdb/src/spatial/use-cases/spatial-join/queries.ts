@@ -43,6 +43,7 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
   `;
 };
 
+/* Select Logic */
 function getSelectString(params: {
   tableRoot: Table;
   tableJoin: Table;
@@ -52,50 +53,121 @@ function getSelectString(params: {
   } | null;
 }) {
   if (params.groupBy) {
-    const groupByString = params.groupBy.selectColumns
-      .map((column) => {
-        if (column.aggregateFn) {
-          if (isLayerType(column.table.type)) {
-            // Get attributes inside properties
-            return `'${column.table.name}.${column.column} ${column.aggregateFn}', ${column.aggregateFn}(map_extract("${column.column}",  ${column.table.name}.properties))`;
-          }
-
-          return `'${column.table.name}.${column.column} ${column.aggregateFn}', ${column.aggregateFn}(${column.table.name}."${column.column}")`;
-        }
-
-        return `'${column.table.name}.${column.column}', ${column.table.name}."${column.column}"`;
-      })
-      .join(', ');
+    const { aggregatesByFunction, nonAggregateColumns } = groupColumnsByAggregateFunction(params.groupBy.selectColumns);
+    const sjoinObjectSql = buildSjoinObject(aggregatesByFunction, nonAggregateColumns);
 
     return `
       SELECT 
         ${params.tableRoot.name}.geometry,
         json_merge_patch(
+          "${params.tableRoot.name}".properties,
           json_object(
-            ${groupByString}
-          ),
-          "${params.tableRoot.name}".properties
+            'sjoin', json_object(
+              ${sjoinObjectSql}
+            )
+          )
         ) AS properties
     `;
   }
 
-  const propertiesFromJoin = params.tableJoin.columns
-    .filter((column) => column.name !== params.geometricColumnJoin)
-    .map((column) => `${params.tableJoin.name}."${column.name}"`)
+  return buildSimpleJoinSelect(params.tableRoot, params.tableJoin, params.geometricColumnJoin);
+}
+
+function groupColumnsByAggregateFunction(selectColumns: Array<{ table: Table; column: string; aggregateFn?: string }>) {
+  const aggregatesByFunction: Record<string, Array<{ table: Table; column: string }>> = {};
+  const nonAggregateColumns: Array<{ table: Table; column: string }> = [];
+
+  selectColumns.forEach((column) => {
+    if (column.aggregateFn) {
+      const funcName = column.aggregateFn.toLowerCase();
+      if (!aggregatesByFunction[funcName]) {
+        aggregatesByFunction[funcName] = [];
+      }
+      aggregatesByFunction[funcName].push({ table: column.table, column: column.column });
+    } else {
+      nonAggregateColumns.push({ table: column.table, column: column.column });
+    }
+  });
+
+  return { aggregatesByFunction, nonAggregateColumns };
+}
+
+function buildSjoinObject(
+  aggregatesByFunction: Record<string, Array<{ table: Table; column: string }>>,
+  nonAggregateColumns: Array<{ table: Table; column: string }>,
+): string {
+  const sjoinParts: string[] = [];
+
+  // Handle aggregate functions
+  Object.entries(aggregatesByFunction).forEach(([funcName, columns]) => {
+    if (funcName === 'count') {
+      sjoinParts.push(buildCountExpression(columns[0]));
+    } else {
+      sjoinParts.push(buildNestedFunctionExpression(funcName, columns));
+    }
+  });
+
+  // Handle non-aggregate columns
+  if (nonAggregateColumns.length > 0) {
+    sjoinParts.push(buildNonAggregateColumns(nonAggregateColumns));
+  }
+
+  return sjoinParts.join(', ');
+}
+
+function buildCountExpression(column: { table: Table; column: string }): string {
+  const valueExpression = generateValueExpression(column.table, column.column, 'COUNT');
+  return `'count', ${valueExpression}`;
+}
+
+function buildNestedFunctionExpression(funcName: string, columns: Array<{ table: Table; column: string }>): string {
+  const functionAttributes = columns
+    .map((column) => {
+      const valueExpression = generateValueExpression(column.table, column.column, funcName.toUpperCase());
+      return `'${column.column}', ${valueExpression}`;
+    })
+    .join(', ');
+
+  return `'${funcName}', json_object(${functionAttributes})`;
+}
+
+function buildNonAggregateColumns(nonAggregateColumns: Array<{ table: Table; column: string }>): string {
+  return nonAggregateColumns
+    .map((column) => {
+      const valueExpression = isLayerType(column.table.type)
+        ? `map_extract("${column.column}", ${column.table.name}.properties)`
+        : `${column.table.name}."${column.column}"`;
+      return `'${column.column}', ${valueExpression}`;
+    })
+    .join(', ');
+}
+
+function generateValueExpression(table: Table, columnName: string, aggregateFunction: string): string {
+  if (isLayerType(table.type)) {
+    return `${aggregateFunction}(map_extract("${columnName}", ${table.name}.properties))`;
+  }
+  return `${aggregateFunction}(${table.name}."${columnName}")`;
+}
+
+function buildSimpleJoinSelect(tableRoot: Table, tableJoin: Table, geometricColumnJoin: string): string {
+  const propertiesFromJoin = tableJoin.columns
+    .filter((column) => column.name !== geometricColumnJoin)
+    .map((column) => `${tableJoin.name}."${column.name}"`)
     .join(', ');
 
   return `
       SELECT 
-        ${params.tableRoot.name}.geometry,
+        ${tableRoot.name}.geometry,
         json_merge_patch(
           json_object(
             ${propertiesFromJoin}
           ),
-          "${params.tableRoot.name}".properties
+          "${tableRoot.name}".properties
         ) AS properties
     `;
 }
 
+/* Join Logic */
 function getJoinString({
   spatialPredicate,
   joinType,
@@ -119,6 +191,7 @@ function getJoinString({
   return `${joinType || ''} JOIN ${tableJoin.name} ON ST_Intersects( ${tableRoot.name}."${geometricColumnRoot}", ${tableJoin.name}."${geometricColumnJoin}")`;
 }
 
+/* Group By Logic */
 function getGroupByString(tableRoot: Table) {
   return `
     GROUP BY ${tableRoot.name}.geometry, ${tableRoot.name}.properties
