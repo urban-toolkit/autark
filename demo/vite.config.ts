@@ -19,4 +19,11 @@ export default defineConfig({
     optimizeDeps: {
         exclude: ['utkmap', 'utkdb'],
     },
+    server: {
+        cors: {
+            origin: '*',
+            allowedHeaders: 'Range, Content-Type, Authorization',
+            exposedHeaders: 'Content-Range'
+        },
+    },
 });

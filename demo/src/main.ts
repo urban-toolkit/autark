@@ -42,7 +42,7 @@ async function runDbMapIntegration() {
     await map.init(bbox);
 
     for (const json of layers) {
-        map.loadGeoJsonLayer(json.data, json.props.type as LayerType);
+        map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }
 
     map.draw();

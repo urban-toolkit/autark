@@ -80,68 +80,51 @@ export class UtkMap {
         this.updateBoundingBoxAndOrigin(bbox);
     }
 
-    loadGeoJsonLayer(geojson: FeatureCollection, typeLayer: LayerType) {
+    loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         switch (typeLayer) {
             case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
             case LayerType.CUSTOM_2DLAYER:
-                this.createFeatures2DLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
+                this.createFeatures2DLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_2D, geojson);
                 break;
 
             case LayerType.OSM_COASTLINE:
-                this.createCoastlineLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
+                this.createCoastlineLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_2D, geojson);
                 break;
 
             case LayerType.OSM_ROADS:
-                this.createRoadsLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_2D);
+                this.createRoadsLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_2D, geojson);
                 break
 
             case LayerType.OSM_BUILDINGS:
-                this.createBuildingsLayerFromGeojson(geojson, typeLayer, LayerGeometryType.FEATURES_3D);
+                this.createBuildingsLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_3D, geojson);
                 break
 
             default:
-                console.error(`Geojson data has an unknown layer type: ${typeLayer}.`);
+                console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
-    }
-
-    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
-        this._layerManager.updateBoundingBoxAndOrigin(bbox);
     }
 
     updateCamera(params: ICameraData) {
         this._camera = new Camera(params);
     }
 
-    createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
-        const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
-
-        if (layer) {
-            layer.createPipeline(this._renderer, this._camera);
-        }
+    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
+        this._layerManager.updateBoundingBoxAndOrigin(bbox);
     }
 
-    updateRenderInfo(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
-        const layer = this._layerManager.searchByLayerInfo(layerInfo);
+    updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
+        const layer = this._layerManager.searchByLayerId(layerName);
 
         if (layer) {
             layer.setLayerRenderInfo(layerRenderInfo);
         }
     }
 
-    updateLayerData(layerInfo: ILayerInfo, layerData: ILayerData): void {
-        const layer = this._layerManager.searchByLayerInfo(layerInfo);
-
-        if (layer) {
-            // load data
-            layer.loadData(layerData);
-        }
-    }
-
-    updateLayerGeometry(layerInfo: ILayerInfo, layerGeometry: ILayerGeometry[]) {
-        const layer = this._layerManager.searchByLayerInfo(layerInfo);
+    updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
+        const layer = this._layerManager.searchByLayerId(layerName);
 
         if (layer) {
             // load data
@@ -149,17 +132,8 @@ export class UtkMap {
         }
     }
 
-    updateLayerComponent(layerInfo: ILayerInfo, layerComponent: ILayerComponent[]) {
-        const layer = this._layerManager.searchByLayerInfo(layerInfo);
-
-        if (layer) {
-            // load data
-            layer.loadComponent(layerComponent);
-        }
-    }
-
-    updateLayerThematic(layerInfo: ILayerInfo, layerThematic: ILayerThematic[]): void {
-        const layer = this._layerManager.searchByLayerInfo(layerInfo);
+    updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]): void {
+        const layer = this._layerManager.searchByLayerId(layerName);
 
         if (layer) {
             layer.loadThematic(layerThematic);
@@ -200,9 +174,9 @@ export class UtkMap {
         this._renderer.finish();
     }
 
-    private createFeatures2DLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createFeatures2DLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
-            id: `${typeLayer.toString()}`,
+            id: `${layerName}`,
             zIndex: this.layerManager.length + 1,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
@@ -235,9 +209,9 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createCoastlineLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createCoastlineLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
-            id: `${typeLayer.toString()}`,
+            id: `${layerName}`,
             zIndex: this.layerManager.length + 1,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
@@ -270,10 +244,9 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-
-    private createRoadsLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createRoadsLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
-            id: `${typeLayer.toString()}`,
+            id: `${layerName}`,
             zIndex: this.layerManager.length + 1,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
@@ -306,9 +279,9 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createBuildingsLayerFromGeojson(geojson: FeatureCollection, typeLayer: LayerType, typeGeometry: LayerGeometryType) {
+    private createBuildingsLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
-            id: `${typeLayer.toString()}`,
+            id: `${layerName}`,
             zIndex: this.layerManager.length + 1,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
@@ -340,4 +313,13 @@ export class UtkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
+
+    private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+        const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
+
+        if (layer) {
+            layer.createPipeline(this._renderer, this._camera);
+        }
+    }
+
 }
