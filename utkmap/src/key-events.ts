@@ -1,4 +1,3 @@
-import { LayerType } from './constants';
 import { MapStyle } from './map-style';
 import { UtkMap } from './utk-map';
 
@@ -26,12 +25,10 @@ export class KeyEvents {
                 const layerInfo = layer.layerInfo;
                 const renderInfo = layer.layerRenderInfo;
 
-                if (layerInfo.typeLayer != LayerType.OSM_BUILDINGS) {
-                    continue;
+                if (layerInfo.id === 'buildings' || layerInfo.id === 'neighborhoods') {
+                    renderInfo.isColorMap = !renderInfo.isColorMap;
+                    this._map.updateRenderInfo(layerInfo.id, renderInfo);
                 }
-
-                renderInfo.isColorMap = !renderInfo.isColorMap;
-                this._map.updateRenderInfo(layerInfo.id, renderInfo);
             }
         }
 
