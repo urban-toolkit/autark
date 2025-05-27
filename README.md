@@ -1,4 +1,4 @@
-# UTK-v2
+# UTK Serveless
 
 This project contains the following sub-projects:
 - `utkdb`
