@@ -74,6 +74,8 @@ export class LayerManager {
 
         if (layer) {
             this._layers.push(layer);
+            this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+
             return layer;
         }
         return null;

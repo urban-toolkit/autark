@@ -14,6 +14,18 @@ export enum LayerType {
     CUSTOM_2DLAYER = 'custom2DLayer',
 }
 
+export enum LayerZIndex {
+    OSM_SURFACE = 0,
+    OSM_COASTLINE = 0.1,
+    OSM_PARKS = 0.2,
+    OSM_WATER = 0.3,
+    OSM_ROADS = 0.4,
+    OSM_BUILDINGS = 1.0,
+    //
+    CUSTOM_2DLAYER = 0.5,
+}
+
+
 export enum ThematicAggregationLevel {
     AGGREGATION_POINT = 'aggreagationPoint',
     AGGREGATION_PRIMITIVE = 'aggregationPrimitive',

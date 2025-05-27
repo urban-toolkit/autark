@@ -6,6 +6,7 @@ import {
     ColorMapInterpolator,
     LayerGeometryType,
     LayerType,
+    LayerZIndex,
     RenderPipeline,
     ThematicAggregationLevel
 } from './constants';
@@ -190,9 +191,17 @@ export class UtkMap {
     }
 
     private createFeatures2DLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
+        let zIndex = -1;
+
+        switch (typeLayer) {
+            case LayerType.OSM_WATER: zIndex = LayerZIndex.OSM_WATER; break;
+            case LayerType.OSM_PARKS: zIndex = LayerZIndex.OSM_PARKS; break;
+            default: zIndex = 0.5 + 0.01 * this.layerManager.length; break;
+        }
+
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: this.layerManager.length + 1,
+            zIndex: zIndex,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
         };
@@ -227,7 +236,7 @@ export class UtkMap {
     private createCoastlineLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: this.layerManager.length + 1,
+            zIndex: LayerZIndex.OSM_COASTLINE,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
         };
@@ -262,7 +271,7 @@ export class UtkMap {
     private createRoadsLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: this.layerManager.length + 1,
+            zIndex: LayerZIndex.OSM_ROADS,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
         };
@@ -297,7 +306,7 @@ export class UtkMap {
     private createBuildingsLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: this.layerManager.length + 1,
+            zIndex: LayerZIndex.OSM_BUILDINGS,
             typeGeometry: typeGeometry,
             typeLayer: typeLayer,
         };
