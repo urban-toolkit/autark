@@ -36,8 +36,6 @@ export abstract class Layer {
 
     setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
         this._layerRenderInfo = layerRenderInfo;
-
-        this.makeLayerRenderInfoDirty();
     }
 
     makeLayerDataInfoDirty() {

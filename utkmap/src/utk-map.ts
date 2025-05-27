@@ -80,14 +80,6 @@ export class UtkMap {
         this.updateBoundingBoxAndOrigin(bbox);
     }
 
-    updateCamera(params: ICameraData) {
-        this._camera = new Camera(params);
-    }
-
-    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
-        this._layerManager.updateBoundingBoxAndOrigin(bbox);
-    }
-
     loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         switch (typeLayer) {
             case LayerType.OSM_SURFACE:
@@ -115,6 +107,14 @@ export class UtkMap {
         }
     }
 
+    updateCamera(params: ICameraData) {
+        this._camera = new Camera(params);
+    }
+
+    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
+        this._layerManager.updateBoundingBoxAndOrigin(bbox);
+    }
+
     updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
@@ -140,6 +140,7 @@ export class UtkMap {
 
         if (layer) {
             layer.setLayerRenderInfo(layerRenderInfo);
+            layer.makeLayerRenderInfoDirty();
         }
     }
     

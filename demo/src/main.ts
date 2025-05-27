@@ -22,7 +22,7 @@ async function runDbMapIntegration() {
 
     console.log('Running map integration demo');
 
-    // DB ------------
+    // Database ------
     const db = new DbMapIntegration();
     await db.init();
 
@@ -31,7 +31,7 @@ async function runDbMapIntegration() {
     await db.loadCsv();
     await db.loadCustomLayer();
 
-    // MAP -----------
+    // Map -----------
     const map = new UtkMap(canvas);
     await map.init(await db.loadOsmBoundingBox());
     map.draw();
@@ -44,11 +44,9 @@ async function runDbMapIntegration() {
 
     // Spatial Join ---
     await db.spatialJoin();
-    
     const thematic = await db.updateThematicData();
 
     map.updateLayerThematic('neighborhoods', thematic);
-    map.updateRenderInfoIsColorMap('neighborhoods', true);
 }
 
 async function runDbStandalone() {
