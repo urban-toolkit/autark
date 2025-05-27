@@ -33,6 +33,7 @@ export interface ILayerRenderInfo {
   isHighlight?: boolean; // is highlight enabled?
   highlightComps?: number[]; // what components?
   isPicking?: boolean; // is picking enabled?
+  isSkip?: boolean; // skip render?
 }
 
 export interface ILayerData {

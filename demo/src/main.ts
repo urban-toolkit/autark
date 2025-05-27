@@ -32,8 +32,9 @@ async function runDbMapIntegration() {
     await db.loadCustomLayer();
 
     // Map -----------
+    const bb = await db.loadOsmBoundingBox();
     const map = new UtkMap(canvas);
-    await map.init(await db.loadOsmBoundingBox());
+    await map.init(bb);
     map.draw();
 
     // Load Layers ---
