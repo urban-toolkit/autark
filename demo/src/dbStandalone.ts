@@ -76,7 +76,7 @@ export class DbStandalone {
       output: {
         type: 'MODIFY_ROOT',
         },      
-      joinType: 'INNER',
+      joinType: 'LEFT',
       groupBy: {
         selectColumns: [
           {

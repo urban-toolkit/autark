@@ -193,7 +193,6 @@ export class TriangulatorBuildings extends Triangulator {
         return [z_SCALE * min_height, z_SCALE * height];
     }
 
-
     protected static fixOrientation(features: Feature[]): Feature[] {
         for (const feature of features) {
             let { coordinates } = <LineString>feature.geometry;
@@ -219,5 +218,4 @@ export class TriangulatorBuildings extends Triangulator {
 
         return features;
     }
-
 }

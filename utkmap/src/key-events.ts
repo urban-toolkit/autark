@@ -31,7 +31,7 @@ export class KeyEvents {
                 }
 
                 renderInfo.isColorMap = !renderInfo.isColorMap;
-                this._map.updateRenderInfo(layerInfo, renderInfo);
+                this._map.updateRenderInfo(layerInfo.id, renderInfo);
             }
         }
 
@@ -43,7 +43,7 @@ export class KeyEvents {
             MapStyle.setPredefinedStyle(styles[id]);
 
             for (const layer of layers) {
-                layer.makeLayerInfoDirty();
+                layer.makeLayerRenderInfoDirty();
             }
         }
     }

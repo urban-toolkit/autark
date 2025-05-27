@@ -12,7 +12,10 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
         let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
 
         const collection: Feature[] = geojson['features'];
-        for (const feature of collection) {
+        for (let fId=0; fId<collection.length; fId++) {
+            // gets the feature
+            const feature = collection[fId];
+
             if (feature.geometry.type === 'LineString') {
                 meshes = Triangulator.lineStringToMesh(feature, origin);
 
@@ -31,19 +34,25 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
                 continue;
             }
 
+            let nPoints = 0;
+            let nTriangles = 0;
+
             for (const triangulation of meshes) {
                 mesh.push({
                     position: triangulation.flatCoords,
                     indices: triangulation.flatIds
                 });
 
-                comps.push({
-                    nPoints: triangulation.flatCoords.length / 2,
-                    nTriangles: triangulation.flatIds.length / 3
-                });
+                nPoints += triangulation.flatCoords.length / 2;
+                nTriangles += triangulation.flatIds.length / 3;
             }
 
+            comps.push({
+                nPoints,
+                nTriangles
+            });
         }
+
         return [mesh, comps];
     }
 

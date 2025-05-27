@@ -39,6 +39,10 @@ export class Features2DLayer extends Layer {
         return this._indices;
     }
 
+    get components(): ILayerComponent[] {
+        return this._components;
+    }
+
     createPipeline(renderer: Renderer): void {
         // TODO: USE OTHER PIPELINES
         this._pipeline = new PipelineTriangleFlat(renderer);
@@ -132,7 +136,6 @@ export class Features2DLayer extends Layer {
                 thematic.push(aggr[aId]);
             }
         }
-
         console.assert(thematic.length === this._position.length / 3);
         this._thematic = thematic;
     }
@@ -141,6 +144,11 @@ export class Features2DLayer extends Layer {
         if (this._renderInfoIsDirty) {
             this._pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
+        }
+
+        if(this._dataInfoIsDirty) {
+            this._pipeline.updateVertexBuffers(this);
+            this._dataInfoIsDirty = false;
         }
 
         this._pipeline.renderPass(camera);

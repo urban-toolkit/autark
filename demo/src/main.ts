@@ -22,30 +22,33 @@ async function runDbMapIntegration() {
 
     console.log('Running map integration demo');
 
-    // DB ------
-
+    // DB ------------
     const db = new DbMapIntegration();
     await db.init();
 
+    // Load Data -----
     await db.loadOsm();
+    await db.loadCsv();
+    await db.loadCustomLayer();
 
-    // await db.loadCustomLayer();
-    // await db.loadCsv();
-    // await db.spatialJoin();
-
-    const layers = await db.exportLayers();
-    const bbox = await db.loadOsmBoundingBox();
-
-    // MAP -----
-
+    // MAP -----------
     const map = new UtkMap(canvas);
-    await map.init(bbox);
+    await map.init(await db.loadOsmBoundingBox());
+    map.draw();
 
+    // Load Layers ---
+    const layers = await db.exportLayers();
     for (const json of layers) {
         map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }
 
-    map.draw();
+    // Spatial Join ---
+    await db.spatialJoin();
+    
+    const thematic = await db.updateThematicData();
+
+    map.updateLayerThematic('neighborhoods', thematic);
+    map.updateRenderInfoIsColorMap('neighborhoods', true);
 }
 
 async function runDbStandalone() {

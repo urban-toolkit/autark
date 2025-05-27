@@ -80,6 +80,14 @@ export class UtkMap {
         this.updateBoundingBoxAndOrigin(bbox);
     }
 
+    updateCamera(params: ICameraData) {
+        this._camera = new Camera(params);
+    }
+
+    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
+        this._layerManager.updateBoundingBoxAndOrigin(bbox);
+    }
+
     loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         switch (typeLayer) {
             case LayerType.OSM_SURFACE:
@@ -107,19 +115,13 @@ export class UtkMap {
         }
     }
 
-    updateCamera(params: ICameraData) {
-        this._camera = new Camera(params);
-    }
-
-    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
-        this._layerManager.updateBoundingBoxAndOrigin(bbox);
-    }
-
-    updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
+    updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
         if (layer) {
-            layer.setLayerRenderInfo(layerRenderInfo);
+            // load data
+            layer.loadThematic(layerThematic);
+            layer.makeLayerDataInfoDirty();
         }
     }
 
@@ -129,14 +131,26 @@ export class UtkMap {
         if (layer) {
             // load data
             layer.loadGeometry(layerGeometry);
+            layer.makeLayerDataInfoDirty();
         }
     }
 
-    updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]): void {
+    updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
         if (layer) {
-            layer.loadThematic(layerThematic);
+            layer.setLayerRenderInfo(layerRenderInfo);
+        }
+    }
+    
+    updateRenderInfoIsColorMap(layerName: string, isColorMap: boolean) {
+        const layer = this._layerManager.searchByLayerId(layerName);
+
+        if (layer) {
+            const layerRenderInfo = layer.layerRenderInfo;
+            layerRenderInfo.isColorMap = isColorMap;
+
+            layer.setLayerRenderInfo(layerRenderInfo);
         }
     }
 
@@ -198,10 +212,10 @@ export class UtkMap {
         const layerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
+            thematic: layerMesh[1].map(() => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [id / (layerMesh[1].length - 1)]
+                    values: [0]
                 }
             })
         };

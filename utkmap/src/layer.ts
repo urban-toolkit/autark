@@ -4,53 +4,59 @@ import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderIn
 import { Renderer } from './renderer';
 
 export abstract class Layer {
-  // layer id
-  protected _layerInfo!: ILayerInfo;
-  // picking shader
-  protected _layerRenderInfo!: ILayerRenderInfo;
-  // uniforms dirty
-  protected _renderInfoIsDirty: boolean = false;
+    // layer id
+    protected _layerInfo!: ILayerInfo;
+    // picking shader
+    protected _layerRenderInfo!: ILayerRenderInfo;
+    // uniforms dirty
+    protected _renderInfoIsDirty: boolean = false;
+    // vbo is dirty
+    protected _dataInfoIsDirty: boolean = false;
 
-  constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
-    this.setLayerInfo(layerInfo);
-    this.setLayerRenderInfo(layerRenderInfo);
-  }
+    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
+        this.setLayerInfo(layerInfo);
+        this.setLayerRenderInfo(layerRenderInfo);
+    }
 
-  get id() {
-    return this._layerInfo.id;
-  }
+    get id() {
+        return this._layerInfo.id;
+    }
 
-  get layerInfo() {
-    return this._layerInfo;
-  }
+    get layerInfo() {
+        return this._layerInfo;
+    }
 
-  get layerRenderInfo() {
-    return this._layerRenderInfo;
-  }
+    get layerRenderInfo() {
+        return this._layerRenderInfo;
+    }
 
-  setLayerInfo(layerInfo: ILayerInfo) {
-    this._layerInfo = layerInfo;
-  }
+    setLayerInfo(layerInfo: ILayerInfo) {
+        this._layerInfo = layerInfo;
+    }
 
-  setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
-    this._layerRenderInfo = layerRenderInfo;
+    setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
+        this._layerRenderInfo = layerRenderInfo;
 
-    this.makeLayerInfoDirty();
-  }
+        this.makeLayerRenderInfoDirty();
+    }
 
-  makeLayerInfoDirty() {
-    this._renderInfoIsDirty = true;
-  }
+    makeLayerDataInfoDirty() {
+        this._dataInfoIsDirty = true;
+    }
 
-  abstract loadData(layerData: ILayerData): void;
+    makeLayerRenderInfoDirty() {
+        this._renderInfoIsDirty = true;
+    }
 
-  abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
+    abstract loadData(layerData: ILayerData): void;
 
-  abstract loadComponent(layerComponent: ILayerComponent[]): void;
+    abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
 
-  abstract loadThematic(layerThematic: ILayerThematic[]): void;
+    abstract loadComponent(layerComponent: ILayerComponent[]): void;
 
-  abstract createPipeline(renderer: Renderer, camera: Camera): void;
+    abstract loadThematic(layerThematic: ILayerThematic[]): void;
 
-  abstract renderPass(camera: Camera): void;
+    abstract createPipeline(renderer: Renderer, camera: Camera): void;
+
+    abstract renderPass(camera: Camera): void;
 }
