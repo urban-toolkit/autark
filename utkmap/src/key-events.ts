@@ -58,6 +58,18 @@ export class KeyEvents {
             this._currentLayer.makeLayerRenderInfoDirty();
         }
 
+        if (event.key === 'h') {
+            if (!this._currentLayer) {
+                return;
+            }
+
+            const layerInfo = this._currentLayer.layerInfo;
+            const renderInfo = this._currentLayer.layerRenderInfo;
+
+            this._map.updateRenderInfoSkip(layerInfo.id, !renderInfo.isSkip);
+            this._currentLayer.makeLayerRenderInfoDirty();
+        }
+
         if (event.key == 's') {
             const styles = ['default', 'light', 'dark'];
             const current = MapStyle.currentStyle;

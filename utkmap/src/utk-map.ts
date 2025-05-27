@@ -156,6 +156,18 @@ export class UtkMap {
         }
     }
 
+    updateRenderInfoSkip(layerName: string, isSkip: boolean) {
+        const layer = this._layerManager.searchByLayerId(layerName);
+
+        if (layer) {
+            const layerRenderInfo = layer.layerRenderInfo;
+            layerRenderInfo.isSkip = isSkip;
+
+            layer.setLayerRenderInfo(layerRenderInfo);
+        }
+    }
+
+
     draw(fps: number = 60) {
         let previousDelta = 0;
 
@@ -183,7 +195,9 @@ export class UtkMap {
 
         // Render each layer
         this._layerManager.layers.forEach((layer) => {
-            layer.renderPass(this._camera);
+            if(!layer.layerRenderInfo.isSkip) {
+                layer.renderPass(this._camera);
+            }
         });
 
         // Finish render
@@ -211,6 +225,7 @@ export class UtkMap {
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPicking: false,
+            isSkip: false,
         };
 
         const layerMesh = TriangulatorFeatures2D.buildMesh(geojson, this.origin);
@@ -246,6 +261,7 @@ export class UtkMap {
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPicking: false,
+            isSkip: false,
         };
 
         const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin, this.boundingBox);
@@ -281,6 +297,7 @@ export class UtkMap {
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPicking: false,
+            isSkip: false,
         };
 
         const layerMesh = TriangulatorRoads.buildMesh(geojson, this.origin);
@@ -316,6 +333,7 @@ export class UtkMap {
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPicking: false,
+            isSkip: false,
         };
 
         const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);

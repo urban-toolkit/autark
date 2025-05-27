@@ -12,6 +12,7 @@ export class DbMapIntegration extends DbStandalone {
     async exportLayers(): Promise<{ props: Table; data: FeatureCollection }[]> {
         const data = [];
         for (const layerData of this.db.tables) {
+
             if (layerData.source === 'csv') {
                 continue;
             }
