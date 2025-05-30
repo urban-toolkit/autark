@@ -82,3 +82,15 @@ cd utkmap && npm run dev-build
 cd utkdb && npm run dev-build
 cd demo && npm run dev
 ```
+
+---
+
+## Notes
+
+* WebGPU is required to run this project. In Chrome or Edge (v113+), it's enabled by default. In Firefox, WebGPU is only available in Nightly builds and must be explicitly enabled::
+
+  1. Download and install [Firefox Nightly](https://www.mozilla.org/en-US/firefox/channel/desktop/#nightly).
+  1. Visit `about:config`.
+  2. Set `dom.webgpu.enabled` to `true`.
+  3. (Optional) You may also need to enable `gfx.webgpu.enabled` and `gfx.webgpu.force-enabled`.
+  4. Restart Firefox.
