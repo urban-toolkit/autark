@@ -27,7 +27,7 @@ async function runDbMapIntegration() {
     await db.init();
 
     // Load Data -----
-    await db.loadOsm();
+    await db.loadOsm(undefined, [LayerType.OSM_PARKS, LayerType.OSM_BUILDINGS]);
     await db.loadCsv();
     await db.loadCustomLayer();
 

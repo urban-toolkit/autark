@@ -27,6 +27,7 @@ export class MouseEvents {
     this._map.renderer.canvas.addEventListener('mouseup', this.mouseUp.bind(this), false);
     this._map.renderer.canvas.addEventListener('contextmenu', this.contextMenu.bind(this), false);
     this._map.renderer.canvas.addEventListener('mousemove', this.mouseMove.bind(this), false);
+    this._map.renderer.canvas.addEventListener('dblclick', this.mouseDoubleClick.bind(this), false);
   }
 
   /**
@@ -114,4 +115,17 @@ export class MouseEvents {
 
     this._map.camera.zoom(event.deltaY * 0.01, x, y);
   }
+
+    /**
+   * Handles mouse double click event
+   * Handles mouse double click
+   */
+  mouseDoubleClick(event: MouseEvent) {
+    this._map.layerManager.layers.forEach((layer) => {
+      layer.layerRenderInfo.isPicking = true;
+      layer.layerRenderInfo.isHighlight = true;
+      layer.layerRenderInfo.pickedComps = [event.offsetX, event.offsetY];
+    });
+  }
+
 }

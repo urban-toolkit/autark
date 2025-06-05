@@ -21,6 +21,7 @@ export abstract class Pipeline {
   // Uniforms buffer
   protected _colorBuffer!: GPUBuffer;
   protected _useColorMap!: GPUBuffer;
+  protected _useHighlight!: GPUBuffer;
   protected _cMapTexture!: GPUTexture;
 
   protected _colorsBindGroup!: GPUBindGroup;
@@ -89,7 +90,13 @@ export abstract class Pipeline {
     });
 
     this._useColorMap = this._renderer.device.createBuffer({
-      label: 'Enable colormap on reder',
+      label: 'Enable colormap on render',
+      size: 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    this._useHighlight = this._renderer.device.createBuffer({
+      label: 'Enable highlight on render',
       size: 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -122,12 +129,17 @@ export abstract class Pipeline {
           buffer: {},
         },
         {
-          binding: 2, // cMap texture
+          binding: 2, // show highlight
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: {},
+        },
+        {
+          binding: 3, // cMap texture
           visibility: GPUShaderStage.FRAGMENT,
           texture: {},
         },
         {
-          binding: 3, // cMap sampler
+          binding: 4, // cMap sampler
           visibility: GPUShaderStage.FRAGMENT,
           sampler: {},
         },
@@ -147,10 +159,14 @@ export abstract class Pipeline {
         },
         {
           binding: 2,
-          resource: this._cMapTexture.createView(),
+          resource: { buffer: this._useHighlight },
         },
         {
           binding: 3,
+          resource: this._cMapTexture.createView(),
+        },
+        {
+          binding: 4,
           resource: cMapSampler,
         },
       ],
@@ -162,13 +178,16 @@ export abstract class Pipeline {
       color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof IMapStyle),
       colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
       useColorMap: <boolean>layer.layerRenderInfo.isColorMap,
+      useHighlight: <boolean>layer.layerRenderInfo.isHighlight
     };
 
     const color = new Float32Array(Object.values(colors.color));
     const useColorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
+    const useHighlight = new Float32Array([colors.useHighlight ? 1.0 : 0.0]);
     const colorMapTexture = new Uint8Array(colors.colorMap);
 
     this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, color);
+    this._renderer.device.queue.writeBuffer(this._useHighlight, 0, useHighlight);
     this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useColorMap);
     this._renderer.device.queue.writeTexture(
       { texture: this._cMapTexture },

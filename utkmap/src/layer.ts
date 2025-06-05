@@ -4,57 +4,77 @@ import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderIn
 import { Renderer } from './renderer';
 
 export abstract class Layer {
-    // layer id
-    protected _layerInfo!: ILayerInfo;
-    // picking shader
-    protected _layerRenderInfo!: ILayerRenderInfo;
-    // uniforms dirty
-    protected _renderInfoIsDirty: boolean = false;
-    // vbo is dirty
-    protected _dataInfoIsDirty: boolean = false;
+  // layer id
+  protected _layerInfo!: ILayerInfo;
+  // picking shader
+  protected _layerRenderInfo!: ILayerRenderInfo;
+  // uniforms dirty
+  protected _renderInfoIsDirty: boolean = false;
+  // vbo is dirty
+  protected _dataInfoIsDirty: boolean = false;
 
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
-        this.setLayerInfo(layerInfo);
-        this.setLayerRenderInfo(layerRenderInfo);
-    }
+  protected _highlighted!: number[];
 
-    get id() {
-        return this._layerInfo.id;
-    }
+  constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
+    this.setLayerInfo(layerInfo);
+    this.setLayerRenderInfo(layerRenderInfo);
+  }
 
-    get layerInfo() {
-        return this._layerInfo;
-    }
+  get id() {
+    return this._layerInfo.id;
+  }
 
-    get layerRenderInfo() {
-        return this._layerRenderInfo;
-    }
+  get layerInfo() {
+    return this._layerInfo;
+  }
 
-    setLayerInfo(layerInfo: ILayerInfo) {
-        this._layerInfo = layerInfo;
-    }
+  get layerRenderInfo() {
+    return this._layerRenderInfo;
+  }
 
-    setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
-        this._layerRenderInfo = layerRenderInfo;
-    }
+  get pickedId() {
+    return this.layerRenderInfo.pickedId;
+  }
 
-    makeLayerDataInfoDirty() {
-        this._dataInfoIsDirty = true;
-    }
+  get pickedComp() {
+    return this.layerRenderInfo.pickedComps;
+  }
 
-    makeLayerRenderInfoDirty() {
-        this._renderInfoIsDirty = true;
-    }
+  get highlighted(): number[] {
+    return this._highlighted;
+  }
 
-    abstract loadData(layerData: ILayerData): void;
+  setLayerInfo(layerInfo: ILayerInfo) {
+    this._layerInfo = layerInfo;
+  }
 
-    abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
+  setLayerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
+    this._layerRenderInfo = layerRenderInfo;
+  }
 
-    abstract loadComponent(layerComponent: ILayerComponent[]): void;
+  makeLayerDataInfoDirty() {
+    this._dataInfoIsDirty = true;
+  }
 
-    abstract loadThematic(layerThematic: ILayerThematic[]): void;
+  makeLayerRenderInfoDirty() {
+    this._renderInfoIsDirty = true;
+  }
 
-    abstract createPipeline(renderer: Renderer, camera: Camera): void;
+  abstract setHighlighted(ids: number[]): void;
 
-    abstract renderPass(camera: Camera): void;
+  abstract loadData(layerData: ILayerData): void;
+
+  abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
+
+  abstract loadComponent(layerComponent: ILayerComponent[]): void;
+
+  abstract loadThematic(layerThematic: ILayerThematic[]): void;
+
+  abstract createPipeline(renderer: Renderer, camera: Camera): void;
+
+  abstract renderPass(camera: Camera): void;
+
+  abstract renderPickingPass(camera: Camera): void;
+
+  abstract getPickedId(x: number, y: number): Promise<number>;
 }

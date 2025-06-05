@@ -33,6 +33,8 @@ export interface ILayerRenderInfo {
   isHighlight?: boolean; // is highlight enabled?
   highlightComps?: number[]; // what components?
   isPicking?: boolean; // is picking enabled?
+  pickedComps?: number[];
+  pickedId?: number;
   isSkip?: boolean; // skip render?
 }
 
@@ -40,6 +42,7 @@ export interface ILayerData {
   geometry: ILayerGeometry[]; // list of geometries
   components: ILayerComponent[]; // list of components
   thematic?: ILayerThematic[]; // list of thematic data
+  highlighted?: number[]; // list of highlight data (boolean)
 }
 
 export interface ILayerGeometry {

@@ -14,6 +14,7 @@ export class PipelineTriangleFlat extends Pipeline {
   // Vertex buffers
   protected _positionBuffer!: GPUBuffer;
   protected _thematicBuffer!: GPUBuffer;
+  protected _highlightedBuffer!: GPUBuffer;
   protected _indicesBuffer!: GPUBuffer;
 
   // shaders
@@ -70,6 +71,13 @@ export class PipelineTriangleFlat extends Pipeline {
     });
 
     // vertex data
+    this._highlightedBuffer = this._renderer.device.createBuffer({
+      label: 'Highlighted data buffer',
+      size: mesh.highlighted.length * 4,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+
+    // vertex data
     this._indicesBuffer = this._renderer.device.createBuffer({
       label: 'Primitive indices buffer',
       size: mesh.indices.length * 4,
@@ -80,6 +88,7 @@ export class PipelineTriangleFlat extends Pipeline {
   updateVertexBuffers(mesh: Features2DLayer) {
     this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
     this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
+    this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlighted));
     this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
   }
 
@@ -95,6 +104,11 @@ export class PipelineTriangleFlat extends Pipeline {
       offset: 0,
       format: 'float32',
     };
+    const highlightedAttribDesc: GPUVertexAttribute = {
+      shaderLocation: 2, // [[location(2)]]
+      offset: 0,
+      format: 'float32',
+    };
 
     const positionBufferDesc: GPUVertexBufferLayout = {
       attributes: [positionAttribDesc],
@@ -106,12 +120,17 @@ export class PipelineTriangleFlat extends Pipeline {
       arrayStride: 4 * 1, // sizeof(float) * 3
       stepMode: 'vertex',
     };
+    const highlightedBufferDesc: GPUVertexBufferLayout = {
+      attributes: [highlightedAttribDesc],
+      arrayStride: 4 * 1, // sizeof(float) * 3
+      stepMode: 'vertex',
+    };
 
     // Vertex Shader
     const vertex: GPUVertexState = {
       module: this._vertModule,
       entryPoint: 'main',
-      buffers: [positionBufferDesc, thematicBufferDesc],
+      buffers: [positionBufferDesc, thematicBufferDesc, highlightedBufferDesc],
     };
 
     // Fragment Shader
@@ -158,6 +177,7 @@ export class PipelineTriangleFlat extends Pipeline {
       primitive,
       depthStencil,
       multisample,
+      label: "Pipeline triangle flat"
     };
     this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
   }
@@ -187,6 +207,7 @@ export class PipelineTriangleFlat extends Pipeline {
     // sets the vertex buffers
     passEncoder.setVertexBuffer(0, this._positionBuffer);
     passEncoder.setVertexBuffer(1, this._thematicBuffer);
+    passEncoder.setVertexBuffer(2, this._highlightedBuffer);
 
     // sets primitive indices buffer
     passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');

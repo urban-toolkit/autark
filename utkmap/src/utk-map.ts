@@ -190,18 +190,44 @@ export class UtkMap {
         // Updates the camera
         this._camera.update();
 
-        // Starts render
+        // Normal render pass for each layer
         this._renderer.start();
-
-        // Render each layer
         this._layerManager.layers.forEach((layer) => {
             if(!layer.layerRenderInfo.isSkip) {
                 layer.renderPass(this._camera);
             }
         });
-
-        // Finish render
         this._renderer.finish();
+
+        // Picking render pass for each layer
+        this._renderer.startPickingRenderPass();
+        this._layerManager.layers.forEach((layer) => {
+            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPicking) {
+                layer.renderPickingPass(this._camera);
+            }
+        });
+        this._renderer.finish();
+        
+
+        // Getting id: TEMP
+        this._layerManager.layers.forEach((layer) => {
+            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPicking) {
+                const pickedComps = layer.layerRenderInfo.pickedComps;
+                if (!pickedComps) return;
+                
+                const [x, y] = pickedComps;
+                layer.getPickedId(x, y).then(id => {
+                    console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
+                    if(id >= 0){
+                        layer.setHighlighted([id]);
+                    }
+                    layer.layerRenderInfo.isPicking = false;
+                });
+            }            
+        });
+                
+
+        
     }
 
     private createFeatures2DLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
@@ -224,6 +250,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
+            isHighlight: false,
             isPicking: false,
             isSkip: false,
         };
@@ -260,6 +287,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
+            isHighlight: false,
             isPicking: false,
             isSkip: false,
         };
@@ -296,6 +324,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
+            isHighlight: false,
             isPicking: false,
             isSkip: false,
         };
@@ -332,6 +361,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_SSAO,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
+            isHighlight: false,
             isPicking: false,
             isSkip: false,
         };

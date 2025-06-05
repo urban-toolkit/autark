@@ -27,6 +27,9 @@ sudo apt-get install build-essential
 
 # macOS
 xcode-select --install
+
+# Windows
+conda install anaconda::make
 ```
 
 To install all required dependencies:
@@ -37,7 +40,13 @@ make install
 
 This command will install dependencies for `utkmap`.
 
-### Running and Building
+### Building and Running
+
+To install required packages:
+
+```bash
+make install
+```
 
 To run the development server with hot-reloading:
 
@@ -45,42 +54,10 @@ To run the development server with hot-reloading:
 make dev
 ```
 
-To compile the frontend for production:
-
-```bash
-make build
-```
-
 To clean build artifacts:
 
 ```bash
 make clean
-```
-
-## Running and Building Manually
-
-If you prefer not to use `make`, you can compile and deploy the project using the following steps:
-
-### Frontend (Node.js)
-
-To install dependencies:
-
-```bash
-cd utkmap && npm install && cd ../utkdb && npm install && cd ../demo && npm install && cd ..
-```
-
-To run the development server with hot-reloading:
-
-```bash
-npm run dev
-```
-
-To build with development settings:
-
-```bash
-cd utkmap && npm run dev-build
-cd utkdb && npm run dev-build
-cd demo && npm run dev
 ```
 
 ---
