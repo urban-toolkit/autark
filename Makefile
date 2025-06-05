@@ -7,8 +7,10 @@ install:
 	$(CONCURRENTLY) "cd utkmap && npm install" "cd utkdb && npm install" "cd demo && npm install"
 
 dev:
-	$(CONCURRENTLY) "cd utkmap && npm run dev-build" "cd utkdb && npm run dev-build" "cd demo && npm run dev"
-
+	$(CONCURRENTLY) \
+		"cd utkmap && npm run dev-build" \
+		"cd utkdb && npm run dev-build" \
+		"sleep 10 && cd demo && npm run dev"
 map:
 	$(CONCURRENTLY) "cd utkmap && npm run build"
 
