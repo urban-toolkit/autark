@@ -20,11 +20,18 @@ export class Renderer {
     protected _depthTexture!: GPUTexture;
     protected _depthBuffer!: GPURenderPassDepthStencilAttachment;
 
+    // Picking
+    protected _pickingBuffer!: GPURenderPassColorAttachment;
+    protected _pickingTexture!: GPUTexture;
+    protected _pickingDepthBuffer!: GPURenderPassDepthStencilAttachment;
+    protected _pickingDepthTexture!: GPUTexture;
+
     // command encoder
     protected _commandEncoder!: GPUCommandEncoder;
 
     // antalising
     protected _sampleCount: number = 4;
+    protected _pickingSampleCount: number = 1;
 
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
@@ -58,6 +65,18 @@ export class Renderer {
         return this._sampleCount;
     }
 
+    get pickingTexture(): GPUTexture {
+        return this._pickingTexture;
+    }
+
+    get pickingBuffer(): GPURenderPassColorAttachment {
+        return this._pickingBuffer;
+    }
+
+    get pickingDepthBuffer(): GPURenderPassDepthStencilAttachment {
+        return this._pickingDepthBuffer;
+    }
+
     // Start the rendering engine
     async init() {
         const api = await this.initWebGPU();
@@ -66,6 +85,7 @@ export class Renderer {
             this.configureContext();
             this.configureFrameBuffer();
             this.configureDepthBuffer();
+            this.configurePickingBuffer();
         }
     }
 
@@ -110,6 +130,41 @@ export class Renderer {
             };
             this._context.configure(canvasConfig);
         }
+    }
+
+    configurePickingBuffer() {
+        const desc: GPUTextureDescriptor = {
+            size: [this._canvas.width, this._canvas.height],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+            sampleCount: this._pickingSampleCount
+        };
+
+        this._pickingTexture = this._device.createTexture(desc);
+        const pickingTextureView = this._pickingTexture.createView();
+
+        this._pickingBuffer = {
+            view: pickingTextureView,
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: 'clear',
+            storeOp: 'store',
+        };
+
+        const depthDesc: GPUTextureDescriptor = {
+            size: [this._canvas.width, this._canvas.height],
+            format: 'depth32float',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            sampleCount: this._pickingSampleCount,
+        };
+        this._pickingDepthTexture = this._device.createTexture(depthDesc);
+        const pickingDepthTextureView = this._pickingDepthTexture.createView();
+
+        this._pickingDepthBuffer = {
+             view: pickingDepthTextureView,
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+        };
     }
 
     configureFrameBuffer() {
@@ -185,7 +240,7 @@ export class Renderer {
             depthStencilAttachment: this._depthBuffer,
         };
 
-        // Create a new pass commands encoder
+        // Create a new command encoder
         const passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
         passEncoder.end();
     }
@@ -193,4 +248,20 @@ export class Renderer {
     finish() {
         this._device.queue.submit([this._commandEncoder.finish()]);
     }
+
+    startPickingRenderPass() {
+
+        this._pickingBuffer.loadOp = 'clear';
+        
+        this._commandEncoder = this._device.createCommandEncoder();
+
+        const renderPassDesc: GPURenderPassDescriptor = {
+            colorAttachments: [this._pickingBuffer],
+            depthStencilAttachment: this._pickingDepthBuffer
+        };
+
+        const passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
+        passEncoder.end();
+    }
+
 }
