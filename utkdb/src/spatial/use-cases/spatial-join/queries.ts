@@ -60,7 +60,7 @@ function getSelectString(params: {
       SELECT 
         ${params.tableRoot.name}.geometry,
         json_merge_patch(
-          "${params.tableRoot.name}".properties,
+          COALESCE(CAST("${params.tableRoot.name}".properties AS JSON), '{}'::JSON),
           json_object(
             'sjoin', json_object(
               ${sjoinObjectSql}
@@ -162,7 +162,7 @@ function buildSimpleJoinSelect(tableRoot: Table, tableJoin: Table, geometricColu
           json_object(
             ${propertiesFromJoin}
           ),
-          "${tableRoot.name}".properties
+          COALESCE(CAST("${tableRoot.name}".properties AS JSON), '{}'::JSON)
         ) AS properties
     `;
 }
