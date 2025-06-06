@@ -1,9 +1,10 @@
 @group(0) @binding(0) var<uniform> color : vec4f;
-@group(0) @binding(1) var<uniform> showThematic : f32;
-@group(0) @binding(2) var<uniform> showHighlight : f32;
-@group(0) @binding(3) var cMapTex : texture_2d<f32>;
-@group(0) @binding(4) var cMapSampler : sampler;
-@group(0) @binding(5) var<uniform> opacity : f32;
+@group(0) @binding(1) var<uniform> highlightColor : vec4f;
+@group(0) @binding(2) var<uniform> showThematic : f32;
+@group(0) @binding(3) var<uniform> showHighlight : f32;
+@group(0) @binding(4) var cMapTex : texture_2d<f32>;
+@group(0) @binding(5) var cMapSampler : sampler;
+@group(0) @binding(6) var<uniform> opacity : f32;
 
 @fragment 
 fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32) -> @location(0) vec4f {
@@ -12,7 +13,7 @@ fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32) -> @locat
     var sampledColor = textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
 
     if(showHighlight > 0 && inHighlighted > 0) {
-        color = vec4f(1, 0, 0, 1);
+        color = highlightColor;
     }
     else if (showThematic > 0) {
         color = sampledColor;

@@ -1,9 +1,9 @@
 fn rand(n: f32) -> f32 { return fract(sin(n) * 43758.5453123); }
 
-@group(0) @binding(5) var<uniform> opacity : f32;
 @group(1) @binding(0) var texSampler: sampler;
 @group(1) @binding(1) var colorTex: texture_2d<f32>;
 @group(1) @binding(2) var normalTex: texture_2d<f32>;
+@group(0) @binding(6) var<uniform> opacity : f32;
 
 @fragment  
 fn main(@location(0) uvs : vec2<f32>) -> @location(0) vec4f { 
