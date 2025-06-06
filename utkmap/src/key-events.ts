@@ -90,7 +90,7 @@ export class KeyEvents {
         }
 
         if (event.key == 's') {
-            const styles = ['default', 'light', 'dark'];
+            const styles = ['default', 'light'];
             const current = MapStyle.currentStyle;
 
             const id = (styles.indexOf(current) + 1) % 3;

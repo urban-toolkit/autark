@@ -126,7 +126,7 @@ export class Renderer {
                 device: this._device,
                 format: 'bgra8unorm',
                 usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-                alphaMode: 'opaque',
+                alphaMode: 'premultiplied',
             };
             this._context.configure(canvasConfig);
         }

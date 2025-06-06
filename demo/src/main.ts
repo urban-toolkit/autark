@@ -29,7 +29,7 @@ async function runDbMapIntegration() {
     // Load Data -----
     await db.loadOsm();
     await db.loadCsv();
-    // await db.loadCustomLayer();
+    await db.loadCustomLayer();
 
     // Map -----------
     const bb = await db.loadOsmBoundingBox();
@@ -45,16 +45,18 @@ async function runDbMapIntegration() {
     }
 
     // Spatial Join ---
-    // await db.spatialJoin();
-    // const thematic = await db.updateThematicData("neighborhoods");
+    await db.spatialJoin();
+    const thematic = await db.updateThematicData("neighborhoods");
+    map.updateLayerThematic('neighborhoods', thematic);
 
-    // map.updateLayerThematic('neighborhoods', thematic);
+    // Opacity
+    map.updateLayerOpacity('neighborhoods', 0.5);
 
     // Spatial Join Roads
-    // Uncomment the next three lines
-    // await db.spatialJoinNear("table_osm_roads");
-    // const thematicRoads = await db.updateThematicData("table_osm_roads");
-    // map.updateLayerThematic('table_osm_roads', thematicRoads);
+    await db.spatialJoinNear("table_osm_roads");
+    const thematicRoads = await db.updateThematicData("table_osm_roads");
+    map.updateLayerThematic('table_osm_roads', thematicRoads);
+
 }
 
 async function runDbStandalone() {

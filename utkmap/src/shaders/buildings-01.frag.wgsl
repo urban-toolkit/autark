@@ -3,6 +3,7 @@
 @group(0) @binding(2) var<uniform> showHighlight : f32;
 @group(0) @binding(3) var cMapTex : texture_2d<f32>;
 @group(0) @binding(4) var cMapSampler : sampler;
+@group(0) @binding(5) var<uniform> opacity : f32;
 
 struct BufferOut {
     @location(0) color  : vec4f,
@@ -36,6 +37,5 @@ fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2)
     output.color  = vec4f(0.5 * shade.rgb + 0.5 * color.rgb, 1.0);
     output.normal = vec4f(normal * 0.5 + 0.5, 1.0);
 
-    return output;
-
+    return vec4f(output.rgb, opacity);
 }

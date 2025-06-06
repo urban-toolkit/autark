@@ -1,10 +1,11 @@
 {
-  "land": "#F6F6F4",
+  "land": "#F2F2F2",
   "roads": "#cbcbcb",
   "parks": "#cccccd",
-  "water": "#cad2d4",
+  "water": "#F6F6F6",
+  "coastline": "#F6F6F6",
   "sky": "#FFFFFF",
-  "surface": "#F6F6F4",
+  "surface": "#F2F2F2",
   "buildings": "#DFDFDF",
   "custom2DLayer":  "#DFDFDF"
 }

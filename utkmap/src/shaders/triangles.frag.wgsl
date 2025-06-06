@@ -3,6 +3,7 @@
 @group(0) @binding(2) var<uniform> showHighlight : f32;
 @group(0) @binding(3) var cMapTex : texture_2d<f32>;
 @group(0) @binding(4) var cMapSampler : sampler;
+@group(0) @binding(5) var<uniform> opacity : f32;
 
 @fragment 
 fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32) -> @location(0) vec4f {
@@ -16,5 +17,5 @@ fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32) -> @locat
     else if (showThematic > 0) {
         color = sampledColor;
     }
-    return color;
+    return vec4f(color.rgb * opacity, opacity);
 }

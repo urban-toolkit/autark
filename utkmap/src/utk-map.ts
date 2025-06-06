@@ -136,6 +136,17 @@ export class UtkMap {
         }
     }
 
+    updateLayerOpacity(layerName: string, opacity: number) {
+        const layer = this._layerManager.searchByLayerId(layerName);
+
+        if (layer) {
+            // load data
+            layer.layerRenderInfo.opacity = opacity;
+            layer.makeLayerRenderInfoDirty();
+        }
+    }
+
+
     updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
@@ -259,6 +270,8 @@ export class UtkMap {
 
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
+            opacity: 1.0,
+            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPick: false,
@@ -295,6 +308,7 @@ export class UtkMap {
 
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
+            opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPick: false,
@@ -331,6 +345,7 @@ export class UtkMap {
 
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
+            opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPick: false,
@@ -346,7 +361,7 @@ export class UtkMap {
         const layerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
+            thematic: layerMesh[1].map(() => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
                     values: [0]
@@ -367,6 +382,7 @@ export class UtkMap {
 
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_SSAO,
+            opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
             isPick: false,

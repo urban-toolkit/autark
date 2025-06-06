@@ -31,7 +31,6 @@ export class PipelineTrianglePicking extends Pipeline {
     this.updateVertexBuffers(mesh);
 
     this.createPipeline();
-
   }
 
   createShaders() {

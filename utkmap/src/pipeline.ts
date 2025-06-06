@@ -9,199 +9,219 @@ import { ColorMap } from './colormap';
 import { IMapStyle } from './interfaces';
 
 export abstract class Pipeline {
-  // renderer reference
-  protected _renderer: Renderer;
+    // renderer reference
+    protected _renderer: Renderer;
 
-  // Transformation matrices uniform buffer
-  protected _mviewBuffer!: GPUBuffer;
-  protected _projcBuffer!: GPUBuffer;
-  protected _cameraBindGroup!: GPUBindGroup;
-  protected _cameraBindGroupLayout!: GPUBindGroupLayout;
+    // Transformation matrices uniform buffer
+    protected _mviewBuffer!: GPUBuffer;
+    protected _projcBuffer!: GPUBuffer;
+    protected _cameraBindGroup!: GPUBindGroup;
+    protected _cameraBindGroupLayout!: GPUBindGroupLayout;
 
-  // Uniforms buffer
-  protected _colorBuffer!: GPUBuffer;
-  protected _useColorMap!: GPUBuffer;
-  protected _useHighlight!: GPUBuffer;
-  protected _cMapTexture!: GPUTexture;
+    // Uniforms buffer
+    protected _colorBuffer!: GPUBuffer;
+    protected _useColorMap!: GPUBuffer;
+    protected _useHighlight!: GPUBuffer;
+    protected _cMapTexture!: GPUTexture;
+    protected _opacity!: GPUBuffer;
 
-  protected _colorsBindGroup!: GPUBindGroup;
-  protected _colorsBindGroupLayout!: GPUBindGroupLayout;
+    protected _colorsBindGroup!: GPUBindGroup;
+    protected _colorsBindGroupLayout!: GPUBindGroupLayout;
 
-  constructor(renderer: Renderer) {
-    this._renderer = renderer;
-  }
 
-  createCameraUniformBindGroup() {
-    this._mviewBuffer = this._renderer.device.createBuffer({
-      label: 'ModelView matrix buffer',
-      size: 16 * 4,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    constructor(renderer: Renderer) {
+        this._renderer = renderer;
+    }
 
-    this._projcBuffer = this._renderer.device.createBuffer({
-      label: 'Projection matrix buffer',
-      size: 16 * 4,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    createCameraUniformBindGroup() {
+        this._mviewBuffer = this._renderer.device.createBuffer({
+            label: 'ModelView matrix buffer',
+            size: 16 * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
 
-    this._cameraBindGroupLayout = this._renderer.device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0, // modelview
-          visibility: GPUShaderStage.VERTEX,
-          buffer: {},
-        },
-        {
-          binding: 1, // projection
-          visibility: GPUShaderStage.VERTEX,
-          buffer: {},
-        },
-      ],
-    });
+        this._projcBuffer = this._renderer.device.createBuffer({
+            label: 'Projection matrix buffer',
+            size: 16 * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
 
-    this._cameraBindGroup = this._renderer.device.createBindGroup({
-      layout: this._cameraBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this._mviewBuffer },
-        },
-        {
-          binding: 1,
-          resource: { buffer: this._projcBuffer },
-        },
-      ],
-    });
-  }
+        this._cameraBindGroupLayout = this._renderer.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // modelview
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {},
+                },
+                {
+                    binding: 1, // projection
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {},
+                },
+            ],
+        });
 
-  updateCameraUniforms(camera: Camera) {
-    const mview = new Float32Array(camera.getModelViewMatrix());
-    const projc = new Float32Array(camera.getProjectionMatrix());
+        this._cameraBindGroup = this._renderer.device.createBindGroup({
+            layout: this._cameraBindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this._mviewBuffer },
+                },
+                {
+                    binding: 1,
+                    resource: { buffer: this._projcBuffer },
+                },
+            ],
+        });
+    }
 
-    this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, mview);
-    this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
-  }
+    updateCameraUniforms(camera: Camera) {
+        const mview = new Float32Array(camera.getModelViewMatrix());
+        const projc = new Float32Array(camera.getProjectionMatrix());
 
-  createColorUniformBindGroup() {
-    this._colorBuffer = this._renderer.device.createBuffer({
-      label: 'Fixed color buffer',
-      size: 4 * 4,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+        this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, mview);
+        this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
+    }
 
-    this._useColorMap = this._renderer.device.createBuffer({
-      label: 'Enable colormap on render',
-      size: 4,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    createColorUniformBindGroup() {
+        this._colorBuffer = this._renderer.device.createBuffer({
+            label: 'Fixed color buffer',
+            size: 4 * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
 
-    this._useHighlight = this._renderer.device.createBuffer({
-      label: 'Enable highlight on render',
-      size: 4,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+        this._useColorMap = this._renderer.device.createBuffer({
+            label: 'Enable colormap on render',
+            size: 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
 
-    this._cMapTexture = this._renderer.device.createTexture({
-      label: 'Colormap texture',
-      size: { width: 256, height: 1 },
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      format: 'rgba8unorm',
-    });
+        this._useHighlight = this._renderer.device.createBuffer({
+            label: 'Enable highlight on render',
+            size: 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
 
-    const cMapSampler = this._renderer.device.createSampler({
-      label: 'Fixed color buffer',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
+        this._cMapTexture = this._renderer.device.createTexture({
+            label: 'Colormap texture',
+            size: { width: 256, height: 1 },
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+            format: 'rgba8unorm',
+        });
 
-    this._colorsBindGroupLayout = this._renderer.device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0, // fixed color
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: {},
-        },
-        {
-          binding: 1, // show thematic data
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: {},
-        },
-        {
-          binding: 2, // show highlight
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: {},
-        },
-        {
-          binding: 3, // cMap texture
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: {},
-        },
-        {
-          binding: 4, // cMap sampler
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: {},
-        },
-      ],
-    });
+        const cMapSampler = this._renderer.device.createSampler({
+            label: 'Fixed color buffer',
+            magFilter: 'linear',
+            minFilter: 'linear',
+            addressModeU: 'clamp-to-edge',
+            addressModeV: 'clamp-to-edge',
+        });
 
-    this._colorsBindGroup = this._renderer.device.createBindGroup({
-      layout: this._colorsBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this._colorBuffer },
-        },
-        {
-          binding: 1,
-          resource: { buffer: this._useColorMap },
-        },
-        {
-          binding: 2,
-          resource: { buffer: this._useHighlight },
-        },
-        {
-          binding: 3,
-          resource: this._cMapTexture.createView(),
-        },
-        {
-          binding: 4,
-          resource: cMapSampler,
-        },
-      ],
-    });
-  }
+        this._opacity = this._renderer.device.createBuffer({
+            label: 'Enable opacity on render',
+            size: 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
 
-  updateColorUniforms(layer: Layer) {
-    const colors = {
-      color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof IMapStyle),
-      colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
-      useColorMap: <boolean>layer.layerRenderInfo.isColorMap,
-      useHighlight: <boolean>layer.layerRenderInfo.isPick
-    };
+        this._colorsBindGroupLayout = this._renderer.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // fixed color
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {},
+                },
+                {
+                    binding: 1, // show thematic data
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {},
+                },
+                {
+                    binding: 2, // show highlight
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {},
+                },
+                {
+                    binding: 3, // cMap texture
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {},
+                },
+                {
+                    binding: 4, // cMap sampler
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 5, // opacity
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {},
+                },
+            ],
+        });
 
-    const color = new Float32Array(Object.values(colors.color));
-    const useColorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
-    const useHighlight = new Float32Array([colors.useHighlight ? 1.0 : 0.0]);
-    const colorMapTexture = new Uint8Array(colors.colorMap);
+        this._colorsBindGroup = this._renderer.device.createBindGroup({
+            layout: this._colorsBindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this._colorBuffer },
+                },
+                {
+                    binding: 1,
+                    resource: { buffer: this._useColorMap },
+                },
+                {
+                    binding: 2,
+                    resource: { buffer: this._useHighlight },
+                },
+                {
+                    binding: 3,
+                    resource: this._cMapTexture.createView(),
+                },
+                {
+                    binding: 4,
+                    resource: cMapSampler,
+                },
+                {
+                    binding: 5,
+                    resource: { buffer: this._opacity},
+                }
+            ],
+        });
+    }
 
-    this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, color);
-    this._renderer.device.queue.writeBuffer(this._useHighlight, 0, useHighlight);
-    this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useColorMap);
-    this._renderer.device.queue.writeTexture(
-      { texture: this._cMapTexture },
-      colorMapTexture,
-      {},
-      { width: 256, height: 1 },
-    );
-  }
+    updateColorUniforms(layer: Layer) {
+        const colors = {
+            color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof IMapStyle),
+            colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
+            useColorMap: <boolean>layer.layerRenderInfo.isColorMap,
+            useHighlight: <boolean>layer.layerRenderInfo.isPick,
+            opacity: layer.layerRenderInfo.opacity
+        };
 
-  abstract build(data: Layer): void;
+        const color = new Float32Array(Object.values(colors.color));
+        const useColorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
+        const useHighlight = new Float32Array([colors.useHighlight ? 1.0 : 0.0]);
+        const colorMapTexture = new Uint8Array(colors.colorMap);
+        const opacity = new Float32Array([colors.opacity]);
 
-  abstract createVertexBuffers(data: Layer): void;
+        this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, color);
+        this._renderer.device.queue.writeBuffer(this._useHighlight, 0, useHighlight);
+        this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useColorMap);
+        this._renderer.device.queue.writeTexture(
+            { texture: this._cMapTexture },
+            colorMapTexture,
+            {},
+            { width: 256, height: 1 },
+        );
+        this._renderer.device.queue.writeBuffer(this._opacity, 0, opacity);
+    }
 
-  abstract updateVertexBuffers(data: Layer): void;
+    abstract build(data: Layer): void;
 
-  abstract renderPass(camera: Camera): void;
+    abstract createVertexBuffers(data: Layer): void;
+
+    abstract updateVertexBuffers(data: Layer): void;
+
+    abstract renderPass(camera: Camera): void;
 }
