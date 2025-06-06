@@ -22,7 +22,7 @@ export class DbStandalone {
             LayerType.OSM_PARKS,
             LayerType.OSM_WATER,
             LayerType.OSM_ROADS,
-            // LayerType.OSM_BUILDINGS,
+            LayerType.OSM_BUILDINGS,
         ],
         osmTable: string = 'table_osm',
     ) {
