@@ -382,7 +382,7 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         // Uniform Data
         const pipelineLayoutDesc = {
-            bindGroupLayouts: [this._texturesPass02BindGroupLayout],
+            bindGroupLayouts: [this._colorsBindGroupLayout, this._texturesPass02BindGroupLayout],
         };
 
         // Pipeline
@@ -456,7 +456,8 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.setPipeline(this._pipeline02);
 
         // sets the uniform buffers
-        passEncoder.setBindGroup(0, this._texturesPass02BindGroup);
+        passEncoder.setBindGroup(0, this._colorsBindGroup);
+        passEncoder.setBindGroup(1, this._texturesPass02BindGroup);
 
         // draw command
         passEncoder.draw(6);

@@ -1,8 +1,9 @@
 fn rand(n: f32) -> f32 { return fract(sin(n) * 43758.5453123); }
 
-@group(0) @binding(0) var texSampler: sampler;
-@group(0) @binding(1) var colorTex: texture_2d<f32>;
-@group(0) @binding(2) var normalTex: texture_2d<f32>;
+@group(0) @binding(5) var<uniform> opacity : f32;
+@group(1) @binding(0) var texSampler: sampler;
+@group(1) @binding(1) var colorTex: texture_2d<f32>;
+@group(1) @binding(2) var normalTex: texture_2d<f32>;
 
 @fragment  
 fn main(@location(0) uvs : vec2<f32>) -> @location(0) vec4f { 
@@ -29,5 +30,5 @@ fn main(@location(0) uvs : vec2<f32>) -> @location(0) vec4f {
 
     let color = textureSample(colorTex, texSampler, fuvs );
 
-    return vec4<f32>( cc * color.rgb, color.a);
+    return vec4<f32>( cc * color.rgb * opacity, opacity * color.a);
 }

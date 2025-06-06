@@ -17,8 +17,8 @@ export class TriangulatorRoads extends Triangulator {
       const base = <LineString>feature.geometry;
       base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
 
-      const top = lineOffset(base, 200, { units: 'kilometers' }).geometry.coordinates;
-      const bot = lineOffset(base, -200, { units: 'kilometers' }).geometry.coordinates;
+      const top = lineOffset(base, 300, { units: 'kilometers' }).geometry.coordinates;
+      const bot = lineOffset(base, -300, { units: 'kilometers' }).geometry.coordinates;
 
       bot.forEach((cord: number[]) => top.unshift(cord));
       top.push(top[0]);

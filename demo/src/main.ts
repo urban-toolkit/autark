@@ -50,13 +50,13 @@ async function runDbMapIntegration() {
     map.updateLayerThematic('neighborhoods', thematic);
 
     // Opacity
-    map.updateLayerOpacity('neighborhoods', 0.5);
-    map.updateLayerOpacity('table_osm_buildings', 0.5);
+    map.updateLayerOpacity('neighborhoods', 0.75);
+    map.updateLayerOpacity('table_osm_buildings', 0.75);
 
-    // // Spatial Join Roads
-    // await db.spatialJoinNear("table_osm_roads");
-    // const thematicRoads = await db.updateThematicData("table_osm_roads");
-    // map.updateLayerThematic('table_osm_roads', thematicRoads);
+    // Spatial Join Roads
+    await db.spatialJoinNear("table_osm_roads");
+    const thematicRoads = await db.updateThematicData("table_osm_roads");
+    map.updateLayerThematic('table_osm_roads', thematicRoads);
 
 }
 
