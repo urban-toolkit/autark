@@ -76,13 +76,15 @@ export class KeyEvents {
                 return;
             }
 
+            console.log(`Toggling skip for layer: ${this._currentLayer.layerInfo.id}`);
+
             const layerInfo = this._currentLayer.layerInfo;
             const renderInfo = this._currentLayer.layerRenderInfo;
             this._map.updateRenderInfoSkip(layerInfo.id, !renderInfo.isSkip);
 
             // Turn off picking as well
             if(renderInfo.isSkip)
-                this._map.updateRenderInfoSkip(layerInfo.id, false);
+                this._map.updateRenderInfoPick(layerInfo.id, false);
 
             this._currentLayer.makeLayerRenderInfoDirty();
         }

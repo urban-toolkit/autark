@@ -27,9 +27,9 @@ async function runDbMapIntegration() {
     await db.init();
 
     // Load Data -----
-    await db.loadOsm(undefined, [LayerType.OSM_PARKS, LayerType.OSM_BUILDINGS]);
+    await db.loadOsm();
     await db.loadCsv();
-    await db.loadCustomLayer();
+    // await db.loadCustomLayer();
 
     // Map -----------
     const bb = await db.loadOsmBoundingBox();
@@ -40,14 +40,21 @@ async function runDbMapIntegration() {
     // Load Layers ---
     const layers = await db.exportLayers();
     for (const json of layers) {
+        console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
         map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }
 
     // Spatial Join ---
-    await db.spatialJoin();
-    const thematic = await db.updateThematicData();
+    // await db.spatialJoin();
+    // const thematic = await db.updateThematicData("neighborhoods");
 
-    map.updateLayerThematic('neighborhoods', thematic);
+    // map.updateLayerThematic('neighborhoods', thematic);
+
+    // Spatial Join Roads
+    // Uncomment the next three lines
+    // await db.spatialJoinNear("table_osm_roads");
+    // const thematicRoads = await db.updateThematicData("table_osm_roads");
+    // map.updateLayerThematic('table_osm_roads', thematicRoads);
 }
 
 async function runDbStandalone() {
@@ -64,7 +71,3 @@ if (MAP_DEMO) {
 } else {
     runDbStandalone();
 }
-
-// TODO:
-// 1. Use spatial join result to color the neighborhoods layer
-// 4. Crop data on db?

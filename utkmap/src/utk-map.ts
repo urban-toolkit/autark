@@ -176,7 +176,7 @@ export class UtkMap {
 
             layer.setLayerRenderInfo(layerRenderInfo);
 
-            if(isPick == false) {
+            if(isPick === false) {
                 layer.setHighlighted([]);
             }
         }
@@ -223,7 +223,6 @@ export class UtkMap {
             }
         });
         this._renderer.finish();
-        
 
         // Getting id: TEMP
         this._layerManager.layers.forEach((layer) => {
@@ -237,11 +236,9 @@ export class UtkMap {
                     }
                     layer.layerRenderInfo.pickedComps = undefined;
                 });
-            }            
+            }
         });
-                
 
-        
     }
 
     private createFeatures2DLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
@@ -352,7 +349,7 @@ export class UtkMap {
             thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [id / (layerMesh[1].length - 1)]
+                    values: [0]
                 }
             })
         };
