@@ -32,10 +32,6 @@ export abstract class Layer {
     return this._layerRenderInfo;
   }
 
-  get pickedId() {
-    return this.layerRenderInfo.pickedId;
-  }
-
   get pickedComp() {
     return this.layerRenderInfo.pickedComps;
   }

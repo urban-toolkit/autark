@@ -122,9 +122,8 @@ export class MouseEvents {
    */
   mouseDoubleClick(event: MouseEvent) {
     this._map.layerManager.layers.forEach((layer) => {
-      layer.layerRenderInfo.isPicking = true;
-      layer.layerRenderInfo.isHighlight = true;
-      layer.layerRenderInfo.pickedComps = [event.offsetX, event.offsetY];
+      if(layer.layerRenderInfo.isPick)
+        layer.layerRenderInfo.pickedComps = [event.offsetX, event.offsetY];
     });
   }
 

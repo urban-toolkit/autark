@@ -167,6 +167,21 @@ export class UtkMap {
         }
     }
 
+    updateRenderInfoPick(layerName: string, isPick: boolean) {
+        const layer = this._layerManager.searchByLayerId(layerName);
+
+        if (layer) {
+            const layerRenderInfo = layer.layerRenderInfo;
+            layerRenderInfo.isPick = isPick;
+
+            layer.setLayerRenderInfo(layerRenderInfo);
+
+            if(isPick == false) {
+                layer.setHighlighted([]);
+            }
+        }
+    }
+
 
     draw(fps: number = 60) {
         let previousDelta = 0;
@@ -202,7 +217,8 @@ export class UtkMap {
         // Picking render pass for each layer
         this._renderer.startPickingRenderPass();
         this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPicking) {
+            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
+                console.log(layer.layerRenderInfo.pickedComps);
                 layer.renderPickingPass(this._camera);
             }
         });
@@ -211,17 +227,15 @@ export class UtkMap {
 
         // Getting id: TEMP
         this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPicking) {
-                const pickedComps = layer.layerRenderInfo.pickedComps;
-                if (!pickedComps) return;
+            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 
-                const [x, y] = pickedComps;
+                const [x, y] = layer.layerRenderInfo.pickedComps;
                 layer.getPickedId(x, y).then(id => {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if(id >= 0){
                         layer.setHighlighted([id]);
                     }
-                    layer.layerRenderInfo.isPicking = false;
+                    layer.layerRenderInfo.pickedComps = undefined;
                 });
             }            
         });
@@ -250,8 +264,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
-            isHighlight: false,
-            isPicking: false,
+            isPick: false,
             isSkip: false,
         };
 
@@ -287,8 +300,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
-            isHighlight: false,
-            isPicking: false,
+            isPick: false,
             isSkip: false,
         };
 
@@ -324,8 +336,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
-            isHighlight: false,
-            isPicking: false,
+            isPick: false,
             isSkip: false,
         };
 
@@ -361,8 +372,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_SSAO,
             colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
             isColorMap: false,
-            isHighlight: false,
-            isPicking: false,
+            isPick: false,
             isSkip: false,
         };
 

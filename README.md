@@ -1,6 +1,6 @@
 # UTK Serverless
 
-This repository contains a serverless map visualizer, implemented in TypeScript/JavaScript for lightweight client-side execution with built-in access to geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
+A serverless map visualizer, implemented in TypeScript/JavaScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
 
 * `utkdb`: Handles data management and querying.
 * `utkmap`: Provides map-based visualization capabilities.
@@ -59,6 +59,30 @@ To clean build artifacts:
 ```bash
 make clean
 ```
+
+---
+
+## Interaction Controls
+
+You can explore and modify the map using both keyboard and mouse:
+
+### Keyboard Shortcuts
+
+| Key         | Action                                                              |
+|-------------|---------------------------------------------------------------------|
+| `↑`         | Switch to the next map layer                                        |
+| `↓`         | Switch to the previous map layer                                    |
+| `t`         | Toggle thematic map rendering for the current layer                 |
+| `h` / `v`   | Toggle visibility of the current layer                              |
+| `s`         | Cycle through map styles (`default`, `light`, `dark`)               |
+
+
+### Mouse Actions
+
+| Action         | Effect                                                            |
+|----------------|-------------------------------------------------------------------|
+| Double Click   | Select object in the currently active layer (if selectable)       |
+
 
 ---
 

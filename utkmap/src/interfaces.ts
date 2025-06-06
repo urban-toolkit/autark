@@ -30,12 +30,9 @@ export interface ILayerRenderInfo {
   pipeline: RenderPipeline; // render Pipeline
   isColorMap?: boolean; // is colormap enabled?
   colorMapInterpolator: ColorMapInterpolator; // used colormap
-  isHighlight?: boolean; // is highlight enabled?
-  highlightComps?: number[]; // what components?
-  isPicking?: boolean; // is picking enabled?
   pickedComps?: number[];
-  pickedId?: number;
   isSkip?: boolean; // skip render?
+  isPick?: boolean; // picking enabled?
 }
 
 export interface ILayerData {

@@ -178,7 +178,7 @@ export abstract class Pipeline {
       color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof IMapStyle),
       colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
       useColorMap: <boolean>layer.layerRenderInfo.isColorMap,
-      useHighlight: <boolean>layer.layerRenderInfo.isHighlight
+      useHighlight: <boolean>layer.layerRenderInfo.isPick
     };
 
     const color = new Float32Array(Object.values(colors.color));
