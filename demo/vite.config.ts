@@ -15,9 +15,9 @@ export function pluginWatchNodeModules(modules: string[]) {
 }
 
 export default defineConfig({
-    plugins: [pluginWatchNodeModules(['utkmap', 'utkdb'])],
+    plugins: [pluginWatchNodeModules(['utkmap', 'utkdb', 'utkplot'])],
     optimizeDeps: {
-        exclude: ['utkmap', 'utkdb'],
+        exclude: ['utkmap', 'utkdb', 'utkplot'],
     },
     server: {
         cors: {

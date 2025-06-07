@@ -7,27 +7,36 @@
     <style>
         body {
             margin: 20px;
-            height: 800px;
-
             display: flex;
 
-            flex-direction: column;
+            flex-direction: row;
             flex-wrap: nowrap;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
         }
 
         canvas {
             width:800px;
-            height:800px;
+            min-height:800px !important;
 
+            margin: 10px;
             border: 1px solid #bfbfbf;
         }
+
+        #plot {
+            width:800px;
+            min-height:400px !important;
+
+            margin: 10px;
+            border: 1px solid #bfbfbf;
+        }
+
     </style>
 </head>
 
 <body>
     <canvas id="wgpu"></canvas>
+    <div id="plot"></div>
     <script type="module" src="/src/main.ts"></script>
 </body>
 

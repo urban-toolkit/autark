@@ -1,7 +1,10 @@
 import { FeatureCollection, GeoJsonProperties } from 'geojson';
 
 import { DbStandalone } from './dbStandalone';
+
+// TODO: FIX
 import { Table } from '../../utkdb/dist/shared/interfaces';
+
 import { ILayerThematic, ThematicAggregationLevel } from 'utkmap';
 
 export class DbMapIntegration extends DbStandalone {

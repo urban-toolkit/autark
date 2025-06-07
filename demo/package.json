@@ -23,6 +23,7 @@
   "dependencies": {
     "earcut": "^3.0.0",
     "utkdb": "file:../utkdb",
-    "utkmap": "file:../utkmap"
+    "utkmap": "file:../utkmap",
+    "utkplot": "file:../utkplot"
   }
 }

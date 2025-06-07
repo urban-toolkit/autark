@@ -196,6 +196,13 @@ export class Features2DLayer extends Layer {
         this.makeLayerDataInfoDirty();
     }
 
+    clearHighlighted(): void {
+        this._highlighted.fill(0);
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataInfoDirty();
+    }
+
     private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
         return layerThematic.values;
     }

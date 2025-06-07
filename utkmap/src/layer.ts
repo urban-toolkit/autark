@@ -57,6 +57,8 @@ export abstract class Layer {
     }
 
     abstract setHighlighted(ids: number[]): void;
+    
+    abstract clearHighlighted(): void;
 
     abstract loadData(layerData: ILayerData): void;
 
