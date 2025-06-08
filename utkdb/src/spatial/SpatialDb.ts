@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { CsvTable, CustomLayerTable, LayerTable, Table } from '../shared/interfaces';
@@ -15,7 +16,9 @@ import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase'
 import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase';
 import { GetBoundingBoxUseCase } from './shared/use-cases/get-bounding-box/GetBoundingBoxUseCase';
 import { BoundingBox } from './shared/use-cases/get-bounding-box/interfaces';
+import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { isLayerType } from './use-cases/load-layer/interfaces';
+import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -23,6 +26,7 @@ export class SpatialDb {
   public tables: Array<Table> = [];
   private osmBoudingBox?: BoundingBox;
   private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
+  private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
   private loadQueryUseCase?: LoadQueryUseCase;
@@ -31,12 +35,14 @@ export class SpatialDb {
   private spatialJoinUseCase?: SpatialJoinUseCase;
   private getBoundingBoxUseCase?: GetBoundingBoxUseCase;
   private dropTableUseCase?: DropTableUseCase;
+  private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
 
   async init() {
     this.db = await loadDb();
     this.conn = await this.db.connect();
 
     this.loadOsmFromPbfUseCase = new LoadOsmFromPbfUseCase(this.conn);
+    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
     this.loadQueryUseCase = new LoadQueryUseCase(this.conn);
@@ -45,6 +51,7 @@ export class SpatialDb {
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.getBoundingBoxUseCase = new GetBoundingBoxUseCase(this.conn);
     this.dropTableUseCase = new DropTableUseCase(this.conn);
+    this.transformBoundingBoxCoordinatesUseCase = new TransformBoundingBoxCoordinatesUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
@@ -69,6 +76,41 @@ export class SpatialDb {
         tableName: table.name,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
         layers: params.autoLoadLayers.layers,
+      });
+
+      if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
+      this.tables = this.tables.filter((t) => t.name !== table.name);
+    }
+  }
+
+  async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<void> {
+    if (
+      !this.db ||
+      !this.conn ||
+      !this.loadOsmFromOverpassApiUseCase ||
+      !this.dropTableUseCase ||
+      !this.getBoundingBoxUseCase ||
+      !this.transformBoundingBoxCoordinatesUseCase
+    )
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.loadOsmFromOverpassApiUseCase.exec(params);
+    this.tables.push(table);
+
+    if (params.autoLoadLayers) {
+      for (const layer of params.autoLoadLayers.layers) {
+        console.log('start loading layer', layer);
+        await this.loadLayer({
+          osmInputTableName: table.name,
+          coordinateFormat: params.autoLoadLayers.coordinateFormat,
+          layer: layer,
+        });
+        console.log('end loading layer', layer);
+      }
+
+      this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
+        boundingBox: params.boundingBox,
+        coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
 
       if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });

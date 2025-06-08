@@ -20,7 +20,8 @@ export async function loadDb() {
   const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
   // Instantiate the asynchronus version of DuckDB-wasm
   const worker = new Worker(bundle.mainWorker!);
-  const logger = new duckdb.ConsoleLogger();
+  // Use VoidLogger to disable all DuckDB logging
+  const logger = new duckdb.VoidLogger();
   const db = new duckdb.AsyncDuckDB(logger, worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 
