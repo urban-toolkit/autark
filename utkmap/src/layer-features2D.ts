@@ -8,6 +8,7 @@ import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
+import { PipelineBorderFlat } from './pipeline-border-flat';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
 export class Features2DLayer extends Layer {
@@ -20,6 +21,7 @@ export class Features2DLayer extends Layer {
     protected _components: ILayerComponent[] = [];
 
     protected _pipeline!: Pipeline;
+    protected _pipelineBorder!: PipelineBorderFlat;
     protected _pipelinePicking!: PipelineTrianglePicking;
 
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
@@ -53,6 +55,9 @@ export class Features2DLayer extends Layer {
         // TODO: USE OTHER PIPELINES
         this._pipeline = new PipelineTriangleFlat(renderer);
         this._pipeline.build(this);
+
+        this._pipelineBorder = new PipelineBorderFlat(renderer);
+        this._pipelineBorder.build(this);
 
         this._pipelinePicking = new PipelineTrianglePicking(renderer);
         this._pipelinePicking.build(this);
@@ -163,6 +168,7 @@ export class Features2DLayer extends Layer {
         }
 
         this._pipeline.renderPass(camera);
+        this._pipelineBorder.renderPass(camera);
     }
 
     renderPickingPass(camera: Camera): void {

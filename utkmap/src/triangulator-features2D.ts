@@ -47,13 +47,9 @@ export abstract class TriangulatorFeatures2D extends Triangulator {
                 nTriangles += triangulation.flatIds.length / 3;
             }
 
-            comps.push({
-                nPoints,
-                nTriangles
-            });
+            comps.push({nPoints, nTriangles});
         }
 
         return [mesh, comps];
     }
-
 }
