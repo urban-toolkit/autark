@@ -229,7 +229,6 @@ export class UtkMap {
         this._renderer.startPickingRenderPass();
         this._layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
-                console.log(layer.layerRenderInfo.pickedComps);
                 layer.renderPickingPass(this._camera);
             }
         });
