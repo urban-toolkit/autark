@@ -28,7 +28,7 @@ import { KeyEvents } from './key-events';
 import { MouseEvents } from './mouse-events';
 import { LayerManager } from './layer-manager';
 
-import { TriangulatorFeatures2D } from './triangulator-features2D';
+import { TriangulatorFeatures } from './triangulator-features';
 import { TriangulatorBuildings } from './triangulator-buildings';
 import { TriangulatorRoads } from './triangulator-roads';
 import { TriangulatorCoastline } from './triangulator-coastline';
@@ -86,21 +86,24 @@ export class UtkMap {
             case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
-            case LayerType.CUSTOM_2DLAYER:
-                this.createFeatures2DLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_2D, geojson);
+                this.createFeaturesLayerFromGeojson(layerName, typeLayer, geojson);
                 break;
 
             case LayerType.OSM_COASTLINE:
-                this.createCoastlineLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_2D, geojson);
+                this.createCoastlineLayerFromGeojson(layerName, geojson);
                 break;
 
             case LayerType.OSM_ROADS:
-                this.createRoadsLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_2D, geojson);
+                this.createRoadsLayerFromGeojson(layerName, geojson);
                 break
 
             case LayerType.OSM_BUILDINGS:
-                this.createBuildingsLayerFromGeojson(layerName, typeLayer, LayerGeometryType.FEATURES_3D, geojson);
+                this.createBuildingsLayerFromGeojson(layerName, geojson);
                 break
+
+            case LayerType.CUSTOM_LAYER:
+                this.createCustomLayerFromGeojson(layerName, geojson);
+            break;
 
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
@@ -250,7 +253,7 @@ export class UtkMap {
 
     }
 
-    private createFeatures2DLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
+    private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         let zIndex = -1;
 
         switch (typeLayer) {
@@ -262,7 +265,7 @@ export class UtkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: zIndex,
-            typeGeometry: typeGeometry,
+            typeGeometry: LayerGeometryType.FEATURES_2D,
             typeLayer: typeLayer,
         };
 
@@ -276,7 +279,7 @@ export class UtkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorFeatures2D.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature 2D Layer mesh');
             return;
@@ -296,12 +299,12 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createCoastlineLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
+    private createCoastlineLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: LayerZIndex.OSM_COASTLINE,
-            typeGeometry: typeGeometry,
-            typeLayer: typeLayer,
+            typeGeometry: LayerGeometryType.FEATURES_2D,
+            typeLayer: LayerType.OSM_COASTLINE,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -333,12 +336,12 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createRoadsLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
+    private createRoadsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: LayerZIndex.OSM_ROADS,
-            typeGeometry: typeGeometry,
-            typeLayer: typeLayer,
+            typeGeometry: LayerGeometryType.FEATURES_2D,
+            typeLayer: LayerType.OSM_ROADS,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -352,7 +355,7 @@ export class UtkMap {
 
         const layerMesh = TriangulatorRoads.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Roads Layer mesh');
+            console.error('Invalid Roads Layer.');
             return;
         }
 
@@ -370,12 +373,12 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    private createBuildingsLayerFromGeojson(layerName: string, typeLayer: LayerType, typeGeometry: LayerGeometryType, geojson: FeatureCollection) {
+    private createBuildingsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: LayerZIndex.OSM_BUILDINGS,
-            typeGeometry: typeGeometry,
-            typeLayer: typeLayer,
+            typeGeometry: LayerGeometryType.FEATURES_3D,
+            typeLayer: LayerType.OSM_BUILDINGS,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -389,7 +392,7 @@ export class UtkMap {
 
         const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Building Layer mesh');
+            console.error('Invalid Building Layer.');
             return;
         }
 
@@ -406,6 +409,53 @@ export class UtkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
+
+    private createCustomLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+        const zIndex = 0.5 + 0.01 * this.layerManager.length;
+
+        const layerInfo: ILayerInfo = {
+            id: `${layerName}`,
+            zIndex: zIndex,
+            typeGeometry: LayerGeometryType.BORDERS_2D,
+            typeLayer: LayerType.CUSTOM_LAYER
+        };
+
+        const layerRenderInfo: ILayerRenderInfo = {
+            pipeline: RenderPipeline.TRIANGLE_FLAT,
+            opacity: 1.0,
+            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            isColorMap: false,
+            isPick: false,
+            isSkip: false,
+        };
+
+        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Feature Layer.');
+            return;
+        }
+        const layerBorder = TriangulatorFeatures.buildBorder(geojson, this.origin);
+        if (layerBorder.length === 0) {
+            console.error('Invalid Feature Layer border.');
+            return;
+        }
+
+        const layerData = {
+            border: layerBorder,
+            geometry: layerMesh[0],
+            components: layerMesh[1],
+            thematic: layerMesh[1].map(() => {
+                return {
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [0]
+                }
+            })
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    }
+
 
     private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);

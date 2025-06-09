@@ -8,7 +8,7 @@ import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { Features2DLayer } from './layer-features2D';
+import { BordersLayer } from './layer-borders';
 
 export class PipelineBorderFlat extends Pipeline {
     // Vertex buffers
@@ -22,49 +22,21 @@ export class PipelineBorderFlat extends Pipeline {
     // render pipeline
     protected _pipeline!: GPURenderPipeline;
 
-    // points
-    protected _borderIndices!: number[];
-
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
-    build(mesh: Features2DLayer) {
+    build(borders: BordersLayer) {
         this.createShaders();
 
-        this.loadBorderIndices(mesh);
-        this.createVertexBuffers(mesh);
+        this.createVertexBuffers(borders);
         this.createColorUniformBindGroup();
         this.createCameraUniformBindGroup();
 
-        this.updateVertexBuffers(mesh);
+        this.updateVertexBuffers(borders);
 
         this.createPipeline();
     }
-
-    loadBorderIndices(mesh: Features2DLayer) {
-        const components = mesh.components;
-        const indices: number[] = [];
-
-        for (let i = 0; i < components.length; i++) {
-            let start = i === 0 ? 0 : components[i - 1].nPoints;
-            const end = components[i].nPoints;
-            const count = end - start;
-
-            if (count < 2) continue;
-
-            // Create segments: (start, start+1), (start+1, start+2), ..., (end-2, end-1)
-            for (let j = 0; j < count - 1; j++) {
-                indices.push(start + j, start + j + 1);
-            }
-
-            // Close the ring by connecting last and first
-            indices.push(end - 1, start);
-        }
-        this._borderIndices = indices;
-    }
-
-
 
     createShaders() {
         // Vertex shader
@@ -80,25 +52,25 @@ export class PipelineBorderFlat extends Pipeline {
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
-    createVertexBuffers(mesh: Features2DLayer) {
+    createVertexBuffers(borders: BordersLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
-            size: mesh.position.length * 4,
+            size: borders.borderPos.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         // vertex data
         this._borderIndicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
-            size: this._borderIndices.length * 4,
+            size: borders.borderIds.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
     }
 
-    updateVertexBuffers(mesh: Features2DLayer) {
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
-        this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(this._borderIndices));
+    updateVertexBuffers(borders: BordersLayer) {
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
+        this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
     }
 
     createPipeline() {

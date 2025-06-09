@@ -2,11 +2,11 @@ import { ILayerInfo, ILayerRenderInfo, ILayerData } from './interfaces';
 
 import { Renderer } from './renderer';
 
-import { Features2DLayer } from './layer-features2D';
+import { FeaturesLayer } from './layer-features';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
-export class BuildingsLayer extends Features2DLayer {
+export class BuildingsLayer extends FeaturesLayer {
     protected _normal!: number[];
 
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {

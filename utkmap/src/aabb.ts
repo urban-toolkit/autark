@@ -64,10 +64,10 @@ class Box2D {
                     }
                 }
                 else {
-                    if (booleanEqual(point(tFirst), point(pFirst))  ||
-                        booleanEqual(point(tFirst), point(pLast ))  ||
-                        booleanEqual(point(tLast ), point(pFirst))  ||
-                        booleanEqual(point(tLast ), point(pLast )) 
+                    if (booleanEqual(point(tFirst), point(pFirst)) ||
+                        booleanEqual(point(tFirst), point(pLast)) ||
+                        booleanEqual(point(tLast), point(pFirst)) ||
+                        booleanEqual(point(tLast), point(pLast))
                     ) {
                         return true;
                     }
@@ -128,8 +128,8 @@ export class AABB {
                     if (!box) { continue; }
 
                     newBox.expand(box);
-                    
-                    if(oId === 0) {
+
+                    if (oId === 0) {
                         this._boxes.set(overId, newBox);
                     } else {
                         this._boxes.delete(overId);

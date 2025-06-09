@@ -8,7 +8,7 @@ import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { Features2DLayer } from './layer-features2D';
+import { FeaturesLayer } from './layer-features';
 
 export class PipelineTriangleFlat extends Pipeline {
     // Vertex buffers
@@ -28,7 +28,7 @@ export class PipelineTriangleFlat extends Pipeline {
         super(renderer);
     }
 
-    build(mesh: Features2DLayer) {
+    build(mesh: FeaturesLayer) {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -55,7 +55,7 @@ export class PipelineTriangleFlat extends Pipeline {
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
-    createVertexBuffers(mesh: Features2DLayer) {
+    createVertexBuffers(mesh: FeaturesLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -85,7 +85,7 @@ export class PipelineTriangleFlat extends Pipeline {
         });
     }
 
-    updateVertexBuffers(mesh: Features2DLayer) {
+    updateVertexBuffers(mesh: FeaturesLayer) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlighted));
