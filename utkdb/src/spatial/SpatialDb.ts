@@ -99,13 +99,11 @@ export class SpatialDb {
 
     if (params.autoLoadLayers) {
       for (const layer of params.autoLoadLayers.layers) {
-        console.log('start loading layer', layer);
         await this.loadLayer({
           osmInputTableName: table.name,
           coordinateFormat: params.autoLoadLayers.coordinateFormat,
           layer: layer,
         });
-        console.log('end loading layer', layer);
       }
 
       this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
