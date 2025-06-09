@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>UTK Demo</title>
+    <title>Utk Serverless (Examples)</title>
     <style>
         body {
             margin: 20px;
@@ -15,28 +15,23 @@
             align-items: flex-start;
         }
 
-        canvas {
+        #app {
             width:800px;
             min-height:800px !important;
 
             margin: 10px;
             border: 1px solid #bfbfbf;
-        }
 
-        #plot {
-            width:800px;
-            min-height:400px !important;
-
-            margin: 10px;
-            border: 1px solid #bfbfbf;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
         }
 
     </style>
 </head>
 
 <body>
-    <canvas id="wgpu"></canvas>
-    <div id="plot"></div>
+    <div id="app">   </div>
     <script type="module" src="/src/main.ts"></script>
 </body>
 
