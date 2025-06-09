@@ -10,7 +10,6 @@
     "format": "prettier --write ."
   },
   "devDependencies": {
-    "@types/earcut": "^2.1.4",
     "@types/geojson": "^7946.0.16",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
     "@typescript-eslint/parser": "^7.17.0",
@@ -21,7 +20,6 @@
     "vite": "^5.3.4"
   },
   "dependencies": {
-    "earcut": "^3.0.0",
     "utkdb": "file:../utkdb",
     "utkmap": "file:../utkmap",
     "utkplot": "file:../utkplot"
