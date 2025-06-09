@@ -28,36 +28,3 @@ export interface Params {
     layers: Array<LayerType>;
   };
 }
-
-export interface FormattedOsmNode {
-  kind: 'node';
-  id: number;
-  tags: Record<string, string> | null;
-  refs: null;
-  lat: number;
-  lon: number;
-  ref_roles: null;
-  ref_types: null;
-}
-
-export interface FormattedOsmWay {
-  kind: 'way';
-  id: number;
-  tags: Record<string, string> | null;
-  refs: number[];
-  lat: null;
-  lon: null;
-  ref_roles: null;
-  ref_types: null;
-}
-
-export interface FormattedOsmRelation {
-  kind: 'relation';
-  id: number;
-  tags: Record<string, string> | null;
-  refs: number[];
-  lat: null;
-  lon: null;
-  ref_roles: string[];
-  ref_types: ('node' | 'way' | 'relation')[];
-}

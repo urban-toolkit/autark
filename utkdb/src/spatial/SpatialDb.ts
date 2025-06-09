@@ -42,7 +42,7 @@ export class SpatialDb {
     this.conn = await this.db.connect();
 
     this.loadOsmFromPbfUseCase = new LoadOsmFromPbfUseCase(this.conn);
-    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.conn);
+    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
     this.loadQueryUseCase = new LoadQueryUseCase(this.conn);
