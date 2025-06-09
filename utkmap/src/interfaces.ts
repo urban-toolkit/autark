@@ -37,6 +37,7 @@ export interface ILayerRenderInfo {
 }
 
 export interface ILayerData {
+    border?: ILayerBorder[]; // list of borders
     geometry: ILayerGeometry[]; // list of geometries
     components: ILayerComponent[]; // list of components
     thematic?: ILayerThematic[]; // list of thematic data
@@ -47,6 +48,11 @@ export interface ILayerGeometry {
     position: number[]; // coordinate of the points
     normal?: number[]; // normals of the points
     indices?: number[]; // ids of the vertices
+}
+
+export interface ILayerBorder {
+    position: number[]; // coordinates of the border points
+    indices: number[]; // indices of the border points
 }
 
 export interface ILayerThematic {

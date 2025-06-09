@@ -1,5 +1,5 @@
-import * as d3_scale from 'd3-scale-chromatic';
 import * as d3_color from 'd3-color';
+import * as d3_scale from 'd3-scale-chromatic';
 
 import { ColorHEX, ColorMapInterpolator, ColorRGB, ColorTEX } from './constants';
 

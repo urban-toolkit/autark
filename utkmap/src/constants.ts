@@ -1,6 +1,7 @@
 export enum LayerGeometryType {
     FEATURES_2D = 'features2d',
     FEATURES_3D = 'features3d',
+    BORDERS_2D  = 'borders2d'
 }
 
 export enum LayerType {
@@ -11,7 +12,7 @@ export enum LayerType {
     OSM_ROADS = 'roads',
     OSM_BUILDINGS = 'buildings',
     //
-    CUSTOM_2DLAYER = 'custom2DLayer',
+    CUSTOM_LAYER = 'custom2DLayer',
 }
 
 export enum LayerZIndex {

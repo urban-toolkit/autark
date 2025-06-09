@@ -2,11 +2,12 @@ import { IBoundingBox, ILayerData, ILayerInfo, ILayerRenderInfo } from './interf
 import { LayerGeometryType } from './constants';
 
 import { Layer } from './layer';
-import { Features2DLayer } from './layer-features2D';
+import { FeaturesLayer } from './layer-features';
 import { BuildingsLayer } from './layer-buildings';
 
 import { Feature, Polygon } from 'geojson';
 import { polygon } from '@turf/turf';
+import { BordersLayer } from './layer-borders';
 
 export class LayerManager {
     protected _origin: number[] = [];
@@ -61,8 +62,11 @@ export class LayerManager {
 
         // loads based on type
         switch (layerInfo.typeGeometry) {
+            case LayerGeometryType.BORDERS_2D:
+                layer = new BordersLayer(layerInfo, layerRender, layerData);
+                break;
             case LayerGeometryType.FEATURES_2D:
-                layer = new Features2DLayer(layerInfo, layerRender, layerData);
+                layer = new FeaturesLayer(layerInfo, layerRender, layerData);
                 break;
             case LayerGeometryType.FEATURES_3D:
                 layer = new BuildingsLayer(layerInfo, layerRender, layerData);
