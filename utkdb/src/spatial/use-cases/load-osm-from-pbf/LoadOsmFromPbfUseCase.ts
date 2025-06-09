@@ -12,8 +12,8 @@ export class LoadOsmFromPbfUseCase {
     this.conn = conn;
   }
 
-  async exec({ pbfFileUrl, outputTableName, boudingBox }: Params): Promise<OsmTable> {
-    const loadPbfQuery = LOAD_PBF_ON_TABLE_QUERY(pbfFileUrl, outputTableName, boudingBox);
+  async exec({ pbfFileUrl, outputTableName }: Params): Promise<OsmTable> {
+    const loadPbfQuery = LOAD_PBF_ON_TABLE_QUERY(pbfFileUrl, outputTableName);
     const tableDescribeResponse = await this.conn.query(loadPbfQuery);
 
     return {
