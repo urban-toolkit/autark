@@ -198,7 +198,9 @@ export class SpatialDb {
     return new QueryOperation(tableName, this.tables);
   }
 
-  applyQuery(query: QueryOperation) {
+  // TODO: Lucas, essa função estava sem tipo de retorno e o build tava falhando na minnha máquina
+  // coloquei any e passou, mas não sei se é o tipo correto.
+  applyQuery(query: QueryOperation): any {
     const sql = query.getSql();
     console.log(sql);
     return this.conn?.query(sql);

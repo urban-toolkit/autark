@@ -2,7 +2,7 @@ import { SpatialDb } from 'utkdb';
 
 import { Example } from '../example';
 
-export class OsmLoadPbf extends Example {
+export class LoadGeojson extends Example {
     protected db!: SpatialDb;
     protected divId: string = 'output-div';
 
@@ -17,11 +17,11 @@ export class OsmLoadPbf extends Example {
         if(!app || !div) { return; }
 
         app.style.width = '800px';
-        app.style.minHeight = '275px';
+        app.style.minHeight = '185px';
         app.style.border = '1px solid #bfbfbf';
 
         div.id = this.divId;
-        div.innerHTML = '<h2>osm-load-pbf.ts</h2>';
+        div.innerHTML = '<h2>load-geojson.ts</h2>';
 
         if(app) {
             app.appendChild(div);
@@ -32,20 +32,10 @@ export class OsmLoadPbf extends Example {
         this.db = new SpatialDb();
         await this.db.init();
 
-        await this.db.loadOsm({
-            pbfFileUrl: 'http://localhost:5173/data/lower-mn.osm.pbf',
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
-                layers: [
-                    'coastline',
-                    'parks',
-                    'water',
-                    'roads',
-                    'buildings',
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
-                dropOsmTable: true,
-            },
+        await this.db.loadCustomLayer({
+            geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+            outputTableName: 'neighborhoods',
+            coordinateFormat: 'EPSG:3395'
         });
     }
 
@@ -61,7 +51,7 @@ export class OsmLoadPbf extends Example {
             div.innerHTML += `</ul>`;
 
             div.innerHTML += `<p>Number of tables: ${tables.length}</p>`;
-            div.innerHTML += `<p><b>Successfully loaded OSM data from PBF file.</b><p>`;
+            div.innerHTML += `<p><b>Successfully loaded Geojson file.</b><p>`;
         }
     }
 }
