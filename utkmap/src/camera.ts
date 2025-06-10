@@ -128,6 +128,11 @@ export class Camera {
         this.updateEyeDirAndLen();
     }
 
+    resize(width: number, height: number): void {
+        this.setViewportResolution(width, height);
+        this.update();
+    }
+
     zoom(delta: number, x: number, y: number): void {
         delta = delta < 0 ? 100 * (this.wEye[2] * 0.001) : -100 * (this.wEye[2] * 0.001);
 
@@ -175,12 +180,15 @@ export class Camera {
     }
 
     update(): void {
+
+        const aspect = this.viewportWidth / this.viewportHeight;
+
         // model matrix
         this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1 / this.groundRes));
         // view matrix
         mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
         // projection matrix
-        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, 1, this.wNear, this.wFar);
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wNear, this.wFar);
     }
 
     loadPosition(state: string): void {
@@ -262,13 +270,15 @@ export class Camera {
         vec3.normalize(wRight, vec3.cross(wRight, this.wEyeDir, this.wUp));
 
         const upOffset = vec3.scale(vec3.create(), this.wUp, Math.tan(this.fovy / 2) * (y - 0.5) * 2);
-        const rightOffset = vec3.scale(vec3.create(), wRight, Math.tan(this.fovy / 2) * (x - 0.5) * 2);
+        const aspect = this.viewportWidth / this.viewportHeight;
+        const rightOffset = vec3.scale(vec3.create(), wRight, Math.tan(this.fovy / 2) * (x - 0.5) * 2 * aspect);
         const offset = vec3.add(vec3.create(), upOffset, rightOffset);
         const dir = vec3.add(vec3.create(), this.wEyeDir, offset);
         vec3.normalize(dir, dir);
 
         return dir;
     }
+
 
     activateBirdsEye() {
         throw Error('BirdsEye view not implemented yet');

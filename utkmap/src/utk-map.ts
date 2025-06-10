@@ -42,12 +42,17 @@ export class UtkMap {
 
     protected _canvas!: HTMLCanvasElement;
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, autoResize = true) {
+        this._canvas = canvas;
         this._camera = new Camera();
         this._renderer = new Renderer(canvas);
         this._keyEvents = new KeyEvents(this);
         this._mouseEvents = new MouseEvents(this);
         this._layerManager = new LayerManager();
+
+        if (autoResize) {
+            window.addEventListener('resize', this._handleResize.bind(this));
+        }
     }
 
     get camera(): Camera {
@@ -75,6 +80,7 @@ export class UtkMap {
 
         this._keyEvents.bindEvents();
         this._mouseEvents.bindEvents();
+        this._handleResize();
 
         this.render();
 
@@ -109,6 +115,22 @@ export class UtkMap {
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
+    }
+
+    private _handleResize() {
+        const width = this._canvas.width * window.devicePixelRatio;
+        const height = this._canvas.height * window.devicePixelRatio;
+
+        this.resize(width, height);
+    }
+
+    resize(width: number, height: number) {
+        this._canvas.width = width;
+        this._canvas.height = height;
+
+        this._camera.setViewportResolution(width, height);
+        this._camera.update();
+        this._renderer.resize(width, height);
     }
 
     updateCamera(params: ICameraData) {

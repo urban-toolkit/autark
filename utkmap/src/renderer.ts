@@ -115,6 +115,16 @@ export class Renderer {
         return true;
     }
 
+    resize(width: number, height: number) {
+        this._canvas.width = width;
+        this._canvas.height = height;
+
+        this.configureContext();
+        this.configureFrameBuffer();
+        this.configureDepthBuffer();
+        this.configurePickingBuffer();
+    }
+
     // Configure the webgpu canvas context
     configureContext() {
         if (!this._context) {
