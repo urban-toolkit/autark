@@ -23,7 +23,7 @@ export class MapVega extends Example {
         super();
     }
 
-    public buildHtmlNodes() {
+    public buildHtml() {
         const app = document.querySelector('#app') as HTMLElement | null;
 
         this.canvas = document.createElement('canvas');
@@ -36,7 +36,8 @@ export class MapVega extends Example {
 
         if (!app || !titleDiv || !this.canvas) { return; }
 
-        this.canvas.width = this.canvas.height = 1024;
+        this.canvas.width = 1024;
+        this.canvas.height = 768;
 
         titleDiv.style.display = 'flex';
         titleDiv.style.flexDirection = 'row';
@@ -53,6 +54,7 @@ export class MapVega extends Example {
 
         this.plotBar.style.width = '100%';
         this.plotBar.style.height = '30px';
+        this.plotBar.style.cursor = 'move';
 
         this.plotBdy.style.width = '100%';
         this.floatingDiv();
@@ -141,8 +143,6 @@ export class MapVega extends Example {
         this.plotBar.style.backgroundColor = '#bfbfbf';
         this.plotDiv.style.border = '1px solid #d3d3d3';
     }
-
-    public print(): void { }
 
     protected async loadLayers(): Promise<void> {
         const data = [];

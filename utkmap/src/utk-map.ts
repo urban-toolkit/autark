@@ -118,8 +118,8 @@ export class UtkMap {
     }
 
     private _handleResize() {
-        const width = this._canvas.width * window.devicePixelRatio;
-        const height = this._canvas.height * window.devicePixelRatio;
+        const width = this._canvas.width;
+        const height = this._canvas.height;
 
         this.resize(width, height);
     }

@@ -10,7 +10,7 @@ export class LoadCsv extends Example {
         super();
     }
 
-    public buildHtmlNodes() {
+    public buildHtml() {
         const app = document.querySelector('#app') as HTMLElement | null;
         const div = document.createElement('div');
 

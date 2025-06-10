@@ -14,7 +14,7 @@ export class SpatialJoinNearVis extends Example {
         super();
     }
 
-    public buildHtmlNodes() {
+    public buildHtml() {
         const app = document.querySelector('#app') as HTMLElement | null;
 
         this.canvas = document.createElement('canvas');
@@ -94,8 +94,6 @@ export class SpatialJoinNearVis extends Example {
 
         this.map.draw();
     }
-
-    public print(): void { }
 
     protected async loadLayers(): Promise<void> {
         const data = [];

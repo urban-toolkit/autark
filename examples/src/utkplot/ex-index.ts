@@ -3,7 +3,6 @@ import { MapVega } from "./map-vega";
 export async function PlotMapVega() {
     const example = new MapVega();
 
-    example.buildHtmlNodes();
+    example.buildHtml();
     await example.run();
-    await example.print();
 }

@@ -7,7 +7,7 @@ import { SpatialJoinNear } from "./spatial-join-near";
 export async function DbOsmLoadPbf() {
     const example = new OsmLoadPbf();
 
-    example.buildHtmlNodes();
+    example.buildHtml();
     await example.run();
     await example.print();
 }
@@ -15,7 +15,7 @@ export async function DbOsmLoadPbf() {
 export async function DbLoadGeojson() {
     const example = new LoadGeojson();
 
-    example.buildHtmlNodes();
+    example.buildHtml();
     await example.run();
     await example.print();
 }
@@ -23,7 +23,7 @@ export async function DbLoadGeojson() {
 export async function DbLoadCsv() {
     const example = new LoadCsv();
 
-    example.buildHtmlNodes();
+    example.buildHtml();
     await example.run();
     await example.print();
 }
@@ -31,7 +31,7 @@ export async function DbLoadCsv() {
 export async function DbSpatialJoin() {
     const example = new SpatialJoin();
 
-    example.buildHtmlNodes();
+    example.buildHtml();
     await example.run();
     await example.print();
 }
@@ -39,7 +39,7 @@ export async function DbSpatialJoin() {
 export async function DbSpatialJoinNear() {
     const example = new SpatialJoinNear();
 
-    example.buildHtmlNodes();
+    example.buildHtml();
     await example.run();
     await example.print();
 }

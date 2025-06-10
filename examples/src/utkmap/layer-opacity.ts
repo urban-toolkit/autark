@@ -13,7 +13,7 @@ export class LayerOpacity extends Example {
         super();
     }
 
-    public buildHtmlNodes() {
+    public buildHtml() {
         const app = document.querySelector('#app') as HTMLElement | null;
 
         this.canvas = document.createElement('canvas');
@@ -70,8 +70,6 @@ export class LayerOpacity extends Example {
         this.map.updateLayerOpacity('neighborhoods', 0.75);
         this.map.draw();
     }
-
-    public print(): void { }
 
     protected async loadLayers(): Promise<void> {
         const data = [];

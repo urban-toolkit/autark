@@ -13,7 +13,7 @@ export class OsmLayersPbf extends Example {
         super();
     }
 
-    public buildHtmlNodes() {
+    public buildHtml() {
         const app = document.querySelector('#app') as HTMLElement | null;
         
         this.canvas = document.createElement('canvas');
@@ -82,6 +82,4 @@ export class OsmLayersPbf extends Example {
             this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
         }
     }
-
-    public print(): void { }
 }
