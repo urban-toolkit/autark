@@ -109,9 +109,12 @@ export class MouseEvents {
     const canvas = this._map.renderer.canvas;
 
     // changes the values
-    const maxAxisLength = Math.max(canvas.clientWidth, canvas.clientHeight);
-    const x = event.offsetX / maxAxisLength;
-    const y = (canvas.height - event.offsetY) / maxAxisLength;
+    // const maxAxisLength = Math.max(canvas.clientWidth, canvas.clientHeight);
+    // const x = event.offsetX / maxAxisLength;
+    // const y = (canvas.height - event.offsetY) / maxAxisLength;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / canvas.clientWidth;
+    const y = 1.0 - (event.clientY - rect.top) / canvas.clientHeight;
 
     this._map.camera.zoom(event.deltaY * 0.01, x, y);
   }
