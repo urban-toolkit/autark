@@ -13,5 +13,6 @@ export default defineConfig({
     },
     copyPublicDir: false,
     emptyOutDir: false,
+    sourcemap: true
   },
 });
