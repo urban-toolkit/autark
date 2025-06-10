@@ -18,7 +18,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
       SELECT id, UNNEST(refs) as ref, UNNEST(range(length(refs))) as ref_idx
         FROM ${tableName}
         SEMI JOIN ${layer} USING (id)
-          WHERE kind IN ('way', 'rel');
+          WHERE kind IN ('way', 'relation');
 
     CREATE TEMP TABLE ${layer}_required_nodes_with_geometries AS
       SELECT id, ST_POINT(lat, lon) geometry
@@ -69,7 +69,7 @@ function getLayerQuery(layer: string): (t: string) => string {
 const GET_PARKS = (tableName: string) => `
   CREATE TEMP TABLE parks AS
     SELECT id, tags FROM ${tableName}
-      WHERE kind IN ('way', 'rel') AND
+      WHERE kind IN ('way', 'relation') AND
       (
         map_extract(tags, 'leisure')[1] IN ('dog_park', 'park', 'playground', 'recreation_ground') OR
         map_extract(tags, 'landuse')[1] IN ('wood', 'grass', 'forest', 'orchad', 'village_green', 'vineyard', 'cemetery', 'meadow', 'village_green') OR
@@ -80,7 +80,7 @@ const GET_PARKS = (tableName: string) => `
 const GET_WATER = (tableName: string) => `
   CREATE TEMP TABLE water AS
     SELECT id, tags FROM ${tableName}
-      WHERE kind IN ('way', 'rel') AND
+      WHERE kind IN ('way', 'relation') AND
       (
         map_extract(tags, 'natural')[1] IN ('water', 'wetland', 'bay', 'strait', 'spring') OR
         map_extract(tags, 'water')[1] IN ('pond', 'reservoir', 'lagoon', 'stream_pool', 'lake', 'pool', 'canal', 'river')
