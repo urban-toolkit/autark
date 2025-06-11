@@ -51,7 +51,7 @@ export class UtkMap {
         this._layerManager = new LayerManager();
 
         if (autoResize) {
-            window.addEventListener('resize', this._handleResize.bind(this));
+            window.addEventListener('resize', this.handleResize.bind(this));
         }
     }
 
@@ -80,7 +80,7 @@ export class UtkMap {
 
         this._keyEvents.bindEvents();
         this._mouseEvents.bindEvents();
-        this._handleResize();
+        this.handleResize();
 
         this.render();
 
@@ -117,7 +117,7 @@ export class UtkMap {
         }
     }
 
-    private _handleResize() {
+    private handleResize() {
         const width = this._canvas.width;
         const height = this._canvas.height;
 
@@ -125,8 +125,8 @@ export class UtkMap {
     }
 
     resize(width: number, height: number) {
-        this._canvas.width = width;
-        this._canvas.height = height;
+        this._canvas.width = width * (window.devicePixelRatio || 1);
+        this._canvas.height = height * (window.devicePixelRatio || 1);
 
         this._camera.setViewportResolution(width, height);
         this._camera.update();
