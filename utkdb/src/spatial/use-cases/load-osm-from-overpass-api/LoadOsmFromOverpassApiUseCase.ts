@@ -26,9 +26,14 @@ export class LoadOsmFromOverpassApiUseCase {
       throw new Error('No OSM elements found in the specified bounding box');
     }
 
-    await this.insertOsmDataUsingJson(outputTableName, osmData);
+    console.log(`Before filter count: ${osmData.elements.length}`);
+    // Filter elements to only include those within bounding box
+    const filteredOsmData = this.filterElements(osmData, boundingBox);
+    console.log(`Filtered to ${filteredOsmData.elements.length} OSM elements within bounding box`);
 
-    console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${outputTableName}`);
+    await this.insertOsmDataUsingJson(outputTableName, filteredOsmData);
+
+    console.log(`Successfully inserted ${filteredOsmData.elements.length} OSM elements into ${outputTableName}`);
 
     const tableDescribeResponse = await this.conn.query(`DESCRIBE ${outputTableName}`);
     return {
@@ -61,6 +66,81 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
+   * Filter OSM elements to only include those within the bounding box
+   * Uses geometry-aware filtering to preserve complete road geometries
+   */
+  private filterElements(osmData: OverpassApiResponse, boundingBox: Params['boundingBox']): OverpassApiResponse {
+    const { minLat, minLon, maxLat, maxLon } = boundingBox;
+
+    // Step 1: Identify nodes that are within the bounding box
+    const nodesInBBox = osmData.elements.filter((element) => {
+      if (element.type !== 'node') return false;
+      if (element.lat === undefined || element.lon === undefined) return false;
+
+      return element.lat >= minLat && element.lat <= maxLat && element.lon >= minLon && element.lon <= maxLon;
+    });
+
+    const nodeIdsInBBox = new Set(nodesInBBox.map((node) => node.id));
+
+    // Step 2: Find ways that have at least one node within the bounding box
+    const waysWithNodesInBBox = osmData.elements.filter((element) => {
+      if (element.type !== 'way') return false;
+      if (!element.nodes || element.nodes.length === 0) return false;
+
+      // Keep way if it has at least one node in the bounding box
+      return element.nodes.some((nodeId) => nodeIdsInBBox.has(nodeId));
+    });
+
+    // Step 3: Get ALL nodes referenced by these valid ways (even if outside bbox)
+    // This preserves complete geometry for roads that cross boundaries
+    const allReferencedNodeIds = new Set<number>();
+    waysWithNodesInBBox.forEach((way) => {
+      way.nodes?.forEach((nodeId) => allReferencedNodeIds.add(nodeId));
+    });
+
+    // Step 4: Include all nodes that are either in bbox OR referenced by valid ways
+    const validNodes = osmData.elements.filter((element) => {
+      if (element.type !== 'node') return false;
+      return nodeIdsInBBox.has(element.id) || allReferencedNodeIds.has(element.id);
+    });
+
+    // Step 5: Keep all ways that have nodes in the bounding box (with complete node references)
+    const validWays = waysWithNodesInBBox;
+
+    // Create a Set of valid way IDs for relation filtering
+    const validWayIds = new Set(validWays.map((way) => way.id));
+    const validNodeIds = new Set(validNodes.map((node) => node.id));
+
+    // Step 6: Filter relations to only include members that reference valid nodes/ways
+    const validRelations = osmData.elements
+      .filter((element) => element.type === 'relation')
+      .map((relation) => ({
+        ...relation,
+        members:
+          relation.members?.filter((member) => {
+            if (member.type === 'node') {
+              return validNodeIds.has(member.ref);
+            } else if (member.type === 'way') {
+              return validWayIds.has(member.ref);
+            } else if (member.type === 'relation') {
+              // For now, keep relation references as they might be valid
+              // You can adjust this logic based on your specific needs
+              return true;
+            }
+            return false;
+          }) || [],
+      }))
+      .filter((relation) => relation.members && relation.members.length > 0); // Remove relations with no valid members
+
+    // Combine all filtered elements
+    const filteredElements = [...validNodes, ...validWays, ...validRelations];
+
+    return {
+      elements: filteredElements,
+    };
+  }
+
+  /**
    * Format OSM data into the exact structure expected by our table schema
    */
   private formatOsmDataForJson(osmData: OverpassApiResponse): Array<{
@@ -83,6 +163,10 @@ export class LoadOsmFromOverpassApiUseCase {
       ref_roles: string[];
       ref_types: string[];
     }> = [];
+
+    console.log({ node: osmData.elements.find((e) => e.type === 'node') });
+    console.log({ way: osmData.elements.find((e) => e.type === 'way') });
+    console.log({ relation: osmData.elements.find((e) => e.type === 'relation') });
 
     osmData.elements.forEach((element) => {
       switch (element.type) {
