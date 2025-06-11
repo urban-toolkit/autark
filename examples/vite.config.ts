@@ -19,7 +19,24 @@ export default defineConfig({
     optimizeDeps: {
         exclude: ['utkmap', 'utkdb', 'utkplot'],
     },
+    build: {
+        rollupOptions: {
+            input: {
+                main: '/index.html',
+                nested: '/src/utkdb/',
+                nested2: '/src/utkmap/',
+                nested3: '/src/utkplot/',
+            }
+        }
+    },
     server: {
+        // open: '/src/utkdb/load-csv.html',
+        // open: '/src/utkdb/load-geojson.html',
+        // open: '/src/utkdb/load-osm-pbf.html',
+        // open: '/src/utkdb/spatial-join-near.html',
+        // open: '/src/utkdb/spatial-join.html',
+        // open: '/src/utkmap/geojson-vis.html',
+        open: '/src/utkmap/layer-opacity.html',
         cors: {
             origin: '*',
             allowedHeaders: 'Range, Content-Type, Authorization',
