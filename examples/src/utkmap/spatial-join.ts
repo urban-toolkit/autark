@@ -120,3 +120,9 @@ export class SpatialJoin {
         this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 }
+
+async function main() {
+    const example = new SpatialJoin();
+    await example.run();
+}
+main();

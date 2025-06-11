@@ -230,3 +230,12 @@ export class MapVega {
         }
     }
 }
+
+
+async function main() {
+    const example = new MapVega();
+    await example.run();
+
+    example.floatingDiv();
+}
+main();
