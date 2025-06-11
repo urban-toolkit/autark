@@ -1,9 +1,7 @@
 import { SpatialDb } from 'utkdb';
 import { UtkMap, LayerType } from 'utkmap';
 
-import { Example } from '../example';
-
-export class LayerOpacity extends Example {
+export class LayerOpacity {
     protected map!: UtkMap;
     protected db!: SpatialDb;
 

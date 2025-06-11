@@ -1,9 +1,7 @@
 import { SpatialDb } from 'utkdb';
 import { UtkMap, LayerType, IBoundingBox } from 'utkmap';
 
-import { Example } from '../example';
-
-export class GeojsonVis extends Example {
+export class GeojsonVis {
     protected map!: UtkMap;
     protected db!: SpatialDb;
 

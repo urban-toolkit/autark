@@ -1,35 +1,9 @@
 import { FeatureCollection } from 'geojson';
 import { SpatialDb } from 'utkdb';
 
-import { Example } from '../example';
-
-export class SpatialJoin extends Example {
+export class SpatialJoin {
     protected db!: SpatialDb;
-    protected divId: string = 'output-div';
-
     protected geojson!: FeatureCollection;
-
-    constructor() {
-        super();
-    }
-
-    public buildHtml() {
-        const app = document.querySelector('#app') as HTMLElement | null;
-        const div = document.createElement('div');
-
-        if (!app || !div) { return; }
-
-        app.style.width = '800px';
-        app.style.minHeight = '285px';
-        app.style.border = '1px solid #bfbfbf';
-
-        div.id = this.divId;
-        div.innerHTML = '<h2>spatial-join.ts</h2>';
-
-        if (app) {
-            app.appendChild(div);
-        }
-    }
 
     public async run(): Promise<void> {
         this.db = new SpatialDb();
@@ -74,7 +48,7 @@ export class SpatialJoin extends Example {
     }
 
     public print(): void {
-        const div = document.getElementById(this.divId);
+        const div = document.getElementById('output');
         
         if (div) {
             const tables = this.db.tables;
@@ -96,3 +70,9 @@ export class SpatialJoin extends Example {
         }
     }
 }
+
+async function main() {
+    const example = new SpatialJoin();
+    await example.run();
+}
+main();

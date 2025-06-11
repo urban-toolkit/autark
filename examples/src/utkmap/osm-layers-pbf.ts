@@ -1,9 +1,7 @@
 import { UtkMap, LayerType } from 'utkmap';
 import { SpatialDb } from 'utkdb';
 
-import { Example } from '../example';
-
-export class OsmLayersPbf extends Example {
+export class OsmLayersPbf {
     protected map!: UtkMap;
     protected db!: SpatialDb;
 

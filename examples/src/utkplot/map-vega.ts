@@ -6,9 +6,7 @@ import {
     UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel
 } from 'utkmap';
 
-import { Example } from '../example';
-
-export class MapVega extends Example {
+export class MapVega {
     protected map!: UtkMap;
     protected db!: SpatialDb;
     protected plot!: UtkPlot
@@ -232,11 +230,3 @@ export class MapVega extends Example {
         }
     }
 }
-
-async function main() {
-    const example = new MapVega();
-    await example.run();
-
-    example.floatingDiv();
-}
-main();

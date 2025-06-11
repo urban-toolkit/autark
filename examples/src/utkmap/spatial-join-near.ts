@@ -1,10 +1,9 @@
 import { SpatialDb } from 'utkdb';
 import { UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel } from 'utkmap';
 
-import { Example } from '../example';
 import { GeoJsonProperties } from 'geojson';
 
-export class SpatialJoinNear extends Example {
+export class SpatialJoinNear {
     protected map!: UtkMap;
     protected db!: SpatialDb;
 
