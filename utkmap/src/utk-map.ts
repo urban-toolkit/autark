@@ -117,13 +117,6 @@ export class UtkMap {
         }
     }
 
-    private handleResize() {
-        const width = this._canvas.width;
-        const height = this._canvas.height;
-
-        this.resize(width, height);
-    }
-
     resize(width: number, height: number) {
         this._canvas.width = width * (window.devicePixelRatio || 1);
         this._canvas.height = height * (window.devicePixelRatio || 1);
@@ -161,17 +154,6 @@ export class UtkMap {
         }
     }
 
-    updateLayerOpacity(layerName: string, opacity: number) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            // load data
-            layer.layerRenderInfo.opacity = opacity;
-            layer.makeLayerRenderInfoDirty();
-        }
-    }
-
-
     updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
@@ -181,6 +163,16 @@ export class UtkMap {
         }
     }
     
+    updateRenderInfoOpacity(layerName: string, opacity: number) {
+        const layer = this._layerManager.searchByLayerId(layerName);
+
+        if (layer) {
+            // load data
+            layer.layerRenderInfo.opacity = opacity;
+            layer.makeLayerRenderInfoDirty();
+        }
+    }
+
     updateRenderInfoIsColorMap(layerName: string, isColorMap: boolean) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
@@ -218,7 +210,6 @@ export class UtkMap {
         }
     }
 
-
     draw(fps: number = 60) {
         let previousDelta = 0;
 
@@ -235,6 +226,13 @@ export class UtkMap {
         }
 
         requestAnimationFrame(update);
+    }
+
+    private handleResize() {
+        const width = this._canvas.width;
+        const height = this._canvas.height;
+
+        this.resize(width, height);
     }
 
     private render() {

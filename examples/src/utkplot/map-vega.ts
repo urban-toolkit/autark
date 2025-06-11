@@ -78,7 +78,7 @@ export class MapVega {
             await this.loadLayers();
             await this.updateThematicData();
 
-            this.map.updateLayerOpacity('neighborhoods', 0.75);
+            this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
             this.map.draw();
 
             this.plot = new UtkPlotVega(plotBdy, this.getVegaSpec());
@@ -95,7 +95,7 @@ export class MapVega {
 
         const plot = document.querySelector('#plot') as HTMLDivElement;
         const bar  = document.querySelector('#plotBar') as HTMLDivElement;
-;
+
         bar.addEventListener('mousedown', mouseDown)
 
         function mouseDown(e: MouseEvent) {
@@ -187,7 +187,10 @@ export class MapVega {
                 values: [],
             },
             selection: {
-                "click": { "type": "single" }
+                "click": { 
+                    "type": "multi",
+                    "toggle": "event.altKey"
+                }
             },
             width: 450,
             height: 450,
@@ -228,6 +231,10 @@ export class MapVega {
                 console.log("Selection updated:", selection);
             }
         }
+    }
+
+    protected async updateMapPickCallback() {
+
     }
 }
 
