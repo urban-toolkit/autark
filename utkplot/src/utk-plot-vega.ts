@@ -43,7 +43,6 @@ export class UtkPlotVega extends UtkPlot {
 
         plot.view.addSignalListener("click", (selection, predicates) => {
             console.log("Selection updated:", selection, predicates);
-            console.log("Selection updated:", selection, Array.from(predicates._vgsid_));
 
             const locList = Array.from(predicates._vgsid_);
 
