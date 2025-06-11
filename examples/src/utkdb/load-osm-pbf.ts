@@ -1,8 +1,6 @@
 import { SpatialDb } from 'utkdb';
 
-import { Example } from '../example';
-
-export class LoadOsmPbf extends Example {
+export class LoadOsmPbf {
     protected db!: SpatialDb;
 
     public async run(): Promise<void> {

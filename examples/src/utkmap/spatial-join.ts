@@ -1,10 +1,9 @@
 import { SpatialDb } from 'utkdb';
 import { UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, IBoundingBox } from 'utkmap';
 
-import { Example } from '../example';
 import { GeoJsonProperties } from 'geojson';
 
-export class SpatialJoin extends Example {
+export class SpatialJoin {
     protected map!: UtkMap;
     protected db!: SpatialDb;
 
@@ -121,9 +120,3 @@ export class SpatialJoin extends Example {
         this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 }
-
-async function main() {
-    const example = new SpatialJoin();
-    await example.run();
-}
-main();
