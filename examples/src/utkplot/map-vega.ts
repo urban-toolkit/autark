@@ -13,62 +13,6 @@ export class MapVega extends Example {
     protected db!: SpatialDb;
     protected plot!: UtkPlot
 
-    protected canvas!: HTMLCanvasElement;
-    
-    protected plotDiv!: HTMLDivElement;
-    protected plotBdy!: HTMLDivElement;
-    protected plotBar!: HTMLDivElement;
-
-    constructor() {
-        super();
-    }
-
-    public buildHtml() {
-        const app = document.querySelector('#app') as HTMLElement | null;
-
-        this.canvas = document.createElement('canvas');
-
-        this.plotDiv = document.createElement('div');
-        this.plotBar = document.createElement('div');
-        this.plotBdy = document.createElement('div');
-
-        const titleDiv = document.createElement('div');
-
-        if (!app || !titleDiv || !this.canvas) { return; }
-
-        this.canvas.width = 1024;
-        this.canvas.height = 768;
-
-        titleDiv.style.display = 'flex';
-        titleDiv.style.flexDirection = 'row';
-        titleDiv.style.justifyContent = 'center';
-        titleDiv.style.width = '1024px';
-        titleDiv.innerHTML = '<h2>map-vega.ts</h2>';
-
-        this.plotDiv.style.position = 'fixed';
-        this.plotDiv.style.zIndex = '10';
-        this.plotDiv.style.backgroundColor = 'rgb(255, 255, 255)';
-        this.plotDiv.style.opacity = '0.75';
-        this.plotDiv.style.width = '500px';
-        this.plotDiv.id = 'plotDiv';
-
-        this.plotBar.style.width = '100%';
-        this.plotBar.style.height = '30px';
-        this.plotBar.style.cursor = 'move';
-
-        this.plotBdy.style.width = '100%';
-        this.floatingDiv();
-
-        if (app) {
-            this.plotDiv.appendChild(this.plotBar);
-            this.plotDiv.appendChild(this.plotBdy);
-
-            app.appendChild(titleDiv);
-            app.appendChild(this.canvas);
-            app.appendChild(this.plotDiv);
-        }
-    }
-
     public async run(): Promise<void> {
         this.db = new SpatialDb();
         await this.db.init();
@@ -124,24 +68,65 @@ export class MapVega extends Example {
             },
         });
 
-        this.map = new UtkMap(this.canvas);
-        await this.map.init(await this.db.getOsmBoundingBox());
+        const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+        const plotBdy = document.querySelector('#plotBody') as HTMLDivElement;
 
-        await this.loadLayers();
-        await this.updateThematicData();
+        if (canvas && plotBdy) {
+            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
 
-        this.map.updateLayerOpacity('neighborhoods', 0.75);
-        this.map.draw();
+            this.map = new UtkMap(canvas);
+            await this.map.init(await this.db.getOsmBoundingBox());
 
-        this.plot = new UtkPlotVega(this.plotBdy, this.getVegaSpec());
+            await this.loadLayers();
+            await this.updateThematicData();
 
-        await this.loadPlotData();
-        await this.updatePlotCallback();
+            this.map.updateLayerOpacity('neighborhoods', 0.75);
+            this.map.draw();
 
-        this.plot.draw();
+            this.plot = new UtkPlotVega(plotBdy, this.getVegaSpec());
 
-        this.plotBar.style.backgroundColor = '#bfbfbf';
-        this.plotDiv.style.border = '1px solid #d3d3d3';
+            await this.loadPlotData();
+            await this.updatePlotCallback();
+
+            this.plot.draw();
+        }
+    }
+
+    public floatingDiv() {
+        let newX = 0, newY = 0, startX = 0, startY = 0;
+
+        const plot = document.querySelector('#plot') as HTMLDivElement;
+        const bar  = document.querySelector('#plotBar') as HTMLDivElement;
+;
+        bar.addEventListener('mousedown', mouseDown)
+
+        function mouseDown(e: MouseEvent) {
+            startX = e.clientX
+            startY = e.clientY
+
+            document.addEventListener('mousemove', mouseMove)
+            document.addEventListener('mouseup', mouseUp)
+        }
+
+        function mouseMove(e: MouseEvent) {
+            newX = startX - e.clientX
+            newY = startY - e.clientY
+
+            startX = e.clientX
+            startY = e.clientY
+
+            plot.style.top = (plot.offsetTop - newY) + 'px';
+            plot.style.left = (plot.offsetLeft - newX) + 'px';
+
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function mouseUp() {
+            document.removeEventListener('mousemove', mouseMove)
+        }
+
+        plot.style.visibility = 'visible';
     }
 
     protected async loadLayers(): Promise<void> {
@@ -208,8 +193,8 @@ export class MapVega extends Example {
             },
             width: 450,
             height: 450,
-            background: "rgba(255, 255, 255, 0.75)",
-            view: { "fill": "rgba(255, 255, 255, 0.75)" },
+            background: "rgba(255, 255, 255, 0.85)",
+            view: { "fill": "rgba(255, 255, 255, 0.85)" },
             mark: 'bar',
             encoding: {
                 x: { field: 'ntaname', type: 'ordinal' },
@@ -246,37 +231,12 @@ export class MapVega extends Example {
             }
         }
     }
-
-    protected async floatingDiv() {
-        let newX = 0, newY = 0, startX = 0, startY = 0;
-
-        const floatingDiv = this.plotDiv;
-        this.plotBar.addEventListener('mousedown', mouseDown)
-
-        function mouseDown(e: MouseEvent) {
-            startX = e.clientX
-            startY = e.clientY
-
-            document.addEventListener('mousemove', mouseMove)
-            document.addEventListener('mouseup', mouseUp)
-        }
-
-        function mouseMove(e:MouseEvent) {
-            newX = startX - e.clientX
-            newY = startY - e.clientY
-
-            startX = e.clientX
-            startY = e.clientY
-
-            floatingDiv.style.top = (floatingDiv.offsetTop - newY) + 'px';
-            floatingDiv.style.left = (floatingDiv.offsetLeft - newX) + 'px';
-
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function mouseUp() {
-            document.removeEventListener('mousemove', mouseMove)
-        }
-    }
 }
+
+async function main() {
+    const example = new MapVega();
+    await example.run();
+
+    example.floatingDiv();
+}
+main();

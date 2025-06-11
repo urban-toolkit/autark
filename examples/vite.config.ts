@@ -39,7 +39,8 @@ export default defineConfig({
         // open: '/src/utkmap/osm-layers-api.html',
         // open: '/src/utkmap/osm-layers-pbf.html',
         // open: '/src/utkmap/spatial-join-near.html',
-        open: '/src/utkmap/spatial-join.html',
+        // open: '/src/utkmap/spatial-join.html',
+        open: '/src/utkplot/map-vega.html',
         cors: {
             origin: '*',
             allowedHeaders: 'Range, Content-Type, Authorization',
