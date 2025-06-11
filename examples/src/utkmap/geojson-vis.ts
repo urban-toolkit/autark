@@ -26,7 +26,9 @@ export class GeojsonVis extends Example {
         });
 
         const canvas = document.querySelector('canvas');
+
         if (canvas) {
+            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
             this.map = new UtkMap(canvas);
 
             await this.map.init(boundingBox);

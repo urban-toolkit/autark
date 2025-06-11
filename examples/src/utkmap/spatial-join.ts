@@ -1,59 +1,29 @@
 import { SpatialDb } from 'utkdb';
-import { UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel } from 'utkmap';
+import { UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, IBoundingBox } from 'utkmap';
 
 import { Example } from '../example';
 import { GeoJsonProperties } from 'geojson';
 
-export class SpatialJoinNearVis extends Example {
+export class SpatialJoin extends Example {
     protected map!: UtkMap;
     protected db!: SpatialDb;
-
-    protected canvas!: HTMLCanvasElement;
-
-    constructor() {
-        super();
-    }
-
-    public buildHtml() {
-        const app = document.querySelector('#app') as HTMLElement | null;
-
-        this.canvas = document.createElement('canvas');
-        const div = document.createElement('div');
-
-        if (!app || !div || !this.canvas) { return; }
-
-        this.canvas.width = this.canvas.height = this.canvas.parentElement?.clientHeight || 800;
-
-        div.style.display = 'flex';
-        div.style.flexDirection = 'row';
-        div.style.justifyContent = 'center';
-        div.style.width = '800px';
-
-        div.innerHTML = '<h2>spatial-join-near-vis.ts</h2>';
-
-        if (app) {
-            app.appendChild(div);
-            app.appendChild(this.canvas);
-        }
-    }
 
     public async run(): Promise<void> {
         this.db = new SpatialDb();
         await this.db.init();
 
-        await this.db.loadOsm({
-            pbfFileUrl: 'http://localhost:5173/data/lower-mn.osm.pbf',
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
-                layers: [
-                    'coastline',
-                    'parks',
-                    'water',
-                    'roads'
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
-                dropOsmTable: true,
-            },
+        // CHECK: Compute the bomding box even if there is no osm data
+        const boundingBox: IBoundingBox = {
+            minLon: 4940354.793551397,
+            minLat: -8239795.593876557,
+            maxLon: 4942534.993601108,
+            maxLat: -8237537.099519547
+        }
+
+        await this.db.loadCustomLayer({
+            geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+            outputTableName: 'neighborhoods',
+            coordinateFormat: 'EPSG:3395'
         });
 
         await this.db.loadCsv({
@@ -67,10 +37,9 @@ export class SpatialJoinNearVis extends Example {
         });
 
         await this.db.spatialJoin({
-            tableRootName: 'table_osm_roads',
+            tableRootName: 'neighborhoods',
             tableJoinName: 'noise',
-            spatialPredicate: 'NEAR',
-            nearDistance: 1000,
+            spatialPredicate: 'INTERSECT',
             output: {
                 type: 'MODIFY_ROOT',
             },
@@ -86,13 +55,18 @@ export class SpatialJoinNearVis extends Example {
             },
         });
 
-        this.map = new UtkMap(this.canvas);
-        await this.map.init(await this.db.getOsmBoundingBox());
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
 
-        await this.loadLayers();
-        await this.updateThematicData();
+            this.map = new UtkMap(canvas);
+            await this.map.init(boundingBox);
 
-        this.map.draw();
+            await this.loadLayers();
+            await this.updateThematicData();
+
+            this.map.draw();
+        }
     }
 
     protected async loadLayers(): Promise<void> {
@@ -116,7 +90,7 @@ export class SpatialJoinNearVis extends Example {
     protected async updateThematicData() {
         const thematicData: ILayerThematic[] = [];
 
-        const geojson = await this.db.getLayer('table_osm_roads');
+        const geojson = await this.db.getLayer('neighborhoods');
 
         if (geojson) {
             for (const feature of geojson.features) {
@@ -144,6 +118,12 @@ export class SpatialJoinNearVis extends Example {
             }
         }
 
-        this.map.updateLayerThematic('table_osm_roads', thematicData);
+        this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 }
+
+async function main() {
+    const example = new SpatialJoin();
+    await example.run();
+}
+main();

@@ -22,8 +22,7 @@ export default defineConfig({
     build: {
         rollupOptions: {
             input: {
-                main: '/index.html',
-                nested: '/src/utkdb/',
+                nested : '/src/utkdb/',
                 nested2: '/src/utkmap/',
                 nested3: '/src/utkplot/',
             }
@@ -36,7 +35,11 @@ export default defineConfig({
         // open: '/src/utkdb/spatial-join-near.html',
         // open: '/src/utkdb/spatial-join.html',
         // open: '/src/utkmap/geojson-vis.html',
-        open: '/src/utkmap/layer-opacity.html',
+        // open: '/src/utkmap/layer-opacity.html',
+        // open: '/src/utkmap/osm-layers-api.html',
+        // open: '/src/utkmap/osm-layers-pbf.html',
+        // open: '/src/utkmap/spatial-join-near.html',
+        open: '/src/utkmap/spatial-join.html',
         cors: {
             origin: '*',
             allowedHeaders: 'Range, Content-Type, Authorization',
