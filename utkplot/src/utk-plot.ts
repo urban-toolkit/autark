@@ -4,9 +4,10 @@ import { PlotEvents } from "./plot-events";
 
 export abstract class UtkPlot {
     protected _div!: HTMLElement;
+    protected _view!: any; 
 
     protected _data!: GeoJsonProperties[];
-    protected _selection!: GeoJsonProperties[];
+    protected _selectedIds!: number[] | string[];
 
     protected _plotEvents!: PlotEvents;
 
@@ -15,13 +16,16 @@ export abstract class UtkPlot {
         this._plotEvents = new PlotEvents(events);
     }
 
-    get selection(): GeoJsonProperties[] {
-        return this._selection;
+    get view(): any {
+        return this._view;
     }
 
-    set selection(selection: GeoJsonProperties[]) {
-        this._selection = selection;
-        this.draw();
+    get selectedIds(): number[] | string[] {
+        return this._selectedIds;
+    }
+
+    set selectedIds(selectedIds: number[] | string[]) {
+        this._selectedIds = selectedIds;
     }
 
     get plotEvents(): PlotEvents {
