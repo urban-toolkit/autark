@@ -13,7 +13,8 @@ export abstract class Layer {
     // vbo is dirty
     protected _dataInfoIsDirty: boolean = false;
 
-    protected _highlighted!: number[];
+    protected _highlightedVertices!: number[];
+    protected _highlightedIds!: Set<number>;
 
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
         this.setLayerInfo(layerInfo);
@@ -36,8 +37,8 @@ export abstract class Layer {
         return this.layerRenderInfo.pickedComps;
     }
 
-    get highlighted(): number[] {
-        return this._highlighted;
+    get highlightedIds(): number[] {
+        return Array.from(this._highlightedIds);
     }
 
     setLayerInfo(layerInfo: ILayerInfo) {
@@ -56,9 +57,15 @@ export abstract class Layer {
         this._renderInfoIsDirty = true;
     }
 
-    abstract setHighlighted(ids: number[]): void;
-    
-    abstract clearHighlighted(): void;
+    clearHighlightedIds() {
+        this._highlightedVertices.fill(0);
+        this._highlightedIds.clear();
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataInfoDirty();
+    }
+
+    abstract setHighlightedIds(ids: number[]): void;
 
     abstract loadData(layerData: ILayerData): void;
 

@@ -65,7 +65,7 @@ export class FeaturesLayer extends Layer {
             this.loadThematic(layerData.thematic);
         }
 
-        this._highlighted = new Array(this._position.length / 3).fill(0);
+        this._highlightedVertices = new Array(this._position.length / 3).fill(0);
     }
 
     loadGeometry(layerGeometry: ILayerGeometry[]): void {
@@ -168,11 +168,17 @@ export class FeaturesLayer extends Layer {
         this._pipelinePicking.renderPass(camera);
     }
 
-    setHighlighted(ids: number[]): void {
+    setHighlightedIds(ids: number[]): void {
 
-        if (ids.length == 0) {
-            this._highlighted.fill(0);
-        }
+        // If id is already in highlightedIds, remove it (i.e., toggle it off)
+        ids.forEach(id => {
+            if(this._highlightedIds.has(id)) {
+                this._highlightedIds.delete(id);
+            }
+            else {
+                this._highlightedIds.add(id);
+            }
+        });
 
         const toggled = new Set<number>();
         for (const id of ids) {
@@ -185,18 +191,11 @@ export class FeaturesLayer extends Layer {
                 const vertexIndex = this._indices[i];
 
                 if (!toggled.has(vertexIndex)) {
-                    this._highlighted[vertexIndex] = 1 - this._highlighted[vertexIndex];
+                    this._highlightedVertices[vertexIndex] = 1 - this._highlightedVertices[vertexIndex];
                     toggled.add(vertexIndex);
                 }
             }
         }
-
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataInfoDirty();
-    }
-
-    clearHighlighted(): void {
-        this._highlighted.fill(0);
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataInfoDirty();
