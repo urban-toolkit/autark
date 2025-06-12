@@ -27,32 +27,6 @@ export class BuildingsLayer extends FeaturesLayer {
         this._pipelinePicking.build(this);
     }
 
-    setHighlighted(ids: number[]): void {
-
-        if (ids.length == 0) {
-            this._highlighted.fill(0);
-        }
-
-        const toggled = new Set<number>();
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = sTriangle * 3; i < eTriangle * 3; i++) {
-                const vertexIndex = this._indices[i];
-                if (!toggled.has(vertexIndex)) {
-                    this._highlighted[vertexIndex] = 1 - this._highlighted[vertexIndex];
-                    toggled.add(vertexIndex);
-                }
-            }
-        }
-
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataInfoDirty();
-    }
-
     computeNormals(): void {
         // same size as the position array
         const len = this._position.length;

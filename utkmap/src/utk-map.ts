@@ -213,7 +213,7 @@ export class UtkMap {
             layer.setLayerRenderInfo(layerRenderInfo);
 
             if(isPick === false) {
-                layer.setHighlighted([]);
+                layer.clearHighlightedIds();
             }
         }
     }
@@ -265,14 +265,14 @@ export class UtkMap {
         });
         this._renderer.finish();
 
-        // Getting id: TEMP
+        // Getting ids
         this._layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 const [x, y] = layer.layerRenderInfo.pickedComps;
                 layer.getPickedId(x, y).then(id => {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if(id >= 0){
-                        layer.setHighlighted([id]);
+                        layer.setHighlightedIds([id]);
                         this._mapEvents.emit('picked', [`${id}`], layer.layerInfo.id);
                     }
                     layer.layerRenderInfo.pickedComps = undefined;
