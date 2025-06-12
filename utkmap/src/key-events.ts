@@ -3,7 +3,7 @@ import { UtkMap } from './utk-map';
 import { Layer } from './layer';
 
 export class KeyEvents {
-    private _map!: UtkMap;
+    private _map!: UtkMap
     private _currentLayer!: Layer;
 
     constructor(utkMap: UtkMap) {

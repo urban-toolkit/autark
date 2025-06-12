@@ -7,6 +7,7 @@ import {
     LayerGeometryType,
     LayerType,
     LayerZIndex,
+    MapEvent,
     RenderPipeline,
     ThematicAggregationLevel
 } from './constants';
@@ -26,6 +27,7 @@ import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { KeyEvents } from './key-events';
 import { MouseEvents } from './mouse-events';
+import { MapEvents } from './map-events';
 import { LayerManager } from './layer-manager';
 
 import { TriangulatorFeatures } from './triangulator-features';
@@ -38,6 +40,7 @@ export class UtkMap {
     protected _renderer!: Renderer;
     protected _keyEvents!: KeyEvents;
     protected _mouseEvents!: MouseEvents;
+    protected _mapEvents!: MapEvents;
     protected _layerManager!: LayerManager;
 
     protected _canvas!: HTMLCanvasElement;
@@ -48,6 +51,7 @@ export class UtkMap {
         this._renderer = new Renderer(canvas);
         this._keyEvents = new KeyEvents(this);
         this._mouseEvents = new MouseEvents(this);
+        this._mapEvents = new MapEvents([MapEvent.PICK]);
         this._layerManager = new LayerManager();
 
         if (autoResize) {
@@ -73,6 +77,10 @@ export class UtkMap {
 
     get boundingBox(): Feature<Polygon> {
         return this._layerManager.boundingBox;
+    }
+
+    get mapEvents(): MapEvents {
+        return this._mapEvents;
     }
 
     async init(bbox: IBoundingBox) {
@@ -265,6 +273,7 @@ export class UtkMap {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if(id >= 0){
                         layer.setHighlighted([id]);
+                        this._mapEvents.emit('picked', [`${id}`], layer.layerInfo.id);
                     }
                     layer.layerRenderInfo.pickedComps = undefined;
                 });

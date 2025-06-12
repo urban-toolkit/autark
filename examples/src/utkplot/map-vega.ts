@@ -3,7 +3,8 @@ import { Feature, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'utkdb';
 import { UtkPlot, UtkPlotVega } from 'utkplot';
 import {
-    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel
+    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel,
+    MapEvent
 } from 'utkmap';
 
 export class MapVega {
@@ -84,7 +85,9 @@ export class MapVega {
             this.plot = new UtkPlotVega(plotBdy, this.getVegaSpec());
 
             await this.loadPlotData();
-            await this.updatePlotCallback();
+            
+            this.updatePlotCallback();
+            this.updateMapCallback();
 
             this.plot.draw();
         }
@@ -218,7 +221,7 @@ export class MapVega {
         this.plot.loadData(data);
     }
 
-    protected async updatePlotCallback() {
+    protected updatePlotCallback() {
         this.plot.mapCallback = (selection: number[]) => {
             const layer = this.map.layerManager.searchByLayerId('neighborhoods');
 
@@ -233,8 +236,10 @@ export class MapVega {
         }
     }
 
-    protected async updateMapPickCallback() {
-
+    protected updateMapCallback() {
+        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection, layerId) => {
+            console.log("Map Callback:", selection, layerId);
+        });
     }
 }
 

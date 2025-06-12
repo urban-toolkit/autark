@@ -26,6 +26,10 @@ export enum LayerZIndex {
     CUSTOM_2DLAYER = 0.5,
 }
 
+export enum MapEvent {
+    PICK = 'pick',
+}
+
 
 export enum ThematicAggregationLevel {
     AGGREGATION_POINT = 'aggreagationPoint',
@@ -51,3 +55,6 @@ export enum MouseStatus {
 export type ColorHEX = `#${string}`;
 export type ColorRGB = { r: number; g: number; b: number; opacity: number };
 export type ColorTEX = number[];
+
+export type MapEventListener = (selection: string[], layerId: string) => void;
+
