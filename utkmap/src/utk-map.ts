@@ -273,7 +273,7 @@ export class UtkMap {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if(id >= 0){
                         layer.setHighlightedIds([id]);
-                        this._mapEvents.emit('picked', [`${id}`], layer.layerInfo.id);
+                        this._mapEvents.emit(MapEvent.PICK, [id], layer.layerInfo.id);
                     }
                     layer.layerRenderInfo.pickedComps = undefined;
                 });

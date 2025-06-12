@@ -30,7 +30,6 @@ export enum MapEvent {
     PICK = 'pick',
 }
 
-
 export enum ThematicAggregationLevel {
     AGGREGATION_POINT = 'aggreagationPoint',
     AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
@@ -56,5 +55,4 @@ export type ColorHEX = `#${string}`;
 export type ColorRGB = { r: number; g: number; b: number; opacity: number };
 export type ColorTEX = number[];
 
-export type MapEventListener = (selection: string[], layerId: string) => void;
-
+export type MapEventListener = (selection: number[] | string[], layerId: string) => void;

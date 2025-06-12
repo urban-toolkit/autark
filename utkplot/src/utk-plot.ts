@@ -1,4 +1,6 @@
 import { GeoJsonProperties } from "geojson";
+import { PlotEvent } from "./constants";
+import { PlotEvents } from "./plot-events";
 
 export abstract class UtkPlot {
     protected _div!: HTMLElement;
@@ -6,10 +8,11 @@ export abstract class UtkPlot {
     protected _data!: GeoJsonProperties[];
     protected _selection!: GeoJsonProperties[];
 
-    protected _mapCallback!: (selection: number[]) => void;
+    protected _plotEvents!: PlotEvents;
 
-    constructor(svg: HTMLElement) {
+    constructor(svg: HTMLElement, events: PlotEvent[] = [PlotEvent.CLICK]) {
         this._div = svg;
+        this._plotEvents = new PlotEvents(events);
     }
 
     get selection(): GeoJsonProperties[] {
@@ -21,8 +24,8 @@ export abstract class UtkPlot {
         this.draw();
     }
 
-    set mapCallback(callback: (selection: number[]) => void) {
-        this._mapCallback = callback;
+    get plotEvents(): PlotEvents {
+        return this._plotEvents;
     }
 
     loadData(DataItem: GeoJsonProperties[]) {

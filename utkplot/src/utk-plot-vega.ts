@@ -4,6 +4,7 @@ import { TopLevelSpec } from "vega-lite";
 import { GeoJsonProperties } from "geojson";
 
 import { UtkPlot } from "./utk-plot";
+import { PlotEvent } from "./constants";
 
 export class UtkPlotVega extends UtkPlot {
     protected _vegaSpec: any;
@@ -49,7 +50,7 @@ export class UtkPlotVega extends UtkPlot {
             const loc = <number>locList[0];
             this._selection = [this._data[loc]];
 
-            this._mapCallback(<number[]>locList)
+            this.plotEvents.emit(PlotEvent.CLICK, <number[]>locList)
         });
     }
 }
