@@ -120,7 +120,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         // vertex data
         this._highlightedBuffer = this._renderer.device.createBuffer({
             label: 'Highlighted data buffer',
-            size: mesh.highlighted.length * 4,
+            size: mesh.highlightedVertices.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
@@ -137,7 +137,7 @@ export class PipelineBuildingSSAO extends Pipeline {
     updateVertexBuffers(mesh: BuildingsLayer): void {
         this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, new Float32Array(mesh.normal));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlighted));
+        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }

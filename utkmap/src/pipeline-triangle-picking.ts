@@ -105,10 +105,11 @@ export class PipelineTrianglePicking extends Pipeline {
     });
 
     const commandEncoder = this._renderer.device.createCommandEncoder();
+
     commandEncoder.copyTextureToBuffer(
       {
         texture: this._renderer.pickingTexture,
-        origin: { x, y: y },
+        origin: { x: x, y: y },
       },
       {
         buffer: readBuffer,

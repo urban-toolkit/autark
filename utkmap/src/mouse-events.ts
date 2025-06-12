@@ -109,9 +109,6 @@ export class MouseEvents {
     const canvas = this._map.renderer.canvas;
 
     // changes the values
-    // const maxAxisLength = Math.max(canvas.clientWidth, canvas.clientHeight);
-    // const x = event.offsetX / maxAxisLength;
-    // const y = (canvas.height - event.offsetY) / maxAxisLength;
     const rect = canvas.getBoundingClientRect();
     const x = (event.clientX - rect.left) / canvas.clientWidth;
     const y = 1.0 - (event.clientY - rect.top) / canvas.clientHeight;
@@ -124,10 +121,26 @@ export class MouseEvents {
    * Handles mouse double click
    */
   mouseDoubleClick(event: MouseEvent) {
+    const canvas = this._map.renderer.canvas;
+    const rect = canvas.getBoundingClientRect();
+
+    // Mouse position relative to canvas
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Scale factors from CSS size to actual canvas resolution
+    const scaleX = canvas.width / canvas.clientWidth;
+    const scaleY = canvas.height / canvas.clientHeight;
+
+    const adjustedX = Math.floor(mouseX * scaleX);
+    const adjustedY = Math.floor(mouseY * scaleY);
+
     this._map.layerManager.layers.forEach((layer) => {
-      if(layer.layerRenderInfo.isPick)
-        layer.layerRenderInfo.pickedComps = [event.offsetX, event.offsetY];
+      if (layer.layerRenderInfo.isPick) {
+        layer.layerRenderInfo.pickedComps = [adjustedX, adjustedY];
+      }
     });
   }
+
 
 }

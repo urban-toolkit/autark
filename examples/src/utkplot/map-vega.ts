@@ -160,8 +160,8 @@ export class MapVega {
             if (layer) {
                 layer.layerRenderInfo.isPick = true;
 
-                layer.clearHighlighted();
-                layer.setHighlighted(selection as number[]);
+                layer.clearHighlightedIds();
+                layer.setHighlightedIds(selection as number[]);
 
                 console.log("Selection updated:", selection);
             }

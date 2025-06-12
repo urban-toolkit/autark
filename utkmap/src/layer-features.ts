@@ -66,6 +66,7 @@ export class FeaturesLayer extends Layer {
         }
 
         this._highlightedVertices = new Array(this._position.length / 3).fill(0);
+        this._highlightedIds = new Set<number>();
     }
 
     loadGeometry(layerGeometry: ILayerGeometry[]): void {

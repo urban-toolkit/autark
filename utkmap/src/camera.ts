@@ -180,7 +180,6 @@ export class Camera {
     }
 
     update(): void {
-
         const aspect = this.viewportWidth / this.viewportHeight;
 
         // model matrix

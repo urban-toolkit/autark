@@ -41,6 +41,10 @@ export abstract class Layer {
         return Array.from(this._highlightedIds);
     }
 
+    get highlightedVertices(): number[] {
+        return this._highlightedVertices;
+    }
+
     setLayerInfo(layerInfo: ILayerInfo) {
         this._layerInfo = layerInfo;
     }
