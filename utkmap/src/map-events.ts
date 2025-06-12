@@ -1,9 +1,9 @@
-import { MapEventListener } from './constants';
+import { MapEvent, MapEventListener } from './constants';
 
 export class MapEvents {
     private _listeners: { [event: string]: MapEventListener[] } = {};
 
-    constructor(events: string[]) {
+    constructor(events: MapEvent[]) {
         events.forEach(event => {
             this._listeners[event] = [];
         });
@@ -21,8 +21,9 @@ export class MapEvents {
         }
     }
 
-    emit(event: string, selection: string[], layerId: string): void {
+    emit(event: string, selection: number[] | string[], layerId: string): void {
         if (this._listeners[event]) {
+            console.log(`Emitting event: ${event} with selection: ${selection} for layer: ${layerId}`);
             this._listeners[event].forEach(listener => listener(selection, layerId));
         }
     }
