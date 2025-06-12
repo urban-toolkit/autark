@@ -273,13 +273,12 @@ export class UtkMap {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if(id >= 0){
                         layer.setHighlightedIds([id]);
-                        this._mapEvents.emit(MapEvent.PICK, [id], layer.layerInfo.id);
+                        this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
                     }
                     layer.layerRenderInfo.pickedComps = undefined;
                 });
             }
         });
-
     }
 
     private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
@@ -302,7 +301,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -339,7 +338,7 @@ export class UtkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -376,7 +375,7 @@ export class UtkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -413,7 +412,7 @@ export class UtkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_SSAO,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -453,7 +452,7 @@ export class UtkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_BLUES,
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,

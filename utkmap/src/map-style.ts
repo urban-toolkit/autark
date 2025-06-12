@@ -23,7 +23,7 @@ export class MapStyle {
     // default color for unknown layers
     protected static _notFound: ColorHEX = '#FFFFFF';
     // default highlight color
-    protected static _highlight: ColorHEX = '#FFDD00';
+    protected static _highlight: ColorHEX = '#5dade2';
 
     // custom style
     protected static _current: IMapStyle = MapStyle._default;

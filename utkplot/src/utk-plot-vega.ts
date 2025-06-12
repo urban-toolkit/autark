@@ -41,15 +41,12 @@ export class UtkPlotVega extends UtkPlot {
 
     async draw(): Promise<void> {
         const plot = await embed(this._div, this._vegaSpec, {mode: "vega-lite"});
+        this._view = plot.view;
 
-        plot.view.addSignalListener("click", (selection, predicates) => {
+        this._view.addSignalListener("click", (selection: any, predicates: any) => {
             console.log("Selection updated:", selection, predicates);
 
-            const locList = Array.from(predicates._vgsid_);
-
-            const loc = <number>locList[0];
-            this._selection = [this._data[loc]];
-
+            const locList = Array.from(predicates?._vgsid_ || []);
             this.plotEvents.emit(PlotEvent.CLICK, <number[]>locList)
         });
     }

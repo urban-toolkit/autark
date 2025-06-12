@@ -158,19 +158,23 @@ export class MapVega {
             const layer = this.map.layerManager.searchByLayerId('neighborhoods');
 
             if (layer) {
+                console.log("Map updated by plot. Selected regions:", selection);
+
                 layer.layerRenderInfo.isPick = true;
 
                 layer.clearHighlightedIds();
                 layer.setHighlightedIds(selection as number[]);
-
-                console.log("Selection updated:", selection);
             }
         });
     }
 
-    protected updateMapListeners() {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection, layerId) => {
-            console.log("Map Event Listener:", selection, layerId);
+    protected async updateMapListeners() {
+        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
+            console.log("Plot updated by Map. Selected regions:", selection);
+
+            // const view = this.plot.view;
+            // view.signal('click', { _vgsid_: selection });
+            // view.runAsync();
         });
     }
 

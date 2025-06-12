@@ -13,7 +13,7 @@ fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32) -> @locat
     var sampledColor = textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
 
     if(showHighlight > 0 && inHighlighted > 0) {
-        color = highlightColor;
+        color = vec4f(highlightColor.r / 255, highlightColor.g / 255, highlightColor.b / 255, highlightColor.a);
     }
     else if (showThematic > 0) {
         color = sampledColor;
