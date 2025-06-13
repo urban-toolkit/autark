@@ -8,29 +8,20 @@ import { PlotEvent } from "./constants";
 
 export class UtkPlotVega extends UtkPlot {
     protected _vegaSpec: any;
+    protected _vegaDataKey!: string;
 
-    constructor(div: HTMLElement, vegaSpec: any) {
-        super(div);
+    constructor(div: HTMLElement, vegaSpec: any, vegaDataKey: string, plotEvents: PlotEvent[]) {
+        super(div, plotEvents);
 
-        this._vegaSpec = vegaSpec;
+        this.setVegaSpec(vegaSpec, vegaDataKey);
     }
 
-    get vegaSpec(): TopLevelSpec {
-        return this._vegaSpec;
+    get data(): GeoJsonProperties[] {
+        return this._data;
     }
 
-    set vegaSpec(spec: TopLevelSpec) {
-        this._vegaSpec = spec;
-
-        if (this._data) {
-            this._vegaSpec.data = {
-                values: this._data,
-            };
-        }
-    }
-
-    loadData(DataItem: GeoJsonProperties[]): void {
-        this._data = DataItem;
+    set data(data: GeoJsonProperties[]) {
+        this._data = data;
 
         if (this._vegaSpec) {
             this._vegaSpec.data = {
@@ -39,13 +30,55 @@ export class UtkPlotVega extends UtkPlot {
         }
     }
 
+    get vegaSpec(): TopLevelSpec {
+        return this._vegaSpec;
+    }
+
+    setVegaSpec(spec: TopLevelSpec, vegaDataKey: string) {
+        this._vegaSpec = spec;
+        this._vegaDataKey = vegaDataKey;
+
+        if (this._data) {
+            this._vegaSpec.data = {
+                values: this._data,
+            };
+        }
+    }
+
+    configureSignalListeners(propName: string): void {
+        const listeners = this.plotEvents.listeners;
+
+        for (const listener in listeners) {
+            this._view.addSignalListener(listener, (_selection: any, predicates: any) => {
+                const keys = Object.keys(predicates || {});
+                if( keys.length === 0 || !keys.includes(propName)) {
+                    this.plotEvents.emit(PlotEvent.BRUSH, [])
+                    return;
+                }
+                else {
+                    const locList: number[] = [];
+
+                    predicates[propName].forEach((value: any) => {
+                        const loc = this._data.findIndex( (d: GeoJsonProperties) => {
+                            if(!d) return false;
+                            return d[propName] === value;
+                        });
+
+                        if (loc !== -1) {
+                            locList.push(loc);
+                        }
+                    });
+
+                    this.plotEvents.emit(listener, locList)
+                }
+            });
+        }
+    }
+
     async draw(): Promise<void> {
-        const plot = await embed(this._div, this._vegaSpec, {mode: "vega-lite"});
+        const plot = await embed(this._div, this._vegaSpec, { mode: "vega-lite" });
         this._view = plot.view;
 
-        this._view.addSignalListener("click", (_selection: any, predicates: any) => {
-            const locList = Array.from(predicates?._vgsid_ || []);
-            this.plotEvents.emit(PlotEvent.CLICK, <number[]>locList)
-        });
+        this.configureSignalListeners('ntaname');
     }
 }

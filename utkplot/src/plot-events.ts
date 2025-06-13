@@ -9,6 +9,10 @@ export class PlotEvents {
         });
     }
 
+    get listeners(): { [event: string]: PlotEventListener[] } {
+        return this._listeners;
+    }
+
     addEventListener(event: string, listener: PlotEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event].push(listener);

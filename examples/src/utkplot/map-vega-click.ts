@@ -3,7 +3,7 @@ import { Feature, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'utkdb';
 import { PlotEvent, UtkPlot, UtkPlotVega } from 'utkplot';
 import {
-    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel,MapEvent
+    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent
 } from 'utkmap';
 
 export class MapVega {
@@ -81,12 +81,13 @@ export class MapVega {
             this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
             this.map.draw();
 
-            this.plot = new UtkPlotVega(plotBdy, this.vegaSpec());
+            const vegaDataKey = 'ntaname';
+            this.plot = new UtkPlotVega(plotBdy, this.vegaSpec(), vegaDataKey, [PlotEvent.CLICK]);
 
             await this.loadPlotData();
-            
+
             this.updatePlotListeners();
-            this.updateMapListeners();
+            this.updateMapListeners(vegaDataKey);
 
             this.plot.draw();
         }
@@ -150,7 +151,7 @@ export class MapVega {
         const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
             return f.properties;
         });
-        this.plot.loadData(data);
+        this.plot.data = data;
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
@@ -163,14 +164,12 @@ export class MapVega {
                 layer.clearHighlightedIds();
                 layer.setHighlightedIds(selection as number[]);
 
-                const highlightedIds = layer.highlightedIds;
-                console.log("Map updated. Selected regions:");
-                console.log({ highlightedIds });
+                console.log("Map updated.");
             }
         });
     }
 
-    protected async updateMapListeners() {
+    protected async updateMapListeners(vegaDataKey: string) {
         this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
             const state = this.plot.view.getState();
 
@@ -178,11 +177,27 @@ export class MapVega {
                 state.data[`click_store`] = [];
             }
 
-            state.data[`click_store`] = selection.map((id: number | string) => ({ "_vgsid_": id, "unit": "" }));
+            const values = selection.map((id: number | string) => { 
+                const el = this.plot.data[id as number];
+                if(!el) {
+                    return '';
+                } else {
+                    return el[vegaDataKey];
+                }
+            });
+    
+            state.data[`click_store`] = {
+                "values": [ values ],
+                "unit": "",
+                "fields": [{
+                    "field": vegaDataKey,
+                    "channel": "x",
+                    "type": "E"
+                }]
+            };
             this.plot.view.setState(state);
 
-            console.log("Plot updated. Selected regions:");
-            console.log({ state });
+            console.log("Plot updated.");
 
             this.plot.view.run();
         });
@@ -195,12 +210,16 @@ export class MapVega {
             data: {
                 values: [],
             },
-            selection: {
-                "click": { 
-                    "type": "multi",
-                    "toggle": "event.altKey"
+            params: [
+                {
+                    name: "click",
+                    select: {
+                        type: "point",
+                        toggle: "event.altKey",
+                        encodings: ["x"]
+                    }
                 }
-            },
+            ],
             width: 450,
             height: 450,
             background: "rgba(255, 255, 255, 0.85)",
@@ -211,9 +230,11 @@ export class MapVega {
                 y: { field: 'sjoin.count', type: 'quantitative' },
                 color: {
                     condition: {
-                        selection: "click",
+                        param: "click",
+                        empty: false,
                         value: "#5dade2"
                     },
+
                     "value": "lightgray"
                 }
             },
@@ -224,7 +245,7 @@ export class MapVega {
         let newX = 0, newY = 0, startX = 0, startY = 0;
 
         const plot = document.querySelector('#plot') as HTMLDivElement;
-        const bar  = document.querySelector('#plotBar') as HTMLDivElement;
+        const bar = document.querySelector('#plotBar') as HTMLDivElement;
 
         bar.addEventListener('mousedown', mouseDown)
 
