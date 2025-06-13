@@ -275,6 +275,10 @@ export class UtkMap {
                         layer.setHighlightedIds([id]);
                         this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
                     }
+                    else {
+                        layer.clearHighlightedIds();
+                        this._mapEvents.emit(MapEvent.PICK, [], layer.layerInfo.id);
+                    }
                     layer.layerRenderInfo.pickedComps = undefined;
                 });
             }

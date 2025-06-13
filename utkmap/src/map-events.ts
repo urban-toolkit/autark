@@ -23,7 +23,6 @@ export class MapEvents {
 
     emit(event: string, selection: number[] | string[], layerId: string): void {
         if (this._listeners[event]) {
-            console.log(`Emitting event: ${event} with selection: ${selection} for layer: ${layerId}`);
             this._listeners[event].forEach(listener => listener(selection, layerId));
         }
     }

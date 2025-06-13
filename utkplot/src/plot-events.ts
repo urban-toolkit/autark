@@ -23,7 +23,6 @@ export class PlotEvents {
 
     emit(event: string, selection: number[] | string[]): void {
         if (this._listeners[event]) {
-            console.log(`Emitting event: ${event} with selection: ${selection}`);
             this._listeners[event].forEach(listener => listener(selection));
         }
     }

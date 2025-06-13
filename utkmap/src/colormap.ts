@@ -44,7 +44,6 @@ export class ColorMap {
 
     public static hexToRgb(color: ColorHEX): ColorRGB {
         const rgb = d3_color.rgb(color);
-        console.log('hexToRgb', color, rgb);
         return { r: rgb.r, g: rgb.g, b: rgb.b, opacity: 1.0 };
     }
 }

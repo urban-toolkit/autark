@@ -24,8 +24,8 @@ export class MapVega {
                     'coastline',
                     'parks',
                     'water',
-                    'roads',
-                    'buildings',
+                    // 'roads',
+                    // 'buildings',
                 ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
                 dropOsmTable: true,
             },
@@ -112,10 +112,10 @@ export class MapVega {
         }
     }
 
-    protected async loadLayerData() {
+    protected async loadLayerData(layerId: string = 'neighborhoods') {
         const thematicData: ILayerThematic[] = [];
 
-        const geojson = await this.db.getLayer('neighborhoods');
+        const geojson = await this.db.getLayer(layerId);
 
         if (geojson) {
             for (const feature of geojson.features) {
@@ -146,35 +146,45 @@ export class MapVega {
         this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 
-    protected async loadPlotData() {
-        const data = (await this.db.getLayer('neighborhoods')).features.map((f: Feature) => {
+    protected async loadPlotData(layerId: string = 'neighborhoods') {
+        const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
             return f.properties;
         });
         this.plot.loadData(data);
     }
 
-    protected updatePlotListeners() {
+    protected updatePlotListeners(layerId: string = 'neighborhoods') {
         this.plot.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[] | string[]) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods');
+            const layer = this.map.layerManager.searchByLayerId(layerId);
 
             if (layer) {
-                console.log("Map updated by plot. Selected regions:", selection);
-
                 layer.layerRenderInfo.isPick = true;
 
                 layer.clearHighlightedIds();
                 layer.setHighlightedIds(selection as number[]);
+
+                const highlightedIds = layer.highlightedIds;
+                console.log("Map updated. Selected regions:");
+                console.log({ highlightedIds });
             }
         });
     }
 
     protected async updateMapListeners() {
         this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
-            console.log("Plot updated by Map. Selected regions:", selection);
+            const state = this.plot.view.getState();
 
-            // const view = this.plot.view;
-            // view.signal('click', { _vgsid_: selection });
-            // view.runAsync();
+            if (!state.data[`click_store`] || selection.length === 0) {
+                state.data[`click_store`] = [];
+            }
+
+            state.data[`click_store`] = selection.map((id: number | string) => ({ "_vgsid_": id, "unit": "" }));
+            this.plot.view.setState(state);
+
+            console.log("Plot updated. Selected regions:");
+            console.log({ state });
+
+            this.plot.view.run();
         });
     }
 
