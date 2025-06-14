@@ -30,8 +30,7 @@ export abstract class UtkPlot {
         return this._plotEvents;
     }
 
-
-    abstract configureSignalListeners(propName: string): void;
+    abstract configureSignalListeners(): void;
 
     abstract draw(): Promise<void>;
 }

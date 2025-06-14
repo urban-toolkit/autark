@@ -6,4 +6,4 @@ export enum PlotEvent {
 }
 
 export type PlotEventListener = (selection: number[] | string[]) => void;
-export type D3PlotBuilder = (div: HTMLElement, d3DataKey: string, data: GeoJsonProperties[]) => SVGElement;
+export type D3PlotBuilder = (div: HTMLElement, d3DataKey: string, data: GeoJsonProperties[]) => any;
