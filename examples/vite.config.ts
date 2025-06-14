@@ -42,6 +42,7 @@ export default defineConfig({
         // open: '/src/utkmap/spatial-join.html',
         // open: '/src/utkplot/map-vega-click.html',
         open: '/src/utkplot/map-vega-brush.html',
+        // open: '/src/utkplot/map-d3-click.html',
         cors: {
             origin: '*',
             allowedHeaders: 'Range, Content-Type, Authorization',

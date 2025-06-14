@@ -1,0 +1,69 @@
+body {
+    margin: 20px;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+#app {
+    margin: 10px;
+
+    width: 800px;
+    min-height: 185px;
+    border: 1px solid #bfbfbf;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+canvas {
+    margin: 10px;
+    width: 780px;
+    height: 780px;
+}
+
+#plot {
+    position: fixed;
+    z-index: 10;
+    background-color: #ffffff;
+    opacity: 0.85;
+    width: 600px;
+    border: 1px solid #bfbfbf;
+    border-radius: 10px 10px 0px 0px;
+    visibility: hidden;
+}
+
+#plotBar {
+    width: 100%;
+    height: 30px;
+    cursor: move;
+    background-color: #bfbfbf;
+    border-radius: 10px 10px 0px 0px;
+    border-bottom: 1px solid #bbb;
+    box-shadow: 0px 1px 3px #666;
+}
+
+#plotBody {
+    margin: 5px;
+    width: calc(100% - 10px);
+    height: 500px;
+}
+
+svg {
+    width: 100%;
+    height: 100%;
+    border: none !important;
+}
+
+.tick line{
+    stroke-width: 1px;
+    stroke: #dfdfdf;
+}
+
+.title  {
+    font-size: 12px;
+    fill: #333;
+}
