@@ -45,23 +45,23 @@ export class UtkPlotVega extends UtkPlot {
         }
     }
 
-    configureSignalListeners(propName: string): void {
+    configureSignalListeners(): void {
         const listeners = this.plotEvents.listeners;
 
         for (const listener in listeners) {
             this._view.addSignalListener(listener, (_selection: any, predicates: any) => {
                 const keys = Object.keys(predicates || {});
-                if( keys.length === 0 || !keys.includes(propName)) {
+                if( keys.length === 0 || !keys.includes(this._vegaDataKey)) {
                     this.plotEvents.emit(PlotEvent.BRUSH, [])
                     return;
                 }
                 else {
                     const locList: number[] = [];
 
-                    predicates[propName].forEach((value: any) => {
+                    predicates[this._vegaDataKey].forEach((value: any) => {
                         const loc = this._data.findIndex( (d: GeoJsonProperties) => {
                             if(!d) return false;
-                            return d[propName] === value;
+                            return d[this._vegaDataKey] === value;
                         });
 
                         if (loc !== -1) {
@@ -79,6 +79,6 @@ export class UtkPlotVega extends UtkPlot {
         const plot = await embed(this._div, this._vegaSpec, { mode: "vega-lite" });
         this._view = plot.view;
 
-        this.configureSignalListeners('ntaname');
+        this.configureSignalListeners();
     }
 }
