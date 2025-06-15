@@ -98,18 +98,22 @@ export class SpatialDb {
     this.tables.push(table);
 
     if (params.autoLoadLayers) {
-      for (const layer of params.autoLoadLayers.layers) {
-        await this.loadLayer({
-          osmInputTableName: table.name,
-          coordinateFormat: params.autoLoadLayers.coordinateFormat,
-          layer: layer,
-        });
-      }
-
       this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: params.boundingBox,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
+
+      for (const layer of params.autoLoadLayers.layers) {
+        const sendBb = layer !== 'buildings' && layer !== 'coastline';
+        // const sendBb = true;
+
+        await this.loadLayer({
+          osmInputTableName: table.name,
+          coordinateFormat: params.autoLoadLayers.coordinateFormat,
+          layer: layer,
+          boundingBox: sendBb ? this.osmBoudingBox : undefined,
+        });
+      }
 
       if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
       this.tables = this.tables.filter((t) => t.name !== table.name);

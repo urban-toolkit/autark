@@ -1,15 +1,17 @@
 // TODO: 1. falta layer de ROADS
 
 import { LayerType } from './interfaces';
+import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
 
 type Params = {
   tableName: string;
   layer: LayerType;
   outputFormat: string;
   outputTableName: string;
+  boundingBox?: BoundingBox;
 };
 
-export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName }: Params) => {
+export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
   const query = getLayerQuery(layer);
 
   return `
@@ -31,23 +33,54 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
       SELECT
           ${layer}.id,
           ${layer}.tags properties,
-          ST_Transform(
-            ST_MakeLine(
-            list(nodes.geometry ORDER BY ref_idx ASC)
-            ),
-            'EPSG:4326',
-            '${outputFormat}'
-          ) geometry
+          ${buildGeometrySelect({ outputFormat, boundingBox })} geometry
       FROM ${layer}
       JOIN ${layer}_with_nodes_refs
       ON ${layer}.id = ${layer}_with_nodes_refs.id
       JOIN ${layer}_required_nodes_with_geometries nodes
       ON ${layer}_with_nodes_refs.ref = nodes.id
-      GROUP BY 1, 2;
+      GROUP BY 1, 2
+      ${buildHavingClause({ outputFormat, boundingBox })};
 
     DESCRIBE ${outputTableName};
   `;
 };
+
+function buildGeometrySelect({ outputFormat, boundingBox }: { outputFormat: string; boundingBox?: BoundingBox }) {
+  const baseGeometry = `ST_Transform(
+    ST_MakeLine(
+      list(nodes.geometry ORDER BY ref_idx ASC)
+    ),
+    'EPSG:4326',
+    '${outputFormat}'
+  )`;
+
+  if (!boundingBox) {
+    return baseGeometry;
+  }
+
+  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
+
+  return `ST_Intersection(${baseGeometry}, ${boundingBoxGeometry})`;
+}
+
+function buildHavingClause({ outputFormat, boundingBox }: { outputFormat: string; boundingBox?: BoundingBox }) {
+  if (!boundingBox) {
+    return '';
+  }
+
+  const baseGeometry = `ST_Transform(
+    ST_MakeLine(
+      list(nodes.geometry ORDER BY ref_idx ASC)
+    ),
+    'EPSG:4326',
+    '${outputFormat}'
+  )`;
+
+  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
+
+  return `HAVING ST_Intersects(${baseGeometry}, ${boundingBoxGeometry})`;
+}
 
 function getLayerQuery(layer: string): (t: string) => string {
   switch (layer) {

@@ -1,3 +1,5 @@
+import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+
 export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings' | 'custom2DLayer';
 
 export function isLayerType(value: string): value is LayerType {
@@ -9,6 +11,7 @@ export interface Params {
   outputTableName?: string;
   layer: LayerType;
   coordinateFormat?: string;
+  boundingBox?: BoundingBox;
 }
 
 export interface Layer {

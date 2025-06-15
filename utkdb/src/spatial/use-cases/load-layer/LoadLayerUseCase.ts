@@ -23,6 +23,7 @@ export class LoadLayerUseCase {
       tableName: params.osmInputTableName,
       outputFormat: params.coordinateFormat,
       outputTableName: layerOutputTableName,
+      boundingBox: params.boundingBox,
     });
     const describeTableResponse = await this.conn.query(layerQuery);
 
