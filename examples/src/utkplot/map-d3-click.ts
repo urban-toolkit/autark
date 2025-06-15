@@ -167,7 +167,6 @@ export class MapD3 {
 
                 layer.clearHighlightedIds();
                 layer.setHighlightedIds(selection as number[]);
-
             }
         });
     }
@@ -181,7 +180,7 @@ export class MapD3 {
     }
 
     protected d3Builder(): D3PlotBuilder {
-        return <D3PlotBuilder>this.scatterPlot;
+        return this.scatterPlot;
     }
 
     protected scatterPlot(div: HTMLElement, d3DataKey: string, data: GeoJsonProperties[]) {
@@ -268,10 +267,10 @@ export class MapD3 {
             .text("shape_leng");
 
         // ---- Círculos
-        const cGroup = svg.selectAll('#circles')
+        const cGroup = svg.selectAll('#plotGroup')
             .data([0])
             .join('g')
-            .attr('id', 'circles')
+            .attr('id', 'plotGroup')
             .attr('transform', `translate(${margens.left}, ${margens.top})`);
 
         cGroup.selectAll('circle')
@@ -280,10 +279,10 @@ export class MapD3 {
             .attr('cx', d => mapX(+(d?.shape_area) || 0))
             .attr('cy', d => mapY(+(d?.shape_leng) || 0))
             .attr('r', 6)
-            .style('fill', 'gray')
+            .style('fill', 'lightgray')
             .style('visibility', 'visible');
 
-            return svg.node() as SVGSVGElement;
+        return svg;
     }
 
     protected floatingPlot() {
