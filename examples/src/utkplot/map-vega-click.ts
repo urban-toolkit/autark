@@ -3,8 +3,10 @@ import { Feature, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'utkdb';
 import { PlotEvent, UtkPlot, UtkPlotVega } from 'utkplot';
 import {
-    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent
+    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent,
+    IBoundingBox
 } from 'utkmap';
+import { View } from 'vega';
 
 export class MapVega {
     protected db!: SpatialDb;
@@ -12,24 +14,14 @@ export class MapVega {
     protected plot!: UtkPlot
 
     public async run(): Promise<void> {
+        await this.loadUtkDb();
+        await this.loadUtkMap();
+        await this.loadUtkPlot();
+    }
+
+    protected async loadUtkDb() {
         this.db = new SpatialDb();
         await this.db.init();
-
-        await this.db.loadOsm({
-            pbfFileUrl: 'http://localhost:5173/data/lower-mn.osm.pbf',
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
-                layers: [
-                    'coastline',
-                    'parks',
-                    'water',
-                    // 'roads',
-                    // 'buildings',
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
-                dropOsmTable: true,
-            },
-        });
 
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
@@ -65,35 +57,51 @@ export class MapVega {
                 ],
             },
         });
+    }
 
+    protected async loadUtkMap() {
         const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-        const plotBdy = document.querySelector('#plotBody') as HTMLDivElement;
 
-        if (canvas && plotBdy) {
-            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
-
-            this.map = new UtkMap(canvas);
-            await this.map.init(await this.db.getOsmBoundingBox());
-
-            await this.loadLayers();
-            await this.loadLayerData();
-
-            this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
-            this.map.draw();
-
-            const vegaDataKey = 'ntaname';
-            this.plot = new UtkPlotVega(plotBdy, this.vegaSpec(), vegaDataKey, [PlotEvent.CLICK]);
-
-            await this.loadPlotData();
-
-            this.updatePlotListeners();
-            this.updateMapListeners(vegaDataKey);
-
-            this.plot.draw();
+        if (!canvas) {
+            throw new Error("Canvas element not found.");
         }
 
+        canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
+
+        const boundingBox: IBoundingBox = {
+            minLon: 4940354.793551397,
+            minLat: -8239795.593876557,
+            maxLon: 4942534.993601108,
+            maxLat: -8237537.099519547
+        }
+
+        this.map = new UtkMap(canvas);
+        await this.map.init(boundingBox);
+
+        await this.loadLayers();
+        await this.loadLayerData();
+        this.updateMapListeners('ntaname');
+
+        this.map.draw();
+    }
+
+    protected async loadUtkPlot() {
+        const plotBdy = document.querySelector('#plotBody') as HTMLDivElement;
+
+        if (!plotBdy) {
+            throw new Error("Plot body element not found.");
+        }
+
+        this.plot = new UtkPlotVega(plotBdy, this.vegaSpec(), [PlotEvent.CLICK]);
+
+        await this.loadPlotData();
+        this.updatePlotListeners();
+
+        this.plot.draw();
         this.floatingPlot();
     }
+
+    // ---- Map helper methods ----
 
     protected async loadLayers(): Promise<void> {
         const data = [];
@@ -111,6 +119,8 @@ export class MapVega {
             console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
             this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
         }
+
+        this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
     }
 
     protected async loadLayerData(layerId: string = 'neighborhoods') {
@@ -147,6 +157,43 @@ export class MapVega {
         this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 
+    protected async updateMapListeners(vegaDataKey: string) {
+        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
+            const view  = this.plot.ref as View;
+            const state = view.getState();
+
+            if (!state.data[`click_store`] || selection.length === 0) {
+                state.data[`click_store`] = [];
+            }
+
+            const values = selection.map((id: number | string) => {
+                const el = this.plot.data[id as number];
+                if (!el) {
+                    return '';
+                } else {
+                    return el[vegaDataKey];
+                }
+            });
+
+            state.data[`click_store`] = {
+                "values": [values],
+                "unit": "",
+                "fields": [{
+                    "field": vegaDataKey,
+                    "channel": "x",
+                    "type": "E"
+                }]
+            };
+            view.setState(state);
+
+            console.log("Plot updated.");
+
+            view.run();
+        });
+    }
+
+    // ---- Plot helper methods ----
+
     protected async loadPlotData(layerId: string = 'neighborhoods') {
         const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
             return f.properties;
@@ -155,51 +202,27 @@ export class MapVega {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[] | string[]) => {
-            const layer = this.map.layerManager.searchByLayerId(layerId);
+        this.plot.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[] | string[] | GeoJsonProperties[]) => {
+            const locList: number[] = [];
 
+            selection.forEach((item: number | string | GeoJsonProperties) => {
+                this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
+                    if ( (item as GeoJsonProperties)?.ntaname === d?.ntaname ) {
+                        locList.push(id);
+                        return;
+                    }
+                });
+            });
+
+            const layer = this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.layerRenderInfo.isPick = true;
 
                 layer.clearHighlightedIds();
-                layer.setHighlightedIds(selection as number[]);
+                layer.setHighlightedIds(locList as number[]);
 
                 console.log("Map updated.");
             }
-        });
-    }
-
-    protected async updateMapListeners(vegaDataKey: string) {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
-            const state = this.plot.view.getState();
-
-            if (!state.data[`click_store`] || selection.length === 0) {
-                state.data[`click_store`] = [];
-            }
-
-            const values = selection.map((id: number | string) => { 
-                const el = this.plot.data[id as number];
-                if(!el) {
-                    return '';
-                } else {
-                    return el[vegaDataKey];
-                }
-            });
-    
-            state.data[`click_store`] = {
-                "values": [ values ],
-                "unit": "",
-                "fields": [{
-                    "field": vegaDataKey,
-                    "channel": "x",
-                    "type": "E"
-                }]
-            };
-            this.plot.view.setState(state);
-
-            console.log("Plot updated.");
-
-            this.plot.view.run();
         });
     }
 
@@ -216,7 +239,7 @@ export class MapVega {
                     select: {
                         type: "point",
                         toggle: "event.altKey",
-                        encodings: ["x"]
+                        fields: []
                     }
                 }
             ],
@@ -240,6 +263,8 @@ export class MapVega {
             },
         };
     }
+
+    // ---- Ui helper methods ----
 
     protected floatingPlot() {
         let newX = 0, newY = 0, startX = 0, startY = 0;

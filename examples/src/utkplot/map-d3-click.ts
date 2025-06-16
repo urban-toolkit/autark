@@ -7,7 +7,8 @@ import { SpatialDb } from 'utkdb';
 import { UtkPlot, PlotEvent, UtkPlotD3, D3PlotBuilder } from 'utkplot';
 
 import {
-    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent
+    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent,
+    IBoundingBox
 } from 'utkmap';
 
 export class MapD3 {
@@ -16,24 +17,14 @@ export class MapD3 {
     protected plot!: UtkPlot
 
     public async run(): Promise<void> {
+        await this.loadUtkDb();
+        await this.loadUtkMap();
+        await this.loadUtkPlot();
+    }
+
+    protected async loadUtkDb() {
         this.db = new SpatialDb();
         await this.db.init();
-
-        await this.db.loadOsm({
-            pbfFileUrl: 'http://localhost:5173/data/lower-mn.osm.pbf',
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
-                layers: [
-                    'coastline',
-                    'parks',
-                    'water',
-                    // 'roads',
-                    // 'buildings',
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
-                dropOsmTable: true,
-            },
-        });
 
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
@@ -69,24 +60,57 @@ export class MapD3 {
                 ],
             },
         });
+    }
 
+    protected async loadUtkMap() {
         const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+
+        if (!canvas) {
+            throw new Error("Canvas element not found.");
+        }
+
+        canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
+
+        const boundingBox: IBoundingBox = {
+            minLon: 4940354.793551397,
+            minLat: -8239795.593876557,
+            maxLon: 4942534.993601108,
+            maxLat: -8237537.099519547
+        }
+
+        this.map = new UtkMap(canvas);
+        await this.map.init(boundingBox);
+
+        await this.loadLayers();
+        await this.loadLayerData();
+        this.updateMapListeners('ntaname');
+
+        this.map.draw();
+    }
+
+    protected async loadUtkPlot() {
         const plotBdy = document.querySelector('#plotBody') as HTMLDivElement;
 
+        if (!plotBdy) {
+            throw new Error("Plot body element not found.");
+        }
+
+        this.plot = new UtkPlotD3(plotBdy, this.d3Spec(), [PlotEvent.CLICK]);
+
+        await this.loadPlotData();
+        this.updatePlotListeners();
+
+        this.plot.draw();
+        this.floatingPlot();
+    }
+
+    public async run(): Promise<void> {
+
         if (canvas && plotBdy) {
-            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
 
-            this.map = new UtkMap(canvas);
-            await this.map.init(await this.db.getOsmBoundingBox());
-
-            await this.loadLayers();
-            await this.loadLayerData();
-
-            this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
-            this.map.draw();
 
             const d3DataKey = 'ntaname';
-            this.plot = new UtkPlotD3(plotBdy, this.d3Builder(), d3DataKey, [PlotEvent.CLICK]);
+            this.plot = new UtkPlotD3(plotBdy, this.d3Spec(), d3DataKey, [PlotEvent.CLICK]);
 
             await this.loadPlotData();
 
@@ -115,6 +139,8 @@ export class MapD3 {
             console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
             this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
         }
+
+        this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
     }
 
     protected async loadLayerData(layerId: string = 'neighborhoods') {
@@ -179,7 +205,7 @@ export class MapD3 {
         });
     }
 
-    protected d3Builder(): D3PlotBuilder {
+    protected d3Spec(): D3PlotBuilder {
         return this.scatterPlot;
     }
 
@@ -328,81 +354,3 @@ async function main() {
     await example.run();
 }
 main();
-
-
-// export async function loadChart(data, margens = { left: 50, right: 25, top: 25, bottom: 60 }) {
-//     const svg = d3.select('svg');
-
-//     if (!svg) {
-//         return;
-//     }
-
-//     // ---- Tamanho do Gráfico
-//     const width = +svg.node().getBoundingClientRect().width - margens.left - margens.right;
-//     const height = +svg.node().getBoundingClientRect().height - margens.top - margens.bottom;
-
-//     // ---- Escalas
-//     const distExtent = d3.extent(data, d => d.trip_distance);
-//     const mapX = d3.scaleLinear().domain(distExtent).range([0, width]);
-
-//     const tipExtent = d3.extent(data, d => d.tip_amount);
-//     const mapY = d3.scaleLinear().domain(tipExtent).range([height, 0]);
-
-//     // ---- Eixos
-//     const xAxis = d3.axisBottom(mapX);
-//     svg.selectAll('#axisX')
-//         .data([0])
-//         .join('g')
-//         .attr('id', 'axisX')
-//         .attr('class', 'x axis')
-//         .attr('transform', `translate(${margens.left}, ${+svg.node().getBoundingClientRect().height - margens.bottom})`)
-//         .call(xAxis);
-
-//     const yAxis = d3.axisLeft(mapY);
-//     svg.selectAll('#axisY')
-//         .data([0])
-//         .join('g')
-//         .attr('id', 'axisY')
-//         .attr('class', 'y axis')
-//         .attr('transform', `translate(${margens.left}, ${margens.top})`)
-//         .call(yAxis);
-
-//     // ---- Círculos
-//     const cGroup = svg.selectAll('#chartGroup')
-//         .data([0])
-//         .join('g')
-//         .attr('id', 'chartGroup')
-//         .attr('transform', `translate(${margens.left}, ${margens.top})`);
-
-//     const circles = cGroup.selectAll('circle')
-//         .data(data);
-
-//     circles.enter()
-//         .append('circle')
-//         .attr('cx', d => mapX(d.trip_distance))
-//         .attr('cy', d => mapY(d.tip_amount))
-//         .attr('r', 6)
-//         .style('fill', 'gray');
-
-//     circles.exit()
-//         .remove();
-
-//     circles
-//         .attr('cx', d => mapX(d.trip_distance))
-//         .attr('cy', d => mapY(d.tip_amount))
-//         .attr('r', 6)
-//         .style('fill', 'gray');
-
-//     // ---- Brush
-
-//     const brush = d3.brush()
-//         .filter(event => { console.log(event); return (event.metaKey || event.target.__data__.type !== "overlay") })
-//         .extent([[0, 0], [width, height]])
-//         .on("start brush end", brushed);
-
-//     cGroup.append("g")
-//         .attr("id", "brushGroup")
-//         .attr("class", "brush")
-//         .call(brush)
-//         .call(g => g.select(".overlay").style("cursor", "default"));
-// }

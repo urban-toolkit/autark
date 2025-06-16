@@ -6,15 +6,11 @@ import { UtkPlot } from "./utk-plot";
 import { D3PlotBuilder, PlotEvent } from "./constants";
 
 export class UtkPlotD3 extends UtkPlot {
-    protected _d3DataKey!: string;
+    protected _d3Spec!: D3PlotBuilder;
 
-    protected _plotBuilder!: D3PlotBuilder;
-
-    constructor(div: HTMLElement, plotBuilder: D3PlotBuilder, d3DataKey: string, plotEvents: PlotEvent[]) {
+    constructor(div: HTMLElement, plotBuilder: D3PlotBuilder, plotEvents: PlotEvent[]) {
         super(div, plotEvents);
-
-        this._d3DataKey = d3DataKey;
-        this._plotBuilder = plotBuilder;
+        this._d3Spec = plotBuilder;
     }
 
     get data(): GeoJsonProperties[] {
@@ -27,13 +23,15 @@ export class UtkPlotD3 extends UtkPlot {
 
     configureSignalListeners(): void {
         let locList: number[] = [];
-        const cGroup = this._view.select("#plotGroup");
+        const cGroup = d3.select(<SVGSVGElement>this._ref).select("#plotGroup");
 
-        cGroup.selectAll("circle")
+        //---- Click event -------
+
+        (cGroup.selectAll<SVGCircleElement, GeoJsonProperties>("circle") as d3.Selection<SVGCircleElement, GeoJsonProperties, any, any>)
             .on('click', (event: MouseEvent, d: GeoJsonProperties) => {
                 if (event.target instanceof SVGCircleElement) {
-                    cGroup.selectAll("circle")
-                        .style("fill", function (this: SVGCircleElement, data: GeoJsonProperties, id: number) {
+                    (cGroup.selectAll<SVGCircleElement, GeoJsonProperties>("circle") as d3.Selection<SVGCircleElement, GeoJsonProperties, any, any>)
+                        .style("fill", (data: GeoJsonProperties, id: number, nodes: ArrayLike<SVGCircleElement>) => {
                             if (data?.ntaname === d?.ntaname) {
                                 const loc = locList.indexOf(id);
 
@@ -46,7 +44,7 @@ export class UtkPlotD3 extends UtkPlot {
                                 }
                             }
                             else {
-                                return d3.select(this).style("fill");
+                                return d3.select(nodes[id]).style("fill");
                             }
                         });
                 }
@@ -54,8 +52,8 @@ export class UtkPlotD3 extends UtkPlot {
                 this.plotEvents.emit(PlotEvent.CLICK, locList)
             });
 
-        this._view.on('click', (event: MouseEvent) => {
-            if (event.target === this._view.node()) {
+        d3.select(this._ref as SVGSVGElement).on('click', (event: MouseEvent) => {
+            if (event.target === this._ref) {
                 locList = []; // Clear selection
                 cGroup.selectAll("circle")
                     .style("fill", 'lightgray'); // Reset color
@@ -66,7 +64,7 @@ export class UtkPlotD3 extends UtkPlot {
     }
 
     async draw(): Promise<void> {
-        this._view = this._plotBuilder(this._div, this._d3DataKey, this._data);
+        this._ref = this._d3Spec(this._div, this._data);
 
         this.configureSignalListeners();
     }

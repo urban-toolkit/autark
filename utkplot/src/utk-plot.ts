@@ -1,10 +1,11 @@
 import { GeoJsonProperties } from "geojson";
 import { PlotEvent } from "./constants";
 import { PlotEvents } from "./plot-events";
+import { View } from "vega";
 
 export abstract class UtkPlot {
     protected _div!: HTMLElement;
-    protected _view!: any; 
+    protected _ref!: View | SVGSVGElement;
 
     protected _data!: GeoJsonProperties[];
     protected _plotEvents!: PlotEvents;
@@ -14,8 +15,8 @@ export abstract class UtkPlot {
         this._plotEvents = new PlotEvents(events);
     }
 
-    get view(): any {
-        return this._view;
+    get ref(): View | SVGSVGElement {
+        return this._ref;
     }
 
     get data(): GeoJsonProperties[] {

@@ -5,5 +5,5 @@ export enum PlotEvent {
     BRUSH = 'brush',
 }
 
-export type PlotEventListener = (selection: number[] | string[]) => void;
-export type D3PlotBuilder = (div: HTMLElement, d3DataKey: string, data: GeoJsonProperties[]) => any;
+export type PlotEventListener = (selection: number[] | string[] | GeoJsonProperties[]) => void;
+export type D3PlotBuilder = (div: HTMLElement, data: GeoJsonProperties[]) => any;
