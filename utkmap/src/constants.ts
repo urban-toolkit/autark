@@ -51,6 +51,7 @@ export enum MouseStatus {
     MOUSE_DRAG = 'mouseDrag',
 }
 
+// TODO move to types.ts
 export type ColorHEX = `#${string}`;
 export type ColorRGB = { r: number; g: number; b: number; opacity: number };
 export type ColorTEX = number[];

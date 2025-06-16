@@ -8,6 +8,8 @@ export abstract class UtkPlot {
     protected _ref!: View | SVGSVGElement;
 
     protected _data!: GeoJsonProperties[];
+    protected _locList: GeoJsonProperties[] = [];
+
     protected _plotEvents!: PlotEvents;
 
     constructor(svg: HTMLElement, events: PlotEvent[]) {
@@ -26,6 +28,10 @@ export abstract class UtkPlot {
     set data(data: GeoJsonProperties[]) {
         this._data = data;
     }
+
+    set locList(locList: GeoJsonProperties[]) {
+        this._locList = locList;
+    }    
 
     get plotEvents(): PlotEvents {
         return this._plotEvents;

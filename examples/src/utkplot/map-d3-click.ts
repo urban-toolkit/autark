@@ -4,7 +4,7 @@ import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'utkdb';
 
-import { UtkPlot, PlotEvent, UtkPlotD3, D3PlotBuilder } from 'utkplot';
+import { UtkPlot, PlotEvent, UtkPlotD3, D3PlotBuilder, PlotStyle } from 'utkplot';
 
 import {
     UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent,
@@ -83,7 +83,7 @@ export class MapD3 {
 
         await this.loadLayers();
         await this.loadLayerData();
-        this.updateMapListeners('ntaname');
+        this.updateMapListeners();
 
         this.map.draw();
     }
@@ -104,24 +104,7 @@ export class MapD3 {
         this.floatingPlot();
     }
 
-    public async run(): Promise<void> {
-
-        if (canvas && plotBdy) {
-
-
-            const d3DataKey = 'ntaname';
-            this.plot = new UtkPlotD3(plotBdy, this.d3Spec(), d3DataKey, [PlotEvent.CLICK]);
-
-            await this.loadPlotData();
-
-            this.updatePlotListeners();
-            this.updateMapListeners(d3DataKey);
-
-            this.plot.draw();
-        }
-
-        this.floatingPlot();
-    }
+    // ---- Map helper methods ----
 
     protected async loadLayers(): Promise<void> {
         const data = [];
@@ -177,6 +160,32 @@ export class MapD3 {
         this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 
+    protected async updateMapListeners() {
+        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
+            const selData: GeoJsonProperties[] = (selection as number[]).map((d: number) => (this.plot.data[d] as GeoJsonProperties));
+
+            const cGroup = d3.select(this.plot.ref as SVGSVGElement).select("#plotGroup");
+
+            const svgs = cGroup.selectAll("circle");
+
+            svgs
+                .style("fill", function (datum: unknown) {
+                    const dataJd = datum as GeoJsonProperties;
+
+                    if (selData.includes(dataJd)) {
+                        return PlotStyle.highlight;
+                    } else {
+                        return PlotStyle.default;
+                    }
+                });
+
+            this.plot.locList = selData;
+            console.log("Plot updated.");
+        });
+    }
+
+    // ---- Plot helper methods ----
+
     protected async loadPlotData(layerId: string = 'neighborhoods') {
         const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
             return f.properties;
@@ -185,23 +194,27 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[] | string[]) => {
-            const layer = this.map.layerManager.searchByLayerId(layerId);
+        this.plot.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[] | string[] | GeoJsonProperties[]) => {
+            const locList: number[] = [];
 
+            selection.forEach((item: number | string | GeoJsonProperties) => {
+                this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
+                    if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
+                        locList.push(id);
+                        return;
+                    }
+                });
+            });
+
+            const layer = this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.layerRenderInfo.isPick = true;
 
                 layer.clearHighlightedIds();
-                layer.setHighlightedIds(selection as number[]);
+                layer.setHighlightedIds(locList as number[]);
+
+                console.log("Map updated.");
             }
-        });
-    }
-
-    protected async updateMapListeners(d3DataKey: string) {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
-            // TODO Update D3.
-
-            console.log("Plot updated.");
         });
     }
 
@@ -209,7 +222,7 @@ export class MapD3 {
         return this.scatterPlot;
     }
 
-    protected scatterPlot(div: HTMLElement, d3DataKey: string, data: GeoJsonProperties[]) {
+    protected scatterPlot(div: HTMLElement, data: GeoJsonProperties[]): [SVGSVGElement, unknown] {
         const margens = { left: 40, right: 25, top: 10, bottom: 35 };
 
         const svg = d3.select(div)
@@ -224,11 +237,11 @@ export class MapD3 {
         const node = svg.node();
 
         if (!svg || !node) {
-            return;
+            throw new Error("SVG element could not be created.");
         }
 
         // ---- Tamanho do Gráfico
-        const width  = div.clientWidth - margens.left - margens.right;
+        const width = div.clientWidth - margens.left - margens.right;
         const height = 500 - margens.top - margens.bottom;
 
         console.log("Plot size:", { width, height });
@@ -299,7 +312,7 @@ export class MapD3 {
             .attr('id', 'plotGroup')
             .attr('transform', `translate(${margens.left}, ${margens.top})`);
 
-        cGroup.selectAll('circle')
+        const svgs = cGroup.selectAll('circle')
             .data(data)
             .join('circle')
             .attr('cx', d => mapX(+(d?.shape_area) || 0))
@@ -308,8 +321,10 @@ export class MapD3 {
             .style('fill', 'lightgray')
             .style('visibility', 'visible');
 
-        return svg;
+        return [svg.node() as SVGSVGElement, svgs];
     }
+
+    // ---- Ui helper methods ----
 
     protected floatingPlot() {
         let newX = 0, newY = 0, startX = 0, startY = 0;

@@ -1,5 +1,7 @@
 import { GeoJsonProperties } from "geojson";
-import { PlotEvent, PlotEventListener } from './constants';
+import { PlotEvent } from './constants';
+import { PlotEventListener } from "./types";
+
 
 export class PlotEvents {
     private _listeners: { [event: string]: PlotEventListener[] } = {};
