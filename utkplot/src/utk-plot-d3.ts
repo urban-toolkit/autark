@@ -71,8 +71,7 @@ export class UtkPlotD3 extends UtkPlot {
     }
 
     async draw(): Promise<void> {
-        let svgs: any = [];
-        [this._ref, svgs] = this._d3Builder(this._div, this._data);
+        [this._ref, this._svgs] = this._d3Builder(this._div, this._data);
 
         this.configureSignalListeners();
     }
