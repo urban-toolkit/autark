@@ -10,7 +10,9 @@ import { PlotStyle } from "./plot-style";
 
 export class UtkPlotD3 extends UtkPlot {
     protected _d3Builder!: D3PlotBuilder;
-    protected _svgs!: any;
+
+    protected _svgs!: unknown[];
+    protected _locList: GeoJsonProperties[] = [];
 
     constructor(div: HTMLElement, d3Builder: D3PlotBuilder, plotEvents: PlotEvent[]) {
         super(div, plotEvents);
@@ -25,14 +27,15 @@ export class UtkPlotD3 extends UtkPlot {
         this._data = data;
     }
 
+    set locList(locList: GeoJsonProperties[]) {
+        this._locList = locList;
+    }    
+
     configureSignalListeners(): void {
         const that = this;
-
-        const cGroup = d3.select(this._ref as SVGSVGElement).select("#plotGroup");
-        const svgs = cGroup.selectAll("circle");
+        const svgs = d3.selectAll(this._svgs as any[]);
 
         //---- Click event -------
-
         svgs
             .on('click', function (_event: MouseEvent, datumId: unknown) {
                 const dataId = datumId as GeoJsonProperties;
@@ -72,7 +75,6 @@ export class UtkPlotD3 extends UtkPlot {
 
     async draw(): Promise<void> {
         [this._ref, this._svgs] = this._d3Builder(this._div, this._data);
-
         this.configureSignalListeners();
     }
 }

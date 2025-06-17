@@ -1,6 +1,3 @@
-
-
-
 import * as d3 from "d3";
 
 import { Feature, GeoJsonProperties } from 'geojson';
@@ -169,7 +166,7 @@ export class MapD3 {
                 (selection as number[]).map((d: number) => (this.plot.data[d] as GeoJsonProperties));
 
             const cGroup = d3.select(this.plot.ref as SVGSVGElement).select("#plotGroup");
-            const svgs = cGroup.selectAll("circle");
+            const svgs = cGroup.selectAll("rect");
 
             svgs
                 .style("fill", function (datum: unknown) {
@@ -222,11 +219,11 @@ export class MapD3 {
     }
 
     protected d3Spec(): D3PlotBuilder {
-        return this.scatterPlot;
+        return this.barChart;
     }
 
-    protected scatterPlot<SVGCircleElement>(div: HTMLElement, data: GeoJsonProperties[]): [SVGSVGElement, SVGCircleElement[]] {
-        const margens = { left: 40, right: 25, top: 10, bottom: 35 };
+    protected barChart<SVGRectElement>(div: HTMLElement, data: GeoJsonProperties[]): [SVGSVGElement, SVGRectElement[]] {
+        const margens = { left: 40, right: 25, top: 10, bottom: 225 };
 
         const svg = d3.select(div)
             .selectAll('#plot')
@@ -251,20 +248,18 @@ export class MapD3 {
 
         // ---- Escalas
         console.log("Data for scatter plot:", data);
-        const xExtent = <[number, number]>d3.extent(data, d => +(d?.shape_area) || 0);
-        const mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
+        const xExtent = Array.from(new Set(data.map(d => d?.ntaname.substring(0, 50))));
+        const mapX = d3.scaleBand().domain(xExtent).range([0, width]).padding(0.25);
 
         console.log("X extent:", xExtent);
 
-        const yExtent = <[number, number]>d3.extent(data, d => +(d?.shape_leng) || 0);
+        const yExtent = <[number, number]>d3.extent(data, d => +(d?.sjoin.count || 0));
         const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         console.log("Y extent:", yExtent);
 
         // ---- Eixos
-        const xAxis = d3.axisBottom(mapX)
-            .tickSizeInner(-height)
-            .tickFormat(d3.format(".2s"));
+        const xAxis = d3.axisBottom(mapX).tickSizeOuter(0);
 
         const xAxisSelection = svg.selectAll<SVGGElement, unknown>('#axisX')
             .data([0])
@@ -273,17 +268,13 @@ export class MapD3 {
             .attr('class', 'x axis')
             .attr('transform', `translate(${margens.left}, ${500 - margens.bottom})`)
             .style('visibility', 'visible');
-        xAxisSelection.call(xAxis);
 
-        // Add X axis label:
-        xAxisSelection.append("text")
-            .attr('class', 'title')
-            .attr("text-anchor", "end")
-            .attr("x", width)
-            .attr("y", margens.bottom / 2 + 10)
-            .style('visibility', 'visible')
-            .text("shape_area");
-
+        xAxisSelection.call(xAxis)
+            .selectAll("text")  
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", "-.40em")
+            .attr("transform", "rotate(-90)");
 
         const yAxis = d3.axisLeft(mapY)
             .tickSizeInner(-width)
@@ -306,7 +297,7 @@ export class MapD3 {
             .attr("y", -margens.left / 2 - 7)
             .attr("x", -margens.top)
             .style('visibility', 'visible')
-            .text("shape_leng");
+            .text("sjoin.count");
 
         // ---- Círculos
         const cGroup = svg.selectAll('#plotGroup')
@@ -315,16 +306,18 @@ export class MapD3 {
             .attr('id', 'plotGroup')
             .attr('transform', `translate(${margens.left}, ${margens.top})`);
 
-        const svgs = cGroup.selectAll('circle')
+        const svgs = cGroup.selectAll('rect')
             .data(data)
-            .join('circle')
-            .attr('cx', d => mapX(+(d?.shape_area) || 0))
-            .attr('cy', d => mapY(+(d?.shape_leng) || 0))
-            .attr('r', 6)
+            .join("rect")
+            .attr("x", (d: GeoJsonProperties) => mapX(d?.ntaname.substring(0, 50)) || 'unknown')
+            .attr("y", (d: GeoJsonProperties) => mapY(d?.sjoin.count || 0))
+            .attr("height", (d) => mapY(0) - mapY(d?.sjoin.count || 0))
+            .attr("width", mapX.bandwidth())
             .style('fill', 'lightgray')
+            .style('stroke', '#2f2f2f')
             .style('visibility', 'visible');
 
-        return [svg.node() as SVGSVGElement, svgs.nodes() as SVGCircleElement[]];
+        return [svg.node() as SVGSVGElement, svgs.nodes() as SVGRectElement[]];
     }
 
     // ---- Ui helper methods ----
