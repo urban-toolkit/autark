@@ -111,8 +111,12 @@ export class AABB {
 
     buildFeatureBoxes(collection: Feature[]) {
         for (const feature of collection) {
-            const newBox = new Box2D(feature);
 
+            if (!feature.geometry || feature.geometry.type !== 'LineString') {
+                continue;
+            }
+
+            const newBox = new Box2D(feature);
             const overlapIds = this.overlaps(newBox);
 
             if (overlapIds.length === 0) {
@@ -137,6 +141,8 @@ export class AABB {
                 }
             }
         }
+
+        console.log( this._boxes )
     }
 
     private overlaps(box: Box2D): number[] {

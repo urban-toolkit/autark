@@ -39,10 +39,10 @@ export class LayerManager {
             0
         ];
 
-        const xmin = (bbox.minLat - this._origin[0]) * 1.1;
-        const xmax = (bbox.maxLat - this._origin[0]) * 1.1;
-        const ymin = (bbox.minLon - this._origin[1]) * 1.1;
-        const ymax = (bbox.maxLon - this._origin[1]) * 1.1;
+        const xmin = (bbox.minLat - this._origin[0]) * 1.05;
+        const xmax = (bbox.maxLat - this._origin[0]) * 1.05;
+        const ymin = (bbox.minLon - this._origin[1]) * 1.05;
+        const ymax = (bbox.maxLon - this._origin[1]) * 1.05;
 
         this._bbox =
             polygon([

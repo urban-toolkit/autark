@@ -104,7 +104,8 @@ export class SpatialDb {
       });
 
       for (const layer of params.autoLoadLayers.layers) {
-        const sendBb = layer !== 'buildings' && layer !== 'coastline';
+        const sendBb = layer !== 'buildings';
+        // const sendBb = layer !== 'buildings' && layer !== 'coastline';
         // const sendBb = true;
 
         await this.loadLayer({
