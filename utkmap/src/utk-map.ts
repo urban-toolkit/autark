@@ -34,6 +34,7 @@ import { TriangulatorFeatures } from './triangulator-features';
 import { TriangulatorBuildings } from './triangulator-buildings';
 import { TriangulatorRoads } from './triangulator-roads';
 import { TriangulatorCoastline } from './triangulator-coastline';
+import { UtkMapUi } from './utk-map-ui';
 
 export class UtkMap {
     protected _camera!: Camera;
@@ -54,9 +55,15 @@ export class UtkMap {
         this._mapEvents = new MapEvents([MapEvent.PICK]);
         this._layerManager = new LayerManager();
 
+        UtkMapUi.buildUi(this);
+
         if (autoResize) {
             window.addEventListener('resize', this.handleResize.bind(this));
         }
+    }
+
+    get canvas(): HTMLCanvasElement {
+        return this._canvas;
     }
 
     get camera(): Camera {
