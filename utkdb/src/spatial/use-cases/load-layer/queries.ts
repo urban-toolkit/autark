@@ -11,6 +11,12 @@ type Params = {
   boundingBox?: BoundingBox;
 };
 
+/**
+ * Creates geometries based on OSM way structure:
+ * - Closed ways (first node = last node, >3 nodes): Polygon (for areas like buildings, parks, water)
+ * - Open ways: LineString (for linear features like roads, coastlines)
+ */
+
 export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
   const query = getLayerQuery(layer);
 
@@ -33,27 +39,65 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
       SELECT
           ${layer}.id,
           ${layer}.tags properties,
-          ${buildGeometrySelect({ outputFormat, boundingBox })} geometry
+          ${layer}.refs,
+          ${buildGeometrySelect({ outputFormat, boundingBox, layer })} geometry
       FROM ${layer}
       JOIN ${layer}_with_nodes_refs
       ON ${layer}.id = ${layer}_with_nodes_refs.id
       JOIN ${layer}_required_nodes_with_geometries nodes
       ON ${layer}_with_nodes_refs.ref = nodes.id
-      GROUP BY 1, 2
-      ${buildHavingClause({ outputFormat, boundingBox })};
+      GROUP BY 1, 2, 3
+      ${buildHavingClause({ outputFormat, boundingBox, layer })};
 
     DESCRIBE ${outputTableName};
   `;
 };
 
-function buildGeometrySelect({ outputFormat, boundingBox }: { outputFormat: string; boundingBox?: BoundingBox }) {
-  const baseGeometry = `ST_Transform(
-    ST_MakeLine(
-      list(nodes.geometry ORDER BY ref_idx ASC)
-    ),
-    'EPSG:4326',
-    '${outputFormat}'
-  )`;
+function buildGeometrySelect({
+  outputFormat,
+  boundingBox,
+  layer,
+}: {
+  outputFormat: string;
+  boundingBox?: BoundingBox;
+  layer: LayerType;
+}) {
+  // Define which layers should create polygons for closed ways
+  const areaLayers = ['buildings', 'parks', 'water'];
+
+  const baseGeometry = areaLayers.includes(layer)
+    ? `
+    CASE 
+      WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
+        -- Closed way with more than 3 nodes: create polygon
+        ST_Transform(
+          ST_MakePolygon(
+            ST_MakeLine(
+              list(nodes.geometry ORDER BY ref_idx ASC)
+            )
+          ),
+          'EPSG:4326',
+          '${outputFormat}'
+        )
+      ELSE
+        -- Open way: create linestring
+        ST_Transform(
+          ST_MakeLine(
+            list(nodes.geometry ORDER BY ref_idx ASC)
+          ),
+          'EPSG:4326',
+          '${outputFormat}'
+        )
+    END`
+    : `
+    -- Always create linestring for linear features
+    ST_Transform(
+      ST_MakeLine(
+        list(nodes.geometry ORDER BY ref_idx ASC)
+      ),
+      'EPSG:4326',
+      '${outputFormat}'
+    )`;
 
   if (!boundingBox) {
     return baseGeometry;
@@ -64,18 +108,55 @@ function buildGeometrySelect({ outputFormat, boundingBox }: { outputFormat: stri
   return `ST_Intersection(${baseGeometry}, ${boundingBoxGeometry})`;
 }
 
-function buildHavingClause({ outputFormat, boundingBox }: { outputFormat: string; boundingBox?: BoundingBox }) {
+function buildHavingClause({
+  outputFormat,
+  boundingBox,
+  layer,
+}: {
+  outputFormat: string;
+  boundingBox?: BoundingBox;
+  layer: LayerType;
+}) {
   if (!boundingBox) {
     return '';
   }
 
-  const baseGeometry = `ST_Transform(
-    ST_MakeLine(
-      list(nodes.geometry ORDER BY ref_idx ASC)
-    ),
-    'EPSG:4326',
-    '${outputFormat}'
-  )`;
+  // Define which layers should create polygons for closed ways
+  const areaLayers = ['buildings', 'parks', 'water'];
+
+  const baseGeometry = areaLayers.includes(layer)
+    ? `
+    CASE 
+      WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
+        -- Closed way with more than 3 nodes: create polygon
+        ST_Transform(
+          ST_MakePolygon(
+            ST_MakeLine(
+              list(nodes.geometry ORDER BY ref_idx ASC)
+            )
+          ),
+          'EPSG:4326',
+          '${outputFormat}'
+        )
+      ELSE
+        -- Open way: create linestring
+        ST_Transform(
+          ST_MakeLine(
+            list(nodes.geometry ORDER BY ref_idx ASC)
+          ),
+          'EPSG:4326',
+          '${outputFormat}'
+        )
+    END`
+    : `
+    -- Always create linestring for linear features
+    ST_Transform(
+      ST_MakeLine(
+        list(nodes.geometry ORDER BY ref_idx ASC)
+      ),
+      'EPSG:4326',
+      '${outputFormat}'
+    )`;
 
   const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
 
@@ -101,7 +182,7 @@ function getLayerQuery(layer: string): (t: string) => string {
 
 const GET_PARKS = (tableName: string) => `
   CREATE TEMP TABLE parks AS
-    SELECT id, tags FROM ${tableName}
+    SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way', 'relation') AND
       (
         map_extract(tags, 'leisure')[1] IN ('dog_park', 'park', 'playground', 'recreation_ground') OR
@@ -112,7 +193,7 @@ const GET_PARKS = (tableName: string) => `
 
 const GET_WATER = (tableName: string) => `
   CREATE TEMP TABLE water AS
-    SELECT id, tags FROM ${tableName}
+    SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way', 'relation') AND
       (
         map_extract(tags, 'natural')[1] IN ('water', 'wetland', 'bay', 'strait', 'spring') OR
@@ -122,7 +203,7 @@ const GET_WATER = (tableName: string) => `
 
 const GET_BUILDINGS = (tableName: string) => `
    CREATE TEMP TABLE buildings AS
-    SELECT id, tags FROM ${tableName}
+    SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way') AND
       (
         map_extract(tags, 'building')[1] IS NOT NULL OR
@@ -133,7 +214,7 @@ const GET_BUILDINGS = (tableName: string) => `
 
 const GET_COASTLINE = (tableName: string) => `
   CREATE TEMP TABLE coastline AS
-    SELECT id, tags FROM ${tableName}
+    SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way') AND
       (
         map_extract(tags, 'natural')[1] IN ('coastline')
@@ -142,7 +223,7 @@ const GET_COASTLINE = (tableName: string) => `
 
 const GET_ROADS = (tableName: string) => `
   CREATE TEMP TABLE roads AS
-    SELECT id, tags FROM ${tableName}
+    SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way') AND
       (
         map_extract(tags, 'highway')[1] IS NOT NULL AND
