@@ -46,7 +46,7 @@ export class SpatialDb {
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
     this.loadQueryUseCase = new LoadQueryUseCase(this.conn);
-    this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.conn);
+    this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.db, this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.getBoundingBoxUseCase = new GetBoundingBoxUseCase(this.conn);
