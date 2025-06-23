@@ -1,10 +1,6 @@
-import { Column } from '../../../shared/interfaces';
-
 export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string) => {
   return `
-    CREATE TABLE ${featureCollectionTableName} AS SELECT * FROM ST_Read('${geojsonFileUrl}');
-
-    DESCRIBE ${featureCollectionTableName};
+    CREATE TABLE ${featureCollectionTableName} AS SELECT * FROM '${geojsonFileUrl}';
   `;
 };
 
@@ -12,27 +8,22 @@ export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCol
 export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   featureCollectionTableName: string,
   outputTableName: string,
-  columns: Column[],
   coordinateFormat: string,
 ) => {
-  const geoColumn = columns.find((col) => col.type === 'GEOMETRY');
-  if (!geoColumn) {
-    throw new Error("Could not find geometry column in feature collection's");
-  }
-
-  const nonGeoColumns = columns.filter((col) => col !== geoColumn);
-
   return `
     CREATE TABLE ${outputTableName} AS
     SELECT
       ST_Transform(
-        ${geoColumn.name},
+        ST_GeomFromGeoJSON(JSON(feature.geometry)),
         'EPSG:4326',
         '${coordinateFormat}',
         always_xy := true
       ) AS geometry,
-      CAST(json_object(${nonGeoColumns.map((col) => `'${col.name}', ${col.name}`).join(', ')}) AS JSON) AS properties
-    FROM ${featureCollectionTableName};
+      feature.properties AS properties
+    FROM (
+      SELECT UNNEST(features) AS feature
+      FROM ${featureCollectionTableName}
+    );
 
     DROP TABLE ${featureCollectionTableName};
 
