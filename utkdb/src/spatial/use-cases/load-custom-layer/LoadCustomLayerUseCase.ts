@@ -66,32 +66,22 @@ export class LoadCustomLayerUseCase {
     // Create temporary file with GeoJSON data
     const fileName = `temp_geojson_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
 
-    try {
-      // Register the GeoJSON as a temporary file in DuckDB
-      await this.db.registerFileText(fileName, JSON.stringify(geojson));
+    // Register the GeoJSON as a temporary file in DuckDB
+    await this.db.registerFileText(fileName, JSON.stringify(geojson));
 
-      // Create feature collection table from the temporary file
-      const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${outputTableName}_feature_collection`);
-      const describeTableResponse = await this.conn.query(featureCollectionQuery);
-      const featureCollectionColumns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
+    // Create feature collection table from the temporary file
+    const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${outputTableName}_feature_collection`);
+    await this.conn.query(featureCollectionQuery);
 
-      // Create the final layer table
-      const queryLayer = LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY(
-        `${outputTableName}_feature_collection`,
-        outputTableName,
-        featureCollectionColumns,
-        coordinateFormat,
-      );
-      const result = await this.conn.query(queryLayer);
+    // Create the final layer table
+    const queryLayer = LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY(
+      `${outputTableName}_feature_collection`,
+      outputTableName,
+      coordinateFormat,
+    );
 
-      return result;
-    } finally {
-      // Clean up the temporary file
-      try {
-        await this.db.dropFile(fileName);
-      } catch (e) {
-        console.warn(`Failed to cleanup file ${fileName}:`, e);
-      }
-    }
+    await this.db.dropFile(fileName);
+
+    return await this.conn.query(queryLayer);
   }
 }
