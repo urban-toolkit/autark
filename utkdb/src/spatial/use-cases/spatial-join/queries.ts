@@ -10,7 +10,7 @@ interface Params {
   spatialPredicate: string;
   nearDistance?: number;
   groupBy: {
-    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string }>;
+    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>;
   } | null;
   outputTableName: string;
 }
@@ -49,7 +49,7 @@ function getSelectString(params: {
   tableJoin: Table;
   geometricColumnJoin: string;
   groupBy: {
-    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string }>;
+    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>;
   } | null;
 }) {
   if (params.groupBy) {
@@ -73,9 +73,14 @@ function getSelectString(params: {
   return buildSimpleJoinSelect(params.tableRoot, params.tableJoin, params.geometricColumnJoin);
 }
 
-function groupColumnsByAggregateFunction(selectColumns: Array<{ table: Table; column: string; aggregateFn?: string }>) {
-  const aggregatesByFunction: Record<string, Array<{ table: Table; column: string }>> = {};
-  const nonAggregateColumns: Array<{ table: Table; column: string }> = [];
+function groupColumnsByAggregateFunction(
+  selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>,
+) {
+  const aggregatesByFunction: Record<
+    string,
+    Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>
+  > = {};
+  const nonAggregateColumns: Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }> = [];
 
   selectColumns.forEach((column) => {
     if (column.aggregateFn) {
@@ -83,9 +88,17 @@ function groupColumnsByAggregateFunction(selectColumns: Array<{ table: Table; co
       if (!aggregatesByFunction[funcName]) {
         aggregatesByFunction[funcName] = [];
       }
-      aggregatesByFunction[funcName].push({ table: column.table, column: column.column });
+      aggregatesByFunction[funcName].push({
+        table: column.table,
+        column: column.column,
+        aggregateFnResultColumnName: column.aggregateFnResultColumnName,
+      });
     } else {
-      nonAggregateColumns.push({ table: column.table, column: column.column });
+      nonAggregateColumns.push({
+        table: column.table,
+        column: column.column,
+        aggregateFnResultColumnName: column.aggregateFnResultColumnName,
+      });
     }
   });
 
@@ -93,8 +106,8 @@ function groupColumnsByAggregateFunction(selectColumns: Array<{ table: Table; co
 }
 
 function buildSjoinObject(
-  aggregatesByFunction: Record<string, Array<{ table: Table; column: string }>>,
-  nonAggregateColumns: Array<{ table: Table; column: string }>,
+  aggregatesByFunction: Record<string, Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>>,
+  nonAggregateColumns: Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>,
 ): string {
   const sjoinParts: string[] = [];
 
@@ -115,29 +128,37 @@ function buildSjoinObject(
   return sjoinParts.join(', ');
 }
 
-function buildCountExpression(column: { table: Table; column: string }): string {
+function buildCountExpression(column: { table: Table; column: string; aggregateFnResultColumnName?: string }): string {
   const valueExpression = generateValueExpression(column.table, column.column, 'COUNT');
-  return `'count', ${valueExpression}`;
+  const columnName = column.aggregateFnResultColumnName || column.table.name;
+  return `'count', json_object('${columnName}', ${valueExpression})`;
 }
 
-function buildNestedFunctionExpression(funcName: string, columns: Array<{ table: Table; column: string }>): string {
+function buildNestedFunctionExpression(
+  funcName: string,
+  columns: Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>,
+): string {
   const functionAttributes = columns
     .map((column) => {
       const valueExpression = generateValueExpression(column.table, column.column, funcName.toUpperCase());
-      return `'${column.column}', ${valueExpression}`;
+      const columnName = column.aggregateFnResultColumnName || `${column.table.name}.${column.column}`;
+      return `'${columnName}', ${valueExpression}`;
     })
     .join(', ');
 
   return `'${funcName}', json_object(${functionAttributes})`;
 }
 
-function buildNonAggregateColumns(nonAggregateColumns: Array<{ table: Table; column: string }>): string {
+function buildNonAggregateColumns(
+  nonAggregateColumns: Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>,
+): string {
   return nonAggregateColumns
     .map((column) => {
       const valueExpression = isLayerType(column.table.type)
         ? `map_extract("${column.column}", ${column.table.name}.properties)`
         : `${column.table.name}."${column.column}"`;
-      return `'${column.column}', ${valueExpression}`;
+      const columnName = column.aggregateFnResultColumnName || column.column;
+      return `'${columnName}', ${valueExpression}`;
     })
     .join(', ');
 }
