@@ -19,6 +19,7 @@ import { BoundingBox } from './shared/use-cases/get-bounding-box/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { isLayerType } from './use-cases/load-layer/interfaces';
 import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
+import { getBoundingBoxFromPolygon } from './shared/utils';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -98,10 +99,23 @@ export class SpatialDb {
     this.tables.push(table);
 
     if (params.autoLoadLayers) {
-      this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
-        boundingBox: params.boundingBox,
-        coordinateFormat: params.autoLoadLayers.coordinateFormat,
-      });
+      if (!params.boundingBox && !params.polygon) throw new Error('Either boundingBox or polygon must be provided');
+
+      if (params.boundingBox && params.polygon)
+        throw new Error('Either boundingBox or polygon must be provided, not both');
+
+      if (params.boundingBox) {
+        this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
+          boundingBox: params.boundingBox,
+          coordinateFormat: params.autoLoadLayers.coordinateFormat,
+        });
+      } else if (params.polygon) {
+        const calculatedBoundingBox = getBoundingBoxFromPolygon(params.polygon);
+        this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
+          boundingBox: calculatedBoundingBox,
+          coordinateFormat: params.autoLoadLayers.coordinateFormat,
+        });
+      }
 
       for (const layer of params.autoLoadLayers.layers) {
         const sendBb = layer !== 'buildings';

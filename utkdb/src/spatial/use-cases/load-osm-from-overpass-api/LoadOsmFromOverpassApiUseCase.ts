@@ -2,7 +2,7 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { Params, OsmElement } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
-import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
+import { getColumnsFromDuckDbTableDescribe, boundingBoxToPolygon } from '../../shared/utils';
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from './queries';
 
 interface OverpassApiResponse {
@@ -18,23 +18,33 @@ export class LoadOsmFromOverpassApiUseCase {
     this.conn = conn;
   }
 
-  async exec({ boundingBox, outputTableName }: Params): Promise<OsmTable> {
-    const osmData = await this.fetchOsmWithinBBox(boundingBox);
+  async exec(params: Params): Promise<OsmTable> {
+    let polygon: number[][];
+
+    if (params.boundingBox) {
+      polygon = boundingBoxToPolygon(params.boundingBox);
+    } else if (params.polygon) {
+      polygon = params.polygon;
+    } else {
+      throw new Error('Either boundingBox or polygon must be provided');
+    }
+
+    const osmData = await this.fetchOsmWithinPolygon(polygon);
     console.log(`Fetched ${osmData.elements.length} OSM elements`);
 
     if (osmData.elements.length === 0) {
-      throw new Error('No OSM elements found in the specified bounding box');
+      throw new Error('No OSM elements found in the specified area');
     }
 
-    await this.insertOsmDataUsingJson(outputTableName, osmData);
+    await this.insertOsmDataUsingJson(params.outputTableName, osmData);
 
-    console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${outputTableName}`);
+    console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
-    const tableDescribeResponse = await this.conn.query(`DESCRIBE ${outputTableName}`);
+    const tableDescribeResponse = await this.conn.query(`DESCRIBE ${params.outputTableName}`);
     return {
       source: 'osm',
       type: 'pointset',
-      name: outputTableName,
+      name: params.outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
     };
   }
@@ -150,17 +160,18 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Fetch OSM data within a bounding box from the Overpass API
+   * Fetch OSM data within a polygon from the Overpass API
    */
-  private async fetchOsmWithinBBox(bbox: Params['boundingBox']): Promise<OverpassApiResponse> {
-    const { minLat, minLon, maxLat, maxLon } = bbox;
+  private async fetchOsmWithinPolygon(polygon: number[][]): Promise<OverpassApiResponse> {
+    // Format polygon coordinates for Overpass API poly filter
+    const polyCoords = polygon.map(([lon, lat]) => `${lat} ${lon}`).join(' ');
 
     const query = `
       [out:json][timeout:25];
       (
-        node(${minLat},${minLon},${maxLat},${maxLon});
-        way(${minLat},${minLon},${maxLat},${maxLon});
-        relation(${minLat},${minLon},${maxLat},${maxLon});
+        node(poly:"${polyCoords}");
+        way(poly:"${polyCoords}");
+        relation(poly:"${polyCoords}");
       );
       (._; >;);
       out body;
@@ -168,7 +179,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
 
-    console.log(`Fetching OSM data from Overpass API...`);
+    console.log(`Fetching OSM data from Overpass API with polygon...`);
     const response = await fetch(url);
 
     if (!response.ok) {

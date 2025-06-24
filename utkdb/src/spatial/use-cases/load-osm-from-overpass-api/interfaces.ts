@@ -14,17 +14,18 @@ export interface OsmElement {
   nodes?: number[];
 }
 
-export interface Params {
-  boundingBox: {
-    minLat: number;
-    maxLat: number;
-    minLon: number;
-    maxLon: number;
-  };
+export type Params = {
   outputTableName: string;
   autoLoadLayers?: {
     coordinateFormat: string;
     dropOsmTable: boolean;
     layers: Array<LayerType>;
   };
-}
+  boundingBox?: {
+    minLat: number;
+    maxLat: number;
+    minLon: number;
+    maxLon: number;
+  };
+  polygon?: number[][]; // Array of [longitude, latitude] coordinates
+};
