@@ -1,9 +1,36 @@
-import { FeatureCollection, Feature } from "geojson";
+import { FeatureCollection, Feature, BBox } from "geojson";
 
-import { ILayerBorder, ILayerComponent, ILayerGeometry } from "./interfaces";
+import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
 
 export abstract class TriangulatorFeatures extends Triangulator {
+
+    static buildGrid(nx: number, ny: number, bbox: BBox) : { flatCoords: number[], flatIds: number[] } {
+        const flatCoords = [];
+        const flatIds = [];
+
+        const xStep = (bbox[2] - bbox[0]) / nx;
+        const yStep = (bbox[3] - bbox[1]) / ny;
+
+        for (let i = 0; i <= nx; i++) {
+            for (let j = 0; j <= ny; j++) {
+                flatCoords.push(bbox[0] + i * xStep, bbox[1] + j * yStep);
+            }
+        }
+
+        for (let i = 0; i < nx; i++) {
+            for (let j = 0; j < ny; j++) {
+                const a = i * (ny + 1) + j;
+                const b = a + 1;
+                const c = a + ny + 1;
+                const d = c + 1;
+
+                flatIds.push(a, b, c, b, d, c);
+            }
+        }
+
+        return { flatCoords, flatIds };
+    }
 
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
@@ -51,34 +78,5 @@ export abstract class TriangulatorFeatures extends Triangulator {
         }
 
         return [mesh, comps];
-    }
-
-    static buildBorder(geojson: FeatureCollection, origin: number[]): ILayerBorder[] {
-        const border: ILayerBorder[] = [];
-
-        const collection: Feature[] = geojson['features'];
-        for (let fId=0; fId<collection.length; fId++) {
-            // gets the feature
-            const feature = collection[fId];
-
-            if (feature.geometry.type === 'LineString') {
-                border.push(...Triangulator.lineStringToBorder(feature, origin));
-
-            } else if (feature.geometry.type === 'MultiLineString') {
-                border.push(...Triangulator.multiLineStringToBorder(feature, origin));
-
-            } else if (feature.geometry.type === 'Polygon') {
-                border.push(...Triangulator.polygonToBorder(feature, origin));
-
-            } else if (feature.geometry.type === 'MultiPolygon') {
-                border.push(...Triangulator.multiPolygonToBorder(feature, origin));
-            }
-            else {
-                console.warn('Unsupported geometry type:', feature.geometry.type);
-                continue;
-            }
-        }
-
-        return border;
     }
 }

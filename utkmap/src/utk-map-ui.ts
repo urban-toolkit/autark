@@ -1,8 +1,51 @@
+import { Layer } from './layer.js';
 import { UtkMap } from './utk-map.js';
 
 export class UtkMapUi {
+    static _map: UtkMap
+    static _currentLayer: Layer | null;
+
+    static get map(): UtkMap {
+        return UtkMapUi._map;
+    }
+
+    static set map(map: UtkMap) {
+        UtkMapUi._map = map;
+    }
+
+    static get currentLayer(): Layer | null {
+        return UtkMapUi._currentLayer;
+    }
+
+    static set currentLayer(layer: Layer | null) {
+        UtkMapUi._currentLayer = layer;
+    }
+
+    static changeLayer(layer: Layer | null): void {
+        if (!layer) {
+            console.warn('No layer provided to changeLayer');
+            return;
+        }
+
+        UtkMapUi.currentLayer = layer;
+        console.log(`Current layer: ${UtkMapUi.currentLayer.layerInfo.id}`);
+
+        // Turn off picking for all layers
+        UtkMapUi.map.layerManager.layers.forEach(layer => {
+            if (layer.layerInfo.id == UtkMapUi.currentLayer?.id)
+                return;
+            UtkMapUi.map.updateRenderInfoPick(layer.layerInfo.id, false);
+            layer.makeLayerRenderInfoDirty();
+        });
+
+        // Setting pick to true
+        UtkMapUi.map.updateRenderInfoPick(UtkMapUi.currentLayer.layerInfo.id, true);
+        UtkMapUi.currentLayer.makeLayerRenderInfoDirty();
+    }
 
     static buildUi(map: UtkMap): void {
+        UtkMapUi.map = map;
+
         const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
         const styleNode = document.createElement('style');
 
@@ -16,8 +59,8 @@ export class UtkMapUi {
         uiDiv.style.width = '24px';
         uiDiv.style.height = '24px';
         uiDiv.style.position = 'absolute';
-        uiDiv.style.top = (map.canvas.offsetTop + 5) + 'px';
-        uiDiv.style.left = (map.canvas.offsetLeft + 5) + 'px';
+        uiDiv.style.top = (UtkMapUi.map.canvas.offsetTop + 5) + 'px';
+        uiDiv.style.left = (UtkMapUi.map.canvas.offsetLeft + 5) + 'px';
         uiDiv.style.zIndex = '1000';
 
         const icon = document.createElement('a');
@@ -36,24 +79,34 @@ export class UtkMapUi {
         icon.innerHTML = `<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-menu-2"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>`
 
         icon.addEventListener('click', () => {
-            UtkMapUi.buildSubMenu(map);
+            UtkMapUi.buildSubMenu();
         });
 
         uiDiv.appendChild(styleNode);
         uiDiv.appendChild(icon);
 
-        map.canvas.parentElement?.appendChild(uiDiv);
+        UtkMapUi.map.canvas.parentElement?.appendChild(uiDiv);
     }
 
-    static buildSubMenu(map: UtkMap): void {
+    static updateUi(): void {
+        if (!UtkMapUi.currentLayer) {
+            UtkMapUi.changeLayer(UtkMapUi.map.layerManager.layers[0] || null);
+            return;
+        }
+
+        this.buildActiveLayersDropdown();
+        this.buildEnablePickingDropdown();
+    }
+
+    static buildSubMenu(): void {
         let subMenu = document.getElementById('utkMapSubMenu');
 
         if (!subMenu) {
             subMenu = document.createElement('div');
             subMenu.id = 'utkMapSubMenu';
             subMenu.style.position = 'absolute';
-            subMenu.style.top = (map.canvas.offsetTop + 40) + 'px';
-            subMenu.style.left = (map.canvas.offsetLeft + 5) + 'px';
+            subMenu.style.top = (UtkMapUi.map.canvas.offsetTop + 40) + 'px';
+            subMenu.style.left = (UtkMapUi.map.canvas.offsetLeft + 5) + 'px';
             subMenu.style.width = '300px';
             subMenu.style.display = 'block';
             subMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
@@ -64,10 +117,10 @@ export class UtkMapUi {
             subMenu.style.padding = '10px';
             subMenu.style.visibility = 'hidden';
 
-            map.canvas.parentElement?.appendChild(subMenu);
+            UtkMapUi.map.canvas.parentElement?.appendChild(subMenu);
 
-            UtkMapUi.buildActiveLayersDropdown(map);
-            UtkMapUi.buildEnablePickingDropdown(map);
+            UtkMapUi.buildActiveLayersDropdown();
+            UtkMapUi.buildEnablePickingDropdown();
         }
 
         if (subMenu.style.visibility === 'visible') {
@@ -77,7 +130,7 @@ export class UtkMapUi {
         }
     }
 
-    static buildActiveLayersDropdown(map: UtkMap): void {
+    static buildActiveLayersDropdown(): void {
         const subMenu = document.getElementById('utkMapSubMenu');
 
         if (!subMenu) return;
@@ -94,7 +147,7 @@ export class UtkMapUi {
             subMenu.appendChild(title);
         }
 
-        let separator = document.getElementById('hr');
+        let separator = document.getElementById('activeLayersSeparator');
         if (!separator) {
             separator = document.createElement('hr');
             separator.id = 'activeLayersSeparator';
@@ -155,7 +208,8 @@ export class UtkMapUi {
         dropdownList.innerHTML = '';
 
         // Populate dropdown with checkboxes
-        const layers = map.layerManager.layers;
+        const layers = UtkMapUi.map.layerManager.layers;
+
         layers.forEach(layer => {
             const initialSkip = layer?.layerRenderInfo.isSkip || false;
 
@@ -190,10 +244,10 @@ export class UtkMapUi {
         // Hide dropdown when clicking outside
         document.addEventListener('click', () => {
             dropdownList.style.display = 'none';
-    });
+        });
     }
 
-    static buildEnablePickingDropdown(map: UtkMap): void {
+    static buildEnablePickingDropdown(): void {
         const subMenu = document.getElementById('utkMapSubMenu');
 
         if (!subMenu) return;
@@ -246,7 +300,7 @@ export class UtkMapUi {
             select.addEventListener('change', (e) => {
                 const selectedLayerId = (e.target as HTMLSelectElement).value;
                 layers.forEach(l => {
-                    map.updateRenderInfoPick(l.id, l.id === selectedLayerId)
+                    UtkMapUi.map.updateRenderInfoPick(l.id, l.id === selectedLayerId)
                 });
             });
 
@@ -255,7 +309,7 @@ export class UtkMapUi {
         // Clear previous options
         select.innerHTML = '';
 
-        const layers = map.layerManager.layers;
+        const layers = UtkMapUi.map.layerManager.layers;
         layers.forEach(layer => {
             const layerId = layer.id;
             const isPickEnabled = layer?.layerRenderInfo.isPick || false;
@@ -266,7 +320,8 @@ export class UtkMapUi {
             option.selected = isPickEnabled;
 
             select.appendChild(option);
+
+            UtkMapUi.changeLayer(UtkMapUi.map.layerManager.searchByLayerId(layerId));
         });
     }
-
 }

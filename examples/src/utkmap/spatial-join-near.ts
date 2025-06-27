@@ -98,11 +98,10 @@ export class SpatialJoinNear {
                 const properties = feature.properties as GeoJsonProperties;
 
                 if (!properties) {
-                    console.warn(`Feature ${feature.id} has no properties.`);
                     continue;
                 }
 
-                const val = properties.sjoin.count || 0;
+                const val = properties.sjoin.count.noise || 0;
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,

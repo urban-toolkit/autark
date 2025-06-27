@@ -35,6 +35,7 @@ import { TriangulatorBuildings } from './triangulator-buildings';
 import { TriangulatorRoads } from './triangulator-roads';
 import { TriangulatorCoastline } from './triangulator-coastline';
 import { UtkMapUi } from './utk-map-ui';
+import { TriangulatorBorders } from './triangulator-borders';
 
 export class UtkMap {
     protected _camera!: Camera;
@@ -90,6 +91,10 @@ export class UtkMap {
         return this._mapEvents;
     }
 
+    get keyEvents(): KeyEvents {
+        return this._keyEvents;
+    }
+
     async init(bbox: IBoundingBox) {
         await this._renderer.init();
 
@@ -100,6 +105,7 @@ export class UtkMap {
         this.render();
 
         this.updateBoundingBoxAndOrigin(bbox);
+
     }
 
     loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
@@ -124,12 +130,14 @@ export class UtkMap {
 
             case LayerType.CUSTOM_LAYER:
                 this.createCustomLayerFromGeojson(layerName, geojson);
-            break;
+                break;
 
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
+
+        UtkMapUi.updateUi();
     }
 
     resize(width: number, height: number) {
@@ -177,7 +185,7 @@ export class UtkMap {
             layer.makeLayerRenderInfoDirty();
         }
     }
-    
+
     updateRenderInfoOpacity(layerName: string, opacity: number) {
         const layer = this._layerManager.searchByLayerId(layerName);
 
@@ -219,7 +227,7 @@ export class UtkMap {
 
             layer.setLayerRenderInfo(layerRenderInfo);
 
-            if(isPick === false) {
+            if (isPick === false) {
                 layer.clearHighlightedIds();
             }
         }
@@ -257,7 +265,7 @@ export class UtkMap {
         // Normal render pass for each layer
         this._renderer.start();
         this._layerManager.layers.forEach((layer) => {
-            if(!layer.layerRenderInfo.isSkip) {
+            if (!layer.layerRenderInfo.isSkip) {
                 layer.renderPass(this._camera);
             }
         });
@@ -278,7 +286,7 @@ export class UtkMap {
                 const [x, y] = layer.layerRenderInfo.pickedComps;
                 layer.getPickedId(x, y).then(id => {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
-                    if(id >= 0){
+                    if (id >= 0) {
                         layer.setHighlightedIds([id]);
                         this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
                     }
@@ -291,6 +299,49 @@ export class UtkMap {
             }
         });
     }
+
+    // private createHeatmapLayer(layerName: string, typeLayer: LayerType, nx: number, ny: number) {
+    //     const zIndex = 0.5 + 0.01 * this.layerManager.length;
+
+    //     const layerInfo: ILayerInfo = {
+    //         id: `${layerName}`,
+    //         zIndex: zIndex,
+    //         typeGeometry: LayerGeometryType.HEATMAP_2D,
+    //         typeLayer: typeLayer,
+    //     };
+
+    //     const layerRenderInfo: ILayerRenderInfo = {
+    //         pipeline: RenderPipeline.TRIANGLE_FLAT,
+    //         opacity: 1.0,
+    //         colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+    //         isColorMap: true,
+    //         isPick: false,
+    //         isSkip: false,
+    //     };
+
+    //     const layerMesh = TriangulatorHeatmap.buildHeatmapGrid(nx, ny, this.layerManager.boundingBox);
+    //     if (layerMesh.flatCoords.length === 0 || layerMesh.flatIds.length === 0) {
+    //         console.error('Invalid Heatmap Layer mesh');
+    //         return;
+    //     }
+
+    //     // Adapt layerMesh to match ILayerGeometry
+    //     const geometry: ILayerGeometry = {
+    //         position: layerMesh.flatCoords,
+    //         indices: layerMesh.flatIds,
+    //     };
+
+    //     const layerData = {
+    //         geometry: [geometry],
+    //         components: [{ nPoints: nx * ny, nTriangles: (nx - 1) * (ny - 1) * 2 }],
+    //         thematic: Array.from({ length: nx * ny }, () => ({
+    //             level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+    //             values: [0]
+    //         }))
+    //     };
+
+    //     this.createLayer(layerInfo, layerRenderInfo, layerData);
+    // }
 
     private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         let zIndex = -1;
@@ -474,7 +525,7 @@ export class UtkMap {
             console.error('Invalid Feature Layer.');
             return;
         }
-        const layerBorder = TriangulatorFeatures.buildBorder(geojson, this.origin);
+        const layerBorder = TriangulatorBorders.buildBorder(geojson, this.origin);
         if (layerBorder.length === 0) {
             console.error('Invalid Feature Layer border.');
             return;
@@ -495,7 +546,6 @@ export class UtkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-
     private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
 
@@ -503,5 +553,4 @@ export class UtkMap {
             layer.createPipeline(this._renderer, this._camera);
         }
     }
-
 }

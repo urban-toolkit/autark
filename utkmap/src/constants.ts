@@ -1,7 +1,8 @@
 export enum LayerGeometryType {
     FEATURES_2D = 'features2d',
     FEATURES_3D = 'features3d',
-    BORDERS_2D  = 'borders2d'
+    BORDERS_2D  = 'borders2d',
+    HEATMAP_2D = 'heatmap2d',
 }
 
 export enum LayerType {
