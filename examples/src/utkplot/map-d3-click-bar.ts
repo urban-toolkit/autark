@@ -136,11 +136,10 @@ export class MapD3 {
                 const properties = feature.properties as GeoJsonProperties;
 
                 if (!properties) {
-                    console.warn(`Feature ${feature.id} has no properties.`);
                     continue;
                 }
 
-                const val = properties.sjoin.count || 0;
+                const val = properties.sjoin.count.noise || 0;
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
@@ -244,19 +243,13 @@ export class MapD3 {
         const width = div.clientWidth - margens.left - margens.right;
         const height = 500 - margens.top - margens.bottom;
 
-        console.log("Plot size:", { width, height });
 
         // ---- Escalas
-        console.log("Data for scatter plot:", data);
         const xExtent = Array.from(new Set(data.map(d => d?.ntaname.substring(0, 50))));
         const mapX = d3.scaleBand().domain(xExtent).range([0, width]).padding(0.25);
 
-        console.log("X extent:", xExtent);
-
-        const yExtent = <[number, number]>d3.extent(data, d => +(d?.sjoin.count || 0));
+        const yExtent = <[number, number]>d3.extent(data, d => +(d?.sjoin.count.noise || 0));
         const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
-
-        console.log("Y extent:", yExtent);
 
         // ---- Eixos
         const xAxis = d3.axisBottom(mapX).tickSizeOuter(0);
@@ -297,7 +290,7 @@ export class MapD3 {
             .attr("y", -margens.left / 2 - 7)
             .attr("x", -margens.top)
             .style('visibility', 'visible')
-            .text("sjoin.count");
+            .text("sjoin.count.noise");
 
         // ---- Círculos
         const cGroup = svg.selectAll('#plotGroup')
@@ -310,8 +303,8 @@ export class MapD3 {
             .data(data)
             .join("rect")
             .attr("x", (d: GeoJsonProperties) => mapX(d?.ntaname.substring(0, 50)) || 'unknown')
-            .attr("y", (d: GeoJsonProperties) => mapY(d?.sjoin.count || 0))
-            .attr("height", (d) => mapY(0) - mapY(d?.sjoin.count || 0))
+            .attr("y", (d: GeoJsonProperties) => mapY(d?.sjoin.count.noise || 0))
+            .attr("height", (d) => mapY(0) - mapY(d?.sjoin.count.noise || 0))
             .attr("width", mapX.bandwidth())
             .style('fill', 'lightgray')
             .style('stroke', '#2f2f2f')

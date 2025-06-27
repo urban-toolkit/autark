@@ -139,11 +139,10 @@ export class MapD3 {
                 const properties = feature.properties as GeoJsonProperties;
 
                 if (!properties) {
-                    console.warn(`Feature ${feature.id} has no properties.`);
                     continue;
                 }
 
-                const val = properties.sjoin.count || 0;
+                const val = properties.sjoin.count.noise || 0;
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
@@ -247,19 +246,12 @@ export class MapD3 {
         const width = div.clientWidth - margens.left - margens.right;
         const height = 500 - margens.top - margens.bottom;
 
-        console.log("Plot size:", { width, height });
-
         // ---- Escalas
-        console.log("Data for scatter plot:", data);
         const xExtent = <[number, number]>d3.extent(data, d => +(d?.shape_area) || 0);
         const mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        console.log("X extent:", xExtent);
-
         const yExtent = <[number, number]>d3.extent(data, d => +(d?.shape_leng) || 0);
         const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
-
-        console.log("Y extent:", yExtent);
 
         // ---- Eixos
         const xAxis = d3.axisBottom(mapX)

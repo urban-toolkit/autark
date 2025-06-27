@@ -141,8 +141,6 @@ export class AABB {
                 }
             }
         }
-
-        console.log( this._boxes )
     }
 
     private overlaps(box: Box2D): number[] {

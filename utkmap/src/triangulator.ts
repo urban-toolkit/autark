@@ -11,31 +11,6 @@ export abstract class Triangulator {
         return [[], []]
     };
 
-    // TODO: remove this function
-    protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
-        const collection = geojson['features'];
-
-        for (const feature of collection) {
-            const { coordinates } = <LineString>feature.geometry;
-
-            for(let cId=0; cId < coordinates.length; cId++) {
-                const coords = coordinates[cId];
-                coords[0] -= origin[0];
-                coords[1] -= origin[1];
-            }
-        }
-    }
-
-    protected static generateBorderIds(nCoords: number): number[] {
-        const ids = [];
-
-        for (let i = 0; i < nCoords - 1; i++) {
-            ids.push(i, i + 1);
-        }
-        ids.push(nCoords - 1, 0);
-        return ids;
-    }
-
     static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
 
@@ -52,7 +27,9 @@ export abstract class Triangulator {
         const flatIds = Triangulator.generateBorderIds(flatCoords.length / 2);
 
         return [{ position: flatCoords, indices: flatIds }];
-    } 
+    }
+
+    //------
 
     static multiLineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
@@ -83,6 +60,8 @@ export abstract class Triangulator {
 
         return borders;
     }
+
+    //------
 
     static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
@@ -118,6 +97,8 @@ export abstract class Triangulator {
 
         return [{ position: flatCoords, indices: flatIds }];
     }
+
+    //------
 
     static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const meshes = [];
@@ -164,5 +145,31 @@ export abstract class Triangulator {
         }
 
         return borders;
+    }
+
+    // ---- Aux functions
+
+    protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
+        const collection = geojson['features'];
+
+        for (const feature of collection) {
+            const { coordinates } = <LineString>feature.geometry;
+
+            for(let cId=0; cId < coordinates.length; cId++) {
+                const coords = coordinates[cId];
+                coords[0] -= origin[0];
+                coords[1] -= origin[1];
+            }
+        }
+    }
+
+    protected static generateBorderIds(nCoords: number): number[] {
+        const ids = [];
+
+        for (let i = 0; i < nCoords - 1; i++) {
+            ids.push(i, i + 1);
+        }
+        ids.push(nCoords - 1, 0);
+        return ids;
     }
 }

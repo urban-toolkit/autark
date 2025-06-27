@@ -132,11 +132,10 @@ export class MapVega {
                 const properties = feature.properties as GeoJsonProperties;
 
                 if (!properties) {
-                    console.warn(`Feature ${feature.id} has no properties.`);
                     continue;
                 }
 
-                const val = properties.sjoin.count || 0;
+                const val = properties.sjoin.count.noise || 0;
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
@@ -249,7 +248,7 @@ export class MapVega {
             mark: 'bar',
             encoding: {
                 x: { field: 'ntaname', type: 'ordinal' },
-                y: { field: 'sjoin.count', type: 'quantitative' },
+                y: { field: 'sjoin.count.noise', type: 'quantitative' },
                 color: {
                     condition: [
                         {
