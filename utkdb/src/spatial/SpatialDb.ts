@@ -17,6 +17,7 @@ import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase
 import { GetBoundingBoxUseCase } from './shared/use-cases/get-bounding-box/GetBoundingBoxUseCase';
 import { BoundingBox } from './shared/use-cases/get-bounding-box/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
+import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
 import { isLayerType } from './use-cases/load-layer/interfaces';
 import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 import { getBoundingBoxFromPolygon } from './shared/utils';
@@ -35,6 +36,7 @@ export class SpatialDb {
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
   private getBoundingBoxUseCase?: GetBoundingBoxUseCase;
+  private getBoundingBoxFromLayerUseCase?: GetBoundingBoxFromLayerUseCase;
   private dropTableUseCase?: DropTableUseCase;
   private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
 
@@ -51,6 +53,7 @@ export class SpatialDb {
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.getBoundingBoxUseCase = new GetBoundingBoxUseCase(this.conn);
+    this.getBoundingBoxFromLayerUseCase = new GetBoundingBoxFromLayerUseCase(this.conn);
     this.dropTableUseCase = new DropTableUseCase(this.conn);
     this.transformBoundingBoxCoordinatesUseCase = new TransformBoundingBoxCoordinatesUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
@@ -178,7 +181,7 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadCustomLayerUseCase.exec(params);
+    const table = await this.loadCustomLayerUseCase.exec({ ...params, boudingBox: this.osmBoudingBox });
     this.tables.push(table);
 
     return table;
@@ -199,6 +202,26 @@ export class SpatialDb {
   getOsmBoundingBox(): BoundingBox {
     if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsm() first.');
     return this.osmBoudingBox;
+  }
+
+  async getBoundingBoxFromLayer(layerName: string): Promise<BoundingBox> {
+    if (!this.db || !this.conn || !this.getBoundingBoxFromLayerUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const layerTable = this.tables.find((t) => t.name === layerName);
+    if (!layerTable) throw new Error(`Table ${layerName} not found.`);
+
+    // Verify the table has a geometry column
+    const hasGeometry = layerTable.columns.find((column) => column.type === 'GEOMETRY');
+    if (!hasGeometry) {
+      throw new Error(
+        `Table ${layerName} does not have a geometry column. This method only works with layer tables that contain geometries.`,
+      );
+    }
+
+    return this.getBoundingBoxFromLayerUseCase.exec({
+      layerTableName: layerName,
+    });
   }
 
   // CUSTOM QUERIES

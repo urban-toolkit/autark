@@ -1,3 +1,5 @@
+import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+
 export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string) => {
   return `
     CREATE TABLE ${featureCollectionTableName} AS SELECT * FROM '${geojsonFileUrl}';
@@ -9,21 +11,32 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   featureCollectionTableName: string,
   outputTableName: string,
   coordinateFormat: string,
+  boundingBox?: BoundingBox,
 ) => {
+  const geometryTransform = `ST_Transform(
+    ST_GeomFromGeoJSON(JSON(feature.geometry)),
+    'EPSG:4326',
+    '${coordinateFormat}',
+    always_xy := true
+  )`;
+
+  const geometrySelect = boundingBox
+    ? `ST_Intersection(
+        ${geometryTransform},
+        ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})
+      )`
+    : geometryTransform;
+
   return `
     CREATE TABLE ${outputTableName} AS
     SELECT
-      ST_Transform(
-        ST_GeomFromGeoJSON(JSON(feature.geometry)),
-        'EPSG:4326',
-        '${coordinateFormat}',
-        always_xy := true
-      ) AS geometry,
+      ${geometrySelect} AS geometry,
       feature.properties AS properties
     FROM (
       SELECT UNNEST(features) AS feature
       FROM ${featureCollectionTableName}
-    );
+    )
+    ${boundingBox ? 'WHERE ST_Intersects(' + geometryTransform + ', ST_MakeEnvelope(' + boundingBox.minLat + ', ' + boundingBox.minLon + ', ' + boundingBox.maxLat + ', ' + boundingBox.maxLon + '))' : ''};
 
     DROP TABLE ${featureCollectionTableName};
 

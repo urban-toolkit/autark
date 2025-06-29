@@ -5,6 +5,7 @@ import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { FeatureCollection } from 'geojson';
+import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
 
 export class LoadCustomLayerUseCase {
   private db: AsyncDuckDB;
@@ -20,6 +21,7 @@ export class LoadCustomLayerUseCase {
     geojsonObject,
     outputTableName,
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
+    boundingBox,
   }: Params): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
@@ -48,6 +50,7 @@ export class LoadCustomLayerUseCase {
       geojson,
       outputTableName,
       coordinateFormat,
+      boundingBox,
     );
 
     return {
@@ -62,6 +65,7 @@ export class LoadCustomLayerUseCase {
     geojson: FeatureCollection,
     outputTableName: string,
     coordinateFormat: string,
+    boundingBox?: BoundingBox,
   ) {
     // Create temporary file with GeoJSON data
     const fileName = `temp_geojson_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
@@ -78,6 +82,7 @@ export class LoadCustomLayerUseCase {
       `${outputTableName}_feature_collection`,
       outputTableName,
       coordinateFormat,
+      boundingBox,
     );
 
     await this.db.dropFile(fileName);
