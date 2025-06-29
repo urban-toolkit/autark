@@ -46,8 +46,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
       ON ${layer}.id = ${layer}_with_nodes_refs.id
       JOIN ${layer}_required_nodes_with_geometries nodes
       ON ${layer}_with_nodes_refs.ref = nodes.id
-      GROUP BY 1, 2, 3
-      ${buildHavingClause({ outputFormat, boundingBox, layer })};
+      GROUP BY 1, 2, 3;
 
     DESCRIBE ${outputTableName};
   `;
@@ -106,61 +105,6 @@ function buildGeometrySelect({
   const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
 
   return `ST_Intersection(${baseGeometry}, ${boundingBoxGeometry})`;
-}
-
-function buildHavingClause({
-  outputFormat,
-  boundingBox,
-  layer,
-}: {
-  outputFormat: string;
-  boundingBox?: BoundingBox;
-  layer: LayerType;
-}) {
-  if (!boundingBox) {
-    return '';
-  }
-
-  // Define which layers should create polygons for closed ways
-  const areaLayers = ['buildings', 'parks', 'water'];
-
-  const baseGeometry = areaLayers.includes(layer)
-    ? `
-    CASE 
-      WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
-        -- Closed way with more than 3 nodes: create polygon
-        ST_Transform(
-          ST_MakePolygon(
-            ST_MakeLine(
-              list(nodes.geometry ORDER BY ref_idx ASC)
-            )
-          ),
-          'EPSG:4326',
-          '${outputFormat}'
-        )
-      ELSE
-        -- Open way: create linestring
-        ST_Transform(
-          ST_MakeLine(
-            list(nodes.geometry ORDER BY ref_idx ASC)
-          ),
-          'EPSG:4326',
-          '${outputFormat}'
-        )
-    END`
-    : `
-    -- Always create linestring for linear features
-    ST_Transform(
-      ST_MakeLine(
-        list(nodes.geometry ORDER BY ref_idx ASC)
-      ),
-      'EPSG:4326',
-      '${outputFormat}'
-    )`;
-
-  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
-
-  return `HAVING ST_Intersects(${baseGeometry}, ${boundingBoxGeometry})`;
 }
 
 function getLayerQuery(layer: string): (t: string) => string {
