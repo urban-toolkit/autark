@@ -9,18 +9,21 @@ export class SpatialJoinNear {
         this.db = new SpatialDb();
         await this.db.init();
 
-        await this.db.loadOsm({
-            pbfFileUrl: 'http://localhost:5173/data/lower-mn.osm.pbf',
-            outputTableName: 'table_osm',
+        await this.db.loadOsmFromOverpassApi({
+            boundingBox: {
+                minLon: -74.0217296397,
+                minLat: 40.6989916231,
+                maxLon: -74.0005168092,
+                maxLat: 40.7131479624,
+            }, outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
                 layers: [
-                    'roads'
+                    'roads',
                 ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
                 dropOsmTable: true,
             },
         });
-
         await this.db.loadCsv({
             csvFileUrl: 'http://localhost:5173/data/noise_sample.csv',
             outputTableName: 'noise',
