@@ -1,5 +1,5 @@
 import { SpatialDb } from 'utkdb';
-import { UtkMap, LayerType, IBoundingBox } from 'utkmap';
+import { UtkMap, LayerType } from 'utkmap';
 
 export class GeojsonVis {
     protected map!: UtkMap;
@@ -9,13 +9,8 @@ export class GeojsonVis {
         this.db = new SpatialDb();
         await this.db.init();
 
-        // CHECK: Compute the bomding box even if there is no osm data
-        const boundingBox: IBoundingBox = { 
-            minLon: 4940354.793551397,
-            minLat: -8239795.593876557,
-            maxLon: 4942534.993601108,
-            maxLat: -8237537.099519547
-        }
+        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
+        console.log("Bounding Box:", boundingBox);
 
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',

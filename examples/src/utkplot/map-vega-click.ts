@@ -3,9 +3,9 @@ import { Feature, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'utkdb';
 import { PlotEvent, UtkPlot, UtkPlotVega } from 'utkplot';
 import {
-    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent,
-    IBoundingBox
+    UtkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent
 } from 'utkmap';
+
 import { View } from 'vega';
 
 export class MapVega {
@@ -68,12 +68,8 @@ export class MapVega {
 
         canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
 
-        const boundingBox: IBoundingBox = {
-            minLon: 4940354.793551397,
-            minLat: -8239795.593876557,
-            maxLon: 4942534.993601108,
-            maxLat: -8237537.099519547
-        }
+        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
+        console.log("Bounding Box:", boundingBox);
 
         this.map = new UtkMap(canvas);
         await this.map.init(boundingBox);

@@ -181,7 +181,7 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadCustomLayerUseCase.exec({ ...params, boudingBox: this.osmBoudingBox });
+    const table = await this.loadCustomLayerUseCase.exec({ ...params, boundingBox: this.osmBoudingBox });
     this.tables.push(table);
 
     return table;
