@@ -10,10 +10,10 @@ export const GET_BOUNDING_BOX_FROM_LAYER_QUERY = (layerTableName: string) => {
       WHERE geometry IS NOT NULL
     )
     SELECT 
-      CAST(MIN(min_x) AS DOUBLE) as minLat,
-      CAST(MIN(min_y) AS DOUBLE) as minLon,
-      CAST(MAX(max_x) AS DOUBLE) as maxLat,
-      CAST(MAX(max_y) AS DOUBLE) as maxLon
+      CAST(MIN(min_x) AS DOUBLE) as minLon,
+      CAST(MIN(min_y) AS DOUBLE) as minLat,
+      CAST(MAX(max_x) AS DOUBLE) as maxLon,
+      CAST(MAX(max_y) AS DOUBLE) as maxLat
     FROM geometry_bounds;
   `;
 };
