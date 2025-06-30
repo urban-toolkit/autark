@@ -172,6 +172,6 @@ const GET_ROADS = (tableName: string) => `
       (
         map_extract(tags, 'highway')[1] IS NOT NULL AND
         map_extract(tags, 'area')[1] IS DISTINCT FROM 'yes' AND
-        map_extract(tags, 'highway')[1] NOT IN ('cycleway', 'footway', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway')
+        map_extract(tags, 'highway')[1] NOT IN ('cycleway', 'elevator', 'footway', 'steps', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway')
       );
 `;

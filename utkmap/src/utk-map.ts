@@ -464,6 +464,9 @@ export class UtkMap {
     }
 
     private createBuildingsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+        console.log(`Creating buildings layer from geojson: ${layerName}`);
+        console.log(geojson);
+
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: LayerZIndex.OSM_BUILDINGS,
