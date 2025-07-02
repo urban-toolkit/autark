@@ -9,14 +9,18 @@ export class GeojsonVis {
         this.db = new SpatialDb();
         await this.db.init();
 
-        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-        console.log("Bounding Box:", boundingBox);
+        // Reads a local GeoJSON file
+        const geoJsonFile = await fetch('http://localhost:5173/data/mnt_neighs.geojson');
+        console.log("Loaded GeoJSON file:", geoJsonFile);
 
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395'
         });
+
+        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
+        console.log("Bounding Box:", boundingBox);
 
         const canvas = document.querySelector('canvas');
 
