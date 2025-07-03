@@ -3,7 +3,6 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { CsvTable, CustomLayerTable, LayerTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
-import { LoadOsmFromPbfUseCase, LoadOsmFromPbfParams } from './use-cases/load-osm-from-pbf';
 import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
 import { QueryOperation } from '../query-operation';
@@ -27,7 +26,6 @@ export class SpatialDb {
   private conn?: AsyncDuckDBConnection;
   public tables: Array<Table> = [];
   private osmBoudingBox?: BoundingBox;
-  private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
   private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
@@ -44,7 +42,6 @@ export class SpatialDb {
     this.db = await loadDb();
     this.conn = await this.db.connect();
 
-    this.loadOsmFromPbfUseCase = new LoadOsmFromPbfUseCase(this.conn);
     this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
@@ -60,33 +57,6 @@ export class SpatialDb {
   }
 
   // LOAD's methods
-  async loadOsm(params: LoadOsmFromPbfParams): Promise<void> {
-    if (!this.db || !this.conn || !this.loadOsmFromPbfUseCase || !this.dropTableUseCase || !this.getBoundingBoxUseCase)
-      throw new Error('Database not initialized. Please call init() first.');
-
-    const table = await this.loadOsmFromPbfUseCase.exec(params);
-    this.tables.push(table);
-
-    if (params.autoLoadLayers) {
-      for (const layer of params.autoLoadLayers.layers) {
-        await this.loadLayer({
-          osmInputTableName: table.name,
-          coordinateFormat: params.autoLoadLayers.coordinateFormat,
-          layer: layer,
-        });
-      }
-
-      this.osmBoudingBox = await this.getBoundingBoxUseCase.exec({
-        tableName: table.name,
-        coordinateFormat: params.autoLoadLayers.coordinateFormat,
-        layers: params.autoLoadLayers.layers,
-      });
-
-      if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
-      this.tables = this.tables.filter((t) => t.name !== table.name);
-    }
-  }
-
   async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<void> {
     if (
       !this.db ||
@@ -200,7 +170,7 @@ export class SpatialDb {
   }
 
   getOsmBoundingBox(): BoundingBox {
-    if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsm() first.');
+    if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsmFromOverpassApi() first.');
     return this.osmBoudingBox;
   }
 
