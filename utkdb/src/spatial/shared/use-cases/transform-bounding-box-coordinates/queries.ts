@@ -12,8 +12,8 @@ export const TRANSFORM_BOUNDING_BOX_COORDINATES_QUERY = ({ boundingBox, coordina
   return `
     WITH transformed_bounds AS (
       SELECT
-        ST_Transform(ST_Point(${boundingBox.minLon}, ${boundingBox.minLat}), 'EPSG:4326', '${coordinateFormat}') as min_point,
-        ST_Transform(ST_Point(${boundingBox.maxLon}, ${boundingBox.maxLat}), 'EPSG:4326', '${coordinateFormat}') as max_point
+        ST_Transform(ST_Point(${boundingBox.minLon}, ${boundingBox.minLat}), 'EPSG:4326', '${coordinateFormat}', always_xy := true) as min_point,
+        ST_Transform(ST_Point(${boundingBox.maxLon}, ${boundingBox.maxLat}), 'EPSG:4326', '${coordinateFormat}', always_xy := true) as max_point
     )
     SELECT 
       CAST(ST_X(min_point) AS DOUBLE) as minLon,

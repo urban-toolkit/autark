@@ -63,7 +63,7 @@ function buildGeometrySelect({
   layer: LayerType;
 }) {
   // Define which layers should create polygons for closed ways
-  const areaLayers = ['buildings', 'parks', 'water'];
+  const areaLayers = ['parks', 'water'];
 
   const baseGeometry = areaLayers.includes(layer)
     ? `
@@ -77,7 +77,8 @@ function buildGeometrySelect({
             )
           ),
           'EPSG:4326',
-          '${outputFormat}'
+          '${outputFormat}',
+          always_xy := true
         )
       ELSE
         -- Open way: create linestring
@@ -86,7 +87,8 @@ function buildGeometrySelect({
             list(nodes.geometry ORDER BY ref_idx ASC)
           ),
           'EPSG:4326',
-          '${outputFormat}'
+          '${outputFormat}',
+          always_xy := true
         )
     END`
     : `
@@ -96,7 +98,8 @@ function buildGeometrySelect({
         list(nodes.geometry ORDER BY ref_idx ASC)
       ),
       'EPSG:4326',
-      '${outputFormat}'
+      '${outputFormat}',
+      always_xy := true
     )`;
 
   if (!boundingBox) {
@@ -136,7 +139,8 @@ function buildHavingClause({
             )
           ),
           'EPSG:4326',
-          '${outputFormat}'
+          '${outputFormat}',
+          always_xy := true
         )
       ELSE
         -- Open way: create linestring
@@ -145,7 +149,8 @@ function buildHavingClause({
             list(nodes.geometry ORDER BY ref_idx ASC)
           ),
           'EPSG:4326',
-          '${outputFormat}'
+          '${outputFormat}',
+          always_xy := true
         )
     END`
     : `
@@ -155,7 +160,8 @@ function buildHavingClause({
         list(nodes.geometry ORDER BY ref_idx ASC)
       ),
       'EPSG:4326',
-      '${outputFormat}'
+      '${outputFormat}',
+      always_xy := true
     )`;
 
   const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
