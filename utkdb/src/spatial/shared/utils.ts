@@ -1,5 +1,4 @@
-import { Column } from '../../shared/interfaces';
-import { BoundingBox } from './use-cases/get-bounding-box/interfaces';
+import { Column, BoundingBox } from '../../shared/interfaces';
 
 type DuckDbTableDescriptionColumn = {
   column_name: string;

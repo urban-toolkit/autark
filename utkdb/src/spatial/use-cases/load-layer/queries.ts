@@ -1,7 +1,7 @@
 // TODO: 1. falta layer de ROADS
 
 import { LayerType } from './interfaces';
-import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+import { BoundingBox } from '../../../shared/interfaces';
 
 type Params = {
   tableName: string;
@@ -29,7 +29,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
           WHERE kind IN ('way', 'relation');
 
     CREATE TEMP TABLE ${layer}_required_nodes_with_geometries AS
-      SELECT id, ST_POINT(lat, lon) geometry
+      SELECT id, ST_POINT(lon, lat) geometry
         FROM ${tableName} nodes
         SEMI JOIN ${layer}_with_nodes_refs
         ON nodes.id = ${layer}_with_nodes_refs.ref
@@ -103,7 +103,7 @@ function buildGeometrySelect({
     return baseGeometry;
   }
 
-  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
+  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
 
   return `ST_Intersection(${baseGeometry}, ${boundingBoxGeometry})`;
 }
@@ -158,7 +158,7 @@ function buildHavingClause({
       '${outputFormat}'
     )`;
 
-  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})`;
+  const boundingBoxGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
 
   return `HAVING ST_Intersects(${baseGeometry}, ${boundingBoxGeometry})`;
 }
@@ -224,10 +224,15 @@ const GET_COASTLINE = (tableName: string) => `
 const GET_ROADS = (tableName: string) => `
   CREATE TEMP TABLE roads AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way') AND
+      WHERE kind = 'way' AND
+      -- ensure the way has at least two distinct nodes so ST_MakeLine can build a geometry
+      array_length(refs) > 1 AND
       (
         map_extract(tags, 'highway')[1] IS NOT NULL AND
         map_extract(tags, 'area')[1] IS DISTINCT FROM 'yes' AND
-        map_extract(tags, 'highway')[1] NOT IN ('cycleway', 'elevator', 'footway', 'steps', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway')
+        map_extract(tags, 'highway')[1] NOT IN (
+          'cycleway', 'elevator', 'footway', 'steps', 'pedestrian',
+          'proposed', 'construction', 'abandoned', 'platform', 'raceway'
+        )
       );
 `;

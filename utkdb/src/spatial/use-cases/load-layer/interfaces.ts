@@ -1,4 +1,4 @@
-import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+import { BoundingBox } from '../../../shared/interfaces';
 
 export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings' | 'custom2DLayer';
 

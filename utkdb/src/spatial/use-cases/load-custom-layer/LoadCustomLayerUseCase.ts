@@ -5,7 +5,7 @@ import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { FeatureCollection } from 'geojson';
-import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+import { BoundingBox } from '../../../shared/interfaces';
 
 export class LoadCustomLayerUseCase {
   private db: AsyncDuckDB;

@@ -1,4 +1,4 @@
-import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+import { BoundingBox } from '../../../shared/interfaces';
 
 export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string) => {
   return `
@@ -23,7 +23,7 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   const geometrySelect = boundingBox
     ? `ST_Intersection(
         ${geometryTransform},
-        ST_MakeEnvelope(${boundingBox.minLat}, ${boundingBox.minLon}, ${boundingBox.maxLat}, ${boundingBox.maxLon})
+        ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})
       )`
     : geometryTransform;
 
@@ -36,7 +36,7 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
       SELECT UNNEST(features) AS feature
       FROM ${featureCollectionTableName}
     )
-    ${boundingBox ? 'WHERE ST_Intersects(' + geometryTransform + ', ST_MakeEnvelope(' + boundingBox.minLat + ', ' + boundingBox.minLon + ', ' + boundingBox.maxLat + ', ' + boundingBox.maxLon + '))' : ''};
+    ${boundingBox ? 'WHERE ST_Intersects(' + geometryTransform + ', ST_MakeEnvelope(' + boundingBox.minLon + ', ' + boundingBox.minLat + ', ' + boundingBox.maxLon + ', ' + boundingBox.maxLat + '))' : ''};
 
     DROP TABLE ${featureCollectionTableName};
 

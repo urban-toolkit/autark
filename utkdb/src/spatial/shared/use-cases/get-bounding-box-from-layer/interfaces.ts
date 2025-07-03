@@ -1,4 +1,4 @@
-import type { BoundingBox } from '../get-bounding-box/interfaces';
+import type { BoundingBox } from '../../../../shared/interfaces';
 
 export interface GetBoundingBoxFromLayerParams {
   layerTableName: string;

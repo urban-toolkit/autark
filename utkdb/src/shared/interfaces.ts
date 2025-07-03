@@ -16,5 +16,12 @@ export interface Column {
   type: string;
 }
 
+export interface BoundingBox {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}
+
 // TODO:
 // 4. Crop data on db?

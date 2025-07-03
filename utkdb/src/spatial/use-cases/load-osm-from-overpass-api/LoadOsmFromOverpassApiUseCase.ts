@@ -36,8 +36,7 @@ export class LoadOsmFromOverpassApiUseCase {
       throw new Error('No OSM elements found in the specified area');
     }
 
-    const finalData = this.filterElements(osmData, polygon);
-    await this.insertOsmDataUsingJson(params.outputTableName, finalData);
+    await this.insertOsmDataUsingJson(params.outputTableName, osmData);
 
     console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
@@ -188,72 +187,5 @@ export class LoadOsmFromOverpassApiUseCase {
     }
 
     return response.json();
-  }
-
-  private filterElements(osmData: OverpassApiResponse, polygon: number[][]): OverpassApiResponse {
-    // Step 1: Identify nodes that are within the polygon
-    const nodesInPolygon = osmData.elements.filter((element) => {
-      if (element.type !== 'node') return false;
-      if (element.lat === undefined || element.lon === undefined) return false;
-
-      return this.isPointInPolygon([element.lon, element.lat], polygon);
-    });
-
-    const nodeIdsInPolygon = new Set(nodesInPolygon.map((node) => node.id));
-
-    // Step 2: Find ways that have at least one node within the polygon
-    const waysWithNodesInPolygon = osmData.elements.filter((element) => {
-      if (element.type !== 'way') return false;
-      if (!element.nodes || element.nodes.length === 0) return false;
-
-      // Keep way if it has at least one node in the polygon
-      return element.nodes.some((nodeId) => nodeIdsInPolygon.has(nodeId));
-    });
-
-    // Step 3: Get ALL nodes referenced by these valid ways (even if outside polygon)
-    // This preserves complete geometry for roads that cross boundaries
-    const allReferencedNodeIds = new Set<number>();
-    waysWithNodesInPolygon.forEach((way) => {
-      way.nodes?.forEach((nodeId) => allReferencedNodeIds.add(nodeId));
-    });
-
-    // Step 4: Include all nodes that are either in polygon OR referenced by valid ways
-    const validNodes = osmData.elements.filter((element) => {
-      if (element.type !== 'node') return false;
-      return nodeIdsInPolygon.has(element.id) || allReferencedNodeIds.has(element.id);
-    });
-
-    // Step 5: Keep all ways that have nodes in the polygon (with complete node references)
-    const validWays = waysWithNodesInPolygon;
-
-    const validRelations = osmData.elements.filter((element) => element.type === 'relation');
-
-    // Combine all filtered elements
-    const filteredElements = [...validNodes, ...validWays, ...validRelations];
-
-    return {
-      elements: filteredElements,
-    };
-  }
-
-  /**
-   * Check if a point is inside a polygon using the ray casting algorithm
-   * @param point [longitude, latitude]
-   * @param polygon Array of [longitude, latitude] coordinates
-   */
-  private isPointInPolygon(point: number[], polygon: number[][]): boolean {
-    const [x, y] = point;
-    let inside = false;
-
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const [xi, yi] = polygon[i];
-      const [xj, yj] = polygon[j];
-
-      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-        inside = !inside;
-      }
-    }
-
-    return inside;
   }
 }

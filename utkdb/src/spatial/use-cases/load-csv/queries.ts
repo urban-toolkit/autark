@@ -35,7 +35,7 @@ export const LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY = ({
       SELECT
           *,
           ST_Transform(
-              ST_Point(CAST(${latColumnName} AS DOUBLE), CAST(${longColumnName} AS DOUBLE)),
+              ST_Point(CAST(${longColumnName} AS DOUBLE), CAST(${latColumnName} AS DOUBLE)),
               'EPSG:4326',
               '${coordinateFormat}'
           ) AS ${DEFAULT_GEO_COLUMN_NAME}

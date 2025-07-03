@@ -1,5 +1,5 @@
 import { FeatureCollection } from 'geojson';
-import { BoundingBox } from '../../shared/use-cases/get-bounding-box/interfaces';
+import { BoundingBox } from '../../../shared/interfaces';
 
 export interface Params {
   geojsonFileUrl?: string;
