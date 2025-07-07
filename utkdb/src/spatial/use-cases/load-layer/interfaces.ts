@@ -1,9 +1,9 @@
 import { BoundingBox } from '../../../shared/interfaces';
 
-export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings' | 'custom2DLayer';
+export type LayerType = 'surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings' | 'custom2DLayer' | 'grid';
 
 export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'custom2DLayer'].includes(value);
+  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'custom2DLayer', 'grid'].includes(value);
 }
 
 export interface Params {
