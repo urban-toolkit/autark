@@ -3,24 +3,24 @@
 import { Feature, FeatureCollection, Polygon } from 'geojson';
 
 import {
-    ColorMapInterpolator,
-    LayerGeometryType,
-    LayerType,
-    LayerZIndex,
-    MapEvent,
-    RenderPipeline,
-    ThematicAggregationLevel
+  ColorMapInterpolator,
+  LayerGeometryType,
+  LayerType,
+  LayerZIndex,
+  MapEvent,
+  RenderPipeline,
+  ThematicAggregationLevel,
 } from './constants';
 
 import {
-    IBoundingBox,
-    ICameraData,
-    ILayerComponent,
-    ILayerData,
-    ILayerGeometry,
-    ILayerInfo,
-    ILayerRenderInfo,
-    ILayerThematic
+  IBoundingBox,
+  ICameraData,
+  ILayerComponent,
+  ILayerData,
+  ILayerGeometry,
+  ILayerInfo,
+  ILayerRenderInfo,
+  ILayerThematic,
 } from './interfaces';
 
 import { Camera } from './camera';
@@ -38,522 +38,526 @@ import { UtkMapUi } from './utk-map-ui';
 import { TriangulatorBorders } from './triangulator-borders';
 
 export class UtkMap {
-    protected _camera!: Camera;
-    protected _renderer!: Renderer;
-    protected _keyEvents!: KeyEvents;
-    protected _mouseEvents!: MouseEvents;
-    protected _mapEvents!: MapEvents;
-    protected _layerManager!: LayerManager;
+  protected _camera!: Camera;
+  protected _renderer!: Renderer;
+  protected _keyEvents!: KeyEvents;
+  protected _mouseEvents!: MouseEvents;
+  protected _mapEvents!: MapEvents;
+  protected _layerManager!: LayerManager;
 
-    protected _canvas!: HTMLCanvasElement;
+  protected _canvas!: HTMLCanvasElement;
 
-    constructor(canvas: HTMLCanvasElement, autoResize = true) {
-        this._canvas = canvas;
-        this._camera = new Camera();
-        this._renderer = new Renderer(canvas);
-        this._keyEvents = new KeyEvents(this);
-        this._mouseEvents = new MouseEvents(this);
-        this._mapEvents = new MapEvents([MapEvent.PICK]);
-        this._layerManager = new LayerManager();
+  constructor(canvas: HTMLCanvasElement, autoResize = true) {
+    this._canvas = canvas;
+    this._camera = new Camera();
+    this._renderer = new Renderer(canvas);
+    this._keyEvents = new KeyEvents(this);
+    this._mouseEvents = new MouseEvents(this);
+    this._mapEvents = new MapEvents([MapEvent.PICK]);
+    this._layerManager = new LayerManager();
 
-        UtkMapUi.buildUi(this);
+    UtkMapUi.buildUi(this);
 
-        if (autoResize) {
-            window.addEventListener('resize', this.handleResize.bind(this));
-        }
+    if (autoResize) {
+      window.addEventListener('resize', this.handleResize.bind(this));
+    }
+  }
+
+  get canvas(): HTMLCanvasElement {
+    return this._canvas;
+  }
+
+  get camera(): Camera {
+    return this._camera;
+  }
+
+  get renderer(): Renderer {
+    return this._renderer;
+  }
+
+  get layerManager(): LayerManager {
+    return this._layerManager;
+  }
+
+  get origin(): number[] {
+    return this._layerManager.origin;
+  }
+
+  get boundingBox(): Feature<Polygon> {
+    return this._layerManager.boundingBox;
+  }
+
+  get mapEvents(): MapEvents {
+    return this._mapEvents;
+  }
+
+  get keyEvents(): KeyEvents {
+    return this._keyEvents;
+  }
+
+  async init(bbox: IBoundingBox) {
+    await this._renderer.init();
+
+    this._keyEvents.bindEvents();
+    this._mouseEvents.bindEvents();
+    this.handleResize();
+
+    this.render();
+
+    this.updateBoundingBoxAndOrigin(bbox);
+  }
+
+  loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
+    switch (typeLayer) {
+      case LayerType.OSM_SURFACE:
+      case LayerType.OSM_WATER:
+      case LayerType.OSM_PARKS:
+        this.createFeaturesLayerFromGeojson(layerName, typeLayer, geojson);
+        break;
+
+      case LayerType.OSM_COASTLINE:
+        this.createCoastlineLayerFromGeojson(layerName, geojson);
+        break;
+
+      case LayerType.OSM_ROADS:
+        this.createRoadsLayerFromGeojson(layerName, geojson);
+        break;
+
+      case LayerType.OSM_BUILDINGS:
+        this.createBuildingsLayerFromGeojson(layerName, geojson);
+        break;
+
+      case LayerType.CUSTOM_POLYGONS_LAYER:
+        this.createCustomLayerFromGeojson(layerName, geojson);
+        break;
+
+      default:
+        console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
+        break;
     }
 
-    get canvas(): HTMLCanvasElement {
-        return this._canvas;
+    UtkMapUi.updateUi();
+  }
+
+  resize(width: number, height: number) {
+    this._canvas.width = width * (window.devicePixelRatio || 1);
+    this._canvas.height = height * (window.devicePixelRatio || 1);
+
+    this._camera.setViewportResolution(width, height);
+    this._camera.update();
+    this._renderer.resize(width, height);
+  }
+
+  updateCamera(params: ICameraData) {
+    this._camera = new Camera(params);
+  }
+
+  updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
+    this._layerManager.updateBoundingBoxAndOrigin(bbox);
+  }
+
+  updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      // load data
+      layer.loadThematic(layerThematic);
+      layer.makeLayerDataInfoDirty();
     }
+  }
 
-    get camera(): Camera {
-        return this._camera;
+  updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      // load data
+      layer.loadGeometry(layerGeometry);
+      layer.makeLayerDataInfoDirty();
     }
+  }
 
-    get renderer(): Renderer {
-        return this._renderer;
+  updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      layer.setLayerRenderInfo(layerRenderInfo);
+      layer.makeLayerRenderInfoDirty();
     }
+  }
 
-    get layerManager(): LayerManager {
-        return this._layerManager;
+  updateRenderInfoOpacity(layerName: string, opacity: number) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      // load data
+      layer.layerRenderInfo.opacity = opacity;
+      layer.makeLayerRenderInfoDirty();
     }
+  }
 
-    get origin(): number[] {
-        return this._layerManager.origin;
+  updateRenderInfoIsColorMap(layerName: string, isColorMap: boolean) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      const layerRenderInfo = layer.layerRenderInfo;
+      layerRenderInfo.isColorMap = isColorMap;
+
+      layer.setLayerRenderInfo(layerRenderInfo);
     }
+  }
 
-    get boundingBox(): Feature<Polygon> {
-        return this._layerManager.boundingBox;
+  updateRenderInfoSkip(layerName: string, isSkip: boolean) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      const layerRenderInfo = layer.layerRenderInfo;
+      layerRenderInfo.isSkip = isSkip;
+
+      layer.setLayerRenderInfo(layerRenderInfo);
     }
+  }
 
-    get mapEvents(): MapEvents {
-        return this._mapEvents;
+  updateRenderInfoPick(layerName: string, isPick: boolean) {
+    const layer = this._layerManager.searchByLayerId(layerName);
+
+    if (layer) {
+      const layerRenderInfo = layer.layerRenderInfo;
+      layerRenderInfo.isPick = isPick;
+
+      layer.setLayerRenderInfo(layerRenderInfo);
+
+      if (isPick === false) {
+        layer.clearHighlightedIds();
+      }
     }
+  }
 
-    get keyEvents(): KeyEvents {
-        return this._keyEvents;
-    }
+  draw(fps: number = 60) {
+    let previousDelta = 0;
 
-    async init(bbox: IBoundingBox) {
-        await this._renderer.init();
+    const update = (currentDelta: number) => {
+      requestAnimationFrame(update);
+      const delta = currentDelta - previousDelta;
 
-        this._keyEvents.bindEvents();
-        this._mouseEvents.bindEvents();
-        this.handleResize();
+      if (fps && delta < 1000 / fps) {
+        return;
+      }
 
-        this.render();
+      this.render();
+      previousDelta = currentDelta;
+    };
 
-        this.updateBoundingBoxAndOrigin(bbox);
+    requestAnimationFrame(update);
+  }
 
-    }
+  private handleResize() {
+    const width = this._canvas.width;
+    const height = this._canvas.height;
 
-    loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
-        switch (typeLayer) {
-            case LayerType.OSM_SURFACE:
-            case LayerType.OSM_WATER:
-            case LayerType.OSM_PARKS:
-                this.createFeaturesLayerFromGeojson(layerName, typeLayer, geojson);
-                break;
+    this.resize(width, height);
+  }
 
-            case LayerType.OSM_COASTLINE:
-                this.createCoastlineLayerFromGeojson(layerName, geojson);
-                break;
+  private render() {
+    // Updates the camera
+    this._camera.update();
 
-            case LayerType.OSM_ROADS:
-                this.createRoadsLayerFromGeojson(layerName, geojson);
-                break
+    // Normal render pass for each layer
+    this._renderer.start();
+    this._layerManager.layers.forEach((layer) => {
+      if (!layer.layerRenderInfo.isSkip) {
+        layer.renderPass(this._camera);
+      }
+    });
+    this._renderer.finish();
 
-            case LayerType.OSM_BUILDINGS:
-                this.createBuildingsLayerFromGeojson(layerName, geojson);
-                break
+    // Picking render pass for each layer
+    this._renderer.startPickingRenderPass();
+    this._layerManager.layers.forEach((layer) => {
+      if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
+        layer.renderPickingPass(this._camera);
+      }
+    });
+    this._renderer.finish();
 
-            case LayerType.CUSTOM_LAYER:
-                this.createCustomLayerFromGeojson(layerName, geojson);
-                break;
-
-            default:
-                console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
-                break;
-        }
-
-        UtkMapUi.updateUi();
-    }
-
-    resize(width: number, height: number) {
-        this._canvas.width = width * (window.devicePixelRatio || 1);
-        this._canvas.height = height * (window.devicePixelRatio || 1);
-
-        this._camera.setViewportResolution(width, height);
-        this._camera.update();
-        this._renderer.resize(width, height);
-    }
-
-    updateCamera(params: ICameraData) {
-        this._camera = new Camera(params);
-    }
-
-    updateBoundingBoxAndOrigin(bbox: IBoundingBox) {
-        this._layerManager.updateBoundingBoxAndOrigin(bbox);
-    }
-
-    updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            // load data
-            layer.loadThematic(layerThematic);
-            layer.makeLayerDataInfoDirty();
-        }
-    }
-
-    updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            // load data
-            layer.loadGeometry(layerGeometry);
-            layer.makeLayerDataInfoDirty();
-        }
-    }
-
-    updateRenderInfo(layerName: string, layerRenderInfo: ILayerRenderInfo) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            layer.setLayerRenderInfo(layerRenderInfo);
-            layer.makeLayerRenderInfoDirty();
-        }
-    }
-
-    updateRenderInfoOpacity(layerName: string, opacity: number) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            // load data
-            layer.layerRenderInfo.opacity = opacity;
-            layer.makeLayerRenderInfoDirty();
-        }
-    }
-
-    updateRenderInfoIsColorMap(layerName: string, isColorMap: boolean) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            const layerRenderInfo = layer.layerRenderInfo;
-            layerRenderInfo.isColorMap = isColorMap;
-
-            layer.setLayerRenderInfo(layerRenderInfo);
-        }
-    }
-
-    updateRenderInfoSkip(layerName: string, isSkip: boolean) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            const layerRenderInfo = layer.layerRenderInfo;
-            layerRenderInfo.isSkip = isSkip;
-
-            layer.setLayerRenderInfo(layerRenderInfo);
-        }
-    }
-
-    updateRenderInfoPick(layerName: string, isPick: boolean) {
-        const layer = this._layerManager.searchByLayerId(layerName);
-
-        if (layer) {
-            const layerRenderInfo = layer.layerRenderInfo;
-            layerRenderInfo.isPick = isPick;
-
-            layer.setLayerRenderInfo(layerRenderInfo);
-
-            if (isPick === false) {
-                layer.clearHighlightedIds();
-            }
-        }
-    }
-
-    draw(fps: number = 60) {
-        let previousDelta = 0;
-
-        const update = (currentDelta: number) => {
-            requestAnimationFrame(update);
-            const delta = currentDelta - previousDelta;
-
-            if (fps && delta < 1000 / fps) {
-                return;
-            }
-
-            this.render();
-            previousDelta = currentDelta;
-        }
-
-        requestAnimationFrame(update);
-    }
-
-    private handleResize() {
-        const width = this._canvas.width;
-        const height = this._canvas.height;
-
-        this.resize(width, height);
-    }
-
-    private render() {
-        // Updates the camera
-        this._camera.update();
-
-        // Normal render pass for each layer
-        this._renderer.start();
-        this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip) {
-                layer.renderPass(this._camera);
-            }
+    // Getting ids
+    this._layerManager.layers.forEach((layer) => {
+      if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
+        const [x, y] = layer.layerRenderInfo.pickedComps;
+        layer.getPickedId(x, y).then((id) => {
+          console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
+          if (id >= 0) {
+            layer.setHighlightedIds([id]);
+            this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
+          } else {
+            layer.clearHighlightedIds();
+            this._mapEvents.emit(MapEvent.PICK, [], layer.layerInfo.id);
+          }
+          layer.layerRenderInfo.pickedComps = undefined;
         });
-        this._renderer.finish();
+      }
+    });
+  }
 
-        // Picking render pass for each layer
-        this._renderer.startPickingRenderPass();
-        this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
-                layer.renderPickingPass(this._camera);
-            }
-        });
-        this._renderer.finish();
+  // private createHeatmapLayer(layerName: string, typeLayer: LayerType, nx: number, ny: number) {
+  //     const zIndex = 0.5 + 0.01 * this.layerManager.length;
 
-        // Getting ids
-        this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
-                const [x, y] = layer.layerRenderInfo.pickedComps;
-                layer.getPickedId(x, y).then(id => {
-                    console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
-                    if (id >= 0) {
-                        layer.setHighlightedIds([id]);
-                        this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
-                    }
-                    else {
-                        layer.clearHighlightedIds();
-                        this._mapEvents.emit(MapEvent.PICK, [], layer.layerInfo.id);
-                    }
-                    layer.layerRenderInfo.pickedComps = undefined;
-                });
-            }
-        });
+  //     const layerInfo: ILayerInfo = {
+  //         id: `${layerName}`,
+  //         zIndex: zIndex,
+  //         typeGeometry: LayerGeometryType.HEATMAP_2D,
+  //         typeLayer: typeLayer,
+  //     };
+
+  //     const layerRenderInfo: ILayerRenderInfo = {
+  //         pipeline: RenderPipeline.TRIANGLE_FLAT,
+  //         opacity: 1.0,
+  //         colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+  //         isColorMap: true,
+  //         isPick: false,
+  //         isSkip: false,
+  //     };
+
+  //     const layerMesh = TriangulatorHeatmap.buildHeatmapGrid(nx, ny, this.layerManager.boundingBox);
+  //     if (layerMesh.flatCoords.length === 0 || layerMesh.flatIds.length === 0) {
+  //         console.error('Invalid Heatmap Layer mesh');
+  //         return;
+  //     }
+
+  //     // Adapt layerMesh to match ILayerGeometry
+  //     const geometry: ILayerGeometry = {
+  //         position: layerMesh.flatCoords,
+  //         indices: layerMesh.flatIds,
+  //     };
+
+  //     const layerData = {
+  //         geometry: [geometry],
+  //         components: [{ nPoints: nx * ny, nTriangles: (nx - 1) * (ny - 1) * 2 }],
+  //         thematic: Array.from({ length: nx * ny }, () => ({
+  //             level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+  //             values: [0]
+  //         }))
+  //     };
+
+  //     this.createLayer(layerInfo, layerRenderInfo, layerData);
+  // }
+
+  private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
+    let zIndex = -1;
+
+    switch (typeLayer) {
+      case LayerType.OSM_WATER:
+        zIndex = LayerZIndex.OSM_WATER;
+        break;
+      case LayerType.OSM_PARKS:
+        zIndex = LayerZIndex.OSM_PARKS;
+        break;
+      default:
+        zIndex = 0.5 + 0.01 * this.layerManager.length;
+        break;
     }
 
-    // private createHeatmapLayer(layerName: string, typeLayer: LayerType, nx: number, ny: number) {
-    //     const zIndex = 0.5 + 0.01 * this.layerManager.length;
+    const layerInfo: ILayerInfo = {
+      id: `${layerName}`,
+      zIndex: zIndex,
+      typeGeometry: LayerGeometryType.FEATURES_2D,
+      typeLayer: typeLayer,
+    };
 
-    //     const layerInfo: ILayerInfo = {
-    //         id: `${layerName}`,
-    //         zIndex: zIndex,
-    //         typeGeometry: LayerGeometryType.HEATMAP_2D,
-    //         typeLayer: typeLayer,
-    //     };
+    const layerRenderInfo: ILayerRenderInfo = {
+      pipeline: RenderPipeline.TRIANGLE_FLAT,
+      opacity: 1.0,
+      // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
+      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+      isColorMap: false,
+      isPick: false,
+      isSkip: false,
+    };
 
-    //     const layerRenderInfo: ILayerRenderInfo = {
-    //         pipeline: RenderPipeline.TRIANGLE_FLAT,
-    //         opacity: 1.0,
-    //         colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-    //         isColorMap: true,
-    //         isPick: false,
-    //         isSkip: false,
-    //     };
-
-    //     const layerMesh = TriangulatorHeatmap.buildHeatmapGrid(nx, ny, this.layerManager.boundingBox);
-    //     if (layerMesh.flatCoords.length === 0 || layerMesh.flatIds.length === 0) {
-    //         console.error('Invalid Heatmap Layer mesh');
-    //         return;
-    //     }
-
-    //     // Adapt layerMesh to match ILayerGeometry
-    //     const geometry: ILayerGeometry = {
-    //         position: layerMesh.flatCoords,
-    //         indices: layerMesh.flatIds,
-    //     };
-
-    //     const layerData = {
-    //         geometry: [geometry],
-    //         components: [{ nPoints: nx * ny, nTriangles: (nx - 1) * (ny - 1) * 2 }],
-    //         thematic: Array.from({ length: nx * ny }, () => ({
-    //             level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-    //             values: [0]
-    //         }))
-    //     };
-
-    //     this.createLayer(layerInfo, layerRenderInfo, layerData);
-    // }
-
-    private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
-        let zIndex = -1;
-
-        switch (typeLayer) {
-            case LayerType.OSM_WATER: zIndex = LayerZIndex.OSM_WATER; break;
-            case LayerType.OSM_PARKS: zIndex = LayerZIndex.OSM_PARKS; break;
-            default: zIndex = 0.5 + 0.01 * this.layerManager.length; break;
-        }
-
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zIndex: zIndex,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
-            typeLayer: typeLayer,
-        };
-
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
-
-        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Feature 2D Layer mesh');
-            return;
-        }
-
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map(() => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [0]
-                }
-            })
-        };
-
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+    if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+      console.error('Invalid Feature 2D Layer mesh');
+      return;
     }
 
-    private createCoastlineLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zIndex: LayerZIndex.OSM_COASTLINE,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
-            typeLayer: LayerType.OSM_COASTLINE,
+    const layerData = {
+      geometry: layerMesh[0],
+      components: layerMesh[1],
+      thematic: layerMesh[1].map(() => {
+        return {
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [0],
         };
+      }),
+    };
 
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
+    this.createLayer(layerInfo, layerRenderInfo, layerData);
+  }
 
-        const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin, this.boundingBox);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Coastline Layer mesh');
-            return;
-        }
+  private createCoastlineLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    const layerInfo: ILayerInfo = {
+      id: `${layerName}`,
+      zIndex: LayerZIndex.OSM_COASTLINE,
+      typeGeometry: LayerGeometryType.FEATURES_2D,
+      typeLayer: LayerType.OSM_COASTLINE,
+    };
 
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [id / (layerMesh[1].length - 1)]
-                }
-            })
-        };
+    const layerRenderInfo: ILayerRenderInfo = {
+      pipeline: RenderPipeline.TRIANGLE_FLAT,
+      opacity: 1.0,
+      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+      isColorMap: false,
+      isPick: false,
+      isSkip: false,
+    };
 
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin, this.boundingBox);
+    if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+      console.error('Invalid Coastline Layer mesh');
+      return;
     }
 
-    private createRoadsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zIndex: LayerZIndex.OSM_ROADS,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
-            typeLayer: LayerType.OSM_ROADS,
+    const layerData = {
+      geometry: layerMesh[0],
+      components: layerMesh[1],
+      thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
+        return {
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [id / (layerMesh[1].length - 1)],
         };
+      }),
+    };
 
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
+    this.createLayer(layerInfo, layerRenderInfo, layerData);
+  }
 
-        const layerMesh = TriangulatorRoads.buildMesh(geojson, this.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Roads Layer.');
-            return;
-        }
+  private createRoadsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    const layerInfo: ILayerInfo = {
+      id: `${layerName}`,
+      zIndex: LayerZIndex.OSM_ROADS,
+      typeGeometry: LayerGeometryType.FEATURES_2D,
+      typeLayer: LayerType.OSM_ROADS,
+    };
 
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map(() => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [0]
-                }
-            })
-        };
+    const layerRenderInfo: ILayerRenderInfo = {
+      pipeline: RenderPipeline.TRIANGLE_FLAT,
+      opacity: 1.0,
+      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+      isColorMap: false,
+      isPick: false,
+      isSkip: false,
+    };
 
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    const layerMesh = TriangulatorRoads.buildMesh(geojson, this.origin);
+    if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+      console.error('Invalid Roads Layer.');
+      return;
     }
 
-    private createBuildingsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
-        console.log(`Creating buildings layer from geojson: ${layerName}`);
-        console.log(geojson);
-
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zIndex: LayerZIndex.OSM_BUILDINGS,
-            typeGeometry: LayerGeometryType.FEATURES_3D,
-            typeLayer: LayerType.OSM_BUILDINGS,
+    const layerData = {
+      geometry: layerMesh[0],
+      components: layerMesh[1],
+      thematic: layerMesh[1].map(() => {
+        return {
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [0],
         };
+      }),
+    };
 
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_SSAO,
-            opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
+    this.createLayer(layerInfo, layerRenderInfo, layerData);
+  }
 
-        const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Building Layer.');
-            return;
-        }
+  private createBuildingsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    console.log(`Creating buildings layer from geojson: ${layerName}`);
+    console.log(geojson);
 
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [id / (layerMesh[1].length - 1)]
-                }
-            })
-        };
+    const layerInfo: ILayerInfo = {
+      id: `${layerName}`,
+      zIndex: LayerZIndex.OSM_BUILDINGS,
+      typeGeometry: LayerGeometryType.FEATURES_3D,
+      typeLayer: LayerType.OSM_BUILDINGS,
+    };
 
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    const layerRenderInfo: ILayerRenderInfo = {
+      pipeline: RenderPipeline.TRIANGLE_SSAO,
+      opacity: 1.0,
+      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+      isColorMap: false,
+      isPick: false,
+      isSkip: false,
+    };
+
+    const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
+    if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+      console.error('Invalid Building Layer.');
+      return;
     }
 
-    private createCustomLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
-        const zIndex = 0.5 + 0.01 * this.layerManager.length;
-
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zIndex: zIndex,
-            typeGeometry: LayerGeometryType.BORDERS_2D,
-            typeLayer: LayerType.CUSTOM_LAYER
+    const layerData = {
+      geometry: layerMesh[0],
+      components: layerMesh[1],
+      thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
+        return {
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [id / (layerMesh[1].length - 1)],
         };
+      }),
+    };
 
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
+    this.createLayer(layerInfo, layerRenderInfo, layerData);
+  }
 
-        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Feature Layer.');
-            return;
-        }
-        const layerBorder = TriangulatorBorders.buildBorder(geojson, this.origin);
-        if (layerBorder.length === 0) {
-            console.error('Invalid Feature Layer border.');
-            return;
-        }
+  private createCustomLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    const zIndex = 0.5 + 0.01 * this.layerManager.length;
 
-        const layerData = {
-            border: layerBorder,
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map(() => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [0]
-                }
-            })
-        };
+    const layerInfo: ILayerInfo = {
+      id: `${layerName}`,
+      zIndex: zIndex,
+      typeGeometry: LayerGeometryType.BORDERS_2D,
+      typeLayer: LayerType.CUSTOM_POLYGONS_LAYER,
+    };
 
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    const layerRenderInfo: ILayerRenderInfo = {
+      pipeline: RenderPipeline.TRIANGLE_FLAT,
+      opacity: 1.0,
+      // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
+      colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+      isColorMap: false,
+      isPick: false,
+      isSkip: false,
+    };
+
+    const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+    if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+      console.error('Invalid Feature Layer.');
+      return;
+    }
+    const layerBorder = TriangulatorBorders.buildBorder(geojson, this.origin);
+    if (layerBorder.length === 0) {
+      console.error('Invalid Feature Layer border.');
+      return;
     }
 
-    private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
-        const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
+    const layerData = {
+      border: layerBorder,
+      geometry: layerMesh[0],
+      components: layerMesh[1],
+      thematic: layerMesh[1].map(() => {
+        return {
+          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+          values: [0],
+        };
+      }),
+    };
 
-        if (layer) {
-            layer.createPipeline(this._renderer, this._camera);
-        }
+    this.createLayer(layerInfo, layerRenderInfo, layerData);
+  }
+
+  private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
+
+    if (layer) {
+      layer.createPipeline(this._renderer, this._camera);
     }
+  }
 }

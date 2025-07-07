@@ -7,5 +7,5 @@
   "sky": "#000000",
   "surface": "#AAAAAA",
   "buildings": "#DFDFDF",
-  "custom2DLayer": "#DFDFDF"
+  "customPolygons": "#DFDFDF"
 }

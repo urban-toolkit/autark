@@ -13,6 +13,7 @@ export class GeojsonVis {
       geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
       outputTableName: 'neighborhoods',
       coordinateFormat: 'EPSG:3395',
+      type: 'polygons',
     });
 
     const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
