@@ -22,6 +22,7 @@ export class LoadCustomLayerUseCase {
     outputTableName,
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
     boundingBox,
+    type,
   }: Params): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
@@ -55,7 +56,7 @@ export class LoadCustomLayerUseCase {
 
     return {
       source: 'geojson',
-      type: 'custom2DLayer',
+      type: type,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
       name: outputTableName,
     };
