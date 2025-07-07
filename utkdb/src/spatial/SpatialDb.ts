@@ -19,6 +19,8 @@ import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-
 import { isLayerType } from './use-cases/load-layer/interfaces';
 import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 import { getBoundingBoxFromPolygon } from './shared/utils';
+import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
+import { GridLayerTable } from '../shared/interfaces';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -35,6 +37,7 @@ export class SpatialDb {
   private getBoundingBoxFromLayerUseCase?: GetBoundingBoxFromLayerUseCase;
   private dropTableUseCase?: DropTableUseCase;
   private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
+  private loadGridLayerUseCase?: LoadGridLayerUseCase;
 
   async init() {
     this.db = await loadDb();
@@ -50,6 +53,7 @@ export class SpatialDb {
     this.getBoundingBoxFromLayerUseCase = new GetBoundingBoxFromLayerUseCase(this.conn);
     this.dropTableUseCase = new DropTableUseCase(this.conn);
     this.transformBoundingBoxCoordinatesUseCase = new TransformBoundingBoxCoordinatesUseCase(this.conn);
+    this.loadGridLayerUseCase = new LoadGridLayerUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
@@ -148,6 +152,16 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadCustomLayerUseCase.exec({ ...params, boundingBox: this.osmBoudingBox });
+    this.tables.push(table);
+
+    return table;
+  }
+
+  async loadGridLayer(params: LoadGridLayerParams): Promise<GridLayerTable> {
+    if (!this.db || !this.conn || !this.loadGridLayerUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.loadGridLayerUseCase.exec(params);
     this.tables.push(table);
 
     return table;
