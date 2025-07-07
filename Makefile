@@ -30,3 +30,15 @@ clean:
 		"cd utkdb && $(RIMRAF) dist build node_modules" \
 		"cd utkplot && $(RIMRAF) dist build node_modules" \
 		"cd examples && $(RIMRAF) dist build node_modules"
+
+publish:
+	@if [ -z "$(LIB)" ]; then \
+		echo "Error: Please specify a library to publish using LIB=<library>"; \
+		echo "Usage: make publish LIB=utkmap|utkdb|utkplot"; \
+		exit 1; \
+	fi
+	@if [ "$(LIB)" != "utkmap" ] && [ "$(LIB)" != "utkdb" ] && [ "$(LIB)" != "utkplot" ]; then \
+		echo "Error: LIB must be one of: utkmap, utkdb, utkplot"; \
+		exit 1; \
+	fi
+	cd $(LIB) && npm pack && npm publish *.tgz

@@ -60,6 +60,25 @@ To clean build artifacts:
 make clean
 ```
 
+### Publishing packages
+
+UTK Serverless is available through **npm** packages. Publishing recently-made changes to **npm** can be done running the commands below.
+
+First, ensure you are logged into your npm account:
+
+```bash
+npm login 
+```
+
+then, publish the desired module:
+
+```bash
+make publish LIB=utkmodule 
+```
+
+***utkmodule*** can assume three values: *utkmap*, *utkdb*, *utkplot*.
+
+
 ---
 
 ## Interaction Controls
