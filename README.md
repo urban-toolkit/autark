@@ -1,18 +1,27 @@
 # UTK Serverless
 
-A serverless map visualizer, implemented in TypeScript/JavaScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
+A serverless map visualizer, implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
 
-* `utkdb`: Handles data management and querying.
-* `utkmap`: Provides map-based visualization capabilities.
+* `utkdb`: A spatial database that handles physical and thematic urban datasets.
+* `utkmap`: A 3D map visualization library.
+* `utkplot`: A D3.js/Vega-lite wrapper to build abstract visualizations.
 
-A `data/` directory is included with example datasets that can be used for testing or demonstration purposes.
+The `example/` directory is included with example codes that can be used for testing or demonstration purposes.
 
 ## Requirements
 
-You’ll need Node.js installed to run and build this project. You can install it via [Conda Forge](https://anaconda.org/conda-forge/nodejs), `brew`, or the [official site](https://nodejs.org). To install it with conda:
+You’ll need Node.js installed to build and run this project. You can install it via [Conda Forge](https://anaconda.org/conda-forge/nodejs) (Windows), [Homebrew](https://brew.sh/) (macOS), [apt-get](https://documentation.ubuntu.com/server/how-to/software/package-management/) (Debian/Ubuntu) or the [official site](https://nodejs.org/). 
 
+To install Node.js:
 ```bash
+# Windows
 conda install -c conda-forge nodejs
+
+# macOS
+brew install node
+
+# Debian/Ubuntu
+sudo apt-get install nodejs
 ```
 
 ## Installing, Running, and Building with Make
@@ -22,23 +31,15 @@ conda install -c conda-forge nodejs
 Install Make (for running predefined build and dev commands):
 
 ```bash
-# Debian/Ubuntu
-sudo apt-get install build-essential
+# Windows
+conda install anaconda::make
 
 # macOS
 xcode-select --install
 
-# Windows
-conda install anaconda::make
+# Debian/Ubuntu
+sudo apt-get install build-essential
 ```
-
-To install all required dependencies:
-
-```bash
-make install
-```
-
-This command will install dependencies for `utkmap`.
 
 ### Building and Running
 
@@ -48,7 +49,7 @@ To install required packages:
 make install
 ```
 
-To run the development server with hot-reloading:
+To run the development server:
 
 ```bash
 make dev
@@ -70,10 +71,6 @@ You can explore and modify the map using both keyboard and mouse:
 
 | Key         | Action                                                              |
 |-------------|---------------------------------------------------------------------|
-| `↑`         | Switch to the next map layer                                        |
-| `↓`         | Switch to the previous map layer                                    |
-| `t`         | Toggle thematic map rendering for the current layer                 |
-| `h` / `v`   | Toggle visibility of the current layer                              |
 | `s`         | Cycle through map styles (`default`, `light`, `dark`)               |
 
 
