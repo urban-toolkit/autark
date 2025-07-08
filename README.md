@@ -1,6 +1,6 @@
-# UTK Serverless
+# Autark
 
-A serverless map visualizer, implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
+A portable UTK-based visualization framework. Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
 
 * `utkdb`: A spatial database that handles physical and thematic urban datasets.
 * `utkmap`: A 3D map visualization library.
