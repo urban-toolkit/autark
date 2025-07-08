@@ -1,6 +1,7 @@
 # Autark
+## A portable UTK-based visualization framework
 
-A portable UTK-based visualization framework. Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
+Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
 
 * `autk-db`: A spatial database that handles physical and thematic urban datasets.
 * `autk-map`: A 3D map visualization library.
