@@ -2,9 +2,9 @@
 
 A portable UTK-based visualization framework. Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
 
-* `autkdb`: A spatial database that handles physical and thematic urban datasets.
-* `autkmap`: A 3D map visualization library.
-* `autkplot`: A D3.js/Vega-lite wrapper to build abstract visualizations.
+* `autk-db`: A spatial database that handles physical and thematic urban datasets.
+* `autk-map`: A 3D map visualization library.
+* `autk-plot`: A D3.js/Vega-lite wrapper to build abstract visualizations.
 
 The `example/` directory is included with example codes that can be used for testing or demonstration purposes.
 
@@ -74,10 +74,10 @@ npm login
 then, publish the desired module:
 
 ```bash
-make publish LIB=autkmodule 
+make publish LIB=autk-module 
 ```
 
-***autkmodule*** can assume three values: *autkmap*, *autkdb*, *autkplot*.
+***autk-module*** can assume three values: *autk-map*, *autk-db*, *autk-plot*.
 
 
 ---
