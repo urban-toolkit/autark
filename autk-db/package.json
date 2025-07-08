@@ -1,16 +1,28 @@
 {
-  "name": "demo",
-  "private": true,
+  "name": "autk-db",
   "version": "0.0.0",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/autk-db.umd.cjs",
+  "module": "./dist/autk-db.js",
+  "types": "./dist/main.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/autk-db.js",
+      "require": "./dist/autk-db.umd.cjs",
+      "types": "./dist/main.d.ts"
+    }
+  },
   "scripts": {
     "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write ."
   },
   "devDependencies": {
-    "@types/d3": "^7.4.3",
     "@types/geojson": "^7946.0.16",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
     "@typescript-eslint/parser": "^7.17.0",
@@ -18,12 +30,11 @@
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.3.3",
     "typescript": "^5.2.2",
-    "vite": "^5.3.4"
+    "vite": "^5.2.0",
+    "vite-plugin-dts": "^4.0.0-beta.1"
   },
   "dependencies": {
-    "d3": "^7.9.0",
-    "autk-db": "file:../autk-db",
-    "autk-map": "file:../autk-map",
-    "autk-plot": "file:../autk-plot"
+    "@duckdb/duckdb-wasm": "^1.28.1-dev106.0",
+    "apache-arrow": "^20.0.0"
   }
 }

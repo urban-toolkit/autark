@@ -1,0 +1,45 @@
+{
+  "name": "autk-plot",
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/autk-plot.umd.cjs",
+  "module": "./dist/autk-plot.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/autk-plot.js",
+      "require": "./dist/autk-plot.umd.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.8.0",
+    "prettier": "^3.3.3",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.3.4",
+    "vite-plugin-dts": "^4.0.0-beta.1"
+  },
+  "dependencies": {
+    "@turf/turf": "^7.2.0",
+    "d3": "^7.9.0",
+    "vega": "^6.1.2",
+    "vega-embed": "^7.0.2",
+    "vega-lite": "^6.1.0"
+  }
+}
