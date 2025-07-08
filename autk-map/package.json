@@ -1,0 +1,49 @@
+{
+  "name": "autk-map",
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/autk-map.umd.cjs",
+  "module": "./dist/autk-map.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/autk-map.js",
+      "require": "./dist/autk-map.umd.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/earcut": "^2.1.4",
+    "@types/geojson": "^7946.0.16",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
+    "@webgpu/types": "^0.1.44",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.8.0",
+    "prettier": "^3.3.3",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.3.4",
+    "vite-plugin-dts": "^4.0.0-beta.1",
+    "vite-plugin-glsl": "^1.3.0"
+  },
+  "dependencies": {
+    "@turf/turf": "^7.2.0",
+    "d3-color": "^3.1.0",
+    "d3-scale-chromatic": "^3.1.0",
+    "earcut": "^3.0.1",
+    "gl-matrix": "^3.4.3"
+  }
+}
