@@ -15,36 +15,21 @@ export function pluginWatchNodeModules(modules: string[]) {
 }
 
 export default defineConfig({
-    plugins: [pluginWatchNodeModules(['utkmap', 'utkdb', 'utkplot'])],
+    plugins: [pluginWatchNodeModules(['autk-map', 'autk-db', 'autk-plot'])],
     optimizeDeps: {
-        exclude: ['utkmap', 'utkdb', 'utkplot'],
+        exclude: ['autk-map', 'autk-db', 'autk-plot'],
     },
     build: {
         rollupOptions: {
             input: {
-                nested : '/src/utkdb/',
-                nested2: '/src/utkmap/',
-                nested3: '/src/utkplot/',
+                nested : '/src/autk-db/',
+                nested2: '/src/autk-map/',
+                nested3: '/src/autk-plot/',
             }
         }
     },
     server: {
-        // open: '/src/utkdb/load-csv.html',
-        // open: '/src/utkdb/load-geojson.html',
-        // open: '/src/utkdb/load-osm-pbf.html',
-        // open: '/src/utkdb/spatial-join-near.html',
-        // open: '/src/utkdb/spatial-join.html',
-        // open: '/src/utkmap/geojson-vis.html',
-        // open: '/src/utkmap/layer-opacity.html',
-        // open: '/src/utkmap/osm-layers-api-niteroi.html',
-        // open: '/src/utkmap/osm-layers-api.html',
-        // open: '/src/utkmap/osm-layers-pbf.html',
-        // open: '/src/utkmap/spatial-join-near.html',
-        // open: '/src/utkmap/spatial-join.html',
-        // open: '/src/utkplot/map-vega-click.html',
-        // open: '/src/utkplot/map-vega-brush.html',
-        // open: '/src/utkplot/map-d3-click.html',
-        open: '/src/utkplot/map-d3-brush.html',
+        open: '/src/autk-plot/map-d3-brush.html',
         cors: {
             origin: '*',
             allowedHeaders: 'Range, Content-Type, Authorization',
