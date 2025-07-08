@@ -13,7 +13,7 @@ export class SpatialJoin {
       geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
       outputTableName: 'neighborhoods',
       coordinateFormat: 'EPSG:3395',
-      type: 'polygons',
+      type: 'features'
     });
 
     await this.db.loadCsv({

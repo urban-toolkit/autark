@@ -7,12 +7,12 @@ export type LayerType =
   | 'parks'
   | 'roads'
   | 'buildings'
-  | 'polylines'
-  | 'polygons'
+  | 'lines'
+  | 'features'
   | 'grid';
 
 export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'polylines', 'polygons', 'grid'].includes(
+  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'lines', 'features', 'grid'].includes(
     value,
   );
 }

@@ -19,6 +19,6 @@ export * from './renderer';
 export * from './triangulator-buildings';
 export * from './triangulator-coastline';
 export * from './triangulator-features';
-export * from './triangulator-roads';
+export * from './triangulator-lines';
 export * from './triangulator';
 export * from './utk-map';

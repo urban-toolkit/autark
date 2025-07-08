@@ -17,7 +17,8 @@ export class MapStyle {
     sky: '#ffffff',
     surface: '#EFEFEF',
     buildings: '#DFDFDF',
-    customPolygons: '#DFDFDF',
+    features: '#DFDFDF',
+    lines: '#DFDFDF',
   };
 
   // default color for unknown layers

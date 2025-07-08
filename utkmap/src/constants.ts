@@ -12,8 +12,8 @@ export enum LayerType {
   OSM_WATER = 'water',
   OSM_ROADS = 'roads',
   OSM_BUILDINGS = 'buildings',
-  //
-  CUSTOM_POLYGONS_LAYER = 'polygons',
+  CUSTOM_FEATURES_LAYER  = 'features',
+  CUSTOM_LINES_LAYER = 'lines',
 }
 
 export enum LayerZIndex {
@@ -23,8 +23,8 @@ export enum LayerZIndex {
   OSM_WATER = 0.3,
   OSM_ROADS = 0.4,
   OSM_BUILDINGS = 1.0,
-  //
-  CUSTOM_POLYGONS_LAYER = 0.5,
+  CUSTOM_FEATURES_LAYER = 0.5,
+  CUSTOM_LINES_LAYER = 0.6,
 }
 
 export enum MapEvent {

@@ -7,5 +7,5 @@ export interface Params {
   outputTableName: string;
   coordinateFormat?: string;
   boundingBox?: BoundingBox;
-  type: 'polylines' | 'polygons';
+  type: 'lines' | 'features';
 }

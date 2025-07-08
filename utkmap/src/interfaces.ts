@@ -16,7 +16,8 @@ export interface IMapStyle {
   sky: ColorHEX;
   surface: ColorHEX;
   buildings: ColorHEX;
-  customPolygons: ColorHEX;
+  features: ColorHEX;
+  lines: ColorHEX;
 }
 
 export interface ILayerInfo {

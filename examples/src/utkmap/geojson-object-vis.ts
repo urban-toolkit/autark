@@ -19,7 +19,7 @@ export class GeojsonVis {
       geojsonObject: data,
       outputTableName: 'neighborhoods',
       coordinateFormat: 'EPSG:3395',
-      type: 'polygons',
+      type: 'features'
     });
 
     const canvas = document.querySelector('canvas');
