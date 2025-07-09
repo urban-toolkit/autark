@@ -2,7 +2,7 @@ import * as d3 from "d3";
 
 import { GeoJsonProperties } from "geojson";
 
-import { AutkPlot } from "./autk-plot";
+import { AutkPlot } from "./main";
 
 import { D3PlotBuilder } from "./types";
 import { PlotEvent } from "./constants";

@@ -1,6 +1,6 @@
+import { AutkMap } from './main';
 import { MapStyle } from './map-style';
-import { AutkMap } from './autk-map';
-import { AutkMapUi } from './autk-map-ui';
+import { AutkMapUi } from './map-ui';
 
 export class KeyEvents {
     private _map!: AutkMap

@@ -21,5 +21,5 @@ export * from './triangulator-coastline';
 export * from './triangulator-features';
 export * from './triangulator-lines';
 export * from './triangulator';
-export * from './autk-map-ui';
-export * from './autk-map';
+export * from './map-ui';
+export * from './main';
