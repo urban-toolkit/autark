@@ -15,7 +15,6 @@ export abstract class TriangulatorCoastline extends Triangulator {
         const comps: ILayerComponent[] = [];
 
         // translate based on origin
-        console.log(geojson);
         Triangulator.translateFeatures(geojson, origin);
         const groups: Feature[][] = this.groupParts(geojson);
 

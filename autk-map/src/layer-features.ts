@@ -1,5 +1,5 @@
 import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
-import { ThematicAggregationLevel } from './constants';
+import { RenderPipeline, ThematicAggregationLevel } from './constants';
 
 import { Layer } from './layer';
 
@@ -9,6 +9,7 @@ import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
+import { PipelineHeatmap } from './pipeline-heatmap';
 
 export class FeaturesLayer extends Layer {
     protected _dimension: number;
@@ -50,7 +51,12 @@ export class FeaturesLayer extends Layer {
     }
 
     createPipeline(renderer: Renderer): void {
-        this._pipeline = new PipelineTriangleFlat(renderer);
+        if (this.layerRenderInfo.pipeline === RenderPipeline.TRIANGLE_FLAT) {
+            this._pipeline = new PipelineTriangleFlat(renderer);
+        }
+        else if (this.layerRenderInfo.pipeline === RenderPipeline.TRIANGLE_HEATMAP) {
+            this._pipeline = new PipelineHeatmap(renderer);
+        }
         this._pipeline.build(this);
 
         this._pipelinePicking = new PipelineTrianglePicking(renderer);

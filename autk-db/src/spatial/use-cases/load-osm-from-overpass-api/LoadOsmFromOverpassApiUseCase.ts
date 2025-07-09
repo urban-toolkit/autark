@@ -94,9 +94,9 @@ export class LoadOsmFromOverpassApiUseCase {
       ref_types: string[];
     }> = [];
 
-    console.log({ node: osmData.elements.find((e) => e.type === 'node') });
-    console.log({ way: osmData.elements.find((e) => e.type === 'way') });
-    console.log({ relation: osmData.elements.find((e) => e.type === 'relation') });
+    // console.log({ node: osmData.elements.find((e) => e.type === 'node') });
+    // console.log({ way: osmData.elements.find((e) => e.type === 'way') });
+    // console.log({ relation: osmData.elements.find((e) => e.type === 'relation') });
 
     osmData.elements.forEach((element) => {
       switch (element.type) {
