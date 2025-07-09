@@ -4,41 +4,47 @@ CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
 install:
-	$(CONCURRENTLY) "cd utkmap && npm install" "cd utkdb && npm install" "cd utkplot && npm install" "cd examples && npm install"
+	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd examples && npm install"
+
+build:
+	$(CONCURRENTLY) \
+		"cd autk-map && npm run build" \
+		"cd autk-db && npm run build" \
+		"cd autk-plot && npm run build"
 
 dev:
 	$(CONCURRENTLY) \
-		"cd utkmap && npm run dev-build" \
-		"cd utkdb && npm run dev-build" \
-		"cd utkplot && npm run dev-build" \
+		"cd autk-map && npm run dev-build" \
+		"cd autk-db && npm run dev-build" \
+		"cd autk-plot && npm run dev-build" \
 		"sleep 10 && cd examples && npm run dev"
 map:
-	$(CONCURRENTLY) "cd utkmap && npm run build"
+	$(CONCURRENTLY) "cd autk-map && npm run build"
 
 db:
-	$(CONCURRENTLY) "cd utkdb && npm run build"
+	$(CONCURRENTLY) "cd autk-db && npm run build"
 
 plot:
-	$(CONCURRENTLY) "cd utkplot && npm run build"
+	$(CONCURRENTLY) "cd autk-plot && npm run build"
 
 examples:
 	$(CONCURRENTLY) "cd examples && npm run dev"
 
 clean:
 	$(CONCURRENTLY) \
-		"cd utkmap && $(RIMRAF) dist build node_modules" \
-		"cd utkdb && $(RIMRAF) dist build node_modules" \
-		"cd utkplot && $(RIMRAF) dist build node_modules" \
+		"cd autk-map && $(RIMRAF) dist build node_modules" \
+		"cd autk-db && $(RIMRAF) dist build node_modules" \
+		"cd autk-plot && $(RIMRAF) dist build node_modules" \
 		"cd examples && $(RIMRAF) dist build node_modules"
 
 publish:
 	@if [ -z "$(LIB)" ]; then \
 		echo "Error: Please specify a library to publish using LIB=<library>"; \
-		echo "Usage: make publish LIB=utkmap|utkdb|utkplot"; \
+		echo "Usage: make publish LIB=autk-map|autk-db|autk-plot"; \
 		exit 1; \
 	fi
-	@if [ "$(LIB)" != "utkmap" ] && [ "$(LIB)" != "utkdb" ] && [ "$(LIB)" != "utkplot" ]; then \
-		echo "Error: LIB must be one of: utkmap, utkdb, utkplot"; \
+	@if [ "$(LIB)" != "autk-map" ] && [ "$(LIB)" != "autk-db" ] && [ "$(LIB)" != "autk-plot" ]; then \
+		echo "Error: LIB must be one of: autk-map, autk-db, autk-plot"; \
 		exit 1; \
 	fi
 	cd $(LIB) && npm pack && npm publish *.tgz

@@ -1,15 +1,15 @@
 # UTK Rules
-utk*/dist/
-utk*/src/*.js
-utk*/package-lock.json
+autk*/dist/
+autk*/src/*.js
+autk*/package-lock.json
 
- utkpy/__pycache__
- utkpy/.ipynb_checkpoints
- utkpy/.venv
+autkpy/__pycache__
+autkpy/.ipynb_checkpoints
+autkpy/.venv
 
- __pycache__
- .ipynb_checkpoints
- .venv
+__pycache__
+.ipynb_checkpoints
+.venv
 
 package-lock.json
 demo/*.js

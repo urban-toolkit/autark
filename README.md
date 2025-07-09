@@ -1,10 +1,10 @@
-# Autark
+# Autark: A portable UTK-based visualization framework
 
-A portable UTK-based visualization framework. Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
+Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:
 
-* `utkdb`: A spatial database that handles physical and thematic urban datasets.
-* `utkmap`: A 3D map visualization library.
-* `utkplot`: A D3.js/Vega-lite wrapper to build abstract visualizations.
+* `autk-db`: A spatial database that handles physical and thematic urban datasets.
+* `autk-map`: A 3D map visualization library.
+* `autk-plot`: A D3.js/Vega-lite wrapper to build abstract visualizations.
 
 The `example/` directory is included with example codes that can be used for testing or demonstration purposes.
 
@@ -63,7 +63,7 @@ make clean
 
 ### Publishing packages
 
-UTK Serverless is available through **npm** packages. Publishing recently-made changes to **npm** can be done running the commands below.
+Autark is available through **npm** packages. Publishing recently-made changes to **npm** can be done running the commands below.
 
 First, ensure you are logged into your npm account:
 
@@ -74,10 +74,10 @@ npm login
 then, publish the desired module:
 
 ```bash
-make publish LIB=utkmodule 
+make publish LIB=autk-module 
 ```
 
-***utkmodule*** can assume three values: *utkmap*, *utkdb*, *utkplot*.
+***autk-module*** can assume three values: *autk-map*, *autk-db*, *autk-plot*.
 
 
 ---
