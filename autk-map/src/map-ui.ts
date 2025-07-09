@@ -1,5 +1,5 @@
 import { Layer } from './layer.js';
-import { AutkMap } from './autk-map.js';
+import { AutkMap } from './main.js';
 
 export class AutkMapUi {
     static _map: AutkMap

@@ -34,7 +34,7 @@ import { TriangulatorFeatures } from './triangulator-features';
 import { TriangulatorBuildings } from './triangulator-buildings';
 import { TriangulatorLines } from './triangulator-lines';
 import { TriangulatorCoastline } from './triangulator-coastline';
-import { AutkMapUi } from './autk-map-ui';
+import { AutkMapUi } from './map-ui';
 import { TriangulatorBorders } from './triangulator-borders';
 
 export class AutkMap {

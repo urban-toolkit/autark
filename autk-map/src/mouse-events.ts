@@ -1,5 +1,5 @@
 import { MouseStatus } from './constants';
-import { AutkMap } from './autk-map';
+import { AutkMap } from './main';
 
 export class MouseEvents {
   // div to attach the events

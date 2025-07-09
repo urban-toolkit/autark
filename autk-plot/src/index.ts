@@ -1,4 +1,4 @@
-export * from './autk-plot'
+export * from './main'
 export * from './colormap';
 export * from './constants'
 export * from './plot-d3';

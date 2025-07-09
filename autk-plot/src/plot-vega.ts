@@ -3,7 +3,7 @@ import { TopLevelSpec } from "vega-lite";
 
 import { GeoJsonProperties } from "geojson";
 
-import { AutkPlot } from "./autk-plot";
+import { AutkPlot } from "./main";
 import { PlotEvent } from "./constants";
 import { View } from "vega";
 
