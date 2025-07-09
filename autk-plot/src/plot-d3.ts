@@ -129,6 +129,20 @@ export class PlotD3 extends AutkPlot {
                 that.plotEvents.emit(PlotEvent.BRUSH, that._locList);
             });
 
+        // // Add a brush to each Y axis
+        // svg.selectAll<SVGGElement, unknown>(".axisY")
+        //     .each(function (key) {
+        //         const brush = d3.brushY()
+        //             .extent([
+        //                 [-10, 0],
+        //                 [ 10, height]
+        //             ])
+        //             .on("start brush end", function (event) { self.brushed(event, key as string); });
+
+        //         d3.select(this).call(brush);
+        //     });
+
+
         const svg = d3.select(this._ref as SVGSVGElement);
         let brushGroup = svg.select<SVGGElement>("g.brush");
 
