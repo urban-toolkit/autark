@@ -4,7 +4,7 @@ CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
 install:
-	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd examples && npm install"
+	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install"
 
 build:
 	$(CONCURRENTLY) \
@@ -13,6 +13,7 @@ build:
 		"cd autk-plot && npm run build"
 
 dev:
+	cd examples && npm install
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \
 		"cd autk-db && npm run dev-build" \
