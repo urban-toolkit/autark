@@ -6,6 +6,9 @@ RIMRAF := npx rimraf
 install:
 	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install"
 
+install-ex:
+	cd examples && npm install
+
 build:
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run build" \
@@ -13,12 +16,14 @@ build:
 		"cd autk-plot && npm run build"
 
 dev:
-	cd examples && npm install
+	make install-ex
+	make build
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
-		"sleep 10 && cd examples && npm run dev"
+		"cd examples && npm run dev"
+
 map:
 	$(CONCURRENTLY) "cd autk-map && npm run build"
 
