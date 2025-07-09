@@ -1,8 +1,7 @@
 export enum LayerGeometryType {
   FEATURES_2D = 'features2d',
   FEATURES_3D = 'features3d',
-  BORDERS_2D = 'borders2d',
-  HEATMAP_2D = 'heatmap2d',
+  BORDERS_2D = 'borders2d'
 }
 
 export enum LayerType {
@@ -14,6 +13,7 @@ export enum LayerType {
   OSM_BUILDINGS = 'buildings',
   CUSTOM_FEATURES_LAYER  = 'features',
   CUSTOM_LINES_LAYER = 'lines',
+  CUSTOM_GRID_LAYER  = 'grid',
 }
 
 export enum LayerZIndex {
@@ -23,8 +23,9 @@ export enum LayerZIndex {
   OSM_WATER = 0.3,
   OSM_ROADS = 0.4,
   OSM_BUILDINGS = 1.0,
-  CUSTOM_FEATURES_LAYER = 0.5,
-  CUSTOM_LINES_LAYER = 0.6,
+  CUSTOM_GRID_LAYER  = 0.5,
+  CUSTOM_FEATURES_LAYER = 0.6,
+  CUSTOM_LINES_LAYER = 0.7
 }
 
 export enum MapEvent {
@@ -40,6 +41,7 @@ export enum ThematicAggregationLevel {
 export enum RenderPipeline {
   TRIANGLE_FLAT = 'triangleFlat',
   TRIANGLE_SSAO = 'triangleSsao',
+  TRIANGLE_HEATMAP = 'triangleHeatmap',
 }
 
 export enum ColorMapInterpolator {
@@ -52,7 +54,6 @@ export enum MouseStatus {
   MOUSE_DRAG = 'mouseDrag',
 }
 
-// TODO move to types.ts
 export type ColorHEX = `#${string}`;
 export type ColorRGB = { r: number; g: number; b: number; opacity: number };
 export type ColorTEX = number[];

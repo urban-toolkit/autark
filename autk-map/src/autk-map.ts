@@ -135,6 +135,10 @@ export class AutkMap {
                 this.createCustomLinesFromGeojson(layerName, geojson);
                 break;
 
+            case LayerType.CUSTOM_GRID_LAYER:
+                this.createCustomGridLayerFromGeojson(layerName, geojson);
+                break;
+
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
@@ -142,6 +146,7 @@ export class AutkMap {
 
         AutkMapUi.updateUi();
     }
+
 
     resize(width: number, height: number) {
         this._canvas.width = width * (window.devicePixelRatio || 1);
@@ -166,7 +171,10 @@ export class AutkMap {
         if (layer) {
             // load data
             layer.loadThematic(layerThematic);
+            this.updateRenderInfoIsColorMap(layerName, true);
+
             layer.makeLayerDataInfoDirty();
+            layer.makeLayerRenderInfoDirty();
         }
     }
 
@@ -301,49 +309,6 @@ export class AutkMap {
             }
         });
     }
-
-    // private createHeatmapLayer(layerName: string, typeLayer: LayerType, nx: number, ny: number) {
-    //     const zIndex = 0.5 + 0.01 * this.layerManager.length;
-
-    //     const layerInfo: ILayerInfo = {
-    //         id: `${layerName}`,
-    //         zIndex: zIndex,
-    //         typeGeometry: LayerGeometryType.HEATMAP_2D,
-    //         typeLayer: typeLayer,
-    //     };
-
-    //     const layerRenderInfo: ILayerRenderInfo = {
-    //         pipeline: RenderPipeline.TRIANGLE_FLAT,
-    //         opacity: 1.0,
-    //         colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
-    //         isColorMap: true,
-    //         isPick: false,
-    //         isSkip: false,
-    //     };
-
-    //     const layerMesh = TriangulatorHeatmap.buildHeatmapGrid(nx, ny, this.layerManager.boundingBox);
-    //     if (layerMesh.flatCoords.length === 0 || layerMesh.flatIds.length === 0) {
-    //         console.error('Invalid Heatmap Layer mesh');
-    //         return;
-    //     }
-
-    //     // Adapt layerMesh to match ILayerGeometry
-    //     const geometry: ILayerGeometry = {
-    //         position: layerMesh.flatCoords,
-    //         indices: layerMesh.flatIds,
-    //     };
-
-    //     const layerData = {
-    //         geometry: [geometry],
-    //         components: [{ nPoints: nx * ny, nTriangles: (nx - 1) * (ny - 1) * 2 }],
-    //         thematic: Array.from({ length: nx * ny }, () => ({
-    //             level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-    //             values: [0]
-    //         }))
-    //     };
-
-    //     this.createLayer(layerInfo, layerRenderInfo, layerData);
-    // }
 
     private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         let zIndex = -1;
@@ -513,11 +478,9 @@ export class AutkMap {
     }
 
     private createCustomFeaturesLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
-        const zIndex = 0.5 + 0.01 * this.layerManager.length;
-
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: zIndex,
+            zIndex: LayerZIndex.CUSTOM_FEATURES_LAYER + 0.01 * this.layerManager.length,
             typeGeometry: LayerGeometryType.BORDERS_2D,
             typeLayer: LayerType.CUSTOM_FEATURES_LAYER,
         };
@@ -561,7 +524,7 @@ export class AutkMap {
     private createCustomLinesFromGeojson(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.CUSTOM_LINES_LAYER,
+            zIndex: LayerZIndex.CUSTOM_LINES_LAYER + 0.01 * this.layerManager.length,
             typeGeometry: LayerGeometryType.FEATURES_2D,
             typeLayer: LayerType.CUSTOM_LINES_LAYER,
         };
@@ -594,7 +557,45 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
-    }    
+    }
+
+    private createCustomGridLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+        const layerInfo: ILayerInfo = {
+            id: `${layerName}`,
+            zIndex: LayerZIndex.CUSTOM_GRID_LAYER,
+            typeGeometry: LayerGeometryType.FEATURES_2D,
+            typeLayer: LayerType.CUSTOM_GRID_LAYER,
+        };
+
+        const layerRenderInfo: ILayerRenderInfo = {
+            pipeline: RenderPipeline.TRIANGLE_HEATMAP,
+            opacity: 1.0,
+            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
+            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            isColorMap: false,
+            isPick: false,
+            isSkip: false,
+        };
+
+        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Feature Layer.');
+            return;
+        }
+
+        const layerData = {
+            geometry: layerMesh[0],
+            components: layerMesh[1],
+            thematic: layerMesh[1].map(() => {
+                return {
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [0],
+                };
+            }),
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    }
 
     private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);

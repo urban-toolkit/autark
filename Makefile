@@ -17,7 +17,7 @@ dev:
 		"cd autk-map && npm run dev-build" \
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
-		"sleep 20 && cd examples && npm run dev"
+		"sleep 10 && cd examples && npm run dev"
 map:
 	$(CONCURRENTLY) "cd autk-map && npm run build"
 
