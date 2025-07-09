@@ -22,7 +22,6 @@ export class GeojsonLinesVis {
     const canvas = document.querySelector('canvas');
 
     if (canvas) {
-      canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
       this.map = new AutkMap(canvas);
 
       await this.map.init(boundingBox);

@@ -9,9 +9,6 @@ export class GeojsonVis {
     this.db = new SpatialDb();
     await this.db.init();
 
-    const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-    console.log('Bounding Box:', boundingBox);
-
     const response = await fetch('http://localhost:5173/data/mnt_neighs.geojson');
     const data = await response.json();
 
@@ -22,10 +19,11 @@ export class GeojsonVis {
       type: 'features'
     });
 
-    const canvas = document.querySelector('canvas');
+    const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
+    console.log('Bounding Box:', boundingBox);
 
+    const canvas = document.querySelector('canvas');
     if (canvas) {
-      canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
       this.map = new AutkMap(canvas);
 
       await this.map.init(boundingBox);

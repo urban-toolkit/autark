@@ -67,8 +67,6 @@ export class MapD3 {
       throw new Error('Canvas element not found.');
     }
 
-    canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
-
     const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
     console.log('Bounding Box:', boundingBox);
 
@@ -226,7 +224,7 @@ export class MapD3 {
       .data([0])
       .join('svg')
       .attr('id', 'plot')
-      .style('width', `calc(${div.clientWidth}px - 4px)`)
+      .style('width', `calc(${div.offsetWidth}px - 4px)`)
       .style('height', '500px')
       .style('visibility', 'visible');
 
@@ -237,7 +235,7 @@ export class MapD3 {
     }
 
     // ---- Tamanho do Gráfico
-    const width = div.clientWidth - margens.left - margens.right;
+    const width = div.offsetWidth - margens.left - margens.right;
     const height = 500 - margens.top - margens.bottom;
 
     // ---- Escalas

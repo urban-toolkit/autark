@@ -30,15 +30,19 @@ export class GeojsonVis {
             },
         });
 
+        console.log('OSM data loaded');
+
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise_sample.csv',
-            outputTableName: 'noise',
+            csvFileUrl: 'http://localhost:5173/data/parking.csv',
+            outputTableName: 'parking',
             geometryColumns: {
                 latColumnName: 'Latitude',
                 longColumnName: 'Longitude',
                 coordinateFormat: 'EPSG:3395',
             },
         });
+
+        console.log('Trees data loaded');
 
         const boundingBox = await this.db.getOsmBoundingBox();
         await this.db.loadGridLayer({
@@ -48,9 +52,11 @@ export class GeojsonVis {
             columns: 30
         });
 
+        console.log('Grid layer created');
+
         await this.db.spatialJoin({
             tableRootName: 'table_grid',
-            tableJoinName: 'noise',
+            tableJoinName: 'parking',
             spatialPredicate: 'NEAR',
             nearDistance: 200,
             output: {
@@ -60,7 +66,7 @@ export class GeojsonVis {
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
+                        tableName: 'parking',
                         column: 'Unique Key',
                         aggregateFn: 'count',
                     },
@@ -68,9 +74,10 @@ export class GeojsonVis {
             },
         });
 
+        console.log('Spatial join completed');
+
         const canvas = document.querySelector('canvas');
         if (canvas) {
-            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
             this.map = new AutkMap(canvas);
 
             await this.map.init(boundingBox);
@@ -112,7 +119,7 @@ export class GeojsonVis {
                     continue;
                 }
 
-                const val = properties.sjoin.count.noise || 0;
+                const val = properties.sjoin.count.parking || 0;
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,

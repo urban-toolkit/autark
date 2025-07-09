@@ -74,10 +74,10 @@ export class MouseEvents {
 
       if (event.buttons === 1 && event.shiftKey) {
         // left button
-        this._map.camera.yaw(dx / canvas.clientWidth);
-        this._map.camera.pitch(dy / canvas.clientHeight);
+        this._map.camera.yaw(dx / canvas.offsetWidth);
+        this._map.camera.pitch(dy / canvas.offsetHeight);
       } else {
-        this._map.camera.translate(dx / canvas.clientWidth, dy / canvas.clientHeight);
+        this._map.camera.translate(dx / canvas.offsetWidth, dy / canvas.offsetHeight);
       }
 
       this._lastPoint = [event.offsetX, event.offsetY];
@@ -110,8 +110,8 @@ export class MouseEvents {
 
     // changes the values
     const rect = canvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / canvas.clientWidth;
-    const y = 1.0 - (event.clientY - rect.top) / canvas.clientHeight;
+    const x = (event.clientX - rect.left) / canvas.offsetWidth;
+    const y = 1.0 - (event.clientY - rect.top) / canvas.offsetHeight;
 
     this._map.camera.zoom(event.deltaY * 0.01, x, y);
   }
@@ -129,8 +129,8 @@ export class MouseEvents {
     const mouseY = event.clientY - rect.top;
 
     // Scale factors from CSS size to actual canvas resolution
-    const scaleX = canvas.width / canvas.clientWidth;
-    const scaleY = canvas.height / canvas.clientHeight;
+    const scaleX = canvas.width / canvas.offsetWidth;
+    const scaleY = canvas.height / canvas.offsetHeight;
 
     const adjustedX = Math.floor(mouseX * scaleX);
     const adjustedY = Math.floor(mouseY * scaleY);

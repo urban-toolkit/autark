@@ -30,8 +30,12 @@ export class OsmLayersApi {
         });
 
         const canvas = document.querySelector('canvas');
+        
         if (canvas) {
-            canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
+            // canvas.width  = canvas.parentElement?.offsetWidth  || 800;
+            // canvas.height = canvas.parentElement?.offsetHeight || 800;
+
+            console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
 
             this.map = new AutkMap(canvas);
 
@@ -65,4 +69,5 @@ async function main() {
     const example = new OsmLayersApi();
     await example.run();
 }
+
 main();

@@ -21,7 +21,7 @@ body {
 
 canvas {
     margin: 10px;
-    width: 780px;
+    width: calc(100% - 20px);
     height: 780px;
 }
 

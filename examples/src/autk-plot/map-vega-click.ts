@@ -65,8 +65,6 @@ export class MapVega {
       throw new Error('Canvas element not found.');
     }
 
-    canvas.width = canvas.height = canvas.parentElement?.clientHeight || 800;
-
     const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
     console.log('Bounding Box:', boundingBox);
 
