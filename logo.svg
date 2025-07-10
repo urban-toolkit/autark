@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Creator: CorelDRAW -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="3507.87px" height="2480.32px" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+viewBox="0 0 377568 148718"
+ xmlns:xlink="http://www.w3.org/1999/xlink"
+ xmlns:xodm="http://www.corel.com/coreldraw/odm/2003">
+ <defs>
+  <style type="text/css">
+   <![CDATA[
+    .str0 {stroke:#4D4D4D;stroke-width:3168;stroke-linejoin:round;stroke-miterlimit:22.9256}
+    .str1 {stroke:#8DA0CB;stroke-width:3168;stroke-linejoin:round;stroke-miterlimit:22.9256}
+    .fil4 {fill:none}
+    .fil1 {fill:#4D4D4D}
+    .fil3 {fill:#8DA0CB}
+    .fil2 {fill:#8DA0CB}
+    .fil0 {fill:white}
+    .fnt0 {font-weight:normal;font-size:111777px;font-family:'Exotc350 DmBd BT'}
+   ]]>
+  </style>
+ </defs>
+ <g id="Camada_x0020_1">
+  <metadata id="CorelCorpID_0Corel-Layer"/>
+  <g id="_684547784">
+   <text x="38865" y="122246"  class="fil0 fnt0">a</text>
+   <text x="84693" y="122246"  class="fil1 fnt0">u</text>
+   <text x="134080" y="122246"  class="fil1 fnt0">t</text>
+   <text x="267374" y="122246"  class="fil1 fnt0">k</text>
+   <text x="171618" y="122246"  class="fil2 fnt0">ar</text>
+   <g>
+    <polygon class="fil3" points="0,98752 2615,107073 41697,50615 81004,106959 83857,98721 41911,38675 "/>
+    <polygon class="fil1" points="4595,112132 7149,120372 41697,71142 76952,121122 79560,112693 41802,58839 "/>
+    <polygon class="fil3" points="33929,88603 29202,95066 54229,95066 49394,88550 "/>
+    <polygon class="fil1" points="26987,98725 22414,105366 60827,105366 56502,98725 "/>
+   </g>
+   <g>
+    <polyline class="fil4 str0" points="240289,68331 240289,27944 264965,27944 280293,27944 280293,43299 "/>
+    <polyline class="fil4 str0" points="270727,24667 270727,1782 308113,1584 308113,70940 "/>
+    <polyline class="fil4 str0" points="311256,52785 337038,52785 337038,120620 320950,120620 "/>
+    <polyline class="fil4 str1" points="244854,33435 274423,33435 274423,39632 "/>
+    <polyline class="fil4 str1" points="274636,6476 303317,6476 303317,70992 "/>
+    <polyline class="fil4 str1" points="311401,58202 331581,58310 331581,116425 "/>
+   </g>
+  </g>
+ </g>
+</svg>
