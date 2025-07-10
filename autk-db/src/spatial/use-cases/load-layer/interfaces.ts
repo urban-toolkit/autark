@@ -12,9 +12,7 @@ export type LayerType =
   | 'grid';
 
 export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'lines', 'features', 'grid'].includes(
-    value,
-  );
+  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'lines', 'features', 'grid'].includes(value);
 }
 
 export interface Params {
@@ -23,6 +21,7 @@ export interface Params {
   layer: LayerType;
   coordinateFormat?: string;
   boundingBox?: BoundingBox;
+  polygon?: number[][]; // Array of [lon, lat] coordinates forming a polygon (optional)
 }
 
 export interface Layer {

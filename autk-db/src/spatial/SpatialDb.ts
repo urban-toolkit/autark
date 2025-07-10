@@ -91,16 +91,21 @@ export class SpatialDb {
       }
 
       for (const layer of params.autoLoadLayers.layers) {
-        const sendBb = layer !== 'buildings';
-        // const sendBb = layer !== 'buildings' && layer !== 'coastline';
-        // const sendBb = true;
+        const shouldCrop = layer !== 'buildings'; // avoid crop buildings layer
 
-        await this.loadLayer({
+        const layerParams: GetLayerParams = {
           osmInputTableName: table.name,
           coordinateFormat: params.autoLoadLayers.coordinateFormat,
-          layer: layer,
-          boundingBox: sendBb ? this.osmBoudingBox : undefined,
-        });
+          layer,
+        };
+
+        if (params.boundingBox) {
+          layerParams.boundingBox = shouldCrop ? this.osmBoudingBox : undefined;
+        } else if (params.polygon) {
+          layerParams.polygon = shouldCrop ? params.polygon : undefined;
+        }
+
+        await this.loadLayer(layerParams);
       }
 
       if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
