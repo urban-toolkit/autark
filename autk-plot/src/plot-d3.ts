@@ -13,7 +13,9 @@ export class PlotD3 extends AutkPlot {
 
     protected _svgs!: unknown[];
     protected _locList: GeoJsonProperties[] = [];
-    protected _brush!: d3.BrushBehavior<unknown>;
+    protected _brushes: { 
+        group: SVGGElement, brush: d3.BrushBehavior<unknown> 
+    }[] = [];
 
     constructor(div: HTMLElement, d3Builder: D3PlotBuilder, plotEvents: PlotEvent[]) {
         super(div, plotEvents);
@@ -31,12 +33,12 @@ export class PlotD3 extends AutkPlot {
     set locList(locList: GeoJsonProperties[]) {
         this._locList = locList;
 
-        if(this.plotEvents.listeners[PlotEvent.BRUSH] && this._locList.length === 0) {
-            const svg = d3.select(this._ref as SVGSVGElement);
-            const brushGroup = svg.select<SVGGElement>("g.brush");
-            brushGroup.call(this._brush.move, null);
+        if (this.plotEvents.listeners[PlotEvent.BRUSH] && this._locList.length === 0) {
+            this._brushes.forEach(obj => {
+                const brushGroup = d3.select(obj.group);
+                brushGroup.call(obj.brush.move, null);
+            });
         }
-            
     }
 
     configureSignalListeners(): void {
@@ -48,6 +50,9 @@ export class PlotD3 extends AutkPlot {
             }
             if (listener === PlotEvent.BRUSH) {
                 this.brushEvent();
+            }
+            if (listener === PlotEvent.BRUSH_Y) {
+                this.brushYEvent();
             }
         }
     }
@@ -83,23 +88,29 @@ export class PlotD3 extends AutkPlot {
                 that.plotEvents.emit(PlotEvent.CLICK, that._locList);
             });
 
-        d3.select(this._ref as SVGSVGElement)
-            .on('click', function (event: MouseEvent) {
-                if (event.target === that._ref) {
-                    that._locList = [];
+        const groups = (this.refs as SVGGElement[]);
+        groups.forEach((group: SVGGElement) => {
+            d3.select(group)
+                .on('click', function (event: MouseEvent) {
+                    if (event.target === group) {
+                        that._locList = [];
 
-                    svgs.style("fill", PlotStyle.default);
-                    that.plotEvents.emit(PlotEvent.CLICK, that._locList)
-                }
-            });
+                        svgs.style("fill", PlotStyle.default);
+                        that.plotEvents.emit(PlotEvent.CLICK, that._locList)
+                    }
+                });
+        });
     }
 
     brushEvent(): void {
         const that = this;
         const svgs = d3.selectAll(this._svgs as any[]);
 
-        //---- Brush event -------
-        this._brush = d3.brush()
+        //---- Brush events -------
+        const groups = (this.refs as SVGGElement[]);
+
+        groups.forEach((group: SVGGElement) => {
+            const brush = d3.brush()
             .on("start end", function (event: any) {
                 if (event.selection) {
                     const selection = event.selection;
@@ -109,9 +120,9 @@ export class PlotD3 extends AutkPlot {
                         const loc = that._locList.indexOf(dataId as GeoJsonProperties);
 
                         const bbox = d3.select(this).node()?.getBBox();
-                        const center = [ bbox?.x + bbox?.width / 2, bbox?.y + bbox?.height / 2 ];
+                        const center = [bbox?.x + bbox?.width / 2, bbox?.y + bbox?.height / 2];
 
-                        if (center[0] >= selection[0][0] && center[0] <= selection[1][0] && 
+                        if (center[0] >= selection[0][0] && center[0] <= selection[1][0] &&
                             center[1] >= selection[0][1] && center[1] <= selection[1][1]) {
                             if (loc === -1) {
                                 that._locList.push(dataId as GeoJsonProperties);
@@ -129,37 +140,89 @@ export class PlotD3 extends AutkPlot {
                 that.plotEvents.emit(PlotEvent.BRUSH, that._locList);
             });
 
-        // // Add a brush to each Y axis
-        // svg.selectAll<SVGGElement, unknown>(".axisY")
-        //     .each(function (key) {
-        //         const brush = d3.brushY()
-        //             .extent([
-        //                 [-10, 0],
-        //                 [ 10, height]
-        //             ])
-        //             .on("start brush end", function (event) { self.brushed(event, key as string); });
+            // stores the brush and the group
+            this._brushes.push({ group, brush });
 
-        //         d3.select(this).call(brush);
-        //     });
+            const svg = d3.select(group);
+            let brushGroup = svg.select<SVGGElement>("g.brush");
 
+            if (brushGroup.empty()) {
+                brushGroup = svg.append("g")
+                    .attr("class", "brush");
+            }
 
-        const svg = d3.select(this._ref as SVGSVGElement);
-        let brushGroup = svg.select<SVGGElement>("g.brush");
+            brushGroup.call(brush);
 
-        if (brushGroup.empty()) {
-            const parent = svgs.select(function() { return this.parentNode; });
-            const transform = parent.attr("transform") || "translate(0, 0)";
-            
-            brushGroup = svg.append("g")
-                .attr("class", "brush")
-                .attr("transform", transform);
-        }
-        
-        brushGroup.call(this._brush);
+        });
     }
 
+    brushYEvent(): void {
+        const that = this;
+        const svgs = d3.selectAll(this._svgs as any[]);
+
+        //---- Brush events -------
+        const groups = (this.refs as SVGGElement[]);
+
+        groups.forEach((group: SVGGElement) => {
+            const groupNode = d3.select(group);
+            const height = groupNode.node()?.getBBox()?.height || 0;
+
+            const brush = d3.brushY()
+            .extent([
+                [-10, 0],
+                [ 10, height]
+            ])
+            .on("start end", function (event: any) {
+                if (event.selection) {
+                    const selection = event.selection;
+                    console.log("Group Transf", groupNode?.attr("transform"));
+                    console.log("Selection", selection);
+
+                    svgs.style("fill", function (datumId: unknown) {
+                        const dataId = datumId as GeoJsonProperties;
+                        const loc = that._locList.indexOf(dataId as GeoJsonProperties);
+
+                        const bbox = d3.select(this).node()?.getBBox();
+                        const center = [bbox?.x + bbox?.width / 2, bbox?.y + bbox?.height / 2];
+
+                        // Create a new rect SVG element as a child of the group for the brush selection, without using d3
+                        if (center[0] >= selection[0][0] && center[0] <= selection[1][0] &&
+                            center[1] >= selection[0][1] && center[1] <= selection[1][1]) {
+                            if (loc === -1) {
+                                that._locList.push(dataId as GeoJsonProperties);
+                            }
+                            return PlotStyle.highlight;
+                        } else {
+                            if (loc >= 0) {
+                                that._locList.splice(loc, 1);
+                            }
+                            return PlotStyle.default;
+                        }
+                    });
+                }
+
+                that.plotEvents.emit(PlotEvent.BRUSH, that._locList);
+            });
+
+            // stores the brush and the group
+            this._brushes.push({ group, brush });
+
+            const svg = d3.select(group);
+            let brushGroup = svg.select<SVGGElement>("g.brush");
+
+            if (brushGroup.empty()) {
+                brushGroup = svg.append("g")
+                    .attr("class", "brush");
+            }
+
+            brushGroup.call(brush);
+
+        });
+    }
+
+
     async draw(): Promise<void> {
-        [this._ref, this._svgs] = this._d3Builder(this._div, this._data);
+        [this._refs, this._svgs] = this._d3Builder(this._div, this._data);
         this.configureSignalListeners();
     }
 }

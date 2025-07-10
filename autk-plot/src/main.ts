@@ -5,7 +5,7 @@ import { View } from "vega";
 
 export abstract class AutkPlot {
     protected _div!: HTMLElement;
-    protected _ref!: View | SVGSVGElement;
+    protected _refs!: View | SVGGElement[];
 
     protected _data!: GeoJsonProperties[];
 
@@ -16,8 +16,8 @@ export abstract class AutkPlot {
         this._plotEvents = new PlotEvents(events);
     }
 
-    get ref(): View | SVGSVGElement {
-        return this._ref;
+    get refs(): View | SVGGElement[] {
+        return this._refs;
     }
 
     get data(): GeoJsonProperties[] {

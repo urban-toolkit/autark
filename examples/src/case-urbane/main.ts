@@ -1,10 +1,9 @@
-import * as d3 from 'd3';
 
 import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
 
-import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle } from 'autk-plot';
+import { PlotEvent, PlotD3, D3PlotBuilder } from 'autk-plot';
 
 import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent } from 'autk-map';
 import { PcChart } from './pc-chart';
@@ -60,17 +59,17 @@ export class Urbane {
         [-74.0051256879, 40.7007701363], [-74.0098046562, 40.6982049132]
     ];
 
-    await this.db.loadOsmFromOverpassApi({
-      polygon: poly,
-      outputTableName: 'table_osm',
-      autoLoadLayers: {
-        coordinateFormat: 'EPSG:3395',
-        layers: ['coastline', 'parks', 'water', 'roads'] as Array<
-          'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'
-        >,
-        dropOsmTable: true,
-      },
-    });
+    // await this.db.loadOsmFromOverpassApi({
+    //   polygon: poly,
+    //   outputTableName: 'table_osm',
+    //   autoLoadLayers: {
+    //     coordinateFormat: 'EPSG:3395',
+    //     layers: ['coastline', 'parks', 'water', 'roads'] as Array<
+    //       'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'
+    //     >,
+    //     dropOsmTable: true,
+    //   },
+    // });
 
     await this.db.loadCustomLayer({
       geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
@@ -167,7 +166,7 @@ export class Urbane {
       throw new Error('Plot body element not found.');
     }
 
-    this.plot = new PlotD3(plotBdy, this.d3Spec(), [PlotEvent.BRUSH]);
+    this.plot = new PlotD3(plotBdy, this.d3Spec(), [PlotEvent.BRUSH_Y]);
 
     await this.loadPlotData();
     this.updatePlotListeners();
@@ -236,18 +235,18 @@ export class Urbane {
         (d: number) => this.plot.data[d] as GeoJsonProperties,
       );
 
-      const cGroup = d3.select(this.plot.ref as SVGSVGElement).select('#plotGroup');
-      const svgs = cGroup.selectAll('circle');
+    //   const cGroup = d3.select(this.plot.refs as SVGSVGElement).select('#plotGroup');
+    //   const svgs = cGroup.selectAll('circle');
 
-      svgs.style('fill', function (datum: unknown) {
-        const dataJd = datum as GeoJsonProperties;
+    //   svgs.style('fill', function (datum: unknown) {
+    //     const dataJd = datum as GeoJsonProperties;
 
-        if (selData.includes(dataJd)) {
-          return PlotStyle.highlight;
-        } else {
-          return PlotStyle.default;
-        }
-      });
+    //     if (selData.includes(dataJd)) {
+    //       return PlotStyle.highlight;
+    //     } else {
+    //       return PlotStyle.default;
+    //     }
+    //   });
 
       this.plot.locList = selData;
       console.log('Plot updated.');

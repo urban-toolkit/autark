@@ -8,7 +8,7 @@ export class PcChart {
     public build<SVGPathElement>(
         div: HTMLElement,
         data: GeoJsonProperties[],
-    ): [SVGSVGElement, SVGPathElement[]] {
+    ): [SVGGElement[], SVGPathElement[]] {
         const margens = { left: 40, right: 25, top: 30, bottom: 35 };
 
         const svg = d3
@@ -112,7 +112,7 @@ export class PcChart {
             .style("fill", "black")
 
 
-        return [svg.node() as SVGSVGElement, svgs.nodes() as SVGPathElement[]];
+        return [yAxisSelection.nodes() as SVGGElement[], svgs.nodes() as SVGPathElement[]];
     }
 
     public brushed(event: d3.D3BrushEvent<SVGElement>, key: string) {
