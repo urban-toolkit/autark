@@ -42,7 +42,7 @@ export class PlotVega extends AutkPlot {
 
     configureSignalListeners(): void {
         const listeners = this.plotEvents.listeners;
-        const view = this._ref as View;
+        const view = this._refs as View;
 
         for (const listener in listeners) {
             view.addSignalListener(listener, (_selection: any, predicates: any) => {
@@ -68,7 +68,7 @@ export class PlotVega extends AutkPlot {
 
     async draw(): Promise<void> {
         const plot = await embed(this._div, this._vegaSpec, { mode: "vega-lite" });
-        this._ref = plot.view;
+        this._refs = plot.view;
 
         this.configureSignalListeners();
     }

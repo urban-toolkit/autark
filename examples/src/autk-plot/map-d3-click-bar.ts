@@ -156,7 +156,10 @@ export class MapD3 {
         (d: number) => this.plot.data[d] as GeoJsonProperties,
       );
 
-      const cGroup = d3.select(this.plot.ref as SVGSVGElement).select('#plotGroup');
+      const groups = this.plot.refs as SVGGElement[];
+
+      // only one click area expected.
+      const cGroup = d3.select(groups[0]);
       const svgs = cGroup.selectAll('rect');
 
       svgs.style('fill', function (datum: unknown) {
@@ -212,7 +215,7 @@ export class MapD3 {
     return this.barChart;
   }
 
-  protected barChart<SVGRectElement>(div: HTMLElement, data: GeoJsonProperties[]): [SVGSVGElement, SVGRectElement[]] {
+  protected barChart<SVGRectElement>(div: HTMLElement, data: GeoJsonProperties[]): [SVGGElement[], SVGRectElement[]] {
     const margens = { left: 40, right: 25, top: 10, bottom: 225 };
 
     const svg = d3
@@ -305,7 +308,7 @@ export class MapD3 {
       .style('stroke', '#2f2f2f')
       .style('visibility', 'visible');
 
-    return [svg.node() as SVGSVGElement, svgs.nodes() as SVGRectElement[]];
+    return [cGroup.nodes() as SVGGElement[], svgs.nodes() as SVGRectElement[]];
   }
 
   // ---- Ui helper methods ----
