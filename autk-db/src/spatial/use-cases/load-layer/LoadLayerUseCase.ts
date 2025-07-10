@@ -24,6 +24,7 @@ export class LoadLayerUseCase {
       outputFormat: params.coordinateFormat,
       outputTableName: layerOutputTableName,
       boundingBox: params.boundingBox,
+      polygon: params.polygon,
     });
     const describeTableResponse = await this.conn.query(layerQuery);
 
