@@ -31,7 +31,7 @@ export class SpatialJoinNear {
         });
 
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise_sample.csv',
+            csvFileUrl: 'http://localhost:5173/data/noise.csv',
             outputTableName: 'noise',
             geometryColumns: {
                 latColumnName: 'Latitude',

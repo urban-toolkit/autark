@@ -69,21 +69,22 @@ export class PcChart {
         }
 
         // ---- Paths
-        const selection = svg.selectAll('#group').data([0]);
+        const selection = svg.selectAll('#plotGroup').data([0]);
         const cGroup = selection.join('g')
-            .attr('id', 'group');
+            .attr('id', 'plotGroup');
 
         const svgs = cGroup
-            .selectAll(".tripPath")
+            .selectAll(".neighPath")
             .data(data)
             .join("path")
             .attr("d", path)
-            .attr("class", "tripPath")
+            .attr("class", "neighPath")
             .style("fill", "none")
-            .style("stroke", "#69b3a2")
+            .style("stroke", "#bfbfbf")
+            .style("stroke-width", "2px")
             .style("opacity", 0.5)
 
-        d3.select('#group')
+        d3.select('#plotGroup')
             .attr('transform', `translate(${margens.left}, ${margens.top})`);
 
         const yAxisSelection = svg
@@ -114,9 +115,4 @@ export class PcChart {
 
         return [yAxisSelection.nodes() as SVGGElement[], svgs.nodes() as SVGPathElement[]];
     }
-
-    public brushed(event: d3.D3BrushEvent<SVGElement>, key: string) {
-        console.log("Brushed:", key, event);
-    }
-
 }

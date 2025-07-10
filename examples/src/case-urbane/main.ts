@@ -1,11 +1,13 @@
+import * as d3 from 'd3';
 
 import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
 
-import { PlotEvent, PlotD3, D3PlotBuilder } from 'autk-plot';
+import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle } from 'autk-plot';
 
 import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent } from 'autk-map';
+
 import { PcChart } from './pc-chart';
 
 export class Urbane {
@@ -81,7 +83,7 @@ export class Urbane {
 
   protected async loadThematicData() {
     await this.db.loadCsv({
-      csvFileUrl: 'http://localhost:5173/data/noise_sample.csv',
+      csvFileUrl: 'http://localhost:5173/data/noise.csv',
       outputTableName: 'noise',
       geometryColumns: {
         latColumnName: 'Latitude',
@@ -93,6 +95,16 @@ export class Urbane {
     await this.db.loadCsv({
       csvFileUrl: 'http://localhost:5173/data/parking.csv',
       outputTableName: 'parking',
+      geometryColumns: {
+        latColumnName: 'Latitude',
+        longColumnName: 'Longitude',
+        coordinateFormat: 'EPSG:3395',
+      },
+    });
+
+    await this.db.loadCsv({
+      csvFileUrl: 'http://localhost:5173/data/permit.csv',
+      outputTableName: 'permit',
       geometryColumns: {
         latColumnName: 'Latitude',
         longColumnName: 'Longitude',
@@ -132,6 +144,25 @@ export class Urbane {
           {
             tableName: 'parking',
             column: 'Unique Key',
+            aggregateFn: 'count',
+          },
+        ],
+      },
+    });
+
+    await this.db.spatialJoin({
+      tableRootName: 'neighborhoods',
+      tableJoinName: 'permit',
+      spatialPredicate: 'INTERSECT',
+      output: {
+        type: 'MODIFY_ROOT',
+      },
+      joinType: 'LEFT',
+      groupBy: {
+        selectColumns: [
+          {
+            tableName: 'permit',
+            column: 'PERMIT_SI_NO',
             aggregateFn: 'count',
           },
         ],
@@ -235,18 +266,18 @@ export class Urbane {
         (d: number) => this.plot.data[d] as GeoJsonProperties,
       );
 
-    //   const cGroup = d3.select(this.plot.refs as SVGSVGElement).select('#plotGroup');
-    //   const svgs = cGroup.selectAll('circle');
+      const cGroup = d3.select('#plotGroup');
+      const svgs = cGroup.selectAll('path');
 
-    //   svgs.style('fill', function (datum: unknown) {
-    //     const dataJd = datum as GeoJsonProperties;
+      svgs.style('stroke', function (datum: unknown) {
+        const dataJd = datum as GeoJsonProperties;
 
-    //     if (selData.includes(dataJd)) {
-    //       return PlotStyle.highlight;
-    //     } else {
-    //       return PlotStyle.default;
-    //     }
-    //   });
+        if (selData.includes(dataJd)) {
+          return PlotStyle.highlight
+        } else {
+          return PlotStyle.default;
+        }
+      });
 
       this.plot.locList = selData;
       console.log('Plot updated.');
@@ -263,7 +294,7 @@ export class Urbane {
   }
 
   protected updatePlotListeners(layerId: string = 'neighborhoods') {
-    this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: number[] | string[] | GeoJsonProperties[]) => {
+    this.plot.plotEvents.addEventListener(PlotEvent.BRUSH_Y, (selection: number[] | string[] | GeoJsonProperties[]) => {
       const locList: number[] = [];
 
       selection.forEach((item: number | string | GeoJsonProperties) => {

@@ -111,7 +111,7 @@ export class PlotD3 extends AutkPlot {
 
         groups.forEach((group: SVGGElement) => {
             const brush = d3.brush()
-            .on("start end", function (event: any) {
+            .on("start brush end", function (event: any) {
                 if (event.selection) {
                     const selection = event.selection;
 
@@ -158,12 +158,14 @@ export class PlotD3 extends AutkPlot {
 
     brushYEvent(): void {
         const that = this;
-        const svgs = d3.selectAll(this._svgs as any[]);
+        const marks = d3.selectAll(this._svgs as any[]);
+
+        const status = this._svgs.map(() => (this._refs as SVGGElement[]).map(() => -1));
 
         //---- Brush events -------
         const groups = (this.refs as SVGGElement[]);
 
-        groups.forEach((group: SVGGElement) => {
+        groups.forEach((group: SVGGElement, gId: number) => {
             const groupNode = d3.select(group);
             const height = groupNode.node()?.getBBox()?.height || 0;
 
@@ -172,22 +174,30 @@ export class PlotD3 extends AutkPlot {
                 [-10, 0],
                 [ 10, height]
             ])
-            .on("start end", function (event: any) {
+            .on("start brush end", function (event: any) {
                 if (event.selection) {
                     const selection = event.selection;
-                    console.log("Group Transf", groupNode?.attr("transform"));
-                    console.log("Selection", selection);
 
-                    svgs.style("fill", function (datumId: unknown) {
+                    console.log(selection);
+
+                    marks.each(function (_d, mId: number) {
+                        const coords = d3.select(this).attr('d').split(/[,;ML]/).filter(str => str !== '').map(str => Number(str));
+
+                        if (selection[0] === selection[1]) {
+                            status[mId][gId] = -1;
+                        }
+                        else {
+                            status[mId][gId] = (coords[2 * gId + 1] >= selection[0] && coords[2 * gId + 1] <= selection[1]) ? 1 : 0;
+                        }
+
+                    });
+
+                    marks.style("stroke", function (datumId: unknown, mId: number) {
                         const dataId = datumId as GeoJsonProperties;
                         const loc = that._locList.indexOf(dataId as GeoJsonProperties);
 
-                        const bbox = d3.select(this).node()?.getBBox();
-                        const center = [bbox?.x + bbox?.width / 2, bbox?.y + bbox?.height / 2];
-
-                        // Create a new rect SVG element as a child of the group for the brush selection, without using d3
-                        if (center[0] >= selection[0][0] && center[0] <= selection[1][0] &&
-                            center[1] >= selection[0][1] && center[1] <= selection[1][1]) {
+                        if (status[mId].filter(s => s === -1).length !== groups.length && 
+                            status[mId].filter(s => Math.abs(s) !== 1).length === 0) {
                             if (loc === -1) {
                                 that._locList.push(dataId as GeoJsonProperties);
                             }
@@ -201,7 +211,7 @@ export class PlotD3 extends AutkPlot {
                     });
                 }
 
-                that.plotEvents.emit(PlotEvent.BRUSH, that._locList);
+                that.plotEvents.emit(PlotEvent.BRUSH_Y, that._locList);
             });
 
             // stores the brush and the group
