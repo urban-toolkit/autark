@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { CsvTable, CustomLayerTable, LayerTable, Table } from '../shared/interfaces';
+import { CsvTable, CustomLayerTable, LayerTable, JsonTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
 import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
+import { LoadJsonUseCase, LoadJsonParams } from './use-cases/load-json';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
@@ -31,6 +32,7 @@ export class SpatialDb {
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
+  private loadJsonUseCase?: LoadJsonUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
   private getBoundingBoxFromLayerUseCase?: GetBoundingBoxFromLayerUseCase;
@@ -45,6 +47,7 @@ export class SpatialDb {
 
     this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.db, this.conn);
+    this.loadJsonUseCase = new LoadJsonUseCase(this.db, this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.db, this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
@@ -118,6 +121,16 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadCsvUseCase.exec(params);
+    this.tables.push(table);
+
+    return table;
+  }
+
+  async loadJson(params: LoadJsonParams): Promise<JsonTable> {
+    if (!this.db || !this.conn || !this.loadJsonUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.loadJsonUseCase.exec(params);
     this.tables.push(table);
 
     return table;
