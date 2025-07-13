@@ -5,10 +5,8 @@ import { CsvTable, CustomLayerTable, LayerTable, Table } from '../shared/interfa
 import { loadDb } from '../config/duckdb';
 import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
-import { QueryOperation } from '../query-operation';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
-import { LoadQueryUseCase } from './use-cases/load-query';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
 import { SpatialJoinParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
@@ -21,6 +19,8 @@ import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './u
 import { getBoundingBoxFromPolygon } from './shared/utils';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
 import { GridLayerTable } from '../shared/interfaces';
+import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces';
+import { RawQueryUseCase } from './use-cases/raw-query';
 
 export class SpatialDb {
   private db?: AsyncDuckDB;
@@ -30,7 +30,6 @@ export class SpatialDb {
   private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
-  private loadQueryUseCase?: LoadQueryUseCase;
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
@@ -38,6 +37,7 @@ export class SpatialDb {
   private dropTableUseCase?: DropTableUseCase;
   private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
   private loadGridLayerUseCase?: LoadGridLayerUseCase;
+  private rawQueryUseCase?: RawQueryUseCase;
 
   async init() {
     this.db = await loadDb();
@@ -46,7 +46,6 @@ export class SpatialDb {
     this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
-    this.loadQueryUseCase = new LoadQueryUseCase(this.conn);
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.db, this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
@@ -54,6 +53,7 @@ export class SpatialDb {
     this.dropTableUseCase = new DropTableUseCase(this.conn);
     this.transformBoundingBoxCoordinatesUseCase = new TransformBoundingBoxCoordinatesUseCase(this.conn);
     this.loadGridLayerUseCase = new LoadGridLayerUseCase(this.conn);
+    this.rawQueryUseCase = new RawQueryUseCase(this.conn);
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
@@ -138,20 +138,6 @@ export class SpatialDb {
     return table;
   }
 
-  async loadQuery(query: QueryOperation, outputTableName: string): Promise<Table> {
-    if (!this.db || !this.conn || !this.loadQueryUseCase)
-      throw new Error('Database not initialized. Please call init() first.');
-
-    const querySql = query.getSql();
-    const mainTable = query.getMainTable();
-    if (!mainTable) throw new Error('Main table not found on query.');
-
-    const table = await this.loadQueryUseCase.exec({ query: querySql, outputTableName, mainTable });
-    this.tables.push(table);
-
-    return table;
-  }
-
   async loadCustomLayer(params: LoadCustomLayerParams): Promise<CustomLayerTable> {
     if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
@@ -221,15 +207,17 @@ export class SpatialDb {
     return table;
   }
 
-  createQuery(tableName: string): QueryOperation {
-    return new QueryOperation(tableName, this.tables);
-  }
+  async rawQuery<T = RawQueryOutput>(params: RawQueryParams): Promise<T | Table> {
+    if (!this.db || !this.conn || !this.rawQueryUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
 
-  // TODO: Lucas, essa função estava sem tipo de retorno e o build tava falhando na minnha máquina
-  // coloquei any e passou, mas não sei se é o tipo correto.
-  applyQuery(query: QueryOperation): any {
-    const sql = query.getSql();
-    console.log(sql);
-    return this.conn?.query(sql);
+    const result = await this.rawQueryUseCase.exec(params);
+
+    if (params.output.type === 'CREATE_TABLE') {
+      this.tables.push(result as Table);
+      return result as Table;
+    }
+
+    return result as unknown as T;
   }
 }
