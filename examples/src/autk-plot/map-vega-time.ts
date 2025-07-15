@@ -60,13 +60,6 @@ export class TemporalVega {
             },
         });
 
-    // const data = await this.db.rawQuery({
-    //     query: 'SELECT * FROM roads',
-    //     output: {
-    //         type: 'RETURN_OBJECT',
-    //     },
-    // });
-
     }
 
     protected async loadAutkMap() {
@@ -96,10 +89,24 @@ export class TemporalVega {
             throw new Error('Plot body element not found.');
         }
 
-        this.plot = new PlotD3(plotBdy, this.d3Spec(), []);
+        this.plot = new PlotD3(plotBdy, this.d3Spec(), [PlotEvent.BRUSH_X]);
 
-        // await this.loadPlotData();
-        // this.updatePlotListeners();
+
+        // mock data
+        const mockData: {hour: number, count: number}[] = [
+            { hour: 0, count: 0 },
+            { hour: 1, count: 20 },
+            { hour: 2, count: 30 },
+            { hour: 3, count: 40 },
+            { hour: 4, count: 50 },
+            { hour: 5, count: 50 },
+            { hour: 6, count: 80 },
+            { hour: 7, count: 90 },
+            { hour: 8, count: 20 },
+        ];
+        this.plot.data = mockData;
+
+        this.updatePlotListeners();
 
         this.plot.draw();
         this.floatingPlot();
@@ -127,7 +134,7 @@ export class TemporalVega {
         // this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
     }
 
-    protected async loadLayerData(layerId: string = 'neighborhoods') {
+    protected async loadLayerData(hour: number = 0, layerId: string = 'neighborhoods') {
 
         const thematicData: ILayerThematic[] = [];
 
@@ -145,7 +152,7 @@ export class TemporalVega {
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [val],
+                    values: [Math.random()],
                 });
             }
 
@@ -170,36 +177,38 @@ export class TemporalVega {
 
     }
 
-    // protected updatePlotListeners(layerId: string = 'neighborhoods') {
-    //     this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: number[] | string[] | GeoJsonProperties[]) => {
-    //         const locList: number[] = [];
+    protected updatePlotListeners(layerId: string = 'neighborhoods') {
+        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH_X, (selection: number[] | string[] | GeoJsonProperties[]) => {
 
-    //         selection.forEach((item: number | string | GeoJsonProperties) => {
-    //             this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
-    //                 if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
-    //                     locList.push(id);
-    //                     return;
-    //                 }
-    //             });
-    //         });
+            console.log(selection);
+            // const locList: number[] = [];
 
-    //         const layer = this.map.layerManager.searchByLayerId(layerId);
-    //         if (layer) {
-    //             layer.layerRenderInfo.isPick = true;
+            // selection.forEach((item: number | string | GeoJsonProperties) => {
+            //     this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
+            //         if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
+            //             locList.push(id);
+            //             return;
+            //         }
+            //     });
+            // });
 
-    //             layer.clearHighlightedIds();
-    //             layer.setHighlightedIds(locList as number[]);
+            // const layer = this.map.layerManager.searchByLayerId(layerId);
+            // if (layer) {
+            //     layer.layerRenderInfo.isPick = true;
 
-    //             console.log('Map updated.');
-    //         }
-    //     });
-    // }
+            //     layer.clearHighlightedIds();
+            //     layer.setHighlightedIds(locList as number[]);
 
-    protected d3Spec(): D3PlotBuilder {
-        return this.scatterPlot;
+            //     console.log('Map updated.');
+            // }
+        });
     }
 
-    protected scatterPlot<SVGCircleElement>(
+    protected d3Spec(): D3PlotBuilder {
+        return this.lineChart;
+    }
+
+    protected lineChart<SVGCircleElement>(
         div: HTMLElement,
         data: GeoJsonProperties[],
     ): [SVGGElement[], SVGCircleElement[]] {
@@ -216,6 +225,11 @@ export class TemporalVega {
             .style('height', '500px')
             .style('visibility', 'visible');
 
+        // Create main group
+        const g = svg
+            .append('g')
+            .attr('transform', `translate(${margens.left}, ${margens.top})`);
+
         const node = svg.node();
 
         if (!svg || !node) {
@@ -223,83 +237,82 @@ export class TemporalVega {
         }
 
         // ---- Tamanho do Gráfico
-        // const width = div.offsetWidth - margens.left - margens.right;
-        // const height = 500 - margens.top - margens.bottom;
+        const width = div.offsetWidth - margens.left - margens.right;
+        const height = 500 - margens.top - margens.bottom;
 
         // ---- Escalas
-        // const xExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_area || 0);
-        // const mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
+        const xExtent: [number, number] = <[number, number]>d3.extent(data, (d) => +d?.hour || 0);
+        const xScale: d3.ScaleLinear<number, number> = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        // const yExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_leng || 0);
-        // const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
+        const yExtent: [number, number] = <[number, number]>d3.extent(data, (d) => +d?.count || 0);
+        const yScale: d3.ScaleLinear<number, number> = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
-        // // ---- Eixos
-        // const xAxis = d3.axisBottom(mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
+        // ---- Eixos
+        const xAxis = d3.axisBottom(xScale).tickSizeInner(-height).tickFormat(d3.format('.2s'));
 
-        // const xAxisSelection = svg
-        //     .selectAll<SVGGElement, unknown>('#axisX')
-        //     .data([0])
-        //     .join('g')
-        //     .attr('id', 'axisX')
-        //     .attr('class', 'x axis')
-        //     .attr('transform', `translate(${margens.left}, ${500 - margens.bottom})`)
-        //     .style('visibility', 'visible');
-        // xAxisSelection.call(xAxis);
+        const xAxisSelection = svg
+            .selectAll<SVGGElement, unknown>('#axisX')
+            .data([0])
+            .join('g')
+            .attr('id', 'axisX')
+            .attr('class', 'x axis')
+            .attr('transform', `translate(${margens.left}, ${500 - margens.bottom})`)
+            .style('visibility', 'visible');
+        xAxisSelection.call(xAxis);
 
-        // // Add X axis label:
-        // xAxisSelection
-        //     .append('text')
-        //     .attr('class', 'title')
-        //     .attr('text-anchor', 'end')
-        //     .attr('x', width)
-        //     .attr('y', margens.bottom / 2 + 10)
-        //     .style('visibility', 'visible')
-        //     .text('shape_area');
+        // Add X axis label:
+        xAxisSelection
+            .append('text')
+            .attr('class', 'title')
+            .attr('text-anchor', 'end')
+            .attr('x', width)
+            .attr('y', margens.bottom / 2 + 10)
+            .style('visibility', 'visible')
+            .text('hour');
 
-        // const yAxis = d3.axisLeft(mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
+        const yAxis = d3.axisLeft(yScale).tickSizeInner(-width).tickFormat(d3.format('.2s'));
 
-        // const yAxisSelection = svg
-        //     .selectAll<SVGGElement, unknown>('#axisY')
-        //     .data([0])
-        //     .join('g')
-        //     .attr('id', 'axisY')
-        //     .attr('class', 'y axis')
-        //     .attr('transform', `translate(${margens.left}, ${margens.top})`)
-        //     .style('visibility', 'visible');
-        // yAxisSelection.call(yAxis);
+        const yAxisSelection = svg
+            .selectAll<SVGGElement, unknown>('#axisY')
+            .data([0])
+            .join('g')
+            .attr('id', 'axisY')
+            .attr('class', 'y axis')
+            .attr('transform', `translate(${margens.left}, ${margens.top})`)
+            .style('visibility', 'visible');
+        yAxisSelection.call(yAxis);
 
-        // // Y axis label:
-        // yAxisSelection
-        //     .append('text')
-        //     .attr('class', 'title')
-        //     .attr('text-anchor', 'end')
-        //     .attr('transform', 'rotate(-90)')
-        //     .attr('y', -margens.left / 2 - 7)
-        //     .attr('x', -margens.top)
-        //     .style('visibility', 'visible')
-        //     .text('shape_leng');
+        // Y axis label:
+        yAxisSelection
+            .append('text')
+            .attr('class', 'title')
+            .attr('text-anchor', 'end')
+            .attr('transform', 'rotate(-90)')
+            .attr('y', -margens.left / 2 - 7)
+            .attr('x', -margens.top)
+            .style('visibility', 'visible')
+            .text('count');
 
-        // // ---- Círculos
-        // const cGroup = svg
-        //     .selectAll('#plotGroup')
-        //     .data([0])
-        //     .join('g')
-        //     .attr('id', 'plotGroup')
-        //     .attr('transform', `translate(${margens.left}, ${margens.top})`);
+        // Line generator
+        const line: any = d3
+            .line<{ hour: number; count: number }>()
+            .x(d => xScale(d.hour))
+            .y(d => yScale(d.count))
+            .curve(d3.curveMonotoneX); // Smooth curve
 
-        // const svgs = cGroup
-        //     .selectAll('circle')
-        //     .data(data)
-        //     .join('circle')
-        //     .attr('cx', (d) => mapX(+d?.shape_area || 0))
-        //     .attr('cy', (d) => mapY(+d?.shape_leng || 0))
-        //     .attr('r', 6)
-        //     .style('fill', 'lightgray')
-        //     .style('visibility', 'visible');
+        // Draw the line
+        const linePath = g
+            .append('path')
+            .datum(data)
+            .attr('class', 'line')
+            .attr('fill', 'none')
+            .attr('stroke', '#69b3a2')
+            .attr('stroke-width', 2)
+            .attr('d', line);
 
         // The function must return the groups over which the brush will be applied
         // and the svg elements that will be affected by the brush.
-        return [svg.nodes() as SVGGElement[], svg.nodes() as SVGCircleElement[]];
+        return [g.nodes() as SVGGElement[], svg.nodes() as SVGCircleElement[]];
     }
 
     protected floatingPlot() {
