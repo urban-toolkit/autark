@@ -127,13 +127,17 @@ export type ColorHEX = `#${string}`;
 
 /**
  * Color RGB type.
- * @typedef {Object} ColorRGB
- * @property {number} r - Red component (0-255).
- * @property {number} g - Green component (0-255).
- * @property {number} b - Blue component (0-255).
- * @property {number} opacity - Opacity (0-1).
  */
-export type ColorRGB = { r: number; g: number; b: number; opacity: number };
+export type ColorRGB = { 
+    /** Red component (0-255).*/
+    r: number; 
+    /** Green component (0-255).*/
+    g: number; 
+    /** Blue component (0-255).*/
+    b: number; 
+    /** Opacity (0-1).*/
+    opacity: number 
+};
 
 /**
  * Color TEX type.
@@ -144,9 +148,10 @@ export type ColorTEX = number[];
 
 /**
  * Map event listener type.
- * @typedef {function} MapEventListener
- * @param {number[] | string[]} selection - The selected features or components.
- * @param {string} layerId - The ID of the layer associated with the event.
- * @returns {void}
  */
-export type MapEventListener = (selection: number[] | string[], layerId: string) => void;
+export type MapEventListener = (
+    /** The selected features or components.*/
+    selection: number[] | string[], 
+    /** The ID of the layer associated with the event.*/
+    layerId: string
+) => void;

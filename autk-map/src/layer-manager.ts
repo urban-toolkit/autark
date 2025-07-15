@@ -66,8 +66,8 @@ export class LayerManager {
 
     /**
      * Set the bounding box of the map.
+     * TODO: Receive a Feature<Polygon> instead of IBoundingBox
      * @param {IBoundingBox} bbox - The bounding box to set.
-     * @todo: Recive a Feature<Polygon> instead of IBoundingBox
      */
     set boundingBox(bbox: IBoundingBox) {
         const xmin = (bbox.minLon - (bbox.maxLon + bbox.minLon) * 0.5) * 1.05;

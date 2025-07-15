@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> LayerManager</title>
+
+  <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="./build/entry.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,400,700|Inconsolata,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  <link type="text/css" rel="stylesheet" href="https://jmblog.github.io/color-themes-for-google-code-prettify/themes/tomorrow-night.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/app.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/iframe.css">
+  <link type="text/css" rel="stylesheet" href="">
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+  
+</head>
+
+
+
+<body class="layout small-header">
+    <div id="stickyNavbarOverlay"></div>
+    
+
+<div class="top-nav">
+    <div class="inner">
+        <a id="hamburger" role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+        </a>
+        <div class="logo">
+            
+            
+        </div>
+        <div class="menu">
+            
+            <div class="navigation">
+                <a
+                    href="index.html"
+                    class="link"
+                >
+                    Documentation
+                </a>
+                
+                
+                
+            </div>
+        </div>
+    </div>
+</div>
+    <div id="main">
+        <div
+            class="sidebar "
+            id="sidebarNav"
+        >
+            
+                <div class="search-wrapper">
+                    <input id="search" type="text" placeholder="Search docs..." class="input">
+                </div>
+            
+            <nav>
+                
+                    <h2><a href="index.html">Documentation</a></h2><div class="category"><h3>Classes</h3><ul><li><a href="AABB.html">AABB</a></li><li><a href="AutkMap.html">AutkMap</a></li><li><a href="Box2D.html">Box2D</a></li><li><a href="KeyEvents.html">KeyEvents</a></li><li><a href="Layer.html">Layer</a></li><li><a href="LayerManager.html">LayerManager</a></li><li><a href="MapEvents.html">MapEvents</a></li></ul><h3>Interfaces</h3><ul><li><a href="IBoundingBox.html">IBoundingBox</a></li><li><a href="ICameraData.html">ICameraData</a></li><li><a href="ILayerBorder.html">ILayerBorder</a></li><li><a href="ILayerComponent.html">ILayerComponent</a></li><li><a href="ILayerData.html">ILayerData</a></li><li><a href="ILayerGeometry.html">ILayerGeometry</a></li><li><a href="ILayerInfo.html">ILayerInfo</a></li><li><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></li><li><a href="ILayerThematic.html">ILayerThematic</a></li><li><a href="IMapStyle.html">IMapStyle</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ColorMapInterpolator">ColorMapInterpolator</a></li><li><a href="global.html#LayerGeometryType">LayerGeometryType</a></li><li><a href="global.html#LayerType">LayerType</a></li><li><a href="global.html#LayerZIndex">LayerZIndex</a></li><li><a href="global.html#MapEvent">MapEvent</a></li><li><a href="global.html#MouseStatus">MouseStatus</a></li><li><a href="global.html#RenderPipeline">RenderPipeline</a></li><li><a href="global.html#ThematicAggregationLevel">ThematicAggregationLevel</a></li></ul></div>
+                
+            </nav>
+        </div>
+        <div class="core" id="main-content-wrapper">
+            <div class="content">
+                <header class="page-title">
+                    <p>Class</p>
+                    <h1>LayerManager</h1>
+                </header>
+                
+
+
+
+
+<section>
+
+<header>
+    
+        <h2><span class="attribs"><span class="type-signature"></span></span>LayerManager<span class="signature">()</span><span class="type-signature"></span></h2>
+        
+            <div class="class-description">Manages the layers of the map.
+
+This class provides methods to add, remove, and search for layers,
+as well as to manage the bounding box of the map.</div>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class='vertical-section'>
+                <div class="members">
+                    <div class="member">
+                        <div class=name>
+                            <span class="tag">Constructor</span>
+                        </div>
+                        
+
+
+    
+    <h4 class="name" id="LayerManager">
+        <a class="href-link" href="#LayerManager">#</a>
+        
+        <span class="code-name">
+            
+                new LayerManager<span class="signature">()</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line13">line 13</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        
+    
+    </div>
+    
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <div class='vertical-section'>
+            <h1>Members</h1>
+            <div class="members">
+            
+                <div class="member">
+
+<h4 class="name" id="boundingBox">
+    <a class="href-link" href="#boundingBox">#</a>
+    
+    <span class="code-name">
+        boundingBox
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Get the bounding box of the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line41">line 41</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="boundingBox">
+    <a class="href-link" href="#boundingBox">#</a>
+    
+    <span class="code-name">
+        boundingBox
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Set the bounding box of the map.
+TODO: Receive a Feature<Polygon> instead of IBoundingBox
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line49">line 49</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="layers">
+    <a class="href-link" href="#layers">#</a>
+    
+    <span class="code-name">
+        layers
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Get the layers of the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line20">line 20</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="length">
+    <a class="href-link" href="#length">#</a>
+    
+    <span class="code-name">
+        length
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Get the number of layers.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line27">line 27</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="origin">
+    <a class="href-link" href="#origin">#</a>
+    
+    <span class="code-name">
+        origin
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Get the origin of the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line34">line 34</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+            </div>
+        </div>
+    
+
+    
+        <div class='vertical-section'>
+            <h1>Methods</h1>
+            <div class="members">
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="addLayer">
+        <a class="href-link" href="#addLayer">#</a>
+        
+        <span class="code-name">
+            
+                addLayer<span class="signature">(layerInfo, layerRender, layerData)</span><span class="type-signature"> &rarr; {<a href="Layer.html">Layer</a>|null}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Adds a layer to the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerInfo</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerInfo.html">ILayerInfo</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The information about the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerRender</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The rendering information for the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerData</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerData.html">ILayerData</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The data associated with the layer.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line176">line 176</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>- The created layer or null if the type is unknown.</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type"><a href="Layer.html">Layer</a></code>
+|
+
+<code class="param-type">null</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="boundingBox">
+        <a class="href-link" href="#boundingBox">#</a>
+        
+        <span class="code-name">
+            
+                boundingBox<span class="signature">(bbox)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Set the bounding box of the map.
+TODO: Receive a Feature<Polygon> instead of IBoundingBox
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>bbox</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="IBoundingBox.html">IBoundingBox</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The bounding box to set.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line166">line 166</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="delLayer">
+        <a class="href-link" href="#delLayer">#</a>
+        
+        <span class="code-name">
+            
+                delLayer<span class="signature">(layerId)</span><span class="type-signature"> &rarr; {void}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Removes a layer from the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerId</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The ID of the layer to remove.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line183">line 183</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">void</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="layers">
+        <a class="href-link" href="#layers">#</a>
+        
+        <span class="code-name">
+            
+                layers<span class="signature">()</span><span class="type-signature"> &rarr; {Array.&lt;<a href="Layer.html">Layer</a>>}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Get the layers of the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line141">line 141</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>- The list of layers.</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">Array.&lt;<a href="Layer.html">Layer</a>></code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="length">
+        <a class="href-link" href="#length">#</a>
+        
+        <span class="code-name">
+            
+                length<span class="signature">()</span><span class="type-signature"> &rarr; {number}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Get the number of layers.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line147">line 147</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>- The number of layers.</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">number</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="origin">
+        <a class="href-link" href="#origin">#</a>
+        
+        <span class="code-name">
+            
+                origin<span class="signature">()</span><span class="type-signature"> &rarr; {Array.&lt;number>}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Get the origin of the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line153">line 153</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>- The origin coordinates in meters.</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">Array.&lt;number></code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="searchByLayerId">
+        <a class="href-link" href="#searchByLayerId">#</a>
+        
+        <span class="code-name">
+            
+                searchByLayerId<span class="signature">(layerId)</span><span class="type-signature"> &rarr; {<a href="Layer.html">Layer</a>|null}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Searches for a layer by its ID.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerId</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The ID of the layer to search for.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="layer-manager.ts.html" class="button">View Source</a>
+            <span>
+                <a href="layer-manager.ts.html">layer-manager.ts</a>, <a href="layer-manager.ts.html#line191">line 191</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>- The found layer or null if not found.</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type"><a href="Layer.html">Layer</a></code>
+|
+
+<code class="param-type">null</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+            </div>
+        </div>
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+            </div>
+            
+            <footer class="footer">
+                <div class="content has-text-centered">
+                    <p>Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.4</a></p>
+                    <p class="sidebar-created-by">
+                        <a href="https://github.com/SoftwareBrothers/better-docs" target="_blank">BetterDocs theme</a> provided with <i class="fas fa-heart"></i> by
+                        <a href="http://softwarebrothers.co" target="_blank">SoftwareBrothers - JavaScript Development Agency</a>
+                    </p>
+                </div>
+            </footer>
+            
+        </div>
+        <div id="side-nav" class="side-nav">
+        </div>
+    </div>
+<script src="scripts/app.min.js"></script>
+<script>PR.prettyPrint();</script>
+<script src="scripts/linenumber.js"> </script>
+
+<script src="scripts/search.js"> </script>
+
+
+</body>
+</html>
