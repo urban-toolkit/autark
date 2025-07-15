@@ -2,14 +2,14 @@ import * as d3 from 'd3';
 
 import { Feature, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'autk-db';
-import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle } from 'autk-plot';
+import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle, PlotVega, AutkPlot } from 'autk-plot';
 import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent } from 'autk-map';
 
 export class TemporalVega {
     
     protected db!: SpatialDb;
     protected map!: AutkMap;
-    protected plot!: PlotD3;
+    protected plot!: AutkPlot;
 
     public async run(): Promise<void> {
 
@@ -32,18 +32,18 @@ export class TemporalVega {
         });
 
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise.csv',
-            outputTableName: 'noise',
+            csvFileUrl: 'http://localhost:5173/data/taxi.csv',
+            outputTableName: 'taxi',
             geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
+                latColumnName: 'pickup_latitude',
+                longColumnName: 'pickup_longitude',
                 coordinateFormat: 'EPSG:3395',
             },
         });
 
         await this.db.spatialJoin({
             tableRootName: 'neighborhoods',
-            tableJoinName: 'noise',
+            tableJoinName: 'taxi',
             spatialPredicate: 'INTERSECT',
             output: {
                 type: 'MODIFY_ROOT',
@@ -52,13 +52,21 @@ export class TemporalVega {
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
-                        column: 'Unique Key',
+                        tableName: 'taxi',
+                        column: 'hour',
                         aggregateFn: 'count',
                     },
                 ],
             },
         });
+
+    // const data = await this.db.rawQuery({
+    //     query: 'SELECT * FROM roads',
+    //     output: {
+    //         type: 'RETURN_OBJECT',
+    //     },
+    // });
+
     }
 
     protected async loadAutkMap() {
@@ -75,38 +83,40 @@ export class TemporalVega {
 
         await this.loadLayers();
         await this.loadLayerData();
-        this.updateMapListeners();
+        // this.updateMapListeners();
 
         this.map.draw();
     }
 
     protected async loadAutkPlot() {
+
         const plotBdy = document.querySelector('#plotBody') as HTMLDivElement;
 
         if (!plotBdy) {
             throw new Error('Plot body element not found.');
         }
 
-        this.plot = new PlotD3(plotBdy, this.d3Spec(), [PlotEvent.BRUSH]);
+        this.plot = new PlotD3(plotBdy, this.d3Spec(), []);
 
-        await this.loadPlotData();
-        this.updatePlotListeners();
+        // await this.loadPlotData();
+        // this.updatePlotListeners();
 
         this.plot.draw();
         this.floatingPlot();
     }
 
-    // ---- Map helper methods ----
-
     protected async loadLayers(): Promise<void> {
         const data = [];
         for (const layerData of this.db.tables) {
+
             if (layerData.source === 'csv') {
                 continue;
             }
 
             const geojson = await this.db.getLayer(layerData.name);
+            console.log(geojson);
             data.push({ props: layerData, data: geojson });
+
         }
 
         for (const json of data) {
@@ -114,10 +124,11 @@ export class TemporalVega {
             this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
         }
 
-        this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
+        // this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
     }
 
     protected async loadLayerData(layerId: string = 'neighborhoods') {
+
         const thematicData: ILayerThematic[] = [];
 
         const geojson = await this.db.getLayer(layerId);
@@ -130,7 +141,7 @@ export class TemporalVega {
                     continue;
                 }
 
-                const val = properties.sjoin.count.noise || 0;
+                const val = properties.sjoin.count.taxi || 0;
 
                 thematicData.push({
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
@@ -150,66 +161,39 @@ export class TemporalVega {
         this.map.updateLayerThematic('neighborhoods', thematicData);
     }
 
-    protected async updateMapListeners() {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
-            const selData: GeoJsonProperties[] = (selection as number[]).map(
-                (d: number) => this.plot.data[d] as GeoJsonProperties,
-            );
-
-            const refs = this.plot.refs as SVGGElement[];
-
-            // only one brush area expected.
-            const cGroup = d3.select(refs[0]);
-            const svgs = cGroup.selectAll('circle');
-
-            svgs.style('fill', function (datum: unknown) {
-                const dataJd = datum as GeoJsonProperties;
-
-                if (selData.includes(dataJd)) {
-                    return PlotStyle.highlight;
-                } else {
-                    return PlotStyle.default;
-                }
-            });
-
-            this.plot.locList = selData;
-            console.log('Plot updated.');
-        });
-    }
-
-    // ---- Plot helper methods ----
-
     protected async loadPlotData(layerId: string = 'neighborhoods') {
+
         const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
             return f.properties;
         });
         this.plot.data = data;
+
     }
 
-    protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: number[] | string[] | GeoJsonProperties[]) => {
-            const locList: number[] = [];
+    // protected updatePlotListeners(layerId: string = 'neighborhoods') {
+    //     this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: number[] | string[] | GeoJsonProperties[]) => {
+    //         const locList: number[] = [];
 
-            selection.forEach((item: number | string | GeoJsonProperties) => {
-                this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
-                    if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
-                        locList.push(id);
-                        return;
-                    }
-                });
-            });
+    //         selection.forEach((item: number | string | GeoJsonProperties) => {
+    //             this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
+    //                 if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
+    //                     locList.push(id);
+    //                     return;
+    //                 }
+    //             });
+    //         });
 
-            const layer = this.map.layerManager.searchByLayerId(layerId);
-            if (layer) {
-                layer.layerRenderInfo.isPick = true;
+    //         const layer = this.map.layerManager.searchByLayerId(layerId);
+    //         if (layer) {
+    //             layer.layerRenderInfo.isPick = true;
 
-                layer.clearHighlightedIds();
-                layer.setHighlightedIds(locList as number[]);
+    //             layer.clearHighlightedIds();
+    //             layer.setHighlightedIds(locList as number[]);
 
-                console.log('Map updated.');
-            }
-        });
-    }
+    //             console.log('Map updated.');
+    //         }
+    //     });
+    // }
 
     protected d3Spec(): D3PlotBuilder {
         return this.scatterPlot;
@@ -219,6 +203,7 @@ export class TemporalVega {
         div: HTMLElement,
         data: GeoJsonProperties[],
     ): [SVGGElement[], SVGCircleElement[]] {
+
         const margens = { left: 40, right: 25, top: 10, bottom: 35 };
 
         const svg = d3
@@ -238,86 +223,84 @@ export class TemporalVega {
         }
 
         // ---- Tamanho do Gráfico
-        const width = div.offsetWidth - margens.left - margens.right;
-        const height = 500 - margens.top - margens.bottom;
+        // const width = div.offsetWidth - margens.left - margens.right;
+        // const height = 500 - margens.top - margens.bottom;
 
         // ---- Escalas
-        const xExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_area || 0);
-        const mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
+        // const xExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_area || 0);
+        // const mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_leng || 0);
-        const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
+        // const yExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_leng || 0);
+        // const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
-        // ---- Eixos
-        const xAxis = d3.axisBottom(mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
+        // // ---- Eixos
+        // const xAxis = d3.axisBottom(mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
 
-        const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisX')
-            .attr('class', 'x axis')
-            .attr('transform', `translate(${margens.left}, ${500 - margens.bottom})`)
-            .style('visibility', 'visible');
-        xAxisSelection.call(xAxis);
+        // const xAxisSelection = svg
+        //     .selectAll<SVGGElement, unknown>('#axisX')
+        //     .data([0])
+        //     .join('g')
+        //     .attr('id', 'axisX')
+        //     .attr('class', 'x axis')
+        //     .attr('transform', `translate(${margens.left}, ${500 - margens.bottom})`)
+        //     .style('visibility', 'visible');
+        // xAxisSelection.call(xAxis);
 
-        // Add X axis label:
-        xAxisSelection
-            .append('text')
-            .attr('class', 'title')
-            .attr('text-anchor', 'end')
-            .attr('x', width)
-            .attr('y', margens.bottom / 2 + 10)
-            .style('visibility', 'visible')
-            .text('shape_area');
+        // // Add X axis label:
+        // xAxisSelection
+        //     .append('text')
+        //     .attr('class', 'title')
+        //     .attr('text-anchor', 'end')
+        //     .attr('x', width)
+        //     .attr('y', margens.bottom / 2 + 10)
+        //     .style('visibility', 'visible')
+        //     .text('shape_area');
 
-        const yAxis = d3.axisLeft(mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
+        // const yAxis = d3.axisLeft(mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
 
-        const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisY')
-            .attr('class', 'y axis')
-            .attr('transform', `translate(${margens.left}, ${margens.top})`)
-            .style('visibility', 'visible');
-        yAxisSelection.call(yAxis);
+        // const yAxisSelection = svg
+        //     .selectAll<SVGGElement, unknown>('#axisY')
+        //     .data([0])
+        //     .join('g')
+        //     .attr('id', 'axisY')
+        //     .attr('class', 'y axis')
+        //     .attr('transform', `translate(${margens.left}, ${margens.top})`)
+        //     .style('visibility', 'visible');
+        // yAxisSelection.call(yAxis);
 
-        // Y axis label:
-        yAxisSelection
-            .append('text')
-            .attr('class', 'title')
-            .attr('text-anchor', 'end')
-            .attr('transform', 'rotate(-90)')
-            .attr('y', -margens.left / 2 - 7)
-            .attr('x', -margens.top)
-            .style('visibility', 'visible')
-            .text('shape_leng');
+        // // Y axis label:
+        // yAxisSelection
+        //     .append('text')
+        //     .attr('class', 'title')
+        //     .attr('text-anchor', 'end')
+        //     .attr('transform', 'rotate(-90)')
+        //     .attr('y', -margens.left / 2 - 7)
+        //     .attr('x', -margens.top)
+        //     .style('visibility', 'visible')
+        //     .text('shape_leng');
 
-        // ---- Círculos
-        const cGroup = svg
-            .selectAll('#plotGroup')
-            .data([0])
-            .join('g')
-            .attr('id', 'plotGroup')
-            .attr('transform', `translate(${margens.left}, ${margens.top})`);
+        // // ---- Círculos
+        // const cGroup = svg
+        //     .selectAll('#plotGroup')
+        //     .data([0])
+        //     .join('g')
+        //     .attr('id', 'plotGroup')
+        //     .attr('transform', `translate(${margens.left}, ${margens.top})`);
 
-        const svgs = cGroup
-            .selectAll('circle')
-            .data(data)
-            .join('circle')
-            .attr('cx', (d) => mapX(+d?.shape_area || 0))
-            .attr('cy', (d) => mapY(+d?.shape_leng || 0))
-            .attr('r', 6)
-            .style('fill', 'lightgray')
-            .style('visibility', 'visible');
+        // const svgs = cGroup
+        //     .selectAll('circle')
+        //     .data(data)
+        //     .join('circle')
+        //     .attr('cx', (d) => mapX(+d?.shape_area || 0))
+        //     .attr('cy', (d) => mapY(+d?.shape_leng || 0))
+        //     .attr('r', 6)
+        //     .style('fill', 'lightgray')
+        //     .style('visibility', 'visible');
 
         // The function must return the groups over which the brush will be applied
         // and the svg elements that will be affected by the brush.
-        return [cGroup.nodes() as SVGGElement[], svgs.nodes() as SVGCircleElement[]];
+        return [svg.nodes() as SVGGElement[], svg.nodes() as SVGCircleElement[]];
     }
-
-    // ---- Ui helper methods ----
 
     protected floatingPlot() {
         let newX = 0,
