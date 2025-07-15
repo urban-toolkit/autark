@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> Home</title>
+
+  <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="./build/entry.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,400,700|Inconsolata,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  <link type="text/css" rel="stylesheet" href="https://jmblog.github.io/color-themes-for-google-code-prettify/themes/tomorrow-night.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/app.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/iframe.css">
+  <link type="text/css" rel="stylesheet" href="">
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+  
+</head>
+
+
+
+<body class="layout small-header">
+    <div id="stickyNavbarOverlay"></div>
+    
+
+<div class="top-nav">
+    <div class="inner">
+        <a id="hamburger" role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+        </a>
+        <div class="logo">
+            
+            
+        </div>
+        <div class="menu">
+            
+            <div class="navigation">
+                <a
+                    href="index.html"
+                    class="link"
+                >
+                    Documentation
+                </a>
+                
+                
+                
+            </div>
+        </div>
+    </div>
+</div>
+    <div id="main">
+        <div
+            class="sidebar "
+            id="sidebarNav"
+        >
+            
+                <div class="search-wrapper">
+                    <input id="search" type="text" placeholder="Search docs..." class="input">
+                </div>
+            
+            <nav>
+                
+                    <h2><a href="index.html">Documentation</a></h2><div class="category"><h3>Classes</h3><ul><li><a href="AABB.html">AABB</a></li><li><a href="AutkMap.html">AutkMap</a></li><li><a href="Box2D.html">Box2D</a></li><li><a href="KeyEvents.html">KeyEvents</a></li><li><a href="Layer.html">Layer</a></li><li><a href="LayerManager.html">LayerManager</a></li><li><a href="MapEvents.html">MapEvents</a></li></ul><h3>Interfaces</h3><ul><li><a href="IBoundingBox.html">IBoundingBox</a></li><li><a href="ICameraData.html">ICameraData</a></li><li><a href="ILayerBorder.html">ILayerBorder</a></li><li><a href="ILayerComponent.html">ILayerComponent</a></li><li><a href="ILayerData.html">ILayerData</a></li><li><a href="ILayerGeometry.html">ILayerGeometry</a></li><li><a href="ILayerInfo.html">ILayerInfo</a></li><li><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></li><li><a href="ILayerThematic.html">ILayerThematic</a></li><li><a href="IMapStyle.html">IMapStyle</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ColorMapInterpolator">ColorMapInterpolator</a></li><li><a href="global.html#LayerGeometryType">LayerGeometryType</a></li><li><a href="global.html#LayerType">LayerType</a></li><li><a href="global.html#LayerZIndex">LayerZIndex</a></li><li><a href="global.html#MapEvent">MapEvent</a></li><li><a href="global.html#MouseStatus">MouseStatus</a></li><li><a href="global.html#RenderPipeline">RenderPipeline</a></li><li><a href="global.html#ThematicAggregationLevel">ThematicAggregationLevel</a></li></ul></div>
+                
+            </nav>
+        </div>
+        <div class="core" id="main-content-wrapper">
+            <div class="content">
+                <header class="page-title">
+                    <p></p>
+                    <h1>Home</h1>
+                </header>
+                
+
+
+
+    
+
+
+    <h3> </h3>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    <section>
+        <article><h1>Autark: A portable UTK-based visualization framework</h1>
+<div align="center">
+  <img src="https://github.com/urban-toolkit/autark/blob/main/logo.png?raw=true" alt="Autark Logo" height="200"/></br>
+</div>
+<br>
+<p>Autark is implemented in TypeScript for lightweight client-side execution with built-in access to OpenStreetMap geometry data for exploring spatial features directly in the browser. It consists of the following sub-projects:</p>
+<ul>
+<li><code>autk-db</code>: A spatial database that handles physical and thematic urban datasets.</li>
+<li><code>autk-map</code>: A 3D map visualization library.</li>
+<li><code>autk-plot</code>: A D3.js/Vega-lite wrapper to build abstract visualizations.</li>
+</ul>
+<p>The <code>example/</code> directory is included with example codes that can be used for testing or demonstration purposes.</p>
+<h2>Requirements</h2>
+<p>You’ll need Node.js installed to build and run this project. You can install it via <a href="https://anaconda.org/conda-forge/nodejs">Conda Forge</a> (Windows), <a href="https://brew.sh/">Homebrew</a> (macOS), <a href="https://documentation.ubuntu.com/server/how-to/software/package-management/">apt-get</a> (Debian/Ubuntu) or the <a href="https://nodejs.org/">official site</a>.</p>
+<p>To install Node.js:</p>
+<pre class="prettyprint source lang-bash"><code># Windows
+conda install -c conda-forge nodejs
+
+# macOS
+brew install node
+
+# Debian/Ubuntu
+sudo apt-get install nodejs
+</code></pre>
+<h2>Installing, Running, and Building with Make</h2>
+<h3>Installation</h3>
+<p>Install Make (for running predefined build and dev commands):</p>
+<pre class="prettyprint source lang-bash"><code># Windows
+conda install anaconda::make
+
+# macOS
+xcode-select --install
+
+# Debian/Ubuntu
+sudo apt-get install build-essential
+</code></pre>
+<h3>Building and Running</h3>
+<p>To install required packages:</p>
+<pre class="prettyprint source lang-bash"><code>make install
+</code></pre>
+<p>To run the development server:</p>
+<pre class="prettyprint source lang-bash"><code>make dev
+</code></pre>
+<p>To clean build artifacts:</p>
+<pre class="prettyprint source lang-bash"><code>make clean
+</code></pre>
+<h3>Publishing packages</h3>
+<p>Autark is available through <strong>npm</strong> packages. Publishing recently-made changes to <strong>npm</strong> can be done running the commands below.</p>
+<p>First, ensure you are logged into your npm account:</p>
+<pre class="prettyprint source lang-bash"><code>npm login 
+</code></pre>
+<p>then, publish the desired module:</p>
+<pre class="prettyprint source lang-bash"><code>make publish LIB=autk-module 
+</code></pre>
+<p><em><strong>autk-module</strong></em> can assume three values: <em>autk-map</em>, <em>autk-db</em>, <em>autk-plot</em>.</p>
+<hr>
+<h2>Interaction Controls</h2>
+<p>You can explore and modify the map using both keyboard and mouse:</p>
+<h3>Keyboard Shortcuts</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s</code></td>
+<td>Cycle through map styles (<code>default</code>, <code>light</code>, <code>dark</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3>Mouse Actions</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Double Click</td>
+<td>Select object in the currently active layer (if selectable)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>Notes</h2>
+<ul>
+<li>
+<p>WebGPU is required to run this project. In Chrome or Edge (v113+), it's enabled by default. In Firefox, WebGPU is only available in Nightly builds and must be explicitly enabled::</p>
+<ol>
+<li>Download and install <a href="https://www.mozilla.org/en-US/firefox/channel/desktop/#nightly">Firefox Nightly</a>.</li>
+<li>Visit <code>about:config</code>.</li>
+<li>Set <code>dom.webgpu.enabled</code> to <code>true</code>.</li>
+<li>(Optional) You may also need to enable <code>gfx.webgpu.enabled</code> and <code>gfx.webgpu.force-enabled</code>.</li>
+<li>Restart Firefox.</li>
+</ol>
+</li>
+</ul></article>
+    </section>
+
+
+
+
+
+
+            </div>
+            
+            <footer class="footer">
+                <div class="content has-text-centered">
+                    <p>Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.4</a></p>
+                    <p class="sidebar-created-by">
+                        <a href="https://github.com/SoftwareBrothers/better-docs" target="_blank">BetterDocs theme</a> provided with <i class="fas fa-heart"></i> by
+                        <a href="http://softwarebrothers.co" target="_blank">SoftwareBrothers - JavaScript Development Agency</a>
+                    </p>
+                </div>
+            </footer>
+            
+        </div>
+        <div id="side-nav" class="side-nav">
+        </div>
+    </div>
+<script src="scripts/app.min.js"></script>
+<script>PR.prettyPrint();</script>
+<script src="scripts/linenumber.js"> </script>
+
+<script src="scripts/search.js"> </script>
+
+
+</body>
+</html>

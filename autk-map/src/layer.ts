@@ -9,7 +9,10 @@ import { Renderer } from './renderer';
  * 
  * It includes methods for loading data, geometry, components, and thematic data,
  * as well as rendering and picking operations.
- */
+ * 
+ * @param {ILayerInfo} layerInfo - The information about the layer.
+ * @param {ILayerRenderInfo} layerRenderInfo - The rendering information for the layer.
+*/
 export abstract class Layer {
     protected _layerInfo!: ILayerInfo;
     protected _layerRenderInfo!: ILayerRenderInfo;
@@ -20,11 +23,6 @@ export abstract class Layer {
     protected _highlightedIds!: Set<number>;
     protected _highlightedVertices!: number[];
 
-    /**
-     * Creates an instance of Layer.
-     * @param {ILayerInfo} layerInfo - The information about the layer.
-     * @param {ILayerRenderInfo} layerRenderInfo - The rendering information for the layer.
-     */
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
         this._layerInfo = layerInfo;
         this._layerRenderInfo = layerRenderInfo;

@@ -1,0 +1,4881 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> AutkMap</title>
+
+  <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="./build/entry.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,400,700|Inconsolata,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  <link type="text/css" rel="stylesheet" href="https://jmblog.github.io/color-themes-for-google-code-prettify/themes/tomorrow-night.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/app.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/iframe.css">
+  <link type="text/css" rel="stylesheet" href="">
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+  
+</head>
+
+
+
+<body class="layout small-header">
+    <div id="stickyNavbarOverlay"></div>
+    
+
+<div class="top-nav">
+    <div class="inner">
+        <a id="hamburger" role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+        </a>
+        <div class="logo">
+            
+            
+        </div>
+        <div class="menu">
+            
+            <div class="navigation">
+                <a
+                    href="index.html"
+                    class="link"
+                >
+                    Documentation
+                </a>
+                
+                
+                
+            </div>
+        </div>
+    </div>
+</div>
+    <div id="main">
+        <div
+            class="sidebar "
+            id="sidebarNav"
+        >
+            
+                <div class="search-wrapper">
+                    <input id="search" type="text" placeholder="Search docs..." class="input">
+                </div>
+            
+            <nav>
+                
+                    <h2><a href="index.html">Documentation</a></h2><div class="category"><h3>Classes</h3><ul><li><a href="AABB.html">AABB</a></li><li><a href="AutkMap.html">AutkMap</a></li><li><a href="Box2D.html">Box2D</a></li><li><a href="KeyEvents.html">KeyEvents</a></li><li><a href="Layer.html">Layer</a></li><li><a href="LayerManager.html">LayerManager</a></li><li><a href="MapEvents.html">MapEvents</a></li></ul><h3>Interfaces</h3><ul><li><a href="IBoundingBox.html">IBoundingBox</a></li><li><a href="ICameraData.html">ICameraData</a></li><li><a href="ILayerBorder.html">ILayerBorder</a></li><li><a href="ILayerComponent.html">ILayerComponent</a></li><li><a href="ILayerData.html">ILayerData</a></li><li><a href="ILayerGeometry.html">ILayerGeometry</a></li><li><a href="ILayerInfo.html">ILayerInfo</a></li><li><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></li><li><a href="ILayerThematic.html">ILayerThematic</a></li><li><a href="IMapStyle.html">IMapStyle</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ColorMapInterpolator">ColorMapInterpolator</a></li><li><a href="global.html#LayerGeometryType">LayerGeometryType</a></li><li><a href="global.html#LayerType">LayerType</a></li><li><a href="global.html#LayerZIndex">LayerZIndex</a></li><li><a href="global.html#MapEvent">MapEvent</a></li><li><a href="global.html#MouseStatus">MouseStatus</a></li><li><a href="global.html#RenderPipeline">RenderPipeline</a></li><li><a href="global.html#ThematicAggregationLevel">ThematicAggregationLevel</a></li></ul></div>
+                
+            </nav>
+        </div>
+        <div class="core" id="main-content-wrapper">
+            <div class="content">
+                <header class="page-title">
+                    <p>Class</p>
+                    <h1>AutkMap</h1>
+                </header>
+                
+
+
+
+
+<section>
+
+<header>
+    
+        <h2><span class="attribs"><span class="type-signature"></span></span>AutkMap<span class="signature">(canvas, autoResize<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
+        
+            <div class="class-description">The main autark map class.
+
+`AutkMap` encapsulates the core logic for initializing and rendering a map on a given HTML canvas element.
+It manages the camera, map rendering, map layers, and user interactions through keyboard, mouse, and map events.</div>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class='vertical-section'>
+                <div class="members">
+                    <div class="member">
+                        <div class=name>
+                            <span class="tag">Constructor</span>
+                        </div>
+                        
+
+
+    
+    <h4 class="name" id="AutkMap">
+        <a class="href-link" href="#AutkMap">#</a>
+        
+        <span class="code-name">
+            
+                new AutkMap<span class="signature">(canvas, autoResize<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+            <th>Attributes</th>
+            
+
+            
+            <th>Default</th>
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>canvas</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">HTMLCanvasElement</code>
+
+
+  
+  </td>
+
+  
+      <td class="attributes">
+      
+
+      
+
+      
+      </td>
+  
+
+  
+      <td class="default">
+      
+      </td>
+  
+
+  <td class="description last">The canvas element to render the map on</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>autoResize</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">boolean</code>
+
+
+  
+  </td>
+
+  
+      <td class="attributes">
+      
+          &lt;optional><br>
+      
+
+      
+
+      
+      </td>
+  
+
+  
+      <td class="default">
+      
+          true
+      
+      </td>
+  
+
+  <td class="description last">Whether to automatically resize the canvas on window resize</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line32">line 32</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    
+        <pre class="prettyprint"><code>const canvas = document.getElementById('map-canvas') as HTMLCanvasElement;
+const map = new AutkMap(canvas);
+await map.init(boundingBox);
+map.loadGeoJsonLayer('roads', LayerType.OSM_ROADS, geojsonData);</code></pre>
+    
+
+
+
+                    </div>
+                </div>
+            </div>
+        
+    
+    </div>
+    
+    
+
+    
+
+    
+        <h3 class="subsection-title">Classes</h3>
+
+        <dl>
+            <dt><a href="AutkMap.html">AutkMap</a></dt>
+            <dd></dd>
+        </dl>
+    
+
+    
+
+    
+
+    
+
+    
+        <div class='vertical-section'>
+            <h1>Members</h1>
+            <div class="members">
+            
+                <div class="member">
+
+<h4 class="name" id="boundingBox">
+    <a class="href-link" href="#boundingBox">#</a>
+    
+    <span class="code-name">
+        boundingBox
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the bounding box of the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line114">line 114</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="camera">
+    <a class="href-link" href="#camera">#</a>
+    
+    <span class="code-name">
+        camera
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the camera instance used for rendering the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line58">line 58</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="camera">
+    <a class="href-link" href="#camera">#</a>
+    
+    <span class="code-name">
+        camera
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Sets the camera instance used for rendering the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line65">line 65</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="canvas">
+    <a class="href-link" href="#canvas">#</a>
+    
+    <span class="code-name">
+        canvas
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the canvas element used for rendering the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line93">line 93</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="layerManager">
+    <a class="href-link" href="#layerManager">#</a>
+    
+    <span class="code-name">
+        layerManager
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the layer manager instance used for managing map layers.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line79">line 79</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="mapEvents">
+    <a class="href-link" href="#mapEvents">#</a>
+    
+    <span class="code-name">
+        mapEvents
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the map events instance used for handling map interactions.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line86">line 86</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="origin">
+    <a class="href-link" href="#origin">#</a>
+    
+    <span class="code-name">
+        origin
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the origin of the map, which is the center of the bounding box.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line107">line 107</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="renderer">
+    <a class="href-link" href="#renderer">#</a>
+    
+    <span class="code-name">
+        renderer
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the renderer instance used for rendering the map.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line72">line 72</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+<h4 class="name" id="ui">
+    <a class="href-link" href="#ui">#</a>
+    
+    <span class="code-name">
+        ui
+    </span>
+    
+</h4>
+
+
+
+
+<div class="description">
+    Gets the UI instance used for managing the map's user interface.
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line100">line 100</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+</div>
+            
+            </div>
+        </div>
+    
+
+    
+        <div class='vertical-section'>
+            <h1>Methods</h1>
+            <div class="members">
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="boundingBox">
+        <a class="href-link" href="#boundingBox">#</a>
+        
+        <span class="code-name">
+            
+                boundingBox<span class="signature">()</span><span class="type-signature"> &rarr; {Feature.&lt;Polygon>}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the bounding box of the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line696">line 696</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The bounding box</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">Feature.&lt;Polygon></code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="camera">
+        <a class="href-link" href="#camera">#</a>
+        
+        <span class="code-name">
+            
+                camera<span class="signature">(camera)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Sets the camera instance used for rendering the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>camera</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">Camera</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The camera instance to set</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line654">line 654</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="canvas">
+        <a class="href-link" href="#canvas">#</a>
+        
+        <span class="code-name">
+            
+                canvas<span class="signature">()</span><span class="type-signature"> &rarr; {HTMLCanvasElement}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the canvas element used for rendering the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line678">line 678</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The canvas element</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">HTMLCanvasElement</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createBuildingsLayerFromGeojson">
+        <a class="href-link" href="#createBuildingsLayerFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createBuildingsLayerFromGeojson<span class="signature">(layerName, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a buildings layer from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line461">line 461</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createCoastlineLayerFromGeojson">
+        <a class="href-link" href="#createCoastlineLayerFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createCoastlineLayerFromGeojson<span class="signature">(layerName, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a coastline layer from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line386">line 386</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createCustomFeaturesLayerFromGeojson">
+        <a class="href-link" href="#createCustomFeaturesLayerFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createCustomFeaturesLayerFromGeojson<span class="signature">(layerName, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a custom features layer from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line498">line 498</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createCustomGridLayerFromGeojson">
+        <a class="href-link" href="#createCustomGridLayerFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createCustomGridLayerFromGeojson<span class="signature">(layerName, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a custom grid layer from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line580">line 580</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createCustomLinesFromGeojson">
+        <a class="href-link" href="#createCustomLinesFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createCustomLinesFromGeojson<span class="signature">(layerName, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates custom lines from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line542">line 542</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createFeaturesLayerFromGeojson">
+        <a class="href-link" href="#createFeaturesLayerFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createFeaturesLayerFromGeojson<span class="signature">(layerName, typeLayer, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a features layer from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>typeLayer</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="global.html#LayerType">LayerType</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The type of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line336">line 336</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createLayer">
+        <a class="href-link" href="#createLayer">#</a>
+        
+        <span class="code-name">
+            
+                createLayer<span class="signature">(layerInfo, layerRenderInfo, layerData)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a layer from the provided information.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerInfo</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerInfo.html">ILayerInfo</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The information about the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerRenderInfo</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The rendering information for the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerData</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerData.html">ILayerData</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The data for the layer.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line619">line 619</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="createRoadsLayerFromGeojson">
+        <a class="href-link" href="#createRoadsLayerFromGeojson">#</a>
+        
+        <span class="code-name">
+            
+                createRoadsLayerFromGeojson<span class="signature">(layerName, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Creates a roads layer from a GeoJSON source.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line423">line 423</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="draw">
+        <a class="href-link" href="#draw">#</a>
+        
+        <span class="code-name">
+            
+                draw<span class="signature">(fps)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Starts the drawing loop.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>fps</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">number</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The frames per second to target.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line756">line 756</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="handleResize">
+        <a class="href-link" href="#handleResize">#</a>
+        
+        <span class="code-name">
+            
+                handleResize<span class="signature">()</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Handles window resize events
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line269">line 269</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="init">
+        <a class="href-link" href="#init">#</a>
+        
+            
+                <span class='tag'>async</span>
+            
+        
+        <span class="code-name">
+            
+                init<span class="signature">(bbox)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Initializes the map with the given bounding box.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>bbox</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="IBoundingBox.html">IBoundingBox</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The bounding box to initialize the map with</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line703">line 703</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="layerManager">
+        <a class="href-link" href="#layerManager">#</a>
+        
+        <span class="code-name">
+            
+                layerManager<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="LayerManager.html">LayerManager</a>}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the layer manager instance used for managing map layers.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line666">line 666</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The layer manager instance</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type"><a href="LayerManager.html">LayerManager</a></code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="loadGeoJsonLayer">
+        <a class="href-link" href="#loadGeoJsonLayer">#</a>
+        
+        <span class="code-name">
+            
+                loadGeoJsonLayer<span class="signature">(layerName, typeLayer, geojson)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Loads a GeoJSON layer into the map.
+
+This method creates a layer based on the provided GeoJSON data and adds it to the map's layer manager.
+Supported OSM layer types include:
+- OSM_COASTLINE
+- OSM_WATER
+- OSM_PARKS
+- OSM_ROADS
+- OSM_BUILDINGS
+
+Custom layers can also be loaded with types:
+- CUSTOM_FEATURES_LAYER
+- CUSTOM_LINES_LAYER
+- CUSTOM_GRID_LAYER
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>typeLayer</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="global.html#LayerType">LayerType</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The type of the layer</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>geojson</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">FeatureCollection</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The GeoJSON data to load</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line725">line 725</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="mapEvents">
+        <a class="href-link" href="#mapEvents">#</a>
+        
+        <span class="code-name">
+            
+                mapEvents<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="MapEvents.html">MapEvents</a>}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the map events instance used for handling map interactions.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line672">line 672</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The map events instance</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type"><a href="MapEvents.html">MapEvents</a></code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="origin">
+        <a class="href-link" href="#origin">#</a>
+        
+        <span class="code-name">
+            
+                origin<span class="signature">()</span><span class="type-signature"> &rarr; {Array.&lt;number>}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the origin of the map, which is the center of the bounding box.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line690">line 690</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The origin coordinates [x, y]</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">Array.&lt;number></code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="render">
+        <a class="href-link" href="#render">#</a>
+        
+        <span class="code-name">
+            
+                render<span class="signature">()</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Renders the map.
+
+This method updates the camera, starts the rendering process, and handles picking for each layer.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line291">line 291</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="renderer">
+        <a class="href-link" href="#renderer">#</a>
+        
+        <span class="code-name">
+            
+                renderer<span class="signature">()</span><span class="type-signature"> &rarr; {Renderer}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the renderer instance used for rendering the map.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line660">line 660</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The renderer instance</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">Renderer</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="resize">
+        <a class="href-link" href="#resize">#</a>
+        
+        <span class="code-name">
+            
+                resize<span class="signature">(width, height)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Resizes the canvas and updates the camera viewport.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>width</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">number</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The new width of the canvas.</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>height</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">number</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The new height of the canvas.</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line279">line 279</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="ui">
+        <a class="href-link" href="#ui">#</a>
+        
+        <span class="code-name">
+            
+                ui<span class="signature">()</span><span class="type-signature"> &rarr; {AutkMapUi}</span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Gets the UI instance used for managing the map's user interface.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line684">line 684</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class='columns method-parameter'>
+        <div class="column is-2"><label>Returns:</label></div>
+        <div class="column is-10">
+            
+                    
+
+<div class="columns">
+    
+    <div class='param-desc column is-7'>The UI instance</div>
+    
+    
+    <div class='column is-5 has-text-left'>
+        <label>Type: </label>
+        
+<code class="param-type">AutkMapUi</code>
+
+
+    </div>
+    
+</div>
+
+                
+        </div>
+    </div>
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="updateLayerGeometry">
+        <a class="href-link" href="#updateLayerGeometry">#</a>
+        
+        <span class="code-name">
+            
+                updateLayerGeometry<span class="signature">(layerName, layerGeometry)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Updates the geometry of a layer.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerGeometry</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">Array.&lt;<a href="ILayerGeometry.html">ILayerGeometry</a>></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The geometry data to update</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line741">line 741</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="updateLayerThematic">
+        <a class="href-link" href="#updateLayerThematic">#</a>
+        
+        <span class="code-name">
+            
+                updateLayerThematic<span class="signature">(layerName, layerThematic)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Updates the thematic information of a layer.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerThematic</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">Array.&lt;<a href="ILayerThematic.html">ILayerThematic</a>></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The thematic information to update</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line733">line 733</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+                <div class="member">
+
+
+    
+    <h4 class="name" id="updateRenderInfoProperty">
+        <a class="href-link" href="#updateRenderInfoProperty">#</a>
+        
+        <span class="code-name">
+            
+                updateRenderInfoProperty<span class="signature">(layerName, property, value)</span><span class="type-signature"></span>
+            
+        </span>
+    </h4>
+    
+
+    
+    
+    <div class="description">
+        Updates the render information of a layer.
+    </div>
+    
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+<div class="table-container">
+    <table class="params table">
+        <thead>
+        <tr>
+            
+            <th>Name</th>
+            
+
+            <th>Type</th>
+
+            
+
+            
+
+            <th class="last">Description</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>layerName</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">string</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The name of the layer</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>property</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type"><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The property to update</td>
+</tr>
+
+
+        
+
+            
+<tr class="deep-level-0">
+  
+      <td class="name"><code>value</code></td>
+  
+
+  <td class="type">
+  
+      
+<code class="param-type">unknown</code>
+
+
+  
+  </td>
+
+  
+
+  
+
+  <td class="description last">The new value for the property</td>
+</tr>
+
+
+        
+        </tbody>
+    </table>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+
+    
+
+    
+        <p class="tag-source">
+            <a href="main.ts.html" class="button">View Source</a>
+            <span>
+                <a href="main.ts.html">main.ts</a>, <a href="main.ts.html#line750">line 750</a>
+            </span>
+        </p>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+            
+            </div>
+        </div>
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+            </div>
+            
+            <footer class="footer">
+                <div class="content has-text-centered">
+                    <p>Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.4</a></p>
+                    <p class="sidebar-created-by">
+                        <a href="https://github.com/SoftwareBrothers/better-docs" target="_blank">BetterDocs theme</a> provided with <i class="fas fa-heart"></i> by
+                        <a href="http://softwarebrothers.co" target="_blank">SoftwareBrothers - JavaScript Development Agency</a>
+                    </p>
+                </div>
+            </footer>
+            
+        </div>
+        <div id="side-nav" class="side-nav">
+        </div>
+    </div>
+<script src="scripts/app.min.js"></script>
+<script>PR.prettyPrint();</script>
+<script src="scripts/linenumber.js"> </script>
+
+<script src="scripts/search.js"> </script>
+
+
+</body>
+</html>

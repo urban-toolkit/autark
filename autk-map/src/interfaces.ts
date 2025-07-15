@@ -11,15 +11,25 @@ import {
  * Interface for map styles.
  */
 export interface IMapStyle {
+  /** Land layer (map background) color */
   land: ColorHEX;
+  /** Roads color */
   roads: ColorHEX;
+  /** Parks color */
   parks: ColorHEX;
+  /** Water color */
   water: ColorHEX;
+  /** Coastline color */
   coastline: ColorHEX;
+  /** Sky color */
   sky: ColorHEX;
+  /** Surface color */
   surface: ColorHEX;
+  /** Buildings color */
   buildings: ColorHEX;
+  /** Features color */
   features: ColorHEX;
+  /** Lines color */
   lines: ColorHEX;
 }
 

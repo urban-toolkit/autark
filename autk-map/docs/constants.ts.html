@@ -1,0 +1,280 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> constants.ts</title>
+
+  <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="./build/entry.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,400,700|Inconsolata,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  <link type="text/css" rel="stylesheet" href="https://jmblog.github.io/color-themes-for-google-code-prettify/themes/tomorrow-night.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/app.min.css">
+  <link type="text/css" rel="stylesheet" href="styles/iframe.css">
+  <link type="text/css" rel="stylesheet" href="">
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+  
+</head>
+
+
+
+<body class="layout small-header">
+    <div id="stickyNavbarOverlay"></div>
+    
+
+<div class="top-nav">
+    <div class="inner">
+        <a id="hamburger" role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+        </a>
+        <div class="logo">
+            
+            
+        </div>
+        <div class="menu">
+            
+            <div class="navigation">
+                <a
+                    href="index.html"
+                    class="link"
+                >
+                    Documentation
+                </a>
+                
+                
+                
+            </div>
+        </div>
+    </div>
+</div>
+    <div id="main">
+        <div
+            class="sidebar "
+            id="sidebarNav"
+        >
+            
+                <div class="search-wrapper">
+                    <input id="search" type="text" placeholder="Search docs..." class="input">
+                </div>
+            
+            <nav>
+                
+                    <h2><a href="index.html">Documentation</a></h2><div class="category"><h3>Classes</h3><ul><li><a href="AABB.html">AABB</a></li><li><a href="AutkMap.html">AutkMap</a></li><li><a href="Box2D.html">Box2D</a></li><li><a href="KeyEvents.html">KeyEvents</a></li><li><a href="Layer.html">Layer</a></li><li><a href="LayerManager.html">LayerManager</a></li><li><a href="MapEvents.html">MapEvents</a></li></ul><h3>Interfaces</h3><ul><li><a href="IBoundingBox.html">IBoundingBox</a></li><li><a href="ICameraData.html">ICameraData</a></li><li><a href="ILayerBorder.html">ILayerBorder</a></li><li><a href="ILayerComponent.html">ILayerComponent</a></li><li><a href="ILayerData.html">ILayerData</a></li><li><a href="ILayerGeometry.html">ILayerGeometry</a></li><li><a href="ILayerInfo.html">ILayerInfo</a></li><li><a href="ILayerRenderInfo.html">ILayerRenderInfo</a></li><li><a href="ILayerThematic.html">ILayerThematic</a></li><li><a href="IMapStyle.html">IMapStyle</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ColorMapInterpolator">ColorMapInterpolator</a></li><li><a href="global.html#LayerGeometryType">LayerGeometryType</a></li><li><a href="global.html#LayerType">LayerType</a></li><li><a href="global.html#LayerZIndex">LayerZIndex</a></li><li><a href="global.html#MapEvent">MapEvent</a></li><li><a href="global.html#MouseStatus">MouseStatus</a></li><li><a href="global.html#RenderPipeline">RenderPipeline</a></li><li><a href="global.html#ThematicAggregationLevel">ThematicAggregationLevel</a></li></ul></div>
+                
+            </nav>
+        </div>
+        <div class="core" id="main-content-wrapper">
+            <div class="content">
+                <header class="page-title">
+                    <p>Source</p>
+                    <h1>constants.ts</h1>
+                </header>
+                
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Layer geometry types for the map.
+ * @enum {string}
+ * @property {string} FEATURES_2D - Represents 2D features.
+ * @property {string} FEATURES_3D - Represents 3D features.
+ * @property {string} BORDERS_2D  - Represents borders of 2D features.
+ */
+export enum LayerGeometryType {
+  FEATURES_2D = 'features2d',
+  FEATURES_3D = 'features3d',
+  BORDERS_2D = 'borders2d'
+}
+
+/**
+ * Layer types for the map.
+ * @enum {string}
+ * @property {string} OSM_SURFACE - Represents OpenStreetMap surface layer.
+ * @property {string} OSM_COASTLINE - Represents OpenStreetMap coastline layer.
+ * @property {string} OSM_PARKS - Represents OpenStreetMap parks layer.
+ * @property {string} OSM_WATER - Represents OpenStreetMap water layer.
+ * @property {string} OSM_ROADS - Represents OpenStreetMap roads layer.
+ * @property {string} OSM_BUILDINGS - Represents OpenStreetMap buildings layer.
+ * @property {string} CUSTOM_FEATURES_LAYER - Represents custom features layer.
+ * @property {string} CUSTOM_LINES_LAYER - Represents custom lines layer.
+ * @property {string} CUSTOM_GRID_LAYER - Represents custom grid layer.
+ */
+export enum LayerType {
+  OSM_SURFACE = 'surface',
+  OSM_COASTLINE = 'coastline',
+  OSM_PARKS = 'parks',
+  OSM_WATER = 'water',
+  OSM_ROADS = 'roads',
+  OSM_BUILDINGS = 'buildings',
+  CUSTOM_FEATURES_LAYER  = 'features',
+  CUSTOM_LINES_LAYER = 'lines',
+  CUSTOM_GRID_LAYER  = 'grid',
+}
+
+/**
+ * Layer Z-index values for rendering order.
+ * @enum {number}
+ * @property {number} OSM_SURFACE - Z-index for OpenStreetMap surface layer.
+ * @property {number} OSM_COASTLINE - Z-index for OpenStreetMap coastline layer.
+ * @property {number} OSM_PARKS - Z-index for OpenStreetMap parks layer.
+ * @property {number} OSM_WATER - Z-index for OpenStreetMap water layer.
+ * @property {number} OSM_ROADS - Z-index for OpenStreetMap roads layer.
+ * @property {number} OSM_BUILDINGS - Z-index for OpenStreetMap buildings layer.
+ * @property {number} CUSTOM_GRID_LAYER  - Z-index for custom grid layer.
+ * @property {number} CUSTOM_FEATURES_LAYER - Z-index for custom features layer.
+ * @property {number} CUSTOM_LINES_LAYER - Z-index for custom lines layer.
+ */
+export enum LayerZIndex {
+  OSM_SURFACE = 0,
+  OSM_COASTLINE = 0.1,
+  OSM_PARKS = 0.2,
+  OSM_WATER = 0.3,
+  OSM_ROADS = 0.4,
+  OSM_BUILDINGS = 1.0,
+  CUSTOM_GRID_LAYER  = 0.5,
+  CUSTOM_FEATURES_LAYER = 0.6,
+  CUSTOM_LINES_LAYER = 0.7
+}
+
+/**
+ * Map events for interaction.
+ * @enum {string}
+ * @property {string} PICK - Event triggered when a feature is picked.
+ */
+export enum MapEvent {
+  PICK = 'pick',
+}
+
+/**
+ * Thematic aggregation levels for thematic data.
+ * @enum {string}
+ * @property {string} AGGREGATION_POINT - Represents aggregation at the point level.
+ * @property {string} AGGREGATION_PRIMITIVE - Represents aggregation at the primitive level.
+ * @property {string} AGGREGATION_COMPONENT - Represents aggregation at the component level.
+ */
+export enum ThematicAggregationLevel {
+  AGGREGATION_POINT = 'aggregationPoint',
+  AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
+  AGGREGATION_COMPONENT = 'aggregationComponent',
+}
+
+/**
+ * Render pipelines for different rendering techniques.
+ * @enum {string}
+ * @property {string} TRIANGLE_FLAT - Flat triangle rendering.
+ * @property {string} TRIANGLE_SSAO - Screen Space Ambient Occlusion triangle rendering.
+ * @property {string} TRIANGLE_HEATMAP - Heatmap triangle rendering.
+ */
+export enum RenderPipeline {
+  TRIANGLE_FLAT = 'triangleFlat',
+  TRIANGLE_SSAO = 'triangleSsao',
+  TRIANGLE_HEATMAP = 'triangleHeatmap',
+}
+
+/**
+ * Color map interpolators for thematic data visualization.
+ * @enum {string}
+ * @property {string} INTERPOLATOR_REDS - Red color interpolation.
+ * @property {string} INTERPOLATOR_BLUES - Blue color interpolation.
+ */
+export enum ColorMapInterpolator {
+  INTERPOLATOR_REDS = 'interpolateReds',
+  INTERPOLATOR_BLUES = 'interpolateBlues',
+}
+
+/**
+ * Mouse status for interaction state.
+ * @enum {string}
+ * @property {string} MOUSE_IDLE - Mouse is idle.
+ * @property {string} MOUSE_DRAG - Mouse is dragging.
+ */
+export enum MouseStatus {
+  MOUSE_IDLE = 'mouseIdle',
+  MOUSE_DRAG = 'mouseDrag',
+}
+
+/**
+ * Color Hex type.
+ * @typedef {string} ColorHEX
+ * @description Represents a color in hexadecimal format, e.g., "#FF5733".
+ */
+export type ColorHEX = `#${string}`;
+
+/**
+ * Color RGB type.
+ */
+export type ColorRGB = { 
+    /** Red component (0-255).*/
+    r: number; 
+    /** Green component (0-255).*/
+    g: number; 
+    /** Blue component (0-255).*/
+    b: number; 
+    /** Opacity (0-1).*/
+    opacity: number 
+};
+
+/**
+ * Color TEX type.
+ * @typedef {number[]} ColorTEX
+ * @description Represents a color in texture format.
+ */
+export type ColorTEX = number[];
+
+/**
+ * Map event listener type.
+ */
+export type MapEventListener = (
+    /** The selected features or components.*/
+    selection: number[] | string[], 
+    /** The ID of the layer associated with the event.*/
+    layerId: string
+) => void;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+            </div>
+            
+            <footer class="footer">
+                <div class="content has-text-centered">
+                    <p>Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.4</a></p>
+                    <p class="sidebar-created-by">
+                        <a href="https://github.com/SoftwareBrothers/better-docs" target="_blank">BetterDocs theme</a> provided with <i class="fas fa-heart"></i> by
+                        <a href="http://softwarebrothers.co" target="_blank">SoftwareBrothers - JavaScript Development Agency</a>
+                    </p>
+                </div>
+            </footer>
+            
+        </div>
+        <div id="side-nav" class="side-nav">
+        </div>
+    </div>
+<script src="scripts/app.min.js"></script>
+<script>PR.prettyPrint();</script>
+<script src="scripts/linenumber.js"> </script>
+
+<script src="scripts/search.js"> </script>
+
+
+</body>
+</html>
