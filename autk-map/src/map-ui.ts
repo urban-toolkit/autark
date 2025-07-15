@@ -2,50 +2,53 @@ import { Layer } from './layer.js';
 import { AutkMap } from './main.js';
 
 export class AutkMapUi {
-    static _map: AutkMap
-    static _currentLayer: Layer | null;
+    protected _map: AutkMap
+    protected _currentLayer: Layer | null;
 
-    static get map(): AutkMap {
-        return AutkMapUi._map;
+    constructor(map: AutkMap) {
+        this._map = map;
+        this._currentLayer = null;
     }
 
-    static set map(map: AutkMap) {
-        AutkMapUi._map = map;
+    get map(): AutkMap {
+        return this._map;
     }
 
-    static get currentLayer(): Layer | null {
-        return AutkMapUi._currentLayer;
+    set map(map: AutkMap) {
+        this._map = map;
     }
 
-    static set currentLayer(layer: Layer | null) {
-        AutkMapUi._currentLayer = layer;
+    get currentLayer(): Layer | null {
+        return this._currentLayer;
     }
 
-    static changeLayer(layer: Layer | null): void {
+    set currentLayer(layer: Layer | null) {
+        this._currentLayer = layer;
+    }
+
+    public changeLayer(layer: Layer | null): void {
         if (!layer) {
             console.warn('No layer provided to changeLayer');
             return;
         }
 
-        AutkMapUi.currentLayer = layer;
-        console.log(`Current layer: ${AutkMapUi.currentLayer.layerInfo.id}`);
+        this.currentLayer = layer;
+        console.log(`Current layer: ${this.currentLayer.layerInfo.id}`);
 
         // Turn off picking for all layers
-        AutkMapUi.map.layerManager.layers.forEach(layer => {
-            if (layer.layerInfo.id == AutkMapUi.currentLayer?.id)
+        this.map.layerManager.layers.forEach(layer => {
+            if (layer.layerInfo.id == this.currentLayer?.id)
                 return;
-            AutkMapUi.map.updateRenderInfoPick(layer.layerInfo.id, false);
+            this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', false);
             layer.makeLayerRenderInfoDirty();
         });
 
         // Setting pick to true
-        AutkMapUi.map.updateRenderInfoPick(AutkMapUi.currentLayer.layerInfo.id, true);
-        AutkMapUi.currentLayer.makeLayerRenderInfoDirty();
+        this.map.updateRenderInfoProperty(this.currentLayer.layerInfo.id, 'isPick', true);
+        this.currentLayer.makeLayerRenderInfoDirty();
     }
 
-    static buildUi(map: AutkMap): void {
-        AutkMapUi.map = map;
-
+    public buildUi(): void {
         const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
         const styleNode = document.createElement('style');
 
@@ -59,8 +62,8 @@ export class AutkMapUi {
         uiDiv.style.width = '24px';
         uiDiv.style.height = '24px';
         uiDiv.style.position = 'absolute';
-        uiDiv.style.top = (AutkMapUi.map.canvas.offsetTop + 5) + 'px';
-        uiDiv.style.left = (AutkMapUi.map.canvas.offsetLeft + 5) + 'px';
+        uiDiv.style.top = (this.map.canvas.offsetTop + 5) + 'px';
+        uiDiv.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
         uiDiv.style.zIndex = '1000';
 
         const icon = document.createElement('a');
@@ -79,18 +82,18 @@ export class AutkMapUi {
         icon.innerHTML = `<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-menu-2"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>`
 
         icon.addEventListener('click', () => {
-            AutkMapUi.buildSubMenu();
+            this.buildSubMenu();
         });
 
         uiDiv.appendChild(styleNode);
         uiDiv.appendChild(icon);
 
-        AutkMapUi.map.canvas.parentElement?.appendChild(uiDiv);
+        this.map.canvas.parentElement?.appendChild(uiDiv);
     }
 
-    static updateUi(): void {
-        if (!AutkMapUi.currentLayer) {
-            AutkMapUi.changeLayer(AutkMapUi.map.layerManager.layers[0] || null);
+    public updateUi(): void {
+        if (!this.currentLayer) {
+            this.changeLayer(this.map.layerManager.layers[0] || null);
             return;
         }
 
@@ -98,15 +101,15 @@ export class AutkMapUi {
         this.buildEnablePickingDropdown();
     }
 
-    static buildSubMenu(): void {
+    protected buildSubMenu(): void {
         let subMenu = document.getElementById('autkMapSubMenu');
 
         if (!subMenu) {
             subMenu = document.createElement('div');
             subMenu.id = 'autkMapSubMenu';
             subMenu.style.position = 'absolute';
-            subMenu.style.top = (AutkMapUi.map.canvas.offsetTop + 40) + 'px';
-            subMenu.style.left = (AutkMapUi.map.canvas.offsetLeft + 5) + 'px';
+            subMenu.style.top = (this.map.canvas.offsetTop + 40) + 'px';
+            subMenu.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
             subMenu.style.width = '300px';
             subMenu.style.display = 'block';
             subMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
@@ -117,10 +120,10 @@ export class AutkMapUi {
             subMenu.style.padding = '10px';
             subMenu.style.visibility = 'hidden';
 
-            AutkMapUi.map.canvas.parentElement?.appendChild(subMenu);
+            this.map.canvas.parentElement?.appendChild(subMenu);
 
-            AutkMapUi.buildActiveLayersDropdown();
-            AutkMapUi.buildEnablePickingDropdown();
+            this.buildActiveLayersDropdown();
+            this.buildEnablePickingDropdown();
         }
 
         if (subMenu.style.visibility === 'visible') {
@@ -130,7 +133,7 @@ export class AutkMapUi {
         }
     }
 
-    static buildActiveLayersDropdown(): void {
+    protected buildActiveLayersDropdown(): void {
         const subMenu = document.getElementById('autkMapSubMenu');
 
         if (!subMenu) return;
@@ -208,7 +211,7 @@ export class AutkMapUi {
         dropdownList.innerHTML = '';
 
         // Populate dropdown with checkboxes
-        const layers = AutkMapUi.map.layerManager.layers;
+        const layers = this.map.layerManager.layers;
 
         layers.forEach(layer => {
             const initialSkip = layer?.layerRenderInfo.isSkip || false;
@@ -247,7 +250,7 @@ export class AutkMapUi {
         });
     }
 
-    static buildEnablePickingDropdown(): void {
+    protected buildEnablePickingDropdown(): void {
         const subMenu = document.getElementById('autkMapSubMenu');
 
         if (!subMenu) return;
@@ -300,7 +303,7 @@ export class AutkMapUi {
             select.addEventListener('change', (e) => {
                 const selectedLayerId = (e.target as HTMLSelectElement).value;
                 layers.forEach(l => {
-                    AutkMapUi.map.updateRenderInfoPick(l.id, l.id === selectedLayerId)
+                    this.map.updateRenderInfoProperty(l.id, 'isPick', l.id === selectedLayerId);
                 });
             });
 
@@ -309,7 +312,7 @@ export class AutkMapUi {
         // Clear previous options
         select.innerHTML = '';
 
-        const layers = AutkMapUi.map.layerManager.layers;
+        const layers = this.map.layerManager.layers;
         layers.forEach(layer => {
             const layerId = layer.id;
             const isPickEnabled = layer?.layerRenderInfo.isPick || false;
@@ -321,7 +324,7 @@ export class AutkMapUi {
 
             select.appendChild(option);
 
-            AutkMapUi.changeLayer(AutkMapUi.map.layerManager.searchByLayerId(layerId));
+            this.changeLayer(this.map.layerManager.searchByLayerId(layerId));
         });
     }
 }

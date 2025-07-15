@@ -224,7 +224,7 @@ export class Urbane {
       this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }
 
-    this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
+    this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
   }
 
   protected async loadLayerData(layerId: string = 'neighborhoods') {

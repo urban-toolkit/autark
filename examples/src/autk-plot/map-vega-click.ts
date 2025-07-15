@@ -112,7 +112,7 @@ export class MapVega {
       this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }
 
-    this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
+    this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
   }
 
   protected async loadLayerData(layerId: string = 'neighborhoods') {
@@ -150,7 +150,7 @@ export class MapVega {
 
   protected async updateMapListeners(vegaDataKey: string) {
     this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
-      const view = this.plot.ref as View;
+      const view = this.plot.refs as View;
       const state = view.getState();
 
       if (!state.data[`click_store`] || selection.length === 0) {

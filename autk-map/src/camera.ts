@@ -278,7 +278,6 @@ export class Camera {
         return dir;
     }
 
-
     activateBirdsEye() {
         throw Error('BirdsEye view not implemented yet');
     }

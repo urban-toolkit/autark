@@ -54,10 +54,6 @@ export class PlotD3 extends AutkPlot {
             if (listener === PlotEvent.BRUSH_Y) {
                 this.brushYEvent();
             }
-            if (listener === PlotEvent.BRUSH_X) {
-                this.brushXEvent();
-            }
-
         }
     }
 
@@ -182,6 +178,8 @@ export class PlotD3 extends AutkPlot {
                 if (event.selection) {
                     const selection = event.selection;
 
+                    console.log(selection);
+
                     marks.each(function (_d, mId: number) {
                         const coords = d3.select(this).attr('d').split(/[,;ML]/).filter(str => str !== '').map(str => Number(str));
 
@@ -232,41 +230,6 @@ export class PlotD3 extends AutkPlot {
         });
     }
 
-    brushXEvent(): void {
-
-        const groups: SVGGElement[] = this.refs as SVGGElement[];
-
-        groups.forEach((group: SVGGElement, gId: number) => {
-
-            const groupNode = d3.select(group);
-            const width = groupNode.node()?.getBBox()?.width || 0;
-            const height = groupNode.node()?.getBBox()?.height || 0;
-
-            const brush = d3.brushX()
-                .extent([
-                    [0, 0],
-                    [width, height]
-                ])
-                .on("start brush end", (event: any) => {
-
-                    const selection = event.selection;
-                    this.plotEvents.emit(PlotEvent.BRUSH_X, selection);
-                }
-            )
-
-            const svg = d3.select(group);
-            let brushGroup = svg.select<SVGGElement>("g.brush");
-
-            if (brushGroup.empty()) {
-                brushGroup = svg.append("g")
-                    .attr("class", "brush");
-            }
-
-            brushGroup.call(brush);
-
-        })
-
-    }
 
     async draw(): Promise<void> {
         [this._refs, this._svgs] = this._d3Builder(this._div, this._data);

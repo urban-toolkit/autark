@@ -116,7 +116,7 @@ export class MouseEvents {
     this._map.camera.zoom(event.deltaY * 0.01, x, y);
   }
 
-    /**
+  /**
    * Handles mouse double click event
    * Handles mouse double click
    */
@@ -141,6 +141,4 @@ export class MouseEvents {
       }
     });
   }
-
-
 }

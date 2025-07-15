@@ -40,7 +40,7 @@ export class LayerOpacity {
 
       await this.loadLayers();
 
-      this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
+      this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
       this.map.draw();
     }
   }

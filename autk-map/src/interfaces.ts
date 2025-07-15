@@ -7,6 +7,9 @@ import {
   ThematicAggregationLevel,
 } from './constants';
 
+/**
+ * Interface for map styles.
+ */
 export interface IMapStyle {
   land: ColorHEX;
   roads: ColorHEX;
@@ -20,52 +23,76 @@ export interface IMapStyle {
   lines: ColorHEX;
 }
 
+/**
+ * Interface for layer information.
+ */
 export interface ILayerInfo {
-  id: string; // layer id
-  zIndex: number; // layer render order
-  typeGeometry: LayerGeometryType; // layer geometry type
-  typeLayer: LayerType; // layer physical type
+  id: string;
+  zIndex: number;
+  typeGeometry: LayerGeometryType;
+  typeLayer: LayerType;
 }
 
+/**
+ * Interface for layer render information.
+ */
 export interface ILayerRenderInfo {
-  pipeline: RenderPipeline; // render Pipeline
-  opacity: number; // layer opacity
-  isColorMap?: boolean; // is colormap enabled?
-  colorMapInterpolator: ColorMapInterpolator; // used colormap
+  pipeline: RenderPipeline;
+  opacity: number;
+  isColorMap?: boolean;
+  colorMapInterpolator: ColorMapInterpolator;
   pickedComps?: number[];
-  isSkip?: boolean; // skip render?
-  isPick?: boolean; // picking enabled?
+  isSkip?: boolean;
+  isPick?: boolean;
 }
 
+/**
+ * Interface for layer border information.
+ */
 export interface ILayerData {
-  border?: ILayerBorder[]; // list of borders
-  geometry: ILayerGeometry[]; // list of geometries
-  components: ILayerComponent[]; // list of components
-  thematic?: ILayerThematic[]; // list of thematic data
-  highlighted?: number[]; // list of highlight data (boolean)
+  border?: ILayerBorder[];
+  geometry: ILayerGeometry[];
+  components: ILayerComponent[];
+  thematic?: ILayerThematic[];
+  highlighted?: number[];
 }
 
+/**
+ * Interface for layer geometry information.
+ */
 export interface ILayerGeometry {
-  position: number[]; // coordinate of the points
-  normal?: number[]; // normals of the points
-  indices?: number[]; // ids of the vertices
+  position: number[];
+  normal?: number[];
+  indices?: number[];
 }
 
+/**
+ * Interface for layer border information.
+ */
 export interface ILayerBorder {
-  position: number[]; // coordinates of the border points
-  indices: number[]; // indices of the border points
+  position: number[];
+  indices: number[];
 }
 
+/**
+ * Interface for layer thematic data.
+ */
 export interface ILayerThematic {
-  level: ThematicAggregationLevel; // aggregation level
-  values: number[]; // data values
+  level: ThematicAggregationLevel;
+  values: number[];
 }
 
+/**
+ * Interface for layer components.
+ */
 export interface ILayerComponent {
   nPoints: number;
   nTriangles: number;
 }
 
+/**
+ * Interface for camera data.
+ */
 export interface ICameraData {
   origin: number[];
   direction: {
@@ -75,6 +102,9 @@ export interface ICameraData {
   };
 }
 
+/**
+ * Interface for Bounding Box.
+ */
 export interface IBoundingBox {
   minLon: number;
   minLat: number;

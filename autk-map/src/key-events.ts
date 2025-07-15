@@ -1,15 +1,25 @@
 import { AutkMap } from './main';
 import { MapStyle } from './map-style';
-import { AutkMapUi } from './map-ui';
 
+/**
+ * KeyEvents class handles keyboard interactions with the map.
+ * It allows toggling layer properties and changing map styles using keyboard shortcuts.
+ */
 export class KeyEvents {
     private _map!: AutkMap
 
+    /**
+     * Constructor for KeyEvents
+     * @param {AutkMap} map The map instance
+     */
     constructor(map: AutkMap) {
         this._map = map;
     }
 
-    bindEvents(): void {
+    /**
+     * Key events binding function
+     */
+    public bindEvents(): void {
         document.removeEventListener('keyup', this.keyUp.bind(this), false);
         document.addEventListener('keyup', this.keyUp.bind(this), false);
     }
@@ -20,33 +30,32 @@ export class KeyEvents {
      */
     async keyUp(event: KeyboardEvent) {
          if (event.key === 't') {
-            if (!AutkMapUi.currentLayer) {
+            if (!this._map.ui.currentLayer) {
                 return;
             }
 
-            const layerInfo = AutkMapUi.currentLayer.layerInfo;
-            const renderInfo = AutkMapUi.currentLayer.layerRenderInfo;
+            const layerInfo = this._map.ui.currentLayer.layerInfo;
+            const renderInfo = this._map.ui.currentLayer.layerRenderInfo;
 
-            this._map.updateRenderInfoIsColorMap(layerInfo.id, !renderInfo.isColorMap);
-            AutkMapUi.currentLayer.makeLayerRenderInfoDirty();
+            this._map.updateRenderInfoProperty(layerInfo.id, 'isColorMap', !renderInfo.isColorMap);
+            this._map.ui.currentLayer.makeLayerRenderInfoDirty();
         }
 
         if (event.key === 'h' || event.key === 'v') {
-            if (!AutkMapUi.currentLayer) {
+            if (!this._map.ui.currentLayer) {
                 return;
             }
 
-            console.log(`Toggling skip for layer: ${AutkMapUi.currentLayer.layerInfo.id}`);
+            const layerInfo = this._map.ui.currentLayer.layerInfo;
+            const renderInfo = this._map.ui.currentLayer.layerRenderInfo;
 
-            const layerInfo = AutkMapUi.currentLayer.layerInfo;
-            const renderInfo = AutkMapUi.currentLayer.layerRenderInfo;
-            this._map.updateRenderInfoSkip(layerInfo.id, !renderInfo.isSkip);
+            this._map.updateRenderInfoProperty(layerInfo.id, 'isSkip', !renderInfo.isSkip);
 
             // Turn off picking as well
             if(renderInfo.isSkip)
-                this._map.updateRenderInfoPick(layerInfo.id, false);
+                this._map.updateRenderInfoProperty(layerInfo.id, 'isPick', false);
 
-            AutkMapUi.currentLayer.makeLayerRenderInfoDirty();
+            this._map.ui.currentLayer.makeLayerRenderInfoDirty();
         }
 
         if (event.key == 's') {

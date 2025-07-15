@@ -2,8 +2,8 @@ import * as d3 from 'd3';
 
 import { Feature, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'autk-db';
-import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle, PlotVega, AutkPlot } from 'autk-plot';
-import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent } from 'autk-map';
+import { PlotEvent, PlotD3, D3PlotBuilder, AutkPlot } from 'autk-plot';
+import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel } from 'autk-map';
 
 export class TemporalVega {
     
@@ -130,8 +130,6 @@ export class TemporalVega {
             console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
             this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
         }
-
-        // this.map.updateRenderInfoOpacity('neighborhoods', 0.75);
     }
 
     protected async loadLayerData(hour: number = 0, layerId: string = 'neighborhoods') {
@@ -301,8 +299,7 @@ export class TemporalVega {
             .curve(d3.curveMonotoneX); // Smooth curve
 
         // Draw the line
-        const linePath = g
-            .append('path')
+        g.append('path')
             .datum(data)
             .attr('class', 'line')
             .attr('fill', 'none')

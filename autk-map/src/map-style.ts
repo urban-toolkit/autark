@@ -7,74 +7,93 @@ import light from './styles/light.json';
 import dark from './styles/dark.json';
 
 export class MapStyle {
-  // default color map
-  protected static _default: IMapStyle = {
-    land: '#DFDFDF',
-    roads: '#d9b504',
-    parks: '#C3D0B2',
-    water: '#BED2D7',
-    coastline: '#BED2D7',
-    sky: '#ffffff',
-    surface: '#EFEFEF',
-    buildings: '#DFDFDF',
-    features: '#DFDFDF',
-    lines: '#DFDFDF',
-  };
+    /**
+     * Default map style
+     */
+    protected static _default: IMapStyle = {
+        land: '#DFDFDF',
+        roads: '#d9b504',
+        parks: '#C3D0B2',
+        water: '#BED2D7',
+        coastline: '#BED2D7',
+        sky: '#ffffff',
+        surface: '#EFEFEF',
+        buildings: '#DFDFDF',
+        features: '#DFDFDF',
+        lines: '#DFDFDF',
+    };
 
-  // default color for unknown layers
-  protected static _notFound: ColorHEX = '#FFFFFF';
-  // default highlight color
-  protected static _highlight: ColorHEX = '#5dade2';
+    /**
+     * Not found color
+     */
+    protected static _notFound: ColorHEX = '#FFFFFF';
+    /**
+     * Highlight color
+     */
+    protected static _highlight: ColorHEX = '#5dade2';
 
-  // custom style
-  protected static _current: IMapStyle = MapStyle._default;
-  protected static _currentStyle: string = 'default';
+    /**
+     * Current map style
+     */
+    protected static _current: IMapStyle = MapStyle._default;
+    /**
+     * Current map style id
+     */
+    protected static _currentStyle: string = 'default';
 
-  public static get currentStyle(): string {
-    return MapStyle._currentStyle;
-  }
-
-  /**
-   * Get the feature color
-   * @param {string} type Feature type
-   */
-  public static getColor(type: keyof IMapStyle): ColorRGB {
-    // uses the default style if available
-    const style = MapStyle._current;
-    const hex = style[type] || MapStyle._notFound;
-
-    return ColorMap.hexToRgb(hex);
-  }
-
-  /**
-   * Set the feature color
-   * @param {string} style new map style in id: #rrggbb format
-   */
-  public static setPredefinedStyle(style: string) {
-    let styleObj: IMapStyle = MapStyle._default;
-    let styleSrt: string = 'default';
-
-    if (style === 'light') {
-      styleObj = <IMapStyle>light;
-      styleSrt = 'light';
-    } else if (style === 'dark') {
-      styleObj = <IMapStyle>dark;
-      styleSrt = 'dark';
+    /**
+     * Get the current map style id
+     * @return {string} The current map style id
+     */
+    public static get currentStyle(): string {
+        return MapStyle._currentStyle;
     }
 
-    MapStyle._current = styleObj;
-    MapStyle._currentStyle = styleSrt;
-  }
+    /**
+     * Get the feature color
+     * @param {string} type Feature type
+     */
+    public static getColor(type: keyof IMapStyle): ColorRGB {
+        // uses the default style if available
+        const style = MapStyle._current;
+        const hex = style[type] || MapStyle._notFound;
 
-  /**
-   * Set the feature color
-   * @param {string} style new map style json
-   */
-  public static setCustomStyle(style: IMapStyle) {
-    MapStyle._current = style;
-  }
+        return ColorMap.hexToRgb(hex);
+    }
 
-  public static getHighlightColor(): ColorRGB {
-    return ColorMap.hexToRgb(MapStyle._highlight);
-  }
+    /**
+     * Set the feature color
+     * @param {string} style new map style in id: #rrggbb format
+     */
+    public static setPredefinedStyle(style: string) {
+        let styleObj: IMapStyle = MapStyle._default;
+        let styleSrt: string = 'default';
+
+        if (style === 'light') {
+            styleObj = <IMapStyle>light;
+            styleSrt = 'light';
+        } else if (style === 'dark') {
+            styleObj = <IMapStyle>dark;
+            styleSrt = 'dark';
+        }
+
+        MapStyle._current = styleObj;
+        MapStyle._currentStyle = styleSrt;
+    }
+
+    /**
+     * Set the feature color
+     * @param {string} style new map style json
+     */
+    public static setCustomStyle(style: IMapStyle) {
+        MapStyle._current = style;
+    }
+
+    /**
+     * Get the highlight color
+     * @returns {ColorRGB} The highlight color
+     */
+    public static getHighlightColor(): ColorRGB {
+        return ColorMap.hexToRgb(MapStyle._highlight);
+    }
 }

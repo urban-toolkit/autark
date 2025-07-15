@@ -9,6 +9,10 @@ class Box2D {
 
     public feats: Feature[] = [];
 
+    /**
+     * Constructs a Box2D instance from a GeoJSON feature.
+     * @param {Feature} feature - The GeoJSON feature to create the bounding box from.
+     */
     constructor(feature: Feature) {
 
         const { coordinates } = <LineString>feature.geometry;
@@ -21,6 +25,10 @@ class Box2D {
         this.add(feature);
     }
 
+    /**
+     * Adds a feature to the bounding box, updating its dimensions if necessary.
+     * @param {Feature} feature - The GeoJSON feature to add.
+     */
     private add(feature: Feature) {
         const { coordinates } = <LineString>feature.geometry;
 
@@ -36,7 +44,12 @@ class Box2D {
         this.feats = Array.from(new Set([feature, ...this.feats]));
     }
 
-    overlaps(box: Box2D) {
+    /**
+     * Checks if this bounding box overlaps with another bounding box.
+     * @param {Box2D} box - The other bounding box to check against.
+     * @returns {boolean} - True if the boxes overlap, false otherwise.
+     */
+    public overlaps(box: Box2D) {
         if (box.xmin > this.xmax ||
             box.xmax < this.xmin ||
             box.ymin > this.ymax ||
@@ -78,7 +91,11 @@ class Box2D {
         return false;
     }
 
-    expand(box: Box2D) {
+    /**
+     * Expands the bounding box to include another bounding box.
+     * @param {Box2D} box - The bounding box to expand to.
+     */
+    public expand(box: Box2D) {
         this.xmin = this.xmin > box.xmin ? box.xmin : this.xmin;
         this.xmax = this.xmax < box.xmax ? box.xmax : this.xmax;
         this.ymin = this.ymin > box.ymin ? box.ymin : this.ymin;
@@ -88,28 +105,52 @@ class Box2D {
     }
 }
 
+/**
+ * AABB (Axis-Aligned Bounding Box) class for managing bounding boxes of features.
+ * It allows building bounding boxes from GeoJSON features and checking overlaps.
+ */
 export class AABB {
     protected _boxCount = 0;
     protected _boxes: Map<number, Box2D>;
 
+    /**
+     * Constructs an AABB instance.
+     * Initializes an empty map to hold bounding boxes.
+     */
     constructor() {
         this._boxes = new Map<number, Box2D>;
     }
 
+    /**
+     * Gets the count of bounding boxes.
+     * @returns {number} - The number of bounding boxes.
+     */
     get boxCount(): number {
         return this._boxCount;
     }
 
+    /**
+     * Gets the map of bounding boxes.
+     * @returns {Map<number, Box2D>} - The map containing bounding boxes.
+     */
     get boxes(): Map<number, Box2D> {
         return this._boxes;
     }
 
-    buildGeoJsonBoxes(geojson: FeatureCollection) {
+    /**
+     * Builds bounding boxes from a GeoJSON feature collection.
+     * @param {FeatureCollection} geojson - The GeoJSON feature collection to build boxes from.
+     */
+    public buildGeoJsonBoxes(geojson: FeatureCollection) {
         const collection: Feature[] = geojson['features'];
         this.buildFeatureBoxes(collection);
     }
 
-    buildFeatureBoxes(collection: Feature[]) {
+    /**
+     * Builds bounding boxes from a collection of GeoJSON features.
+     * @param {Feature[]} collection - The array of GeoJSON features to build boxes from.
+     */
+    public buildFeatureBoxes(collection: Feature[]) {
         for (const feature of collection) {
 
             if (!feature.geometry || feature.geometry.type !== 'LineString') {
@@ -143,6 +184,11 @@ export class AABB {
         }
     }
 
+    /**
+     * Checks for overlaps with a given bounding box.
+     * @param {Box2D} box - The bounding box to check for overlaps.
+     * @returns {number[]} - An array of IDs of overlapping boxes.
+     */
     private overlaps(box: Box2D): number[] {
         const overIds = [];
 
