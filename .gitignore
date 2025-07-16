@@ -1,4 +1,5 @@
 # UTK Rules
+autk*/docs/
 autk*/dist/
 autk*/src/*.js
 autk*/package-lock.json

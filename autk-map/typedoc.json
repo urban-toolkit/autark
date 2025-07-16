@@ -1,0 +1,11 @@
+// typedoc.json
+{
+    "readme": "../README.md",
+    "plugin": ["typedoc-github-theme"],
+    "theme": "typedoc-github-theme",
+    "out": "docs",
+    "entryPoints": ["src"],
+    "navigationLinks": {
+        "Github": "https://github.com/urban-toolkit/autark"
+    },
+}

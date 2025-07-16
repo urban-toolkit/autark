@@ -3,9 +3,8 @@ import {
     Polygon
 } from 'geojson';
 
-import { 
-    polygon,
-    centroid
+import {
+    polygon
 } from '@turf/turf';
 
 import { 
@@ -30,7 +29,9 @@ import { LayerGeometryType } from './constants';
  */
 export class LayerManager {
     protected _layers: Layer[] = [];
+
     protected _bbox!: Feature<Polygon>;
+    protected _origin!: number[];
 
     /**
      * Get the layers of the map.
@@ -53,7 +54,15 @@ export class LayerManager {
      * @returns {number[]} - The origin coordinates in meters.
      */
     get origin(): number[] {
-        return centroid(this._bbox).geometry.coordinates;
+        return this._origin
+    }
+
+    /**
+     * Set the origin of the map.
+     * @param {number[]} origin - The origin coordinates in meters.
+     */
+    set origin(origin: number[]) {
+        this._origin = origin;
     }
 
     /**
@@ -70,10 +79,12 @@ export class LayerManager {
      * @param {IBoundingBox} bbox - The bounding box to set.
      */
     set boundingBox(bbox: IBoundingBox) {
-        const xmin = (bbox.minLon - (bbox.maxLon + bbox.minLon) * 0.5) * 1.05;
-        const xmax = (bbox.maxLon - (bbox.maxLon + bbox.minLon) * 0.5) * 1.05;
-        const ymin = (bbox.minLat - (bbox.maxLat + bbox.minLat) * 0.5) * 1.05;
-        const ymax = (bbox.maxLat - (bbox.maxLat + bbox.minLat) * 0.5) * 1.05;
+        this.origin = [(bbox.maxLon + bbox.minLon) * 0.5, (bbox.maxLat + bbox.minLat) * 0.5];
+
+        const xmin = (bbox.minLon - this._origin[0]) * 1.05;
+        const xmax = (bbox.maxLon - this._origin[0]) * 1.05;
+        const ymin = (bbox.minLat - this._origin[1]) * 1.05;
+        const ymax = (bbox.maxLat - this._origin[1]) * 1.05;
 
         this._bbox = polygon([
             [

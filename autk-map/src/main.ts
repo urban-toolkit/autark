@@ -70,6 +70,8 @@ export class AutkMap {
     protected _canvas!: HTMLCanvasElement;
 
     constructor(canvas: HTMLCanvasElement, autoResize = true) {
+        this._canvas = canvas;
+
         this._camera = new Camera();
         this._renderer = new Renderer(canvas);
         this._layerManager = new LayerManager();
@@ -79,7 +81,6 @@ export class AutkMap {
         this._mapEvents = new MapEvents([MapEvent.PICK]);
 
         this._ui = new AutkMapUi(this);
-        this._canvas = canvas;
 
         if (autoResize) {
             window.addEventListener('resize', this.handleResize.bind(this));
