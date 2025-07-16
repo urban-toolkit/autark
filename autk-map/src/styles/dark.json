@@ -1,12 +1,10 @@
 {
-    "land": "#AAAAAA",
-    "roads": "#454545",
+    "surface": "#AAAAAA",
+    "coastline": "#DFDFDF",
     "parks": "#191b1a",
     "water": "#191b1a",
-    "coastline": "#DFDFDF",
-    "sky": "#000000",
-    "surface": "#AAAAAA",
+    "roads": "#454545",
     "buildings": "#DFDFDF",
-    "features": "#DFDFDF",
+    "boundaries": "#DFDFDF",
     "lines": "#DFDFDF"
 }

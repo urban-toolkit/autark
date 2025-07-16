@@ -12,41 +12,119 @@ import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
 import { Triangles3DLayer } from './layer-triangles3D';
 
+/**
+ * PipelineBuildingSSAO is a rendering pipeline for drawing 3D buildings with SSAO (Screen Space Ambient Occlusion).
+ * It uses WebGPU to render the buildings in two passes: one for normal and color maps, and another for SSAO computation.
+ */
 export class PipelineBuildingSSAO extends Pipeline {
-    // Vertex buffers
+    /**
+     * Position buffer for vertex data.
+     * @type {GPUBuffer}
+     */
     protected _positionBuffer!: GPUBuffer;
+
+    /**
+     * Normal buffer for vertex data.
+     * @type {GPUBuffer}
+     */
     protected _normalBuffer!: GPUBuffer;
+
+    /**
+     * Thematic buffer for vertex data.
+     * @type {GPUBuffer}
+     */
     protected _thematicBuffer!: GPUBuffer;
+
+    /**
+     * Highlighted buffer for vertex data.
+     * @type {GPUBuffer}
+     */
     protected _highlightedBuffer!: GPUBuffer;
+
+    /**
+     * Indices buffer for vertex data.
+     * @type {GPUBuffer}
+     */
     protected _indicesBuffer!: GPUBuffer;
 
-    // colors and normal map
+    /**
+     * Vertex shader module for the first pass.
+     * @type {GPUShaderModule}
+     */
     protected _vertModule01!: GPUShaderModule;
+
+    /**
+     * Fragment shader module for the first pass.
+     * @type {GPUShaderModule}
+     */
     protected _fragModule01!: GPUShaderModule;
 
-    // SSAO computation
+    /**
+     * Vertex shader module for the second pass.
+     * @type {GPUShaderModule}
+     */
     protected _vertModule02!: GPUShaderModule;
+
+    /**
+     * Fragment shader module for the second pass.
+     * @type {GPUShaderModule}
+     */
     protected _fragModule02!: GPUShaderModule;
 
-    // first pass (normal & color maps)
+    /**
+     * Render pipeline for the first pass.
+     * @type {GPURenderPipeline}
+     */
     protected _pipeline01!: GPURenderPipeline;
-    // first pass (SSAO)
+
+    /**
+     * Render pipeline for the second pass.
+     * @type {GPURenderPipeline}
+     */
     protected _pipeline02!: GPURenderPipeline;
 
-    // Output buffers (Pass 01)
+    /**
+     * Shared color buffer for the first pass.
+     * @type {GPURenderPassColorAttachment}
+     */
     protected _colorsSharedBuffer!: GPURenderPassColorAttachment;
+
+    /**
+     * Shared normal buffer for the first pass.
+     * @type {GPURenderPassColorAttachment}
+     */
     protected _normalsSharedBuffer!: GPURenderPassColorAttachment;
-    // Depth buffer
+
+    /**
+     * Depth buffer for the first pass.
+     * @type {GPURenderPassDepthStencilAttachment}
+     */
     protected _depthBufferPass01!: GPURenderPassDepthStencilAttachment;
 
-    // Input Bind Groups
+    /**
+     * Bind group for colors.
+     * @type {GPUBindGroup}
+     */
     protected _texturesPass02BindGroup!: GPUBindGroup;
+    
+    /**
+     * Bind group layout for textures in the second pass.
+     * @type {GPUBindGroupLayout}
+     */
     protected _texturesPass02BindGroupLayout!: GPUBindGroupLayout;
 
+    /**
+     * Constructor for PipelineBuildingSSAO
+     * @param {Renderer} renderer The renderer instance
+     */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
+    /**
+     * Builds the pipeline with the provided mesh data.
+     * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
+     */
     build(mesh: Triangles3DLayer) {
         this.createShaders();
 
@@ -65,6 +143,9 @@ export class PipelineBuildingSSAO extends Pipeline {
         this.createPipeline02();
     }
 
+    /**
+     * Creates the vertex and fragment shaders for the pipeline.
+     */
     createShaders(): void {
         // Vertex shader
         const vsDesc01 = {
@@ -95,6 +176,10 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._fragModule02 = this._renderer.device.createShaderModule(fsDesc02);
     }
 
+    /**
+     * Creates the vertex buffers for the mesh data.
+     * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
+     */
     createVertexBuffers(mesh: Triangles3DLayer): void {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
@@ -134,6 +219,10 @@ export class PipelineBuildingSSAO extends Pipeline {
         this.updateVertexBuffers(mesh);
     }
 
+    /**
+     * Updates the vertex buffers with the provided mesh data.
+     * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
+     */
     updateVertexBuffers(mesh: Triangles3DLayer): void {
         this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, new Float32Array(mesh.normal));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
@@ -142,6 +231,9 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }
 
+    /**
+     * Creates the shared textures for the pipeline.
+     */
     createSharedTextures() {
         const colorTextureDesc: GPUTextureDescriptor = {
             label: 'Shared colors texture',
@@ -177,6 +269,9 @@ export class PipelineBuildingSSAO extends Pipeline {
         };
     }
 
+    /**
+     * Creates the depth buffer for the first pass.
+     */
     createDepthBufferPass01() {
         // Depth texture
         const depthTextureDesc: GPUTextureDescriptor = {
@@ -244,6 +339,9 @@ export class PipelineBuildingSSAO extends Pipeline {
         });
     }
 
+    /**
+     * Creates the first render pipeline for the SSAO pass.
+     */
     createPipeline01(): void {
         // Vertex data
         const positionAttribDesc: GPUVertexAttribute = {
@@ -334,6 +432,9 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._pipeline01 = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
+    /**
+     * Creates the second render pipeline for the SSAO pass.
+     */
     createPipeline02(): void {
         // Vertex Shader
         const vertex: GPUVertexState = {
@@ -399,6 +500,10 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._pipeline02 = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
+    /**
+     * Renders the first pass of the SSAO pipeline.
+     * @param {Camera} camera The camera instance
+     */
     pass01(camera: Camera) {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;
@@ -436,6 +541,9 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.end();
     }
 
+    /**
+     * Renders the second pass of the SSAO pipeline.
+     */
     pass02() {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;

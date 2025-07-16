@@ -8,32 +8,89 @@ import { MapStyle } from './map-style';
 import { ColorMap } from './colormap';
 import { IMapStyle } from './interfaces';
 
+/**
+ * Abstract class representing a rendering pipeline.
+ * It provides methods for creating camera and color uniform bind groups,
+ * updating camera and color uniforms, and defining the structure for building
+ * and rendering the pipeline.
+ */
 export abstract class Pipeline {
-    // renderer reference
+    /**
+     * Renderer reference
+     */
     protected _renderer: Renderer;
 
-    // Transformation matrices uniform buffer
+    /**
+     * ModelView matrix uniform buffer
+     */
     protected _mviewBuffer!: GPUBuffer;
+
+    /**
+     * Projection matrix uniform buffer
+     */
     protected _projcBuffer!: GPUBuffer;
+
+    /**
+     * Camera bind group
+     */
     protected _cameraBindGroup!: GPUBindGroup;
+
+    /**
+     * Camera bind group layout
+     */
     protected _cameraBindGroupLayout!: GPUBindGroupLayout;
 
-    // Uniforms buffer
+    /**
+     * Color uniform buffer
+     */
     protected _colorBuffer!: GPUBuffer;
+
+    /**
+     * Highlight color uniform buffer
+     */
     protected _highlightColorBuffer!: GPUBuffer;
+
+    /**
+     * Use color map uniform buffer
+     */
     protected _useColorMap!: GPUBuffer;
+
+    /**
+     * Use highlight uniform buffer
+     */
     protected _useHighlight!: GPUBuffer;
+
+    /**
+     * Color map texture
+     */
     protected _cMapTexture!: GPUTexture;
+
+    /**
+     * Opacity uniform buffer
+     */
     protected _opacity!: GPUBuffer;
 
+    /**
+     * Colors bind group
+     */
     protected _colorsBindGroup!: GPUBindGroup;
+
+    /**
+     * Colors bind group layout
+     */
     protected _colorsBindGroupLayout!: GPUBindGroupLayout;
 
-
+    /**
+     * Pipeline constructor
+     * @param {Renderer} renderer The renderer instance
+     */
     constructor(renderer: Renderer) {
         this._renderer = renderer;
     }
 
+    /**
+     * Creates the camera uniform bind group.
+     */
     createCameraUniformBindGroup() {
         this._mviewBuffer = this._renderer.device.createBuffer({
             label: 'ModelView matrix buffer',
@@ -77,6 +134,10 @@ export abstract class Pipeline {
         });
     }
 
+    /**
+     * Updates the camera uniform buffers with the current camera state.
+     * @param {Camera} camera The camera instance
+     */
     updateCameraUniforms(camera: Camera) {
         const mview = new Float32Array(camera.getModelViewMatrix());
         const projc = new Float32Array(camera.getProjectionMatrix());
@@ -85,6 +146,9 @@ export abstract class Pipeline {
         this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
     }
 
+    /**
+     * Creates the color uniform bind group.
+     */
     createColorUniformBindGroup() {
         this._colorBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
@@ -206,6 +270,10 @@ export abstract class Pipeline {
         });
     }
 
+    /**
+     * Updates the color uniform buffers with the current layer state.
+     * @param {Layer} layer The layer instance
+     */
     updateColorUniforms(layer: Layer) {
         const colors = {
             color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof IMapStyle),
@@ -236,11 +304,26 @@ export abstract class Pipeline {
         this._renderer.device.queue.writeBuffer(this._opacity, 0, opacity);
     }
 
+    /**
+     * Builds the pipeline.
+     * @param {Layer} data The layer instance
+     */
     abstract build(data: Layer): void;
 
+    /**
+     * Creates the vertex buffers.
+     * @param {Layer} data The layer instance
+     */
     abstract createVertexBuffers(data: Layer): void;
 
+    /**
+     * Updates the vertex buffers with the provided data.
+     * @param {Layer} data The layer instance
+     */
     abstract updateVertexBuffers(data: Layer): void;
 
+    /**
+     * Creates the shaders for the pipeline.
+     */
     abstract renderPass(camera: Camera): void;
 }

@@ -6,11 +6,23 @@ import earcut from 'earcut';
 
 export abstract class Triangulator {
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    /**
+     * Builds a mesh from GeoJSON features.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @param {Feature<Polygon | MultiPolygon>} bbox The bounding box feature
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
     static buildMesh(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {
         return [[], []]
     };
 
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
     static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
 
@@ -20,6 +32,12 @@ export abstract class Triangulator {
         return [{ flatCoords, flatIds }];
     } 
 
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
     static lineStringToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
         const { coordinates } = <LineString>feature.geometry;
 
@@ -29,8 +47,12 @@ export abstract class Triangulator {
         return [{ position: flatCoords, indices: flatIds }];
     }
 
-    //------
-
+    /**
+     * Converts a MultiLineString feature to a mesh representation.
+     * @param {Feature} feature The GeoJSON feature representing a MultiLineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerGeometry[]} An array of geometries
+     */
     static multiLineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
 
@@ -46,6 +68,12 @@ export abstract class Triangulator {
         return meshes;
     }
 
+    /**
+     * Converts a MultiLineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a MultiLineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
     static multiLineStringToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
         const { coordinates } = <MultiLineString>feature.geometry;
 
@@ -61,8 +89,12 @@ export abstract class Triangulator {
         return borders;
     }
 
-    //------
-
+    /**
+     * Converts a Polygon feature to a mesh representation.
+     * @param {Feature} feature The GeoJSON feature representing a Polygon
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerGeometry[]} An array of geometries
+     */
     static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
 
@@ -80,6 +112,12 @@ export abstract class Triangulator {
         return [{ flatCoords, flatIds }];
     }
 
+    /**
+     * Converts a Polygon feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a Polygon
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
     static polygonToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
         const { coordinates } = <Polygon>feature.geometry;
 
@@ -98,8 +136,12 @@ export abstract class Triangulator {
         return [{ position: flatCoords, indices: flatIds }];
     }
 
-    //------
-
+    /**
+     * Converts a MultiPolygon feature to a mesh representation.
+     * @param {Feature} feature The GeoJSON feature representing a MultiPolygon
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerGeometry[]} An array of geometries
+     */
     static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const meshes = [];
 
@@ -123,6 +165,12 @@ export abstract class Triangulator {
         return meshes;
     }
 
+    /**
+     * Converts a MultiPolygon feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a MultiPolygon
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
     static multiPolygonToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
         const borders = [];
 
@@ -147,8 +195,11 @@ export abstract class Triangulator {
         return borders;
     }
 
-    // ---- Aux functions
-
+    /**
+     * Translates the features in the GeoJSON collection based on the origin.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     */
     protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
         const collection = geojson['features'];
 
@@ -163,6 +214,11 @@ export abstract class Triangulator {
         }
     }
 
+    /**
+     * Generates border indices for a given number of coordinates.
+     * @param {number} nCoords The number of coordinates
+     * @returns {number[]} An array of border indices
+     */
     protected static generateBorderIds(nCoords: number): number[] {
         const ids = [];
 

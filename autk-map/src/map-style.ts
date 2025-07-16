@@ -11,15 +11,13 @@ export class MapStyle {
      * Default map style
      */
     protected static _default: IMapStyle = {
-        land: '#DFDFDF',
-        roads: '#d9b504',
+        surface: '#EFEFEF',
+        coastline: '#BED2D7',
         parks: '#C3D0B2',
         water: '#BED2D7',
-        coastline: '#BED2D7',
-        sky: '#ffffff',
-        surface: '#EFEFEF',
+        roads: '#d9b504',
         buildings: '#DFDFDF',
-        features: '#DFDFDF',
+        boundaries: '#DFDFDF',
         lines: '#DFDFDF',
     };
 

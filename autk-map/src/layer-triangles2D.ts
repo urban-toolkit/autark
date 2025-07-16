@@ -10,18 +10,60 @@ import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
+/**
+ * Triangles2DLayer class extends Layer to handle rendering of 2D triangles layers.
+ * It manages the positions, thematic data, indices, and components of the layer, as well as the rendering pipelines.
+ */
 export class Triangles2DLayer extends Layer {
+    /**
+     * Dimension of the layer (2 for a 2D layer).
+     * @type {number}
+     */
     protected _dimension: number;
 
+    /**
+     * Positions of the triangles.
+     * @type {number[]}
+     */
     protected _position!: number[];
+
+    /**
+     * Thematic data for the layer.
+     * @type {number[]}
+     */
     protected _thematic!: number[];
+
+    /**
+     * Indices of the triangles.
+     * @type {number[]}
+     */
     protected _indices!: number[];
 
+    /**
+     * Components of the layer.
+     * @type {ILayerComponent[]}
+     */
     protected _components: ILayerComponent[] = [];
 
+    /**
+     * Rendering pipeline for the layer.
+     * @type {Pipeline}
+     */
     protected _pipeline!: Pipeline;
+
+    /**
+     * Pipeline for picking triangles.
+     * @type {PipelineTrianglePicking}
+     */
     protected _pipelinePicking!: PipelineTrianglePicking;
 
+    /**
+     * Constructor for Triangles2DLayer
+     * @param {ILayerInfo} layerInfo - The layer information.
+     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {ILayerData} layerData - The layer data.
+     * @param {number} dimension - The dimension of the layer (2 or 3).
+     */
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
         super(layerInfo, layerRenderInfo);
         this._dimension = dimension;
@@ -29,27 +71,53 @@ export class Triangles2DLayer extends Layer {
         this.loadData(layerData);
     }
 
+    /**
+     * Get the positions of the triangles.
+     * @returns {number[]} - The positions of the triangles.
+     */
     get position(): number[] {
         return this._position;
     }
 
+    /**
+     * Get the thematic data of the layer.
+     * @returns {number[]} - The thematic data.
+     */
     get thematic(): number[] {
         return this._thematic;
     }
 
+    /**
+     * Get the indices of the triangles.
+     * @returns {number[]} - The indices of the triangles.
+     */
     get indices(): number[] {
         return this._indices;
     }
 
+    /**
+     * Get the components of the layer.
+     * @returns {ILayerComponent[]} - The components of the layer.
+     */
     get components(): ILayerComponent[] {
         return this._components;
     }
 
-    getPickedId(x: number, y: number): Promise<number> {
+    /**
+     * Get the picked ID at the specified screen coordinates.
+     * @param x - The x-coordinate of the screen position.
+     * @param y - The y-coordinate of the screen position.
+     * @returns {Promise<number>} - A promise that resolves to the picked ID.
+     */
+    public getPickedId(x: number, y: number): Promise<number> {
         return this._pipelinePicking.readPickedId(x, y);
     }
 
-    createPipeline(renderer: Renderer): void {
+    /**
+     * Create the rendering pipeline for the layer.
+     * @param {Renderer} renderer - The renderer instance.
+     */
+    public createPipeline(renderer: Renderer): void {
         if (this.layerRenderInfo.pipeline === RenderPipeline.TRIANGLE_FLAT) {
             this._pipeline = new PipelineTriangleFlat(renderer);
         }
@@ -62,7 +130,11 @@ export class Triangles2DLayer extends Layer {
         this._pipelinePicking.build(this);
     }
 
-    loadData(layerData: ILayerData): void {
+    /**
+     * Load the layer data, including geometry and components.
+     * @param {ILayerData} layerData - The data associated with the layer.
+     */
+    public loadData(layerData: ILayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
 
@@ -74,7 +146,11 @@ export class Triangles2DLayer extends Layer {
         this._highlightedIds = new Set<number>();
     }
 
-    loadGeometry(layerGeometry: ILayerGeometry[]): void {
+    /**
+     * Load the geometry data for the layer.
+     * @param {ILayerGeometry[]} layerGeometry - The geometry data to load.
+     */
+    public loadGeometry(layerGeometry: ILayerGeometry[]): void {
         const position: number[] = [];
         const indices: number[] = [];
 
@@ -91,14 +167,14 @@ export class Triangles2DLayer extends Layer {
                     position.push(d);
 
                     if (id % 2 === 1) {
-                        const z = this._layerInfo.zIndex;
+                        const z = this._layerInfo.zValue;
                         position.push(z);
                     }
                 }
 
                 if (this._dimension === 3) {
                     if (id % 3 === 2) {
-                        d += this._layerInfo.zIndex;
+                        d += this._layerInfo.zValue;
                     }
 
                     position.push(d);
@@ -110,7 +186,11 @@ export class Triangles2DLayer extends Layer {
         this._indices = indices;
     }
 
-    loadComponent(layerComponents: ILayerComponent[]): void {
+    /**
+     * Load the components of the layer.
+     * @param {ILayerComponent[]} layerComponents - The components to load.
+     */
+    public loadComponent(layerComponents: ILayerComponent[]): void {
         this._components = [];
 
         const accum = { nPoints: 0, nTriangles: 0 };
@@ -127,7 +207,11 @@ export class Triangles2DLayer extends Layer {
         }
     }
 
-    loadThematic(layerThematic: ILayerThematic[]): void {
+    /**
+     * Load the thematic data for the layer.
+     * @param {ILayerThematic[]} layerThematic - The thematic data to load.
+     */
+    public loadThematic(layerThematic: ILayerThematic[]): void {
         const thematic: number[] = [];
 
         for (let compId = 0; compId < layerThematic.length; compId++) {
@@ -156,7 +240,11 @@ export class Triangles2DLayer extends Layer {
         this._thematic = thematic;
     }
 
-    renderPass(camera: Camera): void {
+    /**
+     * Render the layer for the current pass.
+     * @param {Camera} camera - The camera instance.
+     */
+    public renderPass(camera: Camera): void {
         if (this._renderInfoIsDirty) {
             this._pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
@@ -170,12 +258,19 @@ export class Triangles2DLayer extends Layer {
         this._pipeline.renderPass(camera);
     }
 
-    renderPickingPass(camera: Camera): void {
+    /**
+     * Render the picking pass for the layer.
+     * @param {Camera} camera - The camera instance.
+     */
+    public renderPickingPass(camera: Camera): void {
         this._pipelinePicking.renderPass(camera);
     }
 
-    setHighlightedIds(ids: number[]): void {
-
+    /**
+     * Set highlighted IDs for the layer.
+     * @param {number[]} ids - The IDs to highlight.
+     */
+    public setHighlightedIds(ids: number[]): void {
         // If id is already in highlightedIds, remove it (i.e., toggle it off)
         ids.forEach(id => {
             if(this._highlightedIds.has(id)) {
@@ -207,10 +302,21 @@ export class Triangles2DLayer extends Layer {
         this.makeLayerDataInfoDirty();
     }
 
+    /**
+     * Aggregate thematic data for point level.
+     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
+     * @returns {number[]} - The aggregated thematic data.
+     */
     private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
         return layerThematic.values;
     }
 
+    /**
+     * Aggregate thematic data for primitive level.
+     * @param {number} component - The component index.
+     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
+     * @returns {number[]} - The aggregated thematic data.
+     */
     private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): number[] {
         // component points: start/end indices and number of points
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
@@ -233,6 +339,12 @@ export class Triangles2DLayer extends Layer {
         return thematic;
     }
 
+    /**
+     * Aggregate thematic data for component level.
+     * @param {number} component - The component index.
+     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
+     * @returns {number[]} - The aggregated thematic data.
+     */
     private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): number[] {
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;

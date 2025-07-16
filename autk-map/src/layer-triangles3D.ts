@@ -6,20 +6,41 @@ import { Triangles2DLayer } from './layer-triangles2D';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
+/**
+ * Triangles3DLayer class extends Triangles2DLayer to handle rendering of 3D triangles layers.
+ * It manages the normals and creates a specific rendering pipeline for 3D triangles.
+ */
 export class Triangles3DLayer extends Triangles2DLayer {
+    /**
+     * Normals of the triangles.
+     * @type {number[]}
+     */
     protected _normal!: number[];
 
+    /**
+     * Constructor for Triangles3DLayer
+     * @param {ILayerInfo} layerInfo - The layer information.
+     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {ILayerData} layerData - The layer data.
+     */
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
         super(layerInfo, layerRenderInfo, layerData, 3);
         this.computeNormals();
     }
 
+    /**
+     * Get the normals of the triangles.
+     * @returns {number[]} - The normals of the triangles.
+     */
     get normal(): number[] {
         return this._normal;
     }
 
-    createPipeline(renderer: Renderer): void {
-        // TODO: USE OTHER PIPELINES
+    /**
+     * Create the rendering pipeline for the layer.
+     * @param {Renderer} renderer - The renderer instance.
+     */
+    public createPipeline(renderer: Renderer): void {
         this._pipeline = new PipelineBuildingSSAO(renderer);
         this._pipeline.build(this);
 
@@ -27,7 +48,10 @@ export class Triangles3DLayer extends Triangles2DLayer {
         this._pipelinePicking.build(this);
     }
 
-    computeNormals(): void {
+    /**
+     * Compute the normals for the triangles.
+     */
+    public computeNormals(): void {
         // same size as the position array
         const len = this._position.length;
 

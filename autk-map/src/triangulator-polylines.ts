@@ -6,9 +6,23 @@ import { FeatureCollection, Feature, LineString } from 'geojson';
 import { ILayerGeometry, ILayerComponent } from './interfaces';
 import { Triangulator } from './triangulator';
 
+/**
+ * Class for triangulating polylines from GeoJSON features.
+ * It provides methods to convert different geometry types into polyline meshes.
+ */
 export class TriangulatorPolylines extends Triangulator {
+    /**
+     * The offset distance for the polyline extrusion.
+     * @type {number}
+     */
     static offset: number = 300;
 
+    /**
+     * Builds a mesh from GeoJSON features representing polylines.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];

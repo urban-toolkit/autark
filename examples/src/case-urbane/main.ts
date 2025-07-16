@@ -77,7 +77,7 @@ export class Urbane {
       geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
       outputTableName: 'neighborhoods',
       coordinateFormat: 'EPSG:3395',
-      type: 'features'
+      type: 'boundaries'
     });
   }
 

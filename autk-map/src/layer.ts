@@ -9,20 +9,52 @@ import { Renderer } from './renderer';
  * 
  * It includes methods for loading data, geometry, components, and thematic data,
  * as well as rendering and picking operations.
- * 
- * @param {ILayerInfo} layerInfo - The information about the layer.
- * @param {ILayerRenderInfo} layerRenderInfo - The rendering information for the layer.
 */
 export abstract class Layer {
+    /**
+     * Layer information.
+     * @type {ILayerInfo}
+     */
     protected _layerInfo!: ILayerInfo;
+
+    /**
+     * Layer rendering information.
+     * @type {ILayerRenderInfo}
+     */
     protected _layerRenderInfo!: ILayerRenderInfo;
 
+    /**
+     * Indicates if the layer's rendering information is dirty.
+     * This is used to determine if uniforms need to be reloaded.
+     * @type {boolean}
+     */
     protected _renderInfoIsDirty: boolean = false;
+
+    /**
+     * Indicates if the layer's data information is dirty.
+     * This is used to determine if VOBs need to be reconstructed.
+     * @type {boolean}
+     */
     protected _dataInfoIsDirty: boolean = false;
 
+    /**
+     * Highlighted IDs of the layer.
+     * This is a set to ensure uniqueness of highlighted IDs.
+     * @type {Set<number>}
+     */
     protected _highlightedIds!: Set<number>;
+
+    /**
+     * Highlighted vertices of the layer.
+     * @type {number[]}
+     */
     protected _highlightedVertices!: number[];
 
+    /**
+     * Constructor for Layer
+     * @param {ILayerInfo} layerInfo - The layer information.
+     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
+     */
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
         this._layerInfo = layerInfo;
         this._layerRenderInfo = layerRenderInfo;

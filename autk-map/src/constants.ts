@@ -29,9 +29,9 @@ export enum LayerType {
   OSM_WATER = 'water',
   OSM_ROADS = 'roads',
   OSM_BUILDINGS = 'buildings',
-  BOUNDARIES_LAYER  = 'features',
+  BOUNDARIES_LAYER  = 'boundaries',
   POLYLINES_LAYER = 'lines',
-  HEATMAP_LAYER  = 'grid',
+  HEATMAP_LAYER  = 'heatmap',
 }
 
 /**

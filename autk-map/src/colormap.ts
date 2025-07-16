@@ -3,7 +3,19 @@ import * as d3_scale from 'd3-scale-chromatic';
 
 import { ColorHEX, ColorMapInterpolator, ColorRGB, ColorTEX } from './constants';
 
+/**
+ * ColorMap class provides methods to handle color mapping and interpolation.
+ * It allows retrieval of colors based on values and color map interpolators,
+ * as well as conversion between RGB and HEX color formats.
+ * @example
+ * const color = ColorMap.getColor(0.5, ColorMapInterpolator.INTERPOLATOR_REDS);
+ * const colorMap = ColorMap.getColorMap(ColorMapInterpolator.INTERPOLATOR_REDS, 256);
+ */
 export class ColorMap {
+    /**
+     * The color map interpolator function.
+     * This is set when a color map is requested.
+     */
     protected static _interpolator: (t: number) => string;
 
     /**

@@ -6,9 +6,20 @@ import { Box2D } from "./box2d";
  * It allows building bounding boxes from GeoJSON features and checking overlaps.
  */
 export class AABB {
+    /**
+     * The count of bounding boxes.
+     * @type {number}
+     */
     protected _boxCount = 0;
+    /**
+     * A map to store bounding boxes with their IDs.
+     * @type {Map<number, Box2D>}
+     */
     protected _boxes: Map<number, Box2D>;
 
+    /**
+     * Initializes the AABB instance with an empty map of boxes.
+     */
     constructor() {
         this._boxes = new Map<number, Box2D>;
     }

@@ -1,123 +1,148 @@
 import {
-  ColorHEX,
-  ColorMapInterpolator,
-  LayerGeometryType,
-  LayerType,
-  RenderPipeline,
-  ThematicAggregationLevel,
+    ColorHEX,
+    ColorMapInterpolator,
+    LayerGeometryType,
+    LayerType,
+    RenderPipeline,
+    ThematicAggregationLevel,
 } from './constants';
 
 /**
  * Interface for map styles.
+ * @property {ColorHEX} surface - Color of the map's surface.
+ * @property {ColorHEX} coastline - Color of the map's coastline.
+ * @property {ColorHEX} parks - Color of the map's parks.
+ * @property {ColorHEX} water - Color of the map's water bodies.
+ * @property {ColorHEX} roads - Color of the map's roads.
+ * @property {ColorHEX} buildings - Color of the map's buildings.
+ * @property {ColorHEX} features - Color of the map's features.
+ * @property {ColorHEX} lines - Color of the map's lines.
  */
 export interface IMapStyle {
-  /** Land layer (map background) color */
-  land: ColorHEX;
-  /** Roads color */
-  roads: ColorHEX;
-  /** Parks color */
-  parks: ColorHEX;
-  /** Water color */
-  water: ColorHEX;
-  /** Coastline color */
-  coastline: ColorHEX;
-  /** Sky color */
-  sky: ColorHEX;
-  /** Surface color */
-  surface: ColorHEX;
-  /** Buildings color */
-  buildings: ColorHEX;
-  /** Features color */
-  features: ColorHEX;
-  /** Lines color */
-  lines: ColorHEX;
+    surface: ColorHEX;
+    coastline: ColorHEX;
+    parks: ColorHEX;
+    water: ColorHEX;
+    roads: ColorHEX;
+    buildings: ColorHEX;
+    boundaries: ColorHEX;
+    lines: ColorHEX;
 }
 
 /**
  * Interface for layer information.
+ * @property {string} id - Unique identifier for the layer.
+ * @property {number} zValue - Z-value of the layer for rendering order.
+ * @property {LayerGeometryType} typeGeometry - Type of geometry used in the layer.
+ * @property {LayerType} typeLayer - Type of layer.
  */
 export interface ILayerInfo {
-  id: string;
-  zIndex: number;
-  typeGeometry: LayerGeometryType;
-  typeLayer: LayerType;
+    id: string;
+    zValue: number;
+    typeGeometry: LayerGeometryType;
+    typeLayer: LayerType;
 }
 
 /**
  * Interface for layer render information.
+ * @property {RenderPipeline} pipeline - Rendering pipeline used for the layer.
+ * @property {number} opacity - Opacity of the layer.
+ * @property {boolean} [isColorMap] - Indicates if the layer is a color map.
+ * @property {ColorMapInterpolator} colorMapInterpolator - Interpolator for color mapping.
+ * @property {number[]} [pickedComps] - Components that are picked, if any.
+ * @property {boolean} [isSkip] - Indicates if the layer should be skipped in rendering.
+ * @property {boolean} [isPick] - Indicates if the layer is for picking
  */
 export interface ILayerRenderInfo {
-  pipeline: RenderPipeline;
-  opacity: number;
-  isColorMap?: boolean;
-  colorMapInterpolator: ColorMapInterpolator;
-  pickedComps?: number[];
-  isSkip?: boolean;
-  isPick?: boolean;
+    pipeline: RenderPipeline;
+    opacity: number;
+    isColorMap?: boolean;
+    colorMapInterpolator: ColorMapInterpolator;
+    pickedComps?: number[];
+    isSkip?: boolean;
+    isPick?: boolean;
 }
 
 /**
  * Interface for layer border information.
+ * @property {ILayerBorder[]} [border] - Array of borders for the layer.
+ * @property {ILayerGeometry[]} geometry - Array of geometries for the layer.
+ * @property {ILayerComponent[]} components - Array of components for the layer.
+ * @property {ILayerThematic[]} [thematic] - Thematic data for the layer.
+ * @property {number[]} [highlighted] - Indices of highlighted components in the layer.
  */
 export interface ILayerData {
-  border?: ILayerBorder[];
-  geometry: ILayerGeometry[];
-  components: ILayerComponent[];
-  thematic?: ILayerThematic[];
-  highlighted?: number[];
+    border?: ILayerBorder[];
+    geometry: ILayerGeometry[];
+    components: ILayerComponent[];
+    thematic?: ILayerThematic[];
+    highlighted?: number[];
 }
 
 /**
  * Interface for layer geometry information.
+ * @property {number[]} position - Array of positions for the geometry.
+ * @property {number[]} [normal] - Optional array of normals for the geometry.
+ * @property {number[]} [indices] - Optional array of indices for the geometry.
  */
 export interface ILayerGeometry {
-  position: number[];
-  normal?: number[];
-  indices?: number[];
+    position: number[];
+    normal?: number[];
+    indices?: number[];
 }
 
 /**
  * Interface for layer border information.
+ * @property {number[]} position - Position of the border.
+ * @property {number[]} indices - Indices of the border.
  */
 export interface ILayerBorder {
-  position: number[];
-  indices: number[];
+    position: number[];
+    indices: number[];
 }
 
 /**
  * Interface for layer thematic data.
+ * @property {ThematicAggregationLevel} level - Thematic aggregation level.
+ * @property {number[]} values - Array of values for the thematic layer.
  */
 export interface ILayerThematic {
-  level: ThematicAggregationLevel;
-  values: number[];
+    level: ThematicAggregationLevel;
+    values: number[];
 }
 
 /**
  * Interface for layer components.
+ * @property {number} nPoints - Number of points in the layer component.
+ * @property {number} nTriangles - Number of triangles in the layer component.
  */
 export interface ILayerComponent {
-  nPoints: number;
-  nTriangles: number;
+    nPoints: number;
+    nTriangles: number;
 }
 
 /**
  * Interface for camera data.
+ * @property {number[]} up - Up vector of the camera.
+ * @property {number[]} eye - Position of the camera.
+ * @property {number[]} lookAt - Point the camera is looking at.
  */
 export interface ICameraData {
-  origin: number[];
-  direction: {
     up: number[];
     eye: number[];
     lookAt: number[];
-  };
 }
 
 /**
  * Interface for Bounding Box.
+ * @property {number} minLon - Minimum longitude of the bounding box.
+ * @property {number} minLat - Minimum latitude of the bounding box.
+ * @property {number} maxLon - Maximum longitude of the bounding box.
+ * @property {number} maxLat - Maximum latitude of the bounding box.
  */
 export interface IBoundingBox {
-  minLon: number;
-  minLat: number;
-  maxLon: number;
-  maxLat: number;
+    minLon: number;
+    minLat: number;
+    maxLon: number;
+    maxLat: number;
 }

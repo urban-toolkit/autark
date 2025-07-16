@@ -3,8 +3,17 @@ import { FeatureCollection, Feature } from "geojson";
 import { ILayerBorder } from "./interfaces";
 import { Triangulator } from "./triangulator";
 
-export abstract class TriangulatorBorders extends Triangulator {
-
+/**
+ * Class for triangulating borders from GeoJSON features.
+ * It provides methods to convert different geometry types into borders.
+ */
+export class TriangulatorBorders extends Triangulator {
+    /**
+     * Converts GeoJSON features into a collection of borders.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
     static buildBorder(geojson: FeatureCollection, origin: number[]): ILayerBorder[] {
         const border: ILayerBorder[] = [];
 

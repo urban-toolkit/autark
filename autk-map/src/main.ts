@@ -191,7 +191,6 @@ export class AutkMap {
         this.render();
 
         this._ui.buildUi();
-
     }
 
     /**
@@ -206,9 +205,9 @@ export class AutkMap {
      * - OSM_BUILDINGS
      *
      * Custom layers can also be loaded with types:
-     * - CUSTOM_FEATURES_LAYER
-     * - CUSTOM_LINES_LAYER
-     * - CUSTOM_GRID_LAYER
+     * - BOUNDARIES_LAYER
+     * - POLYLINES_LAYER
+     * - HEATMAP_LAYER
      *
      * @param {string} layerName The name of the layer
      * @param {LayerType} typeLayer The type of the layer
@@ -372,8 +371,7 @@ export class AutkMap {
         this._canvas.width = width * (window.devicePixelRatio || 1);
         this._canvas.height = height * (window.devicePixelRatio || 1);
 
-        this._camera.setViewportResolution(width, height);
-        this._camera.update();
+        this._camera.resize(width, height);
         this._renderer.resize(width, height);
     }
 
@@ -450,7 +448,7 @@ export class AutkMap {
 
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: zIndex,
+            zValue: zIndex,
             typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: typeLayer,
         };
@@ -493,7 +491,7 @@ export class AutkMap {
     private createLayerFromOsmCoastline(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerRenderOrder.OSM_COASTLINE,
+            zValue: LayerRenderOrder.OSM_COASTLINE,
             typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: LayerType.OSM_COASTLINE,
         };
@@ -535,7 +533,7 @@ export class AutkMap {
     private createLayerfromOsmRoads(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerRenderOrder.OSM_ROADS,
+            zValue: LayerRenderOrder.OSM_ROADS,
             typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: LayerType.OSM_ROADS,
         };
@@ -578,7 +576,7 @@ export class AutkMap {
     private createLayersFromOsmBuildings(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerRenderOrder.OSM_BUILDINGS,
+            zValue: LayerRenderOrder.OSM_BUILDINGS,
             typeGeometry: LayerGeometryType.TRIANGLES_3D,
             typeLayer: LayerType.OSM_BUILDINGS,
         };
@@ -620,7 +618,7 @@ export class AutkMap {
     private createLayerFromBoundaries(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerRenderOrder.BOUNDARIES_LAYER + 0.01 * this.layerManager.length,
+            zValue: LayerRenderOrder.BOUNDARIES_LAYER + 0.01 * this.layerManager.length,
             typeGeometry: LayerGeometryType.BOUNDARIES_2D,
             typeLayer: LayerType.BOUNDARIES_LAYER,
         };
@@ -669,7 +667,7 @@ export class AutkMap {
     private createLayerFromPolylines(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerRenderOrder.POLYLINES_LAYER + 0.01 * this.layerManager.length,
+            zValue: LayerRenderOrder.POLYLINES_LAYER + 0.01 * this.layerManager.length,
             typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: LayerType.POLYLINES_LAYER,
         };
@@ -712,7 +710,7 @@ export class AutkMap {
     private createLayerFromHeatmap(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerRenderOrder.HEATMAP_LAYER,
+            zValue: LayerRenderOrder.HEATMAP_LAYER,
             typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: LayerType.HEATMAP_LAYER,
         };

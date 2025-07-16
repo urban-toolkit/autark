@@ -3,18 +3,42 @@ import { Feature, LineString } from "geojson";
 
 /**
  * Constructs a Box2D instance from a GeoJSON feature.
- * It initializes the bounding box dimensions based on the feature's coordinates.
- * 
- * @param {Feature} feature - The GeoJSON feature to create the bounding box from.
  */
 export class Box2D {
+    /**
+     * The minimum x-coordinate of the bounding box.
+     * @type {number}
+     */
     public xmin: number = 0;
+
+    /**
+     * The maximum x-coordinate of the bounding box.
+     * @type {number}
+     */
     public xmax: number = 0;
+
+    /**
+     * The minimum y-coordinate of the bounding box.
+     * @type {number}
+     */
     public ymin: number = 0;
+
+    /**
+     * The maximum y-coordinate of the bounding box.
+     * @type {number}
+     */
     public ymax: number = 0;
 
+    /**
+     * The features contained within the bounding box.
+     * @type {Feature[]}
+     */
     public feats: Feature[] = [];
 
+    /**
+     * Initializes the bounding box dimensions based on the feature's coordinates.
+     * @param {Feature} feature - The GeoJSON feature to create the bounding box from.
+     */
     constructor(feature: Feature) {
         const { coordinates } = <LineString>feature.geometry;
 

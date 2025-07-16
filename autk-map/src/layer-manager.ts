@@ -28,9 +28,22 @@ import { LayerGeometryType } from './constants';
  * as well as to manage the bounding box of the map.
  */
 export class LayerManager {
+    /**
+     * List of layers in the map.
+     * @type {Layer[]}
+     */
     protected _layers: Layer[] = [];
 
+    /**
+     * Bounding box of the map.
+     * @type {Feature<Polygon>}
+     */
     protected _bbox!: Feature<Polygon>;
+
+    /**
+     * Origin of the map.
+     * @type {number[]}
+     */
     protected _origin!: number[];
 
     /**
@@ -125,7 +138,7 @@ export class LayerManager {
 
         if (layer) {
             this._layers.push(layer);
-            this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+            this._layers.sort((a, b) => a.layerInfo.zValue - b.layerInfo.zValue);
 
             return layer;
         }

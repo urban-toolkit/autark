@@ -4,11 +4,18 @@ import { MapStyle } from './map-style';
 /**
  * KeyEvents class handles keyboard interactions with the map.
  * It allows toggling layer properties and changing map styles using keyboard shortcuts.
- * @param {AutkMap} map The map instance
  */
 export class KeyEvents {
+    /**
+     * Reference to the AutkMap instance.
+     * @type {AutkMap}
+     */
     private _map!: AutkMap
 
+    /**
+     * Constructor for KeyEvents
+     * @param {AutkMap} map The map instance
+     */
     constructor(map: AutkMap) {
         this._map = map;
     }

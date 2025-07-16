@@ -8,11 +8,11 @@ export type LayerType =
   | 'roads'
   | 'buildings'
   | 'lines'
-  | 'features'
-  | 'grid';
+  | 'boundaries'
+  | 'heatmap';
 
 export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'lines', 'features', 'grid'].includes(value);
+  return ['surface', 'coastline', 'water', 'parks', 'roads', 'buildings', 'lines', 'boundaries', 'heatmap'].includes(value);
 }
 
 export interface Params {

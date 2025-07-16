@@ -10,22 +10,53 @@ import { Camera } from './camera';
 
 import { Triangles2DBorder } from './layer-triangles2D-borders';
 
+/**
+ * PipelineBorderFlat is a rendering pipeline for drawing flat borders of triangles in 2D space.
+ * It uses WebGPU to render lines based on the provided border data.
+ */
 export class PipelineBorderFlat extends Pipeline {
-    // Vertex buffers
+    /**
+     * Position buffer for vertex data.
+     * @type {GPUBuffer}
+     */
     protected _positionBuffer!: GPUBuffer;
+
+    /**
+     * Buffer for border indices.
+     * @type {GPUBuffer}
+     */
     protected _borderIndicesBuffer!: GPUBuffer;
 
-    // shaders
+    /**
+     * Vertex shader module.
+     * @type {GPUShaderModule}
+     */
     protected _vertModule!: GPUShaderModule;
+
+    /**
+     * Fragment shader module.
+     * @type {GPUShaderModule}
+     */
     protected _fragModule!: GPUShaderModule;
 
-    // render pipeline
+    /**
+     * Render pipeline for drawing borders.
+     * @type {GPURenderPipeline}
+     */
     protected _pipeline!: GPURenderPipeline;
 
+    /**
+     * Constructor for PipelineBorderFlat
+     * @param {Renderer} renderer The renderer instance
+     */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
+    /**
+     * Builds the pipeline with the provided border data.
+     * @param {Triangles2DBorder} borders The border data containing positions and indices
+     */
     build(borders: Triangles2DBorder) {
         this.createShaders();
 
@@ -38,6 +69,9 @@ export class PipelineBorderFlat extends Pipeline {
         this.createPipeline();
     }
 
+    /**
+     * Creates the vertex and fragment shaders for the pipeline.
+     */
     createShaders() {
         // Vertex shader
         const vsmDesc = {
@@ -52,6 +86,10 @@ export class PipelineBorderFlat extends Pipeline {
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
+    /**
+     * Creates the vertex buffers for the pipeline.
+     * @param {Triangles2DBorder} borders The border data containing positions and indices
+     */
     createVertexBuffers(borders: Triangles2DBorder) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
@@ -68,11 +106,18 @@ export class PipelineBorderFlat extends Pipeline {
         });
     }
 
+    /**
+     * Updates the vertex buffers with the provided border data.
+     * @param {Triangles2DBorder} borders The border data containing positions and indices
+     */
     updateVertexBuffers(borders: Triangles2DBorder) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
         this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
     }
 
+    /**
+     * Creates the render pipeline for drawing borders.
+     */
     createPipeline() {
         // Vertex data
         const positionAttribDesc: GPUVertexAttribute = {
@@ -151,6 +196,10 @@ export class PipelineBorderFlat extends Pipeline {
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
+    /**
+     * Renders the border flat pipeline.
+     * @param {Camera} camera The camera instance
+     */
     renderPass(camera: Camera) {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;

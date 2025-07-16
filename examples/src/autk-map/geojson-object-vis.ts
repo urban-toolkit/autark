@@ -16,7 +16,7 @@ export class GeojsonVis {
       geojsonObject: data,
       outputTableName: 'neighborhoods',
       coordinateFormat: 'EPSG:3395',
-      type: 'features'
+      type: 'boundaries'
     });
 
     const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');

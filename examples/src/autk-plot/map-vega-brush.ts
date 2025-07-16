@@ -25,7 +25,7 @@ export class MapVega {
       geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
       outputTableName: 'neighborhoods',
       coordinateFormat: 'EPSG:3395',
-      type: 'features'
+      type: 'boundaries'
     });
 
     await this.db.loadCsv({
@@ -148,7 +148,7 @@ export class MapVega {
 
   protected async updateMapListeners(vegaDataKey: string) {
     this.map.mapEvents.addEventListener(MapEvent.PICK, (selection) => {
-      const view = this.plot.ref as View;
+      const view = this.plot.refs as View;
       const state = view.getState();
 
       if (!state.data[`brush_store`] || selection.length === 0) {

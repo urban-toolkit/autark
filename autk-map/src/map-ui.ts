@@ -1,31 +1,67 @@
 import { Layer } from './layer.js';
 import { AutkMap } from './main.js';
 
+/**
+ * Map UI class for managing the user interface elements of the map.
+ */
 export class AutkMapUi {
+    /**
+     * Reference to the AutkMap instance.
+     * @type {AutkMap}
+     */
     protected _map: AutkMap
+
+    /**
+     * Currently selected layer in the UI.
+     * @type {Layer | null}
+     */
     protected _currentLayer: Layer | null;
 
+    /**
+     * Constructor for AutkMapUi
+     * @param {AutkMap} map The map instance
+     */
     constructor(map: AutkMap) {
         this._map = map;
         this._currentLayer = null;
     }
 
+    /**
+     * Get the map instance.
+     * @returns {AutkMap} - The map instance.
+     */
     get map(): AutkMap {
         return this._map;
     }
 
+    /**
+     * Set the map instance.
+     * @param {AutkMap} map - The map instance to set.
+     */
     set map(map: AutkMap) {
         this._map = map;
     }
 
+    /**
+     * Get the current layer in the UI.
+     * @returns {Layer | null} - The currently selected layer or null if none is selected.
+     */
     get currentLayer(): Layer | null {
         return this._currentLayer;
     }
 
+    /**
+     * Set the current layer in the UI.
+     * @param {Layer | null} layer - The layer to set as current or null to clear.
+     */
     set currentLayer(layer: Layer | null) {
         this._currentLayer = layer;
     }
 
+    /**
+     * Change the current layer in the UI.
+     * @param {Layer | null} layer - The layer to change to or null to clear.
+     */
     public changeLayer(layer: Layer | null): void {
         if (!layer) {
             console.warn('No layer provided to changeLayer');
@@ -48,6 +84,9 @@ export class AutkMapUi {
         this.currentLayer.makeLayerRenderInfoDirty();
     }
 
+    /**
+     * Build the UI elements for the map.
+     */
     public buildUi(): void {
         const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
         const styleNode = document.createElement('style');
@@ -91,6 +130,9 @@ export class AutkMapUi {
         this.map.canvas.parentElement?.appendChild(uiDiv);
     }
 
+    /**
+     * Update the UI elements based on the current state of the map.
+     */
     public updateUi(): void {
         if (!this.currentLayer) {
             this.changeLayer(this.map.layerManager.layers[0] || null);
@@ -101,6 +143,9 @@ export class AutkMapUi {
         this.buildEnablePickingDropdown();
     }
 
+    /**
+     * Build the submenu for layer options.
+     */
     protected buildSubMenu(): void {
         let subMenu = document.getElementById('autkMapSubMenu');
 
@@ -133,6 +178,9 @@ export class AutkMapUi {
         }
     }
 
+    /**
+     * Build the active layers dropdown.
+     */
     protected buildActiveLayersDropdown(): void {
         const subMenu = document.getElementById('autkMapSubMenu');
 
@@ -250,6 +298,10 @@ export class AutkMapUi {
         });
     }
 
+    /**
+     * Build the enable picking dropdown.
+     * This allows users to select which layer should be enabled for picking.
+     */
     protected buildEnablePickingDropdown(): void {
         const subMenu = document.getElementById('autkMapSubMenu');
 

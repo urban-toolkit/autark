@@ -7,7 +7,17 @@ import { Triangulator } from "./triangulator";
 import { AABB } from "./aabb";
 import { booleanClockwise } from "@turf/turf";
 
+/**
+ * Class for triangulating buildings from GeoJSON features.
+ * It provides methods to convert different geometry types into building meshes.
+ */
 export class TriangulatorBuildings extends Triangulator {
+    /**
+     * Builds a mesh from GeoJSON features representing buildings.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
@@ -106,7 +116,12 @@ export class TriangulatorBuildings extends Triangulator {
         return [mesh, comps];
     }
 
-    static groupBuildings(geojson: FeatureCollection): Feature[][] {
+    /**
+     * Groups buildings based on their AABB.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @returns {Feature[][]} An array of grouped features
+     */
+    private static groupBuildings(geojson: FeatureCollection): Feature[][] {
         // checks if is a valid feature
         let filtered = TriangulatorBuildings.removeInvalidBuildingParts(geojson.features);
 
@@ -134,6 +149,11 @@ export class TriangulatorBuildings extends Triangulator {
         return features;
     }
 
+    /**
+     * Removes invalid building parts from the feature collection.
+     * @param {Feature[]} features The array of GeoJSON features
+     * @returns {Feature[]} The filtered array of valid features
+     */
     private static removeInvalidBuildingParts(features: Feature[]): Feature[] {
 
         const filtered = features.filter((feat: Feature) => {
@@ -155,6 +175,11 @@ export class TriangulatorBuildings extends Triangulator {
         return filtered;
     }
 
+    /**
+     * Computes the heights of a building feature.
+     * @param {Feature} feature The GeoJSON feature representing a building
+     * @returns {number[]} An array containing the minimum and maximum heights
+     */
     private static computeBuildingHeights(feature: Feature): number[] {
         const z_SCALE = 1.0;
         const FLOOR_HEIGHT = 3.4; // in meters
@@ -193,6 +218,11 @@ export class TriangulatorBuildings extends Triangulator {
         return [z_SCALE * min_height, z_SCALE * height];
     }
 
+    /**
+     * Fixes the orientation of the features to ensure consistent winding order.
+     * @param {Feature[]} features The array of GeoJSON features
+     * @returns {Feature[]} The array with fixed orientations
+     */
     protected static fixOrientation(features: Feature[]): Feature[] {
         for (const feature of features) {
             let { coordinates } = <LineString>feature.geometry;
@@ -206,6 +236,11 @@ export class TriangulatorBuildings extends Triangulator {
         return features;
     }
 
+    /**
+     * Closes the features by ensuring the first and last points are the same.
+     * @param {Feature[]} features The array of GeoJSON features
+     * @returns {Feature[]} The array with closed features
+     */
     protected static closeFeatures(features: Feature[]): Feature[] {
         for (const feature of features) {
             const { coordinates } = <LineString>feature.geometry;

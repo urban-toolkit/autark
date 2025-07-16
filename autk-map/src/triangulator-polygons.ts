@@ -3,8 +3,17 @@ import { FeatureCollection, Feature, BBox } from "geojson";
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
 
-export abstract class TriangulatorPolygons extends Triangulator {
-
+/**
+ * Class for triangulating polygons from GeoJSON features.
+ * It provides methods to convert different geometry types into polygon meshes.
+ */
+export class TriangulatorPolygons extends Triangulator {
+    /**
+     * Builds a mesh from GeoJSON features representing polygons.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
     static buildGrid(nx: number, ny: number, bbox: BBox) : { flatCoords: number[], flatIds: number[] } {
         const flatCoords = [];
         const flatIds = [];
@@ -32,6 +41,12 @@ export abstract class TriangulatorPolygons extends Triangulator {
         return { flatCoords, flatIds };
     }
 
+    /**
+     * Builds a mesh from GeoJSON features representing polygons.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];

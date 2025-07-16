@@ -7,9 +7,18 @@ import { AABB } from "./aabb";
 import { Triangulator } from "./triangulator";
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 
-
+/**
+ * Class for triangulating coastlines from GeoJSON features.
+ * It provides methods to convert different geometry types into coastline meshes.
+ */
 export abstract class TriangulatorCoastline extends Triangulator {
-
+    /**
+     * Builds a mesh from GeoJSON features representing coastlines.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {number[]} origin The origin point for translation
+     * @param {Feature<Polygon | MultiPolygon>} bbox The bounding box feature
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
     static override buildMesh(geojson: FeatureCollection, origin: number[], bbox: Feature<Polygon | MultiPolygon>): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
@@ -72,7 +81,12 @@ export abstract class TriangulatorCoastline extends Triangulator {
         return [mesh, comps];
     }
 
-    static mergeGroupGeometry(group: Feature[]): Position[] {
+    /**
+     * Merges the geometry of a group of features into a single array of positions.
+     * @param {Feature[]} group The array of GeoJSON features
+     * @returns {Position[]} An array of merged positions
+     */
+    private static mergeGroupGeometry(group: Feature[]): Position[] {
         // merged geometry
         const merge: Position[] = [];
         const { coordinates } = <LineString>group[0].geometry;
@@ -132,7 +146,12 @@ export abstract class TriangulatorCoastline extends Triangulator {
         return merge;
     }
 
-    static groupParts(geojson: FeatureCollection): Feature[][] {
+    /**
+     * Groups the features based on their AABB.
+     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @returns {Feature[][]} An array of grouped features
+     */
+    private static groupParts(geojson: FeatureCollection): Feature[][] {
         // builds the AABB
         const aabb = new AABB();
         aabb.buildFeatureBoxes(geojson.features);

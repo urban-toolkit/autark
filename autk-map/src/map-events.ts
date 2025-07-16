@@ -3,11 +3,18 @@ import { MapEvent, MapEventListener } from './constants';
 /**
  * Class to handle map events.
  * It allows adding, removing, and emitting events for map interactions.
- * @param {MapEvent[]} events - The array of map events to listen for.
  */
 export class MapEvents {
+    /**
+     * Listeners for each map event.
+     * @type {Object<string, MapEventListener[]>}
+     */
     private _listeners: { [event: string]: MapEventListener[] } = {};
 
+    /**
+     * Constructor for MapEvents
+     * @param {MapEvent[]} events - The list of map events to initialize.
+     */
     constructor(events: MapEvent[]) {
         events.forEach(event => {
             this._listeners[event] = [];
