@@ -6,7 +6,7 @@ import pickingFragmentSource from './shaders/picking.frag.wgsl';
 import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
-import { FeaturesLayer } from './layer-features';
+import { Triangles2DLayer } from './layer-triangles2D';
 
 export class PipelineTrianglePicking extends Pipeline {
   private _positionBuffer!: GPUBuffer;
@@ -22,7 +22,7 @@ export class PipelineTrianglePicking extends Pipeline {
     super(renderer);
   }
 
-  build(mesh: FeaturesLayer): void {
+  build(mesh: Triangles2DLayer): void {
 
     this.createShaders();
 
@@ -47,7 +47,7 @@ export class PipelineTrianglePicking extends Pipeline {
     this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
   }
 
-  createVertexBuffers(mesh: FeaturesLayer): void {
+  createVertexBuffers(mesh: Triangles2DLayer): void {
     this._positionBuffer = this._renderer.device.createBuffer({
       label: 'Position buffer',
       size: mesh.position.length * 4,
@@ -67,7 +67,7 @@ export class PipelineTrianglePicking extends Pipeline {
     });
   }
 
-  updateVertexBuffers(layer: FeaturesLayer): void {
+  updateVertexBuffers(layer: Triangles2DLayer): void {
     this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(layer.position));
     this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(layer.indices));
 

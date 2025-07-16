@@ -1,28 +1,26 @@
 /**
- * Layer geometry types for the map.
- * @enum {string}
- * @property {string} FEATURES_2D - Represents 2D features.
- * @property {string} FEATURES_3D - Represents 3D features.
- * @property {string} BORDERS_2D  - Represents borders of 2D features.
+ * The types of geometry supported in autk-map.
+ * @property {string} FEATURES_2D - Represents a 2D triangulation.
+ * @property {string} FEATURES_3D - Represents a 3D triangulation.
+ * @property {string} BOUNDARIES_2D - Represents a 2D triangulation with boundaries.
  */
 export enum LayerGeometryType {
-  FEATURES_2D = 'features2d',
-  FEATURES_3D = 'features3d',
-  BORDERS_2D = 'borders2d'
+  TRIANGLES_2D = 'triangles2d',
+  TRIANGLES_3D = 'triangles3d',
+  BOUNDARIES_2D = 'boundaries2d'
 }
 
 /**
- * Layer types for the map.
- * @enum {string}
- * @property {string} OSM_SURFACE - Represents OpenStreetMap surface layer.
- * @property {string} OSM_COASTLINE - Represents OpenStreetMap coastline layer.
- * @property {string} OSM_PARKS - Represents OpenStreetMap parks layer.
- * @property {string} OSM_WATER - Represents OpenStreetMap water layer.
- * @property {string} OSM_ROADS - Represents OpenStreetMap roads layer.
- * @property {string} OSM_BUILDINGS - Represents OpenStreetMap buildings layer.
- * @property {string} CUSTOM_FEATURES_LAYER - Represents custom features layer.
- * @property {string} CUSTOM_LINES_LAYER - Represents custom lines layer.
- * @property {string} CUSTOM_GRID_LAYER - Represents custom grid layer.
+ * The types of layer supported in autk-map.
+ * @property {string} OSM_SURFACE - Represents the OpenStreetMap surface layer.
+ * @property {string} OSM_COASTLINE - Represents the OpenStreetMap coastline layer.
+ * @property {string} OSM_PARKS - Represents the OpenStreetMap parks layer.
+ * @property {string} OSM_WATER - Represents the OpenStreetMap water layer.
+ * @property {string} OSM_ROADS - Represents the OpenStreetMap roads layer.
+ * @property {string} OSM_BUILDINGS - Represents the OpenStreetMap buildings layer.
+ * @property {string} BOUNDARIES_LAYER - Represents a layer with closed linestrings, multilinestrings, polygons, or multipolygons.
+ * @property {string} POLYLINES_LAYER - Represents a layer of open linestrings or multilinestrings.
+ * @property {string} HEATMAP_LAYER - Represents a heatmap layer.
  */
 export enum LayerType {
   OSM_SURFACE = 'surface',
@@ -31,39 +29,37 @@ export enum LayerType {
   OSM_WATER = 'water',
   OSM_ROADS = 'roads',
   OSM_BUILDINGS = 'buildings',
-  CUSTOM_FEATURES_LAYER  = 'features',
-  CUSTOM_LINES_LAYER = 'lines',
-  CUSTOM_GRID_LAYER  = 'grid',
+  BOUNDARIES_LAYER  = 'features',
+  POLYLINES_LAYER = 'lines',
+  HEATMAP_LAYER  = 'grid',
 }
 
 /**
- * Layer Z-index values for rendering order.
- * @enum {number}
- * @property {number} OSM_SURFACE - Z-index for OpenStreetMap surface layer.
- * @property {number} OSM_COASTLINE - Z-index for OpenStreetMap coastline layer.
- * @property {number} OSM_PARKS - Z-index for OpenStreetMap parks layer.
- * @property {number} OSM_WATER - Z-index for OpenStreetMap water layer.
- * @property {number} OSM_ROADS - Z-index for OpenStreetMap roads layer.
- * @property {number} OSM_BUILDINGS - Z-index for OpenStreetMap buildings layer.
- * @property {number} CUSTOM_GRID_LAYER  - Z-index for custom grid layer.
- * @property {number} CUSTOM_FEATURES_LAYER - Z-index for custom features layer.
- * @property {number} CUSTOM_LINES_LAYER - Z-index for custom lines layer.
+ * Rendering order of the layers based on their type.
+ * @property {string} OSM_SURFACE - Represents the OpenStreetMap surface layer.
+ * @property {string} OSM_COASTLINE - Represents the OpenStreetMap coastline layer.
+ * @property {string} OSM_PARKS - Represents the OpenStreetMap parks layer.
+ * @property {string} OSM_WATER - Represents the OpenStreetMap water layer.
+ * @property {string} OSM_ROADS - Represents the OpenStreetMap roads layer.
+ * @property {string} OSM_BUILDINGS - Represents the OpenStreetMap buildings layer.
+ * @property {string} BOUNDARIES_LAYER - Represents a layer with closed linestrings, multilinestrings, polygons, or multipolygons.
+ * @property {string} POLYLINES_LAYER - Represents a layer of open linestrings or multilinestrings.
+ * @property {string} HEATMAP_LAYER - Represents a heatmap layer.
  */
-export enum LayerZIndex {
+export enum LayerRenderOrder {
   OSM_SURFACE = 0,
   OSM_COASTLINE = 0.1,
   OSM_PARKS = 0.2,
   OSM_WATER = 0.3,
   OSM_ROADS = 0.4,
   OSM_BUILDINGS = 1.0,
-  CUSTOM_GRID_LAYER  = 0.5,
-  CUSTOM_FEATURES_LAYER = 0.6,
-  CUSTOM_LINES_LAYER = 0.7
+  BOUNDARIES_LAYER = 0.6,
+  POLYLINES_LAYER = 0.7,
+  HEATMAP_LAYER  = 0.5
 }
 
 /**
  * Map events for interaction.
- * @enum {string}
  * @property {string} PICK - Event triggered when a feature is picked.
  */
 export enum MapEvent {
@@ -72,7 +68,6 @@ export enum MapEvent {
 
 /**
  * Thematic aggregation levels for thematic data.
- * @enum {string}
  * @property {string} AGGREGATION_POINT - Represents aggregation at the point level.
  * @property {string} AGGREGATION_PRIMITIVE - Represents aggregation at the primitive level.
  * @property {string} AGGREGATION_COMPONENT - Represents aggregation at the component level.
@@ -85,7 +80,6 @@ export enum ThematicAggregationLevel {
 
 /**
  * Render pipelines for different rendering techniques.
- * @enum {string}
  * @property {string} TRIANGLE_FLAT - Flat triangle rendering.
  * @property {string} TRIANGLE_SSAO - Screen Space Ambient Occlusion triangle rendering.
  * @property {string} TRIANGLE_HEATMAP - Heatmap triangle rendering.
@@ -98,7 +92,6 @@ export enum RenderPipeline {
 
 /**
  * Color map interpolators for thematic data visualization.
- * @enum {string}
  * @property {string} INTERPOLATOR_REDS - Red color interpolation.
  * @property {string} INTERPOLATOR_BLUES - Blue color interpolation.
  */
@@ -109,7 +102,6 @@ export enum ColorMapInterpolator {
 
 /**
  * Mouse status for interaction state.
- * @enum {string}
  * @property {string} MOUSE_IDLE - Mouse is idle.
  * @property {string} MOUSE_DRAG - Mouse is dragging.
  */
@@ -119,39 +111,39 @@ export enum MouseStatus {
 }
 
 /**
- * Color Hex type.
- * @typedef {string} ColorHEX
- * @description Represents a color in hexadecimal format, e.g., "#FF5733".
+ * Represents a color in hexadecimal format.
+ * @example "#FF5733"
  */
 export type ColorHEX = `#${string}`;
 
 /**
- * Color RGB type.
+ * Represents a color in RGB format, with red, green, blue components and an opacity.
+ * @property {number} r - Red component. Value must be between 0 and 255.
+ * @property {number} g - Green component. Value must be between 0 and 255.
+ * @property {number} b - Blue component. Value must be between 0 and 255.
+ * @property {number} opacity - Opacity. Value must be between
+ * @example { r: 255, g: 87, b: 51, opacity: 1 }
  */
 export type ColorRGB = { 
-    /** Red component (0-255).*/
     r: number; 
-    /** Green component (0-255).*/
     g: number; 
-    /** Blue component (0-255).*/
     b: number; 
-    /** Opacity (0-1).*/
     opacity: number 
 };
 
 /**
- * Color TEX type.
- * @typedef {number[]} ColorTEX
- * @description Represents a color in texture format.
+ * Represents a texture of colors as an array of numbers. 
+ * Each group of four numbers represents a color in RGBA format.
+ * @example [255, 87, 51, 1, 236, 12, 34, 0.8, ...]
  */
 export type ColorTEX = number[];
 
 /**
  * Map event listener type.
+ * @param {number[] | string[]} selection - The selected features or components.
+ * @param {string} layerId - The ID of the layer associated with the event.
  */
 export type MapEventListener = (
-    /** The selected features or components.*/
-    selection: number[] | string[], 
-    /** The ID of the layer associated with the event.*/
+    selection: number[] | string[],
     layerId: string
 ) => void;

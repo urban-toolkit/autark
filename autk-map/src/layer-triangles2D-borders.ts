@@ -3,10 +3,10 @@ import { ILayerData, ILayerInfo, ILayerRenderInfo } from './interfaces';
 import { Camera } from './camera';
 import { Renderer } from './renderer';
 
-import { FeaturesLayer } from './layer-features';
+import { Triangles2DLayer } from './layer-triangles2D';
 import { PipelineBorderFlat } from './pipeline-border-flat';
 
-export class BordersLayer extends FeaturesLayer {
+export class Triangles2DBorder extends Triangles2DLayer {
     protected _borderPos!: number[];
     protected _borderIds!: number[];
 

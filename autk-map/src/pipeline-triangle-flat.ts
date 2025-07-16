@@ -3,14 +3,20 @@
 import trianglesVertexSource from './shaders/triangles.vert.wgsl';
 import trianglesFragmentSource from './shaders/triangles.frag.wgsl';
 
+import heatmapVertexSource from './shaders/heatmap.vert.wgsl';
+import heatmapFragmentSource from './shaders/heatmap.frag.wgsl';
+
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { FeaturesLayer } from './layer-features';
+import { Triangles2DLayer } from './layer-triangles2D';
 
 export class PipelineTriangleFlat extends Pipeline {
+    protected _vertexShaderSrc!: string;
+    protected _fragmentShaderSrc!: string;
+    
     // Vertex buffers
     protected _positionBuffer!: GPUBuffer;
     protected _thematicBuffer!: GPUBuffer;
@@ -24,11 +30,22 @@ export class PipelineTriangleFlat extends Pipeline {
     // render pipeline
     protected _pipeline!: GPURenderPipeline;
 
-    constructor(renderer: Renderer) {
+    constructor(renderer: Renderer, shaderSrc: string = 'default') {
         super(renderer);
+
+        switch(shaderSrc) {
+            case 'heatmap':
+                this._vertexShaderSrc = heatmapVertexSource;
+                this._fragmentShaderSrc = heatmapFragmentSource;
+                break;
+            default:
+                this._vertexShaderSrc = trianglesVertexSource;
+                this._fragmentShaderSrc = trianglesFragmentSource;
+                break;
+        }
     }
 
-    build(mesh: FeaturesLayer) {
+    build(mesh: Triangles2DLayer) {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -44,18 +61,18 @@ export class PipelineTriangleFlat extends Pipeline {
     createShaders() {
         // Vertex shader
         const vsmDesc = {
-            code: trianglesVertexSource,
+            code: this._vertexShaderSrc,
         };
         this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
 
         // Fragment shader
         const fsmDesc = {
-            code: trianglesFragmentSource,
+            code: this._fragmentShaderSrc,
         };
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
-    createVertexBuffers(mesh: FeaturesLayer) {
+    createVertexBuffers(mesh: Triangles2DLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -85,7 +102,7 @@ export class PipelineTriangleFlat extends Pipeline {
         });
     }
 
-    updateVertexBuffers(mesh: FeaturesLayer) {
+    updateVertexBuffers(mesh: Triangles2DLayer) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));

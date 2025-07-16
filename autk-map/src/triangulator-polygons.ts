@@ -3,7 +3,7 @@ import { FeatureCollection, Feature, BBox } from "geojson";
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
 
-export abstract class TriangulatorFeatures extends Triangulator {
+export abstract class TriangulatorPolygons extends Triangulator {
 
     static buildGrid(nx: number, ny: number, bbox: BBox) : { flatCoords: number[], flatIds: number[] } {
         const flatCoords = [];

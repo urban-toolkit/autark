@@ -10,7 +10,7 @@ import {
     ColorMapInterpolator,
     LayerGeometryType,
     LayerType,
-    LayerZIndex,
+    LayerRenderOrder,
     MapEvent,
     RenderPipeline,
     ThematicAggregationLevel,
@@ -33,12 +33,12 @@ import { MouseEvents } from './mouse-events';
 import { MapEvents } from './map-events';
 import { LayerManager } from './layer-manager';
 
-import { TriangulatorFeatures } from './triangulator-features';
+import { TriangulatorPolygons } from './triangulator-polygons';
 import { TriangulatorBuildings } from './triangulator-buildings';
-import { TriangulatorLines } from './triangulator-lines';
+import { TriangulatorPolylines } from './triangulator-polylines';
 import { TriangulatorCoastline } from './triangulator-coastline';
 import { AutkMapUi } from './map-ui';
-import { TriangulatorBorders } from './triangulator-borders';
+import { TriangulatorBorders } from './triangulator-boundaries';
 
 /**
  * The main autark map class.
@@ -46,29 +46,41 @@ import { TriangulatorBorders } from './triangulator-borders';
  * `AutkMap` encapsulates the core logic for initializing and rendering a map on a given HTML canvas element.
  * It manages the camera, map rendering, map layers, and user interactions through keyboard, mouse, and map events.
  * 
- * @param {HTMLCanvasElement} canvas The canvas element to render the map on
- * @param {boolean} [autoResize=true] Whether to automatically resize the canvas on window resize
- *
  * @example
- * 
  * const canvas = document.getElementById('map-canvas') as HTMLCanvasElement;
+ * const boundingBox = \/* { bounding box for the map } *\/ ;
+ *
  * const map = new AutkMap(canvas);
  * await map.init(boundingBox);
- * map.loadGeoJsonLayer('roads', LayerType.OSM_ROADS, geojsonData);
  * 
+ * const geojsonData = { \/* GeoJSON data *\/ };
+ * map.loadGeoJsonLayer('my_data', LayerType.CUSTOM_FEATURES_LAYER, geojsonData);
  */
 export class AutkMap {
+    /** The camera instance used for rendering the map */
     protected _camera!: Camera;
+    /** The renderer instance used for rendering the map */
     protected _renderer!: Renderer;
+    /** The layer manager instance used for managing map layers */
     protected _layerManager!: LayerManager;
 
+    /** The key events handler for keyboard interactions */
     protected _keyEvents!: KeyEvents;
+    /** The mouse events handler for mouse interactions */
     protected _mouseEvents!: MouseEvents;
+    /** The map events handler for map interactions */
     protected _mapEvents!: MapEvents;
 
+    /** The UI instance for managing the map's user interface */
     protected _ui!: AutkMapUi;
+    /** The canvas element used for rendering the map */
     protected _canvas!: HTMLCanvasElement;
 
+    /**
+     * Creates an instance of the AutkMap class.
+     * @param {HTMLCanvasElement} canvas The canvas element to render the map on
+     * @param {boolean} [autoResize=true] Whether to automatically resize the canvas on window resize
+     */
     constructor(canvas: HTMLCanvasElement, autoResize = true) {
         this._canvas = canvas;
 
@@ -207,31 +219,31 @@ export class AutkMap {
             case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
-                this.createFeaturesLayerFromGeojson(layerName, typeLayer, geojson);
+                this.createLayerFromOsmFeatures(layerName, typeLayer, geojson);
                 break;
 
             case LayerType.OSM_COASTLINE:
-                this.createCoastlineLayerFromGeojson(layerName, geojson);
+                this.createLayerFromOsmCoastline(layerName, geojson);
                 break;
 
             case LayerType.OSM_ROADS:
-                this.createRoadsLayerFromGeojson(layerName, geojson);
+                this.createLayerfromOsmRoads(layerName, geojson);
                 break;
 
             case LayerType.OSM_BUILDINGS:
-                this.createBuildingsLayerFromGeojson(layerName, geojson);
+                this.createLayersFromOsmBuildings(layerName, geojson);
                 break;
 
-            case LayerType.CUSTOM_FEATURES_LAYER:
-                this.createCustomFeaturesLayerFromGeojson(layerName, geojson);
+            case LayerType.BOUNDARIES_LAYER:
+                this.createLayerFromBoundaries(layerName, geojson);
                 break;
 
-            case LayerType.CUSTOM_LINES_LAYER:
-                this.createCustomLinesFromGeojson(layerName, geojson);
+            case LayerType.POLYLINES_LAYER:
+                this.createLayerFromPolylines(layerName, geojson);
                 break;
 
-            case LayerType.CUSTOM_GRID_LAYER:
-                this.createCustomGridLayerFromGeojson(layerName, geojson);
+            case LayerType.HEATMAP_LAYER:
+                this.createLayerFromHeatmap(layerName, geojson);
                 break;
 
             default:
@@ -421,15 +433,15 @@ export class AutkMap {
      * @param {LayerType} typeLayer The type of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createFeaturesLayerFromGeojson(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
+    private createLayerFromOsmFeatures(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         let zIndex = -1;
 
         switch (typeLayer) {
             case LayerType.OSM_WATER:
-                zIndex = LayerZIndex.OSM_WATER;
+                zIndex = LayerRenderOrder.OSM_WATER;
                 break;
             case LayerType.OSM_PARKS:
-                zIndex = LayerZIndex.OSM_PARKS;
+                zIndex = LayerRenderOrder.OSM_PARKS;
                 break;
             default:
                 zIndex = 0.5 + 0.01 * this.layerManager.length;
@@ -439,7 +451,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: zIndex,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
+            typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: typeLayer,
         };
 
@@ -453,7 +465,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature 2D Layer mesh');
             return;
@@ -478,11 +490,11 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createCoastlineLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    private createLayerFromOsmCoastline(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.OSM_COASTLINE,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
+            zIndex: LayerRenderOrder.OSM_COASTLINE,
+            typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: LayerType.OSM_COASTLINE,
         };
 
@@ -520,11 +532,11 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createRoadsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    private createLayerfromOsmRoads(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.OSM_ROADS,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
+            zIndex: LayerRenderOrder.OSM_ROADS,
+            typeGeometry: LayerGeometryType.TRIANGLES_2D,
             typeLayer: LayerType.OSM_ROADS,
         };
 
@@ -537,8 +549,8 @@ export class AutkMap {
             isSkip: false,
         };
 
-        TriangulatorLines.offset = 300;
-        const layerMesh = TriangulatorLines.buildMesh(geojson, this.origin);
+        TriangulatorPolylines.offset = 300;
+        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer.');
             return;
@@ -563,11 +575,11 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createBuildingsLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    private createLayersFromOsmBuildings(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.OSM_BUILDINGS,
-            typeGeometry: LayerGeometryType.FEATURES_3D,
+            zIndex: LayerRenderOrder.OSM_BUILDINGS,
+            typeGeometry: LayerGeometryType.TRIANGLES_3D,
             typeLayer: LayerType.OSM_BUILDINGS,
         };
 
@@ -605,12 +617,12 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createCustomFeaturesLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    private createLayerFromBoundaries(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.CUSTOM_FEATURES_LAYER + 0.01 * this.layerManager.length,
-            typeGeometry: LayerGeometryType.BORDERS_2D,
-            typeLayer: LayerType.CUSTOM_FEATURES_LAYER,
+            zIndex: LayerRenderOrder.BOUNDARIES_LAYER + 0.01 * this.layerManager.length,
+            typeGeometry: LayerGeometryType.BOUNDARIES_2D,
+            typeLayer: LayerType.BOUNDARIES_LAYER,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -623,7 +635,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature Layer.');
             return;
@@ -654,12 +666,12 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createCustomLinesFromGeojson(layerName: string, geojson: FeatureCollection) {
+    private createLayerFromPolylines(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.CUSTOM_LINES_LAYER + 0.01 * this.layerManager.length,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
-            typeLayer: LayerType.CUSTOM_LINES_LAYER,
+            zIndex: LayerRenderOrder.POLYLINES_LAYER + 0.01 * this.layerManager.length,
+            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeLayer: LayerType.POLYLINES_LAYER,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -671,8 +683,8 @@ export class AutkMap {
             isSkip: false,
         };
 
-        TriangulatorLines.offset = 600;
-        const layerMesh = TriangulatorLines.buildMesh(geojson, this.origin);
+        TriangulatorPolylines.offset = 600;
+        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer.');
             return;
@@ -697,12 +709,12 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createCustomGridLayerFromGeojson(layerName: string, geojson: FeatureCollection) {
+    private createLayerFromHeatmap(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: LayerZIndex.CUSTOM_GRID_LAYER,
-            typeGeometry: LayerGeometryType.FEATURES_2D,
-            typeLayer: LayerType.CUSTOM_GRID_LAYER,
+            zIndex: LayerRenderOrder.HEATMAP_LAYER,
+            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeLayer: LayerType.HEATMAP_LAYER,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -715,7 +727,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorFeatures.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature Layer.');
             return;

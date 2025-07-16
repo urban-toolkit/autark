@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "doc": "typedoc --options typedoc.json",
+    "doc": "typedoc --options typedoc.json --watch",
     "dev": "vite",
     "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",

@@ -15,9 +15,9 @@ import {
 } from './interfaces';
 
 import { Layer } from './layer';
-import { BordersLayer } from './layer-borders';
-import { FeaturesLayer } from './layer-features';
-import { BuildingsLayer } from './layer-buildings';
+import { Triangles2DBorder } from './layer-triangles2D-borders';
+import { Triangles2DLayer } from './layer-triangles2D';
+import { Triangles3DLayer } from './layer-triangles3D';
 
 import { LayerGeometryType } from './constants';
 
@@ -109,14 +109,14 @@ export class LayerManager {
 
         // loads based on type
         switch (layerInfo.typeGeometry) {
-            case LayerGeometryType.BORDERS_2D:
-                layer = new BordersLayer(layerInfo, layerRender, layerData);
+            case LayerGeometryType.BOUNDARIES_2D:
+                layer = new Triangles2DBorder(layerInfo, layerRender, layerData);
                 break;
-            case LayerGeometryType.FEATURES_2D:
-                layer = new FeaturesLayer(layerInfo, layerRender, layerData);
+            case LayerGeometryType.TRIANGLES_2D:
+                layer = new Triangles2DLayer(layerInfo, layerRender, layerData);
                 break;
-            case LayerGeometryType.FEATURES_3D:
-                layer = new BuildingsLayer(layerInfo, layerRender, layerData);
+            case LayerGeometryType.TRIANGLES_3D:
+                layer = new Triangles3DLayer(layerInfo, layerRender, layerData);
                 break;
             default:
                 console.error(`File ${layerInfo.id}.json has an unknown layer geometry: ${layerInfo.typeGeometry}.`);

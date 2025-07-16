@@ -9,9 +9,8 @@ import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
 import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
-import { PipelineHeatmap } from './pipeline-heatmap';
 
-export class FeaturesLayer extends Layer {
+export class Triangles2DLayer extends Layer {
     protected _dimension: number;
 
     protected _position!: number[];
@@ -55,7 +54,7 @@ export class FeaturesLayer extends Layer {
             this._pipeline = new PipelineTriangleFlat(renderer);
         }
         else if (this.layerRenderInfo.pipeline === RenderPipeline.TRIANGLE_HEATMAP) {
-            this._pipeline = new PipelineHeatmap(renderer);
+            this._pipeline = new PipelineTriangleFlat(renderer, 'heatmap');
         }
         this._pipeline.build(this);
 

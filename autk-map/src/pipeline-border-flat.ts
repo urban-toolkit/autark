@@ -8,7 +8,7 @@ import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { BordersLayer } from './layer-borders';
+import { Triangles2DBorder } from './layer-triangles2D-borders';
 
 export class PipelineBorderFlat extends Pipeline {
     // Vertex buffers
@@ -26,7 +26,7 @@ export class PipelineBorderFlat extends Pipeline {
         super(renderer);
     }
 
-    build(borders: BordersLayer) {
+    build(borders: Triangles2DBorder) {
         this.createShaders();
 
         this.createVertexBuffers(borders);
@@ -52,7 +52,7 @@ export class PipelineBorderFlat extends Pipeline {
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
-    createVertexBuffers(borders: BordersLayer) {
+    createVertexBuffers(borders: Triangles2DBorder) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -68,7 +68,7 @@ export class PipelineBorderFlat extends Pipeline {
         });
     }
 
-    updateVertexBuffers(borders: BordersLayer) {
+    updateVertexBuffers(borders: Triangles2DBorder) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
         this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
     }

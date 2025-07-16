@@ -6,7 +6,7 @@ import { FeatureCollection, Feature, LineString } from 'geojson';
 import { ILayerGeometry, ILayerComponent } from './interfaces';
 import { Triangulator } from './triangulator';
 
-export class TriangulatorLines extends Triangulator {
+export class TriangulatorPolylines extends Triangulator {
     static offset: number = 300;
 
     static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
@@ -19,8 +19,8 @@ export class TriangulatorLines extends Triangulator {
             const base = <LineString>feature.geometry;
             base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
 
-            const top = lineOffset(base,  TriangulatorLines.offset).geometry.coordinates;
-            const bot = lineOffset(base, -TriangulatorLines.offset).geometry.coordinates;
+            const top = lineOffset(base,  TriangulatorPolylines.offset).geometry.coordinates;
+            const bot = lineOffset(base, -TriangulatorPolylines.offset).geometry.coordinates;
 
             bot.forEach((cord: number[]) => top.unshift(cord));
             top.push(top[0]);
