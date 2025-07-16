@@ -10,8 +10,9 @@ import { Triangulator } from "./triangulator";
 export class TriangulatorPolygons extends Triangulator {
     /**
      * Builds a mesh from GeoJSON features representing polygons.
-     * @param {FeatureCollection} geojson The GeoJSON feature collection
-     * @param {number[]} origin The origin point for translation
+     * @param {number} nx The number of divisions in the x-direction
+     * @param {number} ny The number of divisions in the y-direction
+     * @param {BBox} bbox The bounding box defining the area to triangulate
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
      */
     static buildGrid(nx: number, ny: number, bbox: BBox) : { flatCoords: number[], flatIds: number[] } {

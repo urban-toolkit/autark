@@ -8,9 +8,9 @@ export abstract class Triangulator {
 
     /**
      * Builds a mesh from GeoJSON features.
-     * @param {FeatureCollection} geojson The GeoJSON feature collection
-     * @param {number[]} origin The origin point for translation
-     * @param {Feature<Polygon | MultiPolygon>} bbox The bounding box feature
+     * @param {FeatureCollection} _geojson The GeoJSON feature collection
+     * @param {number[]} _origin The origin point for translation
+     * @param {Feature<Polygon | MultiPolygon>} _bbox The bounding box feature
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
      */
     static buildMesh(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {

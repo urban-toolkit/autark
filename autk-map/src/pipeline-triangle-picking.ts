@@ -114,7 +114,7 @@ export class PipelineTrianglePicking extends Pipeline {
 
     /**
      * Updates the vertex buffers with the provided mesh data.
-     * @param {Triangles2DLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {Triangles2DLayer} layer The mesh data containing positions, thematic, and indices
      */
     updateVertexBuffers(layer: Triangles2DLayer): void {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(layer.position));
