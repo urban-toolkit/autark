@@ -7,8 +7,12 @@
 @group(0) @binding(6) var<uniform> opacity : f32;
 
 @fragment 
-fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32) -> @location(0) vec4f {
-    
+fn main(@location(0) inThematic: f32, @location(1) inHighlighted: f32, @location(2) inSkipped: f32) -> @location(0) vec4f {
+
+    if (inSkipped > 0.0) {
+        discard;
+    }
+
     var color = vec4f(color.r / 255, color.g / 255, color.b / 255, color.a);
     var sampledColor = textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
 
