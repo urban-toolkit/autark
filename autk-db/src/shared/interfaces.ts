@@ -27,6 +27,3 @@ export interface BoundingBox {
   maxLon: number;
   maxLat: number;
 }
-
-// TODO:
-// 4. Crop data on db?
