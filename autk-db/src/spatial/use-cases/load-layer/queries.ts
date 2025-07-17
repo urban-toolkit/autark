@@ -9,7 +9,6 @@ type Params = {
   outputFormat: string;
   outputTableName: string;
   boundingBox?: BoundingBox;
-  polygon?: number[][]; // Array of [lon, lat]
 };
 
 /**
@@ -18,7 +17,7 @@ type Params = {
  * - Open ways: LineString (for linear features like roads, coastlines)
  */
 
-export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox, polygon }: Params) => {
+export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
   const query = getLayerQuery(layer);
 
   return `
@@ -41,38 +40,26 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
           ${layer}.id,
           ${layer}.tags properties,
           ${layer}.refs,
-          ${buildGeometrySelect({ outputFormat, boundingBox, polygon, layer })} geometry
+          ${buildGeometrySelect({ outputFormat, boundingBox, layer })} geometry
       FROM ${layer}
       JOIN ${layer}_with_nodes_refs
       ON ${layer}.id = ${layer}_with_nodes_refs.id
       JOIN ${layer}_required_nodes_with_geometries nodes
       ON ${layer}_with_nodes_refs.ref = nodes.id
       GROUP BY 1, 2, 3
-      ${buildHavingClause({ outputFormat, boundingBox, polygon, layer })};
+      ${buildHavingClause({ outputFormat, boundingBox, layer })};
 
     DESCRIBE ${outputTableName};
   `;
 };
 
-function polygonCoordsToWkt(coords: number[][]): string {
-  if (coords.length === 0) return '';
-  // Ensure the polygon is closed
-  const closedCoords =
-    coords[0][0] === coords[coords.length - 1][0] && coords[0][1] === coords[coords.length - 1][1]
-      ? coords
-      : [...coords, coords[0]];
-  return closedCoords.map(([lon, lat]) => `${lon} ${lat}`).join(', ');
-}
-
 function buildGeometrySelect({
   outputFormat,
   boundingBox,
-  polygon,
   layer,
 }: {
   outputFormat: string;
   boundingBox?: BoundingBox;
-  polygon?: number[][];
   layer: LayerType;
 }) {
   // Define which layers should create polygons for closed ways
@@ -115,36 +102,22 @@ function buildGeometrySelect({
       always_xy := true
     )`;
 
-  // Decide clipping geometry (either bounding box or polygon)
-  let clippingGeometry: string | null = null;
+  if (!boundingBox) return baseGeometry;
 
-  if (boundingBox) {
-    clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
-  } else if (polygon) {
-    const wkt = polygonCoordsToWkt(polygon);
-    clippingGeometry = `ST_Transform(ST_GeomFromText('SRID=4326;POLYGON((${wkt}))'), 'EPSG:4326', '${outputFormat}', always_xy := true)`;
-  }
-
-  if (!clippingGeometry) return baseGeometry;
-
-  console.log('clippingGeometry', clippingGeometry);
+  const clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
   return `ST_Intersection(${baseGeometry}, ${clippingGeometry})`;
 }
 
 function buildHavingClause({
   outputFormat,
   boundingBox,
-  polygon,
   layer,
 }: {
   outputFormat: string;
   boundingBox?: BoundingBox;
-  polygon?: number[][];
   layer: LayerType;
 }) {
-  if (!boundingBox && !polygon) {
-    return '';
-  }
+  if (!boundingBox) return '';
 
   // Define which layers should create polygons for closed ways
   const areaLayers = ['buildings', 'parks', 'water'];
@@ -186,16 +159,7 @@ function buildHavingClause({
       always_xy := true
     )`;
 
-  let clippingGeometry: string;
-
-  if (boundingBox) {
-    clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
-  } else {
-    // polygon is guaranteed
-    const wkt = polygonCoordsToWkt(polygon as number[][]);
-    clippingGeometry = `ST_Transform(ST_GeomFromText('SRID=4326;POLYGON((${wkt}))'), 'EPSG:4326', '${outputFormat}', always_xy := true)`;
-  }
-
+  const clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
   return `HAVING ST_Intersects(${baseGeometry}, ${clippingGeometry})`;
 }
 

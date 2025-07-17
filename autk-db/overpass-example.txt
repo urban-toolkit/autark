@@ -1,0 +1,15 @@
+[out:json][timeout:25];
+area["name"="New York"]->.areaNY;
+relation["name"="Battery Park City"](area.areaNY)->.rel1;
+.rel1 map_to_area->.area1;
+relation["name"="Financial District"](area.areaNY)->.rel2;
+.rel2 map_to_area->.area2;
+way(area.area1)->.ways1;
+way(area.area2)->.ways2;
+way(r.rel1)->.mways1;
+way(r.rel2)->.mways2;
+(.ways1;.ways2;.mways1;.mways2;)->.allWays;
+.allWays->.selWays;
+(.selWays;>;)->.complete;
+(.selWays;.complete;);
+out body;

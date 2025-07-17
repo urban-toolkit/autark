@@ -21,11 +21,8 @@ export type Params = {
     dropOsmTable: boolean;
     layers: Array<LayerType>;
   };
-  boundingBox?: {
-    minLat: number;
-    maxLat: number;
-    minLon: number;
-    maxLon: number;
+  queryArea: {
+    geocodeArea: string;
+    areas: string[];
   };
-  polygon?: number[][]; // Array of [longitude, latitude] coordinates
 };

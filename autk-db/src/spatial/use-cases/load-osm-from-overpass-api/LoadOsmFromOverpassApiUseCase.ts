@@ -2,7 +2,7 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { Params, OsmElement } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
-import { getColumnsFromDuckDbTableDescribe, boundingBoxToPolygon } from '../../shared/utils';
+import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from './queries';
 
 interface OverpassApiResponse {
@@ -19,18 +19,9 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   async exec(params: Params): Promise<OsmTable> {
-    let polygon: number[][];
+    if (!params.queryArea) throw new Error('queryArea must be provided');
 
-    if (params.boundingBox) {
-      polygon = boundingBoxToPolygon(params.boundingBox);
-    } else if (params.polygon) {
-      polygon = params.polygon;
-    } else {
-      throw new Error('Either boundingBox or polygon must be provided');
-    }
-
-    const osmData = await this.fetchOsmWithinPolygon(polygon);
-    console.log(`Fetched ${osmData.elements.length} OSM elements`);
+    const osmData = await this.fetchOsmWithinPolygon(params.queryArea);
 
     if (osmData.elements.length === 0) {
       throw new Error('No OSM elements found in the specified area');
@@ -94,10 +85,6 @@ export class LoadOsmFromOverpassApiUseCase {
       ref_types: string[];
     }> = [];
 
-    // console.log({ node: osmData.elements.find((e) => e.type === 'node') });
-    // console.log({ way: osmData.elements.find((e) => e.type === 'way') });
-    // console.log({ relation: osmData.elements.find((e) => e.type === 'relation') });
-
     osmData.elements.forEach((element) => {
       switch (element.type) {
         case 'node':
@@ -160,26 +147,50 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Fetch OSM data within a polygon from the Overpass API
+   * Fetch OSM data within a geocode area from the Overpass API
    */
-  private async fetchOsmWithinPolygon(polygon: number[][]): Promise<OverpassApiResponse> {
-    // Format polygon coordinates for Overpass API poly filter
-    const polyCoords = polygon.map(([lon, lat]) => `${lat} ${lon}`).join(' ');
+  private async fetchOsmWithinPolygon(queryArea: {
+    geocodeArea: string;
+    areas: string[];
+  }): Promise<OverpassApiResponse> {
+    const geocodeAlias = 'areaMain'; // alias without leading dot
 
+    // 1. Main geocode area
+    const geocodeLine = `area[\"name\"=\"${queryArea.geocodeArea}\"]->.${geocodeAlias};`;
+
+    // 2. Build a set of lines for each requested sub-area
+    const subAreaLines: string[] = [];
+    const allWaysSelectors: string[] = [];
+
+    queryArea.areas.forEach((areaName, idx) => {
+      const i = idx + 1;
+      subAreaLines.push(`relation[\"name\"=\"${areaName}\"](area.${geocodeAlias})->.rel${i};`);
+      subAreaLines.push(`.rel${i} map_to_area->.area${i};`);
+      subAreaLines.push(`way(area.area${i})->.ways${i};`);
+      subAreaLines.push(`way(r.rel${i})->.mways${i};`);
+
+      allWaysSelectors.push(`.ways${i};.mways${i};`);
+    });
+
+    // 3. Combine everything into a full query with readable indentation
     const query = `
-      [out:json][timeout:25];
-      (
-        node(poly:"${polyCoords}");
-        way(poly:"${polyCoords}");
-        relation(poly:"${polyCoords}");
-      );
-      (._; >;);
+      [
+        out:json
+      ][timeout:25];
+
+      ${geocodeLine}
+      ${subAreaLines.map((l) => `  ${l}`).join('\n')}
+
+      ( ${allWaysSelectors.join('')} )->.allWays;
+      .allWays->.selWays;
+      ( .selWays; >; )->.complete;
+      ( .selWays; .complete; );
       out body;
-    `.trim();
+    `;
 
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
 
-    console.log(`Fetching OSM data from Overpass API with polygon...`);
+    console.log('Fetching OSM data from Overpass API...');
     const response = await fetch(url);
 
     if (!response.ok) {
