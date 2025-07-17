@@ -639,15 +639,16 @@ export class AutkMap {
             return;
         }
         const layerBorder = TriangulatorBorders.buildBorder(geojson, this.origin);
-        if (layerBorder.length === 0) {
+        if (layerBorder[0].length === 0 || layerBorder[1].length === 0) {
             console.error('Invalid Feature Layer border.');
             return;
         }
 
         const layerData = {
-            border: layerBorder,
             geometry: layerMesh[0],
             components: layerMesh[1],
+            border: layerBorder[0],
+            borderComponents: layerBorder[1],
             thematic: layerMesh[1].map(() => {
                 return {
                     level: ThematicAggregationLevel.AGGREGATION_COMPONENT,

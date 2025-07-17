@@ -65,16 +65,18 @@ export interface ILayerRenderInfo {
 
 /**
  * Interface for layer border information.
- * @property {ILayerBorder[]} [border] - Array of borders for the layer.
  * @property {ILayerGeometry[]} geometry - Array of geometries for the layer.
  * @property {ILayerComponent[]} components - Array of components for the layer.
+ * @property {ILayerBorder[]} [border] - Array of borders for the layer.
+ * @property {ILayerBorderComponent[]} [borderComponents] - Array of border components for the layer.
  * @property {ILayerThematic[]} [thematic] - Thematic data for the layer.
  * @property {number[]} [highlighted] - Indices of highlighted components in the layer.
  */
 export interface ILayerData {
-    border?: ILayerBorder[];
     geometry: ILayerGeometry[];
     components: ILayerComponent[];
+    border?: ILayerBorder[];
+    borderComponents?: ILayerBorderComponent[];
     thematic?: ILayerThematic[];
     highlighted?: number[];
 }
@@ -89,16 +91,6 @@ export interface ILayerGeometry {
     position: number[];
     normal?: number[];
     indices?: number[];
-}
-
-/**
- * Interface for layer border information.
- * @property {number[]} position - Position of the border.
- * @property {number[]} indices - Indices of the border.
- */
-export interface ILayerBorder {
-    position: number[];
-    indices: number[];
 }
 
 /**
@@ -120,6 +112,28 @@ export interface ILayerComponent {
     nPoints: number;
     nTriangles: number;
 }
+
+
+/**
+ * Interface for layer border information.
+ * @property {number[]} position - Position of the border.
+ * @property {number[]} indices - Indices of the border.
+ */
+export interface ILayerBorder {
+    position: number[];
+    indices: number[];
+}
+
+/**
+ * Interface for layer border components.
+ * @property {number[]} nPoints - Number of points in the layer component.
+ * @property {number[]} nLines - Number of lines in the layer component.
+ */
+export interface ILayerBorderComponent {
+    nPoints: number;
+    nLines: number;
+}
+
 
 /**
  * Interface for camera data.
