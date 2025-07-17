@@ -28,6 +28,12 @@ export class PipelineBorderFlat extends Pipeline {
     protected _borderIndicesBuffer!: GPUBuffer;
 
     /**
+     * Buffer for skipped data.
+     * @type {GPUBuffer}
+     */
+    protected _skippedBuffer!: GPUBuffer;
+
+    /**
      * Vertex shader module.
      * @type {GPUShaderModule}
      */
@@ -104,7 +110,13 @@ export class PipelineBorderFlat extends Pipeline {
             size: borders.borderIds.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
-    }
+
+        // vertex data
+        this._skippedBuffer = this._renderer.device.createBuffer({
+            label: 'Skipped data buffer',
+            size: borders.skippedVertices.length * 4,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });    }
 
     /**
      * Updates the vertex buffers with the provided border data.
@@ -113,6 +125,7 @@ export class PipelineBorderFlat extends Pipeline {
     updateVertexBuffers(borders: Triangles2DBorder) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
         this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(borders.skippedVertices));
     }
 
     /**
@@ -132,11 +145,23 @@ export class PipelineBorderFlat extends Pipeline {
             stepMode: 'vertex',
         };
 
+        const skippedAttribDesc: GPUVertexAttribute = {
+            shaderLocation: 3, // [[location(3)]]
+            offset: 0,
+            format: 'float32',
+        };
+
+        const skippedBufferDesc: GPUVertexBufferLayout = {
+            attributes: [skippedAttribDesc],
+            arrayStride: 4 * 1, // sizeof(float) * 3
+            stepMode: 'vertex',
+        };
+
         // Vertex Shader
         const vertex: GPUVertexState = {
             module: this._vertModule,
             entryPoint: 'main',
-            buffers: [positionBufferDesc],
+            buffers: [positionBufferDesc, skippedBufferDesc],
         };
 
         // Fragment Shader
@@ -224,6 +249,7 @@ export class PipelineBorderFlat extends Pipeline {
 
         // sets the vertex buffers
         passEncoder.setVertexBuffer(0, this._positionBuffer);
+        passEncoder.setVertexBuffer(1, this._skippedBuffer);
 
         // sets primitive indices buffer
         passEncoder.setIndexBuffer(this._borderIndicesBuffer, 'uint32');

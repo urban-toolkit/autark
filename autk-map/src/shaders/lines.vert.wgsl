@@ -1,7 +1,17 @@
 @group(1) @binding(0) var<uniform> modelView: mat4x4f;
 @group(1) @binding(1) var<uniform> projection: mat4x4f;
 
+struct VSOut {
+    @builtin(position) outPosition: vec4<f32>,
+    @location(0) outSkipped: f32
+ };
+
 @vertex
-fn main(@location(0) position: vec3f) -> @builtin(position) vec4f {
-    return projection * modelView * vec4f(position, 1);
+fn main(@location(0) inPosition: vec3f, @location(3) inSkipped: f32) -> VSOut {
+    var vsOut: VSOut;
+
+    vsOut.outPosition = projection * modelView * vec4f(inPosition, 1);
+    vsOut.outSkipped = inSkipped;
+
+    return vsOut;
 }
