@@ -144,6 +144,9 @@ export class Triangles2DLayer extends Layer {
 
         this._highlightedVertices = new Array(this._position.length / 3).fill(0);
         this._highlightedIds = new Set<number>();
+
+        this._skippedVertices = new Array(this._position.length / 3).fill(0);
+        this._skippedIds = new Set<number>();
     }
 
     /**
@@ -301,6 +304,44 @@ export class Triangles2DLayer extends Layer {
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataInfoDirty();
     }
+
+
+    /**
+     * Set skipped IDs for the layer.
+     * @param {number[]} ids - The IDs to skip.
+     */
+    public setSkippedIds(ids: number[]): void {
+        // If id is already in skippedIds, remove it (i.e., toggle it off)
+        ids.forEach(id => {
+            if(this._skippedIds.has(id)) {
+                this._skippedIds.delete(id);
+            }
+            else {
+                this._skippedIds.add(id);
+            }
+        });
+
+        const toggled = new Set<number>();
+        for (const id of ids) {
+            if (id < 0) continue;
+
+            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
+            const eTriangle = this._components[id].nTriangles;
+
+            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
+                const vertexIndex = this._indices[i];
+
+                if (!toggled.has(vertexIndex)) {
+                    this._skippedVertices[vertexIndex] = 1 - this._skippedVertices[vertexIndex];
+                    toggled.add(vertexIndex);
+                }
+            }
+        }
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataInfoDirty();
+    }
+
 
     /**
      * Aggregate thematic data for point level.

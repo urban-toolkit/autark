@@ -12,7 +12,12 @@ struct BufferOut {
 }
 
 @fragment 
-fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32) -> BufferOut {
+fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inSkipped: f32) -> BufferOut {
+
+    if (inSkipped > 0.0) {
+        discard;
+    }
+
     var light1: vec3f = normalize(vec3f(1.0, 0.0, 1.0));
     var light2: vec3f = normalize(vec3f(0.0, 1.0, 0.0));
 

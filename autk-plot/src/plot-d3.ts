@@ -35,7 +35,7 @@ export class PlotD3 extends AutkPlot {
 
         if (this.plotEvents.listeners[PlotEvent.BRUSH] && this._locList.length === 0) {
             this._brushes.forEach(obj => {
-                const brushGroup = d3.select(obj.group);
+                const brushGroup = d3.select(obj.group).select<SVGGElement>("g.brush");
                 brushGroup.call(obj.brush.move, null);
             });
         }
