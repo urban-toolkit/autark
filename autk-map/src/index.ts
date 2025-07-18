@@ -22,7 +22,7 @@ export * from './pipeline-triangle-ssao';
 export * from './pipeline';
 export * from './renderer';
 export * from './triangulator-buildings';
-export * from './triangulator-coastline';
+export * from './triangulator-surface';
 export * from './triangulator-polygons';
 export * from './triangulator-polylines';
 export * from './triangulator';
