@@ -20,6 +20,10 @@ type Params = {
 export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
   const query = getLayerQuery(layer);
 
+  if (layer === 'surface') {
+    tableName = `${tableName}_boundaries`;
+  }
+
   return `
     ${query(tableName)}
     CREATE TEMP TABLE ${layer}_with_nodes_refs AS
@@ -175,6 +179,8 @@ function getLayerQuery(layer: string): (t: string) => string {
       return GET_COASTLINE;
     case 'roads':
       return GET_ROADS;
+    case 'surface':
+      return GET_SURFACE;
     default:
       return () => '';
   }
@@ -235,4 +241,11 @@ const GET_ROADS = (tableName: string) => `
           'proposed', 'construction', 'abandoned', 'platform', 'raceway'
         )
       );
+`;
+
+// Get all ways
+const GET_SURFACE = (tableName: string) => `
+  CREATE TEMP TABLE surface AS
+    SELECT id, tags, refs FROM ${tableName}
+      WHERE kind IN ('way');
 `;
