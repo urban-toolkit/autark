@@ -51,6 +51,19 @@ export abstract class Layer {
     protected _highlightedVertices!: number[];
 
     /**
+     * Skipped IDs of the layer.
+     * This is a set to ensure uniqueness of skipped IDs.
+     * @type {Set<number>}
+     */
+    protected _skippedIds!: Set<number>;
+
+    /**
+     * Skipped vertices of the layer.
+     * @type {number[]}
+     */
+    protected _skippedVertices!: number[];
+
+    /**
      * Constructor for Layer
      * @param {ILayerInfo} layerInfo - The layer information.
      * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
@@ -125,6 +138,22 @@ export abstract class Layer {
     }
 
     /**
+     * Gets the IDs of the skipped components in the layer.
+     * @returns {number[]} The skipped IDs.
+     */
+    get skippedIds(): number[] {
+        return Array.from(this._skippedIds);
+    }
+
+    /**
+     * Gets the skipped vertices of the layer.
+     * @returns {number[]} The skipped vertices.
+     */
+    get skippedVertices(): number[] {
+        return this._skippedVertices;
+    }
+
+    /**
      * Marks the layer's data as dirty, indicating that VOBs need to be reconstructed.
      */
     public makeLayerDataInfoDirty() {
@@ -156,6 +185,24 @@ export abstract class Layer {
     abstract setHighlightedIds(ids: number[]): void;
 
     /**
+     * Clears the skipped components of the layer.
+     */
+    public clearSkippedIds() {
+        this._skippedVertices.fill(0);
+        this._skippedIds.clear();
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataInfoDirty();
+    }
+
+    /**
+     * Sets the skipped IDs of the layer.
+     * @param {number[]} ids - The IDs to skip.
+     */
+    abstract setSkippedIds(ids: number[]): void;
+
+
+    /**
      * Loads the data for the layer.
      * @param {ILayerData} layerData - The data to load into the layer.
      */
@@ -179,6 +226,7 @@ export abstract class Layer {
      */
     abstract loadThematic(layerThematic: ILayerThematic[]): void;
 
+
     /**
      * Creates the rendering pipeline for the layer.
      * @param {Renderer} renderer - The renderer to use for the layer.
@@ -191,6 +239,7 @@ export abstract class Layer {
      * @param {Camera} camera - The camera to use for rendering.
      */
     abstract renderPass(camera: Camera): void;
+
 
     /**
      * Renders the picking pass for the layer.

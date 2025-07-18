@@ -1,4 +1,4 @@
-import { ILayerBorder, ILayerComponent, ILayerGeometry } from "./interfaces";
+import { ILayerBorder, ILayerBorderComponent, ILayerComponent, ILayerGeometry } from "./interfaces";
 
 import { Feature, FeatureCollection, LineString, MultiLineString, MultiPolygon, Polygon } from 'geojson';
 
@@ -14,6 +14,17 @@ export abstract class Triangulator {
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
      */
     static buildMesh(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerGeometry[], ILayerComponent[]] {
+        return [[], []]
+    };
+
+    /**
+     * Builds a mesh border from GeoJSON features.
+     * @param {FeatureCollection} _geojson The GeoJSON feature collection
+     * @param {number[]} _origin The origin point for translation
+     * @param {Feature<Polygon | MultiPolygon>} _bbox The bounding box feature
+     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     */
+    static buildBorder(_geojson: FeatureCollection, _origin: number[], _bbox: Feature<Polygon>): [ILayerBorder[], ILayerBorderComponent[]] {
         return [[], []]
     };
 
@@ -38,13 +49,13 @@ export abstract class Triangulator {
      * @param {number[]} origin The origin point for translation
      * @returns {ILayerBorder[]} An array of borders
      */
-    static lineStringToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
+    static lineStringToBorder(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
 
         const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
         const flatIds = Triangulator.generateBorderIds(flatCoords.length / 2);
 
-        return [{ position: flatCoords, indices: flatIds }];
+        return [{ flatCoords, flatIds }];
     }
 
     /**
@@ -74,7 +85,7 @@ export abstract class Triangulator {
      * @param {number[]} origin The origin point for translation
      * @returns {ILayerBorder[]} An array of borders
      */
-    static multiLineStringToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
+    static multiLineStringToBorder(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
 
         const borders = [];
@@ -83,7 +94,7 @@ export abstract class Triangulator {
             const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
             const flatIds = Triangulator.generateBorderIds(flatCoords.length / 2);
 
-            borders.push({ position: flatCoords, indices: flatIds });
+            borders.push({ flatCoords, flatIds });
         }
 
         return borders;
@@ -118,7 +129,7 @@ export abstract class Triangulator {
      * @param {number[]} origin The origin point for translation
      * @returns {ILayerBorder[]} An array of borders
      */
-    static polygonToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
+    static polygonToBorder(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
 
         // copy the coordinates
@@ -133,7 +144,7 @@ export abstract class Triangulator {
         const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
         const flatIds = Triangulator.generateBorderIds(flatCoords.length / 2);
 
-        return [{ position: flatCoords, indices: flatIds }];
+        return [{ flatCoords, flatIds }];
     }
 
     /**
@@ -171,7 +182,7 @@ export abstract class Triangulator {
      * @param {number[]} origin The origin point for translation
      * @returns {ILayerBorder[]} An array of borders
      */
-    static multiPolygonToBorder(feature: Feature, origin: number[]): ILayerBorder[] {
+    static multiPolygonToBorder(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const borders = [];
 
         const { coordinates } = <MultiPolygon>feature.geometry;
@@ -189,7 +200,7 @@ export abstract class Triangulator {
             const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
             const flatIds = Triangulator.generateBorderIds(flatCoords.length / 2);
 
-            borders.push({ position: flatCoords, indices: flatIds });
+            borders.push({ flatCoords, flatIds });
         }
 
         return borders;

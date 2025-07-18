@@ -42,6 +42,12 @@ export class PipelineBuildingSSAO extends Pipeline {
     protected _highlightedBuffer!: GPUBuffer;
 
     /**
+     * Highlighted buffer for vertex data.
+     * @type {GPUBuffer}
+     */
+    protected _skippedBuffer!: GPUBuffer;
+
+    /**
      * Indices buffer for vertex data.
      * @type {GPUBuffer}
      */
@@ -210,6 +216,13 @@ export class PipelineBuildingSSAO extends Pipeline {
         });
 
         // vertex data
+        this._skippedBuffer = this._renderer.device.createBuffer({
+            label: 'Skipped data buffer',
+            size: mesh.skippedVertices.length * 4,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+
+        // vertex data
         this._indicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
             size: mesh.indices.length * 4,
@@ -227,6 +240,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, new Float32Array(mesh.normal));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(mesh.skippedVertices));
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
     }
@@ -364,6 +378,11 @@ export class PipelineBuildingSSAO extends Pipeline {
             offset: 0,
             format: 'float32',
         };
+        const skippedAttribDesc: GPUVertexAttribute = {
+            shaderLocation: 4,
+            offset: 0,
+            format: 'float32',
+        };
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
@@ -385,12 +404,17 @@ export class PipelineBuildingSSAO extends Pipeline {
             arrayStride: 4 * 1, // sizeof(float) * 3
             stepMode: 'vertex',
         };
+        const skippedBufferDesc: GPUVertexBufferLayout = {
+            attributes: [skippedAttribDesc],
+            arrayStride: 4 * 1, // sizeof(float) * 3
+            stepMode: 'vertex',
+        };
 
         // Vertex Shader
         const vertex: GPUVertexState = {
             module: this._vertModule01,
             entryPoint: 'main',
-            buffers: [positionBufferDesc, normalBufferDesc, thematicBufferDesc, highlightedBufferDesc],
+            buffers: [positionBufferDesc, normalBufferDesc, thematicBufferDesc, highlightedBufferDesc, skippedBufferDesc],
         };
 
         // Fragment Shader
@@ -528,6 +552,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.setVertexBuffer(1, this._normalBuffer);
         passEncoder.setVertexBuffer(2, this._thematicBuffer);
         passEncoder.setVertexBuffer(3, this._highlightedBuffer);
+        passEncoder.setVertexBuffer(4, this._skippedBuffer);
 
         // sets primitive indices buffer
         passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');
