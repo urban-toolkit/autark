@@ -1,5 +1,7 @@
 /// <reference types="@webgpu/types" />
 
+import { MapStyle } from "./map-style";
+
 export class Renderer {
     // HTML Canvas reference
     protected _canvas: HTMLCanvasElement;
@@ -98,7 +100,6 @@ export class Renderer {
 
             // Physical Device Adapter
             const adapter = await entry.requestAdapter();
-            console.log({ adapter });
             if (adapter === null) {
                 return false;
             }
@@ -197,7 +198,7 @@ export class Renderer {
         const multiSampleTextureView = this._multisampleTexture.createView();
 
         // Framebuffer definition
-        const sky = { r: 255, g: 255, b: 255 };
+        const sky = MapStyle.getColor('background');
         this._frameBuffer = {
             view: multiSampleTextureView,
             resolveTarget: colorTextureView,

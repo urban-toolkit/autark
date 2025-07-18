@@ -10,21 +10,19 @@ export class OsmLayersApi {
         await this.db.init();
 
         await this.db.loadOsmFromOverpassApi({
-            boundingBox: {
-                minLon: -87.645408,
-                minLat: 41.852234,
-                maxLon: -87.596425,
-                maxLat: 41.897535,
+            queryArea: {
+                geocodeArea: 'Chicago',
+                areas: ['Loop', 'Near South Side'],
             }, outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
                 layers: [
-                    'coastline',
+                    'surface',
                     'parks',
                     'water',
                     'roads',
                     'buildings',
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                ] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                 dropOsmTable: true,
             },
         });

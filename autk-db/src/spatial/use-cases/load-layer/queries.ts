@@ -14,7 +14,7 @@ type Params = {
 /**
  * Creates geometries based on OSM way structure:
  * - Closed ways (first node = last node, >3 nodes): Polygon (for areas like buildings, parks, water)
- * - Open ways: LineString (for linear features like roads, coastlines)
+ * - Open ways: LineString (for linear features like roads)
  */
 
 export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
@@ -175,8 +175,6 @@ function getLayerQuery(layer: string): (t: string) => string {
       return GET_WATER;
     case 'buildings':
       return GET_BUILDINGS;
-    case 'coastline':
-      return GET_COASTLINE;
     case 'roads':
       return GET_ROADS;
     case 'surface':
@@ -218,6 +216,7 @@ const GET_BUILDINGS = (tableName: string) => `
       );
 `;
 
+/*
 const GET_COASTLINE = (tableName: string) => `
   CREATE TEMP TABLE coastline AS
     SELECT id, tags, refs FROM ${tableName}
@@ -226,6 +225,7 @@ const GET_COASTLINE = (tableName: string) => `
         map_extract(tags, 'natural')[1] IN ('coastline')
       );
 `;
+*/
 
 const GET_ROADS = (tableName: string) => `
   CREATE TEMP TABLE roads AS

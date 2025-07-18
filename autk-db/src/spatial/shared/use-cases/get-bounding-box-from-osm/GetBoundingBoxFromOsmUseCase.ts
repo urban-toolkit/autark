@@ -9,14 +9,12 @@ export class GetBoundingBoxFromOsmUseCase {
   async exec(params: GetBoundingBoxFromOsmParams): Promise<BoundingBox> {
     const result = await this.conn.query(GET_BOUNDING_BOX_FROM_OSM_QUERY(params.osmTableName));
     const rows = result.toArray();
-    console.log(rows);
 
     if (rows.length === 0) {
       throw new Error(`Could not calculate bounding box - no coordinates found in table ${params.osmTableName}`);
     }
 
     const row = rows[0];
-    console.log(row.toJSON());
 
     if (row.minLon == null || row.minLat == null || row.maxLon == null || row.maxLat == null) {
       throw new Error(`Could not calculate bounding box - invalid coordinates found in table ${params.osmTableName}`);

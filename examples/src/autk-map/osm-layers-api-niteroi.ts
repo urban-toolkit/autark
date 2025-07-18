@@ -10,21 +10,19 @@ export class OsmLayersApi {
         await this.db.init();
 
         await this.db.loadOsmFromOverpassApi({
-            boundingBox: {
-                minLon: -43.149375,
-                minLat: -22.920271,
-                maxLon: -43.070836,
-                maxLat: -22.856426,
+            queryArea: {
+                geocodeArea: 'Niterói',
+                areas: ['Região Praias da Baía'],
             }, outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
                 layers: [
-                    'coastline',
+                    'surface',
                     'parks',
                     'water',
                     'roads',
                     'buildings',
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                ] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                 dropOsmTable: true,
             },
         });
@@ -32,11 +30,6 @@ export class OsmLayersApi {
         const canvas = document.querySelector('canvas');
         
         if (canvas) {
-            // canvas.width  = canvas.parentElement?.offsetWidth  || 800;
-            // canvas.height = canvas.parentElement?.offsetHeight || 800;
-
-            console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
-
             this.map = new AutkMap(canvas);
 
             await this.map.init(this.db.getOsmBoundingBox());

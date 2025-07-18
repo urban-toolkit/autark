@@ -9,8 +9,8 @@ import {
 
 /**
  * Interface for map styles.
+ * @property {ColorHEX} background - Color of the map's background.
  * @property {ColorHEX} surface - Color of the map's surface.
- * @property {ColorHEX} coastline - Color of the map's coastline.
  * @property {ColorHEX} parks - Color of the map's parks.
  * @property {ColorHEX} water - Color of the map's water bodies.
  * @property {ColorHEX} roads - Color of the map's roads.
@@ -19,8 +19,8 @@ import {
  * @property {ColorHEX} lines - Color of the map's lines.
  */
 export interface IMapStyle {
+    background: ColorHEX;
     surface: ColorHEX;
-    coastline: ColorHEX;
     parks: ColorHEX;
     water: ColorHEX;
     roads: ColorHEX;

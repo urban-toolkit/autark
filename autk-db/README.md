@@ -65,7 +65,7 @@ _Installation instructions can be added here._
     - ⚠️ **Warning:** [TODO] Review if it's working.
   - **`autoLoadLayers`** _(optional)_ – Configuration for automatically extracting and load specific layers:
     - **`coordinateFormat`** _(string)_ – Defines the format in which coordinates should be stored.
-    - **`layers`** _(array)_ – A list of layers to be extracted and stored in separate tables ('surface' | 'coastline' | 'water' | 'parks' | 'roads' | 'buildings').
+    - **`layers`** _(array)_ – A list of layers to be extracted and stored in separate tables ('surface' | 'water' | 'parks' | 'roads' | 'buildings').
 
 - **`OsmTable` (Return Type)**
 
@@ -88,7 +88,7 @@ await spatialDb.loadOsm({
   outputTableName: 'my_pbf_table',
   autoLoadLayers: {
     coordinateFormat: this.projection,
-    layers: ['surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'],
+    layers: ['surface' | 'parks' | 'water' | 'roads' | 'buildings'],
   },
 });
 
@@ -153,7 +153,7 @@ await spatialDb.loadOsm({
 
   - **`osmInputTableName`** _(string, required)_ – Table name of an OSM Table.
   - **`outputTableName`** _(string, required)_ – The name of the table where the extracted layer data will be stored.
-  - **`layer`** _(string, required)_ – Which layer do you want to load (surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings)
+  - **`layer`** _(string, required)_ – Which layer do you want to load (surface' | 'parks' | 'water' | 'roads' | 'buildings)
   - **`coordinateFormat`** _(string, optional)_ – Coordinate type (it will use `EPSG:4326` by default).
 
 - **`LayerTable` (Return Type)**
