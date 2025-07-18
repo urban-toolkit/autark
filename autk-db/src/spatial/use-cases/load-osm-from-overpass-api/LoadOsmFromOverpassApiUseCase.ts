@@ -28,8 +28,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     // 2. Fetch OSM data just for boundaries
     const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea);
-    console.log({ boundariesData });
-    await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData);
+    await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData, true);
     console.log(
       `Successfully inserted ${boundariesData.elements.length} boundaries into ${params.outputTableName}_boundaries`,
     );
@@ -54,7 +53,11 @@ export class LoadOsmFromOverpassApiUseCase {
   /**
    * Insert OSM data using single JSON file approach with direct table creation
    */
-  private async insertOsmDataUsingJson(tableName: string, osmData: OverpassApiResponse): Promise<void> {
+  private async insertOsmDataUsingJson(
+    tableName: string,
+    osmData: OverpassApiResponse,
+    ignoreTags: boolean = false,
+  ): Promise<void> {
     const formattedElements = this.formatOsmDataForJson(osmData);
 
     const fileName = 'osm_data.json';
@@ -62,7 +65,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     await this.conn.query(CREATE_OSM_TABLE_QUERY(tableName));
 
-    await this.conn.query(INSERT_OSM_DATA_QUERY(tableName, fileName));
+    await this.conn.query(INSERT_OSM_DATA_QUERY(tableName, fileName, ignoreTags));
 
     try {
       await this.db.dropFile(fileName);
@@ -212,37 +215,55 @@ export class LoadOsmFromOverpassApiUseCase {
     geocodeArea: string;
     areas: string[];
   }): Promise<OverpassApiResponse> {
-    const geocodeAlias = 'srea';
+    // ------------------------------------------------------------------------
+    // Example of the query:
+    //
+    // [out:json][timeout:25];
+    // area["name"="<geocodeArea>"]->.<mainAreaAlias>;
+    //
+    // relation["name"="<area1>"](area.<mainAreaAlias>)->.rel1;
+    // way(r.rel1)->.ways1;
+    // ...
+    //
+    // (.ways1; .ways2; ...;)->.allWays;
+    //
+    // (.allWays; >;);
+    //
+    // out skel;
+    // ------------------------------------------------------------------------
 
-    // 1. Build lines to select the main administrative relation and convert it to an area
-    const mainAreaLines = [
-      `relation["name"="${queryArea.geocodeArea}"]->.srel;`,
-      `.srel map_to_area->.${geocodeAlias};`,
-    ];
+    const mainAreaAlias = 'areaMain';
 
-    // 2. For every requested sub-area, select the relation that lies inside the main area
-    const subRelationLines: string[] = [];
-    const boundSelectors: string[] = [];
+    // 1. Line to select the main area by name
+    const mainAreaLine = `area["name"="${queryArea.geocodeArea}"]->.${mainAreaAlias};`;
+
+    // 2. For each requested sub-area, select the relation inside the main area and
+    //    then select all ways belonging to that relation.
+    const relationLines: string[] = [];
+    const waysLines: string[] = [];
+    const waysSelectors: string[] = [];
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
-      subRelationLines.push(`relation["name"="${areaName}"](area.${geocodeAlias})->.bound${i};`);
-      boundSelectors.push(`.bound${i};`);
+      relationLines.push(`relation["name"="${areaName}"](area.${mainAreaAlias})->.rel${i};`);
+      waysLines.push(`way(r.rel${i})->.ways${i};`);
+      waysSelectors.push(`.ways${i};`);
     });
 
-    // 3. Compose the full Overpass QL query – we first collect the relations, then
-    // expand (>) to their member ways and nodes so that we get the actual
-    // geometries that form each boundary polygon.
+    // 3. Assemble the final Overpass QL query string.
     const query = `
       [out:json][timeout:25];
 
-      ${mainAreaLines.join('\n')}
-      ${subRelationLines.join('\n')}
+      ${mainAreaLine}
 
-      ( ${boundSelectors.join(' ')} )->.selRels;
-      ( .selRels; >; )->.complete;
-      ( .selRels; .complete; );
-      out body;
+      ${relationLines.join('\n')}
+      ${waysLines.join('\n')}
+
+      ( ${waysSelectors.join(' ')} )->.allWays;
+
+      (.allWays; >;);
+
+      out skel;
     `;
 
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);

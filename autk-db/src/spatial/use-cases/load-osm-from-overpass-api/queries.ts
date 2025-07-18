@@ -11,15 +11,19 @@ export const CREATE_OSM_TABLE_QUERY = (tableName: string): string => `
   );
 `;
 
-export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string): string => `
+export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, ignoreTags: boolean = false): string => `
   INSERT INTO ${tableName} 
   SELECT 
     kind::VARCHAR,
     id::BIGINT,
-    CASE 
+    ${
+      ignoreTags
+        ? 'NULL'
+        : `CASE 
       WHEN tags IS NULL OR tags = [] THEN NULL
       ELSE map_from_entries(tags)
-    END AS tags,
+    END`
+    } AS tags,
     refs::BIGINT[],
     lat::DOUBLE,
     lon::DOUBLE,
