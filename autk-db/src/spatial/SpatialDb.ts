@@ -104,6 +104,7 @@ export class SpatialDb {
       const boundaryTableName = `${params.outputTableName}_boundaries`;
       const rawBoundingBox = await this.getBoundingBoxFromOsmUseCase.exec({ osmTableName: boundaryTableName });
 
+      console.log({ rawBoundingBox });
       this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: rawBoundingBox,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
