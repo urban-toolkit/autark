@@ -21,7 +21,7 @@ import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid
 import { GridLayerTable } from '../shared/interfaces';
 import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces';
 import { RawQueryUseCase } from './use-cases/raw-query';
-import { GetBoundingBoxFromAreaUseCase } from './shared/use-cases/get-bounding-box-from-area/GetBoundingBoxFromAreaUseCase';
+import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
 
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
@@ -47,7 +47,7 @@ export class SpatialDb {
   private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
   private loadGridLayerUseCase?: LoadGridLayerUseCase;
   private rawQueryUseCase?: RawQueryUseCase;
-  private getBoundingBoxFromAreaUseCase?: GetBoundingBoxFromAreaUseCase;
+  private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
 
   /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
@@ -68,7 +68,7 @@ export class SpatialDb {
     this.transformBoundingBoxCoordinatesUseCase = new TransformBoundingBoxCoordinatesUseCase(this.conn);
     this.loadGridLayerUseCase = new LoadGridLayerUseCase(this.conn);
     this.rawQueryUseCase = new RawQueryUseCase(this.conn);
-    this.getBoundingBoxFromAreaUseCase = new GetBoundingBoxFromAreaUseCase();
+    this.getBoundingBoxFromOsmUseCase = new GetBoundingBoxFromOsmUseCase(this.conn);
 
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
@@ -90,16 +90,19 @@ export class SpatialDb {
       !this.conn ||
       !this.loadOsmFromOverpassApiUseCase ||
       !this.dropTableUseCase ||
-      !this.getBoundingBoxFromAreaUseCase ||
+      !this.getBoundingBoxFromOsmUseCase ||
       !this.transformBoundingBoxCoordinatesUseCase
     )
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadOsmFromOverpassApiUseCase.exec(params);
-    this.tables.push(table);
+    const tables = await this.loadOsmFromOverpassApiUseCase.exec(params);
+    for (const table of tables) {
+      this.tables.push(table);
+    }
 
     if (params.autoLoadLayers) {
-      const rawBoundingBox = await this.getBoundingBoxFromAreaUseCase.exec({ queryArea: params.queryArea });
+      const boundaryTableName = `${params.outputTableName}_boundaries`;
+      const rawBoundingBox = await this.getBoundingBoxFromOsmUseCase.exec({ osmTableName: boundaryTableName });
 
       this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: rawBoundingBox,
@@ -110,7 +113,7 @@ export class SpatialDb {
         const shouldCrop = layer !== 'buildings'; // avoid crop buildings layer
 
         const layerParams: GetLayerParams = {
-          osmInputTableName: table.name,
+          osmInputTableName: params.outputTableName,
           coordinateFormat: params.autoLoadLayers.coordinateFormat,
           layer,
         };
@@ -119,8 +122,12 @@ export class SpatialDb {
         await this.loadLayer(layerParams);
       }
 
-      if (params.autoLoadLayers.dropOsmTable) await this.dropTableUseCase.exec({ tableName: table.name });
-      this.tables = this.tables.filter((t) => t.name !== table.name);
+      if (params.autoLoadLayers.dropOsmTable) {
+        for (const table of tables) {
+          await this.dropTableUseCase.exec({ tableName: table.name });
+          this.tables = this.tables.filter((t) => t.name !== table.name);
+        }
+      }
     }
   }
 

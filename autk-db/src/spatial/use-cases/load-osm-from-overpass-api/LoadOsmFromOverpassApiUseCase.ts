@@ -18,26 +18,37 @@ export class LoadOsmFromOverpassApiUseCase {
     this.conn = conn;
   }
 
-  async exec(params: Params): Promise<OsmTable> {
+  async exec(params: Params): Promise<OsmTable[]> {
     if (!params.queryArea) throw new Error('queryArea must be provided');
 
-    const osmData = await this.fetchOsmWithinPolygon(params.queryArea);
-
-    if (osmData.elements.length === 0) {
-      throw new Error('No OSM elements found in the specified area');
-    }
-
+    // 1. Fetch OSM data from query area
+    const osmData = await this.fetchOsmWithinArea(params.queryArea);
     await this.insertOsmDataUsingJson(params.outputTableName, osmData);
-
     console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
+    // 2. Fetch OSM data just for boundaries
+    const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea);
+    console.log({ boundariesData });
+    await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData);
+    console.log(
+      `Successfully inserted ${boundariesData.elements.length} boundaries into ${params.outputTableName}_boundaries`,
+    );
+
     const tableDescribeResponse = await this.conn.query(`DESCRIBE ${params.outputTableName}`);
-    return {
-      source: 'osm',
-      type: 'pointset',
-      name: params.outputTableName,
-      columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-    };
+    return [
+      {
+        source: 'osm',
+        type: 'pointset',
+        name: params.outputTableName,
+        columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
+      },
+      {
+        source: 'osm',
+        type: 'pointset',
+        name: `${params.outputTableName}_boundaries`,
+        columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
+      },
+    ];
   }
 
   /**
@@ -149,10 +160,7 @@ export class LoadOsmFromOverpassApiUseCase {
   /**
    * Fetch OSM data within a geocode area from the Overpass API
    */
-  private async fetchOsmWithinPolygon(queryArea: {
-    geocodeArea: string;
-    areas: string[];
-  }): Promise<OverpassApiResponse> {
+  private async fetchOsmWithinArea(queryArea: { geocodeArea: string; areas: string[] }): Promise<OverpassApiResponse> {
     const geocodeAlias = 'areaMain'; // alias without leading dot
 
     // 1. Main geocode area
@@ -191,6 +199,55 @@ export class LoadOsmFromOverpassApiUseCase {
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
 
     console.log('Fetching OSM data from Overpass API...');
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  private async fetchBoundariesOsmWithinArea(queryArea: {
+    geocodeArea: string;
+    areas: string[];
+  }): Promise<OverpassApiResponse> {
+    const geocodeAlias = 'srea';
+
+    // 1. Build lines to select the main administrative relation and convert it to an area
+    const mainAreaLines = [
+      `relation["name"="${queryArea.geocodeArea}"]->.srel;`,
+      `.srel map_to_area->.${geocodeAlias};`,
+    ];
+
+    // 2. For every requested sub-area, select the relation that lies inside the main area
+    const subRelationLines: string[] = [];
+    const boundSelectors: string[] = [];
+
+    queryArea.areas.forEach((areaName, idx) => {
+      const i = idx + 1;
+      subRelationLines.push(`relation["name"="${areaName}"](area.${geocodeAlias})->.bound${i};`);
+      boundSelectors.push(`.bound${i};`);
+    });
+
+    // 3. Compose the full Overpass QL query – we first collect the relations, then
+    // expand (>) to their member ways and nodes so that we get the actual
+    // geometries that form each boundary polygon.
+    const query = `
+      [out:json][timeout:25];
+
+      ${mainAreaLines.join('\n')}
+      ${subRelationLines.join('\n')}
+
+      ( ${boundSelectors.join(' ')} )->.selRels;
+      ( .selRels; >; )->.complete;
+      ( .selRels; .complete; );
+      out body;
+    `;
+
+    const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+
+    console.log('Fetching OSM boundaries from Overpass API...');
     const response = await fetch(url);
 
     if (!response.ok) {
