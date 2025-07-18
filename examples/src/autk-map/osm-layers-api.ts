@@ -18,7 +18,7 @@ export class OsmLayersApi {
       autoLoadLayers: {
         coordinateFormat: 'EPSG:3395',
         layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
-          'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'
+          'surface' | 'parks' | 'water' | 'roads' | 'buildings'
         >,
         dropOsmTable: true,
       },

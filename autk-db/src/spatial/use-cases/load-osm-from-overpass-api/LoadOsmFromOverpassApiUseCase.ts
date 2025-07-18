@@ -178,24 +178,22 @@ export class LoadOsmFromOverpassApiUseCase {
       subAreaLines.push(`relation[\"name\"=\"${areaName}\"](area.${geocodeAlias})->.rel${i};`);
       subAreaLines.push(`.rel${i} map_to_area->.area${i};`);
       subAreaLines.push(`way(area.area${i})->.ways${i};`);
-      subAreaLines.push(`way(r.rel${i})->.mways${i};`);
 
-      allWaysSelectors.push(`.ways${i};.mways${i};`);
+      allWaysSelectors.push(`.ways${i};`);
     });
 
     // 3. Combine everything into a full query with readable indentation
     const query = `
       [
         out:json
-      ][timeout:25];
+      ];
 
       ${geocodeLine}
       ${subAreaLines.map((l) => `  ${l}`).join('\n')}
 
       ( ${allWaysSelectors.join('')} )->.allWays;
-      .allWays->.selWays;
-      ( .selWays; >; )->.complete;
-      ( .selWays; .complete; );
+      ( .allWays; >; );
+
       out body;
     `;
 

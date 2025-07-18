@@ -1,7 +1,7 @@
-import { SpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
+import { SpatialDb } from 'autk-db';
 
-export class LayerOpacity {
+export class OsmLayersApi {
   protected map!: AutkMap;
   protected db!: SpatialDb;
 
@@ -17,33 +17,25 @@ export class LayerOpacity {
       outputTableName: 'table_osm',
       autoLoadLayers: {
         coordinateFormat: 'EPSG:3395',
-        layers: ['surface', 'parks', 'water', 'roads'] as Array<
+        layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
           'surface' | 'parks' | 'water' | 'roads' | 'buildings'
         >,
         dropOsmTable: true,
       },
     });
 
-    await this.db.loadCustomLayer({
-      geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
-      outputTableName: 'neighborhoods',
-      coordinateFormat: 'EPSG:3395',
-      type: 'boundaries'
-    });
-
     const canvas = document.querySelector('canvas');
     if (canvas) {
       this.map = new AutkMap(canvas);
-      await this.map.init(await this.db.getOsmBoundingBox());
 
+      await this.map.init(this.db.getOsmBoundingBox());
       await this.loadLayers();
 
-      this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
       this.map.draw();
     }
   }
 
-  protected async loadLayers(): Promise<void> {
+  async loadLayers(): Promise<void> {
     const data = [];
     for (const layerData of this.db.tables) {
       if (layerData.source === 'csv') {
@@ -62,7 +54,7 @@ export class LayerOpacity {
 }
 
 async function main() {
-  const example = new LayerOpacity();
+  const example = new OsmLayersApi();
   await example.run();
 }
 main();

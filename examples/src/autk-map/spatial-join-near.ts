@@ -12,20 +12,16 @@ export class SpatialJoinNear {
         await this.db.init();
 
         await this.db.loadOsmFromOverpassApi({
-            boundingBox: {
-                minLon: -74.0217296397,
-                minLat: 40.6989916231,
-                maxLon: -74.0005168092,
-                maxLat: 40.7131479624,
-            }, outputTableName: 'table_osm',
+            queryArea: {
+                geocodeArea: 'New York',
+                areas: ['Battery Park City', 'Financial District'],
+            },
+            outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: [
-                    'coastline',
-                    'parks',
-                    'water',
-                    'roads',
-                ] as Array<'surface' | 'coastline' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
+                >,
                 dropOsmTable: true,
             },
         });

@@ -35,7 +35,6 @@ export enum LayerType {
 /**
  * Rendering order of the layers based on their type.
  * @property {string} OSM_SURFACE - Represents the OpenStreetMap surface layer.
- * @property {string} OSM_COASTLINE - Represents the OpenStreetMap coastline layer.
  * @property {string} OSM_PARKS - Represents the OpenStreetMap parks layer.
  * @property {string} OSM_WATER - Represents the OpenStreetMap water layer.
  * @property {string} OSM_ROADS - Represents the OpenStreetMap roads layer.

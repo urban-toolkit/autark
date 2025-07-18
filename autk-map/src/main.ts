@@ -198,7 +198,7 @@ export class AutkMap {
      *
      * This method creates a layer based on the provided GeoJSON data and adds it to the map's layer manager.
      * Supported OSM layer types include:
-     * - OSM_COASTLINE
+     * - OSM_SURFACE
      * - OSM_WATER
      * - OSM_PARKS
      * - OSM_ROADS
@@ -215,7 +215,6 @@ export class AutkMap {
      */
     loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
         switch (typeLayer) {
-            case LayerType.OSM_SURFACE:
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
                 this.createLayerFromOsmFeatures(layerName, typeLayer, geojson);
@@ -484,7 +483,7 @@ export class AutkMap {
     }
 
     /**
-     * Creates a coastline layer from a GeoJSON source.
+     * Creates a surface layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
