@@ -36,7 +36,7 @@ import { LayerManager } from './layer-manager';
 import { TriangulatorPolygons } from './triangulator-polygons';
 import { TriangulatorBuildings } from './triangulator-buildings';
 import { TriangulatorPolylines } from './triangulator-polylines';
-import { TriangulatorCoastline } from './triangulator-coastline';
+import { TriangulatorSureface } from './triangulator-surface';
 import { AutkMapUi } from './map-ui';
 import { TriangulatorBorders } from './triangulator-boundaries';
 
@@ -221,8 +221,8 @@ export class AutkMap {
                 this.createLayerFromOsmFeatures(layerName, typeLayer, geojson);
                 break;
 
-            case LayerType.OSM_COASTLINE:
-                this.createLayerFromOsmCoastline(layerName, geojson);
+            case LayerType.OSM_SURFACE:
+                this.createLayerFromOsmSurface(layerName, geojson);
                 break;
 
             case LayerType.OSM_ROADS:
@@ -488,12 +488,12 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createLayerFromOsmCoastline(layerName: string, geojson: FeatureCollection) {
+    private createLayerFromOsmSurface(layerName: string, geojson: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: LayerRenderOrder.OSM_COASTLINE,
+            zValue: LayerRenderOrder.OSM_SURFACE,
             typeGeometry: LayerGeometryType.TRIANGLES_2D,
-            typeLayer: LayerType.OSM_COASTLINE,
+            typeLayer: LayerType.OSM_SURFACE,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -505,9 +505,9 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorCoastline.buildMesh(geojson, this.origin, this.boundingBox);
+        const layerMesh = TriangulatorSureface.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Coastline Layer mesh');
+            console.error('Invalid Surface Layer mesh');
             return;
         }
 

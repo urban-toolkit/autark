@@ -13,7 +13,6 @@ export enum LayerGeometryType {
 /**
  * The types of layer supported in autk-map.
  * @property {string} OSM_SURFACE - Represents the OpenStreetMap surface layer.
- * @property {string} OSM_COASTLINE - Represents the OpenStreetMap coastline layer.
  * @property {string} OSM_PARKS - Represents the OpenStreetMap parks layer.
  * @property {string} OSM_WATER - Represents the OpenStreetMap water layer.
  * @property {string} OSM_ROADS - Represents the OpenStreetMap roads layer.
@@ -24,7 +23,6 @@ export enum LayerGeometryType {
  */
 export enum LayerType {
   OSM_SURFACE = 'surface',
-  OSM_COASTLINE = 'coastline',
   OSM_PARKS = 'parks',
   OSM_WATER = 'water',
   OSM_ROADS = 'roads',
@@ -48,14 +46,13 @@ export enum LayerType {
  */
 export enum LayerRenderOrder {
   OSM_SURFACE = 0,
-  OSM_COASTLINE = 0.1,
-  OSM_PARKS = 0.2,
-  OSM_WATER = 0.3,
-  OSM_ROADS = 0.4,
+  OSM_PARKS = 0.1,
+  OSM_WATER = 0.2,
+  OSM_ROADS = 0.3,
   OSM_BUILDINGS = 1.0,
-  BOUNDARIES_LAYER = 0.6,
-  POLYLINES_LAYER = 0.7,
-  HEATMAP_LAYER  = 0.5
+  BOUNDARIES_LAYER = 0.5,
+  POLYLINES_LAYER = 0.6,
+  HEATMAP_LAYER  = 0.4
 }
 
 /**
