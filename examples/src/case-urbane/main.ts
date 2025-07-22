@@ -248,7 +248,6 @@ export class Urbane {
         }
       });
 
-      this.plot.locList = selData;
       console.log('Plot updated.');
     });
   }
@@ -263,10 +262,10 @@ export class Urbane {
   }
 
   protected updatePlotListeners(layerId: string = 'neighborhoods') {
-    this.plot.plotEvents.addEventListener(PlotEvent.BRUSH_Y, (selection: number[] | string[] | GeoJsonProperties[]) => {
+    this.plot.plotEvents.addEventListener(PlotEvent.BRUSH_Y, (selection: unknown[]) => {
       const locList: number[] = [];
 
-      selection.forEach((item: number | string | GeoJsonProperties) => {
+      selection.forEach((item: unknown) => {
         this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
           if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
             locList.push(id);

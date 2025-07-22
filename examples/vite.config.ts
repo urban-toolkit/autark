@@ -29,7 +29,7 @@ export default defineConfig({
         }
     },
     server: {
-        open: '/src/autk-map/osm-layers-api.html',
+        open: '/src/autk-plot/map-d3-brush.html',
         cors: {
             origin: '*',
             allowedHeaders: 'Range, Content-Type, Authorization',

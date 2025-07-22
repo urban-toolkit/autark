@@ -1,4 +1,3 @@
-import { GeoJsonProperties } from "geojson";
 import { PlotEvent } from './constants';
 import { PlotEventListener } from "./types";
 
@@ -27,7 +26,7 @@ export class PlotEvents {
         }
     }
 
-    emit(event: string, selection: number[] | string[] | GeoJsonProperties[]): void {
+    emit(event: string, selection: unknown[]): void {
         if (this._listeners[event]) {
             this._listeners[event].forEach(listener => listener(selection));
         }
