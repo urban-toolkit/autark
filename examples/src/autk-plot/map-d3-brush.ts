@@ -13,6 +13,9 @@ export class MapD3 {
     protected map!: AutkMap;
     protected plot!: PlotD3;
 
+    protected mapX!: d3.ScaleLinear<number, number>;
+    protected mapY!: d3.ScaleLinear<number, number>;
+
     public async run(): Promise<void> {
         await this.loadAutkDb();
         await this.loadAutkMap();
@@ -152,27 +155,8 @@ export class MapD3 {
 
     protected async updateMapListeners() {
         this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
-            const selData: GeoJsonProperties[] = (selection as number[]).map(
-                (d: number) => this.plot.data[d] as GeoJsonProperties,
-            );
 
-            const refs = this.plot.refs as SVGGElement[];
-
-            // only one brush area expected.
-            const cGroup = d3.select(refs[0]);
-            const svgs = cGroup.selectAll('circle');
-
-            svgs.style('fill', function (datum: unknown) {
-                const dataJd = datum as GeoJsonProperties;
-
-                if (selData.includes(dataJd)) {
-                    return PlotStyle.highlight;
-                } else {
-                    return PlotStyle.default;
-                }
-            });
-
-            this.plot.locList = selData;
+            this.highlightSelectedMarks(selection as number[]);
             console.log('Plot updated.');
         });
     }
@@ -187,38 +171,40 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: number[] | string[] | GeoJsonProperties[]) => {
+        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: unknown[]) => {
             const locList: number[] = [];
 
-            selection.forEach((item: number | string | GeoJsonProperties) => {
+            selection.forEach((item: unknown) => {
+                const currentSel = item as number[][];
+
                 this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
-                    if ((item as GeoJsonProperties)?.ntaname === d?.ntaname) {
+                    const xVal = this.mapX(+d?.shape_area || 0);
+                    const yVal = this.mapY(+d?.shape_leng || 0);
+
+                    if (xVal >= currentSel[0][0] &&
+                        xVal <= currentSel[1][0] &&
+                        yVal >= currentSel[0][1] &&
+                        yVal <= currentSel[1][1]) {
                         locList.push(id);
                         return;
                     }
                 });
             });
 
-            const layer = this.map.layerManager.searchByLayerId(layerId);
-            if (layer) {
-                layer.layerRenderInfo.isPick = true;
-
-                layer.clearHighlightedIds();
-                layer.setHighlightedIds(locList as number[]);
-
-                console.log('Map updated.');
-            }
+            this.highlightSelectedBoundaries(layerId, locList);
+            this.highlightSelectedMarks(locList);
+            console.log('Map updated.');
         });
     }
 
     protected d3Spec(): D3PlotBuilder {
-        return this.scatterPlot;
+        return this.scatterPlot.bind(this);
     }
 
-    protected scatterPlot<SVGCircleElement>(
+    protected scatterPlot(
         div: HTMLElement,
-        data: GeoJsonProperties[],
-    ): [SVGGElement[], SVGCircleElement[]] {
+        data: GeoJsonProperties[]
+    ) {
         const margens = { left: 40, right: 25, top: 10, bottom: 35 };
 
         const svg = d3
@@ -243,13 +229,13 @@ export class MapD3 {
 
         // ---- Escalas
         const xExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_area || 0);
-        const mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
+        this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
         const yExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_leng || 0);
-        const mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
+        this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Eixos
-        const xAxis = d3.axisBottom(mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
+        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisX')
@@ -271,7 +257,7 @@ export class MapD3 {
             .style('visibility', 'visible')
             .text('shape_area');
 
-        const yAxis = d3.axisLeft(mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
+        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisY')
@@ -294,27 +280,47 @@ export class MapD3 {
             .style('visibility', 'visible')
             .text('shape_leng');
 
-        // ---- Círculos
         const cGroup = svg
-            .selectAll('#plotGroup')
+            .selectAll('.autkBrushable')
             .data([0])
             .join('g')
-            .attr('id', 'plotGroup')
+            .attr('class', 'autkBrushable')
             .attr('transform', `translate(${margens.left}, ${margens.top})`);
 
-        const svgs = cGroup
-            .selectAll('circle')
+        cGroup
+            .selectAll('.autkMark')
             .data(data)
             .join('circle')
-            .attr('cx', (d) => mapX(+d?.shape_area || 0))
-            .attr('cy', (d) => mapY(+d?.shape_leng || 0))
+            .attr('class', 'autkMark')
+            .attr('cx', (d) => this.mapX(+d?.shape_area || 0))
+            .attr('cy', (d) => this.mapY(+d?.shape_leng || 0))
             .attr('r', 6)
             .style('fill', 'lightgray')
             .style('visibility', 'visible');
+    }
 
-        // The function must return the groups over which the brush will be applied
-        // and the svg elements that will be affected by the brush.
-        return [cGroup.nodes() as SVGGElement[], svgs.nodes() as SVGCircleElement[]];
+    // ---- Highlight methods ----
+
+    protected highlightSelectedMarks(locList: number[]) {
+        const svgs = d3.selectAll('.autkMark');
+        svgs.style('fill', function (_d: unknown, id: number) {
+
+            if (locList.includes(id)) {
+                return PlotStyle.highlight;
+            } else {
+                return PlotStyle.default;
+            }
+        });
+    }
+
+    protected highlightSelectedBoundaries(layerId: string = 'neighborhoods', locList: number[]) {
+        const layer = this.map.layerManager.searchByLayerId(layerId);
+        if (layer) {
+            layer.layerRenderInfo.isPick = true;
+
+            layer.clearHighlightedIds();
+            layer.setHighlightedIds(locList);
+        }
     }
 
     // ---- Ui helper methods ----

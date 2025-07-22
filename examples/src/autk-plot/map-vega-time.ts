@@ -176,7 +176,7 @@ export class TemporalVega {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH_X, (selection: number[] | string[] | GeoJsonProperties[]) => {
+        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH_X, (selection: unknown[]) => {
 
             console.log(selection);
             // const locList: number[] = [];
