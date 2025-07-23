@@ -1,7 +1,5 @@
 import * as d3 from "d3";
 
-import { GeoJsonProperties } from "geojson";
-
 import { AutkPlot } from "./main";
 
 import { D3PlotBuilder } from "./types";
@@ -13,14 +11,6 @@ export class PlotD3 extends AutkPlot {
     constructor(div: HTMLElement, d3Builder: D3PlotBuilder, plotEvents: PlotEvent[]) {
         super(div, plotEvents);
         this._d3Builder = d3Builder;
-    }
-
-    get data(): GeoJsonProperties[] {
-        return this._data;
-    }
-
-    set data(data: GeoJsonProperties[]) {
-        this._data = data;
     }
 
     configureSignalListeners(): void {
@@ -47,13 +37,14 @@ export class PlotD3 extends AutkPlot {
         const svgs = d3.selectAll('.autkMark');
         const grps = d3.selectAll('.autkClickable');
 
-        let locList: number [] = [];
+        let locList: number[] = [];
 
         svgs
             .each( function(_d, id: number) {
                 d3.select(this)
                     .on('click', function (_event: MouseEvent) {
-                        if(locList.includes(id)) {
+                        console.log(_event)
+                        if (locList.includes(id)) {
                             locList = locList.filter(loc => loc !== id);
                         } else {
                             locList.push(id);
@@ -66,7 +57,7 @@ export class PlotD3 extends AutkPlot {
         grps
             .on('click', function (event: MouseEvent) {
                 if (event.target === this) {
-                    locList = []; 
+                    locList = [];
                     that.plotEvents.emit(PlotEvent.CLICK, locList);
                 }
             });

@@ -8,6 +8,7 @@ import { PlotEvent } from "./constants";
 import { View } from "vega";
 
 export class PlotVega extends AutkPlot {
+    protected _refs!: View;
     protected _vegaSpec: any;
 
     constructor(div: HTMLElement, vegaSpec: any, plotEvents: PlotEvent[]) {
@@ -15,8 +16,8 @@ export class PlotVega extends AutkPlot {
         this.vegaSpec = vegaSpec;
     }
 
-    get data(): GeoJsonProperties[] {
-        return this._data;
+    get refs(): View | SVGGElement[] {
+        return this._refs;
     }
 
     set data(data: GeoJsonProperties[]) {

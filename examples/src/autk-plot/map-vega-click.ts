@@ -1,7 +1,7 @@
 import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
-import { PlotEvent, AutkPlot, PlotVega } from 'autk-plot';
+import { PlotEvent, PlotVega } from 'autk-plot';
 import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent } from 'autk-map';
 
 import { View } from 'vega';
@@ -9,7 +9,7 @@ import { View } from 'vega';
 export class MapVega {
   protected db!: SpatialDb;
   protected map!: AutkMap;
-  protected plot!: AutkPlot;
+  protected plot!: PlotVega;
 
   public async run(): Promise<void> {
     await this.loadUtkDb();

@@ -167,6 +167,7 @@ export class MapD3 {
         const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
             return f.properties;
         });
+
         this.plot.data = data;
     }
 
@@ -303,14 +304,19 @@ export class MapD3 {
 
     protected highlightSelectedMarks(locList: number[]) {
         const svgs = d3.selectAll('.autkMark');
-        svgs.style('fill', function (_d: unknown, id: number) {
+        const grps = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
 
+        svgs.style('fill', function (_d: unknown, id: number) {
             if (locList.includes(id)) {
                 return PlotStyle.highlight;
             } else {
                 return PlotStyle.default;
             }
         });
+
+        if (locList.length === 0) {
+            grps.call(d3.brush().move, null);
+        }
     }
 
     protected highlightSelectedBoundaries(layerId: string = 'neighborhoods', locList: number[]) {
