@@ -31,10 +31,13 @@
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",
     "vite": "^7.0.5",
-    "vite-plugin-dts": "^4.5.4"
+    "vite-plugin-dts": "^4.5.4",
+    "@types/rbush": "^3.0.3"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.29.1-dev132.0",
-    "apache-arrow": "^21.0.0"
+    "apache-arrow": "^21.0.0",
+    "@turf/turf": "^7.2.0",
+    "rbush": "^3.0.1"
   }
 }
