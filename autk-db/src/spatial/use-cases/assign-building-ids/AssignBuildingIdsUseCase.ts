@@ -67,8 +67,6 @@ export class AssignBuildingIdsUseCase {
     return await this.describeColumns(tableName);
   }
 
-  // no helpers needed when using JSON payload
-
   private async columnExists(tableName: string, columnName: string): Promise<boolean> {
     const pragma = await this.conn.query(`PRAGMA table_info('${tableName}')`);
     const arr = pragma?.toArray?.() ?? [];
@@ -77,8 +75,6 @@ export class AssignBuildingIdsUseCase {
 
   private async describeColumns(tableName: string): Promise<Column[]> {
     const describe = await this.conn.query(`DESCRIBE ${tableName}`);
-    // DuckDB DESCRIBE returns rows with column_name and column_type indices depending on version.
-    // We rely on positional access as elsewhere in the codebase: name at index 0, type at index 1.
     const rows = describe?.toArray?.() ?? [];
     return rows.map((r: any) => ({ name: r[0] ?? r.column_name ?? r.name, type: r[1] ?? r.column_type ?? r.type }));
   }
