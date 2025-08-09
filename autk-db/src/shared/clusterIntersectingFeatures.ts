@@ -1,16 +1,24 @@
 import { booleanIntersects, bbox as turfBbox } from '@turf/turf';
 import RBush from 'rbush';
-import { FeatureCollection, GeometryCollection, Geometry } from 'geojson';
+import { Geometry } from 'geojson';
 
 /**
- * Groups intersecting features into clusters.
- * For each cluster it returns a wrapper Feature whose geometry is a GeometryCollection
- * of the original geometries and whose properties.parts contains the original feature
- * properties.
+ * Computes connected components (clusters) of intersecting geometries and returns
+ * a mapping from feature id to cluster id. The input array must contain an
+ * application-level identifier for each geometry. Cluster ids are stable only
+ * within a single invocation and start at 0.
  */
-export function clusterIntersectingFeatures(collection: FeatureCollection): FeatureCollection {
-  const features = collection.features;
-  const n = features.length;
+export function computeIntersectingClusterIds(
+  items: Array<{ id: number | string; geometry: Geometry | null | undefined }>,
+): Map<string, number> {
+  const validItems = items.map((it, idx) => ({ ...it, __idx: idx })).filter((it) => it.geometry != null) as Array<{
+    id: number | string;
+    geometry: Geometry;
+    __idx: number;
+  }>;
+
+  const n = validItems.length;
+  if (n === 0) return new Map();
 
   // Union-find structure
   const parent = new Array(n).fill(0).map((_, i) => i);
@@ -21,75 +29,50 @@ export function clusterIntersectingFeatures(collection: FeatureCollection): Feat
     if (ra !== rb) parent[rb] = ra;
   };
 
-  /* ------------------------------------------------------------------
-   * Build an R-tree of all feature bounding boxes for fast candidate lookup
-   * ------------------------------------------------------------------ */
+  // Build R-tree of bboxes
   interface RTreeItem {
     minX: number;
     minY: number;
     maxX: number;
     maxY: number;
-    idx: number; // index of the feature in the array
+    idx: number; // index within validItems
   }
-
   const rtree = new RBush<RTreeItem>();
-  const items: RTreeItem[] = new Array(n);
-
+  const itemsForTree: RTreeItem[] = new Array(n);
   for (let i = 0; i < n; i++) {
-    const [minX, minY, maxX, maxY] = turfBbox(features[i] as any);
-    const item: RTreeItem = { minX, minY, maxX, maxY, idx: i };
-    items[i] = item;
+    const [minX, minY, maxX, maxY] = turfBbox(validItems[i].geometry as any);
+    itemsForTree[i] = { minX, minY, maxX, maxY, idx: i };
   }
+  rtree.load(itemsForTree);
 
-  rtree.load(items);
-
-  /* ------------------------------------------------------------------
-   * Iterate each feature and only test real intersection against nearby
-   * candidates returned by the R-tree, drastically reducing comparisons.
-   * ------------------------------------------------------------------ */
+  // Intersections among nearby candidates
   for (let i = 0; i < n; i++) {
-    const aItem = items[i];
-    // Search R-tree for items whose bbox intersects with aItem
+    const aItem = itemsForTree[i];
     const candidates = rtree.search(aItem);
     for (const cand of candidates) {
       const j = cand.idx;
-      if (j <= i) continue; // avoid duplicate checks & self
-
+      if (j <= i) continue;
       try {
-        if (booleanIntersects(features[i] as any, features[j] as any)) {
+        if (booleanIntersects(validItems[i].geometry as any, validItems[j].geometry as any)) {
           union(i, j);
         }
       } catch {
-        /* ignore invalid geometries */
+        // ignore invalid geometries
       }
     }
   }
 
-  // Collect indices per component
-  const clusters: Map<number, number[]> = new Map();
+  // Assign compact cluster ids
+  const rootToClusterId = new Map<number, number>();
+  let nextClusterId = 0;
+  const result = new Map<string, number>();
   for (let i = 0; i < n; i++) {
     const root = find(i);
-    if (!clusters.has(root)) clusters.set(root, []);
-    clusters.get(root)!.push(i);
+    if (!rootToClusterId.has(root)) rootToClusterId.set(root, nextClusterId++);
+    const clusterId = rootToClusterId.get(root)!;
+    const appId = String(validItems[i].id);
+    result.set(appId, clusterId);
   }
 
-  const wrapperFeatures = Array.from(clusters.values()).map((indices) => {
-    const geoms: Geometry[] = indices.map((idx) => features[idx].geometry).filter((g): g is Geometry => g != null);
-
-    const geomCollection: GeometryCollection = {
-      type: 'GeometryCollection',
-      geometries: geoms,
-    };
-
-    return {
-      type: 'Feature',
-      geometry: geomCollection,
-      properties: {
-        parts: indices.map((idx) => features[idx].properties ?? {}),
-        size: indices.length,
-      },
-    } as const;
-  });
-
-  return { type: 'FeatureCollection', features: wrapperFeatures } as FeatureCollection;
+  return result;
 }

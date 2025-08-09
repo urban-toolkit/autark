@@ -59,7 +59,7 @@ export class SpatialDb {
     this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.db, this.conn);
     this.loadJsonUseCase = new LoadJsonUseCase(this.db, this.conn);
-    this.loadLayerUseCase = new LoadLayerUseCase(this.conn);
+    this.loadLayerUseCase = new LoadLayerUseCase(this.db, this.conn);
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.db, this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
