@@ -6,14 +6,17 @@ import { LayerTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 import { AssignBuildingIdsUseCase } from '../assign-building-ids/AssignBuildingIdsUseCase';
+import { AggregateBuildingLayerUseCase } from '../aggregate-building-layer/AggregateBuildingLayerUseCase';
 
 export class LoadLayerUseCase {
   private conn: AsyncDuckDBConnection;
   private assignBuildingIdsUseCase: AssignBuildingIdsUseCase;
+  private aggregateBuildingLayerUseCase: AggregateBuildingLayerUseCase;
 
   constructor(db: AsyncDuckDB, conn: AsyncDuckDBConnection) {
     this.conn = conn;
     this.assignBuildingIdsUseCase = new AssignBuildingIdsUseCase(db, conn);
+    this.aggregateBuildingLayerUseCase = new AggregateBuildingLayerUseCase(conn);
   }
 
   async exec(params: Params): Promise<LayerTable> {
@@ -34,6 +37,13 @@ export class LoadLayerUseCase {
     // Post-processing for building layers: assign persistent building_id column
     if (params.layer === 'buildings') {
       columns = await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName });
+
+      // Materialize aggregated buildings table for grouped operations
+      const aggregatedOutputTableName = `${layerOutputTableName}_agg`;
+      await this.aggregateBuildingLayerUseCase.exec({
+        inputTableName: layerOutputTableName,
+        outputTableName: aggregatedOutputTableName,
+      });
     }
 
     return {

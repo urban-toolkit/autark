@@ -22,6 +22,7 @@ import { GridLayerTable } from '../shared/interfaces';
 import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces';
 import { RawQueryUseCase } from './use-cases/raw-query';
 import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
+import { getColumnsFromDuckDbTableDescribe } from './shared/utils';
 
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
@@ -185,6 +186,19 @@ export class SpatialDb {
 
     const table = await this.loadLayerUseCase.exec(params);
     this.tables.push(table);
+
+    // If buildings layer, also register the aggregated table created by the loader
+    if (params.layer === 'buildings') {
+      const aggregatedOutputTableName = `${table.name}_agg`;
+      const describe = await this.conn.query(`DESCRIBE ${aggregatedOutputTableName}`);
+      const columns = getColumnsFromDuckDbTableDescribe(describe.toArray());
+      this.tables.push({
+        source: 'osm',
+        type: 'buildings',
+        name: aggregatedOutputTableName,
+        columns,
+      });
+    }
 
     return table;
   }
