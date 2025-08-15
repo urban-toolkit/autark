@@ -1,6 +1,13 @@
 import { CustomLayerTable, LayerTable } from '../../../shared/interfaces';
 
 export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerTable) => {
+  const hasBuildingIdColumn = !!layerTable.columns?.some((c) => c.name === 'building_id');
+
+  const propertiesExpr =
+    layerTable.type === 'buildings' && hasBuildingIdColumn
+      ? `json_merge_patch(COALESCE(CAST(properties AS JSON), '{}'::JSON), json_object('building_id', building_id))`
+      : 'properties';
+
   return `
     SELECT json_object(
          'type', 'FeatureCollection',
@@ -11,23 +18,9 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerT
     SELECT json_object(
             'type', 'Feature',
             'geometry', CAST(ST_AsGeoJSON(geometry) AS JSON),
-            'properties', ${
-              layerTable.type === 'buildings'
-                ? propertiesJsonIncludingBuildingIdIfColumnExists(layerTable.name)
-                : 'properties'
-            }
+            'properties', ${propertiesExpr}
           ) AS feature
     FROM ${layerTable.name}
     ) sub;
 `;
 };
-
-/**
- * Returns a SQL CASE expression that merges building_id into the properties JSON
- * when the column exists in the given table. Falls back to original properties otherwise.
- */
-const propertiesJsonIncludingBuildingIdIfColumnExists = (tableName: string): string => `
-  CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('${tableName}') WHERE name = 'building_id') > 0
-       THEN json_merge_patch(CAST(properties AS JSON), json_object('building_id', building_id))
-       ELSE properties END
-`;

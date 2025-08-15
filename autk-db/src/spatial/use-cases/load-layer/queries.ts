@@ -67,7 +67,7 @@ function buildGeometrySelect({
   layer: LayerType;
 }) {
   // Define which layers should create polygons for closed ways
-  const areaLayers = ['parks', 'water'];
+  const areaLayers = ['buildings', 'parks', 'water'];
 
   const baseGeometry = areaLayers.includes(layer)
     ? `
