@@ -18,6 +18,12 @@ export class AutkMapUi {
     protected _currentLayer: Layer | null;
 
     /**
+     * Reference to the submenu HTML element.
+     * @type {HTMLDivElement | null}
+     */
+    protected _subMenu: HTMLDivElement | null = null;
+
+    /**
      * Constructor for AutkMapUi
      * @param {AutkMap} map The map instance
      */
@@ -147,34 +153,32 @@ export class AutkMapUi {
      * Build the submenu for layer options.
      */
     protected buildSubMenu(): void {
-        let subMenu = document.getElementById('autkMapSubMenu');
+        if (!this._subMenu) {
+            this._subMenu = document.createElement('div');
+            this._subMenu.id = 'autkMapSubMenu';
+            this._subMenu.style.position = 'absolute';
+            this._subMenu.style.top = (this.map.canvas.offsetTop + 40) + 'px';
+            this._subMenu.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+            this._subMenu.style.width = '300px';
+            this._subMenu.style.display = 'block';
+            this._subMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+            this._subMenu.style.zIndex = '1001';
+            this._subMenu.style.backgroundColor = '#fff';
+            this._subMenu.style.border = '1px solid #ccc';
+            this._subMenu.style.borderRadius = '8px';
+            this._subMenu.style.padding = '10px';
+            this._subMenu.style.visibility = 'hidden';
 
-        if (!subMenu) {
-            subMenu = document.createElement('div');
-            subMenu.id = 'autkMapSubMenu';
-            subMenu.style.position = 'absolute';
-            subMenu.style.top = (this.map.canvas.offsetTop + 40) + 'px';
-            subMenu.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
-            subMenu.style.width = '300px';
-            subMenu.style.display = 'block';
-            subMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-            subMenu.style.zIndex = '1001';
-            subMenu.style.backgroundColor = '#fff';
-            subMenu.style.border = '1px solid #ccc';
-            subMenu.style.borderRadius = '8px';
-            subMenu.style.padding = '10px';
-            subMenu.style.visibility = 'hidden';
-
-            this.map.canvas.parentElement?.appendChild(subMenu);
+            this.map.canvas.parentElement?.appendChild(this._subMenu);
 
             this.buildActiveLayersDropdown();
             this.buildEnablePickingDropdown();
         }
 
-        if (subMenu.style.visibility === 'visible') {
-            subMenu.style.visibility = 'hidden';
+        if (this._subMenu.style.visibility === 'visible') {
+            this._subMenu.style.visibility = 'hidden';
         } else {
-            subMenu.style.visibility = 'visible';
+            this._subMenu.style.visibility = 'visible';
         }
     }
 
@@ -182,11 +186,9 @@ export class AutkMapUi {
      * Build the active layers dropdown.
      */
     protected buildActiveLayersDropdown(): void {
-        const subMenu = document.getElementById('autkMapSubMenu');
+        if (!this._subMenu) return;
 
-        if (!subMenu) return;
-
-        let title = document.getElementById('autkMapActiveLayersTitle');
+        let title = this._subMenu.querySelector('#autkMapActiveLayersTitle') as HTMLHeadingElement;
         if (!title) {
             title = document.createElement('h3');
             title.id = 'autkMapActiveLayersTitle';
@@ -195,31 +197,31 @@ export class AutkMapUi {
             title.style.fontSize = '16px';
             title.style.color = '#333';
 
-            subMenu.appendChild(title);
+            this._subMenu.appendChild(title);
         }
 
-        let separator = document.getElementById('activeLayersSeparator');
+        let separator = this._subMenu.querySelector('#activeLayersSeparator') as HTMLHRElement;
         if (!separator) {
             separator = document.createElement('hr');
             separator.id = 'activeLayersSeparator';
             separator.style.margin = '10px 0';
 
-            subMenu.appendChild(separator);
+            this._subMenu.appendChild(separator);
         }
 
         // Create dropdown container
-        let dropdownContainer = document.getElementById('autkMapLayerDropdownContainer');
+        let dropdownContainer = this._subMenu.querySelector('#autkMapLayerDropdownContainer') as HTMLDivElement;
         if (!dropdownContainer) {
             dropdownContainer = document.createElement('div');
             dropdownContainer.id = 'autkMapLayerDropdownContainer';
             dropdownContainer.style.position = 'relative';
             dropdownContainer.style.marginBottom = '10px';
 
-            subMenu.appendChild(dropdownContainer);
+            this._subMenu.appendChild(dropdownContainer);
         }
 
         // Create dropdown button
-        let dropdownButton = document.getElementById('autkMapLayerDropdownButton');
+        let dropdownButton = this._subMenu.querySelector('#autkMapLayerDropdownButton') as HTMLButtonElement;
         if (!dropdownButton) {
             dropdownButton = document.createElement('button');
             dropdownButton.id = 'autkMapLayerDropdownButton';
@@ -236,7 +238,7 @@ export class AutkMapUi {
         }
 
         // Create dropdown list
-        let dropdownList = document.getElementById('autkMapLayerDropdownList');
+        let dropdownList = this._subMenu.querySelector('#autkMapLayerDropdownList') as HTMLDivElement;
         if (!dropdownList) {
             dropdownList = document.createElement('div');
             dropdownList.id = 'autkMapLayerDropdownList';
@@ -303,11 +305,9 @@ export class AutkMapUi {
      * This allows users to select which layer should be enabled for picking.
      */
     protected buildEnablePickingDropdown(): void {
-        const subMenu = document.getElementById('autkMapSubMenu');
+        if (!this._subMenu) return;
 
-        if (!subMenu) return;
-
-        let title = document.getElementById('autkMapEnablePickingTitle');
+        let title = this._subMenu.querySelector('#autkMapEnablePickingTitle') as HTMLHeadingElement;
         if (!title) {
             title = document.createElement('h3');
             title.id = 'autkMapEnablePickingTitle';
@@ -316,27 +316,27 @@ export class AutkMapUi {
             title.style.fontSize = '16px';
             title.style.color = '#333';
 
-            subMenu.appendChild(title);
+            this._subMenu.appendChild(title);
         }
 
-        let separator = document.getElementById('enablePickingSeparator');
+        let separator = this._subMenu.querySelector('#enablePickingSeparator') as HTMLHRElement;
         if (!separator) {
             separator = document.createElement('hr');
             separator.id = 'enablePickingSeparator';
             separator.style.margin = '10px 0';
 
-            subMenu.appendChild(separator);
+            this._subMenu.appendChild(separator);
         }
 
         // Create dropdown container
-        let dropdownContainer = document.getElementById('autkMapEnablePickingDropdownContainer');
+        let dropdownContainer = this._subMenu.querySelector('#autkMapEnablePickingDropdownContainer') as HTMLDivElement;
         if (!dropdownContainer) {
             dropdownContainer = document.createElement('div');
             dropdownContainer.id = 'autkMapEnablePickingDropdownContainer';
             dropdownContainer.style.position = 'relative';
             dropdownContainer.style.marginBottom = '10px';
 
-            subMenu.appendChild(dropdownContainer);
+            this._subMenu.appendChild(dropdownContainer);
         }
 
         // Create a select element if it doesn't exist yet
