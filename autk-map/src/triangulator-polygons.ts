@@ -52,9 +52,9 @@ export class TriangulatorPolygons extends Triangulator {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
-        let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
-
         const collection: Feature[] = geojson['features'];
+
+        let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
         for (let fId=0; fId<collection.length; fId++) {
             // gets the feature
             const feature = collection[fId];
@@ -70,7 +70,6 @@ export class TriangulatorPolygons extends Triangulator {
 
             } else if (feature.geometry.type === 'MultiPolygon') {
                 meshes = Triangulator.multiPolygonToMesh(feature, origin);
-
             }
             else {
                 console.warn('Unsupported geometry type:', feature.geometry.type);

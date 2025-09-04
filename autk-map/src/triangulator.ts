@@ -4,6 +4,9 @@ import { Feature, FeatureCollection, LineString, MultiLineString, MultiPolygon, 
 
 import earcut from 'earcut';
 
+import { extrudePolygons } from "poly-extrude";
+
+
 export abstract class Triangulator {
 
     /**
@@ -41,7 +44,7 @@ export abstract class Triangulator {
         const flatIds = earcut(flatCoords);
 
         return [{ flatCoords, flatIds }];
-    } 
+    }
 
     /**
      * Converts a LineString feature to a border representation.
@@ -57,6 +60,30 @@ export abstract class Triangulator {
 
         return [{ flatCoords, flatIds }];
     }
+
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
+    static lineStringToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <Polygon>feature.geometry;
+
+        const coords = coordinates[0].map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+        const result = extrudePolygons([
+            [coords]
+        ],
+        { depth: heightInfo[1] - heightInfo[0] }
+        );
+
+        const flatCoords = Array.from(result.position).map((cord: number, id: number) => {
+            if (id % 3 === 2) return cord + heightInfo[0];
+            return cord;
+        });
+        return [{ flatCoords, flatIds: Array.from(result.indices) }];
+    }
+
 
     /**
      * Converts a MultiLineString feature to a mesh representation.
@@ -135,7 +162,6 @@ export abstract class Triangulator {
         // copy the coordinates
         const coords = coordinates[0].map((cord: number[]) => cord);
 
-        // TODO: handle holes
         const holes = [];
         for (let i = 1; i < coordinates.length; i++) {
             holes.push(coords.length);
@@ -190,7 +216,6 @@ export abstract class Triangulator {
         for (const polygon of coordinates) {
             const coords = polygon[0].map((cord: number[]) => cord);
 
-            // TODO: handle holes
             const holes = [];
             for (let i = 1; i < polygon.length; i++) {
                 holes.push(coords.length);
@@ -204,25 +229,6 @@ export abstract class Triangulator {
         }
 
         return borders;
-    }
-
-    /**
-     * Translates the features in the GeoJSON collection based on the origin.
-     * @param {FeatureCollection} geojson The GeoJSON feature collection
-     * @param {number[]} origin The origin point for translation
-     */
-    protected static translateFeatures(geojson: FeatureCollection, origin: number[]) {
-        const collection = geojson['features'];
-
-        for (const feature of collection) {
-            const { coordinates } = <LineString>feature.geometry;
-
-            for(let cId=0; cId < coordinates.length; cId++) {
-                const coords = coordinates[cId];
-                coords[0] -= origin[0];
-                coords[1] -= origin[1];
-            }
-        }
     }
 
     /**
