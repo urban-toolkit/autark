@@ -61,7 +61,7 @@ export class TriangulatorBuildings extends Triangulator {
     }
 
     /**
-     * Groups buildings based on their AABB.
+     * Groups buildings based on their id.
      * @param {FeatureCollection} geojson The GeoJSON feature collection
      * @returns {Feature[][]} An array of grouped features
      */
