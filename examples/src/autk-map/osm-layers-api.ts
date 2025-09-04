@@ -17,7 +17,8 @@ export class OsmLayersApi {
       outputTableName: 'table_osm',
       autoLoadLayers: {
         coordinateFormat: 'EPSG:3395',
-        layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+        // layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+        layers: ['surface', 'buildings'] as Array<
           'surface' | 'parks' | 'water' | 'roads' | 'buildings'
         >,
         dropOsmTable: true,
@@ -47,6 +48,10 @@ export class OsmLayersApi {
     }
 
     for (const json of data) {
+        if ( json.props.name === 'table_osm_buildings_agg') {
+            continue;
+        }
+
       console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
       this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }

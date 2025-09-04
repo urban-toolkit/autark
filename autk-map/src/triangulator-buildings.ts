@@ -4,7 +4,7 @@ import { FeatureCollection, Feature, LineString } from "geojson";
 
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { Triangulator } from "./triangulator";
-import { AABB } from "./aabb";
+// import { AABB } from "./aabb";
 import { booleanClockwise } from "@turf/turf";
 
 /**
@@ -23,94 +23,41 @@ export class TriangulatorBuildings extends Triangulator {
         const comps: ILayerComponent[] = [];
 
         // translate based on origin
-        this.translateFeatures(geojson, origin);
         const groups: Feature[][] = this.groupBuildings(geojson);
 
         // iterate over groups
         for (let gId = 0; gId < groups.length; gId++) {
-            // creates a new componenet
-            const component: ILayerComponent = {
-                nPoints: 0,
-                nTriangles: 0
-            };
 
+            let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
             // for each feature of the group
-            for (const feature of groups[gId]) {
-                const { coordinates } = <LineString>feature.geometry;
-
-                // number of vertices
-                const nVertsOnFeature = coordinates.length;
+            for (let fId=0; fId<groups[gId].length; fId++) {
+                // gets the feature
+                const feature = groups[gId][fId];
 
                 // get the heights
                 const heightInfo = TriangulatorBuildings.computeBuildingHeights(feature);
                 if (!heightInfo.length) { continue; }
 
-                // floor ----------------------------------------------------------------------
-                const flatCoords = coordinates.map((cord: number[]) => [cord[0], cord[1], heightInfo[0]]).flat();
-                const flatIds = earcut(coordinates.flat());
-                // ----------------------------------------------------------------------------
-
-                // roof -----------------------------------------------------------------------
-                const flatCoordsRoof = flatCoords.map((el: number, id: number) => {
-                    return (id % 3 === 2 ? heightInfo[1] : el);
-                });
-                for (let eId = 0; eId < flatCoordsRoof.length; eId++) {
-                    flatCoords.push(flatCoordsRoof[eId]);
+                if (feature.geometry.type === 'Polygon') {
+                    meshes = Triangulator.lineStringToBuilding(feature, heightInfo, origin);
                 }
 
-                const flatIdsRoof = earcut(coordinates.flat()).map((el: number) => el + nVertsOnFeature);
-                flatIdsRoof.forEach((el: number) => flatIds.push(el));
-                // ----------------------------------------------------------------------------
+                let nPoints = 0;
+                let nTriangles = 0;
 
-                // walls ----------------------------------------------------------------------
-                for (let eId = 0; eId < nVertsOnFeature; eId++) {
-                    // current
-                    flatCoords.push(flatCoords[3 * eId + 0]);
-                    flatCoords.push(flatCoords[3 * eId + 1]);
-                    flatCoords.push(flatCoords[3 * eId + 2]);
+                for (const triangulation of meshes) {
+                    mesh.push({
+                        position: triangulation.flatCoords,
+                        indices: triangulation.flatIds
+                    });
 
-                    // next
-                    flatCoords.push(flatCoords[3 * ((eId + 1) % nVertsOnFeature) + 0]);
-                    flatCoords.push(flatCoords[3 * ((eId + 1) % nVertsOnFeature) + 1]);
-                    flatCoords.push(flatCoords[3 * ((eId + 1) % nVertsOnFeature) + 2]);
+                    nPoints += triangulation.flatCoords.length / 3;
+                    nTriangles += triangulation.flatIds.length / 3;
                 }
 
-                for (let eId = 0; eId < nVertsOnFeature; eId++) {
-                    // current
-                    flatCoords.push(flatCoordsRoof[3 * eId + 0]);
-                    flatCoords.push(flatCoordsRoof[3 * eId + 1]);
-                    flatCoords.push(flatCoordsRoof[3 * eId + 2]);
-
-                    // next
-                    flatCoords.push(flatCoordsRoof[3 * ((eId + 1) % nVertsOnFeature) + 0]);
-                    flatCoords.push(flatCoordsRoof[3 * ((eId + 1) % nVertsOnFeature) + 1]);
-                    flatCoords.push(flatCoordsRoof[3 * ((eId + 1) % nVertsOnFeature) + 2]);
-                }
-
-                for (let vId = 0; vId < 2 * nVertsOnFeature - 1; vId += 2) {
-                    const v0 = (2 * nVertsOnFeature) + vId;
-                    const v1 = (2 * nVertsOnFeature) + vId + 1;
-
-                    const v2 = v0 + 2 * nVertsOnFeature;
-                    const v3 = v1 + 2 * nVertsOnFeature;
-
-                    flatIds.push(...[v0, v1, v2, v2, v1, v3]);
-                }
-                // ----------------------------------------------------------------------------
-
-                // Add mesh to geometry list
-                mesh.push({
-                    position: flatCoords,
-                    indices: flatIds
-                });
-
-                // updates the component
-                component.nPoints += flatCoords.length / 3;
-                component.nTriangles += flatIds.length / 3;
+                comps.push({ nPoints, nTriangles });
             }
 
-            // add component to components list
-            comps.push(component);
         }
 
         return [mesh, comps];
@@ -125,28 +72,17 @@ export class TriangulatorBuildings extends Triangulator {
         // checks if is a valid feature
         let filtered = TriangulatorBuildings.removeInvalidBuildingParts(geojson.features);
 
-        // make the orientation consistent
-        filtered = TriangulatorBuildings.closeFeatures(filtered);
-        filtered = TriangulatorBuildings.fixOrientation(filtered);
+        const groups: { [key: string]: Feature[] } = {};
+        for (const feat of filtered) {
+            let key = feat.properties ? feat.properties.building_id as string : '-1';
 
-        // builds the AABB
-        const aabb = new AABB();
-        aabb.buildFeatureBoxes(filtered);
-
-        const features = [];
-        for (const box of aabb.boxes) {
-            const group = box[1].feats;
-
-            // empty group
-            if (group.length === 0) {
-                continue;
+            if (!groups[key]) {
+                groups[key] = [];
             }
-
-            // add to the features list
-            features.push([...group]);
+            groups[key].push(feat);
         }
 
-        return features;
+        return Object.values(groups);
     }
 
     /**
@@ -208,7 +144,7 @@ export class TriangulatorBuildings extends Triangulator {
         if ('min_height' in props) {
             min_height = props['min_height'];
         }
-        else if ('min_level' in props) {
+        else if ('min_level' in props && props['min_level'] >= 0) {
             min_height = FLOOR_HEIGHT * props['min_level'];
         }
         else if ('building:min_level' in props) {
@@ -216,41 +152,5 @@ export class TriangulatorBuildings extends Triangulator {
         }
 
         return [z_SCALE * min_height, z_SCALE * height];
-    }
-
-    /**
-     * Fixes the orientation of the features to ensure consistent winding order.
-     * @param {Feature[]} features The array of GeoJSON features
-     * @returns {Feature[]} The array with fixed orientations
-     */
-    protected static fixOrientation(features: Feature[]): Feature[] {
-        for (const feature of features) {
-            let { coordinates } = <LineString>feature.geometry;
-
-            // makes the linestrings orientation consistent
-            if ( booleanClockwise(coordinates) ){
-                coordinates = coordinates.reverse();
-            }
-        }
-
-        return features;
-    }
-
-    /**
-     * Closes the features by ensuring the first and last points are the same.
-     * @param {Feature[]} features The array of GeoJSON features
-     * @returns {Feature[]} The array with closed features
-     */
-    protected static closeFeatures(features: Feature[]): Feature[] {
-        for (const feature of features) {
-            const { coordinates } = <LineString>feature.geometry;
-            // fix the linestring
-            const len = coordinates.length;
-            if (coordinates[0][0] !== coordinates[len - 1][0] || coordinates[0][1] !== coordinates[len - 1][1]) {
-                coordinates.push(coordinates[0]);
-            }
-        }
-
-        return features;
     }
 }
