@@ -1,11 +1,8 @@
-import earcut from "earcut";
 
-import { FeatureCollection, Feature, LineString } from "geojson";
+import { FeatureCollection, Feature } from "geojson";
+import { Triangulator } from "./triangulator";
 
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
-import { Triangulator } from "./triangulator";
-// import { AABB } from "./aabb";
-import { booleanClockwise } from "@turf/turf";
 
 /**
  * Class for triangulating buildings from GeoJSON features.
@@ -25,10 +22,14 @@ export class TriangulatorBuildings extends Triangulator {
         // translate based on origin
         const groups: Feature[][] = this.groupBuildings(geojson);
 
+        let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
+
         // iterate over groups
         for (let gId = 0; gId < groups.length; gId++) {
 
-            let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
+            let nPoints = 0;
+            let nTriangles = 0;
+
             // for each feature of the group
             for (let fId=0; fId<groups[gId].length; fId++) {
                 // gets the feature
@@ -42,9 +43,6 @@ export class TriangulatorBuildings extends Triangulator {
                     meshes = Triangulator.lineStringToBuilding(feature, heightInfo, origin);
                 }
 
-                let nPoints = 0;
-                let nTriangles = 0;
-
                 for (const triangulation of meshes) {
                     mesh.push({
                         position: triangulation.flatCoords,
@@ -54,10 +52,9 @@ export class TriangulatorBuildings extends Triangulator {
                     nPoints += triangulation.flatCoords.length / 3;
                     nTriangles += triangulation.flatIds.length / 3;
                 }
-
-                comps.push({ nPoints, nTriangles });
             }
 
+            comps.push({ nPoints, nTriangles });
         }
 
         return [mesh, comps];
