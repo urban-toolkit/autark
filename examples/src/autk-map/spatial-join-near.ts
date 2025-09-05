@@ -37,7 +37,7 @@ export class SpatialJoinNear {
         });
 
         await this.db.spatialJoin({
-            tableRootName: 'table_osm_buildings',
+            tableRootName: 'table_osm_buildings_agg',
             tableJoinName: 'noise',
             spatialPredicate: 'NEAR',
             nearDistance: 1000,
@@ -89,7 +89,7 @@ export class SpatialJoinNear {
     protected async updateThematicData() {
         const thematicData: ILayerThematic[] = [];
 
-        const geojson = await this.db.getLayer('table_osm_roads');
+        const geojson = await this.db.getLayer('table_osm_buildings_agg');
 
         if (geojson) {
             for (const feature of geojson.features) {
@@ -116,7 +116,7 @@ export class SpatialJoinNear {
             }
         }
 
-        this.map.updateLayerThematic('table_osm_roads', thematicData);
+        this.map.updateLayerThematic('table_osm_buildings', thematicData);
     }
 }
 

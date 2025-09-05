@@ -39,8 +39,21 @@ export class TriangulatorBuildings extends Triangulator {
                 const heightInfo = TriangulatorBuildings.computeBuildingHeights(feature);
                 if (!heightInfo.length) { continue; }
 
-                if (feature.geometry.type === 'Polygon') {
+                if (feature.geometry.type === 'LineString') {
                     meshes = Triangulator.lineStringToBuilding(feature, heightInfo, origin);
+
+                } else if (feature.geometry.type === 'MultiLineString') {
+                    meshes = Triangulator.multiLineStringToBuilding(feature, heightInfo, origin);
+
+                } else if (feature.geometry.type === 'Polygon') {
+                    meshes = Triangulator.polygonToBuilding(feature, heightInfo, origin);
+
+                } else if (feature.geometry.type === 'MultiPolygon') {
+                    meshes = Triangulator.multiPolygonToBuilding(feature, heightInfo, origin);
+
+                } else {
+                    console.warn('Unsupported geometry type:', feature.geometry.type);
+                    continue;
                 }
 
                 for (const triangulation of meshes) {

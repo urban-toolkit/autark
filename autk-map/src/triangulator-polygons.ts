@@ -70,8 +70,8 @@ export class TriangulatorPolygons extends Triangulator {
 
             } else if (feature.geometry.type === 'MultiPolygon') {
                 meshes = Triangulator.multiPolygonToMesh(feature, origin);
-            }
-            else {
+
+            } else {
                 console.warn('Unsupported geometry type:', feature.geometry.type);
                 continue;
             }
