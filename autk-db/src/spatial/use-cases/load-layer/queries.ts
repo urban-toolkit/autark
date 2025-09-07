@@ -213,6 +213,15 @@ const GET_BUILDINGS = (tableName: string) => `
         map_extract(tags, 'building')[1] IS NOT NULL OR
         map_extract(tags, 'building:part')[1] IS NOT NULL OR
         map_extract(tags, 'type')[1] IN ('building')
+      ) AND
+      -- Filter out roof parts (from removeInvalidBuildingParts logic)
+      map_extract(tags, 'building')[1] IS DISTINCT FROM 'roof' AND
+      map_extract(tags, 'building:part')[1] IS DISTINCT FROM 'roof' AND
+      -- Filter out buildings without height information
+      (
+        map_extract(tags, 'height')[1] IS NOT NULL OR
+        map_extract(tags, 'levels')[1] IS NOT NULL OR
+        map_extract(tags, 'building:levels')[1] IS NOT NULL
       );
 `;
 

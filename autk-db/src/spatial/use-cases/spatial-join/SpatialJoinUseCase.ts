@@ -19,11 +19,11 @@ export class SpatialJoinUseCase {
     const tableJoin = tables.find((table) => table.name === params.tableJoinName);
     if (!tableJoin) throw new TableNotFoundError(params.tableJoinName);
 
-    const geometricColumnRoot = tableRoot.columns.find((column) => column.type === 'GEOMETRY')?.name;
-    if (!geometricColumnRoot) throw new GeometryColumnNotFoundError(tableJoin.name);
+    const geometricColumnRoot = this.getGeometryColumnName(tableRoot);
+    if (!geometricColumnRoot) throw new GeometryColumnNotFoundError(tableRoot.name);
 
-    const geometricColumnJoin = tableJoin.columns.find((column) => column.type === 'GEOMETRY')?.name;
-    if (!geometricColumnJoin) throw new GeometryColumnNotFoundError(tableRoot.name);
+    const geometricColumnJoin = this.getGeometryColumnName(tableJoin);
+    if (!geometricColumnJoin) throw new GeometryColumnNotFoundError(tableJoin.name);
 
     const joinType = params.joinType || 'INNER';
     const spatialPredicate = params.spatialPredicate || 'INTERSECT';
@@ -58,6 +58,24 @@ export class SpatialJoinUseCase {
       } as Table,
       created: params.output.type === 'CREATE_NEW',
     };
+  }
+
+  /**
+   * Gets the appropriate geometry column name for a table.
+   * For building tables, prioritizes 'agg_geometry' if available, otherwise falls back to 'geometry'.
+   * For other tables, returns the first geometry column found.
+   */
+  private getGeometryColumnName(table: Table): string | undefined {
+    if (table.source === 'osm' && table.type === 'buildings') {
+      const aggGeometryColumn = table.columns.find(
+        (column) => column.name === 'agg_geometry' && column.type === 'GEOMETRY',
+      );
+
+      if (aggGeometryColumn) return aggGeometryColumn.name;
+    }
+
+    // Default behavior: return first geometry column found
+    return table.columns.find((column) => column.type === 'GEOMETRY')?.name;
   }
 
   private addTablesToGroupBy(

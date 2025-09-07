@@ -34,16 +34,18 @@ export class LoadLayerUseCase {
     const describeTableResponse = await this.conn.query(layerQuery);
     let columns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
 
-    // Post-processing for building layers: assign persistent building_id column
+    // Post-processing for building layers: assign persistent building_id column and add aggregated geometry
     if (params.layer === 'buildings') {
-      columns = await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName });
+      await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName });
 
-      // Materialize aggregated buildings table for grouped operations
-      const aggregatedOutputTableName = `${layerOutputTableName}_agg`;
+      // Add aggregated geometry column to the main building table
       await this.aggregateBuildingLayerUseCase.exec({
         inputTableName: layerOutputTableName,
-        outputTableName: aggregatedOutputTableName,
       });
+
+      // Update columns to include the new agg_geometry column
+      const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${layerOutputTableName}`);
+      columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
     }
 
     return {

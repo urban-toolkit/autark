@@ -56,6 +56,14 @@ function getSelectString(params: {
     const { aggregatesByFunction, nonAggregateColumns } = groupColumnsByAggregateFunction(params.groupBy.selectColumns);
     const sjoinObjectSql = buildSjoinObject(aggregatesByFunction, nonAggregateColumns);
 
+    // Get all additional columns from tableRoot (excluding geometry and properties)
+    const additionalColumns = params.tableRoot.columns
+      .filter((col) => col.name !== 'geometry' && col.name !== 'properties')
+      .map((col) => `${params.tableRoot.name}.${col.name}`);
+
+    const additionalColumnsStr =
+      additionalColumns.length > 0 ? `,\n        ${additionalColumns.join(',\n        ')}` : '';
+
     return `
       SELECT 
         ${params.tableRoot.name}.geometry,
@@ -66,7 +74,7 @@ function getSelectString(params: {
               ${sjoinObjectSql}
             )
           )
-        ) AS properties
+        ) AS properties${additionalColumnsStr}
     `;
   }
 
@@ -176,6 +184,14 @@ function buildSimpleJoinSelect(tableRoot: Table, tableJoin: Table, geometricColu
     .map((column) => `${tableJoin.name}."${column.name}"`)
     .join(', ');
 
+  // Get all additional columns from tableRoot (excluding geometry and properties)
+  const additionalColumns = tableRoot.columns
+    .filter((col) => col.name !== 'geometry' && col.name !== 'properties')
+    .map((col) => `${tableRoot.name}.${col.name}`);
+
+  const additionalColumnsStr =
+    additionalColumns.length > 0 ? `,\n        ${additionalColumns.join(',\n        ')}` : '';
+
   return `
       SELECT 
         ${tableRoot.name}.geometry,
@@ -184,7 +200,7 @@ function buildSimpleJoinSelect(tableRoot: Table, tableJoin: Table, geometricColu
             ${propertiesFromJoin}
           ),
           COALESCE(CAST("${tableRoot.name}".properties AS JSON), '{}'::JSON)
-        ) AS properties
+        ) AS properties${additionalColumnsStr}
     `;
 }
 
@@ -214,7 +230,14 @@ function getJoinString({
 
 /* Group By Logic */
 function getGroupByString(tableRoot: Table) {
+  // Get all additional columns from tableRoot (excluding geometry and properties)
+  const additionalColumns = tableRoot.columns
+    .filter((col) => col.name !== 'geometry' && col.name !== 'properties')
+    .map((col) => `${tableRoot.name}.${col.name}`);
+
+  const allGroupByColumns = [`${tableRoot.name}.geometry`, `${tableRoot.name}.properties`, ...additionalColumns];
+
   return `
-    GROUP BY ${tableRoot.name}.geometry, ${tableRoot.name}.properties
+    GROUP BY ${allGroupByColumns.join(', ')}
   `;
 }
