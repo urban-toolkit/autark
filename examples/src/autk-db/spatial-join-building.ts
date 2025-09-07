@@ -38,7 +38,7 @@ export class SpatialJoinNear {
 
     console.log('Começando o join');
     await this.db.spatialJoin({
-      tableRootName: 'table_osm_buildings_agg',
+      tableRootName: 'table_osm_buildings',
       tableJoinName: 'noise',
       output: {
         type: 'MODIFY_ROOT',
@@ -56,7 +56,7 @@ export class SpatialJoinNear {
     });
     console.log('acabou o join');
 
-    this.geojson = await this.db.getLayer('table_osm_buildings_agg');
+    this.geojson = await this.db.getLayer('table_osm_buildings');
     console.log({
       data: this.geojson,
     });

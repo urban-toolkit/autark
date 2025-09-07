@@ -1,6 +1,4 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
-import { LayerTable } from '../../../shared/interfaces';
-import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
 export class AggregateBuildingLayerUseCase {
   private conn: AsyncDuckDBConnection;
@@ -9,33 +7,38 @@ export class AggregateBuildingLayerUseCase {
     this.conn = conn;
   }
 
-  async exec(params: { inputTableName: string; outputTableName: string }): Promise<LayerTable> {
-    const { inputTableName, outputTableName } = params;
+  async exec(params: { inputTableName: string }): Promise<void> {
+    const { inputTableName } = params;
+    const tempTableName = `${inputTableName}_temp_agg`;
 
-    // Ensure input has building_id; if not present, this will simply fail clearly
-    const query = `
-      CREATE OR REPLACE TABLE ${outputTableName} AS
+    // Create temporary table with aggregated geometries
+    const createTempQuery = `
+      CREATE OR REPLACE TEMP TABLE ${tempTableName} AS
       SELECT
         building_id,
         -- Union all parts of the same building into a single geometry (DuckDB spatial aggregate)
-        ST_Union_Agg(geometry) AS geometry,
-        -- Pick a deterministic representative properties row (smallest id)
-        arg_min(properties, id) AS properties
+        ST_Union_Agg(geometry) AS agg_geometry
       FROM ${inputTableName}
       -- Keep only valid polygonal geometries to avoid topology errors during union
       WHERE ST_IsValid(geometry)
       GROUP BY building_id;
-
-      DESCRIBE ${outputTableName};
     `;
 
-    const describe = await this.conn.query(query);
+    await this.conn.query(createTempQuery);
 
-    return {
-      source: 'osm',
-      type: 'buildings',
-      name: outputTableName,
-      columns: getColumnsFromDuckDbTableDescribe(describe.toArray()),
-    };
+    // Add agg_geometry column to main table via LEFT JOIN
+    const addColumnQuery = `
+      CREATE OR REPLACE TABLE ${inputTableName} AS
+      SELECT 
+        b.*,
+        agg.agg_geometry
+      FROM ${inputTableName} b
+      LEFT JOIN ${tempTableName} agg ON b.building_id = agg.building_id;
+    `;
+
+    await this.conn.query(addColumnQuery);
+
+    // Clean up temp table
+    await this.conn.query(`DROP TABLE IF EXISTS ${tempTableName};`);
   }
 }
