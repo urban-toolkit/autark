@@ -79,11 +79,9 @@ export class TriangulatorBuildings extends Triangulator {
      * @returns {Feature[][]} An array of grouped features
      */
     private static groupBuildings(geojson: FeatureCollection): Feature[][] {
-        // checks if is a valid feature
-        let filtered = TriangulatorBuildings.removeInvalidBuildingParts(geojson.features);
 
         const groups: { [key: string]: Feature[] } = {};
-        for (const feat of filtered) {
+        for (const feat of geojson.features) {
             let key = feat.properties ? feat.properties.building_id as string : '-1';
 
             if (!groups[key]) {
@@ -93,32 +91,6 @@ export class TriangulatorBuildings extends Triangulator {
         }
 
         return Object.values(groups);
-    }
-
-    /**
-     * Removes invalid building parts from the feature collection.
-     * @param {Feature[]} features The array of GeoJSON features
-     * @returns {Feature[]} The filtered array of valid features
-     */
-    private static removeInvalidBuildingParts(features: Feature[]): Feature[] {
-
-        const filtered = features.filter((feat: Feature) => {
-            if (feat.properties === null) {
-                return false;
-            }
-
-            if (feat.properties['building'] === 'roof' || feat.properties['building:part'] === 'roof') {
-                return false;
-            }
-
-            if (!('height' in feat.properties) && !('levels' in feat.properties) && !('building:levels' in feat.properties)) {
-                return false;
-            }
-
-            return true;
-        });
-
-        return filtered;
     }
 
     /**

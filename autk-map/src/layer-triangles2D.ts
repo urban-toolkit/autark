@@ -239,6 +239,7 @@ export class Triangles2DLayer extends Layer {
                 thematic.push(aggr[aId]);
             }
         }
+
         console.assert(thematic.length === this._position.length / 3);
         this._thematic = thematic;
     }

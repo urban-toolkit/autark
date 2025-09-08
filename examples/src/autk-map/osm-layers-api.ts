@@ -37,20 +37,13 @@ export class OsmLayersApi {
 
   async loadLayers(): Promise<void> {
     const data = [];
-    for (const layerData of this.db.tables) {
-      if (layerData.source === 'csv') {
-        continue;
-      }
+    for (const layerData of this.db.getLayerTables()) {
 
-      const geojson = await this.db.getLayer(layerData.name);
+        const geojson = await this.db.getLayer(layerData.name);
       data.push({ props: layerData, data: geojson });
     }
 
     for (const json of data) {
-        if ( json.props.name === 'table_osm_buildings_agg') {
-            continue;
-        }
-
       console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
       this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
     }

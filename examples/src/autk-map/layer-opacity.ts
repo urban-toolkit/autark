@@ -45,10 +45,7 @@ export class LayerOpacity {
 
   protected async loadLayers(): Promise<void> {
     const data = [];
-    for (const layerData of this.db.tables) {
-      if (layerData.source === 'csv') {
-        continue;
-      }
+    for (const layerData of this.db.getLayerTables()) {
 
       const geojson = await this.db.getLayer(layerData.name);
       data.push({ props: layerData, data: geojson });

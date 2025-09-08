@@ -65,10 +65,7 @@ export class OsmLayersApi {
 
     async loadLayers(db: SpatialDb, map: AutkMap): Promise<void> {
         const data = [];
-        for (const layerData of db.tables) {
-            if (layerData.source === 'csv') {
-                continue;
-            }
+        for (const layerData of db.getLayerTables()) {
 
             const geojson = await db.getLayer(layerData.name);
             data.push({ props: layerData, data: geojson });

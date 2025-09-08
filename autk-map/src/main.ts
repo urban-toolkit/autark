@@ -3,6 +3,7 @@
 import {
     Feature,
     FeatureCollection,
+    GeoJsonProperties,
     Polygon
 } from 'geojson';
 
@@ -250,6 +251,50 @@ export class AutkMap {
         }
 
         this._ui.updateUi();
+    }
+
+    updateGeoJsonLayerThematic(layerName: string, getFnv: (feature: Feature) => number, geojson: FeatureCollection, groupById: boolean = false) {
+        const thematicData: ILayerThematic[] = [];
+        let filtered: Feature[] = [];
+
+        if (groupById) {
+            const visited = new Set<string>();
+            filtered = geojson.features.filter((f) => { 
+                let key = f.properties ? f.properties.building_id as string : '-1';
+
+                if (visited.has(key)) {
+                    return false;
+                }
+                visited.add(key);
+                return true;
+            });
+        } else {
+            filtered = geojson.features;
+        }
+
+        for (const feature of filtered) {
+            const properties = feature.properties as GeoJsonProperties; 
+            if (!properties) {
+                continue;
+            }
+
+            const val = getFnv(feature);
+
+            thematicData.push({
+                level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                values: [val],
+            });
+        }
+
+        const valMin = Math.min(...thematicData.map(d => d.values[0]));
+        const valMax = Math.max(...thematicData.map(d => d.values[0]));
+
+        for (let i = 0; i < thematicData.length; i++) {
+            const val = thematicData[i].values[0];
+            thematicData[i].values = [(val - valMin) / (valMax - valMin)];
+        }
+
+        this.updateLayerThematic(layerName, thematicData);
     }
 
     /**
