@@ -24,20 +24,20 @@
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
-    "@typescript-eslint/eslint-plugin": "^8.37.0",
-    "@typescript-eslint/parser": "^8.37.0",
-    "eslint": "^9.31.0",
-    "eslint-config-prettier": "^10.1.5",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.5",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
     "vite-plugin-dts": "^4.5.4",
-    "@types/rbush": "^3.0.3"
+    "@types/rbush": "^4.0.0"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.29.1-dev132.0",
+    "@duckdb/duckdb-wasm": "^1.30.0",
     "apache-arrow": "^21.0.0",
     "@turf/turf": "^7.2.0",
-    "rbush": "^3.0.1"
+    "rbush": "^4.0.1"
   }
 }

@@ -37,6 +37,8 @@ export class LoadCsv {
 
 async function main() {
     const example = new LoadCsv();
+
     await example.run();
-    example.print();}
+    example.print();
+}
 main();

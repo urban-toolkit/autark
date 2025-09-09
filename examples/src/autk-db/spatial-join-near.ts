@@ -55,6 +55,9 @@ export class SpatialJoinNear {
         });
 
         this.geojson = await this.db.getLayer('table_osm_roads');
+        console.log({
+            data: this.geojson,
+        });
     }
 
     public print(): void {
@@ -83,6 +86,8 @@ export class SpatialJoinNear {
 
 async function main() {
     const example = new SpatialJoinNear();
+
     await example.run();
+    example.print();
 }
 main();
