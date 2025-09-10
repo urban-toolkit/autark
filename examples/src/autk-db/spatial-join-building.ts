@@ -72,7 +72,6 @@ export class SpatialJoinNear {
 
             div.innerHTML += `<p>Number of tables: ${tables.length}</p>`;
 
-            console.log(this.geojson);
             if (this.geojson) {
                 div.innerHTML += `<p>features[0].properties.sjoin: ${JSON.stringify(this.geojson.features[0].properties?.sjoin || null)}</p>`;
             }

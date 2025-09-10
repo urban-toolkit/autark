@@ -13,6 +13,7 @@ export class LoadGeojson {
             coordinateFormat: 'EPSG:3395',
             type: 'boundaries'
         });
+        
     }
 
     public print(): void {

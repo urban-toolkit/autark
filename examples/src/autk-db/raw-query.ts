@@ -1,9 +1,8 @@
-import { FeatureCollection } from 'geojson';
 import { SpatialDb } from 'autk-db';
 
-export class SpatialJoin {
+export class RawQueryJoin {
     protected db!: SpatialDb;
-    protected geojson!: FeatureCollection;
+    protected geojson!: any;
 
     public async run(): Promise<void> {
         this.db = new SpatialDb();
@@ -16,40 +15,16 @@ export class SpatialJoin {
             type: 'boundaries'
         });
 
-        await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise.csv',
-            outputTableName: 'noise',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
-
-        await this.db.spatialJoin({
-            tableRootName: 'neighborhoods',
-            tableJoinName: 'noise',
-            spatialPredicate: 'INTERSECT',
+        this.geojson = await this.db.rawQuery({
+            query: 'SELECT * FROM neighborhoods LIMIT 5',
             output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'noise',
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
-                    },
-                ],
+                type: 'RETURN_OBJECT',
             },
         });
 
-        this.geojson = await this.db.getLayer('neighborhoods');
         console.log({
             data: this.geojson,
         });
-
     }
 
     public print(): void {
@@ -67,7 +42,7 @@ export class SpatialJoin {
             div.innerHTML += `<p>Number of tables: ${tables.length}</p>`;
 
             if (this.geojson) {
-                div.innerHTML += `<p>features[0].properties.sjoin: ${JSON.stringify(this.geojson.features[0].properties?.sjoin || null)}</p>`;
+                div.innerHTML += `<p>this.geojson[0].properties.boroname: ${JSON.stringify(this.geojson[0].properties.boroname || null)}</p>`;
             }
 
             div.innerHTML += `<p><b>Successfull Spatial Join.</b><p>`;
@@ -76,7 +51,7 @@ export class SpatialJoin {
 }
 
 async function main() {
-    const example = new SpatialJoin();
+    const example = new RawQueryJoin();
 
     await example.run();
     example.print();
