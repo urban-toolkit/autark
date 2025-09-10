@@ -28,7 +28,7 @@ export class OsmLayersApi {
         });
 
         const canvas = document.querySelector('canvas');
-        
+
         if (canvas) {
             this.map = new AutkMap(canvas);
 

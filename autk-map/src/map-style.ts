@@ -18,7 +18,7 @@ export class MapStyle {
         roads: '#d9b504',
         buildings: '#DFDFDF',
         boundaries: '#DFDFDF',
-        lines: '#DFDFDF',
+        lines: '#FAFAFA',
     };
 
     /**

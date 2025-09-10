@@ -288,7 +288,9 @@ export class SpatialDb {
   getLayerTables(): Array<LayerTable | CustomLayerTable> {
     return this.tables.filter((table): table is LayerTable | CustomLayerTable => {
       return (
-        (table.source === 'osm' && isLayerType(table.type)) || (table.source === 'geojson' && isLayerType(table.type))
+        (table.source === 'osm' && isLayerType(table.type)) || 
+        (table.source === 'geojson' && isLayerType(table.type)) || 
+        (table.source === 'user' && isLayerType(table.type)) // TODO: check if this is correct
       );
     });
   }

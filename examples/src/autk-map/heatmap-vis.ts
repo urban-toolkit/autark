@@ -1,7 +1,9 @@
-import { GeoJsonProperties } from 'geojson';
+// TODO: filter CSV data based on the osm data polygon.
+
+import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
-import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel } from 'autk-map';
+import { AutkMap, LayerType } from 'autk-map';
 
 export class GeojsonVis {
     protected map!: AutkMap;
@@ -19,14 +21,12 @@ export class GeojsonVis {
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+                layers: ['surface', 'parks', 'water', 'roads'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
                 dropOsmTable: true,
             },
         });
-
-        console.log('OSM data loaded');
 
         await this.db.loadCsv({
             csvFileUrl: 'http://localhost:5173/data/parking.csv',
@@ -38,8 +38,6 @@ export class GeojsonVis {
             },
         });
 
-        console.log('Trees data loaded');
-
         const boundingBox = await this.db.getOsmBoundingBox();
         await this.db.loadGridLayer({
             boundingBox: boundingBox,
@@ -47,8 +45,6 @@ export class GeojsonVis {
             rows: 30,
             columns: 30
         });
-
-        console.log('Grid layer created');
 
         await this.db.spatialJoin({
             tableRootName: 'table_grid',
@@ -70,8 +66,6 @@ export class GeojsonVis {
             },
         });
 
-        console.log('Spatial join completed');
-
         const canvas = document.querySelector('canvas');
         if (canvas) {
             this.map = new AutkMap(canvas);
@@ -90,7 +84,6 @@ export class GeojsonVis {
 
             const geojson = await this.db.getLayer(layerData.name);
             data.push({ props: layerData, data: geojson });
-
         }
 
         for (const json of data) {
@@ -100,36 +93,14 @@ export class GeojsonVis {
     }
 
     protected async updateThematicData() {
-        const thematicData: ILayerThematic[] = [];
-
         const geojson = await this.db.getLayer('table_grid');
 
-        if (geojson) {
-            for (const feature of geojson.features) {
-                const properties = feature.properties as GeoJsonProperties;
+        const getFnv = (feature: Feature) => {
+            const properties = feature.properties as GeoJsonProperties;
+            return properties?.sjoin.count.parking || 0;
+        };
 
-                if (!properties) {
-                    continue;
-                }
-
-                const val = properties.sjoin.count.parking || 0;
-
-                thematicData.push({
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [val],
-                });
-            }
-
-            const valMin = Math.min(...thematicData.map(d => d.values[0]));
-            const valMax = Math.max(...thematicData.map(d => d.values[0]));
-
-            for (let i = 0; i < thematicData.length; i++) {
-                const val = thematicData[i].values[0];
-                thematicData[i].values = [(val - valMin) / (valMax - valMin)];
-            }
-        }
-
-        this.map.updateLayerThematic('table_grid', thematicData);
+        this.map.updateGeoJsonLayerThematic('table_grid', getFnv, geojson);
     }
 }
 

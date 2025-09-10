@@ -1,7 +1,7 @@
 import { SpatialDb } from 'autk-db';
-import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel } from 'autk-map';
+import { AutkMap, LayerType } from 'autk-map';
 
-import { GeoJsonProperties } from 'geojson';
+import { Feature, GeoJsonProperties } from 'geojson';
 
 export class SpatialJoin {
   protected map!: AutkMap;
@@ -19,7 +19,6 @@ export class SpatialJoin {
     });
 
     const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-    console.log('Bounding Box:', boundingBox);
 
     await this.db.loadCsv({
       csvFileUrl: 'http://localhost:5173/data/noise.csv',
@@ -77,36 +76,14 @@ export class SpatialJoin {
   }
 
   protected async updateThematicData() {
-    const thematicData: ILayerThematic[] = [];
+        const geojson = await this.db.getLayer('neighborhoods');
 
-    const geojson = await this.db.getLayer('neighborhoods');
+        const getFnv = (feature: Feature) => {
+            const properties = feature.properties as GeoJsonProperties;
+            return properties?.sjoin.count.noise || 0;
+        };
 
-    if (geojson) {
-      for (const feature of geojson.features) {
-        const properties = feature.properties as GeoJsonProperties;
-
-        if (!properties) {
-          continue;
-        }
-
-        const val = properties.sjoin.count.noise || 0;
-
-        thematicData.push({
-          level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-          values: [val],
-        });
-      }
-
-      const valMin = Math.min(...thematicData.map((d) => d.values[0]));
-      const valMax = Math.max(...thematicData.map((d) => d.values[0]));
-
-      for (let i = 0; i < thematicData.length; i++) {
-        const val = thematicData[i].values[0];
-        thematicData[i].values = [(val - valMin) / (valMax - valMin)];
-      }
-    }
-
-    this.map.updateLayerThematic('neighborhoods', thematicData);
+        this.map.updateGeoJsonLayerThematic('neighborhoods', getFnv, geojson);
   }
 }
 

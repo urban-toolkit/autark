@@ -36,8 +36,8 @@ export class SpatialJoinNear {
             },
         });
 
-        const layer = 'table_osm_roads';
-        const groupById = false;
+        const layer = 'table_osm_buildings';
+        const groupById = true;
 
         await this.db.spatialJoin({
             tableRootName: layer,

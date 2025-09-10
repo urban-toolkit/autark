@@ -23,6 +23,7 @@ export class GeojsonVis {
     console.log('Bounding Box:', boundingBox);
 
     const canvas = document.querySelector('canvas');
+
     if (canvas) {
       this.map = new AutkMap(canvas);
 
