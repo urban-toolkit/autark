@@ -6,7 +6,7 @@ import { SpatialDb } from 'autk-db';
 
 import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle } from 'autk-plot';
 
-import { AutkMap, LayerType, ILayerThematic, ThematicAggregationLevel, MapEvent } from 'autk-map';
+import { AutkMap, LayerType, MapEvent } from 'autk-map';
 
 export class MapD3 {
     protected db!: SpatialDb;
@@ -71,7 +71,6 @@ export class MapD3 {
         }
 
         const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-        console.log('Bounding Box:', boundingBox);
 
         this.map = new AutkMap(canvas);
         await this.map.init(boundingBox);
@@ -102,52 +101,25 @@ export class MapD3 {
     // ---- Map helper methods ----
 
     protected async loadLayers(): Promise<void> {
-        const data = [];
         for (const layerData of this.db.getLayerTables()) {
-
             const geojson = await this.db.getLayer(layerData.name);
-            data.push({ props: layerData, data: geojson });
-        }
+            this.map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
 
-        for (const json of data) {
-            console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
-            this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
         this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
     }
 
     protected async loadLayerData(layerId: string = 'neighborhoods') {
-        const thematicData: ILayerThematic[] = [];
-
         const geojson = await this.db.getLayer(layerId);
 
-        if (geojson) {
-            for (const feature of geojson.features) {
-                const properties = feature.properties as GeoJsonProperties;
+        const getFnv = (feature: Feature) => {
+            const properties = feature.properties as GeoJsonProperties;
+            return properties?.sjoin.count.noise || 0;
+        };
 
-                if (!properties) {
-                    continue;
-                }
-
-                const val = properties.sjoin.count.noise || 0;
-
-                thematicData.push({
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [val],
-                });
-            }
-
-            const valMin = Math.min(...thematicData.map((d) => d.values[0]));
-            const valMax = Math.max(...thematicData.map((d) => d.values[0]));
-
-            for (let i = 0; i < thematicData.length; i++) {
-                const val = thematicData[i].values[0];
-                thematicData[i].values = [(val - valMin) / (valMax - valMin)];
-            }
-        }
-
-        this.map.updateLayerThematic('neighborhoods', thematicData);
+        this.map.updateGeoJsonLayerThematic(layerId, getFnv, geojson);
     }
 
     protected async updateMapListeners() {

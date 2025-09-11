@@ -72,16 +72,11 @@ export class SpatialJoinNear {
     }
 
     protected async loadLayers(): Promise<void> {
-        const data = [];
         for (const layerData of this.db.getLayerTables()) {
-
             const geojson = await this.db.getLayer(layerData.name);
-            data.push({ props: layerData, data: geojson });
-        }
+            this.map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
 
-        for (const json of data) {
-            console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
-            this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
 

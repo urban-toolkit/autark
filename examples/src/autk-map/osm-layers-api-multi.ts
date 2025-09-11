@@ -62,20 +62,14 @@ export class OsmLayersApi {
             await this.loadLayers(this.db02, this.map02);
         }
     }
-
-    async loadLayers(db: SpatialDb, map: AutkMap): Promise<void> {
-        const data = [];
+    
+    protected async loadLayers(db: SpatialDb, map: AutkMap): Promise<void> {
         for (const layerData of db.getLayerTables()) {
-
             const geojson = await db.getLayer(layerData.name);
-            data.push({ props: layerData, data: geojson });
-        }
+            map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
 
-        for (const json of data) {
-            console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
-            map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-
     }
 }
 

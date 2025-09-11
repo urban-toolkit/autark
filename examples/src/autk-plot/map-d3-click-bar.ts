@@ -71,7 +71,7 @@ export class MapD3 {
         }
 
         const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-        console.log('Bounding Box:', boundingBox);
+        
 
         this.map = new AutkMap(canvas);
         await this.map.init(boundingBox);

@@ -17,7 +17,7 @@ export class GeojsonVis {
         });
 
         const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-        console.log('Bounding Box:', boundingBox);
+        
 
         const canvas = document.querySelector('canvas');
 
@@ -32,17 +32,14 @@ export class GeojsonVis {
     }
 
     protected async loadLayers(): Promise<void> {
-        const data = [];
         for (const layerData of this.db.getLayerTables()) {
-
             const geojson = await this.db.getLayer(layerData.name);
-            data.push({ props: layerData, data: geojson });
+            this.map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
+
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
-        for (const json of data) {
-            console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
-            this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
-        }
+        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
     }
 }
 
