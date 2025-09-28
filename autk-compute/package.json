@@ -1,0 +1,38 @@
+{
+  "name": "autk-compute",
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/autk-compute.umd.cjs",
+  "module": "./dist/autk-compute.js",
+  "types": "./dist/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/autk-compute.js",
+      "require": "./dist/autk-compute.umd.cjs"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "@types/rbush": "^4.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "@webgpu/types": "^0.1.65",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}
