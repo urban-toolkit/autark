@@ -24,6 +24,7 @@
     "d3": "^7.9.0",
     "autk-db": "file:../autk-db",
     "autk-map": "file:../autk-map",
-    "autk-plot": "file:../autk-plot"
+    "autk-plot": "file:../autk-plot",
+    "autk-compute": "file:../autk-compute"
   }
 }
