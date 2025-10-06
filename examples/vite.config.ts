@@ -29,7 +29,7 @@ export default defineConfig({
     },
   },
   server: {
-    open: '/src/autk-compute/property-func.html',
+    open: '/src/autk-map/compute-osm-function.html',
     cors: {
       origin: '*',
       allowedHeaders: 'Range, Content-Type, Authorization',

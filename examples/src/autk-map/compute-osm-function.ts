@@ -40,7 +40,7 @@ export class SpatialJoin {
             tableRootName: 'table_osm_roads',
             tableJoinName: 'parking',
             spatialPredicate: 'NEAR',
-            nearDistance: 1000,
+            nearDistance: 500,
             output: {
                 type: 'MODIFY_ROOT',
             },
@@ -66,8 +66,11 @@ export class SpatialJoin {
                 x: 'sjoin.count.parking',
             },
             outputColumnName: 'result',
-            wglsFunction: 'x',
+            wglsFunction: `
+                x
+            `,
         });
+
         console.log({ geojson });
 
 
@@ -99,7 +102,7 @@ export class SpatialJoin {
             return properties?.compute.result || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic('neighborhoods', getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic('table_osm_roads', getFnv, geojson);
     }
 }
 
