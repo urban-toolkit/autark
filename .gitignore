@@ -151,3 +151,5 @@ dist
 
 # .pbf files inside public folder
 **/public/data-ignore/*
+
+/test-web-gpu
