@@ -1,7 +1,7 @@
 import { SpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 
-import { AutkMap, ColorMapInterpolator, LayerType } from 'autk-map';
+import { AutkMap, LayerType } from 'autk-map';
 
 import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
