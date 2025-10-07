@@ -1,7 +1,7 @@
 import { SpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 
-import { AutkMap, LayerType } from 'autk-map';
+import { AutkMap, ColorMapInterpolator, LayerType } from 'autk-map';
 
 import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
@@ -26,48 +26,20 @@ export class SpatialJoin {
             },
         });
 
-        await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/parking.csv',
-            outputTableName: 'parking',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
-
-        await this.db.spatialJoin({
-            tableRootName: 'table_osm_roads',
-            tableJoinName: 'parking',
-            spatialPredicate: 'NEAR',
-            nearDistance: 500,
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'parking',
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
-                    },
-                ],
-            },
-        });
-
         let geojson = await this.db.getLayer('table_osm_roads');
-        console.log({ geojson });
 
         const geojsonCompute = new GeojsonCompute();
         geojson = await geojsonCompute.computeFunctionIntoProperties({
             geojson,
             variableMapping: {
-                x: 'sjoin.count.parking',
+                x: 'lanes',
             },
             outputColumnName: 'result',
             wglsFunction: `
-                x
+                if (x <= 0) {
+                    return 1;
+                }
+                return x;
             `,
         });
 
@@ -101,6 +73,7 @@ export class SpatialJoin {
 
             return properties?.compute.result || 0;
         };
+
 
         this.map.updateGeoJsonLayerThematic('table_osm_roads', getFnv, geojson);
     }

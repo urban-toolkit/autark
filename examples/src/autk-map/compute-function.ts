@@ -43,7 +43,7 @@ export class SpatialJoin {
                 y: 'shape_leng',
             },
             outputColumnName: 'result',
-            wglsFunction: 'x / y',
+            wglsFunction: 'return x / y;',
         });
         console.log({ geojson });
 
