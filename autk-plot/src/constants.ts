@@ -1,6 +1,6 @@
 export enum ColorMapInterpolator {
-    INTERPOLATOR_REDS = 'interpolateReds',
-    INTERPOLATOR_BLUES = 'interpolateBlues',
+    SEQUENTIAL_REDS = 'interpolateReds',
+    SEQUENTIAL_BLUES = 'interpolateBlues',
 }
 
 export enum PlotEvent {

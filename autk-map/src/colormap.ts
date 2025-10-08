@@ -1,5 +1,6 @@
 import * as d3_color from 'd3-color';
-import * as d3_scale from 'd3-scale-chromatic';
+import * as d3_scale from 'd3-scale';
+import * as d3_scheme from 'd3-scale-chromatic';
 
 import { ColorHEX, ColorMapInterpolator, ColorRGB, ColorTEX } from './constants';
 
@@ -8,8 +9,8 @@ import { ColorHEX, ColorMapInterpolator, ColorRGB, ColorTEX } from './constants'
  * It allows retrieval of colors based on values and color map interpolators,
  * as well as conversion between RGB and HEX color formats.
  * @example
- * const color = ColorMap.getColor(0.5, ColorMapInterpolator.INTERPOLATOR_REDS);
- * const colorMap = ColorMap.getColorMap(ColorMapInterpolator.INTERPOLATOR_REDS, 256);
+ * const color = ColorMap.getColor(0.5, ColorMapInterpolator.SEQUENTIAL_REDS);
+ * const colorMap = ColorMap.getColorMap(ColorMapInterpolator.SEQUENTIAL_REDS, 256);
  */
 export class ColorMap {
     /**
@@ -23,27 +24,21 @@ export class ColorMap {
      * 
      * It allows retrieval of colors based on values and color map interpolators,
      * as well as conversion between RGB and HEX color formats.
-     * @param {number} value The value to get the color for
+     * @param {number | string} value The value to get the color for
      * @param {ColorMapInterpolator} color The color map interpolator to use
      * @returns {ColorRGB} The RGB color
      */
     public static getColor(value: number, color: ColorMapInterpolator): ColorRGB {
-        if (d3_scale[color] != undefined) {
-            ColorMap._interpolator = d3_scale[color];
+        ColorMap._interpolator = ColorMap.buildInterpolator(color);
 
-            const numberPattern = /\d+/g;
-            const rgbStr = ColorMap._interpolator(value).match(numberPattern);
-            if (rgbStr === null) {
-                return { r: 0, g: 0, b: 0, opacity: 1 };
-            }
-            const rgb = rgbStr.map((el) => +el);
-            return { r: rgb[0], g: rgb[1], b: rgb[2], opacity: 1 };
-        } else if (isNaN(d3_color.rgb(color).r) == false) {
-            const val = d3_color.rgb(color);
-            return { r: val.r, g: val.g, b: val.b, opacity: 1 };
-        } else {
-            throw Error('Color scale or color does not exist.');
+        const numberPattern = /\d+/g;
+        const rgbStr = ColorMap._interpolator(value).match(numberPattern);
+
+        if (rgbStr === null) {
+            return { r: 0, g: 0, b: 0, opacity: 1 };
         }
+        const rgb = rgbStr.map((el) => +el);
+        return { r: rgb[0], g: rgb[1], b: rgb[2], opacity: 1 };
     }
 
     /**
@@ -82,5 +77,23 @@ export class ColorMap {
     public static hexToRgb(color: ColorHEX): ColorRGB {
         const rgb = d3_color.rgb(color);
         return { r: rgb.r, g: rgb.g, b: rgb.b, opacity: 1.0 };
+    }
+
+    private static buildInterpolator(color: ColorMapInterpolator): (t: number) => string {
+        if (color === ColorMapInterpolator.SEQUENTIAL_REDS) {
+            return ColorMap._interpolator = (t: number) => d3_scheme[ColorMapInterpolator.SEQUENTIAL_REDS](t);
+        }
+        else if (color === ColorMapInterpolator.SEQUENTIAL_BLUES) {
+            return ColorMap._interpolator = (t: number) => d3_scheme[ColorMapInterpolator.SEQUENTIAL_BLUES](t);
+        }
+        else if (color === ColorMapInterpolator.OBSERVABLE10) {
+            return ColorMap._interpolator = (t: number) => d3_scale.scaleOrdinal(d3_scheme[ColorMapInterpolator.OBSERVABLE10]).domain([
+                '0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0'
+            ])(t.toFixed(1));
+        }
+        else{
+            return ColorMap._interpolator = (t: number) => d3_scheme[ColorMapInterpolator.SEQUENTIAL_BLUES](t);
+        }
+
     }
 }

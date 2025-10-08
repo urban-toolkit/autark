@@ -253,7 +253,18 @@ export class AutkMap {
         this._ui.updateUi();
     }
 
-    updateGeoJsonLayerThematic(layerName: string, getFnv: (feature: Feature) => number, geojson: FeatureCollection, groupById: boolean = false) {
+    /**
+     * Updates the thematic information of a layer based on a GeoJSON source.
+     * 
+     * This method extracts thematic values from the GeoJSON features using the provided function,
+     * normalizes these values, and updates the layer's thematic data accordingly.
+     * 
+     * @param {string} layerName The name of the layer to update
+     * @param {(feature: Feature) => number} getFnv A function that extracts a numeric value from a GeoJSON feature
+     * @param {FeatureCollection} geojson The GeoJSON data containing the features
+     * @param {boolean} [groupById=false] Whether to group features by their 'building_id' property to ensure uniqueness
+     */
+    updateGeoJsonLayerThematic(layerName: string, getFnv: (feature: Feature) => number, geojson: FeatureCollection, groupById: boolean = false, normalize: boolean = true) {
         const thematicData: ILayerThematic[] = [];
         let filtered: Feature[] = [];
 
@@ -286,12 +297,14 @@ export class AutkMap {
             });
         }
 
-        const valMin = Math.min(...thematicData.map(d => d.values[0]));
-        const valMax = Math.max(...thematicData.map(d => d.values[0]));
+        if(normalize) {
+            const valMin = Math.min(...thematicData.map(d => +d.values[0]));
+            const valMax = Math.max(...thematicData.map(d => +d.values[0]));
 
-        for (let i = 0; i < thematicData.length; i++) {
-            const val = thematicData[i].values[0];
-            thematicData[i].values = [(val - valMin) / (valMax - valMin)];
+            for (let i = 0; i < thematicData.length; i++) {
+                const val = +thematicData[i].values[0];
+                thematicData[i].values = [(val - valMin) / (valMax - valMin)];
+            }
         }
 
         this.updateLayerThematic(layerName, thematicData);
@@ -501,7 +514,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -543,7 +556,7 @@ export class AutkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -585,7 +598,7 @@ export class AutkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -628,7 +641,7 @@ export class AutkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_SSAO,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -671,7 +684,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -720,7 +733,7 @@ export class AutkMap {
         const layerRenderInfo: ILayerRenderInfo = {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -764,7 +777,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_HEATMAP,
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.INTERPOLATOR_REDS,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             isColorMap: false,
             isPick: false,
             isSkip: false,
