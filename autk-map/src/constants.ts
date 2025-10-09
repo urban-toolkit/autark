@@ -94,6 +94,7 @@ export enum RenderPipeline {
 export enum ColorMapInterpolator {
   SEQUENTIAL_REDS = 'interpolateReds',
   SEQUENTIAL_BLUES = 'interpolateBlues',
+  DIVERGING_RED_BLUE = 'interpolateRdBu',
   OBSERVABLE10 = 'schemeObservable10',
 }
 
