@@ -32,7 +32,8 @@ export class ColorMap {
         ColorMap._interpolator = ColorMap.buildInterpolator(color);
 
         const numberPattern = /\d+/g;
-        const rgbStr = ColorMap._interpolator(value).match(numberPattern);
+        const interp = ColorMap._interpolator(value);
+        const rgbStr = d3_color.rgb(interp).formatRgb().match(numberPattern);
 
         if (rgbStr === null) {
             return { r: 0, g: 0, b: 0, opacity: 1 };
@@ -81,19 +82,28 @@ export class ColorMap {
 
     private static buildInterpolator(color: ColorMapInterpolator): (t: number) => string {
         if (color === ColorMapInterpolator.SEQUENTIAL_REDS) {
-            return ColorMap._interpolator = (t: number) => d3_scheme[ColorMapInterpolator.SEQUENTIAL_REDS](t);
+            const scale = d3_scale.scaleLinear(ColorMapInterpolator.SEQUENTIAL_REDS);
+            return (t: number) => scale.domain([
+                0, 1
+            ])(t);
         }
         else if (color === ColorMapInterpolator.SEQUENTIAL_BLUES) {
-            return ColorMap._interpolator = (t: number) => d3_scheme[ColorMapInterpolator.SEQUENTIAL_BLUES](t);
+            const scale = d3_scale.scaleLinear(ColorMapInterpolator.SEQUENTIAL_BLUES)
+            return (t: number) => scale.domain([
+                0, 1
+            ])(t);
         }
         else if (color === ColorMapInterpolator.OBSERVABLE10) {
-            return ColorMap._interpolator = (t: number) => d3_scale.scaleOrdinal(d3_scheme[ColorMapInterpolator.OBSERVABLE10]).domain([
-                '0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0'
+            const scale = d3_scale.scaleOrdinal(d3_scheme[ColorMapInterpolator.OBSERVABLE10]);
+            return (t: number) => scale.domain([
+                '0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'
             ])(t.toFixed(1));
         }
-        else{
-            return ColorMap._interpolator = (t: number) => d3_scheme[ColorMapInterpolator.SEQUENTIAL_BLUES](t);
+        else {
+            const scale = d3_scale.scaleLinear(ColorMapInterpolator.SEQUENTIAL_BLUES)
+            return (t: number) => scale.domain([
+                0, 1
+            ])(t);
         }
-
     }
 }

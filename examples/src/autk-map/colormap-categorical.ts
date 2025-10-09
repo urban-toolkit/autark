@@ -2,8 +2,6 @@ import { SpatialDb } from 'autk-db';
 import { AutkMap, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
 import { Feature, GeoJsonProperties } from 'geojson';
 
-import * as d3_scale from 'd3-scale';
-
 export class GeojsonVis {
     protected map!: AutkMap;
     protected db!: SpatialDb;
@@ -28,7 +26,7 @@ export class GeojsonVis {
 
             await this.map.init(boundingBox);
             await this.loadLayers();
-            await this.updateThematicData('roads', false, true);
+            await this.updateThematicData('roads', false, false);
 
             this.map.draw();
         }
@@ -47,19 +45,9 @@ export class GeojsonVis {
         const geojson = await this.db.getLayer(layer);
         console.log( { geojson  } )
 
-        const catToNum = d3_scale.scaleOrdinal()
-        .domain([
-            'primary', 'secondary', 'other'
-        ])
-        .range([
-            0.0, 0.1, 0.2
-        ])
-
         const getFnv = (feature: Feature) => {
             const properties = feature.properties as GeoJsonProperties;
-            const cat = (['primary', 'secondary'].includes(properties?.highway) ? properties?.highway : 'other');
-
-            return catToNum(cat) as number;
+            return (['primary', 'secondary'].indexOf(properties?.highway) + 1) * 0.1;
         };
         
         this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.OBSERVABLE10);
