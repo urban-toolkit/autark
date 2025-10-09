@@ -1,5 +1,8 @@
+import { ColorMap } from './colormap.js';
 import { Layer } from './layer.js';
 import { AutkMap } from './main.js';
+
+import * as d3 from 'd3';
 
 /**
  * Map UI class for managing the user interface elements of the map.
@@ -87,7 +90,8 @@ export class AutkMapUi {
             layer => {
                 if (layer.layerInfo.id == this.activeLayer?.id) { return; }
                 this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', false);
-            }
+                this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isColorMap', false);
+           }
         );
 
         // Set picking true
@@ -101,7 +105,7 @@ export class AutkMapUi {
         }
 
         // Updates the current legend
-        // this.buildLegend();
+        this.updateLegend();
     }
 
     /**
@@ -109,7 +113,7 @@ export class AutkMapUi {
      */
     public buildUi(): void {
         this.buildHamburgerMenu();
-        // this.buildLegend();
+        this.buildLegend();
     }
 
     /**
@@ -466,8 +470,80 @@ export class AutkMapUi {
                 if (this._activeLayer) {
                     const checked = (e.target as HTMLInputElement).checked;
                     this.map.updateRenderInfoProperty(this._activeLayer.layerInfo.id, 'isColorMap', checked);
+                    if (this._legend) { this._legend.style.visibility = checked ? 'visible' : 'hidden'; }
                 }
             });
         }
+    }
+
+    /**
+     * Build the submenu for layer options.
+     */
+    protected buildLegend(width = 250, height = 50): void {
+        if (!this._legend) {
+            this._legend = document.createElement('div');
+            this._legend.id = 'autkMapLegend';
+            this._legend.style.position = 'absolute';
+            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - width - 30) + 'px';
+            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - height - 30) + 'px';
+            this._legend.style.width = width + 'px';
+            this._legend.style.height = height + 'px';
+            this._legend.style.display = 'block';
+            this._legend.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+            this._legend.style.zIndex = '1001';
+            this._legend.style.backgroundColor = '#fff';
+            this._legend.style.border = '1px solid #ccc';
+            this._legend.style.borderRadius = '8px';
+            this._legend.style.padding = '10px';
+            this._legend.style.visibility = 'hidden';
+
+            this.map.canvas.parentElement?.appendChild(this._legend);
+        }
+
+        const checkbox = document.createElement('input');
+        if(checkbox) {
+            this._legend.style.visibility = checkbox.checked ? 'visible' : 'hidden';
+        }
+        else {
+            this._legend.style.visibility = 'hidden';
+        }
+    }
+
+    protected updateLegend(width = 250, height = 50): void {
+        if (!this._legend || !this._activeLayer) return;
+
+        // Clear previous legend content
+        this._legend.innerHTML = '';
+
+        const title = document.createElement('h4');
+        title.textContent = this._activeLayer.layerInfo.id;
+        title.style.margin = '0 0 10px 0';
+        title.style.fontSize = '14px';
+        title.style.color = '#333';
+        this._legend.appendChild(title);
+       
+        const colorMap: number[][] = [];
+        for (let i = 0; i <= 100; i++) {
+            const val = i / 100;
+            const col = ColorMap.getColor(val, this._activeLayer.layerRenderInfo.colorMapInterpolator);
+            colorMap.push([col.r, col.g, col.b, 1]);
+        }
+
+        const svg = d3.select(this._legend)
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height / 2)
+            .style("border-radius", "4px");
+
+        svg.selectAll("rect")
+            .data(colorMap)
+            .enter()
+            .append("rect")
+            .attr("x", (_d, i) => (i * width / colorMap.length) )
+            .attr("y", 0)
+            .attr("width", width  / colorMap.length)
+            .attr("height", height / 2)
+            .style("fill", (d) => `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${d[3]})`)
+            .style("stroke", "none");
     }
 }
