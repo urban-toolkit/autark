@@ -33,35 +33,6 @@ export class KeyEvents {
      * @param {KeyboardEvent} event The fired event
      */
     async keyUp(event: KeyboardEvent) {
-         if (event.key === 't') {
-            if (!this._map.ui.activeLayer) {
-                return;
-            }
-
-            const layerInfo = this._map.ui.activeLayer.layerInfo;
-            const renderInfo = this._map.ui.activeLayer.layerRenderInfo;
-
-            this._map.updateRenderInfoProperty(layerInfo.id, 'isColorMap', !renderInfo.isColorMap);
-            this._map.ui.activeLayer.makeLayerRenderInfoDirty();
-        }
-
-        if (event.key === 'h' || event.key === 'v') {
-            if (!this._map.ui.activeLayer) {
-                return;
-            }
-
-            const layerInfo = this._map.ui.activeLayer.layerInfo;
-            const renderInfo = this._map.ui.activeLayer.layerRenderInfo;
-
-            this._map.updateRenderInfoProperty(layerInfo.id, 'isSkip', !renderInfo.isSkip);
-
-            // Turn off picking as well
-            if(renderInfo.isSkip)
-                this._map.updateRenderInfoProperty(layerInfo.id, 'isPick', false);
-
-            this._map.ui.activeLayer.makeLayerRenderInfoDirty();
-        }
-
         if (event.key == 's') {
             const styles = ['default', 'light'];
             const current = MapStyle.currentStyle;
