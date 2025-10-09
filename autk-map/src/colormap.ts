@@ -82,15 +82,21 @@ export class ColorMap {
 
     private static buildInterpolator(color: ColorMapInterpolator): (t: number) => string {
         if (color === ColorMapInterpolator.SEQUENTIAL_REDS) {
-            const scale = d3_scale.scaleLinear(ColorMapInterpolator.SEQUENTIAL_REDS);
+            const scale = d3_scale.scaleSequential(d3_scheme[ColorMapInterpolator.SEQUENTIAL_REDS]);
             return (t: number) => scale.domain([
                 0, 1
             ])(t);
         }
         else if (color === ColorMapInterpolator.SEQUENTIAL_BLUES) {
-            const scale = d3_scale.scaleLinear(ColorMapInterpolator.SEQUENTIAL_BLUES)
+            const scale = d3_scale.scaleSequential(d3_scheme[ColorMapInterpolator.SEQUENTIAL_BLUES])
             return (t: number) => scale.domain([
                 0, 1
+            ])(t);
+        }
+        else if (color === ColorMapInterpolator.DIVERGING_RED_BLUE) {
+            const scale = d3_scale.scaleDiverging(d3_scheme[ColorMapInterpolator.DIVERGING_RED_BLUE])
+            return (t: number) => scale.domain([
+                0.0, 0.5, 1.0
             ])(t);
         }
         else if (color === ColorMapInterpolator.OBSERVABLE10) {
@@ -100,7 +106,7 @@ export class ColorMap {
             ])(t.toFixed(1));
         }
         else {
-            const scale = d3_scale.scaleLinear(ColorMapInterpolator.SEQUENTIAL_BLUES)
+            const scale = d3_scale.scaleSequential(d3_scheme[ColorMapInterpolator.SEQUENTIAL_BLUES])
             return (t: number) => scale.domain([
                 0, 1
             ])(t);

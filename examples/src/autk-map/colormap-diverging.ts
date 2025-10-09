@@ -1,32 +1,36 @@
 import { SpatialDb } from 'autk-db';
-import { AutkMap, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
+import { AutkMap, ColorMapInterpolator, LayerType } from 'autk-map';
 import { Feature, GeoJsonProperties } from 'geojson';
 
 export class GeojsonVis {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
+    public async run(): Promise<void> {
         this.db = new SpatialDb();
-
         await this.db.init();
+
         await this.db.loadCustomLayer({
-            geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
-            outputTableName: 'roads',
+            geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+            outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395',
-            type: 'lines'
+            type: 'boundaries'
         });
 
-        const boundingBox = await this.db.getBoundingBoxFromLayer('roads');
+        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
 
-        this.map = new AutkMap(canvas);
-        MapStyle.setPredefinedStyle('light');
 
-        await this.map.init(boundingBox);
-        await this.loadLayers();
-        await this.updateThematicData('roads', false, false);
+        const canvas = document.querySelector('canvas');
 
-        this.map.draw();
+        if (canvas) {
+            this.map = new AutkMap(canvas);
+
+            await this.map.init(boundingBox);
+            await this.loadLayers();
+            await this.updateThematicData();
+
+            this.map.draw();
+        }
     }
 
     protected async loadLayers(): Promise<void> {
@@ -40,14 +44,14 @@ export class GeojsonVis {
 
     protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false, normalize: boolean = true): Promise<void> {
         const geojson = await this.db.getLayer(layer);
-        console.log( { geojson  } )
+        console.log({ geojson })
 
         const getFnv = (feature: Feature) => {
             const properties = feature.properties as GeoJsonProperties;
-            return (['primary', 'secondary'].indexOf(properties?.highway) + 1) * 0.1;
+            return properties?.shape_area || 0;
         };
-        
-        this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.OBSERVABLE10);
+
+        this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.DIVERGING_RED_BLUE);
         this.map.updateGeoJsonLayerThematic(layer, getFnv, geojson, groupById, normalize);
     }
 
@@ -55,12 +59,6 @@ export class GeojsonVis {
 
 async function main() {
     const example = new GeojsonVis();
-    
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
-    }
-
-    await example.run(canvas);
+    await example.run();
 }
 main();
