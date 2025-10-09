@@ -15,7 +15,7 @@ export class AutkMapUi {
      * Currently selected layer in the UI.
      * @type {Layer | null}
      */
-    protected _currentLayer: Layer | null;
+    protected _activeLayer: Layer | null;
 
     /**
      * Reference to the submenu HTML element.
@@ -29,7 +29,7 @@ export class AutkMapUi {
      */
     constructor(map: AutkMap) {
         this._map = map;
-        this._currentLayer = null;
+        this._activeLayer = null;
     }
 
     /**
@@ -52,42 +52,43 @@ export class AutkMapUi {
      * Get the current layer in the UI.
      * @returns {Layer | null} - The currently selected layer or null if none is selected.
      */
-    get currentLayer(): Layer | null {
-        return this._currentLayer;
+    get activeLayer(): Layer | null {
+        return this._activeLayer;
     }
 
     /**
      * Set the current layer in the UI.
      * @param {Layer | null} layer - The layer to set as current or null to clear.
      */
-    set currentLayer(layer: Layer | null) {
-        this._currentLayer = layer;
+    set activeLayer(layer: Layer | null) {
+        this._activeLayer = layer;
     }
 
     /**
      * Change the current layer in the UI.
      * @param {Layer | null} layer - The layer to change to or null to clear.
      */
-    public changeLayer(layer: Layer | null): void {
+    public changeActiveLayer(layer: Layer | null): void {
         if (!layer) {
             console.warn('No layer provided to changeLayer');
             return;
         }
 
-        this.currentLayer = layer;
-        console.log(`Current layer: ${this.currentLayer.layerInfo.id}`);
+        this.activeLayer = layer;
+        console.log(`Active layer: ${this.activeLayer.layerInfo.id}`);
 
         // Turn off picking for all layers
         this.map.layerManager.layers.forEach(layer => {
-            if (layer.layerInfo.id == this.currentLayer?.id)
+            if (layer.layerInfo.id == this.activeLayer?.id){
                 return;
+            }
             this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', false);
             layer.makeLayerRenderInfoDirty();
         });
 
         // Setting pick to true
-        this.map.updateRenderInfoProperty(this.currentLayer.layerInfo.id, 'isPick', true);
-        this.currentLayer.makeLayerRenderInfoDirty();
+        this.map.updateRenderInfoProperty(this.activeLayer.layerInfo.id, 'isPick', true);
+        this.activeLayer.makeLayerRenderInfoDirty();
     }
 
     /**
@@ -140,8 +141,8 @@ export class AutkMapUi {
      * Update the UI elements based on the current state of the map.
      */
     public updateUi(): void {
-        if (!this.currentLayer) {
-            this.changeLayer(this.map.layerManager.layers[0] || null);
+        if (!this.activeLayer) {
+            this.changeActiveLayer(this.map.layerManager.layers[0] || null);
             return;
         }
 
@@ -192,7 +193,7 @@ export class AutkMapUi {
         if (!title) {
             title = document.createElement('h3');
             title.id = 'autkMapActiveLayersTitle';
-            title.textContent = 'Active Layers';
+            title.textContent = 'Visible Layers';
             title.style.margin = '0 0 10px 0';
             title.style.fontSize = '16px';
             title.style.color = '#333';
@@ -311,7 +312,7 @@ export class AutkMapUi {
         if (!title) {
             title = document.createElement('h3');
             title.id = 'autkMapEnablePickingTitle';
-            title.textContent = 'Picking Layer';
+            title.textContent = 'Active Layer';
             title.style.margin = '30px 0 10px 0';
             title.style.fontSize = '16px';
             title.style.color = '#333';
@@ -376,7 +377,7 @@ export class AutkMapUi {
 
             select.appendChild(option);
 
-            this.changeLayer(this.map.layerManager.searchByLayerId(layerId));
+            this.changeActiveLayer(this.map.layerManager.searchByLayerId(layerId));
         });
     }
 }

@@ -34,24 +34,24 @@ export class KeyEvents {
      */
     async keyUp(event: KeyboardEvent) {
          if (event.key === 't') {
-            if (!this._map.ui.currentLayer) {
+            if (!this._map.ui.activeLayer) {
                 return;
             }
 
-            const layerInfo = this._map.ui.currentLayer.layerInfo;
-            const renderInfo = this._map.ui.currentLayer.layerRenderInfo;
+            const layerInfo = this._map.ui.activeLayer.layerInfo;
+            const renderInfo = this._map.ui.activeLayer.layerRenderInfo;
 
             this._map.updateRenderInfoProperty(layerInfo.id, 'isColorMap', !renderInfo.isColorMap);
-            this._map.ui.currentLayer.makeLayerRenderInfoDirty();
+            this._map.ui.activeLayer.makeLayerRenderInfoDirty();
         }
 
         if (event.key === 'h' || event.key === 'v') {
-            if (!this._map.ui.currentLayer) {
+            if (!this._map.ui.activeLayer) {
                 return;
             }
 
-            const layerInfo = this._map.ui.currentLayer.layerInfo;
-            const renderInfo = this._map.ui.currentLayer.layerRenderInfo;
+            const layerInfo = this._map.ui.activeLayer.layerInfo;
+            const renderInfo = this._map.ui.activeLayer.layerRenderInfo;
 
             this._map.updateRenderInfoProperty(layerInfo.id, 'isSkip', !renderInfo.isSkip);
 
@@ -59,7 +59,7 @@ export class KeyEvents {
             if(renderInfo.isSkip)
                 this._map.updateRenderInfoProperty(layerInfo.id, 'isPick', false);
 
-            this._map.ui.currentLayer.makeLayerRenderInfoDirty();
+            this._map.ui.activeLayer.makeLayerRenderInfoDirty();
         }
 
         if (event.key == 's') {
