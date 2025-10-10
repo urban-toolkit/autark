@@ -273,21 +273,20 @@ export class AutkMap {
             filtered = geojson.features.filter((f) => { 
                 let key = f.properties ? f.properties.building_id as string : '-1';
 
-                if (visited.has(key)) {
-                    return false;
+                if (!visited.has(key)) { 
+                    visited.add(key); 
                 }
-                visited.add(key);
-                return true;
+
+                return visited.has(key);
             });
-        } else {
+        } 
+        else {
             filtered = geojson.features;
         }
 
         for (const feature of filtered) {
             const properties = feature.properties as GeoJsonProperties; 
-            if (!properties) {
-                continue;
-            }
+            if (!properties) { continue; }
 
             const val = getFnv(feature);
 
