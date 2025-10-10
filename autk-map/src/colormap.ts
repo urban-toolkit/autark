@@ -61,6 +61,24 @@ export class ColorMap {
     }
 
     /**
+     * Get color array used by interpolator
+     * @param {ColorMapInterpolator} color The color map interpolator to use
+     * @param {number} res The resolution of the color map
+     * @returns {ColorRGB} The array of colors
+     */
+    public static getColorArray(color: ColorMapInterpolator, res = 256): ColorRGB[] {
+        const tex: ColorRGB[] = [];
+
+        for (let id = 0; id < res; id++) {
+            const val = id / (res - 1);
+            const col = ColorMap.getColor(val, color);
+            tex.push(col);
+        }
+
+        return tex;
+    }
+
+    /**
      * Convert RGB color to HEX format
      * @param {ColorRGB} color The RGB color to convert
      * @returns {ColorHEX} The HEX representation of the color

@@ -88,7 +88,7 @@ export class SpatialJoinNear {
             return properties?.sjoin.count.noise || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layer, getFnv, geojson, groupById);
+        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv, groupById);
     }
 }
 

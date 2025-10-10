@@ -97,7 +97,7 @@ export class GeojsonVis {
             return properties?.sjoin.count.parking || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic('table_grid', getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic('table_grid', geojson, getFnv);
     }
 }
 

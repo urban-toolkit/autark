@@ -24,7 +24,7 @@ export class GeojsonVis {
 
         await this.map.init(boundingBox);
         await this.loadLayers();
-        await this.updateThematicData('roads', false, false);
+        await this.updateThematicData('roads');
 
         this.map.draw();
     }
@@ -38,17 +38,17 @@ export class GeojsonVis {
         }
     }
 
-    protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false, normalize: boolean = true): Promise<void> {
+    protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false): Promise<void> {
         const geojson = await this.db.getLayer(layer);
         console.log( { geojson  } )
 
-        const getFnv = (feature: Feature): number => {
+        const getFnv = (feature: Feature): string => {
             const properties = feature.properties as GeoJsonProperties;
-            return (['primary', 'secondary'].indexOf(properties?.highway) + 1) * 0.1;
+            return ['primary', 'secondary'].includes(properties?.highway) ? properties?.highway : 'other';
         };
-        
+
         this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.OBSERVABLE10);
-        this.map.updateGeoJsonLayerThematic(layer, getFnv, geojson, groupById, normalize);
+        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv, groupById);
     }
 
 }
