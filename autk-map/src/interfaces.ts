@@ -58,7 +58,7 @@ export interface ILayerRenderInfo {
     opacity: number;
     isColorMap?: boolean;
     colorMapInterpolator: ColorMapInterpolator;
-    colorMapLabels?: string[];
+    colorMapLabels: string[];
     pickedComps?: number[];
     isSkip?: boolean;
     isPick?: boolean;

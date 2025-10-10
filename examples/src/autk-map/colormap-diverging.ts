@@ -42,17 +42,17 @@ export class GeojsonVis {
         }
     }
 
-    protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false, normalize: boolean = true): Promise<void> {
+    protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false): Promise<void> {
         const geojson = await this.db.getLayer(layer);
         console.log({ geojson })
 
-        const getFnv = (feature: Feature) => {
+        const getFnv = (feature: Feature): number => {
             const properties = feature.properties as GeoJsonProperties;
-            return properties?.shape_area || 0;
+            return +properties?.shape_area || 0;
         };
 
         this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.DIVERGING_RED_BLUE);
-        this.map.updateGeoJsonLayerThematic(layer, getFnv, geojson, groupById, normalize);
+        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv, groupById);
     }
 
 }

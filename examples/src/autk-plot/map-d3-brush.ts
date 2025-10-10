@@ -119,7 +119,7 @@ export class MapD3 {
             return properties?.sjoin.count.noise || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layerId, getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv);
     }
 
     protected async updateMapListeners() {

@@ -75,7 +75,7 @@ export class SpatialJoin {
         };
 
 
-        this.map.updateGeoJsonLayerThematic('table_osm_roads', getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic('table_osm_roads', geojson, getFnv);
     }
 }
 

@@ -1,4 +1,5 @@
 import { ColorMap } from './colormap.js';
+import { ColorMapInterpolator } from './index.js';
 import { Layer } from './layer.js';
 import { AutkMap } from './main.js';
 
@@ -31,7 +32,6 @@ export class AutkMapUi {
      * @type {HTMLDivElement | null}
      */
     protected _legend: HTMLDivElement | null = null;
-
 
     /**
      * Constructor for AutkMapUi
@@ -91,14 +91,14 @@ export class AutkMapUi {
                 if (layer.layerInfo.id == this.activeLayer?.id) { return; }
                 this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', false);
                 this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isColorMap', false);
-           }
+            }
         );
 
         // Set picking true
         this.map.updateRenderInfoProperty(this.activeLayer.layerInfo.id, 'isPick', true);
 
         // Show thematic based on the interface status
-        if( !this._subMenu ) { return; }
+        if (!this._subMenu) { return; }
         let check = this._subMenu.querySelector('#showThematicCheckbox') as HTMLInputElement;
         if (check) {
             this.map.updateRenderInfoProperty(this.activeLayer.layerInfo.id, 'isColorMap', check.checked);
@@ -112,23 +112,6 @@ export class AutkMapUi {
      * Build the UI elements for the map.
      */
     public buildUi(): void {
-        this.buildHamburgerMenu();
-        this.buildLegend();
-    }
-
-    /**
-     * Update the UI elements based on the current state of the map.
-     */
-    public updateUi(): void {
-        this.buildVisibleLayersDropdown();
-        this.buildEnablePickingDropdown();
-        this.buildLegendCheckbox();
-    }
-
-    /**
-     * Build the hamburger menu for layer options.
-     */
-    protected buildHamburgerMenu(): void {
         const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
         const styleNode = document.createElement('style');
         styleNode.appendChild(document.createTextNode(css));
@@ -159,6 +142,14 @@ export class AutkMapUi {
 
         icon.addEventListener('click', () => {
             this.buildSubMenu();
+            this.buildVisibleLayersDropdown();
+            this.buildActiveLayerDropdown();
+            this.buildLegendCheckbox();
+            this.buildLegend();
+
+            if(this._subMenu) {
+                this._subMenu.style.visibility = this._subMenu.style.visibility === 'visible' ? 'hidden' : 'visible';
+            }
         });
 
         uiDiv.appendChild(styleNode);
@@ -189,8 +180,6 @@ export class AutkMapUi {
 
             this.map.canvas.parentElement?.appendChild(this._subMenu);
         }
-        this._subMenu.style.visibility = this._subMenu.style.visibility === 'visible' ? 'hidden' : 'visible';
-        this.updateUi();
     }
 
     /**
@@ -313,9 +302,9 @@ export class AutkMapUi {
     }
 
     /**
-     * Build the active layers dropdown.
+     * Build the active layer dropdown.
      */
-    protected buildEnablePickingDropdown(): void {
+    protected buildActiveLayerDropdown(): void {
         if (!this._subMenu) return;
 
         let title = this._subMenu.querySelector('#activeLayersTitle') as HTMLHeadingElement;
@@ -474,12 +463,14 @@ export class AutkMapUi {
                 }
             });
         }
+
+        this.buildLegend();
     }
 
     /**
      * Build the submenu for layer options.
      */
-    protected buildLegend(width = 250, height = 50): void {
+    protected buildLegend(width = 250, height = 70): void {
         if (!this._legend) {
             this._legend = document.createElement('div');
             this._legend.id = 'autkMapLegend';
@@ -500,16 +491,14 @@ export class AutkMapUi {
             this.map.canvas.parentElement?.appendChild(this._legend);
         }
 
-        const checkbox = document.createElement('input');
-        if(checkbox) {
+        const checkbox = document.querySelector('#showThematicCheckbox') as HTMLInputElement;
+        if (checkbox) {
             this._legend.style.visibility = checkbox.checked ? 'visible' : 'hidden';
         }
-        else {
-            this._legend.style.visibility = 'hidden';
-        }
+        this.updateLegend(width, height);
     }
 
-    protected updateLegend(width = 250, height = 50): void {
+    protected updateLegend(width = 250, height = 70): void {
         if (!this._legend || !this._activeLayer) return;
 
         // Clear previous legend content
@@ -521,29 +510,49 @@ export class AutkMapUi {
         title.style.fontSize = '14px';
         title.style.color = '#333';
         this._legend.appendChild(title);
-       
-        const colorMap: number[][] = [];
-        for (let i = 0; i <= 100; i++) {
-            const val = i / 100;
-            const col = ColorMap.getColor(val, this._activeLayer.layerRenderInfo.colorMapInterpolator);
-            colorMap.push([col.r, col.g, col.b, 1]);
-        }
+
+        // Create color map
+        const interpolator = this._activeLayer.layerRenderInfo.colorMapInterpolator;
+        const labels = this._activeLayer.layerRenderInfo.colorMapLabels;
+
+        const res = interpolator === ColorMapInterpolator.OBSERVABLE10 ? 10 : 100;
+        const slc = interpolator === ColorMapInterpolator.OBSERVABLE10 ? (labels.length < 10 ? labels.length : 10) : 100;
+
+        const colorMap = ColorMap.getColorArray(interpolator, res).slice(0, slc);
 
         const svg = d3.select(this._legend)
             .append("svg")
             .attr("width", width)
-            .attr("height", height / 2)
-            .style("border-radius", "4px");
+            .attr("height", height);
 
         svg.selectAll("rect")
             .data(colorMap)
-            .enter()
-            .append("rect")
-            .attr("x", (_d, i) => (i * width / colorMap.length) )
+            .join("rect")
+            .attr("x", (_d, id) => id * (width / colorMap.length))
             .attr("y", 0)
-            .attr("width", width  / colorMap.length)
-            .attr("height", height / 2)
-            .style("fill", (d) => `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${d[3]})`)
-            .style("stroke", "none");
+            .attr("width", width / colorMap.length)
+            .attr("height", height / 5)
+            .style("fill", (d) => `rgb(${d.r},${d.g},${d.b})`)
+            .style("stroke", (d) => `rgb(${d.r},${d.g},${d.b})`)
+            .style("stroke-width", "2px");
+
+        const textData = labels.map((d, i) => {
+            if (interpolator === ColorMapInterpolator.OBSERVABLE10) {
+                return { label: d, pos: i * (width / colorMap.length) + (width / colorMap.length) / 2 };
+            }
+            else {
+                return { label: d, pos: i * (width / (labels.length - 1)) + (Math.pow(-1, i) * 10) };
+            }
+        });
+
+        svg.selectAll("text")
+            .data(textData)
+            .join("text")
+            .text((d) => `${d.label.substring(0, 3)}`)
+            .attr("x", (d) => d.pos)
+            .attr("y", height / 5 + 15)
+            .style("font-size", "12px")
+            .style("fill", "#333")
+            .style("text-anchor", "middle");
     }
 }

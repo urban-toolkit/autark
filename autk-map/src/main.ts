@@ -249,8 +249,6 @@ export class AutkMap {
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
-
-        this._ui.updateUi();
     }
 
     /**
@@ -260,49 +258,65 @@ export class AutkMap {
      * normalizes these values, and updates the layer's thematic data accordingly.
      * 
      * @param {string} layerName The name of the layer to update
-     * @param {(feature: Feature) => number} getFnv A function that extracts a numeric value from a GeoJSON feature
+     * @param {(feature: Feature) => number | string} getFnv A function that extracts a numeric value from a GeoJSON feature
      * @param {FeatureCollection} geojson The GeoJSON data containing the features
      * @param {boolean} [groupById=false] Whether to group features by their 'building_id' property to ensure uniqueness
      */
-    updateGeoJsonLayerThematic(layerName: string, getFnv: (feature: Feature) => number, geojson: FeatureCollection, groupById: boolean = false, normalize: boolean = true) {
+    updateGeoJsonLayerThematic(layerName: string, geojson: FeatureCollection, getFnv: (feature: Feature) => number | string, groupById: boolean = false) {
         const thematicData: ILayerThematic[] = [];
-        let filtered: Feature[] = [];
 
+        let filtered: Feature[] = geojson.features;
         if (groupById) {
             const visited = new Set<string>();
-            filtered = geojson.features.filter((f) => { 
+            filtered = filtered.filter((f) => { 
                 let key = f.properties ? f.properties.building_id as string : '-1';
 
                 if (!visited.has(key)) { 
                     visited.add(key); 
+                    return true;
                 }
-
-                return visited.has(key);
-            });
-        } 
-        else {
-            filtered = geojson.features;
-        }
-
-        for (const feature of filtered) {
-            const properties = feature.properties as GeoJsonProperties; 
-            if (!properties) { continue; }
-
-            const val = getFnv(feature);
-
-            thematicData.push({
-                level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                values: [val],
+                return false;
             });
         }
 
-        if(normalize) {
+        const dataType = typeof getFnv(filtered[0]);
+
+        if (dataType === 'number') {
+            for (const feature of filtered) {
+                const properties = feature.properties as GeoJsonProperties; 
+                if (!properties) { continue; }
+
+                const val = +getFnv(feature);
+                thematicData.push({
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [val],
+                });
+            }
+
             const valMin = Math.min(...thematicData.map(d => +d.values[0]));
             const valMax = Math.max(...thematicData.map(d => +d.values[0]));
+
+            this.updateRenderInfoProperty(layerName, 'colorMapLabels', [`${valMin}`, `${valMax}`]);
 
             for (let i = 0; i < thematicData.length; i++) {
                 const val = +thematicData[i].values[0];
                 thematicData[i].values = [(val - valMin) / (valMax - valMin)];
+            }
+        }
+
+        if (dataType === 'string') {
+            const strCats = Array.from(new Set(filtered.map(f => getFnv(f) as string)));
+            this.updateRenderInfoProperty(layerName, 'colorMapLabels', strCats);
+
+            for (const feature of filtered) {
+                const properties = feature.properties as GeoJsonProperties; 
+                if (!properties) { continue; }
+
+                const val = 0.1 * strCats.indexOf(getFnv(feature) as string);
+                thematicData.push({
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [val],
+                });
             }
         }
 
@@ -320,10 +334,7 @@ export class AutkMap {
 
         if (layer) {
             layer.loadThematic(layerThematic);
-            this.updateRenderInfoProperty(layerName, 'isColorMap', true);
-
             layer.makeLayerDataInfoDirty();
-            layer.makeLayerRenderInfoDirty();
         }
     }
 
@@ -369,6 +380,9 @@ export class AutkMap {
                     break;
                 case 'colorMapInterpolator':
                     layer.layerRenderInfo.colorMapInterpolator = value as ColorMapInterpolator;
+                    break;
+                case 'colorMapLabels':
+                    layer.layerRenderInfo.colorMapLabels = value as string[];
                     break;
                 case 'pickedComps':
                     layer.layerRenderInfo.pickedComps = value as number[];
@@ -514,6 +528,7 @@ export class AutkMap {
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -556,6 +571,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -598,6 +614,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -641,6 +658,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_SSAO,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -684,6 +702,7 @@ export class AutkMap {
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -733,6 +752,7 @@ export class AutkMap {
             pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -777,6 +797,7 @@ export class AutkMap {
             opacity: 1.0,
             // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
             isPick: false,
             isSkip: false,
