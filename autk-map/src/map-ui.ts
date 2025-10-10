@@ -140,6 +140,11 @@ export class AutkMapUi {
         icon.href = '#';
         icon.innerHTML = `<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-menu-2"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>`
 
+        uiDiv.appendChild(styleNode);
+        uiDiv.appendChild(icon);
+
+        this.map.canvas.parentElement?.appendChild(uiDiv);
+
         icon.addEventListener('click', () => {
             this.buildSubMenu();
             this.buildVisibleLayersDropdown();
@@ -151,11 +156,6 @@ export class AutkMapUi {
                 this._subMenu.style.visibility = this._subMenu.style.visibility === 'visible' ? 'hidden' : 'visible';
             }
         });
-
-        uiDiv.appendChild(styleNode);
-        uiDiv.appendChild(icon);
-
-        this.map.canvas.parentElement?.appendChild(uiDiv);
     }
 
     /**
@@ -498,6 +498,12 @@ export class AutkMapUi {
         this.updateLegend(width, height);
     }
 
+    /**
+     * Updates the legend display.
+     * @param width The width of the legend
+     * @param height The height of the legend
+     * @returns 
+     */
     protected updateLegend(width = 250, height = 70): void {
         if (!this._legend || !this._activeLayer) return;
 
