@@ -42,7 +42,7 @@ export class GeojsonVis {
         const geojson = await this.db.getLayer(layer);
         console.log( { geojson  } )
 
-        const getFnv = (feature: Feature) => {
+        const getFnv = (feature: Feature): number => {
             const properties = feature.properties as GeoJsonProperties;
             return (['primary', 'secondary'].indexOf(properties?.highway) + 1) * 0.1;
         };
