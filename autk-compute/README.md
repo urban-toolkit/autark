@@ -23,7 +23,7 @@ Configuration object for computing values into GeoJSON feature properties.
 
 - **Type:** `Record<string, string>`
 - **Description:** Maps WGSL variable names to GeoJSON property paths.
-- **Example:** `{ x: "properties.population", y: "properties.area" }`
+- **Example:** `{ x: "population", y: "area" }`
 
 ##### `arrayVariables` (Optional)
 
@@ -106,8 +106,8 @@ return trace;
 const result = await computeFunctionIntoProperties({
   geojson: myFeatureCollection,
   variableMapping: {
-    x: 'properties.width',
-    y: 'properties.height',
+    x: 'width',
+    y: 'height',
   },
   outputColumnName: 'area',
   wglsFunction: 'return x * y;',
@@ -120,8 +120,8 @@ const result = await computeFunctionIntoProperties({
 const result = await computeFunctionIntoProperties({
   geojson: myFeatureCollection,
   variableMapping: {
-    embedding: 'properties.embedding',
-    scalar: 'properties.weight',
+    embedding: 'embedding',
+    scalar: 'weight',
   },
   arrayVariables: {
     embedding: 128,
@@ -143,7 +143,7 @@ const result = await computeFunctionIntoProperties({
 const result = await computeFunctionIntoProperties({
   geojson: myFeatureCollection,
   variableMapping: {
-    matrix: 'properties.transformMatrix',
+    matrix: 'transformMatrix',
   },
   matrixVariables: {
     matrix: { rows: 3, cols: 3 },
