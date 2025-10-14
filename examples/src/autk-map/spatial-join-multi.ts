@@ -107,7 +107,7 @@ export class SpatialJoin {
             return properties?.sjoin.count[property] || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic('neighborhoods', getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic('neighborhoods', geojson, getFnv);
     }
 
     uiUpdate() {

@@ -4,7 +4,7 @@ import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
 
-import { PlotEvent, PlotD3, D3PlotBuilder, PlotStyle } from 'autk-plot';
+import { PlotEvent, PlotD3, PlotStyle } from 'autk-plot';
 
 import { AutkMap, LayerType, MapEvent } from 'autk-map';
 
@@ -89,7 +89,7 @@ export class MapD3 {
             throw new Error('Plot body element not found.');
         }
 
-        this.plot = new PlotD3(plotBdy, this.d3Spec(), [PlotEvent.BRUSH]);
+        this.plot = new PlotD3(plotBdy, this.scatterPlot.bind(this), [PlotEvent.BRUSH]);
 
         await this.loadPlotData();
         this.updatePlotListeners();
@@ -119,12 +119,11 @@ export class MapD3 {
             return properties?.sjoin.count.noise || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layerId, getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv);
     }
 
     protected async updateMapListeners() {
         this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
-
             this.highlightSelectedMarks(selection as number[]);
             console.log('Plot updated.');
         });
@@ -133,11 +132,11 @@ export class MapD3 {
     // ---- Plot helper methods ----
 
     protected async loadPlotData(layerId: string = 'neighborhoods') {
-        const data = (await this.db.getLayer(layerId)).features.map((f: Feature) => {
+        const data = await this.db.getLayer(layerId);
+
+        this.plot.data = data.features.map((f: Feature) => {
             return f.properties;
         });
-
-        this.plot.data = data;
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
@@ -167,9 +166,7 @@ export class MapD3 {
         });
     }
 
-    protected d3Spec(): D3PlotBuilder {
-        return this.scatterPlot.bind(this);
-    }
+    // ---- D3 plot method ----
 
     protected scatterPlot(
         div: HTMLElement,

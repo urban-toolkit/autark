@@ -43,7 +43,7 @@ export class SpatialJoin {
                 y: 'shape_leng',
             },
             outputColumnName: 'result',
-            wglsFunction: 'x / y',
+            wglsFunction: 'return x / y;',
         });
         console.log({ geojson });
 
@@ -76,7 +76,7 @@ export class SpatialJoin {
             return properties?.compute.result || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic('neighborhoods', getFnv, geojson);
+        this.map.updateGeoJsonLayerThematic('neighborhoods', geojson, getFnv);
     }
 }
 

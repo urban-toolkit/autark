@@ -17,7 +17,6 @@ export class GeojsonVis {
         });
 
         const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-        
 
         const canvas = document.querySelector('canvas');
 

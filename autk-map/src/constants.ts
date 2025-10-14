@@ -88,12 +88,14 @@ export enum RenderPipeline {
 
 /**
  * Color map interpolators for thematic data visualization.
- * @property {string} INTERPOLATOR_REDS - Red color interpolation.
- * @property {string} INTERPOLATOR_BLUES - Blue color interpolation.
+ * @property {string} SEQUENTIAL_REDS - Red color interpolation.
+ * @property {string} SEQUENTIAL_BLUES - Blue color interpolation.
  */
 export enum ColorMapInterpolator {
-  INTERPOLATOR_REDS = 'interpolateReds',
-  INTERPOLATOR_BLUES = 'interpolateBlues',
+  SEQUENTIAL_REDS = 'interpolateReds',
+  SEQUENTIAL_BLUES = 'interpolateBlues',
+  DIVERGING_RED_BLUE = 'interpolateRdBu',
+  OBSERVABLE10 = 'schemeObservable10',
 }
 
 /**
