@@ -24,3 +24,4 @@ export * from './triangulator-surface';
 export * from './triangulator-polygons';
 export * from './triangulator-polylines';
 export * from './triangulator';
+export * from './bbox-builder';
