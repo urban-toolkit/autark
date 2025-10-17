@@ -1,13 +1,15 @@
 /**
  * The types of geometry supported in autk-map.
- * @property {string} FEATURES_2D - Represents a 2D triangulation.
- * @property {string} FEATURES_3D - Represents a 3D triangulation.
- * @property {string} BOUNDARIES_2D - Represents a 2D triangulation with boundaries.
+ * @property {string} AUTK_2D_POINTS - Represents a point collection.
+ * @property {string} AUTK_2D_LINES - Represents a line collection.
+ * @property {string} AUTK_2D_TRIANGLES - Represents a 2D triangles collection.
+ * @property {string} AUTK_3D_TRIANGLES - Represents a 3D triangles collection.
  */
 export enum LayerGeometryType {
-  TRIANGLES_2D = 'triangles2d',
-  TRIANGLES_3D = 'triangles3d',
-  BOUNDARIES_2D = 'boundaries2d'
+  AUTK_2D_POINTS = 'points2d',
+  AUTK_2D_LINES = 'boundaries2d',
+  AUTK_2D_TRIANGLES = 'triangles2d',
+  AUTK_3D_TRIANGLES = 'triangles3d',
 }
 
 /**
@@ -31,6 +33,15 @@ export enum LayerType {
   POLYLINES_LAYER = 'lines',
   HEATMAP_LAYER  = 'heatmap',
 }
+
+//  PROPOSED LAYER TYPES
+//  AUTK_MAP_SURFACE = 'surface',
+//  AUTK_MAP_PARKS = 'parks',
+//  AUTK_MAP_WATER = 'water',
+//  AUTK_MAP_ROADS = 'roads',
+//  AUTK_MAP_BUILDINGS = 'buildings',
+//  AUTK_MAP_CUSTOM  = 'custom',
+
 
 /**
  * Rendering order of the layers based on their type.

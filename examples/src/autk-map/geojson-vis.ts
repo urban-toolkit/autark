@@ -5,7 +5,7 @@ export class GeojsonVis {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
-    public async run(): Promise<void> {
+    public async run(canvas: HTMLCanvasElement): Promise<void> {
         this.db = new SpatialDb();
         await this.db.init();
 
@@ -16,18 +16,12 @@ export class GeojsonVis {
             type: 'boundaries'
         });
 
-        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
+        this.map = new AutkMap(canvas);
+        await this.map.init();
 
-        const canvas = document.querySelector('canvas');
+        await this.loadLayers();
 
-        if (canvas) {
-            this.map = new AutkMap(canvas);
-
-            await this.map.init(boundingBox);
-            await this.loadLayers();
-
-            this.map.draw();
-        }
+        this.map.draw();
     }
 
     protected async loadLayers(): Promise<void> {
@@ -37,13 +31,17 @@ export class GeojsonVis {
 
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-
-        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
     }
 }
 
 async function main() {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+
     const example = new GeojsonVis();
-    await example.run();
+    await example.run(canvas);
 }
 main();

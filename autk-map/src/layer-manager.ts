@@ -122,13 +122,13 @@ export class LayerManager {
 
         // loads based on type
         switch (layerInfo.typeGeometry) {
-            case LayerGeometryType.BOUNDARIES_2D:
+            case LayerGeometryType.AUTK_2D_LINES:
                 layer = new Triangles2DBorder(layerInfo, layerRender, layerData);
                 break;
-            case LayerGeometryType.TRIANGLES_2D:
+            case LayerGeometryType.AUTK_2D_TRIANGLES:
                 layer = new Triangles2DLayer(layerInfo, layerRender, layerData);
                 break;
-            case LayerGeometryType.TRIANGLES_3D:
+            case LayerGeometryType.AUTK_3D_TRIANGLES:
                 layer = new Triangles3DLayer(layerInfo, layerRender, layerData);
                 break;
             default:

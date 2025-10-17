@@ -40,6 +40,7 @@ import { TriangulatorPolylines } from './triangulator-polylines';
 import { TriangulatorSureface } from './triangulator-surface';
 import { AutkMapUi } from './map-ui';
 import { TriangulatorBorders } from './triangulator-boundaries';
+import { BboxBuilder } from './bbox-builder';
 
 /**
  * The main autark map class.
@@ -174,14 +175,16 @@ export class AutkMap {
     get boundingBox(): Feature<Polygon> {
         return this._layerManager.boundingBox;
     }
-
+    set boundingBox(bbox: IBoundingBox) {
+        this._layerManager.boundingBox = bbox;
+    }
 
     /**
      * Initializes the map with the given bounding box.
      * @param {IBoundingBox} bbox The bounding box to initialize the map with
      */
-    async init(bbox: IBoundingBox) {
-        this._layerManager.boundingBox = bbox;
+    async init(bbox: IBoundingBox | null = null) {
+        if (bbox) this._layerManager.boundingBox = bbox;
 
         await this._renderer.init();
 
@@ -215,6 +218,11 @@ export class AutkMap {
      * @param {FeatureCollection} geojson The GeoJSON data to load
      */
     loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
+        if (!this.boundingBox) {
+            this.boundingBox = BboxBuilder.buildBbox(geojson);
+            console.log({ bbox: this.origin });
+        }
+
         switch (typeLayer) {
             case LayerType.OSM_WATER:
             case LayerType.OSM_PARKS:
@@ -494,7 +502,6 @@ export class AutkMap {
 
     // ---- Private methods for creating layers ----
 
-
     /**
      * Creates a features layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
@@ -519,7 +526,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: zIndex,
-            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
             typeLayer: typeLayer,
         };
 
@@ -563,7 +570,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: LayerRenderOrder.OSM_SURFACE,
-            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
             typeLayer: LayerType.OSM_SURFACE,
         };
 
@@ -606,7 +613,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: LayerRenderOrder.OSM_ROADS,
-            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
             typeLayer: LayerType.OSM_ROADS,
         };
 
@@ -650,7 +657,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: LayerRenderOrder.OSM_BUILDINGS,
-            typeGeometry: LayerGeometryType.TRIANGLES_3D,
+            typeGeometry: LayerGeometryType.AUTK_3D_TRIANGLES,
             typeLayer: LayerType.OSM_BUILDINGS,
         };
 
@@ -693,7 +700,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: LayerRenderOrder.BOUNDARIES_LAYER + 0.01 * this.layerManager.length,
-            typeGeometry: LayerGeometryType.BOUNDARIES_2D,
+            typeGeometry: LayerGeometryType.AUTK_2D_LINES,
             typeLayer: LayerType.BOUNDARIES_LAYER,
         };
 
@@ -709,6 +716,8 @@ export class AutkMap {
         };
 
         const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
+        console.log({ layerMesh });
+
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature Layer.');
             return;
@@ -744,7 +753,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: LayerRenderOrder.POLYLINES_LAYER + 0.01 * this.layerManager.length,
-            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
             typeLayer: LayerType.POLYLINES_LAYER,
         };
 
@@ -788,7 +797,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zValue: LayerRenderOrder.HEATMAP_LAYER,
-            typeGeometry: LayerGeometryType.TRIANGLES_2D,
+            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
             typeLayer: LayerType.HEATMAP_LAYER,
         };
 

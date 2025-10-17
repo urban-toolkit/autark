@@ -68,7 +68,7 @@ export class Camera {
      */
     private static defaultParams: ICameraData = {
         up: [0, 1, 0],
-        eye: [0, 0, 5000],
+        eye: [0, 0, 10000],
         lookAt: [0, 0, 0],
     };
 
