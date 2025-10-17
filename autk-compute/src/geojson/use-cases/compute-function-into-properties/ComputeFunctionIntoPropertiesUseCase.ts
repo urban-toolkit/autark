@@ -4,41 +4,112 @@ import { ComputeFunctionIntoPropertiesParams } from '../../interfaces';
 
 export class ComputeFunctionIntoPropertiesUseCase {
   async exec(params: ComputeFunctionIntoPropertiesParams): Promise<FeatureCollection> {
-    const { geojson, variableMapping, outputColumnName, wglsFunction } = params;
+    const {
+      geojson,
+      variableMapping,
+      arrayVariables = {},
+      matrixVariables = {},
+      outputColumnName,
+      wglsFunction,
+    } = params;
 
     const features = geojson.features ?? [];
     const featureCount = features.length;
     if (featureCount === 0) return geojson;
 
     // Extract input data from features
-    const { orderedVarNames, inputArrays } = this.extractInputData(features, variableMapping, featureCount);
+    const { orderedVarNames, inputArrays, scalarVars, arrayVars, matrixVars } = this.extractInputData(
+      features,
+      variableMapping,
+      arrayVariables,
+      matrixVariables,
+      featureCount,
+    );
 
     // Build and run GPU computation
-    const shader = this.buildShader(orderedVarNames, wglsFunction);
+    const shader = this.buildShader(scalarVars, arrayVars, matrixVars, wglsFunction);
     const result = await this.runComputation(orderedVarNames, inputArrays, shader, featureCount);
 
     // Apply results to features
     return this.applyResultsToFeatures(geojson, features, result, outputColumnName);
   }
 
-  private extractInputData(features: any[], variableMapping: Record<string, string>, featureCount: number) {
+  private extractInputData(
+    features: any[],
+    variableMapping: Record<string, string>,
+    arrayVariables: Record<string, number>,
+    matrixVariables: Record<string, { rows: number; cols: number }>,
+    featureCount: number,
+  ) {
     const orderedVarNames = Object.keys(variableMapping);
     const inputArrays: { [varName: string]: Float32Array } = {};
+    const scalarVars: string[] = [];
+    const arrayVars: Array<{ name: string; length: number }> = [];
+    const matrixVars: Array<{ name: string; rows: number; cols: number }> = [];
 
     for (const varName of orderedVarNames) {
       const path = this.normalizePropertyPath(variableMapping[varName]);
-      const values = new Float32Array(featureCount);
+      const isArray = varName in arrayVariables;
+      const isMatrix = varName in matrixVariables;
 
-      for (let i = 0; i < featureCount; i++) {
-        const value = this.readPathValue(features[i], path);
-        const numeric = Number(value);
-        values[i] = Number.isFinite(numeric) ? numeric : 0;
+      if (isMatrix) {
+        // Handle matrix variable: create flattened 3D buffer
+        const { rows, cols } = matrixVariables[varName];
+        const matrixSize = rows * cols;
+        const values = new Float32Array(featureCount * matrixSize);
+
+        for (let featureIdx = 0; featureIdx < featureCount; featureIdx++) {
+          const value = this.readPathValue(features[featureIdx], path);
+          const sourceMatrix = Array.isArray(value) ? value : [];
+
+          // Iterate through rows and columns
+          for (let row = 0; row < rows; row++) {
+            const sourceRow = Array.isArray(sourceMatrix[row]) ? sourceMatrix[row] : [];
+            for (let col = 0; col < cols; col++) {
+              const offset = featureIdx * matrixSize + row * cols + col;
+              const val = col < sourceRow.length ? Number(sourceRow[col]) : 0;
+              values[offset] = Number.isFinite(val) ? val : 0;
+            }
+          }
+        }
+
+        inputArrays[varName] = values;
+        matrixVars.push({ name: varName, rows, cols });
+      } else if (isArray) {
+        // Handle array variable: create flattened 2D buffer
+        const arrayLength = arrayVariables[varName];
+        const values = new Float32Array(featureCount * arrayLength);
+
+        for (let featureIdx = 0; featureIdx < featureCount; featureIdx++) {
+          const value = this.readPathValue(features[featureIdx], path);
+          const sourceArray = Array.isArray(value) ? value : [];
+
+          // Copy values from source array, pad with zeros if needed
+          for (let elemIdx = 0; elemIdx < arrayLength; elemIdx++) {
+            const offset = featureIdx * arrayLength + elemIdx;
+            const val = elemIdx < sourceArray.length ? Number(sourceArray[elemIdx]) : 0;
+            values[offset] = Number.isFinite(val) ? val : 0;
+          }
+        }
+
+        inputArrays[varName] = values;
+        arrayVars.push({ name: varName, length: arrayLength });
+      } else {
+        // Handle scalar variable (original behavior)
+        const values = new Float32Array(featureCount);
+
+        for (let i = 0; i < featureCount; i++) {
+          const value = this.readPathValue(features[i], path);
+          const numeric = Number(value);
+          values[i] = Number.isFinite(numeric) ? numeric : 0;
+        }
+
+        inputArrays[varName] = values;
+        scalarVars.push(varName);
       }
-
-      inputArrays[varName] = values;
     }
 
-    return { orderedVarNames, inputArrays };
+    return { orderedVarNames, inputArrays, scalarVars, arrayVars, matrixVars };
   }
 
   private async runComputation(
@@ -114,23 +185,84 @@ export class ComputeFunctionIntoPropertiesUseCase {
     return current;
   }
 
-  private buildShader(varNames: string[], wglsFunction: string): string {
-    const bufferDecls = varNames
-      .map((name, idx) => `@group(0) @binding(${idx}) var<storage, read> ${name}Buf: ArrayF32;`)
-      .join('\n');
-    const locals = varNames.map((name) => `  let ${name}: f32 = ${name}Buf.data[idx];`).join('\n');
+  private buildShader(
+    scalarVars: string[],
+    arrayVars: Array<{ name: string; length: number }>,
+    matrixVars: Array<{ name: string; rows: number; cols: number }>,
+    wglsFunction: string,
+  ): string {
+    let bindingIdx = 0;
+    const bufferDecls: string[] = [];
+    const locals: string[] = [];
+    const computeFunctionParams: string[] = [];
+    const computeFunctionArgs: string[] = [];
 
-    const outputBinding = varNames.length;
+    // Struct definition
+    const structDef = `struct ArrayF32 {
+            data: array<f32>
+        }`;
+
+    // Handle scalar variables
+    for (const name of scalarVars) {
+      bufferDecls.push(`@group(0) @binding(${bindingIdx}) var<storage, read> ${name}Buf: ArrayF32;`);
+      locals.push(`  let ${name}: f32 = ${name}Buf.data[idx];`);
+      computeFunctionParams.push(`${name}: f32`);
+      computeFunctionArgs.push(name);
+      bindingIdx++;
+    }
+
+    // Handle array variables
+    for (const { name, length } of arrayVars) {
+      bufferDecls.push(`@group(0) @binding(${bindingIdx}) var<storage, read> ${name}Buf: ArrayF32;`);
+
+      // Create a local view of the array slice for this feature
+      // The buffer is flattened as: [feature0_elem0, feature0_elem1, ..., feature1_elem0, ...]
+      locals.push(`  let ${name}_offset: u32 = idx * ${length}u;`);
+
+      // Pass array parameters to compute function
+      computeFunctionParams.push(`${name}_data: ptr<storage, array<f32>>`);
+      computeFunctionParams.push(`${name}_offset: u32`);
+      computeFunctionParams.push(`${name}_length: u32`);
+
+      computeFunctionArgs.push(`&${name}Buf.data`);
+      computeFunctionArgs.push(`${name}_offset`);
+      computeFunctionArgs.push(`${length}u`);
+
+      bindingIdx++;
+    }
+
+    // Handle matrix variables
+    for (const { name, rows, cols } of matrixVars) {
+      bufferDecls.push(`@group(0) @binding(${bindingIdx}) var<storage, read> ${name}Buf: ArrayF32;`);
+
+      // Create a local view of the matrix slice for this feature
+      // The buffer is flattened as: [feature0_r0_c0, feature0_r0_c1, ..., feature1_r0_c0, ...]
+      const matrixSize = rows * cols;
+      locals.push(`  let ${name}_offset: u32 = idx * ${matrixSize}u;`);
+
+      // Pass matrix parameters to compute function
+      computeFunctionParams.push(`${name}_data: ptr<storage, array<f32>>`);
+      computeFunctionParams.push(`${name}_offset: u32`);
+      computeFunctionParams.push(`${name}_rows: u32`);
+      computeFunctionParams.push(`${name}_cols: u32`);
+
+      computeFunctionArgs.push(`&${name}Buf.data`);
+      computeFunctionArgs.push(`${name}_offset`);
+      computeFunctionArgs.push(`${rows}u`);
+      computeFunctionArgs.push(`${cols}u`);
+
+      bindingIdx++;
+    }
+
+    const outputBinding = bindingIdx;
 
     return `
-        struct ArrayF32 {
-            data: array<f32>
-        }
+        ${structDef}
 
-        ${bufferDecls}
+        ${bufferDecls.join('\n        ')}
         @group(0) @binding(${outputBinding}) var<storage, read_write> outBuf: ArrayF32;
 
-        fn compute_value(${varNames.map((name) => `${name}: f32`).join(', ')}) -> f32 {
+        fn compute_value(${computeFunctionParams.join(', ')}) -> f32 {
             ${wglsFunction}
         }
 
@@ -138,8 +270,8 @@ export class ComputeFunctionIntoPropertiesUseCase {
         fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             let idx: u32 = gid.x;
             if (idx >= arrayLength(&outBuf.data)) { return; }
-            ${locals}
-            let result = compute_value(${varNames.join(', ')});
+${locals.join('\n')}
+            let result = compute_value(${computeFunctionArgs.join(', ')});
             outBuf.data[idx] = result;
         }`;
   }
