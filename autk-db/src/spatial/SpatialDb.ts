@@ -240,17 +240,27 @@ export class SpatialDb {
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
     if (!isLayerTable(layerTable)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
-    return this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+    const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+
+    const osmBoundingBox = this.getOsmBoundingBox();
+    if (osmBoundingBox) {
+      featureCollection.bbox = [
+        osmBoundingBox.minLon,
+        osmBoundingBox.minLat,
+        osmBoundingBox.maxLon,
+        osmBoundingBox.maxLat,
+      ];
+    }
+
+    return featureCollection;
   }
 
   /**
    * Retrieves the bounding box of the OSM data loaded from the Overpass API.
    * @returns The bounding box of the OSM data.
-   * @throws Error if the OSM bounding box is not found.
    */
-  getOsmBoundingBox(): BoundingBox {
-    if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsmFromOverpassApi() first.');
-    return this.osmBoudingBox;
+  getOsmBoundingBox(): BoundingBox | null {
+    return this.osmBoudingBox || null;
   }
 
   /**
