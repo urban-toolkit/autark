@@ -4,6 +4,7 @@ import { Table } from '../../../shared/interfaces';
 import { GeometryColumnNotFoundError, TableNotFoundError } from './errors';
 import { SPATIAL_JOIN_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
+import { isOsmBuildingTable } from '../load-layer/interfaces';
 
 export class SpatialJoinUseCase {
   private conn: AsyncDuckDBConnection;
@@ -52,7 +53,6 @@ export class SpatialJoinUseCase {
     return {
       table: {
         source: tableRoot.source,
-        type: tableRoot.type,
         name: outputTableName,
         columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
       } as Table,
@@ -66,7 +66,7 @@ export class SpatialJoinUseCase {
    * For other tables, returns the first geometry column found.
    */
   private getGeometryColumnName(table: Table): string | undefined {
-    if (table.source === 'osm' && table.type === 'buildings') {
+    if (isOsmBuildingTable(table)) {
       const aggGeometryColumn = table.columns.find(
         (column) => column.name === 'agg_geometry' && column.type === 'GEOMETRY',
       );

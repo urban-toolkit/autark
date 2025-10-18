@@ -49,8 +49,7 @@ export class LoadLayerUseCase {
     }
 
     return {
-      source: 'osm',
-      type: params.layer,
+      source: 'osm_layer',
       columns,
       name: layerOutputTableName,
     };

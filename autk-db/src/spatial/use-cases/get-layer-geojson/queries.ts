@@ -1,10 +1,11 @@
 import { CustomLayerTable, LayerTable } from '../../../shared/interfaces';
+import { isOsmBuildingTable } from '../load-layer/interfaces';
 
 export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerTable) => {
   const hasBuildingIdColumn = !!layerTable.columns?.some((c) => c.name === 'building_id');
 
   const propertiesExpr =
-    layerTable.type === 'buildings' && hasBuildingIdColumn
+    isOsmBuildingTable(layerTable) && hasBuildingIdColumn
       ? `json_merge_patch(COALESCE(CAST(properties AS JSON), '{}'::JSON), json_object('building_id', building_id))`
       : 'properties';
 

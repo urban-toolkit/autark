@@ -1,11 +1,9 @@
-// TODO: 1. falta layer de ROADS
-
-import { LayerType } from './interfaces';
+import { OsmLayerType } from './interfaces';
 import { BoundingBox } from '../../../shared/interfaces';
 
 type Params = {
   tableName: string;
-  layer: LayerType;
+  layer: OsmLayerType;
   outputFormat: string;
   outputTableName: string;
   boundingBox?: BoundingBox;
@@ -64,7 +62,7 @@ function buildGeometrySelect({
 }: {
   outputFormat: string;
   boundingBox?: BoundingBox;
-  layer: LayerType;
+  layer: OsmLayerType;
 }) {
   // Define which layers should create polygons for closed ways
   const areaLayers = ['buildings', 'parks', 'water'];
@@ -119,7 +117,7 @@ function buildHavingClause({
 }: {
   outputFormat: string;
   boundingBox?: BoundingBox;
-  layer: LayerType;
+  layer: OsmLayerType;
 }) {
   if (!boundingBox) return '';
 

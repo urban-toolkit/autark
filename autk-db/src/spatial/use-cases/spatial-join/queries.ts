@@ -1,5 +1,5 @@
 import { Table } from '../../../shared/interfaces';
-import { isLayerType } from '../load-layer/interfaces';
+import { isLayerTable } from '../load-layer/interfaces';
 
 interface Params {
   tableRoot: Table;
@@ -162,7 +162,7 @@ function buildNonAggregateColumns(
 ): string {
   return nonAggregateColumns
     .map((column) => {
-      const valueExpression = isLayerType(column.table.type)
+      const valueExpression = isLayerTable(column.table)
         ? `map_extract("${column.column}", ${column.table.name}.properties)`
         : `${column.table.name}."${column.column}"`;
       const columnName = column.aggregateFnResultColumnName || column.column;
@@ -172,7 +172,7 @@ function buildNonAggregateColumns(
 }
 
 function generateValueExpression(table: Table, columnName: string, aggregateFunction: string): string {
-  if (isLayerType(table.type)) {
+  if (isLayerTable(table)) {
     return `${aggregateFunction}(map_extract("${columnName}", ${table.name}.properties))`;
   }
   return `${aggregateFunction}(${table.name}."${columnName}")`;

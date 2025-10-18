@@ -1,4 +1,4 @@
-import { LayerType } from '../load-layer/interfaces';
+import { OsmLayerType } from '../load-layer/interfaces';
 
 export interface OsmElement {
   type: 'node' | 'way' | 'relation';
@@ -19,7 +19,7 @@ export type Params = {
   autoLoadLayers?: {
     coordinateFormat: string;
     dropOsmTable: boolean;
-    layers: Array<LayerType>;
+    layers: Array<OsmLayerType>;
   };
   queryArea: {
     geocodeArea: string;

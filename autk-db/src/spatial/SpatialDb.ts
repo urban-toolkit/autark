@@ -15,7 +15,7 @@ import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase
 import { BoundingBox } from '../shared/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
-import { isLayerType } from './use-cases/load-layer/interfaces';
+import { isLayerTable } from './use-cases/load-layer/interfaces';
 import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
 import { GridLayerTable } from '../shared/interfaces';
@@ -180,8 +180,7 @@ export class SpatialDb {
 
     const osmTable = this.tables.find((t) => t.name === params.osmInputTableName);
     if (!osmTable) throw new Error(`Table ${params.osmInputTableName} not found.`);
-    if (!(osmTable.source === 'osm' && osmTable.type === 'pointset'))
-      throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
+    if (osmTable.source !== 'osm') throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
 
     const table = await this.loadLayerUseCase.exec(params);
     this.tables.push(table);
@@ -239,7 +238,7 @@ export class SpatialDb {
 
     const layerTable = this.tables.find((t) => t.name === layerTableName);
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
-    if (!isLayerType(layerTable.type)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
+    if (!isLayerTable(layerTable)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
     return this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
   }
@@ -287,11 +286,7 @@ export class SpatialDb {
    */
   getLayerTables(): Array<LayerTable | CustomLayerTable> {
     return this.tables.filter((table): table is LayerTable | CustomLayerTable => {
-      return (
-        (table.source === 'osm' && isLayerType(table.type)) || 
-        (table.source === 'geojson' && isLayerType(table.type)) || 
-        (table.source === 'user' && isLayerType(table.type)) // TODO: check if this is correct
-      );
+      return isLayerTable(table);
     });
   }
 

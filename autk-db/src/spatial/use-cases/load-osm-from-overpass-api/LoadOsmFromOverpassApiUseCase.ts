@@ -37,13 +37,11 @@ export class LoadOsmFromOverpassApiUseCase {
     return [
       {
         source: 'osm',
-        type: 'pointset',
         name: params.outputTableName,
         columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
       },
       {
         source: 'osm',
-        type: 'pointset',
         name: `${params.outputTableName}_boundaries`,
         columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
       },

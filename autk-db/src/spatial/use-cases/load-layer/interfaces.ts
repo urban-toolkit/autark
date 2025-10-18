@@ -1,25 +1,19 @@
-import { BoundingBox } from '../../../shared/interfaces';
+import { BoundingBox, Table } from '../../../shared/interfaces';
 
-export type LayerType =
-  | 'surface'
-  | 'water'
-  | 'parks'
-  | 'roads'
-  | 'buildings'
-  | 'lines'
-  | 'boundaries'
-  | 'heatmap';
-
-export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'water', 'parks', 'roads', 'buildings', 'lines', 'boundaries', 'heatmap'].includes(
-    value,
-  );
+export function isLayerTable(table: Table): boolean {
+  return table.source === 'osm_layer' || table.source === 'geojson';
 }
+
+export function isOsmBuildingTable(table: Table): boolean {
+  return table.source === 'osm_layer' && table.name.endsWith('_buildings');
+}
+
+export type OsmLayerType = 'surface' | 'water' | 'parks' | 'roads' | 'buildings';
 
 export interface Params {
   osmInputTableName: string;
   outputTableName?: string;
-  layer: LayerType;
+  layer: OsmLayerType;
   coordinateFormat?: string;
   boundingBox?: BoundingBox;
 }

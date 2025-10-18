@@ -58,7 +58,6 @@ export class LoadGridLayerUseCase {
 
     return {
       source: 'user',
-      type: 'heatmap',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
     };
