@@ -6,6 +6,7 @@ import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { FeatureCollection } from 'geojson';
 import { BoundingBox } from '../../../shared/interfaces';
+import { mapGeojsonGeometryTypeToLayerType } from '../load-layer/interfaces';
 
 export class LoadCustomLayerUseCase {
   private db: AsyncDuckDB;
@@ -22,7 +23,6 @@ export class LoadCustomLayerUseCase {
     outputTableName,
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
     boundingBox,
-    type,
   }: Params): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
@@ -47,6 +47,18 @@ export class LoadCustomLayerUseCase {
       throw new Error(`Invalid GeoJSON type! Just accepting FeatureCollection for now!`);
     }
 
+    // Extract geometry type from the first feature
+    if (!geojson.features || geojson.features.length === 0) {
+      throw new Error('FeatureCollection is empty - no features found');
+    }
+
+    const firstFeature = geojson.features[0];
+    if (!firstFeature.geometry || !firstFeature.geometry.type) {
+      throw new Error('First feature has no geometry or geometry type');
+    }
+
+    const geometryType = mapGeojsonGeometryTypeToLayerType(firstFeature.geometry.type);
+
     const describeTableResponse = await this.createTableFromFeatureCollection(
       geojson,
       outputTableName,
@@ -56,7 +68,7 @@ export class LoadCustomLayerUseCase {
 
     return {
       source: 'geojson',
-      type: type,
+      type: geometryType,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
       name: outputTableName,
     };
