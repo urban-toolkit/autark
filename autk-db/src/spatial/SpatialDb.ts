@@ -241,7 +241,19 @@ export class SpatialDb {
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
     if (!isLayerType(layerTable.type)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
-    return this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+    const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+
+    const osmBoundingBox = this.getOsmBoundingBox();
+    if (osmBoundingBox) {
+      featureCollection.bbox = [
+        osmBoundingBox.minLon,
+        osmBoundingBox.minLat,
+        osmBoundingBox.maxLon,
+        osmBoundingBox.maxLat,
+      ];
+    }
+
+    return featureCollection;
   }
 
   /**
@@ -288,8 +300,8 @@ export class SpatialDb {
   getLayerTables(): Array<LayerTable | CustomLayerTable> {
     return this.tables.filter((table): table is LayerTable | CustomLayerTable => {
       return (
-        (table.source === 'osm' && isLayerType(table.type)) || 
-        (table.source === 'geojson' && isLayerType(table.type)) || 
+        (table.source === 'osm' && isLayerType(table.type)) ||
+        (table.source === 'geojson' && isLayerType(table.type)) ||
         (table.source === 'user' && isLayerType(table.type)) // TODO: check if this is correct
       );
     });
