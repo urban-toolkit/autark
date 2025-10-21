@@ -1,21 +1,21 @@
 
-import { FeatureCollection, Feature } from "geojson";
-import { Triangulator } from "./triangulator";
+import { FeatureCollection, Feature, LineString, MultiLineString, MultiPolygon, Polygon } from "geojson";
 
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
+import { extrudePolygons } from "poly-extrude";
 
 /**
  * Class for triangulating buildings from GeoJSON features.
  * It provides methods to convert different geometry types into building meshes.
  */
-export class TriangulatorBuildings extends Triangulator {
+export class TriangulatorBuildings {
     /**
      * Builds a mesh from GeoJSON features representing buildings.
      * @param {FeatureCollection} geojson The GeoJSON feature collection
      * @param {number[]} origin The origin point for translation
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
      */
-    static override buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
@@ -40,16 +40,16 @@ export class TriangulatorBuildings extends Triangulator {
                 if (!heightInfo.length) { continue; }
 
                 if (feature.geometry.type === 'LineString') {
-                    meshes = Triangulator.lineStringToBuilding(feature, heightInfo, origin);
+                    meshes = TriangulatorBuildings.lineStringToBuildingMesh(feature, heightInfo, origin);
 
                 } else if (feature.geometry.type === 'MultiLineString') {
-                    meshes = Triangulator.multiLineStringToBuilding(feature, heightInfo, origin);
+                    meshes = TriangulatorBuildings.multiLineStringToBuilding(feature, heightInfo, origin);
 
                 } else if (feature.geometry.type === 'Polygon') {
-                    meshes = Triangulator.polygonToBuilding(feature, heightInfo, origin);
+                    meshes = TriangulatorBuildings.polygonToBuilding(feature, heightInfo, origin);
 
                 } else if (feature.geometry.type === 'MultiPolygon') {
-                    meshes = Triangulator.multiPolygonToBuilding(feature, heightInfo, origin);
+                    meshes = TriangulatorBuildings.multiPolygonToBuilding(feature, heightInfo, origin);
 
                 } else {
                     console.warn('Unsupported geometry type:', feature.geometry.type);
@@ -72,6 +72,8 @@ export class TriangulatorBuildings extends Triangulator {
 
         return [mesh, comps];
     }
+
+    //---------------------------------------------------------------------------
 
     /**
      * Groups buildings based on their id.
@@ -135,4 +137,112 @@ export class TriangulatorBuildings extends Triangulator {
 
         return [z_SCALE * min_height, z_SCALE * height];
     }
+
+    //---------------------------------------------------------------------------
+
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
+    static lineStringToBuildingMesh(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <LineString>feature.geometry;
+
+        const coords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+        const result = extrudePolygons([[coords]], { depth: heightInfo[1] - heightInfo[0] });
+
+        const flatCoords = Array.from(result.position).map((cord: number, id: number) => {
+            if (id % 3 === 2) return cord + heightInfo[0];
+            return cord;
+        });
+        const flatIds = Array.from(result.indices);
+
+        return [{ flatCoords, flatIds }];
+    }
+
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
+    static multiLineStringToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <MultiLineString>feature.geometry;
+
+        const meshes = [];
+        for (const lineString of coordinates) {
+
+            const coords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+            const result = extrudePolygons([[coords]],{ depth: heightInfo[1] - heightInfo[0] });
+
+            const flatCoords = Array.from(result.position).map((cord: number, id: number) => {
+                if (id % 3 === 2) return cord + heightInfo[0];
+                return cord;
+            });
+            const flatIds = Array.from(result.indices);
+            meshes.push({ flatCoords, flatIds });
+        }
+
+        return meshes;
+    }
+
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
+    static polygonToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <Polygon>feature.geometry;
+
+        const coords = [];
+        for (let i = 0; i < coordinates.length; i++) {
+            coords.push( coordinates[i].map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]) );
+        }
+
+        const result = extrudePolygons([coords], { depth: heightInfo[1] - heightInfo[0] });
+
+        const flatCoords = Array.from(result.position).map((cord: number, id: number) => {
+            if (id % 3 === 2) return cord + heightInfo[0];
+            return cord;
+        });
+        const flatIds = Array.from(result.indices);
+
+        return [{ flatCoords, flatIds }];
+    }
+
+
+    /**
+     * Converts a LineString feature to a border representation.
+     * @param {Feature} feature The GeoJSON feature representing a LineString
+     * @param {number[]} origin The origin point for translation
+     * @returns {ILayerBorder[]} An array of borders
+     */
+    static multiPolygonToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const meshes = [];
+
+        const { coordinates } = <MultiPolygon>feature.geometry;
+
+        for (const polygon of coordinates) {
+
+            const coords = [];
+            for (let i = 0; i < polygon.length; i++) {
+                coords.push( polygon[i].map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]) );
+            }
+
+            const result = extrudePolygons([coords], { depth: heightInfo[1] - heightInfo[0] });
+
+            const flatCoords = Array.from(result.position).map((cord: number, id: number) => {
+                if (id % 3 === 2) return cord + heightInfo[0];
+                return cord;
+            });
+            const flatIds = Array.from(result.indices);
+            
+            meshes.push({ flatCoords, flatIds });
+        }
+
+        return meshes;
+    }
+
 }

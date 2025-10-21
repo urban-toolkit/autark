@@ -17,8 +17,9 @@ export class MapStyle {
         water: '#bed2d7',
         roads: '#d9b504',
         buildings: '#DFDFDF',
-        boundaries: '#DFDFDF',
-        lines: '#FAFAFA',
+        points: '#7f7f7fff',
+        polylines: '#DFDFDF',
+        polygons: '#DFDFDF',
     };
 
     /**

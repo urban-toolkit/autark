@@ -1,17 +1,17 @@
 /// <reference types="@webgpu/types" />
 
-import trianglesVertexSource from './shaders/triangles.vert.wgsl';
-import trianglesFragmentSource from './shaders/triangles.frag.wgsl';
+import trianglesVertexSource from './shaders/triangle-01.vert.wgsl';
+import trianglesFragmentSource from './shaders/triangle-01.frag.wgsl';
 
-import heatmapVertexSource from './shaders/heatmap.vert.wgsl';
-import heatmapFragmentSource from './shaders/heatmap.frag.wgsl';
+import heatmapVertexSource from './shaders/raster.vert.wgsl';
+import heatmapFragmentSource from './shaders/raster.frag.wgsl';
 
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { Triangles2DLayer } from './layer-triangles2D';
+import { Mesh } from './layer-mesh';
 
 /**
  * PipelineTriangleFlat is a rendering pipeline for drawing flat triangles in 2D space.
@@ -100,9 +100,9 @@ export class PipelineTriangleFlat extends Pipeline {
 
     /**
      * Builds the pipeline with the provided mesh data.
-     * @param {Triangles2DLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {Mesh} mesh The mesh data containing positions, thematic, and indices
      */
-    build(mesh: Triangles2DLayer) {
+    build(mesh: Mesh) {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -134,9 +134,9 @@ export class PipelineTriangleFlat extends Pipeline {
 
     /**
      * Creates the vertex buffers for the pipeline.
-     * @param {Triangles2DLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {Mesh} mesh The mesh data containing positions, thematic, and indices
      */
-    createVertexBuffers(mesh: Triangles2DLayer) {
+    createVertexBuffers(mesh: Mesh) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -175,9 +175,9 @@ export class PipelineTriangleFlat extends Pipeline {
 
     /**
      * Updates the vertex buffers with the provided mesh data.
-     * @param {Triangles2DLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {Mesh} mesh The mesh data containing positions, thematic, and indices
      */
-    updateVertexBuffers(mesh: Triangles2DLayer) {
+    updateVertexBuffers(mesh: Mesh) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
         this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));

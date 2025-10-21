@@ -5,6 +5,7 @@
     "water": "#F6F6F6",
     "roads": "#cbcbcb",
     "buildings": "#DFDFDF",
-    "boundaries": "#DFDFDF",
-    "lines": "#cccccc"
+    "points": "#DFDFDF",
+    "polylines": "#DFDFDF",
+    "polygons": "#DFDFDF"   
 }

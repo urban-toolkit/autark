@@ -7,8 +7,11 @@ export class StandaloneGeojsonVis {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        const geojson = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
-        this.map.loadGeoJsonLayer('neighborhoods', geojson);
+        const neighs = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
+        const points = await fetch('http://localhost:5173/data/mnt_points_test_proj.geojson').then(res => res.json());
+
+        this.map.loadGeoJsonLayer('neighborhoods', neighs);
+        this.map.loadGeoJsonLayer('points', points);
 
         this.map.draw();
     }

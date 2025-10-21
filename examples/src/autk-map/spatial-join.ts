@@ -7,18 +7,15 @@ export class SpatialJoin {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
-    public async run(): Promise<void> {
+    public async run(canvas: HTMLCanvasElement): Promise<void> {
         this.db = new SpatialDb();
         await this.db.init();
 
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
             outputTableName: 'neighborhoods',
-            coordinateFormat: 'EPSG:3395',
-            type: 'boundaries'
+            coordinateFormat: 'EPSG:3395'
         });
-
-        const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
 
         await this.db.loadCsv({
             csvFileUrl: 'http://localhost:5173/data/noise.csv',
@@ -49,23 +46,19 @@ export class SpatialJoin {
             },
         });
 
-        const canvas = document.querySelector('canvas');
-        if (canvas) {
-            this.map = new AutkMap(canvas);
-            await this.map.init(boundingBox);
+        this.map = new AutkMap(canvas);
+        await this.map.init();
 
-            await this.loadLayers();
-            await this.updateThematicData();
+        await this.loadLayers();
+        await this.updateThematicData();
 
-            this.map.draw();
-        }
+        this.map.draw();
     }
 
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
-
+            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -84,6 +77,12 @@ export class SpatialJoin {
 
 async function main() {
     const example = new SpatialJoin();
-    await example.run();
+
+    const canvas = document.querySelector('canvas');
+    if (!canvas) {
+        throw new Error('No canvas found');
+    }
+
+    await example.run(canvas);
 }
 main();

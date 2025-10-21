@@ -1,10 +1,8 @@
-import { FeatureCollection } from "geojson";
+import { BBox, FeatureCollection } from "geojson";
 
-import { IBoundingBox } from "./interfaces";
+export class LayerBbox  {
 
-export class BboxBuilder  {
-
-    static buildBbox(features: FeatureCollection): IBoundingBox {
+    static build(features: FeatureCollection): BBox {
         if (features.features.length === 0) {
             throw new Error("Feature collection is empty");
         }
@@ -13,21 +11,21 @@ export class BboxBuilder  {
 
         switch (type) {
             case "Point":
-                return BboxBuilder.buildFromPoints(features);
+                return LayerBbox.buildFromPoints(features);
             case "LineString":
-                return BboxBuilder.buildFromLines(features);
+                return LayerBbox.buildFromLines(features);
             case "MultiLineString":
-                return BboxBuilder.buildFromMultiLines(features);
+                return LayerBbox.buildFromMultiLines(features);
             case "Polygon":
-                return BboxBuilder.buildFromPolygons(features);
+                return LayerBbox.buildFromPolygons(features);
             case "MultiPolygon":
-                return BboxBuilder.buildFromMultiPolygons(features);
+                return LayerBbox.buildFromMultiPolygons(features);
             default:
                 throw new Error(`Unsupported geometry type: ${type}`);
         }
     }
 
-    static buildFromPoints(points : FeatureCollection) : IBoundingBox {
+    static buildFromPoints(points : FeatureCollection) : BBox {
         let minLon = Number.POSITIVE_INFINITY;
         let minLat = Number.POSITIVE_INFINITY;
         let maxLon = Number.NEGATIVE_INFINITY;
@@ -47,12 +45,10 @@ export class BboxBuilder  {
             }
         }
 
-        return {
-            minLon, minLat, maxLon, maxLat
-        };
+        return [minLon, minLat, maxLon, maxLat];
     }
 
-    static buildFromLines(lines : FeatureCollection) : IBoundingBox {
+    static buildFromLines(lines : FeatureCollection) : BBox {
         let minLon = Number.POSITIVE_INFINITY;
         let minLat = Number.POSITIVE_INFINITY;
         let maxLon = Number.NEGATIVE_INFINITY;
@@ -74,12 +70,10 @@ export class BboxBuilder  {
             }
         }
 
-        return {
-            minLon, minLat, maxLon, maxLat
-        };
+        return [minLon, minLat, maxLon, maxLat];
     }
 
-    static buildFromMultiLines(multiLines : FeatureCollection) : IBoundingBox {
+    static buildFromMultiLines(multiLines : FeatureCollection) : BBox {
         let minLon = Number.POSITIVE_INFINITY;
         let minLat = Number.POSITIVE_INFINITY;
         let maxLon = Number.NEGATIVE_INFINITY;
@@ -103,12 +97,10 @@ export class BboxBuilder  {
             }
         }
 
-        return {
-            minLon, minLat, maxLon, maxLat
-        };
+        return [minLon, minLat, maxLon, maxLat];
     }
 
-    static buildFromPolygons(polygons : FeatureCollection) : IBoundingBox {
+    static buildFromPolygons(polygons : FeatureCollection) : BBox {
         let minLon = Number.POSITIVE_INFINITY;
         let minLat = Number.POSITIVE_INFINITY;
         let maxLon = Number.NEGATIVE_INFINITY;
@@ -132,12 +124,10 @@ export class BboxBuilder  {
             }
         }
 
-        return {
-            minLon, minLat, maxLon, maxLat
-        };
+        return [minLon, minLat, maxLon, maxLat];
     }
 
-    static buildFromMultiPolygons(multiPolygons : FeatureCollection) : IBoundingBox {
+    static buildFromMultiPolygons(multiPolygons : FeatureCollection) : BBox {
         let minLon = Number.POSITIVE_INFINITY;
         let minLat = Number.POSITIVE_INFINITY;
         let maxLon = Number.NEGATIVE_INFINITY;
@@ -163,8 +153,6 @@ export class BboxBuilder  {
             }
         }
 
-        return {
-            minLon, minLat, maxLon, maxLat
-        };
+        return [minLon, minLat, maxLon, maxLat];
     }
 }

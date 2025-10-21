@@ -1,25 +1,17 @@
 import { 
-    Feature,
-    Polygon
+    BBox
 } from 'geojson';
 
-import {
-    polygon
-} from '@turf/turf';
-
 import { 
-    IBoundingBox,
     ILayerData,
     ILayerInfo,
     ILayerRenderInfo
 } from './interfaces';
 
 import { Layer } from './layer';
-import { Triangles2DBorder } from './layer-triangles2D-borders';
-import { Triangles2DLayer } from './layer-triangles2D';
+import { LayerType } from './constants';
 import { Triangles3DLayer } from './layer-triangles3D';
-
-import { LayerGeometryType } from './constants';
+import { Triangles2DLayer } from './layer-triangles2D';
 
 /**
  * Manages the layers of the map.
@@ -36,9 +28,9 @@ export class LayerManager {
 
     /**
      * Bounding box of the map.
-     * @type {Feature<Polygon>}
+     * @type {BBox}
      */
-    protected _bbox!: Feature<Polygon>;
+    protected _bbox!: BBox;
 
     /**
      * Origin of the map.
@@ -80,34 +72,26 @@ export class LayerManager {
 
     /**
      * Get the bounding box of the map.
-     * @returns {Feature<Polygon>} - The bounding box as a GeoJSON polygon.
+     * @returns {BBox} - The bounding box as a GeoJSON polygon.
      */
-    get boundingBox(): Feature<Polygon> {
+    get boundingBox(): BBox {
         return this._bbox;
     }
 
     /**
      * Set the bounding box of the map.
      * TODO: Receive a Feature<Polygon> instead of IBoundingBox
-     * @param {IBoundingBox} bbox - The bounding box to set.
+     * @param {BBox} bbox - The bounding box to set.
      */
-    set boundingBox(bbox: IBoundingBox) {
-        this.origin = [(bbox.maxLon + bbox.minLon) * 0.5, (bbox.maxLat + bbox.minLat) * 0.5];
+    set boundingBox(bbox: BBox) {
+        this.origin = [(bbox[2] + bbox[0]) * 0.5, (bbox[3] + bbox[1]) * 0.5];
 
-        const xmin = (bbox.minLon - this._origin[0]) * 1.05;
-        const xmax = (bbox.maxLon - this._origin[0]) * 1.05;
-        const ymin = (bbox.minLat - this._origin[1]) * 1.05;
-        const ymax = (bbox.maxLat - this._origin[1]) * 1.05;
+        const xmin = (bbox[0] - this._origin[0]) * 1.05;
+        const xmax = (bbox[2] - this._origin[0]) * 1.05;
+        const ymin = (bbox[1] - this._origin[1]) * 1.05;
+        const ymax = (bbox[3] - this._origin[1]) * 1.05;
 
-        this._bbox = polygon([
-            [
-                [xmin, ymin],
-                [xmin, ymax],
-                [xmax, ymax],
-                [xmax, ymin],
-                [xmin, ymin],
-            ],
-        ]);
+        this._bbox = [xmin, ymin, xmax, ymax];
     }
 
     /**
@@ -120,19 +104,12 @@ export class LayerManager {
     public addLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): Layer | null {
         let layer = null;
 
-        // loads based on type
-        switch (layerInfo.typeGeometry) {
-            case LayerGeometryType.AUTK_2D_LINES:
-                layer = new Triangles2DBorder(layerInfo, layerRender, layerData);
-                break;
-            case LayerGeometryType.AUTK_2D_TRIANGLES:
-                layer = new Triangles2DLayer(layerInfo, layerRender, layerData);
-                break;
-            case LayerGeometryType.AUTK_3D_TRIANGLES:
+        switch (layerInfo.typeLayer) {
+            case LayerType.AUTK_OSM_BUILDINGS:
                 layer = new Triangles3DLayer(layerInfo, layerRender, layerData);
                 break;
             default:
-                console.error(`File ${layerInfo.id}.json has an unknown layer geometry: ${layerInfo.typeGeometry}.`);
+                layer = new Triangles2DLayer(layerInfo, layerRender, layerData);
                 break;
         }
 
@@ -175,5 +152,46 @@ export class LayerManager {
             }
         }
         return layer;
+    }
+
+    /**
+     * Computes the Z-index for a given layer type.
+     * @param {LayerType} layerType - The type of the layer.
+     * @returns {number} - The computed Z-index.
+     */
+    public computeLayerZindex(layerType: LayerType): number {
+        let zIndex = 0;
+        
+        switch (layerType) {
+            case LayerType.AUTK_OSM_SURFACE:
+                zIndex = 0;
+                break;
+            case LayerType.AUTK_OSM_PARKS:
+                zIndex = 0.1;
+                break;
+            case LayerType.AUTK_OSM_WATER:
+                zIndex = 0.2;
+                break;
+            case LayerType.AUTK_OSM_ROADS:
+                zIndex = 0.3;
+                break;
+            case LayerType.AUTK_OSM_BUILDINGS:
+                zIndex = 1.0;
+                break;
+            case LayerType.AUTK_RASTER:
+                zIndex = 0.4;
+                break;
+            case LayerType.AUTK_GEO_POLYGONS:
+                zIndex = 0.5;
+                break;
+            case LayerType.AUTK_GEO_POLYLINES:
+                zIndex = 0.6;
+                break;
+            case LayerType.AUTK_GEO_POINTS:
+                zIndex = 0.7;
+                break;
+        }
+
+        return zIndex;
     }
 }
