@@ -1,0 +1,11 @@
+{"type":"FeatureCollection", "features": [
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8235689.661916239,4941133.086480956]},"properties":{"National Park":"Abraham Lincoln Birthplace NHS","$ Obligated":"$34,584","State":"KY"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8233907.261508302,4953980.916812634]},"properties":{"National Park":"Acadia","$ Obligated":"$102,631","State":"ME"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8228992.361152536,4963117.722755777]},"properties":{"National Park":"Andersonville","$ Obligated":"$65,133","State":"GA"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8231082.869932147,4959468.200253735]},"properties":{"National Park":"Andrew Johnson ","$ Obligated":"$17,949","State":"TN"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8235343.370243398,4945524.022853718]},"properties":{"National Park":"Antietam","$ Obligated":"$54,743","State":"MD"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8234831.390799624,4945505.301834747]},"properties":{"National Park":"Appomattox Court House","$ Obligated":"$12,651","State":"VA"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8237083.306473814,4950807.393570352]},"properties":{"National Park":"Assateague Island","$ Obligated":"$51,921","State":"MD"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8230906.743392642,4952012.324078772]},"properties":{"National Park":"Big Bend","$ Obligated":"$535,983","State":"TX"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[-8231327.443466321,4954006.278607374]},"properties":{"National Park":"Big South Fork National River and Recreation Area","$ Obligated":"$3,009","State":"TN, KY"}}
+]}

@@ -2,7 +2,7 @@ import { ILayerInfo, ILayerRenderInfo, ILayerData } from './interfaces';
 
 import { Renderer } from './renderer';
 
-import { Triangles2DLayer } from './layer-triangles2D';
+import { Mesh } from './layer-mesh';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
@@ -10,7 +10,7 @@ import { PipelineTrianglePicking } from './pipeline-triangle-picking';
  * Triangles3DLayer class extends Triangles2DLayer to handle rendering of 3D triangles layers.
  * It manages the normals and creates a specific rendering pipeline for 3D triangles.
  */
-export class Triangles3DLayer extends Triangles2DLayer {
+export class Triangles3DLayer extends Mesh {
     /**
      * Normals of the triangles.
      * @type {number[]}

@@ -13,16 +13,13 @@ export class GeojsonVis {
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
             outputTableName: 'roads',
-            coordinateFormat: 'EPSG:3395',
-            type: 'lines'
+            coordinateFormat: 'EPSG:3395'
         });
-
-        const boundingBox = await this.db.getBoundingBoxFromLayer('roads');
 
         this.map = new AutkMap(canvas);
         MapStyle.setPredefinedStyle('light');
 
-        await this.map.init(boundingBox);
+        await this.map.init();
         await this.loadLayers();
         await this.updateThematicData('roads');
 
@@ -32,15 +29,13 @@ export class GeojsonVis {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
-
+            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
 
     protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false): Promise<void> {
         const geojson = await this.db.getLayer(layer);
-        console.log( { geojson  } )
 
         const getFnv = (feature: Feature): string => {
             const properties = feature.properties as GeoJsonProperties;

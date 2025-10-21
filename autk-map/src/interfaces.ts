@@ -1,7 +1,6 @@
 import {
     ColorHEX,
     ColorMapInterpolator,
-    LayerGeometryType,
     LayerType,
     RenderPipeline,
     ThematicAggregationLevel,
@@ -25,8 +24,9 @@ export interface IMapStyle {
     water: ColorHEX;
     roads: ColorHEX;
     buildings: ColorHEX;
-    boundaries: ColorHEX;
-    lines: ColorHEX;
+    points: ColorHEX;
+    polylines: ColorHEX;
+    polygons: ColorHEX;
 }
 
 /**
@@ -39,7 +39,6 @@ export interface IMapStyle {
 export interface ILayerInfo {
     id: string;
     zValue: number;
-    typeGeometry: LayerGeometryType;
     typeLayer: LayerType;
 }
 
@@ -146,18 +145,4 @@ export interface ICameraData {
     up: number[];
     eye: number[];
     lookAt: number[];
-}
-
-/**
- * Interface for Bounding Box.
- * @property {number} minLon - Minimum longitude of the bounding box.
- * @property {number} minLat - Minimum latitude of the bounding box.
- * @property {number} maxLon - Maximum longitude of the bounding box.
- * @property {number} maxLat - Maximum latitude of the bounding box.
- */
-export interface IBoundingBox {
-    minLon: number;
-    minLat: number;
-    maxLon: number;
-    maxLat: number;
 }
