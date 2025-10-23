@@ -38,7 +38,7 @@ export interface IMapStyle {
  */
 export interface ILayerInfo {
     id: string;
-    zValue: number;
+    zIndex: number;
     typeLayer: LayerType;
 }
 
@@ -69,6 +69,7 @@ export interface ILayerRenderInfo {
  * @property {ILayerComponent[]} components - Array of components for the layer.
  * @property {ILayerBorder[]} [border] - Array of borders for the layer.
  * @property {ILayerBorderComponent[]} [borderComponents] - Array of border components for the layer.
+ * @property {IRasterData} [raster] - Raster data for the layer.
  * @property {ILayerThematic[]} [thematic] - Thematic data for the layer.
  * @property {number[]} [highlighted] - Indices of highlighted components in the layer.
  */
@@ -77,6 +78,7 @@ export interface ILayerData {
     components: ILayerComponent[];
     border?: ILayerBorder[];
     borderComponents?: ILayerBorderComponent[];
+    raster?: IRasterData[];
     thematic?: ILayerThematic[];
     highlighted?: number[];
 }
@@ -86,11 +88,13 @@ export interface ILayerData {
  * @property {number[]} position - Array of positions for the geometry.
  * @property {number[]} [normal] - Optional array of normals for the geometry.
  * @property {number[]} [indices] - Optional array of indices for the geometry.
+ * @property {number[]} [texCoord] - Optional array of texture coordinates for the geometry.
  */
 export interface ILayerGeometry {
     position: number[];
     normal?: number[];
     indices?: number[];
+    texCoord?: number[];
 }
 
 /**
@@ -104,6 +108,18 @@ export interface ILayerThematic {
 }
 
 /**
+ * Interface for raster data.
+ * @property {number} width - Width of the raster.
+ * @property {number} height - Height of the raster.
+ * @property {number[]} values - Array of raster values.
+ */
+export interface IRasterData {
+    resX: number;
+    resY: number;
+    values: number[];
+}
+
+/**
  * Interface for layer components.
  * @property {number} nPoints - Number of points in the layer component.
  * @property {number} nTriangles - Number of triangles in the layer component.
@@ -112,7 +128,6 @@ export interface ILayerComponent {
     nPoints: number;
     nTriangles: number;
 }
-
 
 /**
  * Interface for layer border information.
@@ -133,7 +148,6 @@ export interface ILayerBorderComponent {
     nPoints: number;
     nLines: number;
 }
-
 
 /**
  * Interface for camera data.

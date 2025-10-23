@@ -1,5 +1,13 @@
-import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
-import { RenderPipeline, ThematicAggregationLevel } from './constants';
+import { ThematicAggregationLevel } from './constants';
+
+import { 
+    ILayerComponent, 
+    ILayerData, 
+    ILayerGeometry, 
+    ILayerInfo, 
+    ILayerRenderInfo, 
+    ILayerThematic 
+} from './interfaces';
 
 import { Layer } from './layer';
 
@@ -11,15 +19,17 @@ import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
 /**
- * Mesh class extends Layer to handle triangulations.
+ * Vector layer class extends Layer to handle vector data.
  * It manages the positions, thematic data, indices, and components of the layer, as well as the rendering pipelines.
  */
-export class Mesh extends Layer {
+export abstract class VectorLayer extends Layer {
     /**
-     * Dimension of the layer (2 for a 2D layer).
+     * Dimension of the layer.
      * @type {number}
      */
     protected _dimension: number;
+
+
 
     /**
      * Positions of the triangles.
@@ -45,6 +55,36 @@ export class Mesh extends Layer {
      */
     protected _components: ILayerComponent[] = [];
 
+
+
+    /**
+     * Highlighted IDs of the layer.
+     * This is a set to ensure uniqueness of highlighted IDs.
+     * @type {Set<number>}
+     */
+    protected _highlightedIds!: Set<number>;
+
+    /**
+     * Highlighted vertices of the layer.
+     * @type {number[]}
+     */
+    protected _highlightedVertices!: number[];
+
+    /**
+     * Skipped IDs of the layer.
+     * This is a set to ensure uniqueness of skipped IDs.
+     * @type {Set<number>}
+     */
+    protected _skippedIds!: Set<number>;
+
+    /**
+     * Skipped vertices of the layer.
+     * @type {number[]}
+     */
+    protected _skippedVertices!: number[];
+
+
+
     /**
      * Rendering pipeline for the layer.
      * @type {Pipeline}
@@ -57,6 +97,9 @@ export class Mesh extends Layer {
      */
     protected _pipelinePicking!: PipelineTrianglePicking;
 
+
+
+
     /**
      * Constructor for Triangles2DLayer
      * @param {ILayerInfo} layerInfo - The layer information.
@@ -66,10 +109,13 @@ export class Mesh extends Layer {
      */
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
         super(layerInfo, layerRenderInfo);
-        this._dimension = dimension;
 
-        this.loadData(layerData);
+        this._dimension = dimension;
+        this.loadLayerData(layerData);
     }
+
+
+
 
     /**
      * Get the positions of the triangles.
@@ -104,37 +150,45 @@ export class Mesh extends Layer {
     }
 
     /**
-     * Get the picked ID at the specified screen coordinates.
-     * @param x - The x-coordinate of the screen position.
-     * @param y - The y-coordinate of the screen position.
-     * @returns {Promise<number>} - A promise that resolves to the picked ID.
+     * Gets the IDs of the highlighted components in the layer.
+     * @returns {number[]} The highlighted IDs.
      */
-    public getPickedId(x: number, y: number): Promise<number> {
-        return this._pipelinePicking.readPickedId(x, y);
+    get highlightedIds(): number[] {
+        return Array.from(this._highlightedIds);
     }
 
     /**
-     * Create the rendering pipeline for the layer.
-     * @param {Renderer} renderer - The renderer instance.
+     * Gets the highlighted vertices of the layer.
+     * @returns {number[]} The highlighted vertices.
      */
-    public createPipeline(renderer: Renderer): void {
-        if (this.layerRenderInfo.pipeline === RenderPipeline.TRIANGLE_FLAT) {
-            this._pipeline = new PipelineTriangleFlat(renderer);
-        }
-        else if (this.layerRenderInfo.pipeline === RenderPipeline.TRIANGLE_HEATMAP) {
-            this._pipeline = new PipelineTriangleFlat(renderer, 'heatmap');
-        }
-        this._pipeline.build(this);
-
-        this._pipelinePicking = new PipelineTrianglePicking(renderer);
-        this._pipelinePicking.build(this);
+    get highlightedVertices(): number[] {
+        return this._highlightedVertices;
     }
+
+    /**
+     * Gets the IDs of the skipped components in the layer.
+     * @returns {number[]} The skipped IDs.
+     */
+    get skippedIds(): number[] {
+        return Array.from(this._skippedIds);
+    }
+
+    /**
+     * Gets the skipped vertices of the layer.
+     * @returns {number[]} The skipped vertices.
+     */
+    get skippedVertices(): number[] {
+        return this._skippedVertices;
+    }
+
+
+
 
     /**
      * Load the layer data, including geometry and components.
      * @param {ILayerData} layerData - The data associated with the layer.
      */
-    public loadData(layerData: ILayerData): void {
+    public loadLayerData(layerData: ILayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
 
@@ -170,14 +224,14 @@ export class Mesh extends Layer {
                     position.push(d);
 
                     if (id % 2 === 1) {
-                        const z = this._layerInfo.zValue;
+                        const z = this._layerInfo.zIndex;
                         position.push(z);
                     }
                 }
 
                 if (this._dimension === 3) {
                     if (id % 3 === 2) {
-                        d += this._layerInfo.zValue;
+                        d += this._layerInfo.zIndex;
                     }
 
                     position.push(d);
@@ -244,6 +298,21 @@ export class Mesh extends Layer {
         this._thematic = thematic;
     }
 
+
+
+
+    /**
+     * Create the rendering pipeline for the layer.
+     * @param {Renderer} renderer - The renderer instance.
+     */
+    public createPipeline(renderer: Renderer): void {
+        this._pipeline = new PipelineTriangleFlat(renderer);
+        this._pipeline.build(this);
+
+        this._pipelinePicking = new PipelineTrianglePicking(renderer);
+        this._pipelinePicking.build(this);
+    }
+
     /**
      * Render the layer for the current pass.
      * @param {Camera} camera - The camera instance.
@@ -254,9 +323,9 @@ export class Mesh extends Layer {
             this._renderInfoIsDirty = false;
         }
 
-        if (this._dataInfoIsDirty) {
+        if (this._dataIsDirty) {
             this._pipeline.updateVertexBuffers(this);
-            this._dataInfoIsDirty = false;
+            this._dataIsDirty = false;
         }
 
         this._pipeline.renderPass(camera);
@@ -270,6 +339,19 @@ export class Mesh extends Layer {
         this._pipelinePicking.renderPass(camera);
     }
 
+
+
+
+    /**
+     * Get the picked ID at the specified screen coordinates.
+     * @param x - The x-coordinate of the screen position.
+     * @param y - The y-coordinate of the screen position.
+     * @returns {Promise<number>} - A promise that resolves to the picked ID.
+     */
+    public getPickedId(x: number, y: number): Promise<number> {
+        return this._pipelinePicking.readPickedId(x, y);
+    }
+
     /**
      * Set highlighted IDs for the layer.
      * @param {number[]} ids - The IDs to highlight.
@@ -277,7 +359,7 @@ export class Mesh extends Layer {
     public setHighlightedIds(ids: number[]): void {
         // If id is already in highlightedIds, remove it (i.e., toggle it off)
         ids.forEach(id => {
-            if(this._highlightedIds.has(id)) {
+            if (this._highlightedIds.has(id)) {
                 this._highlightedIds.delete(id);
             }
             else {
@@ -303,9 +385,8 @@ export class Mesh extends Layer {
         }
 
         this.makeLayerRenderInfoDirty();
-        this.makeLayerDataInfoDirty();
+        this.makeLayerDataDirty();
     }
-
 
     /**
      * Set skipped IDs for the layer.
@@ -314,7 +395,7 @@ export class Mesh extends Layer {
     public setSkippedIds(ids: number[]): void {
         // If id is already in skippedIds, remove it (i.e., toggle it off)
         ids.forEach(id => {
-            if(this._skippedIds.has(id)) {
+            if (this._skippedIds.has(id)) {
                 this._skippedIds.delete(id);
             }
             else {
@@ -340,8 +421,32 @@ export class Mesh extends Layer {
         }
 
         this.makeLayerRenderInfoDirty();
-        this.makeLayerDataInfoDirty();
+        this.makeLayerDataDirty();
     }
+
+    /**
+     * Clears the highlighted components of the layer.
+     */
+    public clearHighlightedIds() {
+        this._highlightedVertices.fill(0);
+        this._highlightedIds.clear();
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataDirty();
+    }
+
+    /**
+     * Clears the skipped components of the layer.
+     */
+    public clearSkippedIds() {
+        this._skippedVertices.fill(0);
+        this._skippedIds.clear();
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataDirty();
+    }
+
+
 
 
     /**

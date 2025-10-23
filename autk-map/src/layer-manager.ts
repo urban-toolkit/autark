@@ -8,8 +8,9 @@ import {
     ILayerRenderInfo
 } from './interfaces';
 
-import { Layer } from './layer';
 import { LayerType } from './constants';
+import { RasterLayer } from './layer-raster';
+import { VectorLayer } from './layer-vector';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
 
@@ -21,10 +22,16 @@ import { Triangles2DLayer } from './layer-triangles2D';
  */
 export class LayerManager {
     /**
-     * List of layers in the map.
-     * @type {Layer[]}
+     * List of vector layers in the map.
+     * @type {VectorLayer[]}
      */
-    protected _layers: Layer[] = [];
+    protected _vectorLayers: VectorLayer[] = [];
+
+    /**
+     * List of raster layers in the map.
+     * @type {RasterLayer[]}
+     */
+    protected _rasterLayers: RasterLayer[] = [];
 
     /**
      * Bounding box of the map.
@@ -39,19 +46,27 @@ export class LayerManager {
     protected _origin!: number[];
 
     /**
-     * Get the layers of the map.
-     * @returns {Layer[]} - The list of layers.
+     * Constructor for LayerManager
      */
-    get layers(): Layer[] {
-        return this._layers;
+    constructor() {
+        this._vectorLayers = [];
+        this._rasterLayers = [];
     }
 
     /**
-     * Get the number of layers.
-     * @returns {number} - The number of layers.
+     * Get the vetor layers of the map.
+     * @returns {Layer[]} - The list of layers.
      */
-    get length(): number {
-        return this._layers.length;
+    get vectorLayers(): VectorLayer[] {
+        return this._vectorLayers;
+    }
+
+    /**
+     * Get the raster layers of the map.
+     * @returns {Layer[]} - The list of layers.
+     */
+    get rasterLayers(): RasterLayer[] {
+        return this._rasterLayers;
     }
 
     /**
@@ -63,35 +78,23 @@ export class LayerManager {
     }
 
     /**
-     * Set the origin of the map.
-     * @param {number[]} origin - The origin coordinates in meters.
-     */
-    set origin(origin: number[]) {
-        this._origin = origin;
-    }
-
-    /**
      * Get the bounding box of the map.
      * @returns {BBox} - The bounding box as a GeoJSON polygon.
      */
-    get boundingBox(): BBox {
+    get bboxAndOrigin(): BBox {
         return this._bbox;
     }
 
     /**
-     * Set the bounding box of the map.
-     * TODO: Receive a Feature<Polygon> instead of IBoundingBox
+     * Set the origin and the bounding box of the map.
      * @param {BBox} bbox - The bounding box to set.
      */
-    set boundingBox(bbox: BBox) {
-        this.origin = [(bbox[2] + bbox[0]) * 0.5, (bbox[3] + bbox[1]) * 0.5];
-
-        const xmin = (bbox[0] - this._origin[0]) * 1.05;
-        const xmax = (bbox[2] - this._origin[0]) * 1.05;
-        const ymin = (bbox[1] - this._origin[1]) * 1.05;
-        const ymax = (bbox[3] - this._origin[1]) * 1.05;
-
-        this._bbox = [xmin, ymin, xmax, ymax];
+    set bboxAndOrigin(bbox: BBox) {
+        this._bbox = bbox;
+        this._origin = [
+            (bbox[2] + bbox[0]) * 0.5,
+            (bbox[3] + bbox[1]) * 0.5
+        ];
     }
 
     /**
@@ -101,7 +104,7 @@ export class LayerManager {
      * @param {ILayerData} layerData - The data associated with the layer.
      * @returns {Layer | null} - The created layer or null if the type is unknown.
      */
-    public addLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): Layer | null {
+    public addVectorLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): VectorLayer | null {
         let layer = null;
 
         switch (layerInfo.typeLayer) {
@@ -114,8 +117,33 @@ export class LayerManager {
         }
 
         if (layer) {
-            this._layers.push(layer);
-            this._layers.sort((a, b) => a.layerInfo.zValue - b.layerInfo.zValue);
+            this._vectorLayers.push(layer);
+            this._vectorLayers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+
+            return layer;
+        }
+        return null;
+    }
+
+    /**
+     * Adds a raster layer to the map.
+     * @param {ILayerInfo} layerInfo - The information about the layer.
+     * @param {ILayerRenderInfo} layerRender - The rendering information for the layer.
+     * @param {ILayerData} layerData - The data associated with the layer.
+     * @returns {Layer | null} - The created layer or null if the type is unknown.
+     */
+    public addRasterLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): RasterLayer | null {
+        let layer = null;
+
+        switch (layerInfo.typeLayer) {
+            case LayerType.AUTK_RASTER:
+                layer = new RasterLayer(layerInfo, layerRender, layerData);
+                break;
+        }
+
+        if (layer) {
+            this._rasterLayers.push(layer);
+            this._rasterLayers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
 
             return layer;
         }
@@ -128,11 +156,20 @@ export class LayerManager {
      */
     delLayer(layerId: string): void {
         // searches the layer
-        for (let lId = 0; lId < this._layers.length; lId++) {
-            const lay = this._layers[lId];
-            if (lay.id === layerId) {
-                this.layers.splice(lId, 1);
-                break;
+        for (let lId = 0; lId < this._vectorLayers.length; lId++) {
+            const lay = this._vectorLayers[lId];
+            if (lay.layerInfo.id === layerId) {
+                this.vectorLayers.splice(lId, 1);
+                return;
+            }
+        }
+
+        // searches the layer
+        for (let lId = 0; lId < this._rasterLayers.length; lId++) {
+            const lay = this._rasterLayers[lId];
+            if (lay.layerInfo.id === layerId) {
+                this._rasterLayers.splice(lId, 1);
+                return;
             }
         }
     }
@@ -142,15 +179,24 @@ export class LayerManager {
      * @param {string} layerId - The ID of the layer to search for.
      * @returns {Layer | null} - The found layer or null if not found.
      */
-    public searchByLayerId(layerId: string): Layer | null {
+    public searchByLayerId(layerId: string): VectorLayer | RasterLayer | null {
         // searches the layer
         let layer = null;
-        for (const lay of this.layers) {
-            if (lay.id === layerId) {
+
+        for (const lay of this.vectorLayers) {
+            if (lay.layerInfo.id === layerId) {
                 layer = lay;
                 break;
             }
         }
+
+        for (const lay of this.rasterLayers) {
+            if (lay.layerInfo.id === layerId) {
+                layer = lay;
+                break;
+            }
+        }
+
         return layer;
     }
 
@@ -159,7 +205,7 @@ export class LayerManager {
      * @param {LayerType} layerType - The type of the layer.
      * @returns {number} - The computed Z-index.
      */
-    public computeLayerZindex(layerType: LayerType): number {
+    public computeZindex(layerType: LayerType): number {
         let zIndex = 0;
         
         switch (layerType) {

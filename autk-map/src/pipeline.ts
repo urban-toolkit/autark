@@ -20,6 +20,7 @@ export abstract class Pipeline {
      */
     protected _renderer: Renderer;
 
+
     /**
      * ModelView matrix uniform buffer
      */
@@ -30,6 +31,8 @@ export abstract class Pipeline {
      */
     protected _projcBuffer!: GPUBuffer;
 
+
+
     /**
      * Camera bind group
      */
@@ -39,6 +42,8 @@ export abstract class Pipeline {
      * Camera bind group layout
      */
     protected _cameraBindGroupLayout!: GPUBindGroupLayout;
+
+
 
     /**
      * Color uniform buffer
@@ -51,6 +56,14 @@ export abstract class Pipeline {
     protected _highlightColorBuffer!: GPUBuffer;
 
     /**
+     * Color map texture
+     */
+    protected _cMapTexture!: GPUTexture;
+
+
+
+
+    /**
      * Use color map uniform buffer
      */
     protected _useColorMap!: GPUBuffer;
@@ -61,24 +74,25 @@ export abstract class Pipeline {
     protected _useHighlight!: GPUBuffer;
 
     /**
-     * Color map texture
-     */
-    protected _cMapTexture!: GPUTexture;
-
-    /**
      * Opacity uniform buffer
      */
     protected _opacity!: GPUBuffer;
 
-    /**
-     * Colors bind group
-     */
-    protected _colorsBindGroup!: GPUBindGroup;
+
+
 
     /**
-     * Colors bind group layout
+     * Render information bind group
      */
-    protected _colorsBindGroupLayout!: GPUBindGroupLayout;
+    protected _renderInfoBindGroup!: GPUBindGroup;
+
+    /**
+     * Render information bind group layout
+     */
+    protected _renderInfoBindGroupLayout!: GPUBindGroupLayout;
+
+
+
 
     /**
      * Pipeline constructor
@@ -87,6 +101,8 @@ export abstract class Pipeline {
     constructor(renderer: Renderer) {
         this._renderer = renderer;
     }
+
+
 
     /**
      * Creates the camera uniform bind group.
@@ -146,6 +162,8 @@ export abstract class Pipeline {
         this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
     }
 
+
+
     /**
      * Creates the color uniform bind group.
      */
@@ -195,7 +213,7 @@ export abstract class Pipeline {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
-        this._colorsBindGroupLayout = this._renderer.device.createBindGroupLayout({
+        this._renderInfoBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [
                 {
                     binding: 0, // fixed color
@@ -235,8 +253,8 @@ export abstract class Pipeline {
             ],
         });
 
-        this._colorsBindGroup = this._renderer.device.createBindGroup({
-            layout: this._colorsBindGroupLayout,
+        this._renderInfoBindGroup = this._renderer.device.createBindGroup({
+            layout: this._renderInfoBindGroupLayout,
             entries: [
                 {
                     binding: 0,
@@ -303,6 +321,8 @@ export abstract class Pipeline {
         );
         this._renderer.device.queue.writeBuffer(this._opacity, 0, opacity);
     }
+
+
 
     /**
      * Builds the pipeline.
