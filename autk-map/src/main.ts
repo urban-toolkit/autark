@@ -11,7 +11,6 @@ import {
 import {
     ColorMapInterpolator,
     LayerType,
-    // LayerRenderOrder,
     MapEvent,
     RenderPipeline,
     ThematicAggregationLevel,
@@ -41,6 +40,8 @@ import { AutkMapUi } from './map-ui';
 import { LayerBbox } from './layer-bbox';
 
 import { polygonize } from '@turf/turf';
+import { VectorLayer } from './layer-vector';
+import { RasterLayer } from './layer-raster';
 
 /**
  * The main autark map class.
@@ -173,10 +174,10 @@ export class AutkMap {
      * @returns {Bbox} The bounding box
      */
     get boundingBox(): BBox {
-        return this._layerManager.boundingBox;
+        return this._layerManager.bboxAndOrigin;
     }
     set boundingBox(bbox: BBox) {
-        this._layerManager.boundingBox = bbox;
+        this._layerManager.bboxAndOrigin = bbox;
     }
 
     /**
@@ -268,15 +269,39 @@ export class AutkMap {
                 this.createBuildingsLayer(layerName, geojson, typeLayer);
                 break;
 
-            case LayerType.AUTK_RASTER:
-                // this.createRasterLayer(layerName, geojson);
-                break;
-
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
     }
+
+    /**
+     * Loads a GeoTIFF layer into the map.
+     * This method creates a layer based on the provided GeoTIFF data and adds it to the map's layer manager.
+     *
+     * @param layerName The name of the layer
+     * @param geotiff The GeoTIFF data to load
+     * @param typeLayer The type of the layer
+     */
+    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection, typeLayer: LayerType | null = null) {
+
+        // TODO: Validate geotiff input
+        // Allow the user to provide a geotiff and parse using geotiff.js library
+
+        switch (typeLayer) {
+            case LayerType.AUTK_RASTER:
+                this.createRasterLayer(layerName, geotiff);
+            break;
+            default:
+                console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
+            break;
+        }
+
+    }
+
+    // public loadObjLayer(layerName: string, objData: string, typeLayer: LayerType | null = null) {
+
+    // }
 
     /**
      * Updates the thematic information of a layer based on a GeoJSON source.
@@ -357,11 +382,11 @@ export class AutkMap {
      * @param {ILayerThematic[]} layerThematic The thematic information to update
      */
     updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
-        const layer = this._layerManager.searchByLayerId(layerName);
+        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer;
 
         if (layer) {
             layer.loadThematic(layerThematic);
-            layer.makeLayerDataInfoDirty();
+            layer.makeLayerDataDirty();
         }
     }
 
@@ -371,12 +396,12 @@ export class AutkMap {
      * @param {string} layerName The name of the layer
      * @param {ILayerGeometry[]} layerGeometry The geometry data to update
      */
-    updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
-        const layer = this._layerManager.searchByLayerId(layerName);
+    public updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
+        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
 
         if (layer) {
             layer.loadGeometry(layerGeometry);
-            layer.makeLayerDataInfoDirty();
+            layer.makeLayerDataDirty();
         }
     }
 
@@ -387,8 +412,8 @@ export class AutkMap {
      * @param {ILayerRenderInfo} property The property to update
      * @param {unknown} value The new value for the property
      */
-    updateRenderInfoProperty(layerName: string, property: keyof ILayerRenderInfo, value: unknown) {
-        const layer = this._layerManager.searchByLayerId(layerName);
+    public updateRenderInfoProperty(layerName: string, property: keyof ILayerRenderInfo, value: unknown) {
+        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
 
         if (layer) {
             switch (property) {
@@ -403,7 +428,7 @@ export class AutkMap {
                     break;
                 case 'isPick':
                     layer.layerRenderInfo.isPick = value as boolean;
-                    if (value === false) { layer.clearHighlightedIds(); }
+                    if (value === false) { (layer as VectorLayer).clearHighlightedIds(); }
                     break;
                 case 'colorMapInterpolator':
                     layer.layerRenderInfo.colorMapInterpolator = value as ColorMapInterpolator;
@@ -427,7 +452,7 @@ export class AutkMap {
      * Starts the drawing loop.
      * @param {number} fps The frames per second to target.
      */
-    draw(fps: number = 60) {
+    public draw(fps: number = 60) {
         let previousDelta = 0;
 
         const update = (currentDelta: number) => {
@@ -444,10 +469,6 @@ export class AutkMap {
 
         requestAnimationFrame(update);
     }
-
-
-    // ---- Private methods ----
-
 
     /**
      * Handles window resize events
@@ -474,7 +495,6 @@ export class AutkMap {
 
     /**
      * Renders the map.
-     *
      * This method updates the camera, starts the rendering process, and handles picking for each layer.
      */
     private render() {
@@ -483,7 +503,7 @@ export class AutkMap {
 
         // Normal render pass for each layer
         this._renderer.start();
-        this._layerManager.layers.forEach((layer) => {
+        this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip) {
                 layer.renderPass(this._camera);
             }
@@ -492,7 +512,7 @@ export class AutkMap {
 
         // Picking render pass for each layer
         this._renderer.startPickingRenderPass();
-        this._layerManager.layers.forEach((layer) => {
+        this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 layer.renderPickingPass(this._camera);
             }
@@ -500,7 +520,7 @@ export class AutkMap {
         this._renderer.finish();
 
         // Getting ids
-        this._layerManager.layers.forEach((layer) => {
+        this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 const [x, y] = layer.layerRenderInfo.pickedComps;
                 layer.getPickedId(x, y).then((id) => {
@@ -518,9 +538,6 @@ export class AutkMap {
         });
     }
 
-
-    // ---- Private methods for creating layers ----
-
     /**
      * Creates a features layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
@@ -530,7 +547,7 @@ export class AutkMap {
     private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: this._layerManager.computeLayerZindex(typeLayer),
+            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
@@ -590,7 +607,7 @@ export class AutkMap {
     private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number = 300) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: this._layerManager.computeLayerZindex(typeLayer),
+            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
@@ -625,10 +642,15 @@ export class AutkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
+    /**
+     * Creates a points layer from a GeoJSON source.
+     * @param {string} layerName The name of the layer.
+     * @param {FeatureCollection} geojson The GeoJSON data.
+     */
     private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: this._layerManager.computeLayerZindex(typeLayer),
+            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
@@ -670,7 +692,7 @@ export class AutkMap {
     private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: this._layerManager.computeLayerZindex(typeLayer),
+            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: LayerType.AUTK_OSM_BUILDINGS,
         };
 
@@ -704,49 +726,47 @@ export class AutkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
     }
 
-    // /**
-    //  * Creates a custom grid layer from a GeoJSON source.
-    //  * @param {string} layerName The name of the layer.
-    //  * @param {FeatureCollection} geojson The GeoJSON data.
-    //  */
-    // private createLayerFromHeatmap(layerName: string, geojson: FeatureCollection) {
-    //     const layerInfo: ILayerInfo = {
-    //         id: `${layerName}`,
-    //         zValue: LayerRenderOrder.HEATMAP_LAYER,
-    //         typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
-    //         typeLayer: LayerType.HEATMAP_LAYER,
-    //     };
+    /**
+     * Creates a custom grid layer from a GeoJSON source.
+     * @param {string} layerName The name of the layer.
+     * @param {FeatureCollection} geojson The GeoJSON data.
+     */
+    private createRasterLayer(layerName: string, geojson: FeatureCollection) {
+        const layerInfo: ILayerInfo = {
+            id: `${layerName}`,
+            zIndex: this._layerManager.computeZindex(LayerType.AUTK_RASTER),
+            typeLayer: LayerType.AUTK_RASTER,
+        };
 
-    //     const layerRenderInfo: ILayerRenderInfo = {
-    //         pipeline: RenderPipeline.TRIANGLE_HEATMAP,
-    //         opacity: 1.0,
-    //         // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-    //         colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-    //         colorMapLabels: ['0.0', '1.0'],
-    //         isColorMap: false,
-    //         isPick: false,
-    //         isSkip: false,
-    //     };
+        const layerRenderInfo: ILayerRenderInfo = {
+            pipeline: RenderPipeline.TRIANGLE_HEATMAP,
+            opacity: 1.0,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
+            isColorMap: false,
+            isPick: false,
+            isSkip: false,
+        };
 
-    //     const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
-    //     if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-    //         console.error('Invalid Feature Layer.');
-    //         return;
-    //     }
+        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Feature Layer.');
+            return;
+        }
 
-    //     const layerData = {
-    //         geometry: layerMesh[0],
-    //         components: layerMesh[1],
-    //         thematic: layerMesh[1].map(() => {
-    //             return {
-    //                 level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-    //                 values: [0],
-    //             };
-    //         }),
-    //     };
+        const layerData = {
+            geometry: layerMesh[0],
+            components: layerMesh[1],
+            thematic: layerMesh[1].map(() => {
+                return {
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [0],
+                };
+            }),
+        };
 
-    //     this.createLayer(layerInfo, layerRenderInfo, layerData);
-    // }
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    }
 
     /**
      * Creates a layer from the provided information.
@@ -755,10 +775,17 @@ export class AutkMap {
      * @param {ILayerData} layerData The data for the layer.
      */
     private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
-        const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
+        let layer: VectorLayer | RasterLayer;
+
+        if (layerInfo.typeLayer === LayerType.AUTK_RASTER) {
+            layer = this._layerManager.addRasterLayer(layerInfo, layerRenderInfo, layerData) as RasterLayer;
+        }
+        else {
+            layer = this._layerManager.addVectorLayer(layerInfo, layerRenderInfo, layerData) as VectorLayer;
+        }
 
         if (layer) {
-            layer.createPipeline(this._renderer, this._camera);
+            layer.createPipeline(this._renderer);
         }
     }
 }

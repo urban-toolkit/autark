@@ -157,7 +157,7 @@ export class MouseEvents {
         const adjustedX = Math.floor(mouseX * scaleX);
         const adjustedY = Math.floor(mouseY * scaleY);
 
-        this._map.layerManager.layers.forEach((layer) => {
+        this._map.layerManager.vectorLayers.forEach((layer) => {
             if (layer.layerRenderInfo.isPick) {
                 layer.layerRenderInfo.pickedComps = [adjustedX, adjustedY];
             }

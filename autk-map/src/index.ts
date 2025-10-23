@@ -5,7 +5,7 @@ export * from './interfaces';
 export * from './key-events';
 export * from './layer-triangles2D';
 export * from './layer-triangles3D';
-export * from './layer-mesh';
+export * from './layer-vector';
 export * from './layer-manager';
 export * from './layer';
 export * from './main';

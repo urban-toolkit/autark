@@ -1,7 +1,7 @@
-import { Camera } from './camera';
-import { ILayerComponent, ILayerData, ILayerGeometry, ILayerInfo, ILayerRenderInfo, ILayerThematic } from './interfaces';
-
-import { Renderer } from './renderer';
+import {
+    ILayerInfo,
+    ILayerRenderInfo
+} from './interfaces';
 
 /**
  * Base class for map layers.
@@ -31,37 +31,11 @@ export abstract class Layer {
     protected _renderInfoIsDirty: boolean = false;
 
     /**
-     * Indicates if the layer's data information is dirty.
+     * Indicates if the layer's data is dirty.
      * This is used to determine if VOBs need to be reconstructed.
      * @type {boolean}
      */
-    protected _dataInfoIsDirty: boolean = false;
-
-    /**
-     * Highlighted IDs of the layer.
-     * This is a set to ensure uniqueness of highlighted IDs.
-     * @type {Set<number>}
-     */
-    protected _highlightedIds!: Set<number>;
-
-    /**
-     * Highlighted vertices of the layer.
-     * @type {number[]}
-     */
-    protected _highlightedVertices!: number[];
-
-    /**
-     * Skipped IDs of the layer.
-     * This is a set to ensure uniqueness of skipped IDs.
-     * @type {Set<number>}
-     */
-    protected _skippedIds!: Set<number>;
-
-    /**
-     * Skipped vertices of the layer.
-     * @type {number[]}
-     */
-    protected _skippedVertices!: number[];
+    protected _dataIsDirty: boolean = false;
 
     /**
      * Constructor for Layer
@@ -71,14 +45,6 @@ export abstract class Layer {
     constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
         this._layerInfo = layerInfo;
         this._layerRenderInfo = layerRenderInfo;
-    }
-
-    /**
-     * Gets the ID of the layer.
-     * @returns {string} The ID of the layer.
-     */
-    get id(): string {
-        return this._layerInfo.id;
     }
 
     /**
@@ -114,50 +80,10 @@ export abstract class Layer {
     }
 
     /**
-     * Gets the picked components of the layer.
-     * @returns {number[] | undefined} The picked components, or undefined if not set.
-     */
-    get pickedComp(): number[] | undefined {
-        return this.layerRenderInfo.pickedComps;
-    }
-
-    /**
-     * Gets the IDs of the highlighted components in the layer.
-     * @returns {number[]} The highlighted IDs.
-     */
-    get highlightedIds(): number[] {
-        return Array.from(this._highlightedIds);
-    }
-
-    /**
-     * Gets the highlighted vertices of the layer.
-     * @returns {number[]} The highlighted vertices.
-     */
-    get highlightedVertices(): number[] {
-        return this._highlightedVertices;
-    }
-
-    /**
-     * Gets the IDs of the skipped components in the layer.
-     * @returns {number[]} The skipped IDs.
-     */
-    get skippedIds(): number[] {
-        return Array.from(this._skippedIds);
-    }
-
-    /**
-     * Gets the skipped vertices of the layer.
-     * @returns {number[]} The skipped vertices.
-     */
-    get skippedVertices(): number[] {
-        return this._skippedVertices;
-    }
-
-    /**
      * Marks the layer's data as dirty, indicating that VOBs need to be reconstructed.
      */
-    public makeLayerDataInfoDirty() {
-        this._dataInfoIsDirty = true;
+    public makeLayerDataDirty() {
+        this._dataIsDirty = true;
     }
 
     /**
@@ -166,92 +92,4 @@ export abstract class Layer {
     public makeLayerRenderInfoDirty() {
         this._renderInfoIsDirty = true;
     }
-
-    /**
-     * Clears the highlighted components of the layer.
-     */
-    public clearHighlightedIds() {
-        this._highlightedVertices.fill(0);
-        this._highlightedIds.clear();
-
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataInfoDirty();
-    }
-
-    /**
-     * Sets the highlighted IDs of the layer.
-     * @param {number[]} ids - The IDs to highlight.
-     */
-    abstract setHighlightedIds(ids: number[]): void;
-
-    /**
-     * Clears the skipped components of the layer.
-     */
-    public clearSkippedIds() {
-        this._skippedVertices.fill(0);
-        this._skippedIds.clear();
-
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataInfoDirty();
-    }
-
-    /**
-     * Sets the skipped IDs of the layer.
-     * @param {number[]} ids - The IDs to skip.
-     */
-    abstract setSkippedIds(ids: number[]): void;
-
-
-    /**
-     * Loads the data for the layer.
-     * @param {ILayerData} layerData - The data to load into the layer.
-     */
-    abstract loadData(layerData: ILayerData): void;
-
-    /**
-     * Loads the geometry for the layer.
-     * @param {ILayerGeometry[]} layerGeometry - The geometries to load into the layer.
-     */
-    abstract loadGeometry(layerGeometry: ILayerGeometry[]): void;
-
-    /**
-     * Loads the component for the layer.
-     * @param {ILayerComponent[]} layerComponent - The components to load into the layer.
-     */
-    abstract loadComponent(layerComponent: ILayerComponent[]): void;
-
-    /**
-     * Loads the thematic data for the layer.
-     * @param {ILayerThematic[]} layerThematic - The thematic data to load into the layer.
-     */
-    abstract loadThematic(layerThematic: ILayerThematic[]): void;
-
-
-    /**
-     * Creates the rendering pipeline for the layer.
-     * @param {Renderer} renderer - The renderer to use for the layer.
-     * @param {Camera} camera - The camera to use for the layer.
-     */
-    abstract createPipeline(renderer: Renderer, camera: Camera): void;
-
-    /**
-     * Renders the layer.
-     * @param {Camera} camera - The camera to use for rendering.
-     */
-    abstract renderPass(camera: Camera): void;
-
-
-    /**
-     * Renders the picking pass for the layer.
-     * @param {Camera} camera - The camera to use for the picking pass.
-     */
-    abstract renderPickingPass(camera: Camera): void;
-
-    /**
-     * Gets the picked ID at the specified coordinates.
-     * @param {number} x - The x-coordinate.
-     * @param {number} y - The y-coordinate.
-     * @returns {Promise<number>} A promise that resolves to the picked ID.
-     */
-    abstract getPickedId(x: number, y: number): Promise<number>;
 }

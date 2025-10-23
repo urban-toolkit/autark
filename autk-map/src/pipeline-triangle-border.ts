@@ -204,7 +204,7 @@ export class PipelineTriangleBorder extends Pipeline {
 
         // Uniform Data
         const pipelineLayoutDesc = {
-            bindGroupLayouts: [this._colorsBindGroupLayout, this._cameraBindGroupLayout],
+            bindGroupLayouts: [this._renderInfoBindGroupLayout, this._cameraBindGroupLayout],
         };
 
         // Pipeline
@@ -255,7 +255,7 @@ export class PipelineTriangleBorder extends Pipeline {
         passEncoder.setIndexBuffer(this._borderIndicesBuffer, 'uint32');
 
         // sets the uniform buffers
-        passEncoder.setBindGroup(0, this._colorsBindGroup);
+        passEncoder.setBindGroup(0, this._renderInfoBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
 
         passEncoder.drawIndexed(this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);

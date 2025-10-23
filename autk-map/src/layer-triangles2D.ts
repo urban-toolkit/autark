@@ -3,14 +3,14 @@ import { ILayerBorder, ILayerBorderComponent, ILayerData, ILayerInfo, ILayerRend
 import { Camera } from './camera';
 import { Renderer } from './renderer';
 
-import { Mesh } from './layer-mesh';
+import { VectorLayer } from './layer-vector';
 import { PipelineTriangleBorder } from './pipeline-triangle-border';
 
 /**
  * Triangles2DBorder class extends Triangles2DLayer to handle rendering of borders in 2D triangles layers.
  * It manages the border positions and indices, and creates a specific rendering pipeline for borders.
  */
-export class Triangles2DLayer extends Mesh {
+export class Triangles2DLayer extends VectorLayer {
     /**
      * Positions of the borders.
      * @type {number[]}
@@ -35,6 +35,8 @@ export class Triangles2DLayer extends Mesh {
      */
     protected _pipelineBorder!: PipelineTriangleBorder;
 
+
+
     /**
      * Constructor for Triangles2DBorder
      * @param {ILayerInfo} layerInfo - The layer information.
@@ -46,8 +48,10 @@ export class Triangles2DLayer extends Mesh {
         super(layerInfo, layerRenderInfo, layerData);
         this._dimension = dimension;
 
-        this.loadData(layerData);
+        this.loadLayerData(layerData);
     }
+
+
 
     /**
      * Get the border positions.
@@ -65,11 +69,13 @@ export class Triangles2DLayer extends Mesh {
         return this._borderIds;
     }
 
+
+
     /**
      * Create the rendering pipeline for the layer.
      * @param {Renderer} renderer - The renderer instance.
      */
-    override createPipeline(renderer: Renderer): void {
+    public createPipeline(renderer: Renderer): void {
         super.createPipeline(renderer);
 
         this._pipelineBorder = new PipelineTriangleBorder(renderer);
@@ -80,19 +86,20 @@ export class Triangles2DLayer extends Mesh {
      * Load the layer data, specifically the border information.
      * @param {ILayerData} layerData - The data associated with the layer.
      */
-    override loadData(layerData: ILayerData): void {
-        super.loadData(layerData);
+    public loadLayerData(layerData: ILayerData): void {
+        super.loadLayerData(layerData);
 
         this.loadBorderGeometry(layerData.border || []);
         this.loadBorderComponent(layerData.borderComponents || []);
     }
 
 
+
     /**
      * Load the border geometry data for the layer.
      * @param {ILayerBorder[]} border - The border geometry data to load.
      */
-    loadBorderGeometry(border: ILayerBorder[]): void {
+    public loadBorderGeometry(border: ILayerBorder[]): void {
         const borders = border;
 
         const position: number[] = [];
@@ -107,21 +114,11 @@ export class Triangles2DLayer extends Mesh {
 
             // merges the position data
             borders[id].position.forEach((d, id) => {
-                if (this._dimension === 2) {
-                    position.push(d);
+                position.push(d);
 
-                    if (id % 2 === 1) {
-                        const z = this._layerInfo.zValue;
-                        position.push(z);
-                    }
-                }
-
-                if (this._dimension === 3) {
-                    if (id % 3 === 2) {
-                        d += this._layerInfo.zValue;
-                    }
-
-                    position.push(d);
+                if (id % 2 === 1) {
+                    const z = this._layerInfo.zIndex;
+                    position.push(z);
                 }
             });
         }
@@ -135,7 +132,7 @@ export class Triangles2DLayer extends Mesh {
      * Load the border components for the layer.
      * @param {ILayerBorderComponent[]} borderComponent - The border components to load.
      */
-    loadBorderComponent(borderComponent: ILayerBorderComponent[]): void {
+    public loadBorderComponent(borderComponent: ILayerBorderComponent[]): void {
         this._borderComponents = [];
 
         const accum = { nPoints: 0, nLines: 0 };
@@ -152,16 +149,18 @@ export class Triangles2DLayer extends Mesh {
         }
     }
 
+
+
     /**
      * Render the layer for the current pass.
      * @param {Camera} camera - The camera instance.
      */
-    override renderPass(camera: Camera): void {
+    public renderPass(camera: Camera): void {
         super.renderPass(camera);
 
-        if( this._borderPos.length === 0 || 
-            this._borderIds.length === 0 || 
-            this._borderComponents.length === 0 ) {
+        if (this._borderPos.length === 0 ||
+            this._borderIds.length === 0 ||
+            this._borderComponents.length === 0) {
             return;
         }
         this._pipelineBorder.renderPass(camera);

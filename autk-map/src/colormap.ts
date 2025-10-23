@@ -98,6 +98,11 @@ export class ColorMap {
         return { r: rgb.r, g: rgb.g, b: rgb.b, opacity: 1.0 };
     }
 
+    /**
+     * Build a color interpolator function for the given color map.
+     * @param color The color map interpolator to use
+     * @returns A function that takes a number t in [0, 1] and returns a color string.
+     */
     private static buildInterpolator(color: ColorMapInterpolator): (t: number) => string {
         if (color === ColorMapInterpolator.SEQUENTIAL_REDS) {
             const scale = d3_scale.scaleSequential(d3_scheme[ColorMapInterpolator.SEQUENTIAL_REDS]);
