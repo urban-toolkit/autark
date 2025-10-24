@@ -288,8 +288,6 @@ export class AutkMap {
         // TODO: Validate geotiff input
         // Allow the user to provide a geotiff and parse using geotiff.js library
 
-        console.log( {geotiff} );
-
         switch (typeLayer) {
             case LayerType.AUTK_RASTER:
                 this.createRasterLayer(layerName, geotiff);
