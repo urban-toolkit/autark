@@ -207,9 +207,6 @@ export class PipelineTriangleRaster extends Pipeline {
     updateRasterUniforms(raster: RasterLayer) {
         const rasterTexture = new Uint8Array(raster.rasterData);
 
-        console.log("----------------------------")
-        console.log( {raster} ); 
-
         this._renderer.device.queue.writeTexture(
             { texture: this._rasterBuffer },
             rasterTexture,

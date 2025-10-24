@@ -262,12 +262,6 @@ export class RasterLayer extends Layer {
         }
 
         this._rasterData = rasterData;
-
-        console.log('Raster data loaded:', {
-            rasterResX: this._rasterResX,
-            rasterResY: this._rasterResY,
-            raster: this._rasterData
-        }); 
     }
 
 
