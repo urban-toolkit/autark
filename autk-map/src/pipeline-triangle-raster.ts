@@ -158,13 +158,27 @@ export class PipelineTriangleRaster extends Pipeline {
             format: 'rgba8unorm',
         });
 
+        const rasterSampler = this._renderer.device.createSampler({
+            label: 'Raster sampler',
+            magFilter: 'linear',
+            minFilter: 'linear',
+            addressModeU: 'clamp-to-edge',
+            addressModeV: 'clamp-to-edge',
+        });
+
         // Raster uniform bind group layout
         this._rasterBindGroupLayout = this._renderer.device.createBindGroupLayout({
+            label: 'Raster bind group layout',
             entries: [
                 {
                     binding: 0,
                     visibility: GPUShaderStage.FRAGMENT,
-                    buffer: {},
+                    texture: {},
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
                 },
             ],
         });
@@ -172,10 +186,15 @@ export class PipelineTriangleRaster extends Pipeline {
         // Raster uniform bind group
         this._rasterBindGroup = this._renderer.device.createBindGroup({
             layout: this._rasterBindGroupLayout,
+            label: 'Raster bind group',
             entries: [
                 {
                     binding: 0,
                     resource: this._rasterBuffer.createView(),
+                },
+                {
+                    binding: 1,
+                    resource: rasterSampler,
                 },
             ],
         });
@@ -188,10 +207,16 @@ export class PipelineTriangleRaster extends Pipeline {
     updateRasterUniforms(raster: RasterLayer) {
         const rasterTexture = new Uint8Array(raster.rasterData);
 
+        console.log("----------------------------")
+        console.log( {raster} ); 
+
         this._renderer.device.queue.writeTexture(
             { texture: this._rasterBuffer },
             rasterTexture,
-            {},
+            {
+                bytesPerRow: raster.rasterResX * 4,
+                rowsPerImage: raster.rasterResY 
+            },
             { width: raster.rasterResX, height: raster.rasterResY },
         );
     }
@@ -287,7 +312,7 @@ export class PipelineTriangleRaster extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline triangle flat"
+            label: "Pipeline Raster"
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }

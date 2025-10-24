@@ -1,22 +1,11 @@
-@group(0) @binding(0) var<uniform> color : vec4f;
-@group(0) @binding(1) var<uniform> highlightColor : vec4f;
-@group(0) @binding(2) var<uniform> showThematic : f32;
-@group(0) @binding(3) var<uniform> showHighlight : f32;
-@group(0) @binding(4) var cMapTex : texture_2d<f32>;
-@group(0) @binding(5) var cMapSampler : sampler;
 @group(0) @binding(6) var<uniform> opacity : f32;
 
+@group(2) @binding(0) var rasterData : texture_2d<f32>;
+@group(2) @binding(1) var rasterSampler : sampler;
+
 @fragment 
-fn main() -> @location(0) vec4f {
+fn main(@location(0) inTexCoord: vec2f) -> @location(0) vec4f {
+    var color = textureSample(rasterData, rasterSampler, inTexCoord);
 
-    var color = vec4f(color.r / 255, color.g / 255, color.b / 255, color.a);
-    var sampledColor = textureSample(cMapTex, cMapSampler, vec2f(inThematic, 0.0));
-
-    if(showHighlight > 0 && inHighlighted > 0) {
-        color = vec4f(highlightColor.r / 255, highlightColor.g / 255, highlightColor.b / 255, highlightColor.a);
-    }
-    else if (showThematic > 0) {
-        color = sampledColor;
-    }
-    return vec4f(color.rgb * inThematic * opacity, inThematic * opacity);
+    return vec4f(color.rgb * opacity, color.a * opacity);
 }

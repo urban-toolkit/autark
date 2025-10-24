@@ -2,7 +2,6 @@ import {
     ColorHEX,
     ColorMapInterpolator,
     LayerType,
-    RenderPipeline,
     ThematicAggregationLevel,
 } from './constants';
 
@@ -53,7 +52,6 @@ export interface ILayerInfo {
  * @property {boolean} [isPick] - Indicates if the layer is for picking
  */
 export interface ILayerRenderInfo {
-    pipeline: RenderPipeline;
     opacity: number;
     isColorMap?: boolean;
     colorMapInterpolator: ColorMapInterpolator;
@@ -109,14 +107,14 @@ export interface ILayerThematic {
 
 /**
  * Interface for raster data.
- * @property {number} width - Width of the raster.
- * @property {number} height - Height of the raster.
+ * @property {number} rasterResX - Width of the raster.
+ * @property {number} rasterResY - Height of the raster.
  * @property {number[]} values - Array of raster values.
  */
 export interface IRasterData {
-    resX: number;
-    resY: number;
-    values: number[];
+    rasterResX: number;
+    rasterResY: number;
+    rasterValues: number[];
 }
 
 /**

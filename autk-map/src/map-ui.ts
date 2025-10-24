@@ -261,9 +261,10 @@ export class AutkMapUi {
         dropdownList.innerHTML = '';
 
         // Populate dropdown with checkboxes
-        const layers = this.map.layerManager.vectorLayers;
+        const layers: Layer[] = this.map.layerManager.vectorLayers;
+        const raster: Layer[] = this.map.layerManager.rasterLayers;
 
-        layers.forEach(layer => {
+        (layers.concat(raster)).forEach(layer => {
             const initialSkip = layer?.layerRenderInfo.isSkip || false;
 
             const label = document.createElement('label');
@@ -380,7 +381,7 @@ export class AutkMapUi {
         dropdownList.innerHTML = '';
 
         // Populate dropdown with checkboxes
-        const layers = this.map.layerManager.vectorLayers;
+        const layers: Layer[] = this.map.layerManager.vectorLayers;
         layers.forEach((layer, id) => {
             const isLast = id === layers.length - 1
 

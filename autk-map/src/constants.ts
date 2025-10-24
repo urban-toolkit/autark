@@ -43,18 +43,6 @@ export enum ThematicAggregationLevel {
 }
 
 /**
- * Render pipelines for different rendering techniques.
- * @property {string} TRIANGLE_FLAT - Flat triangle rendering.
- * @property {string} TRIANGLE_SSAO - Screen Space Ambient Occlusion triangle rendering.
- * @property {string} TRIANGLE_HEATMAP - Heatmap triangle rendering.
- */
-export enum RenderPipeline {
-  TRIANGLE_FLAT = 'triangleFlat',
-  TRIANGLE_SSAO = 'triangleSsao',
-  TRIANGLE_HEATMAP = 'triangleHeatmap',
-}
-
-/**
  * Color map interpolators for thematic data visualization.
  * @property {string} SEQUENTIAL_REDS - Red color interpolation.
  * @property {string} SEQUENTIAL_BLUES - Blue color interpolation.

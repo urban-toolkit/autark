@@ -12,7 +12,6 @@ import {
     ColorMapInterpolator,
     LayerType,
     MapEvent,
-    RenderPipeline,
     ThematicAggregationLevel,
 } from './constants';
 
@@ -42,6 +41,7 @@ import { LayerBbox } from './layer-bbox';
 import { polygonize } from '@turf/turf';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
+import { TriangulatorRaster } from './triangulator-raster';
 
 /**
  * The main autark map class.
@@ -288,6 +288,8 @@ export class AutkMap {
         // TODO: Validate geotiff input
         // Allow the user to provide a geotiff and parse using geotiff.js library
 
+        console.log( {geotiff} );
+
         switch (typeLayer) {
             case LayerType.AUTK_RASTER:
                 this.createRasterLayer(layerName, geotiff);
@@ -298,10 +300,6 @@ export class AutkMap {
         }
 
     }
-
-    // public loadObjLayer(layerName: string, objData: string, typeLayer: LayerType | null = null) {
-
-    // }
 
     /**
      * Updates the thematic information of a layer based on a GeoJSON source.
@@ -508,6 +506,11 @@ export class AutkMap {
                 layer.renderPass(this._camera);
             }
         });
+        this._layerManager.rasterLayers.forEach((layer) => {
+            if (!layer.layerRenderInfo.isSkip) {
+                layer.renderPass(this._camera);
+            }
+        });
         this._renderer.finish();
 
         // Picking render pass for each layer
@@ -552,7 +555,6 @@ export class AutkMap {
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -612,7 +614,6 @@ export class AutkMap {
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -655,7 +656,6 @@ export class AutkMap {
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -697,7 +697,6 @@ export class AutkMap {
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_SSAO,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -729,9 +728,9 @@ export class AutkMap {
     /**
      * Creates a custom grid layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
-     * @param {FeatureCollection} geojson The GeoJSON data.
+     * @param {FeatureCollection} geotiff The GeoJSON data.
      */
-    private createRasterLayer(layerName: string, geojson: FeatureCollection) {
+    private createRasterLayer(layerName: string, geotiff: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(LayerType.AUTK_RASTER),
@@ -739,7 +738,6 @@ export class AutkMap {
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_HEATMAP,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -748,21 +746,26 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorRaster.buildMesh(geotiff, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature Layer.');
             return;
         }
 
-        const layerData = {
+        const props = geotiff.features[0].properties;
+        if (!props) {
+            console.error('GeoTIFF properties are missing.');
+            return;
+        }
+
+        const layerData: ILayerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map(() => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [0],
-                };
-            }),
+            raster: [ {
+                rasterResX: props.rasterResX,
+                rasterResY: props.rasterResY,
+                rasterValues: props.raster
+            }],
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);

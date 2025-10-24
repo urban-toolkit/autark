@@ -28,15 +28,15 @@ export class GeojsonVis {
             },
         });
 
-        await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/parking.csv',
-            outputTableName: 'parking',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
+        // await this.db.loadCsv({
+        //     csvFileUrl: 'http://localhost:5173/data/parking.csv',
+        //     outputTableName: 'parking',
+        //     geometryColumns: {
+        //         latColumnName: 'Latitude',
+        //         longColumnName: 'Longitude',
+        //         coordinateFormat: 'EPSG:3395',
+        //     },
+        // });
 
         const boundingBox = await this.db.getOsmBoundingBox();
 
@@ -50,32 +50,52 @@ export class GeojsonVis {
          * 7. Nas propriedades devemos ter duas variáveis (ex. nx, ny) com a resolução do grid
          */
 
-        await this.db.loadGridLayer({
-            boundingBox: boundingBox,
-            outputTableName: 'table_grid',
-            rows: 30,
-            columns: 30
-        });
+        // await this.db.loadGridLayer({
+        //     boundingBox: boundingBox,
+        //     outputTableName: 'table_grid',
+        //     rows: 30,
+        //     columns: 30
+        // });
 
-        await this.db.spatialJoin({
-            tableRootName: 'table_grid',
-            tableJoinName: 'parking',
-            spatialPredicate: 'NEAR',
-            nearDistance: 200,
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'parking',
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
+        // await this.db.spatialJoin({
+        //     tableRootName: 'table_grid',
+        //     tableJoinName: 'parking',
+        //     spatialPredicate: 'NEAR',
+        //     nearDistance: 200,
+        //     output: {
+        //         type: 'MODIFY_ROOT',
+        //     },
+        //     joinType: 'LEFT',
+        //     groupBy: {
+        //         selectColumns: [
+        //             {
+        //                 tableName: 'parking',
+        //                 column: 'Unique Key',
+        //                 aggregateFn: 'count',
+        //             },
+        //         ],
+        //     },
+        // });
+
+
+        const heatMapFake = {
+            type: 'FeatureCollection',
+            bbox: [boundingBox.minLon, boundingBox.minLat, boundingBox.maxLon, boundingBox.maxLat],
+            features: [
+                {
+                    type: 'Feature',
+                    properties: {
+                        raster: Array.from({ length: 256 * 256 }, () => Math.floor(Math.random() * 100)),
+                        rasterResX: 256,
+                        rasterResY: 256,
                     },
-                ],
-            },
-        });
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [],
+                    },
+                },
+            ],
+        }
 
         const canvas = document.querySelector('canvas');
         if (canvas) {
@@ -83,8 +103,14 @@ export class GeojsonVis {
 
             await this.map.init();
             await this.loadLayers();
-            await this.updateThematicData();
 
+            await this.map.loadGeoTiffLayer(
+                'heatmap',
+                heatMapFake as any,
+                LayerType.AUTK_RASTER,
+            );
+
+            this.map.updateRenderInfoProperty('heatmap', 'opacity', 0.5);
             this.map.draw();
         }
     }

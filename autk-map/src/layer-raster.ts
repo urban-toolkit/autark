@@ -224,26 +224,26 @@ export class RasterLayer extends Layer {
         const rasterData: number[] = [];
 
         for (let id = 0; id < layerRaster.length; id++) {
-            const raster = layerRaster[id];
+            const layer = layerRaster[id];
 
-            if (!raster.values) {
+            if (!layer.rasterValues) {
                 continue;
             }
 
             if (this._rasterResX === undefined) {
-                this._rasterResX = raster.resX;
+                this._rasterResX = layer.rasterResX;
             }
             if (this._rasterResY === undefined) {
-                this._rasterResY = raster.resY;
+                this._rasterResY = layer.rasterResY;
             }
 
-            const isRGBA = layerRaster[id].values.length === layerRaster[0].resX * layerRaster[0].resY * 4;
+            const isRGBA = layer.rasterValues.length === layer.rasterResX * layer.rasterResY * 4;
             if (!isRGBA) {
-                const min = Math.min(...layerRaster[id].values);
-                const max = Math.max(...layerRaster[id].values);
+                const min = Math.min(...layer.rasterValues);
+                const max = Math.max(...layer.rasterValues);
                 const range = max - min;
 
-                layerRaster[id].values.forEach((d) => {
+                layer.rasterValues.forEach((d) => {
                     const t = (d - min) / range;
                     const color = ColorMap.getColor(t, this._layerRenderInfo.colorMapInterpolator);
 
@@ -254,7 +254,7 @@ export class RasterLayer extends Layer {
                 });
             }
             else {
-                raster.values.forEach((d) => {
+                layer.rasterValues.forEach((d) => {
                     rasterData.push(d);
                 });
             }
@@ -262,6 +262,12 @@ export class RasterLayer extends Layer {
         }
 
         this._rasterData = rasterData;
+
+        console.log('Raster data loaded:', {
+            rasterResX: this._rasterResX,
+            rasterResY: this._rasterResY,
+            raster: this._rasterData
+        }); 
     }
 
 
@@ -280,6 +286,11 @@ export class RasterLayer extends Layer {
      * @param {Camera} camera - The camera instance.
      */
     public renderPass(camera: Camera): void {
+        if (this._renderInfoIsDirty) {
+            this._pipeline.updateColorUniforms(this);
+            this._renderInfoIsDirty = false;
+        }
+
         this._pipeline.renderPass(camera);
     }
 }
