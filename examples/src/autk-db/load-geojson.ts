@@ -11,9 +11,13 @@ export class LoadGeojson {
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395',
-            type: 'boundaries'
+            // type: 'boundaries'
         });
-        
+
+        const geojson = await this.db.getLayer('neighborhoods');
+        console.log({
+            geojson,
+        });
     }
 
     public print(): void {

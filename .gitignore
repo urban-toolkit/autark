@@ -153,3 +153,5 @@ dist
 **/public/data-ignore/*
 
 /test-web-gpu
+
+.tool-versions

@@ -245,11 +245,14 @@ export class SpatialDb {
 
     const osmBoundingBox = this.getOsmBoundingBox();
     if (osmBoundingBox) {
+      featureCollection.bbox = osmBoundingBox;
+    } else {
+      const layerBoundingBox = await this.getBoundingBoxFromLayer(layerTableName);
       featureCollection.bbox = [
-        osmBoundingBox.minLon,
-        osmBoundingBox.minLat,
-        osmBoundingBox.maxLon,
-        osmBoundingBox.maxLat,
+        layerBoundingBox.minLon,
+        layerBoundingBox.minLat,
+        layerBoundingBox.maxLon,
+        layerBoundingBox.maxLat,
       ];
     }
 
@@ -258,12 +261,17 @@ export class SpatialDb {
 
   /**
    * Retrieves the bounding box of the OSM data loaded from the Overpass API.
-   * @returns The bounding box of the OSM data.
-   * @throws Error if the OSM bounding box is not found.
+   * @returns The bounding box of the OSM data as array.
    */
-  getOsmBoundingBox(): BoundingBox {
-    if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsmFromOverpassApi() first.');
-    return this.osmBoudingBox;
+  getOsmBoundingBox(): [number, number, number, number] | null {
+    if (!this.osmBoudingBox) return null;
+
+    return [
+      this.osmBoudingBox.minLon,
+      this.osmBoudingBox.minLat,
+      this.osmBoudingBox.maxLon,
+      this.osmBoudingBox.maxLat,
+    ]
   }
 
   /**
