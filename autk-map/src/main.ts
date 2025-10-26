@@ -5,7 +5,6 @@ import {
     Feature,
     FeatureCollection,
     GeoJsonProperties,
-    LineString
 } from 'geojson';
 
 import {
@@ -38,7 +37,6 @@ import { TriangulatorBuildings } from './triangulator-buildings';
 import { AutkMapUi } from './map-ui';
 import { LayerBbox } from './layer-bbox';
 
-import { polygonize } from '@turf/turf';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
 import { TriangulatorRaster } from './triangulator-raster';
@@ -291,10 +289,10 @@ export class AutkMap {
         switch (typeLayer) {
             case LayerType.AUTK_RASTER:
                 this.createRasterLayer(layerName, geotiff);
-            break;
+                break;
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
-            break;
+                break;
         }
 
     }
@@ -561,11 +559,6 @@ export class AutkMap {
             isSkip: false,
         };
 
-        // TODO: Adjust in the database side.
-        if (typeLayer === LayerType.AUTK_OSM_SURFACE) {
-            geojson = polygonize(geojson as FeatureCollection<LineString>);
-        }
-
         const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Polygon Layer');
@@ -759,7 +752,7 @@ export class AutkMap {
         const layerData: ILayerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            raster: [ {
+            raster: [{
                 rasterResX: props.rasterResX,
                 rasterResY: props.rasterResY,
                 rasterValues: props.raster
