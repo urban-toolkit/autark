@@ -6,7 +6,7 @@ import pickingFragmentSource from './shaders/picking.frag.wgsl';
 import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
-import { Triangles2DLayer } from './layer-triangles2D';
+import { VectorLayer } from './layer-vector';
 
 /**
  * PipelineTrianglePicking is a rendering pipeline for picking triangles in 2D space.
@@ -59,9 +59,9 @@ export class PipelineTrianglePicking extends Pipeline {
 
     /**
      * Builds the pipeline with the provided mesh data.
-     * @param {Triangles2DLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    build(mesh: Triangles2DLayer): void {
+    build(mesh: VectorLayer): void {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -90,9 +90,9 @@ export class PipelineTrianglePicking extends Pipeline {
 
     /**
      * Creates the vertex buffers for the pipeline.
-     * @param {Triangles2DLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    createVertexBuffers(mesh: Triangles2DLayer): void {
+    createVertexBuffers(mesh: VectorLayer): void {
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
             size: mesh.position.length * 4,
@@ -114,9 +114,9 @@ export class PipelineTrianglePicking extends Pipeline {
 
     /**
      * Updates the vertex buffers with the provided mesh data.
-     * @param {Triangles2DLayer} layer The mesh data containing positions, thematic, and indices
+     * @param {VectorLayer} layer The mesh data containing positions, thematic, and indices
      */
-    updateVertexBuffers(layer: Triangles2DLayer): void {
+    updateVertexBuffers(layer: VectorLayer): void {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(layer.position));
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(layer.indices));
 

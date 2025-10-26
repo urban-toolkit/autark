@@ -1,20 +1,20 @@
 /// <reference types="@webgpu/types" />
 
-import trianglesVertexSource from './shaders/triangle-01.vert.wgsl';
-import trianglesFragmentSource from './shaders/triangle-01.frag.wgsl';
+import rasterVertexSource from './shaders/raster.vert.wgsl';
+import rasterFragmentSource from './shaders/raster.frag.wgsl';
 
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { VectorLayer } from './layer-vector';
+import { RasterLayer } from './layer-raster';
 
 /**
- * PipelineTriangleFlat is a rendering pipeline for drawing flat triangles in 2D space.
+ * PipelineTriangleRaster is a rendering pipeline for drawing rasterized triangles.
  * It uses WebGPU to render triangles based on the provided mesh data.
  */
-export class PipelineTriangleFlat extends Pipeline {
+export class PipelineTriangleRaster extends Pipeline {
     /**
      * Position buffer for vertex data.
      * @type {GPUBuffer}
@@ -22,30 +22,16 @@ export class PipelineTriangleFlat extends Pipeline {
     protected _positionBuffer!: GPUBuffer;
 
     /**
-     * Buffer for thematic data.
+     * Buffer for primitive indices.
      * @type {GPUBuffer}
      */
-    protected _thematicBuffer!: GPUBuffer;
-
-    /**
-     * Buffer for highlighted data.
-     * @type {GPUBuffer}
-     */
-    protected _highlightedBuffer!: GPUBuffer;
-
-    /**
-     * Buffer for skipped data.
-     * @type {GPUBuffer}
-     */
-    protected _skippedBuffer!: GPUBuffer;
+    protected _texCoordBuffer!: GPUBuffer;
 
     /**
      * Buffer for primitive indices.
      * @type {GPUBuffer}
      */
     protected _indicesBuffer!: GPUBuffer;
-
-
 
     /**
      * Vertex shader module.
@@ -59,15 +45,25 @@ export class PipelineTriangleFlat extends Pipeline {
      */
     protected _fragModule!: GPUShaderModule;
 
-
-
     /**
      * Render pipeline for drawing triangles.
      * @type {GPURenderPipeline}
      */
     protected _pipeline!: GPURenderPipeline;
 
+    /**
+     * Raster uniform buffer
+     */
+    protected _rasterBuffer!: GPUTexture;
+    /**
+     * Raster bind group
+     */
+    protected _rasterBindGroup!: GPUBindGroup;
 
+    /**
+     * Raster bind group layout
+     */
+    protected _rasterBindGroupLayout!: GPUBindGroupLayout;
 
     /**
      * Constructor for PipelineTriangleFlat
@@ -77,21 +73,22 @@ export class PipelineTriangleFlat extends Pipeline {
         super(renderer);
     }
 
-
-
     /**
      * Builds the pipeline with the provided mesh data.
-     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {RasterLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    build(mesh: VectorLayer) {
+    build(mesh: RasterLayer) {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
+        this.createRasterUniformBindGroup(mesh);
+
         this.createColorUniformBindGroup();
         this.createCameraUniformBindGroup();
 
         this.updateVertexBuffers(mesh);
         this.updateColorUniforms(mesh);
+        this.updateRasterUniforms(mesh);
 
         this.createPipeline();
     }
@@ -102,68 +99,123 @@ export class PipelineTriangleFlat extends Pipeline {
     createShaders() {
         // Vertex shader
         const vsmDesc = {
-            code: trianglesVertexSource,
+            code: rasterVertexSource,
         };
         this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
 
         // Fragment shader
         const fsmDesc = {
-            code: trianglesFragmentSource,
+            code: rasterFragmentSource,
         };
         this._fragModule = this._renderer.device.createShaderModule(fsmDesc);
     }
 
     /**
      * Creates the vertex buffers for the pipeline.
-     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {RasterLayer} raster The mesh data containing positions, thematic, and indices
      */
-    createVertexBuffers(mesh: VectorLayer) {
+    override createVertexBuffers(raster: RasterLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
-            size: mesh.position.length * 4,
+            size: raster.position.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
-        // vertex data
-        this._thematicBuffer = this._renderer.device.createBuffer({
-            label: 'Thematic data buffer',
-            size: mesh.thematic.length * 4,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-
-        // vertex data
-        this._highlightedBuffer = this._renderer.device.createBuffer({
-            label: 'Highlighted data buffer',
-            size: mesh.highlightedVertices.length * 4,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-
-        // vertex data
-        this._skippedBuffer = this._renderer.device.createBuffer({
-            label: 'Skipped data buffer',
-            size: mesh.skippedVertices.length * 4,
+        // texture coordinates data
+        this._texCoordBuffer = this._renderer.device.createBuffer({
+            label: 'Texture coordinates buffer',
+            size: raster.texCoord.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         // vertex data
         this._indicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
-            size: mesh.indices.length * 4,
+            size: raster.indices.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
     }
 
     /**
      * Updates the vertex buffers with the provided mesh data.
-     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
+     * @param {RasterLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    updateVertexBuffers(mesh: VectorLayer) {
+    override updateVertexBuffers(mesh: RasterLayer) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
-        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(mesh.skippedVertices));
+        this._renderer.device.queue.writeBuffer(this._texCoordBuffer, 0, new Float32Array(mesh.texCoord));
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
+    }
+
+    /**
+     * Creates the raster uniform bind group.
+     */
+    createRasterUniformBindGroup(raster: RasterLayer) {
+        this._rasterBuffer = this._renderer.device.createTexture({
+            label: 'Raster texture',
+            size: { width: raster.rasterResX, height: raster.rasterResY },
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+            format: 'rgba8unorm',
+        });
+
+        const rasterSampler = this._renderer.device.createSampler({
+            label: 'Raster sampler',
+            magFilter: 'linear',
+            minFilter: 'linear',
+            addressModeU: 'clamp-to-edge',
+            addressModeV: 'clamp-to-edge',
+        });
+
+        // Raster uniform bind group layout
+        this._rasterBindGroupLayout = this._renderer.device.createBindGroupLayout({
+            label: 'Raster bind group layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {},
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+            ],
+        });
+
+        // Raster uniform bind group
+        this._rasterBindGroup = this._renderer.device.createBindGroup({
+            layout: this._rasterBindGroupLayout,
+            label: 'Raster bind group',
+            entries: [
+                {
+                    binding: 0,
+                    resource: this._rasterBuffer.createView(),
+                },
+                {
+                    binding: 1,
+                    resource: rasterSampler,
+                },
+            ],
+        });
+    }
+
+    /**
+     * Updates the raster uniform buffer with the provided raster data.
+     * @param {RasterLayer} layer The raster layer containing raster data
+     */
+    updateRasterUniforms(raster: RasterLayer) {
+        const rasterTexture = new Uint8Array(raster.rasterData);
+
+        this._renderer.device.queue.writeTexture(
+            { texture: this._rasterBuffer },
+            rasterTexture,
+            {
+                bytesPerRow: raster.rasterResX * 4,
+                rowsPerImage: raster.rasterResY 
+            },
+            { width: raster.rasterResX, height: raster.rasterResY },
+        );
     }
 
     /**
@@ -176,41 +228,23 @@ export class PipelineTriangleFlat extends Pipeline {
             offset: 0,
             format: 'float32x3',
         };
-        const thematicAttribDesc: GPUVertexAttribute = {
+
+        // Vertex data
+        const texCoordAttribDesc: GPUVertexAttribute = {
             shaderLocation: 1, // [[location(1)]]
             offset: 0,
-            format: 'float32',
+            format: 'float32x2',
         };
-        const highlightedAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 2, // [[location(2)]]
-            offset: 0,
-            format: 'float32',
-        };
-        const skippedAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 3, // [[location(3)]]
-            offset: 0,
-            format: 'float32',
-        };
-
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
             arrayStride: 4 * 3, // sizeof(float) * 3
             stepMode: 'vertex',
         };
-        const thematicBufferDesc: GPUVertexBufferLayout = {
-            attributes: [thematicAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-        const highlightedBufferDesc: GPUVertexBufferLayout = {
-            attributes: [highlightedAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-        const skippedBufferDesc: GPUVertexBufferLayout = {
-            attributes: [skippedAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
+
+        const texCoordBufferDesc: GPUVertexBufferLayout = {
+            attributes: [texCoordAttribDesc],
+            arrayStride: 4 * 2, // sizeof(float) * 2
             stepMode: 'vertex',
         };
 
@@ -218,7 +252,7 @@ export class PipelineTriangleFlat extends Pipeline {
         const vertex: GPUVertexState = {
             module: this._vertModule,
             entryPoint: 'main',
-            buffers: [positionBufferDesc, thematicBufferDesc, highlightedBufferDesc, skippedBufferDesc],
+            buffers: [positionBufferDesc, texCoordBufferDesc],
         };
 
         // Fragment Shader
@@ -263,7 +297,7 @@ export class PipelineTriangleFlat extends Pipeline {
 
         // Uniform Data
         const pipelineLayoutDesc = {
-            bindGroupLayouts: [this._renderInfoBindGroupLayout, this._cameraBindGroupLayout],
+            bindGroupLayouts: [this._renderInfoBindGroupLayout, this._cameraBindGroupLayout, this._rasterBindGroupLayout],
         };
 
         // Pipeline
@@ -275,7 +309,7 @@ export class PipelineTriangleFlat extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline triangle flat"
+            label: "Pipeline Raster"
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -308,9 +342,7 @@ export class PipelineTriangleFlat extends Pipeline {
 
         // sets the vertex buffers
         passEncoder.setVertexBuffer(0, this._positionBuffer);
-        passEncoder.setVertexBuffer(1, this._thematicBuffer);
-        passEncoder.setVertexBuffer(2, this._highlightedBuffer);
-        passEncoder.setVertexBuffer(3, this._skippedBuffer);
+        passEncoder.setVertexBuffer(1, this._texCoordBuffer);
 
         // sets primitive indices buffer
         passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');
@@ -318,6 +350,7 @@ export class PipelineTriangleFlat extends Pipeline {
         // sets the uniform buffers
         passEncoder.setBindGroup(0, this._renderInfoBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
+        passEncoder.setBindGroup(2, this._rasterBindGroup);
 
         // draw command
         passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);

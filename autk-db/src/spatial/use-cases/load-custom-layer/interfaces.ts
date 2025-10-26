@@ -7,5 +7,4 @@ export interface Params {
   outputTableName: string;
   coordinateFormat?: string;
   boundingBox?: BoundingBox;
-  type: 'lines' | 'boundaries';
 }

@@ -24,8 +24,7 @@ export class MapVega {
     await this.db.loadCustomLayer({
       geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
       outputTableName: 'neighborhoods',
-      coordinateFormat: 'EPSG:3395',
-      type: 'boundaries'
+      coordinateFormat: 'EPSG:3395'
     });
 
     await this.db.loadCsv({
@@ -65,11 +64,8 @@ export class MapVega {
       throw new Error('Canvas element not found.');
     }
 
-    const boundingBox = await this.db.getBoundingBoxFromLayer('neighborhoods');
-    
-
     this.map = new AutkMap(canvas);
-    await this.map.init(boundingBox);
+    await this.map.init();
 
     await this.loadLayers();
     await this.loadLayerData();
@@ -106,7 +102,7 @@ export class MapVega {
 
     for (const json of data) {
       console.log(`Loading layer: ${json.props.name} of type ${json.props.type}`);
-      this.map.loadGeoJsonLayer(json.props.name, json.props.type as LayerType, json.data);
+      this.map.loadGeoJsonLayer(json.props.name, json.data, json.props.type as LayerType);
     }
 
     this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);

@@ -86,9 +86,9 @@ export class AutkMapUi {
         console.log(`Active layer: ${this.activeLayer.layerInfo.id}`);
 
         // Turn off picking for all layers
-        this.map.layerManager.layers.forEach(
+        this.map.layerManager.vectorLayers.forEach(
             layer => {
-                if (layer.layerInfo.id == this.activeLayer?.id) { return; }
+                if (layer.layerInfo.id == this.activeLayer?.layerInfo.id) { return; }
                 this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', false);
                 this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isColorMap', false);
             }
@@ -261,9 +261,10 @@ export class AutkMapUi {
         dropdownList.innerHTML = '';
 
         // Populate dropdown with checkboxes
-        const layers = this.map.layerManager.layers;
+        const layers: Layer[] = this.map.layerManager.vectorLayers;
+        const raster: Layer[] = this.map.layerManager.rasterLayers;
 
-        layers.forEach(layer => {
+        (layers.concat(raster)).forEach(layer => {
             const initialSkip = layer?.layerRenderInfo.isSkip || false;
 
             const label = document.createElement('label');
@@ -275,11 +276,11 @@ export class AutkMapUi {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = !initialSkip;
-            checkbox.value = layer.id;
+            checkbox.value = layer.layerInfo.id;
             checkbox.style.marginRight = '8px';
 
             label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(layer.id));
+            label.appendChild(document.createTextNode(layer.layerInfo.id));
             dropdownList.appendChild(label);
 
             // callback for checkbox change
@@ -380,7 +381,7 @@ export class AutkMapUi {
         dropdownList.innerHTML = '';
 
         // Populate dropdown with checkboxes
-        const layers = this.map.layerManager.layers;
+        const layers: Layer[] = this.map.layerManager.vectorLayers;
         layers.forEach((layer, id) => {
             const isLast = id === layers.length - 1
 
@@ -394,15 +395,15 @@ export class AutkMapUi {
             radio.className = 'active-layer-radio';
             radio.type = 'radio';
             radio.checked = isLast;
-            radio.value = layer.id;
+            radio.value = layer.layerInfo.id;
             radio.style.marginRight = '8px';
 
             if (isLast) {
-                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.id));
+                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
             }
 
             label.appendChild(radio);
-            label.appendChild(document.createTextNode(layer.id));
+            label.appendChild(document.createTextNode(layer.layerInfo.id));
             dropdownList.appendChild(label);
 
             // callback for radio change
@@ -411,7 +412,7 @@ export class AutkMapUi {
                 radios.forEach(r => r.checked = false);
 
                 (e.target as HTMLInputElement).checked = true;
-                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.id));
+                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
             });
 
         });

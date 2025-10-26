@@ -2,7 +2,7 @@ import { ILayerInfo, ILayerRenderInfo, ILayerData } from './interfaces';
 
 import { Renderer } from './renderer';
 
-import { Triangles2DLayer } from './layer-triangles2D';
+import { VectorLayer } from './layer-vector';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
@@ -10,12 +10,14 @@ import { PipelineTrianglePicking } from './pipeline-triangle-picking';
  * Triangles3DLayer class extends Triangles2DLayer to handle rendering of 3D triangles layers.
  * It manages the normals and creates a specific rendering pipeline for 3D triangles.
  */
-export class Triangles3DLayer extends Triangles2DLayer {
+export class Triangles3DLayer extends VectorLayer {
     /**
      * Normals of the triangles.
      * @type {number[]}
      */
     protected _normal!: number[];
+
+
 
     /**
      * Constructor for Triangles3DLayer
@@ -28,6 +30,8 @@ export class Triangles3DLayer extends Triangles2DLayer {
         this.computeNormals();
     }
 
+
+
     /**
      * Get the normals of the triangles.
      * @returns {number[]} - The normals of the triangles.
@@ -35,6 +39,8 @@ export class Triangles3DLayer extends Triangles2DLayer {
     get normal(): number[] {
         return this._normal;
     }
+
+
 
     /**
      * Create the rendering pipeline for the layer.
@@ -48,10 +54,12 @@ export class Triangles3DLayer extends Triangles2DLayer {
         this._pipelinePicking.build(this);
     }
 
+
+
     /**
      * Compute the normals for the triangles.
      */
-    public computeNormals(): void {
+    private computeNormals(): void {
         // same size as the position array
         const len = this._position.length;
 

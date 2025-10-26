@@ -1,25 +1,20 @@
 /// <reference types="@webgpu/types" />
 
 import {
+    BBox,
     Feature,
     FeatureCollection,
     GeoJsonProperties,
-    Polygon
 } from 'geojson';
 
 import {
     ColorMapInterpolator,
-    LayerGeometryType,
     LayerType,
-    LayerRenderOrder,
     MapEvent,
-    RenderPipeline,
     ThematicAggregationLevel,
 } from './constants';
 
 import {
-    IBoundingBox,
-    ILayerComponent,
     ILayerData,
     ILayerGeometry,
     ILayerInfo,
@@ -34,13 +29,17 @@ import { MouseEvents } from './mouse-events';
 import { MapEvents } from './map-events';
 import { LayerManager } from './layer-manager';
 
+import { TriangulatorPoints } from './triangulator-points';
 import { TriangulatorPolygons } from './triangulator-polygons';
-import { TriangulatorBuildings } from './triangulator-buildings';
 import { TriangulatorPolylines } from './triangulator-polylines';
-import { TriangulatorSureface } from './triangulator-surface';
+import { TriangulatorBuildings } from './triangulator-buildings';
+
 import { AutkMapUi } from './map-ui';
-import { TriangulatorBorders } from './triangulator-boundaries';
-import { BboxBuilder } from './bbox-builder';
+import { LayerBbox } from './layer-bbox';
+
+import { VectorLayer } from './layer-vector';
+import { RasterLayer } from './layer-raster';
+import { TriangulatorRaster } from './triangulator-raster';
 
 /**
  * The main autark map class.
@@ -170,22 +169,20 @@ export class AutkMap {
 
     /**
      * Gets the bounding box of the map.
-     * @returns {Feature<Polygon>} The bounding box
+     * @returns {Bbox} The bounding box
      */
-    get boundingBox(): Feature<Polygon> {
-        return this._layerManager.boundingBox;
+    get boundingBox(): BBox {
+        return this._layerManager.bboxAndOrigin;
     }
-    set boundingBox(bbox: IBoundingBox) {
-        this._layerManager.boundingBox = bbox;
+    set boundingBox(bbox: BBox) {
+        this._layerManager.bboxAndOrigin = bbox;
     }
 
     /**
      * Initializes the map with the given bounding box.
-     * @param {IBoundingBox} bbox The bounding box to initialize the map with
+     * @param {BBox} bbox The bounding box to initialize the map with
      */
-    async init(bbox: IBoundingBox | null = null) {
-        if (bbox) this._layerManager.boundingBox = bbox;
-
+    async init() {
         await this._renderer.init();
 
         this._keyEvents.bindEvents();
@@ -202,61 +199,102 @@ export class AutkMap {
      *
      * This method creates a layer based on the provided GeoJSON data and adds it to the map's layer manager.
      * Supported OSM layer types include:
-     * - OSM_SURFACE
-     * - OSM_WATER
-     * - OSM_PARKS
-     * - OSM_ROADS
-     * - OSM_BUILDINGS
+     * - AUTK_OSM_SURFACE
+     * - AUTK_OSM_WATER
+     * - AUTK_OSM_PARKS
+     * - AUTK_OSM_ROADS
+     * - AUTK_OSM_BUILDINGS
      *
      * Custom layers can also be loaded with types:
-     * - BOUNDARIES_LAYER
-     * - POLYLINES_LAYER
-     * - HEATMAP_LAYER
+     * - AUTK_GEO_POINTS
+     * - AUTK_GEO_POLYLINES
+     * - AUTK_GEO_POLYGONS
+     * - AUTK_RASTER
      *
      * @param {string} layerName The name of the layer
      * @param {LayerType} typeLayer The type of the layer
      * @param {FeatureCollection} geojson The GeoJSON data to load
      */
-    loadGeoJsonLayer(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
+    loadGeoJsonLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType | null = null) {
+        // Check if the bounding box is already set
         if (!this.boundingBox) {
-            this.boundingBox = BboxBuilder.buildBbox(geojson);
-            console.log({ bbox: this.origin });
+            if (geojson.bbox) {
+                this.boundingBox = geojson.bbox;
+            } else {
+                this.boundingBox = LayerBbox.build(geojson);
+            }
+        }
+
+        // Check the layer type
+        if (typeLayer === null) {
+            const geoType = geojson.features.length > 0 && geojson.features[0].geometry?.type;
+            console.log('Detected geoType:', geoType);
+
+            switch (geoType) {
+                case 'Point':
+                case 'MultiPoint':
+                    typeLayer = LayerType.AUTK_GEO_POINTS;
+                    break;
+                case 'LineString':
+                case 'MultiLineString':
+                    typeLayer = LayerType.AUTK_GEO_POLYLINES;
+                    break;
+                case 'Polygon':
+                case 'MultiPolygon':
+                    typeLayer = LayerType.AUTK_GEO_POLYGONS;
+                    break;
+            }
         }
 
         switch (typeLayer) {
-            case LayerType.OSM_WATER:
-            case LayerType.OSM_PARKS:
-                this.createLayerFromOsmFeatures(layerName, typeLayer, geojson);
+            case LayerType.AUTK_OSM_SURFACE:
+            case LayerType.AUTK_OSM_WATER:
+            case LayerType.AUTK_OSM_PARKS:
+            case LayerType.AUTK_GEO_POLYGONS:
+                this.createPolygonsLayer(layerName, geojson, typeLayer);
                 break;
 
-            case LayerType.OSM_SURFACE:
-                this.createLayerFromOsmSurface(layerName, geojson);
+            case LayerType.AUTK_OSM_ROADS:
+            case LayerType.AUTK_GEO_POLYLINES:
+                this.createPolylinesLayer(layerName, geojson, typeLayer);
                 break;
 
-            case LayerType.OSM_ROADS:
-                this.createLayerfromOsmRoads(layerName, geojson);
+            case LayerType.AUTK_GEO_POINTS:
+                this.createPointsLayer(layerName, geojson, typeLayer);
                 break;
 
-            case LayerType.OSM_BUILDINGS:
-                this.createLayersFromOsmBuildings(layerName, geojson);
-                break;
-
-            case LayerType.BOUNDARIES_LAYER:
-                this.createLayerFromBoundaries(layerName, geojson);
-                break;
-
-            case LayerType.POLYLINES_LAYER:
-                this.createLayerFromPolylines(layerName, geojson);
-                break;
-
-            case LayerType.HEATMAP_LAYER:
-                this.createLayerFromHeatmap(layerName, geojson);
+            case LayerType.AUTK_OSM_BUILDINGS:
+                this.createBuildingsLayer(layerName, geojson, typeLayer);
                 break;
 
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
+    }
+
+    /**
+     * Loads a GeoTIFF layer into the map.
+     * This method creates a layer based on the provided GeoTIFF data and adds it to the map's layer manager.
+     *
+     * @param layerName The name of the layer
+     * @param geotiff The GeoTIFF data to load
+     * @param typeLayer The type of the layer
+     */
+    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection, typeLayer: LayerType | null = null) {
+
+        // TODO: Validate geotiff input
+        // Allow the user to provide a geotiff and parse using geotiff.js library
+
+        switch (typeLayer) {
+            case LayerType.AUTK_RASTER:
+                this.createRasterLayer(layerName, geotiff);
+                break;
+            default:
+                console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
+                break;
+        }
+
     }
 
     /**
@@ -276,11 +314,11 @@ export class AutkMap {
         let filtered: Feature[] = geojson.features;
         if (groupById) {
             const visited = new Set<string>();
-            filtered = filtered.filter((f) => { 
+            filtered = filtered.filter((f) => {
                 let key = f.properties ? f.properties.building_id as string : '-1';
 
-                if (!visited.has(key)) { 
-                    visited.add(key); 
+                if (!visited.has(key)) {
+                    visited.add(key);
                     return true;
                 }
                 return false;
@@ -291,7 +329,7 @@ export class AutkMap {
 
         if (dataType === 'number') {
             for (const feature of filtered) {
-                const properties = feature.properties as GeoJsonProperties; 
+                const properties = feature.properties as GeoJsonProperties;
                 if (!properties) { continue; }
 
                 const val = +getFnv(feature);
@@ -317,7 +355,7 @@ export class AutkMap {
             this.updateRenderInfoProperty(layerName, 'colorMapLabels', strCats);
 
             for (const feature of filtered) {
-                const properties = feature.properties as GeoJsonProperties; 
+                const properties = feature.properties as GeoJsonProperties;
                 if (!properties) { continue; }
 
                 const val = 0.1 * strCats.indexOf(getFnv(feature) as string);
@@ -338,11 +376,11 @@ export class AutkMap {
      * @param {ILayerThematic[]} layerThematic The thematic information to update
      */
     updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
-        const layer = this._layerManager.searchByLayerId(layerName);
+        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer;
 
         if (layer) {
             layer.loadThematic(layerThematic);
-            layer.makeLayerDataInfoDirty();
+            layer.makeLayerDataDirty();
         }
     }
 
@@ -352,12 +390,12 @@ export class AutkMap {
      * @param {string} layerName The name of the layer
      * @param {ILayerGeometry[]} layerGeometry The geometry data to update
      */
-    updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
-        const layer = this._layerManager.searchByLayerId(layerName);
+    public updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
+        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
 
         if (layer) {
             layer.loadGeometry(layerGeometry);
-            layer.makeLayerDataInfoDirty();
+            layer.makeLayerDataDirty();
         }
     }
 
@@ -368,8 +406,8 @@ export class AutkMap {
      * @param {ILayerRenderInfo} property The property to update
      * @param {unknown} value The new value for the property
      */
-    updateRenderInfoProperty(layerName: string, property: keyof ILayerRenderInfo, value: unknown) {
-        const layer = this._layerManager.searchByLayerId(layerName);
+    public updateRenderInfoProperty(layerName: string, property: keyof ILayerRenderInfo, value: unknown) {
+        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
 
         if (layer) {
             switch (property) {
@@ -384,7 +422,7 @@ export class AutkMap {
                     break;
                 case 'isPick':
                     layer.layerRenderInfo.isPick = value as boolean;
-                    if (value === false) { layer.clearHighlightedIds(); }
+                    if (value === false) { (layer as VectorLayer).clearHighlightedIds(); }
                     break;
                 case 'colorMapInterpolator':
                     layer.layerRenderInfo.colorMapInterpolator = value as ColorMapInterpolator;
@@ -408,7 +446,7 @@ export class AutkMap {
      * Starts the drawing loop.
      * @param {number} fps The frames per second to target.
      */
-    draw(fps: number = 60) {
+    public draw(fps: number = 60) {
         let previousDelta = 0;
 
         const update = (currentDelta: number) => {
@@ -425,10 +463,6 @@ export class AutkMap {
 
         requestAnimationFrame(update);
     }
-
-
-    // ---- Private methods ----
-
 
     /**
      * Handles window resize events
@@ -455,7 +489,6 @@ export class AutkMap {
 
     /**
      * Renders the map.
-     *
      * This method updates the camera, starts the rendering process, and handles picking for each layer.
      */
     private render() {
@@ -464,7 +497,12 @@ export class AutkMap {
 
         // Normal render pass for each layer
         this._renderer.start();
-        this._layerManager.layers.forEach((layer) => {
+        this._layerManager.vectorLayers.forEach((layer) => {
+            if (!layer.layerRenderInfo.isSkip) {
+                layer.renderPass(this._camera);
+            }
+        });
+        this._layerManager.rasterLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip) {
                 layer.renderPass(this._camera);
             }
@@ -473,7 +511,7 @@ export class AutkMap {
 
         // Picking render pass for each layer
         this._renderer.startPickingRenderPass();
-        this._layerManager.layers.forEach((layer) => {
+        this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 layer.renderPickingPass(this._camera);
             }
@@ -481,7 +519,7 @@ export class AutkMap {
         this._renderer.finish();
 
         // Getting ids
-        this._layerManager.layers.forEach((layer) => {
+        this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 const [x, y] = layer.layerRenderInfo.pickedComps;
                 layer.getPickedId(x, y).then((id) => {
@@ -499,41 +537,21 @@ export class AutkMap {
         });
     }
 
-
-    // ---- Private methods for creating layers ----
-
     /**
      * Creates a features layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
      * @param {LayerType} typeLayer The type of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createLayerFromOsmFeatures(layerName: string, typeLayer: LayerType, geojson: FeatureCollection) {
-        let zIndex = -1;
-
-        switch (typeLayer) {
-            case LayerType.OSM_WATER:
-                zIndex = LayerRenderOrder.OSM_WATER;
-                break;
-            case LayerType.OSM_PARKS:
-                zIndex = LayerRenderOrder.OSM_PARKS;
-                break;
-            default:
-                zIndex = 0.5 + 0.01 * this.layerManager.length;
-                break;
-        }
-
+    private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: zIndex,
-            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
+            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
-            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
@@ -543,7 +561,62 @@ export class AutkMap {
 
         const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Feature 2D Layer mesh');
+            console.error('Invalid Polygon Layer');
+            return;
+        }
+
+        let layerBorder = null;
+        if (typeLayer === LayerType.AUTK_GEO_POLYGONS) {
+            layerBorder = TriangulatorPolygons.buildBorder(geojson, this.origin);
+            if (layerBorder[0].length === 0 || layerBorder[1].length === 0) {
+                console.error('Invalid Polygon Layer border.');
+                return;
+            }
+        } else {
+            layerBorder = [[], []];
+        }
+
+        const layerData = {
+            geometry: layerMesh[0],
+            components: layerMesh[1],
+            border: layerBorder[0],
+            borderComponents: layerBorder[1],
+            thematic: layerMesh[1].map(() => {
+                return {
+                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    values: [0],
+                };
+            }),
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
+    }
+
+    /**
+     * Creates a roads layer from a GeoJSON source.
+     * @param {string} layerName The name of the layer.
+     * @param {FeatureCollection} geojson The GeoJSON data.
+     */
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number = 300) {
+        const layerInfo: ILayerInfo = {
+            id: `${layerName}`,
+            zIndex: this._layerManager.computeZindex(typeLayer),
+            typeLayer: typeLayer,
+        };
+
+        const layerRenderInfo: ILayerRenderInfo = {
+            opacity: 1.0,
+            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            colorMapLabels: ['0.0', '1.0'],
+            isColorMap: false,
+            isPick: false,
+            isSkip: false,
+        };
+
+        TriangulatorPolylines.offset = offset;
+        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.origin);
+        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
+            console.error('Invalid Roads Layer.');
             return;
         }
 
@@ -562,20 +635,18 @@ export class AutkMap {
     }
 
     /**
-     * Creates a surface layer from a GeoJSON source.
+     * Creates a points layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createLayerFromOsmSurface(layerName: string, geojson: FeatureCollection) {
+    private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: LayerRenderOrder.OSM_SURFACE,
-            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
-            typeLayer: LayerType.OSM_SURFACE,
+            zIndex: this._layerManager.computeZindex(typeLayer),
+            typeLayer: typeLayer,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -584,53 +655,9 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorSureface.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPoints.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Surface Layer mesh');
-            return;
-        }
-
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [id / (layerMesh[1].length - 1)],
-                };
-            }),
-        };
-
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
-    }
-
-    /**
-     * Creates a roads layer from a GeoJSON source.
-     * @param {string} layerName The name of the layer.
-     * @param {FeatureCollection} geojson The GeoJSON data.
-     */
-    private createLayerfromOsmRoads(layerName: string, geojson: FeatureCollection) {
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zValue: LayerRenderOrder.OSM_ROADS,
-            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
-            typeLayer: LayerType.OSM_ROADS,
-        };
-
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
-
-        TriangulatorPolylines.offset = 300;
-        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Roads Layer.');
+            console.error('Invalid Points Layer.');
             return;
         }
 
@@ -653,16 +680,14 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createLayersFromOsmBuildings(layerName: string, geojson: FeatureCollection) {
+    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: LayerRenderOrder.OSM_BUILDINGS,
-            typeGeometry: LayerGeometryType.AUTK_3D_TRIANGLES,
-            typeLayer: LayerType.OSM_BUILDINGS,
+            zIndex: this._layerManager.computeZindex(typeLayer),
+            typeLayer: LayerType.AUTK_OSM_BUILDINGS,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_SSAO,
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -674,103 +699,6 @@ export class AutkMap {
         const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Building Layer.');
-            return;
-        }
-
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map((_e: ILayerComponent, id: number) => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [id / (layerMesh[1].length - 1)],
-                };
-            }),
-        };
-
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
-    }
-
-    /**
-     * Creates a custom features layer from a GeoJSON source.
-     * @param {string} layerName The name of the layer.
-     * @param {FeatureCollection} geojson The GeoJSON data.
-     */
-    private createLayerFromBoundaries(layerName: string, geojson: FeatureCollection) {
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zValue: LayerRenderOrder.BOUNDARIES_LAYER + 0.01 * this.layerManager.length,
-            typeGeometry: LayerGeometryType.AUTK_2D_LINES,
-            typeLayer: LayerType.BOUNDARIES_LAYER,
-        };
-
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
-
-        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
-        console.log({ layerMesh });
-
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Feature Layer.');
-            return;
-        }
-        const layerBorder = TriangulatorBorders.buildBorder(geojson, this.origin);
-        if (layerBorder[0].length === 0 || layerBorder[1].length === 0) {
-            console.error('Invalid Feature Layer border.');
-            return;
-        }
-
-        const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            border: layerBorder[0],
-            borderComponents: layerBorder[1],
-            thematic: layerMesh[1].map(() => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [0],
-                };
-            }),
-        };
-
-        this.createLayer(layerInfo, layerRenderInfo, layerData);
-    }
-
-    /**
-     * Creates custom lines from a GeoJSON source.
-     * @param {string} layerName The name of the layer.
-     * @param {FeatureCollection} geojson The GeoJSON data.
-     */
-    private createLayerFromPolylines(layerName: string, geojson: FeatureCollection) {
-        const layerInfo: ILayerInfo = {
-            id: `${layerName}`,
-            zValue: LayerRenderOrder.POLYLINES_LAYER + 0.01 * this.layerManager.length,
-            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
-            typeLayer: LayerType.POLYLINES_LAYER,
-        };
-
-        const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_FLAT,
-            opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
-            isColorMap: false,
-            isPick: false,
-            isSkip: false,
-        };
-
-        TriangulatorPolylines.offset = 600;
-        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Roads Layer.');
             return;
         }
 
@@ -791,20 +719,17 @@ export class AutkMap {
     /**
      * Creates a custom grid layer from a GeoJSON source.
      * @param {string} layerName The name of the layer.
-     * @param {FeatureCollection} geojson The GeoJSON data.
+     * @param {FeatureCollection} geotiff The GeoJSON data.
      */
-    private createLayerFromHeatmap(layerName: string, geojson: FeatureCollection) {
+    private createRasterLayer(layerName: string, geotiff: FeatureCollection) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zValue: LayerRenderOrder.HEATMAP_LAYER,
-            typeGeometry: LayerGeometryType.AUTK_2D_TRIANGLES,
-            typeLayer: LayerType.HEATMAP_LAYER,
+            zIndex: this._layerManager.computeZindex(LayerType.AUTK_RASTER),
+            typeLayer: LayerType.AUTK_RASTER,
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
-            pipeline: RenderPipeline.TRIANGLE_HEATMAP,
             opacity: 1.0,
-            // Using a color map interpolator for 2D features is not necessary, but it can be used for thematic layers.
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
             isColorMap: false,
@@ -812,21 +737,26 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorRaster.buildMesh(geotiff, this.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature Layer.');
             return;
         }
 
-        const layerData = {
+        const props = geotiff.features[0].properties;
+        if (!props) {
+            console.error('GeoTIFF properties are missing.');
+            return;
+        }
+
+        const layerData: ILayerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
-            thematic: layerMesh[1].map(() => {
-                return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
-                    values: [0],
-                };
-            }),
+            raster: [{
+                rasterResX: props.rasterResX,
+                rasterResY: props.rasterResY,
+                rasterValues: props.raster
+            }],
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
@@ -839,10 +769,17 @@ export class AutkMap {
      * @param {ILayerData} layerData The data for the layer.
      */
     private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
-        const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
+        let layer: VectorLayer | RasterLayer;
+
+        if (layerInfo.typeLayer === LayerType.AUTK_RASTER) {
+            layer = this._layerManager.addRasterLayer(layerInfo, layerRenderInfo, layerData) as RasterLayer;
+        }
+        else {
+            layer = this._layerManager.addVectorLayer(layerInfo, layerRenderInfo, layerData) as VectorLayer;
+        }
 
         if (layer) {
-            layer.createPipeline(this._renderer, this._camera);
+            layer.createPipeline(this._renderer);
         }
     }
 }

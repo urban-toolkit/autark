@@ -1,20 +1,20 @@
 /// <reference types="@webgpu/types" />
 
-import linesVertexSource from './shaders/lines.vert.wgsl';
-import linesFragmentSource from './shaders/lines.frag.wgsl';
+import linesVertexSource from './shaders/triangle-02.vert.wgsl';
+import linesFragmentSource from './shaders/triangle-02.frag.wgsl';
 
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
 import { Camera } from './camera';
 
-import { Triangles2DBorder } from './layer-triangles2D-borders';
+import { Triangles2DLayer } from './layer-triangles2D';
 
 /**
  * PipelineBorderFlat is a rendering pipeline for drawing flat borders of triangles in 2D space.
  * It uses WebGPU to render lines based on the provided border data.
  */
-export class PipelineBorderFlat extends Pipeline {
+export class PipelineTriangleBorder extends Pipeline {
     /**
      * Position buffer for vertex data.
      * @type {GPUBuffer}
@@ -61,9 +61,9 @@ export class PipelineBorderFlat extends Pipeline {
 
     /**
      * Builds the pipeline with the provided border data.
-     * @param {Triangles2DBorder} borders The border data containing positions and indices
+     * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
-    build(borders: Triangles2DBorder) {
+    build(borders: Triangles2DLayer) {
         this.createShaders();
 
         this.createVertexBuffers(borders);
@@ -94,9 +94,9 @@ export class PipelineBorderFlat extends Pipeline {
 
     /**
      * Creates the vertex buffers for the pipeline.
-     * @param {Triangles2DBorder} borders The border data containing positions and indices
+     * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
-    createVertexBuffers(borders: Triangles2DBorder) {
+    createVertexBuffers(borders: Triangles2DLayer) {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -120,9 +120,9 @@ export class PipelineBorderFlat extends Pipeline {
 
     /**
      * Updates the vertex buffers with the provided border data.
-     * @param {Triangles2DBorder} borders The border data containing positions and indices
+     * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
-    updateVertexBuffers(borders: Triangles2DBorder) {
+    updateVertexBuffers(borders: Triangles2DLayer) {
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
         this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
         this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(borders.skippedVertices));
@@ -204,7 +204,7 @@ export class PipelineBorderFlat extends Pipeline {
 
         // Uniform Data
         const pipelineLayoutDesc = {
-            bindGroupLayouts: [this._colorsBindGroupLayout, this._cameraBindGroupLayout],
+            bindGroupLayouts: [this._renderInfoBindGroupLayout, this._cameraBindGroupLayout],
         };
 
         // Pipeline
@@ -255,7 +255,7 @@ export class PipelineBorderFlat extends Pipeline {
         passEncoder.setIndexBuffer(this._borderIndicesBuffer, 'uint32');
 
         // sets the uniform buffers
-        passEncoder.setBindGroup(0, this._colorsBindGroup);
+        passEncoder.setBindGroup(0, this._renderInfoBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
 
         passEncoder.drawIndexed(this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);

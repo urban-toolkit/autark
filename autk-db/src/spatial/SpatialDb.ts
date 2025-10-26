@@ -241,17 +241,37 @@ export class SpatialDb {
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
     if (!isLayerType(layerTable.type)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
-    return this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+    const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+
+    const osmBoundingBox = this.getOsmBoundingBox();
+    if (osmBoundingBox) {
+      featureCollection.bbox = osmBoundingBox;
+    } else {
+      const layerBoundingBox = await this.getBoundingBoxFromLayer(layerTableName);
+      featureCollection.bbox = [
+        layerBoundingBox.minLon,
+        layerBoundingBox.minLat,
+        layerBoundingBox.maxLon,
+        layerBoundingBox.maxLat,
+      ];
+    }
+
+    return featureCollection;
   }
 
   /**
    * Retrieves the bounding box of the OSM data loaded from the Overpass API.
-   * @returns The bounding box of the OSM data.
-   * @throws Error if the OSM bounding box is not found.
+   * @returns The bounding box of the OSM data as array.
    */
-  getOsmBoundingBox(): BoundingBox {
-    if (!this.osmBoudingBox) throw new Error('OSM bounding box not found. Please call loadOsmFromOverpassApi() first.');
-    return this.osmBoudingBox;
+  getOsmBoundingBox(): [number, number, number, number] | null {
+    if (!this.osmBoudingBox) return null;
+
+    return [
+      this.osmBoudingBox.minLon,
+      this.osmBoudingBox.minLat,
+      this.osmBoudingBox.maxLon,
+      this.osmBoudingBox.maxLat,
+    ]
   }
 
   /**
@@ -288,8 +308,8 @@ export class SpatialDb {
   getLayerTables(): Array<LayerTable | CustomLayerTable> {
     return this.tables.filter((table): table is LayerTable | CustomLayerTable => {
       return (
-        (table.source === 'osm' && isLayerType(table.type)) || 
-        (table.source === 'geojson' && isLayerType(table.type)) || 
+        (table.source === 'osm' && isLayerType(table.type)) ||
+        (table.source === 'geojson' && isLayerType(table.type)) ||
         (table.source === 'user' && isLayerType(table.type)) // TODO: check if this is correct
       );
     });

@@ -40,7 +40,7 @@ export class KeyEvents {
             const id = (styles.indexOf(current) + 1) % 3;
             MapStyle.setPredefinedStyle(styles[id]);
 
-            for (const layer of this._map.layerManager.layers) {
+            for (const layer of this._map.layerManager.vectorLayers) {
                 layer.makeLayerRenderInfoDirty();
             }
         }

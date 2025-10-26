@@ -1,68 +1,25 @@
 /**
- * The types of geometry supported in autk-map.
- * @property {string} AUTK_2D_POINTS - Represents a point collection.
- * @property {string} AUTK_2D_LINES - Represents a line collection.
- * @property {string} AUTK_2D_TRIANGLES - Represents a 2D triangles collection.
- * @property {string} AUTK_3D_TRIANGLES - Represents a 3D triangles collection.
- */
-export enum LayerGeometryType {
-  AUTK_2D_POINTS = 'points2d',
-  AUTK_2D_LINES = 'boundaries2d',
-  AUTK_2D_TRIANGLES = 'triangles2d',
-  AUTK_3D_TRIANGLES = 'triangles3d',
-}
-
-/**
  * The types of layer supported in autk-map.
- * @property {string} OSM_SURFACE - Represents the OpenStreetMap surface layer.
- * @property {string} OSM_PARKS - Represents the OpenStreetMap parks layer.
- * @property {string} OSM_WATER - Represents the OpenStreetMap water layer.
- * @property {string} OSM_ROADS - Represents the OpenStreetMap roads layer.
- * @property {string} OSM_BUILDINGS - Represents the OpenStreetMap buildings layer.
- * @property {string} BOUNDARIES_LAYER - Represents a layer with closed linestrings, multilinestrings, polygons, or multipolygons.
- * @property {string} POLYLINES_LAYER - Represents a layer of open linestrings or multilinestrings.
- * @property {string} HEATMAP_LAYER - Represents a heatmap layer.
+ * @property {string} AUTK_OSM_SURFACE - Represents the OpenStreetMap surface layer (it must be a feature collection of polygons).
+ * @property {string} AUTK_OSM_PARKS - Represents the OpenStreetMap parks layer (it must be a feature collection of polygons).
+ * @property {string} AUTK_OSM_WATER - Represents the OpenStreetMap water layer (it must be a feature collection of polygons).
+ * @property {string} AUTK_OSM_ROADS - Represents the OpenStreetMap roads layer (it must be a feature collection of polylines).
+ * @property {string} AUTK_OSM_BUILDINGS - Represents the OpenStreetMap buildings layer (it must be a feature collection of polygons).
+ * @property {string} AUTK_GEO_POINTS - Represents a layer with points or multipoints.
+ * @property {string} AUTK_GEO_POLYLINES - Represents a layer of linestrings or multilinestrings.
+ * @property {string} AUTK_GEO_POLYGONS - Represents a layer of polygons or multipolygons.
+ * @property {string} AUTK_RASTER - Represents a raster layer.
  */
 export enum LayerType {
-  OSM_SURFACE = 'surface',
-  OSM_PARKS = 'parks',
-  OSM_WATER = 'water',
-  OSM_ROADS = 'roads',
-  OSM_BUILDINGS = 'buildings',
-  BOUNDARIES_LAYER  = 'boundaries',
-  POLYLINES_LAYER = 'lines',
-  HEATMAP_LAYER  = 'heatmap',
-}
-
-//  PROPOSED LAYER TYPES
-//  AUTK_MAP_SURFACE = 'surface',
-//  AUTK_MAP_PARKS = 'parks',
-//  AUTK_MAP_WATER = 'water',
-//  AUTK_MAP_ROADS = 'roads',
-//  AUTK_MAP_BUILDINGS = 'buildings',
-//  AUTK_MAP_CUSTOM  = 'custom',
-
-
-/**
- * Rendering order of the layers based on their type.
- * @property {string} OSM_SURFACE - Represents the OpenStreetMap surface layer.
- * @property {string} OSM_PARKS - Represents the OpenStreetMap parks layer.
- * @property {string} OSM_WATER - Represents the OpenStreetMap water layer.
- * @property {string} OSM_ROADS - Represents the OpenStreetMap roads layer.
- * @property {string} OSM_BUILDINGS - Represents the OpenStreetMap buildings layer.
- * @property {string} BOUNDARIES_LAYER - Represents a layer with closed linestrings, multilinestrings, polygons, or multipolygons.
- * @property {string} POLYLINES_LAYER - Represents a layer of open linestrings or multilinestrings.
- * @property {string} HEATMAP_LAYER - Represents a heatmap layer.
- */
-export enum LayerRenderOrder {
-  OSM_SURFACE = 0,
-  OSM_PARKS = 0.1,
-  OSM_WATER = 0.2,
-  OSM_ROADS = 0.3,
-  OSM_BUILDINGS = 1.0,
-  BOUNDARIES_LAYER = 0.5,
-  POLYLINES_LAYER = 0.6,
-  HEATMAP_LAYER  = 0.4
+  AUTK_OSM_SURFACE = 'surface',
+  AUTK_OSM_PARKS = 'parks',
+  AUTK_OSM_WATER = 'water',
+  AUTK_OSM_ROADS = 'roads',
+  AUTK_OSM_BUILDINGS = 'buildings',
+  AUTK_GEO_POINTS = 'points',
+  AUTK_GEO_POLYLINES = 'lines',
+  AUTK_GEO_POLYGONS = 'polygons',
+  AUTK_RASTER = 'raster'
 }
 
 /**
@@ -83,18 +40,6 @@ export enum ThematicAggregationLevel {
   AGGREGATION_POINT = 'aggregationPoint',
   AGGREGATION_PRIMITIVE = 'aggregationPrimitive',
   AGGREGATION_COMPONENT = 'aggregationComponent',
-}
-
-/**
- * Render pipelines for different rendering techniques.
- * @property {string} TRIANGLE_FLAT - Flat triangle rendering.
- * @property {string} TRIANGLE_SSAO - Screen Space Ambient Occlusion triangle rendering.
- * @property {string} TRIANGLE_HEATMAP - Heatmap triangle rendering.
- */
-export enum RenderPipeline {
-  TRIANGLE_FLAT = 'triangleFlat',
-  TRIANGLE_SSAO = 'triangleSsao',
-  TRIANGLE_HEATMAP = 'triangleHeatmap',
 }
 
 /**

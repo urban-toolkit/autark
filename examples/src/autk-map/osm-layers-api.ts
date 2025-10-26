@@ -28,7 +28,7 @@ export class OsmLayersApi {
         if (canvas) {
             this.map = new AutkMap(canvas);
 
-            await this.map.init(this.db.getOsmBoundingBox());
+            await this.map.init();
             await this.loadLayers();
 
             this.map.draw();
@@ -38,7 +38,8 @@ export class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, layerData.type as LayerType, geojson);
+
+            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
 
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }

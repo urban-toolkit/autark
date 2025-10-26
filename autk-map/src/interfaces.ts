@@ -1,9 +1,7 @@
 import {
     ColorHEX,
     ColorMapInterpolator,
-    LayerGeometryType,
     LayerType,
-    RenderPipeline,
     ThematicAggregationLevel,
 } from './constants';
 
@@ -25,8 +23,9 @@ export interface IMapStyle {
     water: ColorHEX;
     roads: ColorHEX;
     buildings: ColorHEX;
-    boundaries: ColorHEX;
-    lines: ColorHEX;
+    points: ColorHEX;
+    polylines: ColorHEX;
+    polygons: ColorHEX;
 }
 
 /**
@@ -38,8 +37,7 @@ export interface IMapStyle {
  */
 export interface ILayerInfo {
     id: string;
-    zValue: number;
-    typeGeometry: LayerGeometryType;
+    zIndex: number;
     typeLayer: LayerType;
 }
 
@@ -54,7 +52,6 @@ export interface ILayerInfo {
  * @property {boolean} [isPick] - Indicates if the layer is for picking
  */
 export interface ILayerRenderInfo {
-    pipeline: RenderPipeline;
     opacity: number;
     isColorMap?: boolean;
     colorMapInterpolator: ColorMapInterpolator;
@@ -70,6 +67,7 @@ export interface ILayerRenderInfo {
  * @property {ILayerComponent[]} components - Array of components for the layer.
  * @property {ILayerBorder[]} [border] - Array of borders for the layer.
  * @property {ILayerBorderComponent[]} [borderComponents] - Array of border components for the layer.
+ * @property {IRasterData} [raster] - Raster data for the layer.
  * @property {ILayerThematic[]} [thematic] - Thematic data for the layer.
  * @property {number[]} [highlighted] - Indices of highlighted components in the layer.
  */
@@ -78,6 +76,7 @@ export interface ILayerData {
     components: ILayerComponent[];
     border?: ILayerBorder[];
     borderComponents?: ILayerBorderComponent[];
+    raster?: IRasterData[];
     thematic?: ILayerThematic[];
     highlighted?: number[];
 }
@@ -87,11 +86,13 @@ export interface ILayerData {
  * @property {number[]} position - Array of positions for the geometry.
  * @property {number[]} [normal] - Optional array of normals for the geometry.
  * @property {number[]} [indices] - Optional array of indices for the geometry.
+ * @property {number[]} [texCoord] - Optional array of texture coordinates for the geometry.
  */
 export interface ILayerGeometry {
     position: number[];
     normal?: number[];
     indices?: number[];
+    texCoord?: number[];
 }
 
 /**
@@ -105,6 +106,18 @@ export interface ILayerThematic {
 }
 
 /**
+ * Interface for raster data.
+ * @property {number} rasterResX - Width of the raster.
+ * @property {number} rasterResY - Height of the raster.
+ * @property {number[]} values - Array of raster values.
+ */
+export interface IRasterData {
+    rasterResX: number;
+    rasterResY: number;
+    rasterValues: number[];
+}
+
+/**
  * Interface for layer components.
  * @property {number} nPoints - Number of points in the layer component.
  * @property {number} nTriangles - Number of triangles in the layer component.
@@ -113,7 +126,6 @@ export interface ILayerComponent {
     nPoints: number;
     nTriangles: number;
 }
-
 
 /**
  * Interface for layer border information.
@@ -135,7 +147,6 @@ export interface ILayerBorderComponent {
     nLines: number;
 }
 
-
 /**
  * Interface for camera data.
  * @property {number[]} up - Up vector of the camera.
@@ -146,18 +157,4 @@ export interface ICameraData {
     up: number[];
     eye: number[];
     lookAt: number[];
-}
-
-/**
- * Interface for Bounding Box.
- * @property {number} minLon - Minimum longitude of the bounding box.
- * @property {number} minLat - Minimum latitude of the bounding box.
- * @property {number} maxLon - Maximum longitude of the bounding box.
- * @property {number} maxLat - Maximum latitude of the bounding box.
- */
-export interface IBoundingBox {
-    minLon: number;
-    minLat: number;
-    maxLon: number;
-    maxLat: number;
 }

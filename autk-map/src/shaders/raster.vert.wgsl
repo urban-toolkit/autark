@@ -3,17 +3,15 @@
 
 struct VSOut {
     @builtin(position) outPosition: vec4<f32>,
-    @location(0) outThematic: f32,
-    @location(1) outHighlighted: f32
+    @location(0) outTexCoord: vec2<f32>,
  };
 
 @vertex
-fn main(@location(0) inPosition: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32) -> VSOut {
+fn main(@location(0) inPosition: vec3f, @location(1) inTexCoord: vec2f) -> VSOut {
     var vsOut: VSOut;
 
     vsOut.outPosition = projection * modelView * vec4f(inPosition, 1);
-    vsOut.outThematic = inThematic;
-    vsOut.outHighlighted = inHighlighted;
+    vsOut.outTexCoord = inTexCoord;
 
     return vsOut;
 }

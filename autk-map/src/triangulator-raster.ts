@@ -10,56 +10,46 @@ import earcut from 'earcut';
  * Class for triangulating polylines from GeoJSON features.
  * It provides methods to convert different geometry types into polyline meshes.
  */
-export class TriangulatorPolylines {
-    /**
-     * The offset distance for the polyline extrusion.
-     * @type {number}
-     */
-    static offset: number = 300;
+export class TriangulatorRaster {
 
     /**
      * Builds a mesh from GeoJSON features representing polylines.
-     * @param {FeatureCollection} geojson The GeoJSON feature collection
+     * @param {FeatureCollection} geotiff The GeoJSON feature collection
      * @param {number[]} origin The origin point for translation
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
      */
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static buildMesh(geotiff: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
-        const collection: Feature[] = geojson['features'];
+        const bbox = geotiff.bbox;
 
-        let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
-        for (let fId = 0; fId < collection.length; fId++) {
-            // gets the feature
-            const feature = collection[fId];
-
-            if (feature.geometry.type === 'LineString') {
-                meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
-
-            } else if (feature.geometry.type === 'MultiLineString') {
-                meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
-
-            } else {
-                console.warn('Unsupported geometry type:', feature.geometry.type);
-                continue;
-            }
-
-            let nPoints = 0;
-            let nTriangles = 0;
-
-            for (const triangulation of meshes) {
-                mesh.push({
-                    position: triangulation.flatCoords,
-                    indices: triangulation.flatIds
-                });
-
-                nPoints += triangulation.flatCoords.length / 2;
-                nTriangles += triangulation.flatIds.length / 3;
-            }
-            comps.push({ nPoints, nTriangles });
-
+        if (!bbox) {
+            console.warn('GeoTIFF feature collection does not have a bounding box.');
+            return [mesh, comps];
         }
+
+        const p0 = [bbox[0] - origin[0], bbox[1] - origin[1]];
+        const p1 = [bbox[2] - origin[0], bbox[1] - origin[1]];
+        const p2 = [bbox[2] - origin[0], bbox[3] - origin[1]];
+        const p3 = [bbox[0] - origin[0], bbox[3] - origin[1]];
+
+        const flatCoords = [p0[0] , p0[1], p1[0], p1[1], p2[0], p2[1], p3[0], p3[1]];
+        const texCoords = [0, 0, 1, 0, 1, 1, 0, 1];
+
+        const flatIds = [0, 1, 2, 0, 2, 3];
+
+        mesh.push({ 
+            position: flatCoords,
+            texCoord: texCoords,
+            indices: flatIds 
+        });
+
+        const nPoints = flatCoords.length / 2;
+        const nTriangles = flatIds.length / 3;
+
+        comps.push({ nPoints, nTriangles });
+
         return [mesh, comps];
     }
 
