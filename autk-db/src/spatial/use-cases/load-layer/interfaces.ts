@@ -9,10 +9,10 @@ export type LayerType =
   | 'points'
   | 'polygons'
   | 'polylines'
-  | 'rasters';
+  | 'raster';
 
 export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'water', 'parks', 'roads', 'buildings', 'points', 'polygons', 'polylines', 'rasters'].includes(
+  return ['surface', 'water', 'parks', 'roads', 'buildings', 'points', 'polygons', 'polylines', 'raster'].includes(
     value,
   );
 }

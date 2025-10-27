@@ -2,7 +2,7 @@ import { SpatialDb } from 'autk-db';
 import { AutkMap, ColorMapInterpolator, LayerType } from 'autk-map';
 import { Feature, GeoJsonProperties } from 'geojson';
 
-export class GeojsonVis {
+export class ColormapDiv {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
@@ -35,7 +35,6 @@ export class GeojsonVis {
 
     protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false): Promise<void> {
         const geojson = await this.db.getLayer(layer);
-        console.log({ geojson })
 
         const getFnv = (feature: Feature): number => {
             const properties = feature.properties as GeoJsonProperties;
@@ -49,13 +48,12 @@ export class GeojsonVis {
 }
 
 async function main() {
-    const example = new GeojsonVis();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new ColormapDiv();
     await example.run(canvas);
 }
 main();

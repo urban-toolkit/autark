@@ -5,7 +5,7 @@ import { AutkMap, LayerType } from 'autk-map';
 
 import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
-export class SpatialJoin {
+export class ComputeOsm {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
@@ -44,8 +44,8 @@ export class SpatialJoin {
         });
 
         this.map = new AutkMap(canvas);
-        await this.map.init();
 
+        await this.map.init();
         await this.loadLayers();
         await this.updateThematicData(geojson);
 
@@ -63,23 +63,20 @@ export class SpatialJoin {
     protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
         const getFnv = (feature: Feature) => {
             const properties = feature.properties as GeoJsonProperties;
-
             return properties?.compute.result || 0;
         };
-
 
         this.map.updateGeoJsonLayerThematic('table_osm_roads', geojson, getFnv);
     }
 }
 
 async function main() {
-    const example = new SpatialJoin();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new ComputeOsm();
     await example.run(canvas);
 }
 main();

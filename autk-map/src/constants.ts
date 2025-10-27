@@ -17,7 +17,7 @@ export enum LayerType {
   AUTK_OSM_ROADS = 'roads',
   AUTK_OSM_BUILDINGS = 'buildings',
   AUTK_GEO_POINTS = 'points',
-  AUTK_GEO_POLYLINES = 'lines',
+  AUTK_GEO_POLYLINES = 'polylines',
   AUTK_GEO_POLYGONS = 'polygons',
   AUTK_RASTER = 'raster'
 }
