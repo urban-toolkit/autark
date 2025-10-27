@@ -2,14 +2,14 @@ import { SpatialDb } from 'autk-db';
 import { AutkMap, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
 import { Feature, GeoJsonProperties } from 'geojson';
 
-export class GeojsonVis {
+export class ColormapCat {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
         this.db = new SpatialDb();
-
         await this.db.init();
+
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
             outputTableName: 'roads',
@@ -48,14 +48,13 @@ export class GeojsonVis {
 
 }
 
-async function main() {
-    const example = new GeojsonVis();
-    
+async function main() {   
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new ColormapCat();
     await example.run(canvas);
 }
 main();

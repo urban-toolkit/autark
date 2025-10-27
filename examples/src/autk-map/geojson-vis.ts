@@ -16,8 +16,8 @@ export class GeojsonVis {
         });
 
         this.map = new AutkMap(canvas);
-        await this.map.init();
 
+        await this.map.init();
         await this.loadLayers();
 
         this.map.draw();
@@ -33,13 +33,12 @@ export class GeojsonVis {
 }
 
 async function main() {
-    const example = new GeojsonVis();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new GeojsonVis();
     await example.run(canvas);
 }
 main();

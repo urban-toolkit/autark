@@ -58,7 +58,7 @@ export class LoadGridLayerUseCase {
 
     return {
       source: 'user',
-      type: 'rasters',
+      type: 'raster',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
     };

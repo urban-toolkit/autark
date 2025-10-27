@@ -31,9 +31,10 @@ export class LayerOpacity {
         });
 
         this.map = new AutkMap(canvas);
-        await this.map.init();
 
+        await this.map.init();
         await this.loadLayers();
+
         this.map.draw();
     }
 
@@ -43,19 +44,17 @@ export class LayerOpacity {
             this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-
         this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
     }
 }
 
 async function main() {
-    const example = new LayerOpacity();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new LayerOpacity();
     await example.run(canvas);
 }
 main();

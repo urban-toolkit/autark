@@ -10,9 +10,9 @@ export class OsmLayersApi {
 
     public async run(canvas01: HTMLCanvasElement, canvas02: HTMLCanvasElement): Promise<void> {
         this.db01 = new SpatialDb();
-        await this.db01.init();
-
         this.db02 = new SpatialDb();
+
+        await this.db01.init();
         await this.db02.init();
 
         await this.db01.loadOsmFromOverpassApi({
@@ -68,8 +68,6 @@ export class OsmLayersApi {
 }
 
 async function main() {
-    const example = new OsmLayersApi();
-
     const canvas01 = document.querySelector('#map01') as HTMLCanvasElement;
     const canvas02 = document.querySelector('#map02') as HTMLCanvasElement;
 
@@ -77,6 +75,7 @@ async function main() {
         throw new Error('No canvas found');
     }
 
+    const example = new OsmLayersApi();
     await example.run(canvas01, canvas02);
 }
 main();
