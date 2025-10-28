@@ -22,6 +22,7 @@ import { GridLayerTable } from '../shared/interfaces';
 import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces';
 import { RawQueryUseCase } from './use-cases/raw-query';
 import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
+import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-layer';
 
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
@@ -48,6 +49,7 @@ export class SpatialDb {
   private loadGridLayerUseCase?: LoadGridLayerUseCase;
   private rawQueryUseCase?: RawQueryUseCase;
   private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
+  private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
 
   /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
@@ -69,6 +71,7 @@ export class SpatialDb {
     this.loadGridLayerUseCase = new LoadGridLayerUseCase(this.conn);
     this.rawQueryUseCase = new RawQueryUseCase(this.conn);
     this.getBoundingBoxFromOsmUseCase = new GetBoundingBoxFromOsmUseCase(this.conn);
+    this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
 
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
@@ -91,7 +94,8 @@ export class SpatialDb {
       !this.loadOsmFromOverpassApiUseCase ||
       !this.dropTableUseCase ||
       !this.getBoundingBoxFromOsmUseCase ||
-      !this.transformBoundingBoxCoordinatesUseCase
+      !this.transformBoundingBoxCoordinatesUseCase ||
+      !this.polygonizeSurfaceLayerUseCase
     )
       throw new Error('Database not initialized. Please call init() first.');
 
@@ -119,7 +123,17 @@ export class SpatialDb {
         };
 
         layerParams.boundingBox = shouldCrop ? this.osmBoudingBox : undefined;
-        await this.loadLayer(layerParams);
+        const layerTable = await this.loadLayer(layerParams);
+
+        // Polygonize surface layer
+        if (layer === 'surface') {
+          const updatedTable = await this.polygonizeSurfaceLayerUseCase.exec(
+            { surfaceTableName: layerTable.name },
+            layerTable
+          );
+          const tableIndex = this.tables.findIndex((t) => t.name === layerTable.name);
+          if (tableIndex !== -1) this.tables[tableIndex] = updatedTable;
+        }
       }
 
       if (params.autoLoadLayers.dropOsmTable) {
@@ -128,6 +142,8 @@ export class SpatialDb {
           this.tables = this.tables.filter((t) => t.name !== table.name);
         }
       }
+
+      console.log(`OSM data loaded and completed!`);
     }
   }
 

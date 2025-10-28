@@ -20,12 +20,10 @@ type Params = {
 export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
   const query = getLayerQuery(layer);
 
-  // Surface layer uses ST_Polygonize to combine linestrings into polygons
   if (layer === 'surface') {
-    return buildSurfaceLayerQuery({ tableName, layer, outputFormat, outputTableName, query });
+    tableName = `${tableName}_boundaries`;
   }
 
-  // Standard layer query: creates geometries per OSM way
   return `
     ${query(tableName)}
     CREATE TEMP TABLE ${layer}_with_nodes_refs AS
@@ -58,75 +56,6 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
     DESCRIBE ${outputTableName};
   `;
 };
-
-/**
- * Builds query for surface layer using ST_Polygonize to combine linestrings into polygons.
- */
-function buildSurfaceLayerQuery({
-  tableName,
-  layer,
-  outputFormat,
-  outputTableName,
-  query,
-}: {
-  tableName: string;
-  layer: string;
-  outputFormat: string;
-  outputTableName: string;
-  query: (tableName: string) => string;
-}) {
-  return `
-    ${query(tableName)}
-    
-    -- Step 1: Expand node references from ways
-    CREATE TEMP TABLE ${layer}_with_nodes_refs AS
-      SELECT id, UNNEST(refs) as ref, UNNEST(range(length(refs))) as ref_idx
-        FROM ${tableName}
-        SEMI JOIN ${layer} USING (id)
-          WHERE kind IN ('way', 'relation');
-
-    -- Step 2: Get geometry points for all referenced nodes
-    CREATE TEMP TABLE ${layer}_required_nodes_with_geometries AS
-      SELECT id, ST_POINT(lon, lat) geometry
-        FROM ${tableName} nodes
-        SEMI JOIN ${layer}_with_nodes_refs
-        ON nodes.id = ${layer}_with_nodes_refs.ref
-        WHERE kind = 'node';
-
-    -- Step 3: Build linestrings from node sequences
-    CREATE TEMP TABLE ${layer}_linestrings AS
-      SELECT
-          ${layer}.id,
-          ${layer}.tags properties,
-          ${layer}.refs,
-          ST_MakeLine(list(nodes.geometry ORDER BY ref_idx ASC)) geometry
-      FROM ${layer}
-      JOIN ${layer}_with_nodes_refs
-      ON ${layer}.id = ${layer}_with_nodes_refs.id
-      JOIN ${layer}_required_nodes_with_geometries nodes
-      ON ${layer}_with_nodes_refs.ref = nodes.id
-      GROUP BY 1, 2, 3;
-
-    -- Step 4: Polygonize all linestrings and create output table
-    CREATE TABLE ${outputTableName} AS
-      SELECT
-        row_number() OVER () as id,
-        NULL as properties,
-        NULL as refs,
-        ST_Transform(
-          dump.geom,
-          'EPSG:4326',
-          '${outputFormat}',
-          always_xy := true
-        ) as geometry
-      FROM (
-        SELECT UNNEST(ST_Dump(ST_Polygonize(list(geometry)))) as dump
-        FROM ${layer}_linestrings
-      );
-
-    DESCRIBE ${outputTableName};
-  `;
-}
 
 function buildGeometrySelect({
   outputFormat,
