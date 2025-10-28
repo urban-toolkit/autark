@@ -597,7 +597,7 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number = 300) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number = 1000) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),

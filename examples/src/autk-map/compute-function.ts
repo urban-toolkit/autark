@@ -5,7 +5,7 @@ import { AutkMap, LayerType } from 'autk-map';
 
 import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
-export class SpatialJoin {
+export class ComputeFunction {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
@@ -43,8 +43,8 @@ export class SpatialJoin {
         });
 
         this.map = new AutkMap(canvas);
-        await this.map.init();
 
+        await this.map.init();
         await this.loadLayers();
         await this.updateThematicData(geojson);
 
@@ -72,13 +72,12 @@ export class SpatialJoin {
 }
 
 async function main() {
-    const example = new SpatialJoin();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new ComputeFunction();
     await example.run(canvas);
 }
 main();

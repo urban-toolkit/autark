@@ -89,13 +89,12 @@ export class SpatialJoinNear {
 }
 
 async function main() {
-    const example = new SpatialJoinNear();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {  
         throw new Error('No canvas found');
     }
 
+    const example = new SpatialJoinNear();
     await example.run(canvas);
 }
 main();

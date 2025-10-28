@@ -1,7 +1,7 @@
 import { SpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
-export class GeojsonVis {
+export class GeojsonPolygonsVis {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
@@ -18,7 +18,6 @@ export class GeojsonVis {
             coordinateFormat: 'EPSG:3395'
         });
 
-
         this.map = new AutkMap(canvas);
 
         await this.map.init();
@@ -33,19 +32,16 @@ export class GeojsonVis {
             this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-
-        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
     }
 }
 
 async function main() {
-    const example = new GeojsonVis();
-
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
     }
 
+    const example = new GeojsonPolygonsVis();
     await example.run(canvas);
 }
 main();
