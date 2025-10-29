@@ -1,7 +1,7 @@
 # Autark: A portable UTK-based visualization framework
 
 <div align="center">
-  <img src="https://github.com/urban-toolkit/autark/blob/main/logo.png?raw=true" alt="Autark Logo" height="200"/></br>
+  <img src="./logo.png" alt="Autark Logo" height="200"/></br>
 </div>
 <br>
 

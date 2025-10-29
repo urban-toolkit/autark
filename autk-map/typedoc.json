@@ -1,8 +1,8 @@
 // typedoc.json
 {
     "readme": "../README.md",
-    "plugin": ["typedoc-github-theme"],
-    "theme": "typedoc-github-theme",
+    "plugin": ["typedoc-theme-oxide"],
+    "theme": "oxide",
     "out": "docs",
     "entryPoints": ["src"],
     "navigationLinks": {

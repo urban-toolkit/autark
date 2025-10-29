@@ -160,7 +160,7 @@ export class RasterLayer extends Layer {
 
     /**
      * Load the texture coordinates from the layer data.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {ILayerGeometry[]} layerGeometry - The layer data.
      */
     public loadGeometry(layerGeometry: ILayerGeometry[]): void {
         const position: number[] = [];
@@ -218,7 +218,7 @@ export class RasterLayer extends Layer {
 
     /**
      * Load the raster data from the layer data.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {IRasterData[]} layerRaster - The layer data.
      */
     public loadRaster(layerRaster: IRasterData[]): void {
         const rasterData: number[] = [];

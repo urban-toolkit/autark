@@ -4,6 +4,8 @@ autk*/dist/
 autk*/src/*.js
 autk*/package-lock.json
 
+.vscode/
+
 autkpy/__pycache__
 autkpy/.ipynb_checkpoints
 autkpy/.venv

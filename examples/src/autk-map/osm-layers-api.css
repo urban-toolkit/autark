@@ -10,7 +10,7 @@ body {
 #app {
     margin: 10px;
 
-    width: 800px;
+    width: 1280px;
     min-height: 185px;
     border: 1px solid #bfbfbf;
 
@@ -21,7 +21,7 @@ body {
 
 canvas {
     margin: 10px;
-    width: 780px;
-    height: 780px;
+    width: 1280px;
+    height: 1280px;
 }
 

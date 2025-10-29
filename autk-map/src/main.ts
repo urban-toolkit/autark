@@ -182,8 +182,7 @@ export class AutkMap {
     }
 
     /**
-     * Initializes the map with the given bounding box.
-     * @param {BBox} bbox The bounding box to initialize the map with
+     * Initializes the map.
      */
     async init() {
         await this._renderer.init();

@@ -279,7 +279,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     // 3. Assemble the final Overpass QL query string.
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:50];
 
       ${mainAreaLine}
 

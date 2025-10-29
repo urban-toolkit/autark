@@ -202,7 +202,7 @@ export class PipelineTriangleRaster extends Pipeline {
 
     /**
      * Updates the raster uniform buffer with the provided raster data.
-     * @param {RasterLayer} layer The raster layer containing raster data
+     * @param {RasterLayer} raster The raster layer containing raster data
      */
     updateRasterUniforms(raster: RasterLayer) {
         const rasterTexture = new Uint8Array(raster.rasterData);
