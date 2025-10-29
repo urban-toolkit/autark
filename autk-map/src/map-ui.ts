@@ -22,6 +22,12 @@ export class AutkMapUi {
     protected _activeLayer: Layer | null;
 
     /**
+     * Reference to the menu icon HTML element.
+     * @type {HTMLDivElement | null}
+     */
+    protected _menuIcon: HTMLDivElement | null = null;
+
+    /**
      * Reference to the submenu HTML element.
      * @type {HTMLDivElement | null}
      */
@@ -74,6 +80,29 @@ export class AutkMapUi {
         this._activeLayer = layer;
     }
 
+    public handleResize(): void {
+        // Update menu icon position
+        if (this._menuIcon) {
+            this._menuIcon.style.top = (this.map.canvas.offsetTop + 5) + 'px';
+            this._menuIcon.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+        }
+
+        // Update submenu position
+        if (this._subMenu) {
+            this._subMenu.style.top = (this.map.canvas.offsetTop + 40) + 'px';
+            this._subMenu.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+        }
+        
+        // Update legend position
+        if (this._legend) {
+            const width = parseInt(this._legend.style.width);
+            const height = parseInt(this._legend.style.height);
+            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - width - 30) + 'px';
+            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - height - 30) + 'px';
+        }
+    }
+
+
     /**
      * Change the current layer in the UI.
      * @param {Layer | null} layer - The layer to change to or null to clear.
@@ -112,50 +141,53 @@ export class AutkMapUi {
      * Build the UI elements for the map.
      */
     public buildUi(): void {
-        const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
-        const styleNode = document.createElement('style');
-        styleNode.appendChild(document.createTextNode(css));
+        if (!this._menuIcon) {
+            const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
+            const styleNode = document.createElement('style');
+            styleNode.appendChild(document.createTextNode(css));
 
-        const uiDiv = document.createElement('div');
-        uiDiv.id = 'autkMapUi';
-        uiDiv.style.width = '24px';
-        uiDiv.style.height = '24px';
-        uiDiv.style.position = 'absolute';
-        uiDiv.style.top = (this.map.canvas.offsetTop + 5) + 'px';
-        uiDiv.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
-        uiDiv.style.zIndex = '1000';
 
-        const icon = document.createElement('a');
-        icon.id = 'menuIcon';
-        icon.style.width = '24px';
-        icon.style.height = '24px';
-        icon.style.padding = '2px';
-        icon.style.display = 'block';
-        icon.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-        icon.style.zIndex = '1001';
-        icon.style.backgroundColor = '#fff';
-        icon.style.border = '1px solid #ccc';
-        icon.style.borderRadius = '4px';
+            this._menuIcon = document.createElement('div');
+            this._menuIcon.id = 'autkMapUi';
+            this._menuIcon.style.width = '24px';
+            this._menuIcon.style.height = '24px';
+            this._menuIcon.style.position = 'absolute';
+            this._menuIcon.style.top = (this.map.canvas.offsetTop + 5) + 'px';
+            this._menuIcon.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+            this._menuIcon.style.zIndex = '1000';
 
-        icon.href = '#';
-        icon.innerHTML = `<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-menu-2"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>`
+            const icon = document.createElement('a');
+            icon.id = 'menuIcon';
+            icon.style.width = '24px';
+            icon.style.height = '24px';
+            icon.style.padding = '2px';
+            icon.style.display = 'block';
+            icon.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+            icon.style.zIndex = '1001';
+            icon.style.backgroundColor = '#fff';
+            icon.style.border = '1px solid #ccc';
+            icon.style.borderRadius = '4px';
 
-        uiDiv.appendChild(styleNode);
-        uiDiv.appendChild(icon);
+            icon.href = '#';
+            icon.innerHTML = `<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-menu-2"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>`
 
-        this.map.canvas.parentElement?.appendChild(uiDiv);
+            this._menuIcon.appendChild(styleNode);
+            this._menuIcon.appendChild(icon);
 
-        icon.addEventListener('click', () => {
-            this.buildSubMenu();
-            this.buildVisibleLayersDropdown();
-            this.buildActiveLayerDropdown();
-            this.buildLegendCheckbox();
-            this.buildLegend();
+            this.map.canvas.parentElement?.appendChild(this._menuIcon);
 
-            if(this._subMenu) {
-                this._subMenu.style.visibility = this._subMenu.style.visibility === 'visible' ? 'hidden' : 'visible';
-            }
-        });
+            icon.addEventListener('click', () => {
+                this.buildSubMenu();
+                this.buildVisibleLayersDropdown();
+                this.buildActiveLayerDropdown();
+                this.buildLegendCheckbox();
+                this.buildLegend();
+
+                if (this._subMenu) {
+                    this._subMenu.style.visibility = this._subMenu.style.visibility === 'visible' ? 'hidden' : 'visible';
+                }
+            });
+        }
     }
 
     /**

@@ -96,7 +96,10 @@ export class AutkMap {
         this._ui = new AutkMapUi(this);
 
         if (autoResize) {
-            window.addEventListener('resize', this.handleResize.bind(this));
+            window.addEventListener('resize', () => {
+                this.handleResize.bind(this)();
+                this._ui.handleResize();
+            });
         }
     }
 
@@ -256,7 +259,8 @@ export class AutkMap {
 
             case LayerType.AUTK_OSM_ROADS:
             case LayerType.AUTK_GEO_POLYLINES:
-                this.createPolylinesLayer(layerName, geojson, typeLayer);
+                const offset = (typeLayer === LayerType.AUTK_OSM_ROADS) ? 300 : 1000;
+                this.createPolylinesLayer(layerName, geojson, typeLayer, offset);
                 break;
 
             case LayerType.AUTK_GEO_POINTS:
