@@ -28,25 +28,36 @@ export class GeojsonVis {
             },
         });
 
-        const boundingBox = await this.db.getOsmBoundingBox();
-        const heatMapFake = {
-            type: 'FeatureCollection',
-            bbox: [boundingBox.minLon, boundingBox.minLat, boundingBox.maxLon, boundingBox.maxLat],
-            features: [
-                {
-                    type: 'Feature',
-                    properties: {
-                        raster: Array.from({ length: 256 * 256 }, (_d, k) => k),
-                        rasterResX: 256,
-                        rasterResY: 256,
+        await this.db.loadCsv({
+            csvFileUrl: 'http://localhost:5173/data/noise.csv',
+            outputTableName: 'noise',
+            geometryColumns: {
+                latColumnName: 'Latitude',
+                longColumnName: 'Longitude',
+                coordinateFormat: 'EPSG:3395',
+            },
+        });
+
+        console.log('Building heatmap...');
+        await this.db.buildHeatmap({
+            tableJoinName: 'noise',
+            nearDistance: 1000,
+            outputTableName: 'heatmap',
+            grid: {
+                rows: 256,
+                columns: 256,
+            },
+            groupBy: {
+                selectColumns: [
+                    {
+                        tableName: 'noise',
+                        column: 'Unique Key',
+                        aggregateFn: 'count',
                     },
-                    geometry: {
-                        type: 'Point',
-                        coordinates: [],
-                    },
-                },
-            ],  
-        }
+                ],
+            },
+        });
+
 
         const canvas = document.querySelector('canvas');
         if (canvas) {
@@ -55,9 +66,11 @@ export class GeojsonVis {
             await this.map.init();
             await this.loadLayers();
 
+            const heatMap = await this.db.getLayer('heatmap');
+            console.log({ heatMap });
             await this.map.loadGeoTiffLayer(
                 'heatmap',
-                heatMapFake as any,
+                heatMap,
                 LayerType.AUTK_RASTER,
             );
 

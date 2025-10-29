@@ -4,7 +4,7 @@ import { Params } from './interfaces';
 import { CsvTable } from '../../../shared/interfaces';
 import { LOAD_CSV_ON_TABLE_QUERY, LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
-import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
+import { DEFALT_COORDINATE_FORMAT, DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
 
 export class LoadCsvUseCase {
   private db: AsyncDuckDB;
@@ -49,6 +49,12 @@ export class LoadCsvUseCase {
     }
 
     const describeTableResponse = await this.conn.query(loadCsvQuery);
+
+    // Automatically create spatial index for geometry column
+    if (geometryColumns) {
+      const indexName = `idx_${outputTableName}_geometry`;
+      await this.conn.query(`CREATE INDEX ${indexName} ON ${outputTableName} USING RTREE (${DEFAULT_GEO_COLUMN_NAME});`);
+    }
 
     if (tempFileCreated) {
       await this.db.dropFile(csvPath);

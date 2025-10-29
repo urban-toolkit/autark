@@ -23,6 +23,7 @@ import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces
 import { RawQueryUseCase } from './use-cases/raw-query';
 import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
 import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-layer';
+import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
 
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
@@ -50,6 +51,7 @@ export class SpatialDb {
   private rawQueryUseCase?: RawQueryUseCase;
   private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
   private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
+  private buildHeatmapUseCase?: BuildHeatmapUseCase;
 
   /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
@@ -72,6 +74,7 @@ export class SpatialDb {
     this.rawQueryUseCase = new RawQueryUseCase(this.conn);
     this.getBoundingBoxFromOsmUseCase = new GetBoundingBoxFromOsmUseCase(this.conn);
     this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
+    this.buildHeatmapUseCase = new BuildHeatmapUseCase(this.conn);
 
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
@@ -370,5 +373,24 @@ export class SpatialDb {
     }
 
     return result as unknown as T;
+  }
+
+  /**
+   * Builds a heatmap from spatial data by creating a grid and aggregating values.
+   * @param params - Parameters for building the heatmap.
+   * @returns A promise that resolves to the resulting table after building the heatmap.
+   * @throws Error if the database or connection is not initialized.
+   * @throws Error if the buildHeatmapUseCase is not available.
+   * @throws Error if the source table is not found.
+   * @throws Error if the bounding box is not available.
+   */
+  async buildHeatmap(params: BuildHeatmapParams): Promise<Table> {
+    if (!this.db || !this.conn || !this.buildHeatmapUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.buildHeatmapUseCase.exec(params, this.tables, this.osmBoudingBox);
+    this.tables.push(table);
+
+    return table;
   }
 }

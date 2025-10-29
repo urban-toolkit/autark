@@ -57,6 +57,10 @@ export class LoadGridLayerUseCase {
 
     await this.conn.query(insertSql);
 
+    // 3. Create spatial index on geometry column
+    const createIndexSql = `CREATE INDEX idx_${outputTableName}_geometry ON ${outputTableName} USING RTREE (geometry);`;
+    await this.conn.query(createIndexSql);
+
     const describeTableResponse = await this.conn.query(`DESCRIBE ${outputTableName}`);
 
     return {
