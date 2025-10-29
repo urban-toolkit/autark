@@ -4,6 +4,7 @@ import { Params, OsmElement } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from './queries';
+import { HttpCache } from '../../../shared/HttpCache';
 
 interface OverpassApiResponse {
   elements: OsmElement[];
@@ -12,10 +13,21 @@ interface OverpassApiResponse {
 export class LoadOsmFromOverpassApiUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;
+  private cache: HttpCache<OverpassApiResponse>;
 
   constructor(db: AsyncDuckDB, conn: AsyncDuckDBConnection) {
     this.db = db;
     this.conn = conn;
+    this.cache = new HttpCache('overpass-api-cache', 24 * 60 * 60 * 1000); // 24h TTL
+  }
+
+  /**
+   * Generate a cache key from query parameters
+   */
+  private getCacheKey(queryArea: { geocodeArea: string; areas: string[] }, isBoundary: boolean): string {
+    const type = isBoundary ? 'boundaries' : 'data';
+    const areas = [...queryArea.areas].sort().join(',');
+    return `overpass-${type}-${queryArea.geocodeArea}-${areas}`;
   }
 
   async exec(params: Params): Promise<OsmTable[]> {
@@ -161,9 +173,15 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Fetch OSM data within a geocode area from the Overpass API
+   * Fetch OSM data within a geocode area from the Overpass API (with caching)
    */
   private async fetchOsmWithinArea(queryArea: { geocodeArea: string; areas: string[] }): Promise<OverpassApiResponse> {
+    // Try cache first
+    const cacheKey = this.getCacheKey(queryArea, false);
+    const cachedData = await this.cache.get(cacheKey);
+    if (cachedData) return cachedData;
+
+    // Fetch from API
     const geocodeAlias = 'areaMain'; // alias without leading dot
 
     // 1. Main geocode area
@@ -206,13 +224,24 @@ export class LoadOsmFromOverpassApiUseCase {
       throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+
+    // Store in cache for future use
+    await this.cache.set(cacheKey, data);
+
+    return data;
   }
 
   private async fetchBoundariesOsmWithinArea(queryArea: {
     geocodeArea: string;
     areas: string[];
   }): Promise<OverpassApiResponse> {
+    // Try cache first
+    const cacheKey = this.getCacheKey(queryArea, true);
+    const cachedData = await this.cache.get(cacheKey);
+    if (cachedData) return cachedData;
+
+    // Fetch from API
     // ------------------------------------------------------------------------
     // Example of the query:
     //
@@ -273,6 +302,11 @@ export class LoadOsmFromOverpassApiUseCase {
       throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+
+    // Store in cache for future use
+    await this.cache.set(cacheKey, data);
+
+    return data;
   }
 }

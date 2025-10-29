@@ -4,7 +4,7 @@ import { BoundingBox, GridLayerTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
 export interface LoadGridLayerParams {
-  boundingBox: BoundingBox;
+  boundingBox?: BoundingBox;
   rows: number;
   columns: number;
   outputTableName: string;
@@ -20,6 +20,10 @@ export class LoadGridLayerUseCase {
   async exec(params: LoadGridLayerParams): Promise<GridLayerTable> {
     const { boundingBox, rows, columns, outputTableName } = params;
 
+    if (!boundingBox) {
+      throw new Error('Bounding box is required to load a grid layer.');
+    }
+
     if (rows <= 0 || columns <= 0) {
       throw new Error('Rows and columns must be positive integers.');
     }
@@ -34,19 +38,18 @@ export class LoadGridLayerUseCase {
 
     await this.conn.query(createTableSql);
 
-    // 2. Generate grid cells in JS and bulk-insert
+    // 2. Generate grid cell centroids in JS and bulk-insert
     const lonStep = (maxLon - minLon) / columns;
     const latStep = (maxLat - minLat) / rows;
 
     const values: string[] = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < columns; c++) {
-        const west = minLon + c * lonStep;
-        const south = minLat + r * latStep;
-        const east = west + lonStep;
-        const north = south + latStep;
+        // Calculate the center point of each grid cell
+        const centerLon = minLon + (c + 0.5) * lonStep;
+        const centerLat = minLat + (r + 0.5) * latStep;
 
-        values.push(`(ST_MakeEnvelope(${west}, ${south}, ${east}, ${north}), {'row': ${r}, 'column': ${c}})`);
+        values.push(`(ST_Point(${centerLon}, ${centerLat}), {'row': ${r}, 'column': ${c}})`);
       }
     }
 
