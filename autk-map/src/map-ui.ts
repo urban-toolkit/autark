@@ -15,6 +15,9 @@ export class AutkMapUi {
      */
     protected _map: AutkMap
 
+    /** UI margin for positioning elements */
+    protected _uiMargin: number = 10;
+
     /**
      * Currently selected layer in the UI.
      * @type {Layer | null}
@@ -83,22 +86,23 @@ export class AutkMapUi {
     public handleResize(): void {
         // Update menu icon position
         if (this._menuIcon) {
-            this._menuIcon.style.top = (this.map.canvas.offsetTop + 5) + 'px';
-            this._menuIcon.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+            this._menuIcon.style.top = (this.map.canvas.offsetTop + this._uiMargin) + 'px';
+            this._menuIcon.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
         }
 
         // Update submenu position
         if (this._subMenu) {
-            this._subMenu.style.top = (this.map.canvas.offsetTop + 40) + 'px';
-            this._subMenu.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+            this._subMenu.style.top = (this.map.canvas.offsetTop + 30 + 2 * this._uiMargin) + 'px';
+            this._subMenu.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
         }
         
-        // Update legend position
+        // Update legend position (bottom-right of canvas)
         if (this._legend) {
-            const width = parseInt(this._legend.style.width);
-            const height = parseInt(this._legend.style.height);
-            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - width - 30) + 'px';
-            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - height - 30) + 'px';
+            const width = parseInt(this._legend.style.width || '0', 10) || 0;
+            const height = parseInt(this._legend.style.height || '0', 10) || 0;
+            // Position bottom-right relative to the canvas
+            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 2 - width - 3 * this._uiMargin) + 'px';
+            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - 2 - height - 3 * this._uiMargin) + 'px';
         }
     }
 
@@ -142,25 +146,19 @@ export class AutkMapUi {
      */
     public buildUi(): void {
         if (!this._menuIcon) {
-            const css = '#menuIcon svg{ stroke: #aaa } #menuIcon svg:hover{ stroke: #555 }';
-            const styleNode = document.createElement('style');
-            styleNode.appendChild(document.createTextNode(css));
-
-
             this._menuIcon = document.createElement('div');
             this._menuIcon.id = 'autkMapUi';
-            this._menuIcon.style.width = '24px';
-            this._menuIcon.style.height = '24px';
+            this._menuIcon.style.width = '30px !important';
+            this._menuIcon.style.height = '30px !important';
             this._menuIcon.style.position = 'absolute';
-            this._menuIcon.style.top = (this.map.canvas.offsetTop + 5) + 'px';
-            this._menuIcon.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+            this._menuIcon.style.top = (this.map.canvas.offsetTop + this._uiMargin) + 'px';
+            this._menuIcon.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
             this._menuIcon.style.zIndex = '1000';
 
             const icon = document.createElement('a');
             icon.id = 'menuIcon';
-            icon.style.width = '24px';
-            icon.style.height = '24px';
-            icon.style.padding = '2px';
+            icon.style.maxWidth = '30px';
+            icon.style.maxHeight = '30px';
             icon.style.display = 'block';
             icon.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
             icon.style.zIndex = '1001';
@@ -169,11 +167,13 @@ export class AutkMapUi {
             icon.style.borderRadius = '4px';
 
             icon.href = '#';
-            icon.innerHTML = `<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-menu-2"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>`
+            icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+                <rect x="4" y="5"  rx="4" ry="4" width="20" height="3" fill="#aaa" stroke="none"></rect>
+                <rect x="4" y="13"  rx="4" ry="4" width="20" height="3" fill="#aaa" stroke="none"></rect>
+                <rect x="4" y="21" rx="4" ry="4" width="20" height="3" fill="#aaa" stroke="none"></rect>
+            </svg>`
 
-            this._menuIcon.appendChild(styleNode);
             this._menuIcon.appendChild(icon);
-
             this.map.canvas.parentElement?.appendChild(this._menuIcon);
 
             icon.addEventListener('click', () => {
@@ -198,8 +198,8 @@ export class AutkMapUi {
             this._subMenu = document.createElement('div');
             this._subMenu.id = 'autkMapSubMenu';
             this._subMenu.style.position = 'absolute';
-            this._subMenu.style.top = (this.map.canvas.offsetTop + 40) + 'px';
-            this._subMenu.style.left = (this.map.canvas.offsetLeft + 5) + 'px';
+            this._subMenu.style.top = (this.map.canvas.offsetTop + 30 + 2 * this._uiMargin) + 'px';
+            this._subMenu.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
             this._subMenu.style.width = '300px';
             this._subMenu.style.display = 'block';
             this._subMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
@@ -472,7 +472,6 @@ export class AutkMapUi {
             label.id = 'showThematicCheckboxLabel';
             label.style.display = 'flex';
             label.style.alignItems = 'center';
-            label.style.margin = '0 0 10px 0';
             label.style.cursor = 'pointer';
         }
 
@@ -481,10 +480,11 @@ export class AutkMapUi {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = 'showThematicCheckbox';
+            checkbox.style.marginRight = '10px';
             checkbox.checked = this._activeLayer?.layerRenderInfo.isColorMap || false;
 
             label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(' Show Thematic Data'));
+            label.appendChild(document.createTextNode('Thematic Data'));
             this._subMenu.appendChild(label);
 
             // callback for checkbox change
@@ -508,8 +508,6 @@ export class AutkMapUi {
             this._legend = document.createElement('div');
             this._legend.id = 'autkMapLegend';
             this._legend.style.position = 'absolute';
-            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - width - 30) + 'px';
-            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - height - 30) + 'px';
             this._legend.style.width = width + 'px';
             this._legend.style.height = height + 'px';
             this._legend.style.display = 'block';
@@ -518,11 +516,15 @@ export class AutkMapUi {
             this._legend.style.backgroundColor = '#fff';
             this._legend.style.border = '1px solid #ccc';
             this._legend.style.borderRadius = '8px';
-            this._legend.style.padding = '10px';
+            this._legend.style.padding = this._uiMargin + 'px';
             this._legend.style.visibility = 'hidden';
 
+            // Position bottom-right relative to the canvas
+            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 2 - width - 3 * this._uiMargin) + 'px';
+            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - 2 - height - 3 * this._uiMargin) + 'px';
+
             this.map.canvas.parentElement?.appendChild(this._legend);
-        }
+        } 
 
         const checkbox = document.querySelector('#showThematicCheckbox') as HTMLInputElement;
         if (checkbox) {
@@ -535,20 +537,29 @@ export class AutkMapUi {
      * Updates the legend display.
      * @param width The width of the legend
      * @param height The height of the legend
-     * @returns 
      */
     protected updateLegend(width = 250, height = 70): void {
         if (!this._legend || !this._activeLayer) return;
+
+        // Use actual container size
+        const w = width;
+        const h = height;
 
         // Clear previous legend content
         this._legend.innerHTML = '';
 
         const title = document.createElement('h4');
         title.textContent = this._activeLayer.layerInfo.id;
-        title.style.margin = '0 0 10px 0';
+        title.style.margin = `0 0 ${this._uiMargin}px 0`;
         title.style.fontSize = '14px';
         title.style.color = '#333';
         this._legend.appendChild(title);
+
+        // Inner drawing area (leave room for title and padding)
+        const padding = this._uiMargin;
+        const titleHeight = 30;
+        const innerWidth = w - 2 * padding;
+        const innerHeight = h - 2 * padding - titleHeight;
 
         // Create color map
         const interpolator = this._activeLayer.layerRenderInfo.colorMapInterpolator;
@@ -562,34 +573,39 @@ export class AutkMapUi {
         const svg = d3.select(this._legend)
             .append("svg")
             .attr("width", width)
-            .attr("height", height);
+            .attr("height", h - titleHeight);
 
-        svg.selectAll("rect")
+        const rectWidth = innerWidth / colorMap.length;
+        const rectHeight = Math.max(10, innerHeight * 0.4);
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${padding}, ${padding})`);
+
+        g.selectAll("rect")
             .data(colorMap)
             .join("rect")
-            .attr("x", (_d, id) => id * (width / colorMap.length))
+            .attr("x", (_d, id) => id * rectWidth)
             .attr("y", 0)
-            .attr("width", width / colorMap.length)
-            .attr("height", height / 5)
+            .attr("width", rectWidth)
+            .attr("height", rectHeight)
             .style("fill", (d) => `rgb(${d.r},${d.g},${d.b})`)
             .style("stroke", (d) => `rgb(${d.r},${d.g},${d.b})`)
-            .style("stroke-width", "2px");
+            .style("stroke-width", "1px");
 
         const textData = labels.map((d, i) => {
             if (interpolator === ColorMapInterpolator.OBSERVABLE10) {
-                return { label: d, pos: i * (width / colorMap.length) + (width / colorMap.length) / 2 };
-            }
-            else {
-                return { label: d, pos: i * (width / (labels.length - 1)) + (Math.pow(-1, i) * 10) };
+                return { label: d, pos: i * rectWidth + (rectWidth / 2) };
+            } else {
+                return { label: d, pos: i * (innerWidth / (labels.length - 1)) };
             }
         });
 
-        svg.selectAll("text")
+        g.selectAll("text")
             .data(textData)
             .join("text")
             .text((d) => `${d.label.substring(0, 3)}`)
             .attr("x", (d) => d.pos)
-            .attr("y", height / 5 + 15)
+            .attr("y", rectHeight + 14)
             .style("font-size", "12px")
             .style("fill", "#333")
             .style("text-anchor", "middle");
