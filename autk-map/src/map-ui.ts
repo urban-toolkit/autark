@@ -153,7 +153,7 @@ export class AutkMapUi {
             this._menuIcon.style.position = 'absolute';
             this._menuIcon.style.top = (this.map.canvas.offsetTop + this._uiMargin) + 'px';
             this._menuIcon.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
-            this._menuIcon.style.zIndex = '1000';
+            this._menuIcon.style.zIndex = '10';
 
             const icon = document.createElement('a');
             icon.id = 'menuIcon';
@@ -161,7 +161,7 @@ export class AutkMapUi {
             icon.style.maxHeight = '30px';
             icon.style.display = 'block';
             icon.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-            icon.style.zIndex = '1001';
+            icon.style.zIndex = '11';
             icon.style.backgroundColor = '#fff';
             icon.style.border = '1px solid #ccc';
             icon.style.borderRadius = '4px';
@@ -203,7 +203,7 @@ export class AutkMapUi {
             this._subMenu.style.width = '300px';
             this._subMenu.style.display = 'block';
             this._subMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-            this._subMenu.style.zIndex = '1001';
+            this._subMenu.style.zIndex = '11';
             this._subMenu.style.backgroundColor = '#fff';
             this._subMenu.style.border = '1px solid #ccc';
             this._subMenu.style.borderRadius = '8px';
@@ -282,7 +282,7 @@ export class AutkMapUi {
             dropdownList.style.border = '1px solid #ccc';
             dropdownList.style.borderRadius = '4px';
             dropdownList.style.display = 'none';
-            dropdownList.style.zIndex = '1002';
+            dropdownList.style.zIndex = '12';
             dropdownList.style.maxHeight = '200px';
             dropdownList.style.overflowY = 'auto';
             dropdownList.style.padding = '8px 0';
@@ -402,7 +402,7 @@ export class AutkMapUi {
             dropdownList.style.border = '1px solid #ccc';
             dropdownList.style.borderRadius = '4px';
             dropdownList.style.display = 'none';
-            dropdownList.style.zIndex = '1002';
+            dropdownList.style.zIndex = '12';
             dropdownList.style.maxHeight = '200px';
             dropdownList.style.overflowY = 'auto';
             dropdownList.style.padding = '8px 0';
@@ -503,7 +503,7 @@ export class AutkMapUi {
     /**
      * Build the submenu for layer options.
      */
-    protected buildLegend(width = 250, height = 70): void {
+    protected buildLegend(width = 250, height = 80): void {
         if (!this._legend) {
             this._legend = document.createElement('div');
             this._legend.id = 'autkMapLegend';
@@ -512,16 +512,15 @@ export class AutkMapUi {
             this._legend.style.height = height + 'px';
             this._legend.style.display = 'block';
             this._legend.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-            this._legend.style.zIndex = '1001';
+            this._legend.style.zIndex = '11';
             this._legend.style.backgroundColor = '#fff';
             this._legend.style.border = '1px solid #ccc';
             this._legend.style.borderRadius = '8px';
-            this._legend.style.padding = this._uiMargin + 'px';
             this._legend.style.visibility = 'hidden';
 
             // Position bottom-right relative to the canvas
-            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 2 - width - 3 * this._uiMargin) + 'px';
-            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - 2 - height - 3 * this._uiMargin) + 'px';
+            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 2 - width - this._uiMargin) + 'px';
+            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - 2 - height - this._uiMargin) + 'px';
 
             this.map.canvas.parentElement?.appendChild(this._legend);
         } 
@@ -538,28 +537,24 @@ export class AutkMapUi {
      * @param width The width of the legend
      * @param height The height of the legend
      */
-    protected updateLegend(width = 250, height = 70): void {
+    protected updateLegend(width = 250, height = 80): void {
         if (!this._legend || !this._activeLayer) return;
-
-        // Use actual container size
-        const w = width;
-        const h = height;
 
         // Clear previous legend content
         this._legend.innerHTML = '';
 
         const title = document.createElement('h4');
         title.textContent = this._activeLayer.layerInfo.id;
-        title.style.margin = `0 0 ${this._uiMargin}px 0`;
+        title.style.margin = `${this._uiMargin}px`;
         title.style.fontSize = '14px';
         title.style.color = '#333';
         this._legend.appendChild(title);
 
         // Inner drawing area (leave room for title and padding)
         const padding = this._uiMargin;
-        const titleHeight = 30;
-        const innerWidth = w - 2 * padding;
-        const innerHeight = h - 2 * padding - titleHeight;
+        const titleHeight = 40;
+        const innerWidth = width - 4 * padding;
+        const innerHeight = height - titleHeight;
 
         // Create color map
         const interpolator = this._activeLayer.layerRenderInfo.colorMapInterpolator;
@@ -573,13 +568,13 @@ export class AutkMapUi {
         const svg = d3.select(this._legend)
             .append("svg")
             .attr("width", width)
-            .attr("height", h - titleHeight);
+            .attr("height", innerHeight);
 
         const rectWidth = innerWidth / colorMap.length;
-        const rectHeight = Math.max(10, innerHeight * 0.4);
+        const rectHeight = innerHeight * 0.3;
 
         const g = svg.append("g")
-            .attr("transform", `translate(${padding}, ${padding})`);
+            .attr("transform", `translate(${2 * padding}, 0)`);
 
         g.selectAll("rect")
             .data(colorMap)
@@ -605,7 +600,7 @@ export class AutkMapUi {
             .join("text")
             .text((d) => `${d.label.substring(0, 3)}`)
             .attr("x", (d) => d.pos)
-            .attr("y", rectHeight + 14)
+            .attr("y", rectHeight + 12)
             .style("font-size", "12px")
             .style("fill", "#333")
             .style("text-anchor", "middle");
