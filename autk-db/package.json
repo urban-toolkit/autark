@@ -20,7 +20,8 @@
     "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "doc": "typedoc --options typedoc.json --watch"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
@@ -30,6 +31,8 @@
     "eslint": "^9.38.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
+    "typedoc": "^0.28.14",
+    "typedoc-theme-oxide": "^0.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
     "vite-plugin-dts": "^4.5.4"
