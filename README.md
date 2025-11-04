@@ -1,4 +1,4 @@
-# Autark: A portable UTK-based visualization framework
+# Autark: A modular urban toolkit for the web
 
 <div align="center">
   <img src="./logo.png" alt="Autark Logo" height="200"/></br>
