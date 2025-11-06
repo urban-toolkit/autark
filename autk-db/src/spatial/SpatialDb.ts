@@ -55,6 +55,7 @@ export class SpatialDb {
 
   /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
+   * @returns A promise that resolves when initialization is complete.
    */
   async init() {
     this.db = await loadDb();
@@ -83,12 +84,12 @@ export class SpatialDb {
 
   /**
    * Loads OSM data from the Overpass API and optionally loads layers based on the provided parameters.
+   * When autoLoadLayers is enabled, this method will automatically extract and process specific layers
+   * (e.g., buildings, roads, surface) from the OSM data, and optionally polygonize the surface layer.
    *
    * @param params - Parameters for loading OSM data and layers.
-   * @returns A promise that resolves when the OSM data is loaded.
-   * @throws Error if the database or connection is not initialized, or if required parameters are missing.
-   * @throws Error if both boundingBox and polygon are provided, or if neither is provided.
-   * @throws Error if the OSM table is not found or is not of the correct type.
+   * @returns A promise that resolves when the OSM data and layers are fully loaded.
+   * @throws Error if the database or connection is not initialized.
    */
   async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<void> {
     if (
@@ -152,11 +153,9 @@ export class SpatialDb {
 
   /**
    * Loads a CSV file into the database and returns the created CsvTable.
-   * @param params - Parameters for loading the CSV file.
+   * @param params - Parameters for loading the CSV file, including file path and table name.
    * @returns A promise that resolves to the created CsvTable.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the loadCsvUseCase is not available.
-   * @throws Error if the CSV file cannot be loaded.
    */
   async loadCsv(params: LoadCsvParams): Promise<CsvTable> {
     if (!this.db || !this.conn || !this.loadCsvUseCase)
@@ -170,11 +169,9 @@ export class SpatialDb {
 
   /**
    * Loads a JSON file into the database and returns the created JsonTable.
-   * @param params - Parameters for loading the JSON file.
+   * @param params - Parameters for loading the JSON file, including file path and table name.
    * @returns A promise that resolves to the created JsonTable.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the loadJsonUseCase is not available.
-   * @throws Error if the JSON file cannot be loaded.
    */
   async loadJson(params: LoadJsonParams): Promise<JsonTable> {
     if (!this.db || !this.conn || !this.loadJsonUseCase)
@@ -210,11 +207,10 @@ export class SpatialDb {
 
   /**
    * Loads a custom layer from a GeoJSON file and returns the created CustomLayerTable.
-   * @param params - Parameters for loading the custom layer.
+   * If OSM bounding box is available, it will be automatically applied to crop the layer.
+   * @param params - Parameters for loading the custom layer, including file path, table name, and layer type.
    * @returns A promise that resolves to the created CustomLayerTable.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the loadCustomLayerUseCase is not available.
-   * @throws Error if the GeoJSON file cannot be loaded.
    */
   async loadCustomLayer(params: LoadCustomLayerParams): Promise<CustomLayerTable> {
     if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
@@ -228,10 +224,10 @@ export class SpatialDb {
 
   /**
    * Loads a grid layer and returns the created GridLayerTable.
-   * @param params - Parameters for loading the grid layer.
+   * If no bounding box is provided in params, the OSM bounding box will be used if available.
+   * @param params - Parameters for loading the grid layer, including grid size, cell size, and optional bounding box.
    * @returns A promise that resolves to the created GridLayerTable.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the loadGridLayerUseCase is not available.
    */
   async loadGridLayer(params: LoadGridLayerParams): Promise<GridLayerTable> {
     if (!this.db || !this.conn || !this.loadGridLayerUseCase)
@@ -247,8 +243,9 @@ export class SpatialDb {
 
   /**
    * Retrieves the GeoJSON representation of a layer by its table name.
+   * The returned FeatureCollection will include a bbox property with the layer's bounding box.
    * @param layerTableName - The name of the layer table to retrieve.
-   * @returns A promise that resolves to the GeoJSON FeatureCollection of the layer.
+   * @returns A promise that resolves to the GeoJSON FeatureCollection of the layer with bbox.
    * @throws Error if the database or connection is not initialized.
    * @throws Error if the layer table is not found or is not a Layer table.
    */
@@ -280,7 +277,7 @@ export class SpatialDb {
 
   /**
    * Retrieves the bounding box of the OSM data loaded from the Overpass API.
-   * @returns The bounding box of the OSM data as array.
+   * @returns The bounding box as a tuple [minLon, minLat, maxLon, maxLat], or null if no OSM data has been loaded.
    */
   getOsmBoundingBox(): [number, number, number, number] | null {
     if (!this.osmBoudingBox) return null;
@@ -298,7 +295,8 @@ export class SpatialDb {
    * @param layerName - The name of the layer table to retrieve the bounding box from.
    * @returns A promise that resolves to the bounding box of the layer.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the layer table is not found or is not a Layer table.
+   * @throws Error if the layer table is not found.
+   * @throws Error if the layer table does not have a geometry column.
    */
   async getBoundingBoxFromLayer(layerName: string): Promise<BoundingBox> {
     if (!this.db || !this.conn || !this.getBoundingBoxFromLayerUseCase)
@@ -338,10 +336,10 @@ export class SpatialDb {
 
   /**
    * Performs a spatial join between two tables and returns the resulting table.
-   * @param params - Parameters for the spatial join operation.
+   * The method can either create a new table or update an existing one based on the parameters.
+   * @param params - Parameters for the spatial join operation, including source and target tables, join type, and output table name.
    * @returns A promise that resolves to the resulting table after the spatial join.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the spatialJoinUseCase is not available.
    */
   async spatialJoin(params: SpatialJoinParams): Promise<Table> {
     if (!this.db || !this.conn || !this.spatialJoinUseCase)
@@ -356,10 +354,9 @@ export class SpatialDb {
 
   /**
    * Executes a raw SQL query and returns the result.
-   * @param params - Parameters for the raw query.
-   * @returns A promise that resolves to the result of the raw query.
+   * @param params - Parameters for the raw query, including the SQL query string and output type.
+   * @returns A promise that resolves to a Table if output type is 'CREATE_TABLE', otherwise returns the query result of type T.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the rawQueryUseCase is not available.
    */
   async rawQuery<T = RawQueryOutput>(params: RawQueryParams): Promise<T | Table> {
     if (!this.db || !this.conn || !this.rawQueryUseCase)
@@ -377,12 +374,10 @@ export class SpatialDb {
 
   /**
    * Builds a heatmap from spatial data by creating a grid and aggregating values.
-   * @param params - Parameters for building the heatmap.
-   * @returns A promise that resolves to the resulting table after building the heatmap.
+   * The heatmap is generated by creating a grid over the bounding box and aggregating values from the source table into each grid cell.
+   * @param params - Parameters for building the heatmap, including source table, grid configuration, and aggregation method.
+   * @returns A promise that resolves to the resulting GridLayerTable containing the heatmap data.
    * @throws Error if the database or connection is not initialized.
-   * @throws Error if the buildHeatmapUseCase is not available.
-   * @throws Error if the source table is not found.
-   * @throws Error if the bounding box is not available.
    */
   async buildHeatmap(params: BuildHeatmapParams): Promise<Table> {
     if (!this.db || !this.conn || !this.buildHeatmapUseCase)
