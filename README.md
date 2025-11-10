@@ -1,4 +1,4 @@
-# Autark: A modular urban analytics toolkit for the web
+# Autark: A modular urban toolkit for data visualization on the web
 
 <div align="center">
   <img src="./logo.png" alt="Autark Logo" height="200"/></br>
