@@ -1,0 +1,87 @@
+
+import { DbAdapter } from "./adapters";
+
+// GetLayerParams
+
+// {
+//     osmInputTableName: string;
+//     outputTableName?: string;
+//     layer: LayerType;
+//     coordinateFormat?: string;
+//     boundingBox?: BoundingBox;
+// }
+
+// LoadCustomLayerParams
+
+// {
+//     geojsonFileUrl?: string;
+//     geojsonObject?: FeatureCollection;
+//     outputTableName: string;
+//     coordinateFormat?: string;
+//     boundingBox?: BoundingBox;
+// }
+
+// LoadGridLayerParams
+
+// {
+//     boundingBox?: BoundingBox;
+//     rows: number;
+//     columns: number;
+//     outputTableName: string;
+// }
+
+export type LayerType = 'surface' | 'water' | 'parks' | 'roads' | 'buildings' | 'points' | 'polygons' | 'polylines' | 'raster';
+
+export type DataSourceSpec = {
+    type: 'osm' | 'csv' | 'json',
+    outputTableName: string
+}
+
+export type OsmDataSourceSpec = DataSourceSpec & {
+    autoLoadLayers?: {
+        coordinateFormat: string;
+        dropOsmTable: boolean;
+        layers: Array<LayerType>;
+    };
+    queryArea: {
+        geocodeArea: string;
+        areas: string[];
+    };
+}
+
+export type CsvDataSourceSpec = DataSourceSpec & {
+    csvFileUrl?: string;
+    csvObject?: unknown[][];
+    delimiter?: string;
+    geometryColumns?: {
+        latColumnName: string;
+        longColumnName: string;
+        coordinateFormat?: string;
+    };
+}
+
+export type JsonDataSourceSpec = DataSourceSpec & {
+    jsonFileUrl?: string;
+    jsonObject?: unknown[];
+    outputTableName: string;
+    geometryColumns?: {
+        latColumnName: string;
+        longColumnName: string;
+        coordinateFormat?: string;
+    };
+}
+
+export type DbSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSourceSpec;
+
+export type AutkSpec = {
+    data: DbSourceSpec[]
+}
+
+export type EngineOptions = {
+    spec: AutkSpec,
+    targets?: Record<string, HTMLElement>,
+    adapters: {
+        db: DbAdapter
+        // TODO: include computer, map, plot, etc.
+    }
+}

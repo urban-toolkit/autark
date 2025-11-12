@@ -1,0 +1,42 @@
+{
+  "name": "autk-grammar",
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/autk-grammar.umd.cjs",
+  "module": "./dist/autk-grammar.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/autk-grammar.js",
+      "require": "./dist/autk-grammar.umd.cjs"
+    }
+  },
+  "scripts": {
+    "doc": "typedoc --options typedoc.json --watch",
+    "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "@webgpu/types": "^0.1.66",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "ts-loader": "^9.5.4",
+    "typedoc": "^0.28.14",
+    "typedoc-theme-oxide": "^0.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vite-plugin-dts": "^4.5.4",
+    "vite-plugin-glsl": "^1.5.4"
+  }
+}

@@ -9,12 +9,17 @@
 
 It provides a client-side platform for the complete implementation of urban visual analytics systems. It supports loading, storing, querying, joining, and exporting both physical and thematic urban data using standard formats like OpenStreetMap, GeoJSON, and GeoTIFF. Employing GPU acceleration, it allows for fast implementations of urban analysis algorithms. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
 
-Autark is composed of four modules:
+Autark is composed of five core modules:
 
 * `autk-db`: A spatial database that handles physical and thematic urban datasets.
 * `autk-compute`: A module that enables the use of WebGPU to implement general-purpose algorithms using physical and thematic data.
 * `autk-map`: A map visualization library allows the exploration of 2D and 3D physical and thematical layers.
 * `autk-plot`: A d3.js based plot library designed to consume thematic urban data visualizations and facilitate the creation of linked views.
+* `autk-grammar`: A module that allows for the orchestration of the other four modules through a grammar specification.
+
+And three bridges:
+
+* `autk-grammar-db`: A module that implements db adapters using autk-db, bridging `autk-grammar` and `autk-db`.
 
 For demonstration purposes and to facilitate the adoption of Autark, we created a large collection of simple examples illustrating the core functionalities of each module. We also provide several examples on how to combine several modules to build complex applications. All examples are organized in the `example/` directory.
 
@@ -34,6 +39,9 @@ npm install -save autk-plot
 
 # autk-map
 npm install -save autk-map
+
+# autk-grammar
+npm install -save autk-grammar
 ```
 
 ## Development

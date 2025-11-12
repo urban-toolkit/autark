@@ -25,6 +25,7 @@
     "autk-db": "file:../autk-db",
     "autk-map": "file:../autk-map",
     "autk-plot": "file:../autk-plot",
-    "autk-compute": "file:../autk-compute"
+    "autk-compute": "file:../autk-compute",
+    "autk-grammar": "file:../autk-grammar"
   }
 }
