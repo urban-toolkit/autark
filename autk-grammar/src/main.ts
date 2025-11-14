@@ -1,31 +1,22 @@
-import { IEngine } from "./interfaces";
-import { AutkSpec, EngineOptions } from "./types";
+import { DbAdapter, UrbanSpec, createEngine } from "urban-grammar";
+import { createDbAdapter } from "./adapters/db";
 
-export function createEngine(options: EngineOptions): IEngine{
-    const { spec, targets, adapters } = options;
+export class AutkGrammar {
+    private dbAdapter?: DbAdapter;
 
-    async function run() {
-        // Database module
-        const tables = new Map<string, unknown>();
-        for(const source of spec.data) {
-            const table = await adapters.db.resolveSource(source);
-            tables.set(source.outputTableName, table);
-        }
-        // TODO: Compute module, DB module, Map module, Plot module
+    init() {
+        this.dbAdapter = createDbAdapter();
     }
 
-    function updatedSpec(spec: AutkSpec) {
-        // TODO
-        return new Promise<void>((resolve, reject) => {
-            resolve();
-        });
-    }
+    async compile(spec: UrbanSpec) {
+        if(!this.dbAdapter)
+            throw new Error('Database adapter not initialized. Please call init() first.');
 
-    function destroy() {
-        // TODO
-        console.log("Function not implemented yet");
+        createEngine({
+            spec,
+            adapters: {
+                db: this.dbAdapter
+            }
+        })
     }
-
-    return { run, updatedSpec, destroy };
 }
-

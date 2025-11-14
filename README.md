@@ -17,10 +17,6 @@ Autark is composed of five core modules:
 * `autk-plot`: A d3.js based plot library designed to consume thematic urban data visualizations and facilitate the creation of linked views.
 * `autk-grammar`: A module that allows for the orchestration of the other four modules through a grammar specification.
 
-And three bridges:
-
-* `autk-grammar-db`: A module that implements db adapters using autk-db, bridging `autk-grammar` and `autk-db`.
-
 For demonstration purposes and to facilitate the adoption of Autark, we created a large collection of simple examples illustrating the core functionalities of each module. We also provide several examples on how to combine several modules to build complex applications. All examples are organized in the `example/` directory.
 
 ## Installation

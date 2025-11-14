@@ -38,5 +38,12 @@
     "vite": "^7.1.12",
     "vite-plugin-dts": "^4.5.4",
     "vite-plugin-glsl": "^1.5.4"
+  },
+  "dependencies": {
+    "autk-db": "file:../autk-db",
+    "autk-map": "file:../autk-map",
+    "autk-plot": "file:../autk-plot",
+    "autk-compute": "file:../autk-compute",
+    "urban-grammar": "file:../urban-grammar"
   }
 }

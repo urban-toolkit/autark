@@ -1,18 +1,18 @@
 {
-  "name": "autk-grammar-db",
+  "name": "urban-grammar",
   "version": "0.0.0",
   "type": "module",
   "files": [
     "dist"
   ],
-  "main": "./dist/autk-grammar-db.umd.cjs",
-  "module": "./dist/autk-grammar-db.js",
+  "main": "./dist/urban-grammar.umd.cjs",
+  "module": "./dist/urban-grammar.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/autk-grammar-db.js",
-      "require": "./dist/autk-grammar-db.umd.cjs"
+      "import": "./dist/urban-grammar.js",
+      "require": "./dist/urban-grammar.umd.cjs"
     }
   },
   "scripts": {

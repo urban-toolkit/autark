@@ -10,7 +10,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'autk-grammar-db',
+      name: 'urban-grammar',
     },
     copyPublicDir: false,
     emptyOutDir: false,
