@@ -3,8 +3,8 @@ import { FeatureCollection } from 'geojson';
 
 export class PropertyMatrixFunc {
   public async run(): Promise<void> {
-    const imageWidth = 256;
-    const imageHeight = 256;
+    const imageWidth = 128;
+    const imageHeight = 128;
     const targetColor = 128.0; // The color we want to find
 
     // Create synthetic GeoJSON with image data as matrices
@@ -63,8 +63,8 @@ export class PropertyMatrixFunc {
         
         for (var r = 0u; r < img_rows; r++) {
           for (var c = 0u; c < img_cols; c++) {
-            let idx = img_offset + r * img_cols + c;
-            let pixelValue = img_data[idx];
+            let idx = r * img_cols + c;
+            let pixelValue = img[idx];
             
             // Check for exact match
             if (pixelValue == targetColor) {
@@ -96,7 +96,7 @@ export class PropertyMatrixFunc {
         <p>Check the console for detailed results.</p>
         <p>Test performed:</p>
         <ul>
-          <li>✅ 256x256 pixel images analyzed</li>
+          <li>✅ 128x128 pixel images analyzed</li>
           <li>✅ Exact color matching (value: 128)</li>
           <li>✅ Percentage calculation on GPU</li>
           <li>✅ Multiple images processed in parallel</li>
@@ -106,7 +106,7 @@ export class PropertyMatrixFunc {
     }
   }
 
-  // Helper function to generate a synthetic 256x256 image with patterns
+  // Helper function to generate a synthetic 128x128 image with patterns
   private generateImage(width: number, height: number, targetColor: number, colorPercentage: number): number[][] {
     const image: number[][] = [];
     const totalPixels = width * height;

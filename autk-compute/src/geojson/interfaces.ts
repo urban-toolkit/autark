@@ -23,7 +23,9 @@ export interface ComputeFunctionIntoPropertiesParams {
    *
    * Scalar variables are passed as f32 values.
    * Array variables are passed as: arrayName (array<f32, N>) and arrayName_length (u32)
-   * Matrix variables are passed as: matrixName_data (ptr<storage, array<f32>>), matrixName_offset (u32), matrixName_rows (u32), matrixName_cols (u32)
+   * Matrix variables are passed as: matrixName (array<f32, rows*cols>), matrixName_rows (u32), matrixName_cols (u32)
+   *   - Matrices are flattened in row-major order
+   *   - Access element at (row, col): matrixName[row * matrixName_cols + col]
    *
    * Examples:
    * Simple scalar: "return x * y;"
@@ -38,8 +40,7 @@ export interface ComputeFunctionIntoPropertiesParams {
    *   // Calculate trace (sum of diagonal elements)
    *   var trace = 0.0;
    *   for (var i = 0u; i < matrix_rows; i++) {
-   *     let idx = matrix_offset + i * matrix_cols + i;
-   *     trace += matrix_data[idx];
+   *     trace += matrix[i * matrix_cols + i];
    *   }
    *   return trace;
    * `

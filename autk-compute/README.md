@@ -61,10 +61,9 @@ return x * y;
 
 ### Array Variables
 
-Array variables are passed with three parameters:
+Array variables are passed with two parameters:
 
-- `{arrayName}_data` - `ptr<storage, array<f32>>` - pointer to the array data
-- `{arrayName}_offset` - `u32` - starting offset in the buffer
+- `{arrayName}` - `array<f32, N>` - the array itself
 - `{arrayName}_length` - `u32` - length of the array
 
 **Example:**
@@ -72,19 +71,20 @@ Array variables are passed with three parameters:
 ```wgsl
 var sum = 0.0;
 for (var i = 0u; i < myArray_length; i++) {
-  sum += myArray_data[myArray_offset + i];
+  sum += myArray[i];
 }
 return x * sum;
 ```
 
 ### Matrix Variables
 
-Matrix variables are passed with four parameters:
+Matrix variables are passed with three parameters:
 
-- `{matrixName}_data` - `ptr<storage, array<f32>>` - pointer to the matrix data (row-major)
-- `{matrixName}_offset` - `u32` - starting offset in the buffer
+- `{matrixName}` - `array<f32, rows*cols>` - the matrix itself (flattened in row-major order)
 - `{matrixName}_rows` - `u32` - number of rows
 - `{matrixName}_cols` - `u32` - number of columns
+
+Access element at (row, col) using: `matrix[row * matrix_cols + col]`
 
 **Example (calculating trace):**
 
@@ -92,8 +92,7 @@ Matrix variables are passed with four parameters:
 // Calculate trace (sum of diagonal elements)
 var trace = 0.0;
 for (var i = 0u; i < matrix_rows; i++) {
-  let idx = matrix_offset + i * matrix_cols + i;
-  trace += matrix_data[idx];
+  trace += matrix[i * matrix_cols + i];
 }
 return trace;
 ```
@@ -130,7 +129,7 @@ const result = await computeFunctionIntoProperties({
   wglsFunction: `
     var sum = 0.0;
     for (var i = 0u; i < embedding_length; i++) {
-      sum += embedding_data[embedding_offset + i];
+      sum += embedding[i];
     }
     return sum * scalar;
   `,
@@ -152,8 +151,7 @@ const result = await computeFunctionIntoProperties({
   wglsFunction: `
     var trace = 0.0;
     for (var i = 0u; i < matrix_rows; i++) {
-      let idx = matrix_offset + i * matrix_cols + i;
-      trace += matrix_data[idx];
+      trace += matrix[i * matrix_cols + i];
     }
     return trace;
   `,
