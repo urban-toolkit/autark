@@ -58,7 +58,7 @@ export class PropertyArrayFunc {
       wglsFunction: `
         var sum = 0.0;
         for (var i = 0u; i < values_length; i++) {
-          sum += values_data[values_offset + i];
+          sum += values[i];
         }
         return sum / f32(values_length);
       `,
@@ -83,7 +83,7 @@ export class PropertyArrayFunc {
       wglsFunction: `
         var sum = 0.0;
         for (var i = 0u; i < values_length; i++) {
-          sum += values_data[values_offset + i];
+          sum += values[i];
         }
         return temp * sum;
       `,
@@ -110,7 +110,7 @@ export class PropertyArrayFunc {
         var dot = 0.0;
         let minLen = min(a_length, b_length);
         for (var i = 0u; i < minLen; i++) {
-          dot += a_data[a_offset + i] * b_data[b_offset + i];
+          dot += a[i] * b[i];
         }
         return dot;
       `,
@@ -132,9 +132,9 @@ export class PropertyArrayFunc {
       },
       outputColumnName: 'max_measurement',
       wglsFunction: `
-        var maxVal = values_data[values_offset];
+        var maxVal = values[0];
         for (var i = 1u; i < values_length; i++) {
-          let val = values_data[values_offset + i];
+          let val = values[i];
           if (val > maxVal) {
             maxVal = val;
           }

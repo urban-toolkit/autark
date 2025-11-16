@@ -22,7 +22,7 @@ export interface ComputeFunctionIntoPropertiesParams {
    * WGSL function body that returns a f32 value. The function receives the mapped variables as parameters.
    *
    * Scalar variables are passed as f32 values.
-   * Array variables are passed as: arrayName_data (ptr<storage, array<f32>>), arrayName_offset (u32), arrayName_length (u32)
+   * Array variables are passed as: arrayName (array<f32, N>) and arrayName_length (u32)
    * Matrix variables are passed as: matrixName_data (ptr<storage, array<f32>>), matrixName_offset (u32), matrixName_rows (u32), matrixName_cols (u32)
    *
    * Examples:
@@ -30,7 +30,7 @@ export interface ComputeFunctionIntoPropertiesParams {
    * With arrays: `
    *   var sum = 0.0;
    *   for (var i = 0u; i < myArray_length; i++) {
-   *     sum += myArray_data[myArray_offset + i];
+   *     sum += myArray[i];
    *   }
    *   return x * sum;
    * `

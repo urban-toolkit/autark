@@ -194,8 +194,10 @@ export class ComputeFunctionIntoPropertiesUseCase {
     let bindingIdx = 0;
     const bufferDecls: string[] = [];
     const locals: string[] = [];
+    const arrayCopyCode: string[] = [];
     const computeFunctionParams: string[] = [];
     const computeFunctionArgs: string[] = [];
+    const arrayTypeDecls: string[] = [];
 
     // Struct definition
     const structDef = `struct ArrayF32 {
@@ -211,21 +213,27 @@ export class ComputeFunctionIntoPropertiesUseCase {
       bindingIdx++;
     }
 
-    // Handle array variables
+    // Handle array variables - create real array copies
     for (const { name, length } of arrayVars) {
       bufferDecls.push(`@group(0) @binding(${bindingIdx}) var<storage, read> ${name}Buf: ArrayF32;`);
 
-      // Create a local view of the array slice for this feature
-      // The buffer is flattened as: [feature0_elem0, feature0_elem1, ..., feature1_elem0, ...]
+      // Declare array type alias for this specific length
+      arrayTypeDecls.push(`alias ${name}_Array = array<f32, ${length}>;`);
+
+      // Calculate offset
       locals.push(`  let ${name}_offset: u32 = idx * ${length}u;`);
 
-      // Pass array parameters to compute function
-      computeFunctionParams.push(`${name}_data: ptr<storage, array<f32>>`);
-      computeFunctionParams.push(`${name}_offset: u32`);
+      // Create local array and copy data from buffer
+      arrayCopyCode.push(`  var ${name}: ${name}_Array;`);
+      arrayCopyCode.push(`  for (var i = 0u; i < ${length}u; i++) {`);
+      arrayCopyCode.push(`    ${name}[i] = ${name}Buf.data[${name}_offset + i];`);
+      arrayCopyCode.push(`  }`);
+
+      // Pass both the array AND its length to compute function
+      computeFunctionParams.push(`${name}: ${name}_Array`);
       computeFunctionParams.push(`${name}_length: u32`);
 
-      computeFunctionArgs.push(`&${name}Buf.data`);
-      computeFunctionArgs.push(`${name}_offset`);
+      computeFunctionArgs.push(name);
       computeFunctionArgs.push(`${length}u`);
 
       bindingIdx++;
@@ -258,6 +266,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
 
     return `
         ${structDef}
+        ${arrayTypeDecls.join('\n        ')}
 
         ${bufferDecls.join('\n        ')}
         @group(0) @binding(${outputBinding}) var<storage, read_write> outBuf: ArrayF32;
@@ -271,6 +280,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
             let idx: u32 = gid.x;
             if (idx >= arrayLength(&outBuf.data)) { return; }
 ${locals.join('\n')}
+${arrayCopyCode.join('\n')}
             let result = compute_value(${computeFunctionArgs.join(', ')});
             outBuf.data[idx] = result;
         }`;
