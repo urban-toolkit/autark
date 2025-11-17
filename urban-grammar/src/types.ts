@@ -80,7 +80,6 @@ export type UrbanSpec = {
 
 export type EngineOptions = {
     spec: UrbanSpec,
-    targets?: Record<string, HTMLElement>,
     adapters: {
         db: DbAdapter
         // TODO: include computer, map, plot, etc.

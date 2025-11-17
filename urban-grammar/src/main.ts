@@ -2,17 +2,14 @@ import { IEngine } from "./interfaces";
 import { UrbanSpec, EngineOptions } from "./types";
 
 export function createEngine(options: EngineOptions): IEngine{
-    const { spec, targets, adapters } = options;
+    const { spec, adapters } = options;
 
     // TODO check if schema is respected
-    console.log("Targets", targets);
 
     async function run() {
         // Database module
-        const tables = new Map<string, unknown>();
         for(const source of spec.data) {
-            const table = await adapters.db.resolveSource(source);
-            tables.set(source.outputTableName, table);
+            await adapters.db.resolveSource(source);
         }
         // TODO: Compute module, DB module, Map module, Plot module
     }

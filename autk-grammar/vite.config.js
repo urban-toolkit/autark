@@ -12,6 +12,15 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'autk-grammar',
     },
+    rollupOptions: {
+      external: [
+        'autk-db',
+        'autk-map',
+        'autk-plot',
+        'autk-compute',
+        'urban-grammar',
+      ],
+    },
     copyPublicDir: false,
     emptyOutDir: false,
     sourcemap: true

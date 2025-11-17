@@ -26,7 +26,6 @@
     "autk-map": "file:../autk-map",
     "autk-plot": "file:../autk-plot",
     "autk-compute": "file:../autk-compute",
-    "autk-grammar": "file:../autk-grammar",
-    "urban-grammar": "file:../urban-grammar"
+    "autk-grammar": "file:../autk-grammar"
   }
 }

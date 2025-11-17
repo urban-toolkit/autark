@@ -15,8 +15,8 @@ build:
 		"cd autk-db && npm run build" \
 		"cd autk-plot && npm run build" \
 		"cd autk-compute && npm run build" \
-		"cd urban-grammar && npm run build" \
-		"cd autk-grammar && npm run build"
+		"cd urban-grammar && npm run build" 
+	cd autk-grammar && npm run build
 
 dev:
 	make install-ex
@@ -27,8 +27,8 @@ dev:
 		"cd autk-plot && npm run dev-build" \
 		"cd autk-compute && npm run dev-build" \
 		"cd urban-grammar && npm run dev-build" \
-		"cd autk-grammar && npm run dev-build" \
 		"cd examples && npm run dev"
+	cd autk-grammar && npm run dev-build
 
 map:
 	$(CONCURRENTLY) "cd autk-map && npm run build"

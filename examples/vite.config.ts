@@ -14,9 +14,9 @@ export function pluginWatchNodeModules(modules: string[]) {
 }
 
 export default defineConfig({
-  plugins: [pluginWatchNodeModules(['autk-map', 'autk-db', 'autk-plot', 'autk-compute'])],
+  plugins: [pluginWatchNodeModules(['autk-map', 'autk-db', 'autk-plot', 'autk-compute', 'autk-grammar'])],
   optimizeDeps: {
-    exclude: ['autk-map', 'autk-db', 'autk-plot', 'autk-compute'],
+    exclude: ['autk-map', 'autk-db', 'autk-plot', 'autk-compute', 'autk-grammar'],
   },
   build: {
     rollupOptions: {
@@ -25,6 +25,7 @@ export default defineConfig({
         nested2: '/src/autk-map/',
         nested3: '/src/autk-plot/',
         nested4: '/src/autk-compute/',
+        nested5: '/src/autk-grammar/'
       },
     },
   },
