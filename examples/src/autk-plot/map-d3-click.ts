@@ -305,8 +305,8 @@ export class MapD3 {
         if (layer) {
             layer.layerRenderInfo.isPick = true;
 
-            layer.clearHighlightedIds();
-            layer.setHighlightedIds(locList);
+            // layer.clearHighlightedIds();
+            // layer.setHighlightedIds(locList);
         }
     }
 

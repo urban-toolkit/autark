@@ -3,6 +3,7 @@ import { PlotEvent } from "./constants";
 import { PlotEvents } from "./plot-events";
 
 export abstract class AutkPlot {
+
     protected _div!: HTMLElement;
 
     protected _data!: GeoJsonProperties[];
@@ -11,7 +12,6 @@ export abstract class AutkPlot {
 
     constructor(svg: HTMLElement, events: PlotEvent[]) {
         this._div = svg;
-        this._plotEvents = new PlotEvents(events);
     }
 
     get data(): GeoJsonProperties[] {
@@ -26,7 +26,7 @@ export abstract class AutkPlot {
         return this._plotEvents;
     }
 
-    abstract configureSignalListeners(): void;
+    // abstract configureSignalListeners(): void;
 
     abstract draw(): Promise<void>;
 }

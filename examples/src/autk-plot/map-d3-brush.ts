@@ -4,7 +4,7 @@ import { Feature, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
 
-import { PlotEvent, PlotD3, PlotStyle } from 'autk-plot';
+import { PlotEvent, PlotD3, PlotStyle, AutkPlot, Scatterplot } from 'autk-plot';
 
 import { AutkMap, LayerType, MapEvent } from 'autk-map';
 
@@ -74,24 +74,33 @@ export class MapD3 {
 
         await this.loadLayers();
         await this.loadLayerData();
-        this.updateMapListeners();
+        // this.updateMapListeners();
 
         this.map.draw();
     }
 
     protected async loadAutkPlot() {
+
         const plotBdy = document.querySelector('#plotBody') as HTMLDivElement;
 
         if (!plotBdy) {
             throw new Error('Plot body element not found.');
         }
 
-        this.plot = new PlotD3(plotBdy, this.scatterPlot.bind(this), [PlotEvent.BRUSH]);
+        const data = await this.db.getLayer('neighborhoods');
+        const plotData = data.features.map((f: Feature) => {
+            return f.properties;
+        })
 
-        await this.loadPlotData();
-        this.updatePlotListeners();
+        // Goal signature
+        const plot: any = new Scatterplot( plotBdy, plotData );
 
-        this.plot.draw();
+        // this.plot = new PlotD3(plotBdy, this.scatterPlot.bind(this), [PlotEvent.BRUSH]);
+
+        // await this.loadPlotData();
+        // this.updatePlotListeners();
+
+        // this.plot.draw();
         this.floatingPlot();
     }
 
@@ -118,178 +127,79 @@ export class MapD3 {
         this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv);
     }
 
-    protected async updateMapListeners() {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
-            this.highlightSelectedMarks(selection as number[]);
-            console.log('Plot updated.');
-        });
-    }
+    // protected async updateMapListeners() {
+    //     this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
+    //         this.highlightSelectedMarks(selection as number[]);
+    //         console.log('Plot updated.');
+    //     });
+    // }
 
     // ---- Plot helper methods ----
 
-    protected async loadPlotData(layerId: string = 'neighborhoods') {
-        const data = await this.db.getLayer(layerId);
+    // protected async loadPlotData(layerId: string = 'neighborhoods') {
+    //     const data = await this.db.getLayer(layerId);
 
-        this.plot.data = data.features.map((f: Feature) => {
-            return f.properties;
-        });
-    }
+    //     this.plot.data = data.features.map((f: Feature) => {
+    //         return f.properties;
+    //     });
 
-    protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: unknown[]) => {
-            const locList: number[] = [];
+    // }
 
-            selection.forEach((item: unknown) => {
-                const currentSel = item as number[][];
+    // protected updatePlotListeners(layerId: string = 'neighborhoods') {
+    //     this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: unknown[]) => {
+    //         const locList: number[] = [];
 
-                this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
-                    const xVal = this.mapX(+d?.shape_area || 0);
-                    const yVal = this.mapY(+d?.shape_leng || 0);
+    //         selection.forEach((item: unknown) => {
+    //             const currentSel = item as number[][];
 
-                    if (xVal >= currentSel[0][0] &&
-                        xVal <= currentSel[1][0] &&
-                        yVal >= currentSel[0][1] &&
-                        yVal <= currentSel[1][1]) {
-                        locList.push(id);
-                        return;
-                    }
-                });
-            });
+    //             this.plot.data.forEach((d: GeoJsonProperties, id: number) => {
+    //                 const xVal = this.mapX(+d?.shape_area || 0);
+    //                 const yVal = this.mapY(+d?.shape_leng || 0);
 
-            this.highlightSelectedBoundaries(layerId, locList);
-            this.highlightSelectedMarks(locList);
-            console.log('Map updated.');
-        });
-    }
+    //                 if (xVal >= currentSel[0][0] &&
+    //                     xVal <= currentSel[1][0] &&
+    //                     yVal >= currentSel[0][1] &&
+    //                     yVal <= currentSel[1][1]) {
+    //                     locList.push(id);
+    //                     return;
+    //                 }
+    //             });
+    //         });
 
-    // ---- D3 plot method ----
-
-    protected scatterPlot(
-        div: HTMLElement,
-        data: GeoJsonProperties[]
-    ) {
-        const margens = { left: 40, right: 25, top: 10, bottom: 35 };
-
-        const svg = d3
-            .select(div)
-            .selectAll('#plot')
-            .data([0])
-            .join('svg')
-            .attr('id', 'plot')
-            .style('width', `calc(${div.offsetWidth}px - 4px)`)
-            .style('height', '500px')
-            .style('visibility', 'visible');
-
-        const node = svg.node();
-
-        if (!svg || !node) {
-            throw new Error('SVG element could not be created.');
-        }
-
-        // ---- Tamanho do Gráfico
-        const width = div.offsetWidth - margens.left - margens.right;
-        const height = 500 - margens.top - margens.bottom;
-
-        // ---- Escalas
-        const xExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_area || 0);
-        this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
-
-        const yExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_leng || 0);
-        this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
-
-        // ---- Eixos
-        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
-
-        const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisX')
-            .attr('class', 'x axis')
-            .attr('transform', `translate(${margens.left}, ${500 - margens.bottom})`)
-            .style('visibility', 'visible');
-        xAxisSelection.call(xAxis);
-
-        // Add X axis label:
-        xAxisSelection
-            .append('text')
-            .attr('class', 'title')
-            .attr('text-anchor', 'end')
-            .attr('x', width)
-            .attr('y', margens.bottom / 2 + 10)
-            .style('visibility', 'visible')
-            .text('shape_area');
-
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
-
-        const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisY')
-            .attr('class', 'y axis')
-            .attr('transform', `translate(${margens.left}, ${margens.top})`)
-            .style('visibility', 'visible');
-        yAxisSelection.call(yAxis);
-
-        // Y axis label:
-        yAxisSelection
-            .append('text')
-            .attr('class', 'title')
-            .attr('text-anchor', 'end')
-            .attr('transform', 'rotate(-90)')
-            .attr('y', -margens.left / 2 - 7)
-            .attr('x', -margens.top)
-            .style('visibility', 'visible')
-            .text('shape_leng');
-
-        const cGroup = svg
-            .selectAll('.autkBrushable')
-            .data([0])
-            .join('g')
-            .attr('class', 'autkBrushable')
-            .attr('transform', `translate(${margens.left}, ${margens.top})`);
-
-        cGroup
-            .selectAll('.autkMark')
-            .data(data)
-            .join('circle')
-            .attr('class', 'autkMark')
-            .attr('cx', (d) => this.mapX(+d?.shape_area || 0))
-            .attr('cy', (d) => this.mapY(+d?.shape_leng || 0))
-            .attr('r', 6)
-            .style('fill', 'lightgray')
-            .style('visibility', 'visible');
-    }
+    //         this.highlightSelectedBoundaries(layerId, locList);
+    //         // this.highlightSelectedMarks(locList);
+    //         console.log('Map updated.');
+    //     });
+    // }
 
     // ---- Highlight methods ----
 
-    protected highlightSelectedMarks(locList: number[]) {
-        const svgs = d3.selectAll('.autkMark');
-        const grps = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
+    // protected highlightSelectedMarks(locList: number[]) {
+    //     const svgs = d3.selectAll('.autkMark');
+    //     const grps = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
 
-        svgs.style('fill', function (_d: unknown, id: number) {
-            if (locList.includes(id)) {
-                return PlotStyle.highlight;
-            } else {
-                return PlotStyle.default;
-            }
-        });
+    //     svgs.style('fill', function (_d: unknown, id: number) {
+    //         if (locList.includes(id)) {
+    //             return PlotStyle.highlight;
+    //         } else {
+    //             return PlotStyle.default;
+    //         }
+    //     });
 
-        if (locList.length === 0) {
-            grps.call(d3.brush().move, null);
-        }
-    }
+    //     if (locList.length === 0) {
+    //         grps.call(d3.brush().move, null);
+    //     }
+    // }
 
-    protected highlightSelectedBoundaries(layerId: string = 'neighborhoods', locList: number[]) {
-        const layer = this.map.layerManager.searchByLayerId(layerId);
-        if (layer) {
-            layer.layerRenderInfo.isPick = true;
+    // protected highlightSelectedBoundaries(layerId: string = 'neighborhoods', locList: number[]) {
+    //     const layer = this.map.layerManager.searchByLayerId(layerId);
+    //     if (layer) {
+    //         layer.layerRenderInfo.isPick = true;
 
-            layer.clearHighlightedIds();
-            layer.setHighlightedIds(locList);
-        }
-    }
+    //         layer.clearHighlightedIds();
+    //         layer.setHighlightedIds(locList);
+    //     }
+    // }
 
     // ---- Ui helper methods ----
 
