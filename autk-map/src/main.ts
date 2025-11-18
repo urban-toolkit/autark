@@ -531,7 +531,7 @@ export class AutkMap {
                 layer.getPickedId(x, y).then((id) => {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if (id >= 0) {
-                        layer.setHighlightedIds([id]);
+                        layer.toggleHighlightedIds([id]);
                         this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
                     } else {
                         layer.clearHighlightedIds();
