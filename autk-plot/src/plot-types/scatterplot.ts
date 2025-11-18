@@ -1,31 +1,31 @@
-import { GeoJsonProperties } from "geojson";
 import * as d3 from "d3";
 
-// import { AutkPlot } from "../main";
+import { PlotD3 } from "../plot-d3";
+import { PlotConfig } from "../types";
+import { PlotStyle } from "../plot-style";
+import { PlotEvent } from "../constants";
 
-export class Scatterplot {
+export class Scatterplot extends PlotD3   {
 
     protected mapX!: d3.ScaleLinear<number, number>;
     protected mapY!: d3.ScaleLinear<number, number>;
 
-    constructor(div: HTMLElement, data: GeoJsonProperties[]) {
-        this.draw(div, data);
+    constructor(config: PlotConfig) {
+        if(config.events === undefined) { config.events = [PlotEvent.CLICK]; }
+        super(config);
+
+        this.draw();
     }
 
-    protected draw(
-        div: HTMLElement,
-        data: GeoJsonProperties[]
-    ) {
-        const margins = { left: 40, right: 25, top: 10, bottom: 35 };
-
+    public async draw(): Promise<void> {
         const svg = d3
-            .select(div)
+            .select(this._div)
             .selectAll('#plot')
             .data([0])
             .join('svg')
             .attr('id', 'plot')
-            .style('width', `calc(${div.offsetWidth}px - 4px)`)
-            .style('height', '500px')
+            .style('width', `${this._width}`)
+            .style('height', `${this._height || '500px'}`)
             .style('visibility', 'visible');
 
         const node = svg.node();
@@ -35,14 +35,14 @@ export class Scatterplot {
         }
 
         // ---- Tamanho do Gráfico
-        const width = div.offsetWidth - margins.left - margins.right;
-        const height = 500 - margins.top - margins.bottom;
+        const width = this._width - this._margins.left - this._margins.right;
+        const height = this._height - this._margins.top - this._margins.bottom;
 
         // ---- Escalas
-        const xExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_area || 0);
+        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? +d[this._axis[0]] || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(data, (d) => +d?.shape_leng || 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +d[this._axis[1]] || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Eixos
@@ -54,7 +54,7 @@ export class Scatterplot {
             .join('g')
             .attr('id', 'axisX')
             .attr('class', 'x axis')
-            .attr('transform', `translate(${margins.left}, ${500 - margins.bottom})`)
+            .attr('transform', `translate(${this._margins.left}, ${500 - this._margins.bottom})`)
             .style('visibility', 'visible');
         xAxisSelection.call(xAxis);
 
@@ -64,9 +64,9 @@ export class Scatterplot {
             .attr('class', 'title')
             .attr('text-anchor', 'end')
             .attr('x', width)
-            .attr('y', margins.bottom / 2 + 10)
+            .attr('y', this._margins.bottom / 2 + 10)
             .style('visibility', 'visible')
-            .text('shape_area');
+            .text(this._axis[0]);
 
         const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
 
@@ -76,7 +76,7 @@ export class Scatterplot {
             .join('g')
             .attr('id', 'axisY')
             .attr('class', 'y axis')
-            .attr('transform', `translate(${margins.left}, ${margins.top})`)
+            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');
         yAxisSelection.call(yAxis);
 
@@ -86,28 +86,41 @@ export class Scatterplot {
             .attr('class', 'title')
             .attr('text-anchor', 'end')
             .attr('transform', 'rotate(-90)')
-            .attr('y', -margins.left / 2 - 7)
-            .attr('x', -margins.top)
+            .attr('y', -this._margins.left / 2 - 7)
+            .attr('x', -this._margins.top)
             .style('visibility', 'visible')
-            .text('shape_leng');
+            .text(this._axis[1]);
 
         const cGroup = svg
-            .selectAll('.autkBrushable')
+            .selectAll('.autkGroup')
             .data([0])
             .join('g')
-            .attr('class', 'autkBrushable')
-            .attr('transform', `translate(${margins.left}, ${margins.top})`);
+            .attr('class', 'autkGroup')
+            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
+
+        cGroup
+            .selectAll('.autkClear')
+            .data([0])
+            .join('rect')
+            .attr('class', 'autkClear')
+            .attr('width', width)
+            .attr('height', height)
+            .style('fill', 'white')
+            .style('opacity', 0)
+            .style('visibility', 'visible');
 
         cGroup
             .selectAll('.autkMark')
-            .data(data)
+            .data(this.data)
             .join('circle')
             .attr('class', 'autkMark')
-            .attr('cx', (d) => this.mapX(+d?.shape_area || 0))
-            .attr('cy', (d) => this.mapY(+d?.shape_leng || 0))
+            .attr('cx', (d) => this.mapX(d ? +d[this._axis[0]] || 0 : 0))
+            .attr('cy', (d) => this.mapY(d ? +d[this._axis[1]] || 0 : 0))
             .attr('r', 6)
-            .style('fill', 'lightgray')
+            .style('fill', PlotStyle.default)
             .style('visibility', 'visible');
+
+        this.configureSignalListeners();
     }
 
 }

@@ -1,9 +1,22 @@
 
-import type { GeoJsonProperties } from 'geojson';
+import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+
+import { PlotEvent } from './constants';
+
+export type PlotMargins = { left: number; right: number; top: number; bottom: number };
+
+export type PlotConfig = {
+    div: HTMLElement, 
+    data: FeatureCollection<Geometry, GeoJsonProperties>, 
+    events: PlotEvent[],
+    margins?: PlotMargins,
+    width?: number,
+    height?: number,
+    labels?: { axis: string[]; title: string }
+}
+
+export type PlotEventListener = (selection: number[]) => void;
 
 export type ColorHEX = `#${string}`;
 export type ColorRGB = { r: number; g: number; b: number; opacity: number };
 export type ColorTEX = number[];
-
-export type PlotEventListener = (selection: unknown[]) => void;
-export type D3PlotBuilder = (div: HTMLElement, data: GeoJsonProperties[]) => void;

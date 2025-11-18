@@ -49,7 +49,7 @@ export class MapEvents {
      * @param {number[] | string[]} selection - The selection data to pass to the listeners.
      * @param {string} layerId - The ID of the layer associated with the event.
      */
-    public emit(event: string, selection: number[] | string[], layerId: string): void {
+    public emit(event: string, selection: number[], layerId: string): void {
         if (this._listeners[event]) {
             this._listeners[event].forEach(listener => listener(selection, layerId));
         }
