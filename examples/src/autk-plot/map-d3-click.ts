@@ -2,7 +2,6 @@
 import { FeatureCollection } from 'geojson';
 
 import { Scatterplot, PlotEvent } from 'autk-plot';
-
 import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
 
 export class MapD3 {
@@ -12,6 +11,8 @@ export class MapD3 {
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
+        this.geojson = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
+
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
 
@@ -23,9 +24,7 @@ export class MapD3 {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        this.geojson = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
         this.map.loadGeoJsonLayer('neighborhoods', this.geojson);
-
         this.map.draw();
     }
 
@@ -33,7 +32,7 @@ export class MapD3 {
         this.plot = new Scatterplot({
             div: plotDiv,
             data: this.geojson,
-            labels: { axis: ['shape_area', 'shape_leng'], title: 'Neighborhoods Scatterplot' },
+            labels: { axis: ['shape_area', 'shape_leng'], title: 'Plot example' },
             width: 790,
             events: [PlotEvent.CLICK]
         });

@@ -38,6 +38,20 @@ export class Scatterplot extends PlotD3   {
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
 
+        // ---- Title (optional)
+        svg
+            .selectAll<SVGTextElement, string>('#plotTitle')
+            .data([this._title])
+            .join('text')
+            .attr('id', 'plotTitle')
+            .attr('class', 'plot-title')
+            .attr('x', this._margins.left + width / 2)
+            .attr('y', Math.max(this._margins.top * 0.5, 10))
+            .attr('text-anchor', 'middle')
+            .style('font-weight', '600')
+            .style('visibility', 'visible')
+            .text((d) => d);
+
         // ---- Escalas
         const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? +d[this._axis[0]] || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);

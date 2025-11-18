@@ -27,12 +27,12 @@ export abstract class AutkPlot {
         this._plotEvents = new PlotEvents(config.events);
 
         this._data = config.data.features.map((f) => f.properties);
-        this._margins = config.margins || { left: 60, right: 20, top: 20, bottom: 50 };
+        this._margins = config.margins || { left: 60, right: 20, top: 50, bottom: 50 };
         this._width = config.width || 800;
         this._height = config.height || 500;
 
         this._axis = config.labels?.axis || [];
-        this._title = config.labels?.title || '';
+        this._title = config.labels?.title || 'Autk Plot';
     }
 
 
