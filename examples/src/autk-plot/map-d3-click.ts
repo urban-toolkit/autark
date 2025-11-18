@@ -25,6 +25,8 @@ export class MapD3 {
         await this.map.init();
 
         this.map.loadGeoJsonLayer('neighborhoods', this.geojson);
+        this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
+
         this.map.draw();
     }
 
