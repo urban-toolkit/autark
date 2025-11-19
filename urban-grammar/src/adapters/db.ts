@@ -1,5 +1,5 @@
-import { DbSourceSpec } from "../types";
+import { DbSourceSpec, Table } from "../types";
 
 export interface DbAdapter {
-    resolveSource(spec: DbSourceSpec): Promise<unknown>;
+    resolveSource(spec: DbSourceSpec): Promise<Table[]>;
 }

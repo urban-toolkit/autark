@@ -1,4 +1,4 @@
-import { CsvDataSourceSpec, DbAdapter, DbSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar'
+import { CsvDataSourceSpec, DbAdapter, DbSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec, Table } from 'urban-grammar';
 import { SpatialDb } from 'autk-db';
 import { Targets } from '../types';
 
@@ -23,7 +23,7 @@ export function createDbAdapter(targets?: Targets): DbAdapter {
     }
 
     return {
-        async resolveSource(spec: DbSourceSpec): Promise<void> {
+        async resolveSource(spec: DbSourceSpec): Promise<Table[]> {
 
             const db = new SpatialDb();
             await db.init();
@@ -34,17 +34,17 @@ export function createDbAdapter(targets?: Targets): DbAdapter {
                 case 'osm':
                     await db.loadOsmFromOverpassApi(rest_spec as OsmDataSourceSpec);
                     print(db, targets);
-                    return
+                    return db.tables;
                 case 'csv':
                     await db.loadCsv(rest_spec as CsvDataSourceSpec);
                     print(db, targets);
-                    return
+                    return db.tables;
                 case 'json':
                     await db.loadJson(rest_spec as JsonDataSourceSpec);
                     print(db, targets);
-                    return
+                    return db.tables;
                 default: 
-                    return
+                    return []
             }
         }
     }
