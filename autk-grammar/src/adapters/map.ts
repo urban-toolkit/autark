@@ -1,4 +1,4 @@
-import { MapAdapter, MapSpec } from 'urban-grammar';
+import { MapAdapter, MapSpec, Table } from 'urban-grammar';
 import { Targets } from '../types';
 import { AutkMap, MapStyle } from 'autk-map';
 
@@ -38,7 +38,7 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
     // }
 
     return {
-        async resolveMap(spec: MapSpec): Promise<void> {
+        async resolveMap(tables: Table[], spec: MapSpec): Promise<void> {
             if(targets && targets.map){
                 let canvas = document.getElementById("#"+targets.map);
 
@@ -54,6 +54,7 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
                     MapStyle.setPredefinedStyle(spec.style)
 
                 await map.init();
+                
                 
             }
         }
