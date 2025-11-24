@@ -24,6 +24,7 @@
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.16",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
     "@webgpu/types": "^0.1.66",

@@ -1,5 +1,5 @@
 import { IEngine } from "./interfaces";
-import { UrbanSpec, EngineOptions, Table } from "./types";
+import { UrbanSpec, EngineOptions } from "./types";
 
 export function createEngine(options: EngineOptions): IEngine{
     const { spec, adapters } = options;
@@ -7,20 +7,20 @@ export function createEngine(options: EngineOptions): IEngine{
     // TODO check if schema is respected
 
     async function run() {
-        let tables: Table[] = [];
+        let context: unknown;
         
         // Database module
         if(spec.data)
             for(const source of spec.data) {
-                tables = await adapters.db.resolveSource(source);
+                context = await adapters.db.resolveSource(source);
             }
 
         if(spec.map){
-            if(tables.length > 0){
-                await adapters.map.resolveMap(tables, spec.map);
-            }else{
-                throw new Error("Not enough tables loaded: 0");
-            }
+            await adapters.map.resolveMap(context, spec.map);
+        }
+
+        if(spec.plot){
+            await adapters.plot.resolvePlot(undefined, spec.plot);
         }
 
         // TODO: Compute module, DB module, Map module, Plot module

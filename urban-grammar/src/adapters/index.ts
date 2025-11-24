@@ -1,2 +1,3 @@
-export * from './db';
+export * from './data';
 export * from './map';
+export * from './plot';
