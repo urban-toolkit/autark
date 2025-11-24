@@ -1,4 +1,4 @@
-import { AutkGrammar } from 'autk-grammar';
+import { AutkGrammar, AutkGrammarSpec } from 'autk-grammar';
 
 export class LoadCsv {
     protected autkGrammar!: AutkGrammar;
@@ -8,7 +8,7 @@ export class LoadCsv {
             db: "output"
         });
 
-        const spec = {
+        const spec: AutkGrammarSpec = {
             data: [
                 {
                     type: "csv",
@@ -22,7 +22,8 @@ export class LoadCsv {
                 },
                 {
                     type: "json",
-                    jsonFileUrl: 'http://localhost:5173/data/mnt.geojson'
+                    jsonFileUrl: 'http://localhost:5173/data/mnt.geojson',
+                    outputTableName: 'mnt'
                 }
             ]
         }

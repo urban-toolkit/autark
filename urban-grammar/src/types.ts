@@ -1,5 +1,5 @@
 
-import { DataAdapter, PlotAdapter, MapAdapter } from "./adapters";
+import { DataAdapter, PlotAdapter, MapAdapter, ComputeAdapter } from "./adapters";
 import { FeatureCollection } from 'geojson';
 import { DataSourceType, LayerType, ColorMapInterpolator, PlotMark, PlotEvent } from "./constants";
 
@@ -84,7 +84,7 @@ export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSou
 export type MapSpec = {
     style?: 'light' | 'dark',
     layerRefs: {
-        outputTableName: string,
+        dataRef: string,
         opacity?: number,
         isColorMap?: boolean,
         colorMapInterpolator?: ColorMapInterpolator,
@@ -105,8 +105,18 @@ export type PlotSpec = {
     event: PlotEvent
 }
 
+export type ComputeSpec = {
+    dataRef: string,
+    variableMapping: Record<string, string>,
+    arrayVariables?: Record<string, number>,
+    matrixVariables?: Record<string, { rows: number; cols: number }>,
+    outputColumnName: string,
+    wglsFunction: string
+}
+
 export type UrbanSpec = {
     data?: DataSourceSpec[],
+    compute?: ComputeSpec[],
     map?: MapSpec,
     plot?: PlotSpec
 }
@@ -116,7 +126,7 @@ export type EngineOptions = {
     adapters: {
         db: DataAdapter,
         map: MapAdapter,
-        plot: PlotAdapter
-        // TODO: include computer, plot, etc.
+        plot: PlotAdapter,
+        compute: ComputeAdapter
     }
 }

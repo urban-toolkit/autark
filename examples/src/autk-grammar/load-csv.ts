@@ -1,4 +1,4 @@
-import { AutkGrammar } from 'autk-grammar';
+import { AutkGrammar, AutkGrammarSpec } from 'autk-grammar';
 
 export class LoadCsv {
     protected autkGrammar!: AutkGrammar;
@@ -8,7 +8,7 @@ export class LoadCsv {
             db: "output"
         });
 
-        const spec = {
+        const spec: AutkGrammarSpec = {
             data: [
                 {
                     type: "csv",

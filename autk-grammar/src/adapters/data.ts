@@ -23,10 +23,14 @@ export function createDataAdapter(targets?: Targets): DataAdapter {
     }
 
     return {
-        async resolveSource(spec: DataSourceSpec): Promise<SpatialDb | undefined> {
+        async resolveSource(context: SpatialDb | undefined, spec: DataSourceSpec): Promise<SpatialDb | undefined> {
 
-            const db = new SpatialDb();
-            await db.init();
+            let db = context;
+
+            if(!db){
+                db = new SpatialDb();
+                await db.init();
+            }
 
             let {type, ...rest_spec} = spec;
 

@@ -21,7 +21,7 @@ export class ColormapCat {
                 style: 'light',
                 layerRefs: [
                     {
-                        outputTableName: 'roads',
+                        dataRef: 'roads',
                         colorMapInterpolator: ColorMapInterpolator.OBSERVABLE10,
                         getFnv: 'highway'
                     }

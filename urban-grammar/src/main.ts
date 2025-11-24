@@ -9,10 +9,14 @@ export function createEngine(options: EngineOptions): IEngine{
     async function run() {
         let context: unknown;
         
-        // Database module
         if(spec.data)
             for(const source of spec.data) {
-                context = await adapters.db.resolveSource(source);
+                context = await adapters.db.resolveSource(context, source);
+            }
+
+        if(spec.compute)
+            for(const compute of spec.compute) {
+                context = await adapters.compute.resolveCompute(context, compute);
             }
 
         if(spec.map){
@@ -22,8 +26,6 @@ export function createEngine(options: EngineOptions): IEngine{
         if(spec.plot){
             await adapters.plot.resolvePlot(undefined, spec.plot);
         }
-
-        // TODO: Compute module, DB module, Map module, Plot module
     }
 
     function updatedSpec(spec: UrbanSpec) {

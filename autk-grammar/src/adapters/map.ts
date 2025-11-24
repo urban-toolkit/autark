@@ -16,7 +16,7 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
 
         // Load layers
         for(const layerRef of spec.layerRefs){
-            const name = layerRef.outputTableName;
+            const name = layerRef.dataRef;
             const type = tableToTypeMap[name];
             const getFnv = layerRef.getFnv;
 
