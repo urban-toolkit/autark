@@ -26,7 +26,7 @@ export class PlotEvents {
         }
     }
 
-    emit(event: string, selection: unknown[]): void {
+    emit(event: string, selection: number[]): void {
         if (this._listeners[event]) {
             this._listeners[event].forEach(listener => listener(selection));
         }
