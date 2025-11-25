@@ -62,17 +62,16 @@ export abstract class PlotD3 extends AutkPlot {
 
     brushEvent(): void {
         const that = this;
-        const selections: number[][] = [];
+        const selections: number[] = [];
 
         //---- Brush events -------
         const groups = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
-        groups.each(function (_d, id: number) {
-            selections.push([]);
+        groups.each(function (_d) {
 
             const brush = d3.brush()
                 .on("start brush end", function (event: any) {
                     if (event.selection) {
-                        selections[id] = event.selection;
+                        selections.push(...event.selection);
                         that.plotEvents.emit(PlotEvent.BRUSH, selections);
                     }
                 });
@@ -84,17 +83,16 @@ export abstract class PlotD3 extends AutkPlot {
 
     brushXEvent(): void {
         const that = this;
-        const selections: number[][] = [];
+        const selections: number[] = [];
 
         //---- Brush events -------
         const groups = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
-        groups.each(function (_d, id: number) {
-            selections.push([]);
+        groups.each(function (_d) {
 
             const brush = d3.brushX()
                 .on("start brush end", function (event: any) {
                     if (event.selection) {
-                        selections[id] = event.selection;
+                        selections.push(...event.selection);
                         that.plotEvents.emit(PlotEvent.BRUSH_X, selections);
                     }
                 });
@@ -106,17 +104,16 @@ export abstract class PlotD3 extends AutkPlot {
 
     brushYEvent(): void {
         const that = this;
-        const selections: number[][] = [];
+        const selections: number[] = [];
 
         //---- Brush events -------
         const groups = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
-        groups.each(function (_d, id: number) {
-            selections.push([]);
+        groups.each(function (_d) {
 
             const brush = d3.brushY()
                 .on("start brush end", function (event: any) {
                     if (event.selection) {
-                        selections[id] = event.selection;
+                        selections.push(...event.selection);
                         that.plotEvents.emit(PlotEvent.BRUSH_Y, selections);
                     }
                 });
