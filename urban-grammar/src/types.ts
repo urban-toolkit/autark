@@ -1,7 +1,7 @@
 
 import { DataAdapter, PlotAdapter, MapAdapter, ComputeAdapter } from "./adapters";
 import { FeatureCollection } from 'geojson';
-import { DataSourceType, LayerType, ColorMapInterpolator, PlotMark, PlotEvent } from "./constants";
+import { DataSourceType, LayerType, ColorMapInterpolator, PlotMark, PlotEvent, AggregateFunction } from "./constants";
 
 // export type Column = {
 //   name: string,
@@ -18,6 +18,23 @@ import { DataSourceType, LayerType, ColorMapInterpolator, PlotMark, PlotEvent } 
 export type TableSourceSpec = {
     type: DataSourceType,
     outputTableName: string
+}
+
+export type HeatmapSourceSpec = TableSourceSpec & { 
+    tableJoinName: string;
+    nearDistance: number;
+    groupBy?: {
+        selectColumns: Array<{
+            tableName: string;
+            column: string;
+            aggregateFn?: AggregateFunction;
+            aggregateFnResultColumnName?: string;
+        }>;
+    };
+    grid: {
+        rows: number;
+        columns: number;
+    };
 }
 
 export type OsmDataSourceSpec = TableSourceSpec & {
@@ -67,7 +84,7 @@ export type CustomDataSourceSpec = TableSourceSpec & {
     boundingBox?: BoundingBox;
 }
 
-export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSourceSpec | CustomDataSourceSpec;
+export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSourceSpec | CustomDataSourceSpec | HeatmapSourceSpec;
 
 /**
  * Type for map.

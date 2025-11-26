@@ -1,6 +1,6 @@
 export type LayerType = 'surface' | 'water' | 'parks' | 'roads' | 'buildings' | 'points' | 'polygons' | 'polylines' | 'raster';
 
-export type DataSourceType = 'osm' | 'csv' | 'json' | 'geojson';
+export type DataSourceType = 'osm' | 'csv' | 'json' | 'geojson' | 'heatmap';
 
 export enum ColorMapInterpolator {
   SEQUENTIAL_REDS = 'interpolateReds',
@@ -12,3 +12,5 @@ export enum ColorMapInterpolator {
 export type PlotMark = 'bar' | 'line' | 'point';
 
 export type PlotEvent = 'click' | 'brush' | 'brushY' | 'brushX';
+
+export type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max';

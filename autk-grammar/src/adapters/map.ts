@@ -1,6 +1,6 @@
 import { MapAdapter, MapSpec } from 'urban-grammar';
 import { Targets } from '../types';
-import { AutkMap, MapStyle, LayerType, ColorMapInterpolator } from 'autk-map';
+import { AutkMap, MapStyle, LayerType } from 'autk-map';
 import { SpatialDb } from 'autk-db';
 import { Feature, GeoJsonProperties } from 'geojson';
 
@@ -37,8 +37,9 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
                 return '';
             };
 
-            map.updateRenderInfoProperty(name, 'colorMapInterpolator', layerRef.colorMapInterpolator ? layerRef.colorMapInterpolator : ColorMapInterpolator.OBSERVABLE10);
-           
+            if(layerRef.colorMapInterpolator)
+                map.updateRenderInfoProperty(name, 'colorMapInterpolator', layerRef.colorMapInterpolator);
+            
             if(getFnv)
                 map.updateGeoJsonLayerThematic(name, geojson, _getFnv, layerRef.groupById);
         }
