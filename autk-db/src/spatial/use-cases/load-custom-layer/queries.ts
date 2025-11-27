@@ -2,7 +2,7 @@ import { BoundingBox } from '../../../shared/interfaces';
 
 export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string) => {
   return `
-    CREATE TABLE ${featureCollectionTableName} AS SELECT * FROM '${geojsonFileUrl}';
+    CREATE OR REPLACE TABLE ${featureCollectionTableName} AS SELECT * FROM '${geojsonFileUrl}';
   `;
 };
 
@@ -28,7 +28,7 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
     : geometryTransform;
 
   return `
-    CREATE TABLE ${outputTableName} AS
+    CREATE OR REPLACE TABLE ${outputTableName} AS
     SELECT
       ${geometrySelect} AS geometry,
       feature.properties AS properties

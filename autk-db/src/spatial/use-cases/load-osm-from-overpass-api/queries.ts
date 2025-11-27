@@ -1,5 +1,5 @@
 export const CREATE_OSM_TABLE_QUERY = (tableName: string): string => `
-  CREATE TABLE ${tableName} (
+  CREATE OR REPLACE TABLE ${tableName} (
     kind VARCHAR,
     id BIGINT,
     tags MAP(VARCHAR, VARCHAR),

@@ -2,7 +2,7 @@ import { DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
 
 export const LOAD_CSV_ON_TABLE_QUERY = (csvFileUrl: string, tableName: string, delimiter: string) => {
   return `
-        CREATE TABLE ${tableName} AS
+        CREATE OR REPLACE TABLE ${tableName} AS
             SELECT * FROM READ_CSV(
                 '${csvFileUrl}',
                 delim='${delimiter}',
