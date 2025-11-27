@@ -24,6 +24,7 @@ import { RawQueryUseCase } from './use-cases/raw-query';
 import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
 import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-layer';
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
+import { GetTableDataParams, GetTableDataOutput, GetTableDataUseCase } from './use-cases/get-table-data';
 
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
@@ -52,6 +53,7 @@ export class SpatialDb {
   private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
   private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
   private buildHeatmapUseCase?: BuildHeatmapUseCase;
+  private getTableDataUseCase?: GetTableDataUseCase;
 
   /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
@@ -76,6 +78,7 @@ export class SpatialDb {
     this.getBoundingBoxFromOsmUseCase = new GetBoundingBoxFromOsmUseCase(this.conn);
     this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
     this.buildHeatmapUseCase = new BuildHeatmapUseCase(this.conn);
+    this.getTableDataUseCase = new GetTableDataUseCase(this.conn);
 
     this.conn.query('INSTALL spatial; LOAD spatial;');
   }
@@ -330,6 +333,24 @@ export class SpatialDb {
         (table.source === 'user' && isLayerType(table.type)) // TODO: check if this is correct
       );
     });
+  }
+
+  /**
+   * Retrieves the data from any table as an array of plain JavaScript objects.
+   * This method works with all table types (CSV, JSON, Layer, Grid, etc.).
+   * @param params - Parameters including table name and optional pagination (limit, offset).
+   * @returns A promise that resolves to an array of objects representing the table rows.
+   * @throws Error if the database or connection is not initialized.
+   * @throws Error if the table is not found.
+   */
+  async getTableData(params: GetTableDataParams): Promise<GetTableDataOutput> {
+    if (!this.db || !this.conn || !this.getTableDataUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = this.tables.find((t) => t.name === params.tableName);
+    if (!table) throw new Error(`Table ${params.tableName} not found.`);
+
+    return this.getTableDataUseCase.exec(params);
   }
 
   // CUSTOM QUERIES
