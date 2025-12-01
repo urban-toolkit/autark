@@ -48,11 +48,11 @@ export function createDataAdapter(targets?: Targets): DataAdapter {
                     print(db, targets);
                     return db;
                 case 'geojson':
-                    await db.loadCustomLayer(rest_spec as CustomDataSourceSpec)
+                    await db.loadCustomLayer(rest_spec as CustomDataSourceSpec);
                     print(db, targets);
                     return db;
                 case 'heatmap': 
-                    await db.buildHeatmap(rest_spec as HeatmapSourceSpec)
+                    await db.buildHeatmap(rest_spec as HeatmapSourceSpec);
                     print(db, targets);
                     return db;
                 default: 

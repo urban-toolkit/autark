@@ -6,7 +6,7 @@ import { FeatureCollection } from 'geojson';
 export function createComputeAdapter(): ComputeAdapter {
 
     return {
-        async resolveCompute(context: SpatialDb | undefined, spec: ComputeSpec): Promise<void> {
+        async resolveCompute(context: SpatialDb | undefined, spec: ComputeSpec): Promise<SpatialDb | undefined> {
             if(context){
                 console.log("Tables: ", context.tables);
 
@@ -22,11 +22,13 @@ export function createComputeAdapter(): ComputeAdapter {
 
                 console.log("Computed GeoJSON: ", new_geojson);
 
-                // Update context with new geojson TODO: replace existing Table
+                // Update context with new geojson TODO: pass layers current type
                 await context.loadCustomLayer({
                     geojsonObject: new_geojson,
                     outputTableName: spec.dataRef
                 });
+
+                return context;
             }
         }   
     }

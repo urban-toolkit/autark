@@ -50,6 +50,12 @@ export class ComputeFunction {
         }
 
         await this.autkGrammar.run(spec);
+
+        let p = document.getElementById('app')?.appendChild(document.createElement("p"));
+        
+        if(p){
+            p.textContent = "Computation ready. Check result on the console.";
+        }
     }
 }
 

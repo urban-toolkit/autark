@@ -3,7 +3,7 @@ import type { UrbanSpec } from 'urban-grammar';
 export type Targets = {
     compute?: string,
     db?: string,
-    map?: string,
+    map?: string[] | string,
     plot?: string
 }
 

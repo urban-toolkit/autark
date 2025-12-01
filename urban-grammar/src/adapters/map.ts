@@ -7,5 +7,5 @@ import { MapSpec } from "../types";
     * @param {MapSpec} spec The type of the layer.
  */
 export interface MapAdapter {
-    resolveMap(context: unknown, spec: MapSpec): Promise<unknown>;
+    resolveMap(context: unknown, spec: MapSpec, index?: number): Promise<unknown>;
 }

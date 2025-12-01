@@ -1,6 +1,6 @@
 import { AutkGrammar, AutkGrammarSpec } from 'autk-grammar';
 
-export class ComputeOSMFunction {
+export class LayerOpacity {
     protected autkGrammar!: AutkGrammar;
 
     public async run(): Promise<void> {
@@ -14,29 +14,22 @@ export class ComputeOSMFunction {
                     type: 'osm',
                     queryArea: {
                         geocodeArea: 'New York',
-                        areas: ['Battery Park City', 'Financial District'],
+                        areas: ['Manhattan Island'],
                     },
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
                         coordinateFormat: 'EPSG:3395',
-                        layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                        layers: ['surface', 'parks', 'water', 'roads'] as Array<
+                            'surface' | 'parks' | 'water' | 'roads' | 'buildings'
+                        >,
                         dropOsmTable: true,
                     }
                 },
-            ],
-            compute: [
                 {
-                    dataRef: 'table_osm_roads',
-                    variableMapping: {
-                        x: 'lanes',
-                    },
-                    outputColumnName: 'result',
-                    wglsFunction: `
-                        if (x <= 0) {
-                            return 1;
-                        }
-                        return x;
-                    `,
+                    type: 'geojson',
+                    geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+                    outputTableName: 'neighborhoods',
+                    coordinateFormat: 'EPSG:3395'
                 }
             ],
             map: {
@@ -51,11 +44,15 @@ export class ComputeOSMFunction {
                         dataRef: 'table_osm_water'
                     },
                     {
-                        dataRef: 'table_osm_roads',
-                        getFnv: 'result'
+                        dataRef: 'table_osm_roads'
                     },
+                    {
+                        dataRef: 'neighborhoods',
+                        opacity: 0.75
+                    }
                 ]
-            },
+            }
+
         }
 
         await this.autkGrammar.run(spec);
@@ -63,7 +60,7 @@ export class ComputeOSMFunction {
 }
 
 async function main() {
-    const example = new ComputeOSMFunction();
+    const example = new LayerOpacity();
 
     await example.run();
 }

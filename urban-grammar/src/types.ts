@@ -134,7 +134,7 @@ export type ComputeSpec = {
 export type UrbanSpec = {
     data?: DataSourceSpec[],
     compute?: ComputeSpec[],
-    map?: MapSpec,
+    map?: MapSpec[] | MapSpec,
     plot?: PlotSpec
 }
 

@@ -56,7 +56,17 @@ export class HeatmapVis {
             map: {
                 layerRefs: [
                     {
-                        dataRef: 'heatmap'
+                        dataRef: 'table_osm_surface'
+                    },
+                    {
+                        dataRef: 'table_osm_parks'
+                    },
+                    {
+                        dataRef: 'table_osm_water'
+                    },
+                    {
+                        dataRef: 'heatmap',
+                        opacity: 0.5
                     }
                 ]
             }

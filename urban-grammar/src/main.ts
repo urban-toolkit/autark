@@ -20,7 +20,13 @@ export function createEngine(options: EngineOptions): IEngine{
             }
 
         if(spec.map){
-            await adapters.map.resolveMap(context, spec.map);
+            if(Array.isArray(spec.map))
+                for(let i = 0; i < spec.map.length; i++){
+                    let map = spec.map[i];
+                    await adapters.map.resolveMap(context, map, i);
+                }
+            else
+                await adapters.map.resolveMap(context, spec.map);
         }
 
         if(spec.plot){

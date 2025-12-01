@@ -14,20 +14,36 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
             tableToTypeMap[table.name] = table.type as (LayerType | 'pointset');
         }
 
+        console.log("Table to type map", tableToTypeMap);
+        console.log("Tables", context.tables);
+
         // Load layers
         for(const layerRef of spec.layerRefs){
             const name = layerRef.dataRef;
             const type = tableToTypeMap[name];
             const getFnv = layerRef.getFnv;
 
-            const geojson = await context.getLayer(name);
-            map.loadGeoJsonLayer(name, geojson, type as LayerType);
+            const data = await context.getLayer(name);
+
+            if(type == LayerType.AUTK_RASTER)
+                map.loadGeoTiffLayer(
+                    'heatmap',
+                    data,
+                    LayerType.AUTK_RASTER,
+                );
+            else
+                map.loadGeoJsonLayer(name, data, type as LayerType);
+
             console.log(`Loading layer: ${name} of type ${type}`);
 
             function _getFnv(feature: Feature): string | number {
                 const properties = feature.properties as GeoJsonProperties;
-
+                
                 if(getFnv){
+
+                    if(properties && properties.compute && properties.compute[getFnv])
+                        return properties.compute[getFnv];
+
                     if(!properties || !properties[getFnv])
                         throw new Error(`Cannot access value ${getFnv} in table ${name}`);
 
@@ -37,18 +53,28 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
                 return '';
             };
 
+            if(layerRef.opacity)
+                map.updateRenderInfoProperty(name, 'opacity', layerRef.opacity);
+
             if(layerRef.colorMapInterpolator)
                 map.updateRenderInfoProperty(name, 'colorMapInterpolator', layerRef.colorMapInterpolator);
             
             if(getFnv)
-                map.updateGeoJsonLayerThematic(name, geojson, _getFnv, layerRef.groupById);
+                map.updateGeoJsonLayerThematic(name, data, _getFnv, layerRef.groupById);
         }
     }
 
     return {
-        async resolveMap(context: SpatialDb | undefined, spec: MapSpec): Promise<void> {
+        async resolveMap(context: SpatialDb | undefined, spec: MapSpec, index: number = 0): Promise<void> {
             if(targets && targets.map && context){
-                let canvas = document.getElementById(targets.map);
+
+                let canvas;
+
+                if(Array.isArray(targets.map)){
+                    canvas = document.getElementById(targets.map[index]);
+                }else{
+                    canvas = document.getElementById(targets.map);
+                }
 
                 if(!canvas)
                     throw new Error("Could not find rendering target for map: "+targets.map);

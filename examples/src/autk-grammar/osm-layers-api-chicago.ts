@@ -1,6 +1,6 @@
 import { AutkGrammar, AutkGrammarSpec } from 'autk-grammar';
 
-export class ComputeOSMFunction {
+export class OsmLayersApiChicago {
     protected autkGrammar!: AutkGrammar;
 
     public async run(): Promise<void> {
@@ -11,33 +11,24 @@ export class ComputeOSMFunction {
         const spec: AutkGrammarSpec = {
             data: [
                 {
-                    type: 'osm',
+                    type: "osm",
                     queryArea: {
-                        geocodeArea: 'New York',
-                        areas: ['Battery Park City', 'Financial District'],
-                    },
+                        geocodeArea: 'Chicago',
+                        areas: ['Loop', 'Near South Side'],
+                    }, 
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
                         coordinateFormat: 'EPSG:3395',
-                        layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                        layers: [
+                            'surface',
+                            'parks',
+                            'water',
+                            'roads',
+                            'buildings',
+                        ] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                         dropOsmTable: true,
-                    }
-                },
-            ],
-            compute: [
-                {
-                    dataRef: 'table_osm_roads',
-                    variableMapping: {
-                        x: 'lanes',
                     },
-                    outputColumnName: 'result',
-                    wglsFunction: `
-                        if (x <= 0) {
-                            return 1;
-                        }
-                        return x;
-                    `,
-                }
+                },
             ],
             map: {
                 layerRefs: [
@@ -51,11 +42,13 @@ export class ComputeOSMFunction {
                         dataRef: 'table_osm_water'
                     },
                     {
-                        dataRef: 'table_osm_roads',
-                        getFnv: 'result'
+                        dataRef: 'table_osm_roads'
                     },
+                    {
+                        dataRef: 'table_osm_buildings'
+                    }
                 ]
-            },
+            }
         }
 
         await this.autkGrammar.run(spec);
@@ -63,7 +56,7 @@ export class ComputeOSMFunction {
 }
 
 async function main() {
-    const example = new ComputeOSMFunction();
+    const example = new OsmLayersApiChicago();
 
     await example.run();
 }
