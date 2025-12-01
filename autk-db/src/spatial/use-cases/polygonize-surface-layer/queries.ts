@@ -3,7 +3,7 @@ export const LOAD_POLYGONIZED_LAYER_QUERY = (
     outputTableName: string,
 ) => {
     return `
-    CREATE TABLE ${outputTableName} AS
+    CREATE OR REPLACE TABLE ${outputTableName} AS
     SELECT
       ST_GeomFromGeoJSON(JSON(feature.geometry)) AS geometry,
       feature.properties AS properties

@@ -2,7 +2,7 @@ import { DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
 
 export const LOAD_JSON_ON_TABLE_QUERY = (jsonFileUrl: string, tableName: string) => {
   return `
-        CREATE TABLE ${tableName} AS
+        CREATE OR REPLACE TABLE ${tableName} AS
             SELECT * FROM read_json_auto('${jsonFileUrl}');
 
         DESCRIBE ${tableName};

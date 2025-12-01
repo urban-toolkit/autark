@@ -24,6 +24,7 @@ import { RawQueryUseCase } from './use-cases/raw-query';
 import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
 import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-layer';
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
+import { GetTableDataParams, GetTableDataOutput, GetTableDataUseCase } from './use-cases/get-table-data';
 
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
@@ -52,6 +53,7 @@ export class SpatialDb {
   private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
   private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
   private buildHeatmapUseCase?: BuildHeatmapUseCase;
+  private getTableDataUseCase?: GetTableDataUseCase;
 
   /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
@@ -76,8 +78,25 @@ export class SpatialDb {
     this.getBoundingBoxFromOsmUseCase = new GetBoundingBoxFromOsmUseCase(this.conn);
     this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
     this.buildHeatmapUseCase = new BuildHeatmapUseCase(this.conn);
+    this.getTableDataUseCase = new GetTableDataUseCase(this.conn);
 
     this.conn.query('INSTALL spatial; LOAD spatial;');
+  }
+
+  /**
+   * Registers a table in the tables array. If a table with the same name already exists,
+   * it will be replaced and a warning will be logged to the console.
+   * @param table - The table to register.
+   */
+  private _registerTable(table: Table): void {
+    const existingIndex = this.tables.findIndex((t) => t.name === table.name);
+    
+    if (existingIndex !== -1) {
+      console.warn(`Table '${table.name}' already exists. Overwriting...`);
+      this.tables[existingIndex] = table;
+    } else {
+      this.tables.push(table);
+    }
   }
 
   // ---- LOAD's methods
@@ -105,7 +124,7 @@ export class SpatialDb {
 
     const tables = await this.loadOsmFromOverpassApiUseCase.exec(params);
     for (const table of tables) {
-      this.tables.push(table);
+      this._registerTable(table);
     }
 
     if (params.autoLoadLayers) {
@@ -162,7 +181,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadCsvUseCase.exec(params);
-    this.tables.push(table);
+    this._registerTable(table);
 
     return table;
   }
@@ -178,7 +197,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadJsonUseCase.exec(params);
-    this.tables.push(table);
+    this._registerTable(table);
 
     return table;
   }
@@ -200,7 +219,7 @@ export class SpatialDb {
       throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
 
     const table = await this.loadLayerUseCase.exec(params);
-    this.tables.push(table);
+    this._registerTable(table);
 
     return table;
   }
@@ -217,7 +236,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadCustomLayerUseCase.exec({ ...params, boundingBox: this.osmBoudingBox });
-    this.tables.push(table);
+    this._registerTable(table);
 
     return table;
   }
@@ -234,7 +253,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.loadGridLayerUseCase.exec({ ...params, boundingBox: params.boundingBox || this.osmBoudingBox });
-    this.tables.push(table);
+    this._registerTable(table);
 
     return table;
   }
@@ -332,6 +351,24 @@ export class SpatialDb {
     });
   }
 
+  /**
+   * Retrieves the data from any table as an array of plain JavaScript objects.
+   * This method works with all table types (CSV, JSON, Layer, Grid, etc.).
+   * @param params - Parameters including table name and optional pagination (limit, offset).
+   * @returns A promise that resolves to an array of objects representing the table rows.
+   * @throws Error if the database or connection is not initialized.
+   * @throws Error if the table is not found.
+   */
+  async getTableData(params: GetTableDataParams): Promise<GetTableDataOutput> {
+    if (!this.db || !this.conn || !this.getTableDataUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = this.tables.find((t) => t.name === params.tableName);
+    if (!table) throw new Error(`Table ${params.tableName} not found.`);
+
+    return this.getTableDataUseCase.exec(params);
+  }
+
   // CUSTOM QUERIES
 
   /**
@@ -346,7 +383,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const { created, table } = await this.spatialJoinUseCase.exec(params, this.tables);
-    if (created) this.tables.push(table);
+    if (created) this._registerTable(table);
     else this.tables = this.tables.map((t) => (t.name === table.name ? table : t));
 
     return table;
@@ -365,7 +402,7 @@ export class SpatialDb {
     const result = await this.rawQueryUseCase.exec(params);
 
     if (params.output.type === 'CREATE_TABLE') {
-      this.tables.push(result as Table);
+      this._registerTable(result as Table);
       return result as Table;
     }
 
@@ -384,7 +421,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const table = await this.buildHeatmapUseCase.exec(params, this.tables, this.osmBoudingBox);
-    this.tables.push(table);
+    this._registerTable(table);
 
     return table;
   }

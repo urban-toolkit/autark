@@ -39,7 +39,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
         ON nodes.id = ${layer}_with_nodes_refs.ref
         WHERE kind = 'node';
 
-    CREATE TABLE ${outputTableName} AS
+    CREATE OR REPLACE TABLE ${outputTableName} AS
       SELECT
           ${layer}.id,
           ${layer}.tags properties,
