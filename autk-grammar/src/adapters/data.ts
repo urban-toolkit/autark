@@ -1,4 +1,4 @@
-import { CsvDataSourceSpec, CustomDataSourceSpec, DataAdapter, DataSourceSpec, HeatmapSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar';
+import { CsvDataSourceSpec, CustomDataSourceSpec, DataAdapter, DataSourceSpec, HeatmapSourceSpec, JoinSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar';
 import { SpatialDb } from 'autk-db';
 import { Targets } from '../types';
 
@@ -53,6 +53,10 @@ export function createDataAdapter(targets?: Targets): DataAdapter {
                     return db;
                 case 'heatmap': 
                     await db.buildHeatmap(rest_spec as HeatmapSourceSpec);
+                    print(db, targets);
+                    return db;
+                case 'join':
+                    await db.spatialJoin(rest_spec as JoinSourceSpec);
                     print(db, targets);
                     return db;
                 default: 

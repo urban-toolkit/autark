@@ -1,6 +1,6 @@
 export type LayerType = 'surface' | 'water' | 'parks' | 'roads' | 'buildings' | 'points' | 'polygons' | 'polylines' | 'raster';
 
-export type DataSourceType = 'osm' | 'csv' | 'json' | 'geojson' | 'heatmap';
+export type DataSourceType = 'osm' | 'csv' | 'json' | 'geojson' | 'heatmap' | 'join';
 
 export enum ColorMapInterpolator {
   SEQUENTIAL_REDS = 'interpolateReds',

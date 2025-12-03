@@ -41,8 +41,15 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
                 
                 if(getFnv){
 
-                    if(properties && properties.compute && properties.compute[getFnv])
+                    if(properties && properties.compute && properties.compute[getFnv]) // For properties created by the compute module
                         return properties.compute[getFnv];
+
+                    if(properties && properties.sjoin){ // For properties created by spatial join
+                        let propertyPath = getFnv.split('_');
+                        if(propertyPath.length == 2 && properties.sjoin[propertyPath[0]] && properties.sjoin[propertyPath[0]][propertyPath[1]]){
+                            return properties.sjoin[propertyPath[0]][propertyPath[1]];    
+                        }
+                    }
 
                     if(!properties || !properties[getFnv])
                         throw new Error(`Cannot access value ${getFnv} in table ${name}`);

@@ -20,6 +20,26 @@ export type TableSourceSpec = {
     outputTableName: string
 }
 
+export type JoinSourceSpec = Omit<TableSourceSpec, 'outputTableName'> & { 
+    tableRootName: string;
+    tableJoinName: string;
+    output: {
+        type: 'MODIFY_ROOT' | 'CREATE_NEW';
+        tableName?: string; // Required if type is 'CREATE_NEW'
+    };
+    spatialPredicate?: 'INTERSECT' | 'NEAR';
+    joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+    nearDistance?: number;
+    groupBy?: {
+        selectColumns: Array<{
+        tableName: string;
+        column: string;
+        aggregateFn?: AggregateFunction;
+        aggregateFnResultColumnName?: string; // Optional custom name for the aggregation result
+        }>;
+    };
+}
+
 export type HeatmapSourceSpec = TableSourceSpec & { 
     tableJoinName: string;
     nearDistance: number;
@@ -84,7 +104,7 @@ export type CustomDataSourceSpec = TableSourceSpec & {
     boundingBox?: BoundingBox;
 }
 
-export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSourceSpec | CustomDataSourceSpec | HeatmapSourceSpec;
+export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSourceSpec | CustomDataSourceSpec | HeatmapSourceSpec | JoinSourceSpec;
 
 /**
  * Type for map.
