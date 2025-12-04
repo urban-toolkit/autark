@@ -26,13 +26,13 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
 
   return `
     ${query(tableName)}
-    CREATE TEMP TABLE ${layer}_with_nodes_refs AS
+    CREATE OR REPLACE TEMP TABLE ${layer}_with_nodes_refs AS
       SELECT id, UNNEST(refs) as ref, UNNEST(range(length(refs))) as ref_idx
         FROM ${tableName}
         SEMI JOIN ${layer} USING (id)
           WHERE kind IN ('way', 'relation');
 
-    CREATE TEMP TABLE ${layer}_required_nodes_with_geometries AS
+    CREATE OR REPLACE TEMP TABLE ${layer}_required_nodes_with_geometries AS
       SELECT id, ST_POINT(lon, lat) geometry
         FROM ${tableName} nodes
         SEMI JOIN ${layer}_with_nodes_refs
@@ -185,7 +185,7 @@ function getLayerQuery(layer: string): (t: string) => string {
 }
 
 const GET_PARKS = (tableName: string) => `
-  CREATE TEMP TABLE parks AS
+  CREATE OR REPLACE TEMP TABLE parks AS
     SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way', 'relation') AND
       (
@@ -196,7 +196,7 @@ const GET_PARKS = (tableName: string) => `
 `;
 
 const GET_WATER = (tableName: string) => `
-  CREATE TEMP TABLE water AS
+  CREATE OR REPLACE TEMP TABLE water AS
     SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way', 'relation') AND
       (
@@ -206,7 +206,7 @@ const GET_WATER = (tableName: string) => `
 `;
 
 const GET_BUILDINGS = (tableName: string) => `
-   CREATE TEMP TABLE buildings AS
+   CREATE OR REPLACE TEMP TABLE buildings AS
     SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way') AND
       (
@@ -237,7 +237,7 @@ const GET_COASTLINE = (tableName: string) => `
 */
 
 const GET_ROADS = (tableName: string) => `
-  CREATE TEMP TABLE roads AS
+  CREATE OR REPLACE TEMP TABLE roads AS
     SELECT id, tags, refs FROM ${tableName}
       WHERE kind = 'way' AND
       -- ensure the way has at least two distinct nodes so ST_MakeLine can build a geometry
@@ -254,7 +254,7 @@ const GET_ROADS = (tableName: string) => `
 
 // Get all ways
 const GET_SURFACE = (tableName: string) => `
-  CREATE TEMP TABLE surface AS
+  CREATE OR REPLACE TEMP TABLE surface AS
     SELECT id, tags, refs FROM ${tableName}
       WHERE kind IN ('way');
 `;
