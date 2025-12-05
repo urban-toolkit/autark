@@ -2,7 +2,7 @@ import { PlotEvent } from './constants';
 import { PlotEventListener } from "./types";
 
 export class PlotEvents {
-    private _listeners: { [event: string]: PlotEventListener[] } = {};
+    private _listeners: Record<PlotEvent, PlotEventListener[]> = {} as Record<PlotEvent, PlotEventListener[]>;
 
     constructor(events: PlotEvent[]) {
         events.forEach(event => {
@@ -10,23 +10,23 @@ export class PlotEvents {
         });
     }
 
-    get listeners(): { [event: string]: PlotEventListener[] } {
+    get listeners(): Record<PlotEvent, PlotEventListener[]> {
         return this._listeners;
     }
 
-    addEventListener(event: string, listener: PlotEventListener): void {
+    addEventListener(event: PlotEvent, listener: PlotEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event].push(listener);
         }
     }
 
-    removeEventListener(event: string, listener: PlotEventListener): void {
+    removeEventListener(event: PlotEvent, listener: PlotEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event] = this._listeners[event].filter(l => l !== listener);
         }
     }
 
-    emit(event: string, selection: number[]): void {
+    emit(event: PlotEvent, selection: number[]): void {
         if (this._listeners[event]) {
             this._listeners[event].forEach(listener => listener(selection));
         }
