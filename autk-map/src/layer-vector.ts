@@ -353,10 +353,10 @@ export abstract class VectorLayer extends Layer {
     }
 
     /**
-     * Set highlighted IDs for the layer.
+     * Toggle highlighted IDs for the layer.
      * @param {number[]} ids - The IDs to highlight.
      */
-    public setHighlightedIds(ids: number[]): void {
+    public toggleHighlightedIds(ids: number[]): void {
         // If id is already in highlightedIds, remove it (i.e., toggle it off)
         ids.forEach(id => {
             if (this._highlightedIds.has(id)) {
@@ -387,6 +387,32 @@ export abstract class VectorLayer extends Layer {
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }
+
+    /**
+     * Set highlighted IDs for the layer.
+     * @param {number[]} ids - The IDs to highlight.
+     */
+    public setHighlightedIds(ids: number[]): void {
+        this.clearHighlightedIds();
+        
+        this._highlightedIds = new Set(ids);
+
+        for (const id of ids) {
+            if (id < 0) continue;
+
+            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
+            const eTriangle = this._components[id].nTriangles;
+
+            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
+                const vertexIndex = this._indices[i];
+                this._highlightedVertices[vertexIndex] = 1;
+            }
+        }
+
+        this.makeLayerRenderInfoDirty();
+        this.makeLayerDataDirty();
+    }    
+
 
     /**
      * Set skipped IDs for the layer.
@@ -423,6 +449,8 @@ export abstract class VectorLayer extends Layer {
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }
+
+
 
     /**
      * Clears the highlighted components of the layer.

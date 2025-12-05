@@ -98,6 +98,6 @@ export type ColorTEX = number[];
  * @param {string} layerId - The ID of the layer associated with the event.
  */
 export type MapEventListener = (
-    selection: number[] | string[],
+    selection: number[],
     layerId: string
 ) => void;
