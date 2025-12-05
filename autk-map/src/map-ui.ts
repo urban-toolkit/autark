@@ -101,8 +101,8 @@ export class AutkMapUi {
             const width = parseInt(this._legend.style.width || '0', 10) || 0;
             const height = parseInt(this._legend.style.height || '0', 10) || 0;
             // Position bottom-right relative to the canvas
-            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 2 - width - 3 * this._uiMargin) + 'px';
-            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - 2 - height - 3 * this._uiMargin) + 'px';
+            this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 2 - width - this._uiMargin) + 'px';
+            this._legend.style.top = (this.map.canvas.offsetTop + this.map.canvas.clientHeight - 2 - height - this._uiMargin) + 'px';
         }
     }
 
