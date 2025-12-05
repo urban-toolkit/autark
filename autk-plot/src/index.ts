@@ -8,3 +8,5 @@ export * from './types';
 
 // plot types
 export * from './plot-types/scatterplot';
+export * from './plot-types/barchart';
+export * from './plot-types/pcoordinates';
