@@ -8,6 +8,7 @@ export interface LoadGridLayerParams {
   rows: number;
   columns: number;
   outputTableName: string;
+  workspace?: string;
 }
 
 export class LoadGridLayerUseCase {
@@ -18,7 +19,8 @@ export class LoadGridLayerUseCase {
   }
 
   async exec(params: LoadGridLayerParams): Promise<GridLayerTable> {
-    const { boundingBox, rows, columns, outputTableName } = params;
+    const { boundingBox, rows, columns, outputTableName, workspace = 'main' } = params;
+    const qualifiedTableName = `${workspace}.${outputTableName}`;
 
     if (!boundingBox) {
       throw new Error('Bounding box is required to load a grid layer.');
@@ -31,7 +33,7 @@ export class LoadGridLayerUseCase {
     const { minLon, minLat, maxLon, maxLat } = boundingBox;
 
     // 1. Create (or replace) empty table
-    const createTableSql = `CREATE OR REPLACE TABLE ${outputTableName} (
+    const createTableSql = `CREATE OR REPLACE TABLE ${qualifiedTableName} (
       geometry GEOMETRY,
       properties STRUCT(row INTEGER, "column" INTEGER)
     );`;
@@ -53,15 +55,15 @@ export class LoadGridLayerUseCase {
       }
     }
 
-    const insertSql = `INSERT INTO ${outputTableName} VALUES ${values.join(',')};`;
+    const insertSql = `INSERT INTO ${qualifiedTableName} VALUES ${values.join(',')};`;
 
     await this.conn.query(insertSql);
 
     // 3. Create spatial index on geometry column
-    const createIndexSql = `CREATE INDEX idx_${outputTableName}_geometry ON ${outputTableName} USING RTREE (geometry);`;
+    const createIndexSql = `CREATE INDEX idx_${outputTableName}_geometry ON ${qualifiedTableName} USING RTREE (geometry);`;
     await this.conn.query(createIndexSql);
 
-    const describeTableResponse = await this.conn.query(`DESCRIBE ${outputTableName}`);
+    const describeTableResponse = await this.conn.query(`DESCRIBE ${qualifiedTableName}`);
 
     return {
       source: 'user',

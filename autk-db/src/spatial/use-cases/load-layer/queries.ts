@@ -9,6 +9,7 @@ type Params = {
   outputFormat: string;
   outputTableName: string;
   boundingBox?: BoundingBox;
+  workspace?: string;
 };
 
 /**
@@ -17,29 +18,35 @@ type Params = {
  * - Open ways: LineString (for linear features like roads)
  */
 
-export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox }: Params) => {
+export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox, workspace = 'main' }: Params) => {
   const query = getLayerQuery(layer);
-
+  
+  const qualifiedInputTableName = `${workspace}.${tableName}`;
+  const qualifiedOutputTableName = `${workspace}.${outputTableName}`;
+  
+  let actualTableName = qualifiedInputTableName;
   if (layer === 'surface') {
-    tableName = `${tableName}_boundaries`;
+    // For surface layer, we need to reference the boundaries table
+    const baseTableName = tableName.replace(new RegExp(`^${workspace}\\.`), '');
+    actualTableName = `${workspace}.${baseTableName}_boundaries`;
   }
 
   return `
-    ${query(tableName)}
+    ${query(actualTableName)}
     CREATE OR REPLACE TEMP TABLE ${layer}_with_nodes_refs AS
       SELECT id, UNNEST(refs) as ref, UNNEST(range(length(refs))) as ref_idx
-        FROM ${tableName}
+        FROM ${actualTableName}
         SEMI JOIN ${layer} USING (id)
           WHERE kind IN ('way', 'relation');
 
     CREATE OR REPLACE TEMP TABLE ${layer}_required_nodes_with_geometries AS
       SELECT id, ST_POINT(lon, lat) geometry
-        FROM ${tableName} nodes
+        FROM ${actualTableName} nodes
         SEMI JOIN ${layer}_with_nodes_refs
         ON nodes.id = ${layer}_with_nodes_refs.ref
         WHERE kind = 'node';
 
-    CREATE OR REPLACE TABLE ${outputTableName} AS
+    CREATE OR REPLACE TABLE ${qualifiedOutputTableName} AS
       SELECT
           ${layer}.id,
           ${layer}.tags properties,
@@ -53,7 +60,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
       GROUP BY 1, 2, 3
       ${buildHavingClause({ outputFormat, boundingBox, layer })};
 
-    DESCRIBE ${outputTableName};
+    DESCRIBE ${qualifiedOutputTableName};
   `;
 };
 

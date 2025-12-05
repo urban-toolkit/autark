@@ -2,6 +2,7 @@ import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 export interface DropTableParams {
   tableName: string;
+  workspace?: string;
 }
 
 export interface DropTableResult {
@@ -14,7 +15,9 @@ export class DropTableUseCase {
 
   async exec(params: DropTableParams): Promise<DropTableResult> {
     try {
-      await this.conn.query(`DROP TABLE IF EXISTS ${params.tableName};`);
+      const workspace = params.workspace || 'main';
+      const qualifiedTableName = `${workspace}.${params.tableName}`;
+      await this.conn.query(`DROP TABLE IF EXISTS ${qualifiedTableName};`);
       return {
         success: true,
         message: `Table ${params.tableName} dropped successfully`,

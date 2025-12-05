@@ -25,4 +25,5 @@ export type Params = {
     geocodeArea: string;
     areas: string[];
   };
+  workspace?: string;
 };

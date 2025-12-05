@@ -1,8 +1,9 @@
 import { DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
 
-export const LOAD_CSV_ON_TABLE_QUERY = (csvFileUrl: string, tableName: string, delimiter: string) => {
+export const LOAD_CSV_ON_TABLE_QUERY = (csvFileUrl: string, tableName: string, delimiter: string, workspace: string) => {
+  const qualifiedTableName = `${workspace}.${tableName}`;
   return `
-        CREATE OR REPLACE TABLE ${tableName} AS
+        CREATE OR REPLACE TABLE ${qualifiedTableName} AS
             SELECT * FROM READ_CSV(
                 '${csvFileUrl}',
                 delim='${delimiter}',
@@ -10,7 +11,7 @@ export const LOAD_CSV_ON_TABLE_QUERY = (csvFileUrl: string, tableName: string, d
                 AUTO_DETECT=TRUE
             );
 
-        DESCRIBE ${tableName};
+        DESCRIBE ${qualifiedTableName};
   `;
 };
 
@@ -21,6 +22,7 @@ interface LoadCsvOnTableWithCoordinatesParams {
   latColumnName: string;
   longColumnName: string;
   coordinateFormat: string;
+  workspace: string;
 }
 export const LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY = ({
   csvFileUrl,
@@ -29,9 +31,11 @@ export const LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY = ({
   latColumnName,
   longColumnName,
   coordinateFormat,
+  workspace,
 }: LoadCsvOnTableWithCoordinatesParams) => {
+  const qualifiedTableName = `${workspace}.${tableName}`;
   return `
-    CREATE TABLE ${tableName} AS
+    CREATE TABLE ${qualifiedTableName} AS
       SELECT
           *,
           ST_Transform(
@@ -47,6 +51,6 @@ export const LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY = ({
           AUTO_DETECT=TRUE
       );
 
-    DESCRIBE ${tableName};
+    DESCRIBE ${qualifiedTableName};
   `;
 };

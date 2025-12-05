@@ -21,8 +21,10 @@ export class LoadLayerUseCase {
 
   async exec(params: Params): Promise<LayerTable> {
     if (!params.coordinateFormat) params.coordinateFormat = DEFALT_COORDINATE_FORMAT;
+    const workspace = params.workspace || 'main';
 
     const layerOutputTableName = params.outputTableName || `${params.osmInputTableName}_${params.layer}`;
+    const qualifiedOutputTableName = `${workspace}.${layerOutputTableName}`;
 
     const layerQuery = LOAD_LAYER_QUERY({
       layer: params.layer,
@@ -30,21 +32,23 @@ export class LoadLayerUseCase {
       outputFormat: params.coordinateFormat,
       outputTableName: layerOutputTableName,
       boundingBox: params.boundingBox,
+      workspace,
     });
     const describeTableResponse = await this.conn.query(layerQuery);
     let columns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
 
     // Post-processing for building layers: assign persistent building_id column and add aggregated geometry
     if (params.layer === 'buildings') {
-      await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName });
+      await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName, workspace });
 
       // Add aggregated geometry column to the main building table
       await this.aggregateBuildingLayerUseCase.exec({
         inputTableName: layerOutputTableName,
+        workspace,
       });
 
       // Update columns to include the new agg_geometry column
-      const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${layerOutputTableName}`);
+      const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${qualifiedOutputTableName}`);
       columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
     }
 

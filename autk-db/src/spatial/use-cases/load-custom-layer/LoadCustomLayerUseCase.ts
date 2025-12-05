@@ -23,6 +23,7 @@ export class LoadCustomLayerUseCase {
     outputTableName,
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
     boundingBox,
+    workspace = 'main',
   }: Params): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
@@ -63,6 +64,7 @@ export class LoadCustomLayerUseCase {
       geojson,
       outputTableName,
       coordinateFormat,
+      workspace,
       boundingBox,
     );
 
@@ -78,6 +80,7 @@ export class LoadCustomLayerUseCase {
     geojson: FeatureCollection,
     outputTableName: string,
     coordinateFormat: string,
+    workspace: string,
     boundingBox?: BoundingBox,
   ) {
     // Create temporary file with GeoJSON data
@@ -87,7 +90,7 @@ export class LoadCustomLayerUseCase {
     await this.db.registerFileText(fileName, JSON.stringify(geojson));
 
     // Create feature collection table from the temporary file
-    const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${outputTableName}_feature_collection`);
+    const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${outputTableName}_feature_collection`, workspace);
     await this.conn.query(featureCollectionQuery);
 
     // Create the final layer table
@@ -95,6 +98,7 @@ export class LoadCustomLayerUseCase {
       `${outputTableName}_feature_collection`,
       outputTableName,
       coordinateFormat,
+      workspace,
       boundingBox,
     );
 

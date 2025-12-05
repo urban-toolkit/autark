@@ -16,13 +16,14 @@ export class AssignBuildingIdsUseCase {
    * clusters in JS, writes a stable building_id per row back to the table, and
    * returns the updated column list for the table.
    */
-  async exec(params: { tableName: string }): Promise<Column[]> {
-    const { tableName } = params;
+  async exec(params: { tableName: string; workspace?: string }): Promise<Column[]> {
+    const { tableName, workspace = 'main' } = params;
+    const qualifiedTableName = `${workspace}.${tableName}`;
 
     // Read id and geometry as GeoJSON for JS processing
     const selectSql = `
       SELECT id, CAST(ST_AsGeoJSON(geometry) AS JSON) AS geometry_json
-      FROM ${tableName}
+      FROM ${qualifiedTableName}
     `;
     const res = await this.conn.query(selectSql);
     const rows = res.toArray();
@@ -33,13 +34,13 @@ export class AssignBuildingIdsUseCase {
 
     // Skip if nothing to assign
     if (idToCluster.size === 0) {
-      return await this.describeColumns(tableName);
+      return await this.describeColumns(qualifiedTableName);
     }
 
     // Ensure building_id column exists
-    const hasBuildingId = await this.columnExists(tableName, 'building_id');
+    const hasBuildingId = await this.columnExists(qualifiedTableName, 'building_id');
     if (!hasBuildingId) {
-      await this.conn.query(`ALTER TABLE ${tableName} ADD COLUMN building_id BIGINT`);
+      await this.conn.query(`ALTER TABLE ${qualifiedTableName} ADD COLUMN building_id BIGINT`);
     }
 
     // Bulk insert using an in-memory JSON file (same pattern as custom layer loader)
@@ -56,7 +57,7 @@ export class AssignBuildingIdsUseCase {
 
     // Update table by joining on id
     await this.conn.query(
-      `UPDATE ${tableName} AS t SET building_id = b.building_id FROM __tmp_building_ids AS b WHERE t.id = b.id`,
+      `UPDATE ${qualifiedTableName} AS t SET building_id = b.building_id FROM __tmp_building_ids AS b WHERE t.id = b.id`,
     );
 
     // Cleanup temp table
@@ -64,7 +65,7 @@ export class AssignBuildingIdsUseCase {
     await this.conn.query(`DROP TABLE __tmp_building_ids_json`);
     await this.db.dropFile(vfsPath);
 
-    return await this.describeColumns(tableName);
+    return await this.describeColumns(qualifiedTableName);
   }
 
   private async columnExists(tableName: string, columnName: string): Promise<boolean> {

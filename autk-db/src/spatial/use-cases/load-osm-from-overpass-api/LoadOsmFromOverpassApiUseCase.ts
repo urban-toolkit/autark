@@ -32,20 +32,22 @@ export class LoadOsmFromOverpassApiUseCase {
 
   async exec(params: Params): Promise<OsmTable[]> {
     if (!params.queryArea) throw new Error('queryArea must be provided');
+    const workspace = params.workspace || 'main';
 
     // 1. Fetch OSM data from query area
     const osmData = await this.fetchOsmWithinArea(params.queryArea);
-    await this.insertOsmDataUsingJson(params.outputTableName, osmData);
+    await this.insertOsmDataUsingJson(params.outputTableName, osmData, workspace);
     console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
     // 2. Fetch OSM data just for boundaries
     const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea);
-    await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData, true);
+    await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData, workspace, true);
     console.log(
       `Successfully inserted ${boundariesData.elements.length} boundaries into ${params.outputTableName}_boundaries`,
     );
 
-    const tableDescribeResponse = await this.conn.query(`DESCRIBE ${params.outputTableName}`);
+    const qualifiedTableName = `${workspace}.${params.outputTableName}`;
+    const tableDescribeResponse = await this.conn.query(`DESCRIBE ${qualifiedTableName}`);
     return [
       {
         source: 'osm',
@@ -68,6 +70,7 @@ export class LoadOsmFromOverpassApiUseCase {
   private async insertOsmDataUsingJson(
     tableName: string,
     osmData: OverpassApiResponse,
+    workspace: string,
     ignoreTags: boolean = false,
   ): Promise<void> {
     const formattedElements = this.formatOsmDataForJson(osmData);
@@ -75,9 +78,9 @@ export class LoadOsmFromOverpassApiUseCase {
     const fileName = 'osm_data.json';
     await this.db.registerFileText(fileName, JSON.stringify(formattedElements));
 
-    await this.conn.query(CREATE_OSM_TABLE_QUERY(tableName));
+    await this.conn.query(CREATE_OSM_TABLE_QUERY(tableName, workspace));
 
-    await this.conn.query(INSERT_OSM_DATA_QUERY(tableName, fileName, ignoreTags));
+    await this.conn.query(INSERT_OSM_DATA_QUERY(tableName, fileName, workspace, ignoreTags));
 
     try {
       await this.db.dropFile(fileName);

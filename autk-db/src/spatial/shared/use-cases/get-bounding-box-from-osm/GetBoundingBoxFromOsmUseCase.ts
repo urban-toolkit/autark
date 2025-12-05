@@ -7,7 +7,8 @@ export class GetBoundingBoxFromOsmUseCase {
   constructor(private conn: AsyncDuckDBConnection) {}
 
   async exec(params: GetBoundingBoxFromOsmParams): Promise<BoundingBox> {
-    const result = await this.conn.query(GET_BOUNDING_BOX_FROM_OSM_QUERY(params.osmTableName));
+    const workspace = params.workspace || 'main';
+    const result = await this.conn.query(GET_BOUNDING_BOX_FROM_OSM_QUERY(params.osmTableName, workspace));
     const rows = result.toArray();
 
     if (rows.length === 0) {

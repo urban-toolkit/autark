@@ -1,5 +1,7 @@
-export const CREATE_OSM_TABLE_QUERY = (tableName: string): string => `
-  CREATE OR REPLACE TABLE ${tableName} (
+export const CREATE_OSM_TABLE_QUERY = (tableName: string, workspace: string): string => {
+  const qualifiedTableName = `${workspace}.${tableName}`;
+  return `
+  CREATE OR REPLACE TABLE ${qualifiedTableName} (
     kind VARCHAR,
     id BIGINT,
     tags MAP(VARCHAR, VARCHAR),
@@ -10,9 +12,12 @@ export const CREATE_OSM_TABLE_QUERY = (tableName: string): string => `
     ref_types VARCHAR[]
   );
 `;
+};
 
-export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, ignoreTags: boolean = false): string => `
-  INSERT INTO ${tableName} 
+export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, workspace: string, ignoreTags: boolean = false): string => {
+  const qualifiedTableName = `${workspace}.${tableName}`;
+  return `
+  INSERT INTO ${qualifiedTableName} 
   SELECT 
     kind::VARCHAR,
     id::BIGINT,
@@ -31,3 +36,4 @@ export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, ignor
     ref_types::VARCHAR[]
   FROM '${fileName}';
 `;
+};

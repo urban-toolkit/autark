@@ -1,4 +1,5 @@
-export const GET_BOUNDING_BOX_FROM_LAYER_QUERY = (layerTableName: string) => {
+export const GET_BOUNDING_BOX_FROM_LAYER_QUERY = (layerTableName: string, workspace: string) => {
+  const qualifiedTableName = `${workspace}.${layerTableName}`;
   return `
     WITH geometry_bounds AS (
       SELECT 
@@ -6,7 +7,7 @@ export const GET_BOUNDING_BOX_FROM_LAYER_QUERY = (layerTableName: string) => {
         ST_YMin(geometry) as min_y,
         ST_XMax(geometry) as max_x,
         ST_YMax(geometry) as max_y
-      FROM ${layerTableName}
+      FROM ${qualifiedTableName}
       WHERE geometry IS NOT NULL
     )
     SELECT 

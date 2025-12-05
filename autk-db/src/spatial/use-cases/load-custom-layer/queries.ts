@@ -1,8 +1,9 @@
 import { BoundingBox } from '../../../shared/interfaces';
 
-export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string) => {
+export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string, workspace: string) => {
+  const qualifiedTableName = `${workspace}.${featureCollectionTableName}`;
   return `
-    CREATE OR REPLACE TABLE ${featureCollectionTableName} AS SELECT * FROM '${geojsonFileUrl}';
+    CREATE OR REPLACE TABLE ${qualifiedTableName} AS SELECT * FROM '${geojsonFileUrl}';
   `;
 };
 
@@ -11,8 +12,12 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   featureCollectionTableName: string,
   outputTableName: string,
   coordinateFormat: string,
+  workspace: string,
   boundingBox?: BoundingBox,
 ) => {
+  const qualifiedFeatureCollectionTableName = `${workspace}.${featureCollectionTableName}`;
+  const qualifiedOutputTableName = `${workspace}.${outputTableName}`;
+  
   const geometryTransform = `ST_Transform(
     ST_GeomFromGeoJSON(JSON(feature.geometry)),
     'EPSG:4326',
@@ -28,18 +33,18 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
     : geometryTransform;
 
   return `
-    CREATE OR REPLACE TABLE ${outputTableName} AS
+    CREATE OR REPLACE TABLE ${qualifiedOutputTableName} AS
     SELECT
       ${geometrySelect} AS geometry,
       feature.properties AS properties
     FROM (
       SELECT UNNEST(features) AS feature
-      FROM ${featureCollectionTableName}
+      FROM ${qualifiedFeatureCollectionTableName}
     )
     ${boundingBox ? 'WHERE ST_Intersects(' + geometryTransform + ', ST_MakeEnvelope(' + boundingBox.minLon + ', ' + boundingBox.minLat + ', ' + boundingBox.maxLon + ', ' + boundingBox.maxLat + '))' : ''};
 
-    DROP TABLE ${featureCollectionTableName};
+    DROP TABLE ${qualifiedFeatureCollectionTableName};
 
-    DESCRIBE ${outputTableName};
+    DESCRIBE ${qualifiedOutputTableName};
   `;
 };
