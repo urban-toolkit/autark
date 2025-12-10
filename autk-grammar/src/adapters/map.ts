@@ -22,6 +22,7 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
             const name = layerRef.dataRef;
             const type = tableToTypeMap[name];
             const getFnv = layerRef.getFnv;
+            const defaultFnv = layerRef.defaultFnv;
 
             const data = await context.getLayer(name);
 
@@ -51,9 +52,14 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
                         }
                     }
 
-                    if(!properties || !properties[getFnv])
-                        throw new Error(`Cannot access value ${getFnv} in table ${name}`);
-
+                    if(!properties || !properties[getFnv]){
+                        console.log("defaultFnv", defaultFnv);
+                        if(defaultFnv != undefined)
+                            return defaultFnv
+                        else
+                            throw new Error(`Cannot access value ${getFnv} in table ${name}. Value should exist in all rows or default should be set.`);
+                    }
+                        
                     return properties[getFnv];
                 }
 

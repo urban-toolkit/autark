@@ -130,7 +130,8 @@ export type MapSpec = {
         groupById?: boolean,
         isSkip?: boolean,
         isPick?: boolean,
-        getFnv?: string
+        getFnv?: string,
+        defaultFnv?: string | number
     }[]
 }
 

@@ -20,7 +20,6 @@ export class MapD3 {
         this.updatePlotListeners();
     }
 
-
     protected async loadAutkMap(canvas: HTMLCanvasElement) {
         this.map = new AutkMap(canvas);
         await this.map.init();

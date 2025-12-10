@@ -1,6 +1,6 @@
 import { AutkGrammar, AutkGrammarSpec } from 'autk-grammar';
 
-export class SpatialJoinMulti {
+export class SpatialJoin {
     protected autkGrammar!: AutkGrammar;
 
     public async run(): Promise<void> {
@@ -27,17 +27,7 @@ export class SpatialJoinMulti {
                     },
                 },
                 {
-                    type: "csv",
-                    csvFileUrl: 'http://localhost:5173/data/parking.csv',
-                    outputTableName: 'parking',
-                    geometryColumns: {
-                        latColumnName: 'Latitude',
-                        longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
-                    },
-                },
-                {
-                    type: 'join',
+                    type: "join",
                     tableRootName: 'neighborhoods',
                     tableJoinName: 'noise',
                     spatialPredicate: 'INTERSECT',
@@ -49,25 +39,6 @@ export class SpatialJoinMulti {
                         selectColumns: [
                             {
                                 tableName: 'noise',
-                                column: 'Unique Key',
-                                aggregateFn: 'count',
-                            },
-                        ],
-                    },
-                },
-                {
-                    type: 'join',
-                    tableRootName: 'neighborhoods',
-                    tableJoinName: 'parking',
-                    spatialPredicate: 'INTERSECT',
-                    output: {
-                        type: 'MODIFY_ROOT',
-                    },
-                    joinType: 'LEFT',
-                    groupBy: {
-                        selectColumns: [
-                            {
-                                tableName: 'parking',
                                 column: 'Unique Key',
                                 aggregateFn: 'count',
                             },
@@ -91,7 +62,7 @@ export class SpatialJoinMulti {
 }
 
 async function main() {
-    const example = new SpatialJoinMulti();
+    const example = new SpatialJoin();
 
     await example.run();
 }
