@@ -1,7 +1,8 @@
 import { CustomLayerTable, LayerTable } from '../../../shared/interfaces';
 
-export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerTable) => {
+export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerTable, workspace: string) => {
   const hasBuildingIdColumn = !!layerTable.columns?.some((c) => c.name === 'building_id');
+  const qualifiedTableName = `${workspace}.${layerTable.name}`;
 
   const propertiesExpr =
     layerTable.type === 'buildings' && hasBuildingIdColumn
@@ -20,7 +21,7 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerT
             'geometry', CAST(ST_AsGeoJSON(geometry) AS JSON),
             'properties', ${propertiesExpr}
           ) AS feature
-    FROM ${layerTable.name}
+    FROM ${qualifiedTableName}
     ) sub;
 `;
 };

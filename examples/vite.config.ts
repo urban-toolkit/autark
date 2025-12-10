@@ -30,7 +30,7 @@ export default defineConfig({
     },
   },
   server: {
-    open: '/src/autk-map/colormap-categorical.html',
+    open: '/src/autk-plot/map-d3-brush.html',
     cors: {
       origin: '*',
       allowedHeaders: 'Range, Content-Type, Authorization',

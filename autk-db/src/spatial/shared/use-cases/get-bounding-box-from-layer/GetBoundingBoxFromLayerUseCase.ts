@@ -7,7 +7,8 @@ export class GetBoundingBoxFromLayerUseCase {
   constructor(private conn: AsyncDuckDBConnection) {}
 
   async exec(params: GetBoundingBoxFromLayerParams): Promise<BoundingBox> {
-    const result = await this.conn.query(GET_BOUNDING_BOX_FROM_LAYER_QUERY(params.layerTableName));
+    const workspace = params.workspace || 'main';
+    const result = await this.conn.query(GET_BOUNDING_BOX_FROM_LAYER_QUERY(params.layerTableName, workspace));
     const rows = result.toArray();
 
     if (rows.length === 0) {

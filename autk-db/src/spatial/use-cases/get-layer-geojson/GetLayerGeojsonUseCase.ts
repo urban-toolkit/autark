@@ -11,8 +11,8 @@ export class GetLayerGeojsonUseCase {
     this.conn = conn;
   }
 
-  async exec(table: LayerTable | CustomLayerTable): Promise<FeatureCollection> {
-    const query = GET_LAYER_AS_GEOJSON_QUERY(table);
+  async exec(table: LayerTable | CustomLayerTable, workspace: string = 'main'): Promise<FeatureCollection> {
+    const query = GET_LAYER_AS_GEOJSON_QUERY(table, workspace);
     const response = await this.conn.query(query);
 
     return JSON.parse(response.toArray()[0]?.geojson) as FeatureCollection;

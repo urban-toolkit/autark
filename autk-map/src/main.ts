@@ -495,10 +495,10 @@ export class AutkMap {
      * This method updates the camera, starts the rendering process, and handles picking for each layer.
      */
     private render() {
-        // Updates the camera
         this._camera.update();
 
         // Normal render pass for each layer
+        //----------------------------------------------------------------
         this._renderer.start();
         this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip) {
@@ -511,8 +511,11 @@ export class AutkMap {
             }
         });
         this._renderer.finish();
+        //----------------------------------------------------------------
+
 
         // Picking render pass for each layer
+        //----------------------------------------------------------------
         this._renderer.startPickingRenderPass();
         this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
@@ -528,7 +531,7 @@ export class AutkMap {
                 layer.getPickedId(x, y).then((id) => {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if (id >= 0) {
-                        layer.setHighlightedIds([id]);
+                        layer.toggleHighlightedIds([id]);
                         this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
                     } else {
                         layer.clearHighlightedIds();
@@ -538,6 +541,7 @@ export class AutkMap {
                 });
             }
         });
+        //----------------------------------------------------------------
     }
 
     /**

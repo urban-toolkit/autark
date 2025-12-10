@@ -15,7 +15,7 @@ export class LoadJsonUseCase {
     this.conn = conn;
   }
 
-  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns }: Params): Promise<JsonTable> {
+  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = 'main' }: Params): Promise<JsonTable> {
     if (!jsonFileUrl && !jsonObject) {
       throw new Error('Either jsonFileUrl or jsonObject must be provided');
     }
@@ -41,9 +41,10 @@ export class LoadJsonUseCase {
         latColumnName: geometryColumns.latColumnName,
         longColumnName: geometryColumns.longColumnName,
         coordinateFormat: geometryColumns.coordinateFormat || DEFALT_COORDINATE_FORMAT,
+        workspace,
       });
     } else {
-      loadJsonQuery = LOAD_JSON_ON_TABLE_QUERY(jsonPath, outputTableName);
+      loadJsonQuery = LOAD_JSON_ON_TABLE_QUERY(jsonPath, outputTableName, workspace);
     }
 
     const describeTableResponse = await this.conn.query(loadJsonQuery);

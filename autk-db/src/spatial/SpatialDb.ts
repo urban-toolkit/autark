@@ -26,18 +26,30 @@ import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-la
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
 import { GetTableDataParams, GetTableDataOutput, GetTableDataUseCase } from './use-cases/get-table-data';
 
+interface WorkspaceData {
+  tables: Array<Table>;
+  osmBoudingBox?: BoundingBox;
+}
+
 /**
  * SpatialDb class provides methods to interact with a DuckDB database for spatial data operations.
  *
  * It allows loading OSM data, CSV, JSON, custom layers, and grid layers,
  * as well as performing spatial joins and raw queries.
  * It also provides methods to retrieve layer data and bounding boxes.
+ * 
+ * Supports multiple isolated workspaces, each with its own schema and data.
  */
 export class SpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
-  public tables: Array<Table> = [];
-  private osmBoudingBox?: BoundingBox;
+  private currentWorkspace: string = 'main';
+  private workspaces: Map<string, WorkspaceData> = new Map();
+  
+  public get tables(): Array<Table> {
+    return this.getCurrentWorkspaceData().tables;
+  }
+  
   private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
@@ -56,12 +68,35 @@ export class SpatialDb {
   private getTableDataUseCase?: GetTableDataUseCase;
 
   /**
+   * Gets the workspace data for the current workspace.
+   * @returns The WorkspaceData for the current workspace.
+   * @private
+   */
+  private getCurrentWorkspaceData(): WorkspaceData {
+    const data = this.workspaces.get(this.currentWorkspace);
+    if (!data) {
+      throw new Error(`Workspace '${this.currentWorkspace}' not found. This should not happen.`);
+    }
+    return data;
+  }
+
+  /**
    * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
    * @returns A promise that resolves when initialization is complete.
    */
   async init() {
     this.db = await loadDb();
     this.conn = await this.db.connect();
+
+    // Install and load spatial extension
+    await this.conn.query('INSTALL spatial; LOAD spatial;');
+
+    // Create main schema and initialize default workspace
+    await this.conn.query('CREATE SCHEMA IF NOT EXISTS main');
+    this.workspaces.set('main', {
+      tables: [],
+      osmBoudingBox: undefined,
+    });
 
     this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
     this.loadCsvUseCase = new LoadCsvUseCase(this.db, this.conn);
@@ -79,23 +114,59 @@ export class SpatialDb {
     this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
     this.buildHeatmapUseCase = new BuildHeatmapUseCase(this.conn);
     this.getTableDataUseCase = new GetTableDataUseCase(this.conn);
-
-    this.conn.query('INSTALL spatial; LOAD spatial;');
   }
 
   /**
-   * Registers a table in the tables array. If a table with the same name already exists,
+   * Sets the current workspace. If the workspace doesn't exist, it will be created.
+   * @param name - The name of the workspace to switch to.
+   * @returns A promise that resolves when the workspace is set.
+   */
+  async setWorkspace(name: string): Promise<void> {
+    if (!this.conn) {
+      throw new Error('Database not initialized. Please call init() first.');
+    }
+
+    if (!this.workspaces.has(name)) {
+      await this.conn.query(`CREATE SCHEMA IF NOT EXISTS ${name}`);
+      this.workspaces.set(name, {
+        tables: [],
+        osmBoudingBox: undefined,
+      });
+    }
+
+    this.currentWorkspace = name;
+  }
+
+  /**
+   * Gets the list of all available workspaces.
+   * @returns An array of workspace names.
+   */
+  getWorkspaces(): string[] {
+    return Array.from(this.workspaces.keys());
+  }
+
+  /**
+   * Gets the name of the current active workspace.
+   * @returns The current workspace name.
+   */
+  getCurrentWorkspace(): string {
+    return this.currentWorkspace;
+  }
+
+  /**
+   * Registers a table in the current workspace's tables array. If a table with the same name already exists,
    * it will be replaced and a warning will be logged to the console.
    * @param table - The table to register.
    */
   private _registerTable(table: Table): void {
-    const existingIndex = this.tables.findIndex((t) => t.name === table.name);
+    const workspaceData = this.getCurrentWorkspaceData();
+    const existingIndex = workspaceData.tables.findIndex((t) => t.name === table.name);
     
     if (existingIndex !== -1) {
-      console.warn(`Table '${table.name}' already exists. Overwriting...`);
-      this.tables[existingIndex] = table;
+      console.warn(`Table '${table.name}' already exists in workspace '${this.currentWorkspace}'. Overwriting...`);
+      workspaceData.tables[existingIndex] = table;
     } else {
-      this.tables.push(table);
+      workspaceData.tables.push(table);
     }
   }
 
@@ -122,16 +193,20 @@ export class SpatialDb {
     )
       throw new Error('Database not initialized. Please call init() first.');
 
-    const tables = await this.loadOsmFromOverpassApiUseCase.exec(params);
+    const tables = await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
     for (const table of tables) {
       this._registerTable(table);
     }
 
     if (params.autoLoadLayers) {
       const boundaryTableName = `${params.outputTableName}_boundaries`;
-      const rawBoundingBox = await this.getBoundingBoxFromOsmUseCase.exec({ osmTableName: boundaryTableName });
+      const rawBoundingBox = await this.getBoundingBoxFromOsmUseCase.exec({ 
+        osmTableName: boundaryTableName,
+        workspace: this.currentWorkspace 
+      });
 
-      this.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
+      const workspaceData = this.getCurrentWorkspaceData();
+      workspaceData.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: rawBoundingBox,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
@@ -145,29 +220,28 @@ export class SpatialDb {
           layer,
         };
 
-        layerParams.boundingBox = shouldCrop ? this.osmBoudingBox : undefined;
+        layerParams.boundingBox = shouldCrop ? workspaceData.osmBoudingBox : undefined;
         const layerTable = await this.loadLayer(layerParams);
 
         // Polygonize surface layer
         if (layer === 'surface') {
           const updatedTable = await this.polygonizeSurfaceLayerUseCase.exec(
-            { surfaceTableName: layerTable.name },
+            { surfaceTableName: layerTable.name, workspace: this.currentWorkspace },
             layerTable
           );
-          const tableIndex = this.tables.findIndex((t) => t.name === layerTable.name);
-          if (tableIndex !== -1) this.tables[tableIndex] = updatedTable;
+          const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
+          if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
         }
       }
 
       if (params.autoLoadLayers.dropOsmTable) {
         for (const table of tables) {
-          await this.dropTableUseCase.exec({ tableName: table.name });
-          this.tables = this.tables.filter((t) => t.name !== table.name);
+          await this.dropTableUseCase.exec({ tableName: table.name, workspace: this.currentWorkspace });
+          workspaceData.tables = workspaceData.tables.filter((t) => t.name !== table.name);
         }
       }
 
-      console.log(`OSM data loaded and completed!`);
-    }
+      console.log(`OSM data loaded and completed in workspace '${this.currentWorkspace}'!`)    }
   }
 
   /**
@@ -180,7 +254,7 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.loadCsvUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadCsvUseCase.exec(params);
+    const table = await this.loadCsvUseCase.exec({ ...params, workspace: this.currentWorkspace });
     this._registerTable(table);
 
     return table;
@@ -196,7 +270,7 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.loadJsonUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadJsonUseCase.exec(params);
+    const table = await this.loadJsonUseCase.exec({ ...params, workspace: this.currentWorkspace });
     this._registerTable(table);
 
     return table;
@@ -218,7 +292,7 @@ export class SpatialDb {
     if (!(osmTable.source === 'osm' && osmTable.type === 'pointset'))
       throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
 
-    const table = await this.loadLayerUseCase.exec(params);
+    const table = await this.loadLayerUseCase.exec({ ...params, workspace: this.currentWorkspace });
     this._registerTable(table);
 
     return table;
@@ -235,7 +309,12 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadCustomLayerUseCase.exec({ ...params, boundingBox: this.osmBoudingBox });
+    const workspaceData = this.getCurrentWorkspaceData();
+    const table = await this.loadCustomLayerUseCase.exec({ 
+      ...params, 
+      boundingBox: workspaceData.osmBoudingBox,
+      workspace: this.currentWorkspace 
+    });
     this._registerTable(table);
 
     return table;
@@ -252,7 +331,12 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.loadGridLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.loadGridLayerUseCase.exec({ ...params, boundingBox: params.boundingBox || this.osmBoudingBox });
+    const workspaceData = this.getCurrentWorkspaceData();
+    const table = await this.loadGridLayerUseCase.exec({ 
+      ...params, 
+      boundingBox: params.boundingBox || workspaceData.osmBoudingBox,
+      workspace: this.currentWorkspace 
+    });
     this._registerTable(table);
 
     return table;
@@ -276,7 +360,7 @@ export class SpatialDb {
     if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
     if (!isLayerType(layerTable.type)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
 
-    const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable);
+    const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable, this.currentWorkspace);
 
     const osmBoundingBox = this.getOsmBoundingBox();
     if (osmBoundingBox) {
@@ -295,17 +379,18 @@ export class SpatialDb {
   }
 
   /**
-   * Retrieves the bounding box of the OSM data loaded from the Overpass API.
+   * Retrieves the bounding box of the OSM data loaded from the Overpass API for the current workspace.
    * @returns The bounding box as a tuple [minLon, minLat, maxLon, maxLat], or null if no OSM data has been loaded.
    */
   getOsmBoundingBox(): [number, number, number, number] | null {
-    if (!this.osmBoudingBox) return null;
+    const workspaceData = this.getCurrentWorkspaceData();
+    if (!workspaceData.osmBoudingBox) return null;
 
     return [
-      this.osmBoudingBox.minLon,
-      this.osmBoudingBox.minLat,
-      this.osmBoudingBox.maxLon,
-      this.osmBoudingBox.maxLat,
+      workspaceData.osmBoudingBox.minLon,
+      workspaceData.osmBoudingBox.minLat,
+      workspaceData.osmBoudingBox.maxLon,
+      workspaceData.osmBoudingBox.maxLat,
     ]
   }
 
@@ -334,6 +419,7 @@ export class SpatialDb {
 
     return this.getBoundingBoxFromLayerUseCase.exec({
       layerTableName: layerName,
+      workspace: this.currentWorkspace,
     });
   }
 
@@ -366,7 +452,7 @@ export class SpatialDb {
     const table = this.tables.find((t) => t.name === params.tableName);
     if (!table) throw new Error(`Table ${params.tableName} not found.`);
 
-    return this.getTableDataUseCase.exec(params);
+    return this.getTableDataUseCase.exec({ ...params, workspace: this.currentWorkspace });
   }
 
   // CUSTOM QUERIES
@@ -382,9 +468,10 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.spatialJoinUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const { created, table } = await this.spatialJoinUseCase.exec(params, this.tables);
+    const workspaceData = this.getCurrentWorkspaceData();
+    const { created, table } = await this.spatialJoinUseCase.exec(params, workspaceData.tables);
     if (created) this._registerTable(table);
-    else this.tables = this.tables.map((t) => (t.name === table.name ? table : t));
+    else workspaceData.tables = workspaceData.tables.map((t) => (t.name === table.name ? table : t));
 
     return table;
   }
@@ -420,7 +507,8 @@ export class SpatialDb {
     if (!this.db || !this.conn || !this.buildHeatmapUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
-    const table = await this.buildHeatmapUseCase.exec(params, this.tables, this.osmBoudingBox);
+    const workspaceData = this.getCurrentWorkspaceData();
+    const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.osmBoudingBox);
     this._registerTable(table);
 
     return table;

@@ -1,11 +1,12 @@
+
 import { FeatureCollection } from 'geojson';
 
-import { Barchart, PlotEvent } from 'autk-plot';
+import { ParallelCoordinates, PlotEvent } from 'autk-plot';
 import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
 
-export class MapD3 {
+export class MapParallelCoordinates {
     protected map!: AutkMap;
-    protected plot!: Barchart;
+    protected plot!: ParallelCoordinates;
 
     protected geojson!: FeatureCollection;
 
@@ -30,19 +31,21 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new Barchart({
+        this.plot = new ParallelCoordinates({
             div: plotDiv,
             data: this.geojson,
-            labels: { axis: ['ntaname', 'shape_area'], title: 'Plot example' },
-            margins: { left: 60, right: 20, top: 50, bottom: 200 },
+            labels: { 
+                axis: ['shape_area', 'shape_leng', 'cdta2020'], 
+                title: 'Neighborhood Characteristics' 
+            },
             width: 790,
-            events: [PlotEvent.CLICK]
+            events: [PlotEvent.BRUSH_Y]
         });
     }
 
     protected async updateMapListeners() {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[] | string[]) => {
-            this.plot.setHighlightedIds(selection as number[]);
+        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[]) => {
+            this.plot.setHighlightedIds(selection);
         });
     }
 
@@ -54,11 +57,12 @@ export class MapD3 {
             }
         });
     }
+
 }
 
 async function main() {
-    const example = new MapD3();
-    
+    const example = new MapParallelCoordinates();
+
     const canvas = document.querySelector('canvas') as HTMLCanvasElement;
     const plotBdy = document.querySelector('#plotBody') as HTMLElement;
 

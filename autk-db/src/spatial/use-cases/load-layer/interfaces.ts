@@ -48,6 +48,7 @@ export interface Params {
   layer: LayerType;
   coordinateFormat?: string;
   boundingBox?: BoundingBox;
+  workspace?: string;
 }
 
 export interface Layer {

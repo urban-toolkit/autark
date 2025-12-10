@@ -7,8 +7,9 @@ export class AggregateBuildingLayerUseCase {
     this.conn = conn;
   }
 
-  async exec(params: { inputTableName: string }): Promise<void> {
-    const { inputTableName } = params;
+  async exec(params: { inputTableName: string; workspace?: string }): Promise<void> {
+    const { inputTableName, workspace = 'main' } = params;
+    const qualifiedTableName = `${workspace}.${inputTableName}`;
     const tempTableName = `${inputTableName}_temp_agg`;
 
     // Create temporary table with aggregated geometries
@@ -18,7 +19,7 @@ export class AggregateBuildingLayerUseCase {
         building_id,
         -- Union all parts of the same building into a single geometry (DuckDB spatial aggregate)
         ST_Union_Agg(geometry) AS agg_geometry
-      FROM ${inputTableName}
+      FROM ${qualifiedTableName}
       -- Keep only valid polygonal geometries to avoid topology errors during union
       WHERE ST_IsValid(geometry)
       GROUP BY building_id;
@@ -28,11 +29,11 @@ export class AggregateBuildingLayerUseCase {
 
     // Add agg_geometry column to main table via LEFT JOIN
     const addColumnQuery = `
-      CREATE OR REPLACE TABLE ${inputTableName} AS
+      CREATE OR REPLACE TABLE ${qualifiedTableName} AS
       SELECT 
         b.*,
         agg.agg_geometry
-      FROM ${inputTableName} b
+      FROM ${qualifiedTableName} b
       LEFT JOIN ${tempTableName} agg ON b.building_id = agg.building_id;
     `;
 

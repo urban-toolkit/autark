@@ -15,7 +15,7 @@ export class LoadCsvUseCase {
     this.conn = conn;
   }
 
-  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',' }: Params): Promise<CsvTable> {
+  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = 'main' }: Params): Promise<CsvTable> {
     if (!csvFileUrl && !csvObject) {
       throw new Error('Either csvFileUrl or csvObject must be provided');
     }
@@ -34,6 +34,8 @@ export class LoadCsvUseCase {
       tempFileCreated = true;
     }
 
+    const qualifiedTableName = `${workspace}.${outputTableName}`;
+    
     let loadCsvQuery: string;
     if (geometryColumns) {
       loadCsvQuery = LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY({
@@ -43,9 +45,10 @@ export class LoadCsvUseCase {
         latColumnName: geometryColumns.latColumnName,
         longColumnName: geometryColumns.longColumnName,
         coordinateFormat: geometryColumns.coordinateFormat || DEFALT_COORDINATE_FORMAT,
+        workspace,
       });
     } else {
-      loadCsvQuery = LOAD_CSV_ON_TABLE_QUERY(csvPath, outputTableName, delimiter);
+      loadCsvQuery = LOAD_CSV_ON_TABLE_QUERY(csvPath, outputTableName, delimiter, workspace);
     }
 
     const describeTableResponse = await this.conn.query(loadCsvQuery);
@@ -53,7 +56,7 @@ export class LoadCsvUseCase {
     // Automatically create spatial index for geometry column
     if (geometryColumns) {
       const indexName = `idx_${outputTableName}_geometry`;
-      await this.conn.query(`CREATE INDEX ${indexName} ON ${outputTableName} USING RTREE (${DEFAULT_GEO_COLUMN_NAME});`);
+      await this.conn.query(`CREATE INDEX ${indexName} ON ${qualifiedTableName} USING RTREE (${DEFAULT_GEO_COLUMN_NAME});`);
     }
 
     if (tempFileCreated) {

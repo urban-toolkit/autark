@@ -11,7 +11,9 @@ export class GetTableDataUseCase {
   }
 
   async exec(params: GetTableDataParams): Promise<GetTableDataOutput> {
-    let query = `SELECT * FROM ${params.tableName}`;
+    const workspace = params.workspace || 'main';
+    const qualifiedTableName = `${workspace}.${params.tableName}`;
+    let query = `SELECT * FROM ${qualifiedTableName}`;
 
     if (params.limit !== undefined) {
       query += ` LIMIT ${params.limit}`;

@@ -21,23 +21,27 @@ export class PolygonizeSurfaceLayerUseCase {
     }
 
     async exec(params: PolygonizeSurfaceLayerParams, surfaceTable: LayerTable): Promise<LayerTable> {
-        const { surfaceTableName } = params;
-        const geojson = await this.getLayerGeojsonUseCase.exec(surfaceTable) as FeatureCollection<LineString>;
+        const { surfaceTableName, workspace = 'main' } = params;
+        const qualifiedSurfaceTableName = `${workspace}.${surfaceTableName}`;
+        const qualifiedFeatureCollectionTableName = `${workspace}.${surfaceTableName}_feature_collection`;
+        
+        const geojson = await this.getLayerGeojsonUseCase.exec(surfaceTable, workspace) as FeatureCollection<LineString>;
         const polygonizedGeojson = polygonize(geojson) as FeatureCollection<Polygon>;
 
-        await this.conn.query(`DROP TABLE IF EXISTS ${surfaceTableName};`);
-        await this.conn.query(`DROP TABLE IF EXISTS ${surfaceTableName}_feature_collection;`);
+        await this.conn.query(`DROP TABLE IF EXISTS ${qualifiedSurfaceTableName};`);
+        await this.conn.query(`DROP TABLE IF EXISTS ${qualifiedFeatureCollectionTableName};`);
 
         const fileName = `temp_polygonized_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
 
         await this.db.registerFileText(fileName, JSON.stringify(polygonizedGeojson));
 
-        const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${surfaceTableName}_feature_collection`);
+        const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${surfaceTableName}_feature_collection`, workspace);
         await this.conn.query(featureCollectionQuery);
 
         const queryLayer = LOAD_POLYGONIZED_LAYER_QUERY(
             `${surfaceTableName}_feature_collection`,
             surfaceTableName,
+            workspace,
         );
 
         const describeTableResponse = await this.conn.query(queryLayer);
