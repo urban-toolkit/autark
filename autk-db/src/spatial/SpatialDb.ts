@@ -25,6 +25,7 @@ import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-bo
 import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-layer';
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
 import { GetTableDataParams, GetTableDataOutput, GetTableDataUseCase } from './use-cases/get-table-data';
+import { UpdateTableUseCase, UpdateTableParams } from './use-cases/update-table';
 
 interface WorkspaceData {
   tables: Array<Table>;
@@ -66,6 +67,7 @@ export class SpatialDb {
   private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
   private buildHeatmapUseCase?: BuildHeatmapUseCase;
   private getTableDataUseCase?: GetTableDataUseCase;
+  private updateTableUseCase?: UpdateTableUseCase;
 
   /**
    * Gets the workspace data for the current workspace.
@@ -114,6 +116,7 @@ export class SpatialDb {
     this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
     this.buildHeatmapUseCase = new BuildHeatmapUseCase(this.conn);
     this.getTableDataUseCase = new GetTableDataUseCase(this.conn);
+    this.updateTableUseCase = new UpdateTableUseCase(this.db, this.conn);
   }
 
   /**
@@ -453,6 +456,46 @@ export class SpatialDb {
     if (!table) throw new Error(`Table ${params.tableName} not found.`);
 
     return this.getTableDataUseCase.exec({ ...params, workspace: this.currentWorkspace });
+  }
+
+  // ---- UPDATE methods
+
+  /**
+   * Updates an existing table with new data.
+   * 
+   * For layer tables (OSM, GeoJSON), the input data should be a GeoJSON FeatureCollection.
+   * For non-layer tables (CSV, JSON), the input data should be an array of objects.
+   * 
+   * @param params - Parameters for updating the table:
+   *   - tableName: The name of the table to update
+   *   - data: The new data (FeatureCollection for layers, Record<string, unknown>[] for CSV/JSON)
+   *   - strategy: 'replace' (drop and recreate) or 'update' (update existing records by ID)
+   *   - idColumn: Required for 'update' strategy. Supports 'id' or 'properties.attribute_name' format
+   * @returns A promise that resolves to the updated Table with refreshed column metadata.
+   * @throws Error if the database or connection is not initialized.
+   * @throws Error if the table is not found.
+   * @throws Error if idColumn is not provided when using 'update' strategy.
+   */
+  async updateTable(params: Omit<UpdateTableParams, 'workspace'>): Promise<Table> {
+    if (!this.db || !this.conn || !this.updateTableUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = this.tables.find((t) => t.name === params.tableName);
+    if (!table) throw new Error(`Table ${params.tableName} not found.`);
+
+    const result = await this.updateTableUseCase.exec(
+      { ...params, workspace: this.currentWorkspace },
+      table
+    );
+
+    // Update the table in the workspace
+    const workspaceData = this.getCurrentWorkspaceData();
+    const tableIndex = workspaceData.tables.findIndex((t) => t.name === params.tableName);
+    if (tableIndex !== -1) {
+      workspaceData.tables[tableIndex] = result.table;
+    }
+
+    return result.table;
   }
 
   // CUSTOM QUERIES
