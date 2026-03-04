@@ -52,7 +52,14 @@ async function getDevice(): Promise<GPUDevice> {
   }
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) throw new Error("Failed to get GPU adapter.");
-  const device = await adapter.requestDevice();
+
+  // Request higher buffer size limits based on adapter capabilities
+  const device = await adapter.requestDevice({
+    requiredLimits: {
+      maxBufferSize: adapter.limits.maxBufferSize,
+      maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+    },
+  });
   return device;
 }
 
