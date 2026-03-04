@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Params, OsmElement } from './interfaces';
+import { Params, OsmElement, OnLoadingProgress } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from './queries';
@@ -33,14 +33,17 @@ export class LoadOsmFromOverpassApiUseCase {
   async exec(params: Params): Promise<OsmTable[]> {
     if (!params.queryArea) throw new Error('queryArea must be provided');
     const workspace = params.workspace || 'main';
+    const onProgress = params.onProgress;
 
     // 1. Fetch OSM data from query area
-    const osmData = await this.fetchOsmWithinArea(params.queryArea);
+    const osmData = await this.fetchOsmWithinArea(params.queryArea, onProgress);
+    onProgress?.('processing-osm-data');
     await this.insertOsmDataUsingJson(params.outputTableName, osmData, workspace);
     console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
     // 2. Fetch OSM data just for boundaries
-    const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea);
+    const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea, onProgress);
+    onProgress?.('processing-boundaries');
     await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData, workspace, true);
     console.log(
       `Successfully inserted ${boundariesData.elements.length} boundaries into ${params.outputTableName}_boundaries`,
@@ -178,7 +181,10 @@ export class LoadOsmFromOverpassApiUseCase {
   /**
    * Fetch OSM data within a geocode area from the Overpass API (with caching)
    */
-  private async fetchOsmWithinArea(queryArea: { geocodeArea: string; areas: string[] }): Promise<OverpassApiResponse> {
+  private async fetchOsmWithinArea(
+    queryArea: { geocodeArea: string; areas: string[] },
+    onProgress?: OnLoadingProgress,
+  ): Promise<OverpassApiResponse> {
     // Try cache first
     const cacheKey = this.getCacheKey(queryArea, false);
     const cachedData = await this.cache.get(cacheKey);
@@ -221,12 +227,14 @@ export class LoadOsmFromOverpassApiUseCase {
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
 
     console.log('Fetching OSM data from Overpass API...');
-    const response = await fetch(url);
+    onProgress?.('querying-osm-server');
 
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
     }
 
+    onProgress?.('downloading-osm-data');
     const data = await response.json();
 
     // Store in cache for future use
@@ -235,10 +243,10 @@ export class LoadOsmFromOverpassApiUseCase {
     return data;
   }
 
-  private async fetchBoundariesOsmWithinArea(queryArea: {
-    geocodeArea: string;
-    areas: string[];
-  }): Promise<OverpassApiResponse> {
+  private async fetchBoundariesOsmWithinArea(
+    queryArea: { geocodeArea: string; areas: string[] },
+    onProgress?: OnLoadingProgress,
+  ): Promise<OverpassApiResponse> {
     // Try cache first
     const cacheKey = this.getCacheKey(queryArea, true);
     const cachedData = await this.cache.get(cacheKey);
@@ -299,12 +307,14 @@ export class LoadOsmFromOverpassApiUseCase {
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
 
     console.log('Fetching OSM boundaries from Overpass API...');
-    const response = await fetch(url);
+    onProgress?.('querying-osm-boundaries');
 
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
     }
 
+    onProgress?.('downloading-boundaries');
     const data = await response.json();
 
     // Store in cache for future use

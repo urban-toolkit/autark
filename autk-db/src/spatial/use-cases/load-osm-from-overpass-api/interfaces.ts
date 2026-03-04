@@ -14,6 +14,16 @@ export interface OsmElement {
   nodes?: number[];
 }
 
+export type LoadingPhase =
+  | 'querying-osm-server'
+  | 'downloading-osm-data'
+  | 'querying-osm-boundaries'
+  | 'downloading-boundaries'
+  | 'processing-osm-data'
+  | 'processing-boundaries';
+
+export type OnLoadingProgress = (phase: LoadingPhase) => void;
+
 export type Params = {
   outputTableName: string;
   autoLoadLayers?: {
@@ -26,4 +36,5 @@ export type Params = {
     areas: string[];
   };
   workspace?: string;
+  onProgress?: OnLoadingProgress;
 };
