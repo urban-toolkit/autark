@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Autark provenance – map + plot</title>
+  <link rel="stylesheet" href="/src/autk-plot/map-d3-brush.css">
+  <style>
+    #layout { display: flex; gap: 12px; padding: 8px; }
+    #mapPlot { flex: 1; }
+    #sidebar { width: 280px; flex-shrink: 0; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+    #sidebar h3 { margin: 0; padding: 8px 10px; background: #f5f5f5; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h2>Map + Plot with provenance</h2>
+    <div id="layout">
+      <div id="mapPlot">
+        <canvas></canvas>
+        <div id="plot">
+          <div id="plotBar"></div>
+          <div id="plotBody"></div>
+        </div>
+      </div>
+      <div id="sidebar">
+        <h3>Provenance trail</h3>
+        <div id="provenanceTrail"></div>
+      </div>
+    </div>
+  </div>
+</body>
+<script type="module" src="/src/autk-provenance/map-plot-provenance.ts"></script>
+<script>
+  function floatingPlot() {
+    let newX = 0, newY = 0, startX = 0, startY = 0;
+    const plot = document.querySelector('#plot');
+    const bar = document.querySelector('#plotBar');
+    if (!bar || !plot) return;
+    bar.addEventListener('mousedown', mouseDown);
+    plot.style.visibility = 'visible';
+    function mouseDown(e) {
+      startX = e.clientX;
+      startY = e.clientY;
+      document.addEventListener('mousemove', mouseMove);
+      document.addEventListener('mouseup', mouseUp);
+    }
+    function mouseMove(e) {
+      newX = startX - e.clientX;
+      newY = startY - e.clientY;
+      startX = e.clientX;
+      startY = e.clientY;
+      plot.style.top = plot.offsetTop - newY + 'px';
+      plot.style.left = plot.offsetLeft - newX + 'px';
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    function mouseUp() {
+      document.removeEventListener('mousemove', mouseMove);
+    }
+  }
+  floatingPlot();
+</script>
+</html>

@@ -1,0 +1,40 @@
+{
+  "name": "autk-provenance",
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/autk-provenance.umd.cjs",
+  "module": "./dist/autk-provenance.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/autk-provenance.js",
+      "require": "./dist/autk-provenance.umd.cjs"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vite-plugin-dts": "^4.5.4"
+  },
+  "dependencies": {
+    "autk-map": "file:../autk-map",
+    "autk-plot": "file:../autk-plot",
+    "autk-db": "file:../autk-db"
+  }
+}

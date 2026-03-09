@@ -1,0 +1,103 @@
+flowchart TB
+  %% =========================
+  %% VA Systems
+  %% =========================
+  subgraph VA["VA Systems (Producers)"]
+    AUTARK["Autark (autk-db, autk-compute, autk-map, autk-plot)"]
+    EXT1["Other VA System A"]
+    EXT2["Other VA System B"]
+  end
+
+  %% =========================
+  %% Instrumentation
+  %% =========================
+  subgraph INSTR["Instrumentation Layer"]
+    HOOKS["provkit/hooks\n(wrapAsync, lifecycle, context propagation)"]
+    SINK["ProvenanceSink.emit(event)"]
+  end
+
+  AUTARK --> HOOKS
+  AUTARK --> SINK
+  EXT1 --> HOOKS
+  EXT1 --> SINK
+  EXT2 --> HOOKS
+  EXT2 --> SINK
+
+  %% =========================
+  %% Adapters
+  %% =========================
+  subgraph ADP["provkit/adapters"]
+    AUTK_ADP["adapters/autark\n(autark event mapping)"]
+    GEN_ADP["adapters/generic\n(config-driven fallback)"]
+    FUT_ADP["adapters/<future-system>\n(pluggable)"]
+  end
+
+  HOOKS --> AUTK_ADP
+  HOOKS --> GEN_ADP
+  SINK --> AUTK_ADP
+  SINK --> GEN_ADP
+  EXT1 -. new support .-> FUT_ADP
+  EXT2 -. new support .-> FUT_ADP
+
+  %% =========================
+  %% Core
+  %% =========================
+  subgraph CORE["provkit/core"]
+    TRACKER["Tracker API\n(startActivity/endActivity,\nrecordEntity, recordRelation, ingest)"]
+    MODEL["Canonical Model\nEntity, Activity, Agent, Relation"]
+    VALID["Validation + Schema Versioning"]
+  end
+
+  AUTK_ADP --> TRACKER
+  GEN_ADP --> TRACKER
+  FUT_ADP --> TRACKER
+  TRACKER --> MODEL
+  TRACKER --> VALID
+
+  %% =========================
+  %% Storage
+  %% =========================
+  subgraph STORE["provkit/stores"]
+    EVENTLOG["Append-only Event Log"]
+    INDEX["Read Model / Graph Index\n(adjacency, run/session/time indexes)"]
+    MEM["Memory Store"]
+    IDB["IndexedDB Store"]
+    SQL["SQL/Remote Store (future)"]
+  end
+
+  TRACKER --> EVENTLOG
+  EVENTLOG --> INDEX
+  MEM --> EVENTLOG
+  IDB --> EVENTLOG
+  SQL --> EVENTLOG
+
+  %% =========================
+  %% Query + Export
+  %% =========================
+  subgraph QX["provkit/query + provkit/export"]
+    LINEAGE["Lineage Query (upstream)"]
+    IMPACT["Impact Query (downstream)"]
+    HISTORY["History Query (run/session/time)"]
+    EXPORT["Export: JSON / PROV-JSON"]
+  end
+
+  INDEX --> LINEAGE
+  INDEX --> IMPACT
+  INDEX --> HISTORY
+  MODEL --> EXPORT
+  INDEX --> EXPORT
+
+  %% =========================
+  %% Consumers
+  %% =========================
+  subgraph CONS["Consumers"]
+    UI["VA App UI / Debug Panel"]
+    AUDIT["Audit / Reproducibility Reports"]
+    API["External APIs / Data Products"]
+  end
+
+  LINEAGE --> UI
+  IMPACT --> UI
+  HISTORY --> UI
+  EXPORT --> AUDIT
+  EXPORT --> API
