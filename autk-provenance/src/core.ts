@@ -20,6 +20,12 @@ function deepMergeState(
       plot: delta.selection?.plot ?? base.selection.plot,
     },
   };
+  if (base.ui || delta.ui) {
+    next.ui = {
+      ...(base.ui ?? {}),
+      ...(delta.ui ?? {}),
+    };
+  }
   if (base.view || delta.view) next.view = delta.view ?? base.view;
   if (base.data || delta.data) next.data = delta.data ?? base.data;
   return next;

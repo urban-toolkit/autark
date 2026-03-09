@@ -1,4 +1,5 @@
 import { FeatureCollection } from 'geojson';
+import { SpatialDb } from 'autk-db';
 import { PlotEvent, Scatterplot } from 'autk-plot';
 import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
 import {
@@ -7,9 +8,13 @@ import {
 } from 'autk-provenance';
 
 async function main() {
-  const geojson = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(
-    (res) => res.json() as Promise<FeatureCollection>
-  );
+  const db = new SpatialDb();
+  await db.init();
+  await db.loadCustomLayer({
+    geojsonFileUrl: '/data/mnt_neighs_proj.geojson',
+    outputTableName: 'neighborhoods',
+  });
+  const geojson = await db.getLayer('neighborhoods') as FeatureCollection;
 
   const canvas = document.querySelector('canvas') as HTMLCanvasElement;
   const plotBody = document.querySelector('#plotBody') as HTMLElement;
@@ -26,11 +31,15 @@ async function main() {
   map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
   map.draw();
 
+  const plotWidth = Math.max(320, Math.floor(plotBody.getBoundingClientRect().width));
+  const plotHeight = Math.max(500, Math.floor(plotBody.getBoundingClientRect().height || 500));
+
   const plot = new Scatterplot({
     div: plotBody,
     data: geojson,
     labels: { axis: ['shape_area', 'shape_leng'], title: 'Plot with provenance' },
-    width: 790,
+    width: plotWidth,
+    height: plotHeight,
     events: [PlotEvent.BRUSH],
   });
 
@@ -39,10 +48,15 @@ async function main() {
   });
   plot.plotEvents.addEventListener(PlotEvent.BRUSH, (selection: number[]) => {
     const layer = map.layerManager.searchByLayerId('neighborhoods') as VectorLayer | null;
-    if (layer) layer.setHighlightedIds(selection);
+    if (!layer) return;
+    if (selection.length === 0) {
+      layer.clearHighlightedIds();
+    } else {
+      layer.setHighlightedIds(selection);
+    }
   });
 
-  const provenance = createAutarkProvenance({ map, plot });
+  const provenance = createAutarkProvenance({ map, plot, db });
 
   if (trailContainer) {
     renderProvenanceTrailUI({
@@ -50,6 +64,8 @@ async function main() {
       container: trailContainer,
       showBackForward: true,
       showTimestamps: true,
+      showGraph: true,
+      showPathList: true,
     });
   }
 }

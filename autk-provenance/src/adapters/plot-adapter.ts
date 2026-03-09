@@ -18,23 +18,8 @@ export interface PlotAdapterApi {
   applyState(state: AutarkProvenanceState): void;
 }
 
-function makeListener(
-  eventName: string,
-  actionType: ProvenanceAction,
-  onRecord: PlotRecordCallback
-): (selection: number[]) => void {
-  return (selection: number[]) => {
-    const label =
-      selection.length === 0
-        ? `Cleared plot selection`
-        : `${eventName}: ${selection.length} point(s) selected`;
-    onRecord(actionType, label, {
-      selection: {
-        map: null,
-        plot: selection,
-      },
-    });
-  };
+function selectionSignature(selection: number[]): string {
+  return selection.join(',');
 }
 
 export function createPlotAdapter(
@@ -42,6 +27,7 @@ export function createPlotAdapter(
   onRecord: PlotRecordCallback
 ): PlotAdapterApi {
   const listeners: Array<{ event: string; fn: (selection: number[]) => void }> = [];
+  let lastSelectionSig: string | null = null;
   const events: Array<{ event: string; actionType: ProvenanceAction }> = [
     { event: PLOT_CLICK, actionType: ProvenanceAction.PLOT_CLICK },
     { event: PLOT_BRUSH, actionType: ProvenanceAction.PLOT_BRUSH },
@@ -52,7 +38,22 @@ export function createPlotAdapter(
   function startRecording(): void {
     if (listeners.length > 0) return;
     for (const { event, actionType } of events) {
-      const fn = makeListener(event, actionType, onRecord);
+      const fn = (selection: number[]) => {
+        const sig = selectionSignature(selection);
+        if (sig === lastSelectionSig) return;
+        lastSelectionSig = sig;
+
+        const label =
+          selection.length === 0
+            ? `Cleared plot selection`
+            : `${event}: ${selection.length} point(s) selected`;
+        onRecord(actionType, label, {
+          selection: {
+            map: null,
+            plot: selection,
+          },
+        });
+      };
       listeners.push({ event, fn });
       plot.plotEvents.addEventListener(event, fn);
     }
@@ -70,6 +71,7 @@ export function createPlotAdapter(
   function applyState(state: AutarkProvenanceState): void {
     const plotSelection = state.selection?.plot;
     if (Array.isArray(plotSelection)) {
+      lastSelectionSig = selectionSignature(plotSelection);
       plot.setHighlightedIds(plotSelection);
     }
   }

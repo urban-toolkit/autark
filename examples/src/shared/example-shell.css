@@ -1,0 +1,193 @@
+:root {
+  --example-bg: #eef3f8;
+  --example-surface: #ffffff;
+  --example-surface-muted: #f6f9fc;
+  --example-border: #d4dde7;
+  --example-text: #1b3148;
+  --example-text-muted: #546b80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 20px;
+  display: block;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--example-text);
+  background: radial-gradient(circle at top left, #f8fbff, var(--example-bg) 62%);
+}
+
+#app {
+  width: min(96vw, 1200px);
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: auto;
+  border: 1px solid var(--example-border);
+  border-radius: 14px;
+  background: var(--example-surface);
+  box-shadow: 0 10px 26px rgba(28, 53, 76, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+#app > h2 {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 18px;
+  border-bottom: 1px solid var(--example-border);
+  background: linear-gradient(180deg, var(--example-surface), var(--example-surface-muted));
+}
+
+#app > p {
+  margin: 12px 16px 0;
+  color: var(--example-text-muted);
+  line-height: 1.5;
+}
+
+canvas {
+  display: block;
+  width: calc(100% - 24px) !important;
+  max-width: calc(100% - 24px);
+  height: min(72vh, 780px) !important;
+  min-height: 320px;
+  margin: 12px;
+  border: 1px solid #d8e1eb;
+  border-radius: 10px;
+  background: #c8dae6;
+}
+
+#output {
+  width: calc(100% - 24px) !important;
+  min-height: 160px;
+  margin: 12px;
+  padding: 12px;
+  border: 1px solid #d8e1eb;
+  border-radius: 10px;
+  background: #f8fbff;
+  overflow: auto;
+  align-self: stretch;
+}
+
+#output pre {
+  max-width: 100%;
+  overflow: auto;
+  word-break: break-word;
+}
+
+#output table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#output th,
+#output td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e1e7ef;
+  text-align: left;
+  vertical-align: top;
+}
+
+#plot {
+  position: relative !important;
+  z-index: 1;
+  width: calc(100% - 24px) !important;
+  margin: 0 12px 12px;
+  border: 1px solid #d8e1eb;
+  border-radius: 10px;
+  background: #fff;
+  visibility: visible !important;
+  opacity: 1 !important;
+  overflow: hidden;
+}
+
+#plotBar {
+  display: none !important;
+}
+
+#plotBody {
+  width: 100% !important;
+  height: min(52vh, 520px) !important;
+  min-height: 320px;
+  margin: 0 !important;
+}
+
+svg {
+  width: 100%;
+  height: 100%;
+  border: none !important;
+  background: #fff;
+}
+
+select {
+  margin: 12px;
+  max-width: calc(100% - 24px);
+}
+
+.map-container {
+  width: 100%;
+  padding: 0 12px 12px;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.map-container canvas {
+  width: 100% !important;
+  max-width: none;
+  margin: 0 !important;
+  height: min(62vh, 700px) !important;
+}
+
+@media (max-width: 700px) {
+  body {
+    padding: 12px;
+  }
+
+  #app {
+    width: 100%;
+  }
+
+  #app > h2 {
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+
+  #app > p {
+    margin: 10px 12px 0;
+    font-size: 14px;
+  }
+
+  canvas {
+    width: calc(100% - 20px) !important;
+    max-width: calc(100% - 20px);
+    height: min(56vh, 520px) !important;
+    min-height: 260px;
+    margin: 10px;
+  }
+
+  #output {
+    width: calc(100% - 20px) !important;
+    margin: 10px;
+  }
+
+  #plot {
+    width: calc(100% - 20px) !important;
+    margin: 0 10px 10px;
+  }
+
+  #plotBody {
+    height: min(52vh, 420px) !important;
+    min-height: 280px;
+  }
+
+  .map-container {
+    grid-template-columns: 1fr;
+    padding: 0 10px 10px;
+  }
+}

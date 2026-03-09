@@ -11,6 +11,11 @@ const DEFAULT_STATE: AutarkProvenanceState = {
     map: null,
     plot: [],
   },
+  ui: {
+    mapMenuOpen: false,
+    activeLayerId: null,
+    thematicEnabled: false,
+  },
 };
 
 export interface CreateAutarkProvenanceOptions {
@@ -41,9 +46,17 @@ export interface AutarkProvenanceApi {
 export function createAutarkProvenance(options: CreateAutarkProvenanceOptions): AutarkProvenanceApi {
   const { map, plot, db, initialState: initialPartial } = options;
   const initialState: AutarkProvenanceState = {
-    ...DEFAULT_STATE,
-    ...initialPartial,
+    selection: {
+      map: initialPartial?.selection?.map ?? DEFAULT_STATE.selection.map,
+      plot: initialPartial?.selection?.plot ?? [...DEFAULT_STATE.selection.plot],
+    },
+    ui: {
+      ...(DEFAULT_STATE.ui ?? {}),
+      ...(initialPartial?.ui ?? {}),
+    },
   };
+  if (initialPartial?.view) initialState.view = initialPartial.view;
+  if (initialPartial?.data) initialState.data = initialPartial.data;
 
   const core = createProvenanceCore({ initialState });
 
@@ -77,11 +90,13 @@ export function createAutarkProvenance(options: CreateAutarkProvenanceOptions): 
   function stopRecording(): void {
     mapAdapter?.stopRecording();
     plotAdapter?.stopRecording();
+    dbAdapter?.stopRecording();
   }
 
   function startRecording(): void {
     mapAdapter?.startRecording();
     plotAdapter?.startRecording();
+    dbAdapter?.startRecording();
   }
 
   startRecording();

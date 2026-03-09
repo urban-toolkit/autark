@@ -7,6 +7,12 @@ export interface AutarkProvenanceState {
     map: { layerId: string; ids: number[] } | null;
     plot: number[];
   };
+  ui?: {
+    mapMenuOpen?: boolean;
+    activeLayerId?: string | null;
+    visibleLayerIds?: string[];
+    thematicEnabled?: boolean;
+  };
   view?: {
     center: [number, number];
     zoom?: number;
@@ -25,23 +31,33 @@ export interface AutarkProvenanceState {
  */
 export enum ProvenanceAction {
   ROOT = 'root',
+  MAP_INIT = 'MAP_INIT',
   MAP_PICK = 'MAP_PICK',
   MAP_LAYER_LOAD = 'MAP_LAYER_LOAD',
   MAP_VIEW = 'MAP_VIEW',
+  MAP_UI_MENU_TOGGLE = 'MAP_UI_MENU_TOGGLE',
+  MAP_UI_VISIBLE_LAYER_TOGGLE = 'MAP_UI_VISIBLE_LAYER_TOGGLE',
+  MAP_UI_ACTIVE_LAYER_CHANGE = 'MAP_UI_ACTIVE_LAYER_CHANGE',
+  MAP_UI_THEMATIC_TOGGLE = 'MAP_UI_THEMATIC_TOGGLE',
   PLOT_CLICK = 'PLOT_CLICK',
   PLOT_BRUSH = 'PLOT_BRUSH',
   PLOT_BRUSH_X = 'PLOT_BRUSH_X',
   PLOT_BRUSH_Y = 'PLOT_BRUSH_Y',
   PLOT_DATA = 'PLOT_DATA',
+  DB_INIT = 'DB_INIT',
   DB_WORKSPACE = 'DB_WORKSPACE',
   DB_LOAD_OSM = 'DB_LOAD_OSM',
   DB_LOAD_CSV = 'DB_LOAD_CSV',
   DB_LOAD_JSON = 'DB_LOAD_JSON',
+  DB_LOAD_LAYER = 'DB_LOAD_LAYER',
   DB_LOAD_CUSTOM_LAYER = 'DB_LOAD_CUSTOM_LAYER',
   DB_LOAD_GRID_LAYER = 'DB_LOAD_GRID_LAYER',
+  DB_GET_LAYER = 'DB_GET_LAYER',
   DB_SPATIAL_JOIN = 'DB_SPATIAL_JOIN',
   DB_UPDATE_TABLE = 'DB_UPDATE_TABLE',
   DB_DROP_TABLE = 'DB_DROP_TABLE',
+  DB_RAW_QUERY = 'DB_RAW_QUERY',
+  DB_BUILD_HEATMAP = 'DB_BUILD_HEATMAP',
   DB_OTHER = 'DB_OTHER',
 }
 
@@ -78,9 +94,35 @@ export interface IMapForProvenance {
     addEventListener(event: string, listener: (selection: number[], layerId: string) => void): void;
     removeEventListener?(event: string, listener: (selection: number[], layerId: string) => void): void;
   };
+  canvas: {
+    parentElement: HTMLElement | null;
+  };
+  ui?: {
+    activeLayer?: { layerInfo?: { id: string }; layerRenderInfo?: { isColorMap?: boolean } } | null;
+    changeActiveLayer?(layer: unknown): void;
+  };
+  updateRenderInfoProperty?(
+    layerName: string,
+    property: string,
+    value: unknown
+  ): void;
   layerManager: {
-    searchByLayerId(layerId: string): { setHighlightedIds(ids: number[]): void; clearHighlightedIds(): void; layerInfo?: { id: string } } | null;
-    vectorLayers?: Array<{ layerInfo?: { id: string }; setHighlightedIds(ids: number[]): void; clearHighlightedIds(): void }>;
+    searchByLayerId(layerId: string): {
+      setHighlightedIds?(ids: number[]): void;
+      clearHighlightedIds?(): void;
+      layerInfo?: { id: string };
+      layerRenderInfo?: { isSkip?: boolean; isColorMap?: boolean };
+    } | null;
+    vectorLayers?: Array<{
+      layerInfo?: { id: string };
+      setHighlightedIds?(ids: number[]): void;
+      clearHighlightedIds?(): void;
+      layerRenderInfo?: { isSkip?: boolean; isColorMap?: boolean };
+    }>;
+    rasterLayers?: Array<{
+      layerInfo?: { id: string };
+      layerRenderInfo?: { isSkip?: boolean; isColorMap?: boolean };
+    }>;
   };
 }
 

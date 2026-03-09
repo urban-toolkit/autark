@@ -16,6 +16,14 @@ Autark is available as an umbrella package plus individual modules:
 * `autk-map`: A map visualization library that allows the exploration of 2D and 3D physical and thematical layers.
 * `autk-plot`: A d3.js based plot library designed to consume urban data in standard formats and create linked views.
 
+## Provenance Module
+
+Autark also includes a provenance module (`autk-provenance`) for recording and replaying user analysis history across map, plot, and database interactions.
+
+For detailed provenance startup, verification, and testing instructions, see:
+
+- `autk-provenance/README.md`
+
 For demonstration purposes and to facilitate the adoption of Autark, we created a large collection of simple examples illustrating the core functionalities of each module. We also provide several examples on how to combine several modules to build complex applications. All examples are organized in the `example/` directory.
 
 ## Installation

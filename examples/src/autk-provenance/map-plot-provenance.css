@@ -21,7 +21,7 @@ body {
 }
 
 #app {
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -48,15 +48,24 @@ body {
   font-size: 14px;
 }
 
-#workspace {
+#layout {
   display: grid;
-  grid-template-columns: minmax(520px, 1fr) minmax(360px, 460px);
+  grid-template-columns: minmax(0, 1fr) 420px;
   gap: 16px;
   align-items: start;
 }
 
+#analysisColumn {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(420px, 56vh) minmax(560px, 44vh);
+  gap: 16px;
+}
+
 .panel {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
@@ -73,18 +82,18 @@ body {
 }
 
 .panel-body {
+  flex: 1;
   padding: 12px;
+  min-height: 0;
 }
 
 .map-panel .panel-body {
   padding: 0;
-  height: min(74vh, 760px);
-  min-height: 460px;
 }
 
 .plot-panel .panel-body {
-  height: min(74vh, 760px);
-  min-height: 460px;
+  display: flex;
+  overflow: hidden;
 }
 
 canvas {
@@ -95,26 +104,24 @@ canvas {
 }
 
 #plot {
+  display: flex;
+  flex: 1;
   position: relative;
   z-index: 1;
   width: 100%;
   height: 100%;
-  visibility: visible;
+  min-height: 540px;
   border: 1px solid #d8e1eb;
   border-radius: 10px;
   background: #fff;
   overflow: hidden;
 }
 
-#plotBar {
-  display: none;
-}
-
 #plotBody {
-  margin: 0;
+  flex: 1;
   width: 100%;
   height: 100%;
-  min-height: 260px;
+  min-height: 0;
 }
 
 svg {
@@ -122,6 +129,36 @@ svg {
   height: 100%;
   border: none !important;
   background: #fff;
+}
+
+#sidebar {
+  position: sticky;
+  top: 20px;
+  height: calc(100vh - 40px);
+  max-height: 920px;
+}
+
+#sidebar .panel-body {
+  height: calc(100% - 46px);
+  padding: 10px;
+}
+
+#provenanceTrail {
+  height: 100%;
+}
+
+#provenanceTrail.autk-provenance-root {
+  min-height: 0;
+}
+
+#provenanceTrail .autk-provenance-graph-wrap {
+  height: 340px;
+  max-height: 420px;
+}
+
+#provenanceTrail .autk-provenance-path {
+  flex: 1;
+  max-height: none;
 }
 
 .tick line {
@@ -135,15 +172,23 @@ svg {
   font-weight: 600;
 }
 
-@media (max-width: 1180px) {
-  #workspace {
+@media (max-width: 1260px) {
+  #layout {
     grid-template-columns: 1fr;
   }
 
-  .map-panel .panel-body,
-  .plot-panel .panel-body {
-    height: min(62vh, 560px);
-    min-height: 360px;
+  #analysisColumn {
+    grid-template-rows: minmax(420px, 54vh) 600px;
+  }
+
+  #sidebar {
+    position: static;
+    height: 420px;
+    max-height: none;
+  }
+
+  #sidebar .panel-body {
+    height: calc(100% - 46px);
   }
 }
 
@@ -173,9 +218,11 @@ svg {
     padding: 10px;
   }
 
-  .map-panel .panel-body,
-  .plot-panel .panel-body {
-    height: 420px;
-    min-height: 320px;
+  #analysisColumn {
+    grid-template-rows: 420px 560px;
+  }
+
+  #sidebar {
+    height: 360px;
   }
 }
