@@ -12,9 +12,9 @@ It provides a client-side platform for the complete implementation of urban visu
 Autark is composed of four modules:
 
 * `autk-db`: A spatial database that handles physical and thematic urban datasets.
-* `autk-compute`: A module that enables the use of WebGPU to implement general-purpose algorithms using physical and thematic data.
-* `autk-map`: A map visualization library allows the exploration of 2D and 3D physical and thematical layers.
-* `autk-plot`: A d3.js based plot library designed to consume thematic urban data visualizations and facilitate the creation of linked views.
+* `autk-compute`: a WebGPU based general-purpose computation engine to implement general-purpose algorithms using physical and thematic data.
+* `autk-map`: A map visualization library that allows the exploration of 2D and 3D physical and thematical layers.
+* `autk-plot`: A d3.js based plot library designed to consume urban data in standard formats and create linked views.
 
 For demonstration purposes and to facilitate the adoption of Autark, we created a large collection of simple examples illustrating the core functionalities of each module. We also provide several examples on how to combine several modules to build complex applications. All examples are organized in the `example/` directory.
 
@@ -68,7 +68,11 @@ After installing the required packages, run the following command to start the d
 ```bash
 make dev
 ```
-There are several examples in the `example/` directory that can be loaded to test Autark. To open an example different from the default, you can either change the address in the browser or update the `server.open` attribute in the `examples/vite.config.ts` file. If you decide to edit the Vite file, you must run `make dev` again.
+There are several examples in the `example/` directory that can be loaded to test Autark. To open an example different from the default, you can append the `OPEN` parameter to `make dev`. For instance:
+
+```bash
+make dev OPEN=/src/autk-map/geojson-vis.html
+```
 
 ## Notes
 

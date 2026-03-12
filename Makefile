@@ -3,6 +3,8 @@
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
+OPEN ?= /src/autk-plot/map-d3-brush.html
+
 install:
 	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd autk-compute && npm install"
 
@@ -24,7 +26,7 @@ dev:
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
 		"cd autk-compute && npm run dev-build" \
-		"cd examples && npm run dev"
+		"cd examples && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 map:
 	$(CONCURRENTLY) "cd autk-map && npm run build"
@@ -39,7 +41,7 @@ compute:
 	$(CONCURRENTLY) "cd autk-compute && npm run build"
 
 examples:
-	$(CONCURRENTLY) "cd examples && npm run dev"
+	$(CONCURRENTLY) "cd examples && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 clean:
 	$(CONCURRENTLY) \
