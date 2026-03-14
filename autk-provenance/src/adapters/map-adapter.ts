@@ -1,4 +1,4 @@
-import type { AutarkProvenanceState, IMapForProvenance } from '../types';
+import type { AutarkProvenanceState, IMapForProvenance, MapViewState } from '../types';
 import { ProvenanceAction } from '../types';
 
 const MAP_PICK_EVENT = 'pick';
@@ -39,6 +39,7 @@ export function createMapAdapter(
 ): MapAdapterApi {
   const mapObj = map as unknown as Record<string, unknown>;
   let pickListener: ((selection: number[], layerId: string) => void) | null = null;
+  let viewListener: ((state: MapViewState) => void) | null = null;
   let clickListener: ((event: Event) => void) | null = null;
   let changeListener: ((event: Event) => void) | null = null;
   let isApplyingState = false;
@@ -211,6 +212,15 @@ export function createMapAdapter(
     };
     map.mapEvents.addEventListener(MAP_PICK_EVENT, pickListener);
 
+    if (map.addViewListener) {
+      viewListener = (viewState: MapViewState) => {
+        if (isApplyingState) return;
+        const alt = viewState.eye[2].toFixed(0);
+        onRecord(ProvenanceAction.MAP_VIEW, `View changed (alt: ${alt})`, { view: viewState });
+      };
+      map.addViewListener(viewListener);
+    }
+
     if (typeof document !== 'undefined') {
       clickListener = (event: Event) => {
         if (isApplyingState || !inMapContainer(event.target)) return;
@@ -269,6 +279,10 @@ export function createMapAdapter(
       map.mapEvents.removeEventListener(MAP_PICK_EVENT, pickListener);
       pickListener = null;
     }
+    if (viewListener && map.removeViewListener) {
+      map.removeViewListener(viewListener);
+      viewListener = null;
+    }
     if (clickListener && typeof document !== 'undefined') {
       document.removeEventListener('click', clickListener);
       clickListener = null;
@@ -312,6 +326,10 @@ export function createMapAdapter(
       }
 
       syncUiDom(ui);
+
+      if (state.view && map.setViewState) {
+        map.setViewState(state.view);
+      }
 
       if (selection) {
         const targetLayerId = selection.map?.layerId;

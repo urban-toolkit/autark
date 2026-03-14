@@ -1,4 +1,14 @@
 /**
+ * Serialisable snapshot of the map camera viewport.
+ * Sufficient to fully restore the camera via resetCamera(state.up, state.lookAt, state.eye).
+ */
+export interface MapViewState {
+  eye: [number, number, number];
+  lookAt: [number, number, number];
+  up: [number, number, number];
+}
+
+/**
  * Canonical state shape for autark provenance.
  * Captures everything needed to restore the current analysis state.
  */
@@ -13,11 +23,7 @@ export interface AutarkProvenanceState {
     visibleLayerIds?: string[];
     thematicEnabled?: boolean;
   };
-  view?: {
-    center: [number, number];
-    zoom?: number;
-    pitch?: number;
-  };
+  view?: MapViewState;
   data?: {
     workspace: string;
     layerTableNames: string[];
@@ -94,6 +100,12 @@ export interface IMapForProvenance {
     addEventListener(event: string, listener: (selection: number[], layerId: string) => void): void;
     removeEventListener?(event: string, listener: (selection: number[], layerId: string) => void): void;
   };
+  /** Register a callback to be notified whenever the camera viewport changes (zoom or pan). */
+  addViewListener?(callback: (state: MapViewState) => void): void;
+  /** Unregister a viewport change callback. */
+  removeViewListener?(callback: (state: MapViewState) => void): void;
+  /** Restore the camera to a previously captured viewport state. */
+  setViewState?(state: MapViewState): void;
   canvas: {
     parentElement: HTMLElement | null;
   };
