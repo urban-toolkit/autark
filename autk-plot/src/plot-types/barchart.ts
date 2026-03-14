@@ -11,7 +11,7 @@ export class Barchart extends PlotD3 {
     protected mapY!: d3.ScaleLinear<number, number>;
 
     constructor(config: PlotConfig) {
-        if(config.events === undefined) { config.events = [PlotEvent.CLICK]; }
+        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
         super(config);
 
         this.draw();

@@ -18,18 +18,10 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['autk-map', 'autk-db', 'autk-plot', 'autk-compute'],
   },
-  build: {
-    rollupOptions: {
-      input: {
-        nested: '/src/autk-db/',
-        nested2: '/src/autk-map/',
-        nested3: '/src/autk-plot/',
-        nested4: '/src/autk-compute/',
-      },
-    },
-  },
+
   server: {
-    open: '/src/autk-map/compute-osm-function.html',
+    // @ts-ignore
+    open: process.env.VITE_OPEN || '/src/urbane/main.html',
     cors: {
       origin: '*',
       allowedHeaders: 'Range, Content-Type, Authorization',

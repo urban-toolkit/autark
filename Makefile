@@ -3,13 +3,15 @@
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
-OPEN ?= /src/autk-plot/map-d3-brush.html
+APP ?= examples
 
 install:
 	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd autk-compute && npm install"
 
-install-ex:
-	cd examples && npm install
+install-app:
+	cd $(APP) && npm install
+
+
 
 build:
 	$(CONCURRENTLY) \
@@ -18,15 +20,17 @@ build:
 		"cd autk-plot && npm run build" \
 		"cd autk-compute && npm run build"
 
+
 dev:
-	make install-ex
+	make install
+	make install-app
 	make build
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
 		"cd autk-compute && npm run dev-build" \
-		"cd examples && VITE_OPEN=\"$(OPEN)\" npm run dev"
+		"cd $(APP) && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 map:
 	$(CONCURRENTLY) "cd autk-map && npm run build"
@@ -40,8 +44,6 @@ plot:
 compute:
 	$(CONCURRENTLY) "cd autk-compute && npm run build"
 
-examples:
-	$(CONCURRENTLY) "cd examples && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 clean:
 	$(CONCURRENTLY) \
@@ -49,7 +51,8 @@ clean:
 		"cd autk-db && $(RIMRAF) dist build node_modules" \
 		"cd autk-plot && $(RIMRAF) dist build node_modules" \
 		"cd autk-compute && $(RIMRAF) dist build node_modules" \
-		"cd examples && $(RIMRAF) dist build node_modules"
+		"cd examples && $(RIMRAF) dist build node_modules" \
+		"cd case-studies && $(RIMRAF) dist build node_modules"
 
 publish:
 	@if [ -z "$(LIB)" ]; then \

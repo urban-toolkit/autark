@@ -21,7 +21,7 @@ export default defineConfig({
 
   server: {
     // @ts-ignore
-    open: process.env.VITE_OPEN || '/src/autk-plot/map-d3-brush.html',
+    open: process.env.VITE_OPEN || '/src/autk-plot/map-d3-table.html',
     cors: {
       origin: '*',
       allowedHeaders: 'Range, Content-Type, Authorization',

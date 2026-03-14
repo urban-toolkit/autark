@@ -62,15 +62,22 @@ After istalling Node,js and GNU Make, in the root folder of the project, run the
 make install
 ```
 
-After installing the required packages, run the following command to start the development server:
+After installing the required packages, run the following command to start the development server for the default `examples` application:
 
 ```bash
 make dev
 ```
-There are several examples in the `example/` directory that can be loaded to test Autark. To open an example different from the default, you can append the `OPEN` parameter to `make dev`. For instance:
+
+There are several examples inside the `examples/` directory that can be loaded to test Autark. To open a specific file or app different from the default, you can append the `OPEN` parameter to `make dev`. The `APP` and `OPEN` variables can be used together. For instance, to open a specific example:
 
 ```bash
-make dev OPEN=/src/autk-map/geojson-vis.html
+make dev OPEN=/src/autk-plot/map-d3-table.html
+```
+
+If you wish to run a different application, such as one of the `case-studies`, you can specify the target environment using the `APP` variable. The `case-studies` folder contains multiple applications:
+
+```bash
+make dev APP=case-studies OPEN=/src/urbane/main.html
 ```
 
 ## Notes

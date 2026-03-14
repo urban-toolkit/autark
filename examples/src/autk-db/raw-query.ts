@@ -11,8 +11,7 @@ export class RawQueryJoin {
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
             outputTableName: 'neighborhoods',
-            coordinateFormat: 'EPSG:3395',
-            type: 'boundaries'
+            coordinateFormat: 'EPSG:3395'
         });
 
         this.geojson = await this.db.rawQuery({
