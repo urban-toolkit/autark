@@ -75,7 +75,7 @@ export class TableVis extends PlotD3 {
             .selectAll('td')
             .data((row) => {
                 return this._axis.map(col => {
-                    return { column: col, value: row ? row[col] : 'unknown' };
+                    return { column: col, value: row ? this.getNestedValue(row, col) : 'unknown' };
                 });
             })
             .join('td')
@@ -86,7 +86,7 @@ export class TableVis extends PlotD3 {
     }
 
     override updatePlotSelection(): void {
-        const trs = d3.selectAll('.autkMark');
+        const trs = d3.select(this._div).selectAll('.autkMark');
 
         trs.style('background-color', (_d: unknown, id: number) => {
             if (this.selection.includes(id)) {

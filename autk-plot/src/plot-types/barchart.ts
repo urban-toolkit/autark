@@ -56,12 +56,12 @@ export class Barchart extends PlotD3 {
 
         // ---- Scales
         const xDomain = this.data.map((d) => {
-            const val = d ? d[this._axis[0]] : 'unknown';
+            const val = d ? this.getNestedValue(d, this._axis[0]) : 'unknown';
             return String(val);
         });
         this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +d[this._axis[1]] || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._axis[1]) || 0 : 0);
         this.mapY = d3.scaleLinear().domain([0, yExtent[1]]).range([height, 0]);
 
         // ---- Axes
@@ -132,15 +132,15 @@ export class Barchart extends PlotD3 {
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', (d) => {
-                const val = d ? d[this._axis[0]] : 'unknown';
+                const val = d ? this.getNestedValue(d, this._axis[0]) : 'unknown';
                 return this.mapX(String(val)) || 0;
             })
-            .attr('y', (d) => this.mapY(d ? +d[this._axis[1]] || 0 : 0))
-            .attr('height', (d) => height - this.mapY(d ? +d[this._axis[1]] || 0 : 0))
+            .attr('y', (d) => this.mapY(d ? +this.getNestedValue(d, this._axis[1]) || 0 : 0))
+            .attr('height', (d) => height - this.mapY(d ? +this.getNestedValue(d, this._axis[1]) || 0 : 0))
             .attr('width', this.mapX.bandwidth())
             .style('fill', PlotStyle.default)
             .style('stroke', '#2f2f2f')
-            .style('visibility', 'visible');
+            .style('visibility', 'inherit');
 
         this.configureSignalListeners();
     }

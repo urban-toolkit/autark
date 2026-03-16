@@ -92,7 +92,7 @@ export class AutkMapUi {
 
         // Update submenu position
         if (this._subMenu) {
-            this._subMenu.style.top = (this.map.canvas.offsetTop + 30 + 2 * this._uiMargin) + 'px';
+            this._subMenu.style.top = (this.map.canvas.offsetTop + 35 + 2 * this._uiMargin) + 'px';
             this._subMenu.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
         }
         
@@ -148,35 +148,30 @@ export class AutkMapUi {
         if (!this._menuIcon) {
             this._menuIcon = document.createElement('div');
             this._menuIcon.id = 'autkMapUi';
-            this._menuIcon.style.width = '30px !important';
-            this._menuIcon.style.height = '30px !important';
+            this._menuIcon.style.width = '40px';
+            this._menuIcon.style.height = '40px';
             this._menuIcon.style.position = 'absolute';
             this._menuIcon.style.top = (this.map.canvas.offsetTop + this._uiMargin) + 'px';
             this._menuIcon.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
-            this._menuIcon.style.zIndex = '10';
+            this._menuIcon.style.display = 'flex';
+            this._menuIcon.style.alignItems = 'center';
+            this._menuIcon.style.justifyContent = 'center';
+            this._menuIcon.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+            this._menuIcon.style.zIndex = '11';
+            this._menuIcon.style.backgroundColor = '#fff';
+            this._menuIcon.style.border = '1px solid #ccc';
+            this._menuIcon.style.borderRadius = '6px';
+            this._menuIcon.style.cursor = 'pointer';
 
-            const icon = document.createElement('a');
-            icon.id = 'menuIcon';
-            icon.style.maxWidth = '30px';
-            icon.style.maxHeight = '30px';
-            icon.style.display = 'block';
-            icon.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-            icon.style.zIndex = '11';
-            icon.style.backgroundColor = '#fff';
-            icon.style.border = '1px solid #ccc';
-            icon.style.borderRadius = '4px';
+            this._menuIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                <rect x="8" y="10" rx="1.5" ry="1.5" width="24" height="3.5" fill="#666" stroke="none"></rect>
+                <rect x="8" y="18.5" rx="1.5" ry="1.5" width="24" height="3.5" fill="#666" stroke="none"></rect>
+                <rect x="8" y="27" rx="1.5" ry="1.5" width="24" height="3.5" fill="#666" stroke="none"></rect>
+            </svg>`;
 
-            icon.href = '#';
-            icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-                <rect x="4" y="5"  rx="4" ry="4" width="20" height="3" fill="#aaa" stroke="none"></rect>
-                <rect x="4" y="13"  rx="4" ry="4" width="20" height="3" fill="#aaa" stroke="none"></rect>
-                <rect x="4" y="21" rx="4" ry="4" width="20" height="3" fill="#aaa" stroke="none"></rect>
-            </svg>`
-
-            this._menuIcon.appendChild(icon);
             this.map.canvas.parentElement?.appendChild(this._menuIcon);
 
-            icon.addEventListener('click', () => {
+            this._menuIcon.addEventListener('click', () => {
                 this.buildSubMenu();
                 this.buildVisibleLayersDropdown();
                 this.buildActiveLayerDropdown();
@@ -198,7 +193,7 @@ export class AutkMapUi {
             this._subMenu = document.createElement('div');
             this._subMenu.id = 'autkMapSubMenu';
             this._subMenu.style.position = 'absolute';
-            this._subMenu.style.top = (this.map.canvas.offsetTop + 30 + 2 * this._uiMargin) + 'px';
+            this._subMenu.style.top = (this.map.canvas.offsetTop + 35 + 2 * this._uiMargin) + 'px';
             this._subMenu.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
             this._subMenu.style.width = '300px';
             this._subMenu.style.display = 'block';

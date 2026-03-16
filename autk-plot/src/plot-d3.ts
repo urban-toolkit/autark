@@ -31,8 +31,8 @@ export abstract class PlotD3 extends AutkPlot {
     }
 
     clickEvent(): void {
-        const svgs = d3.selectAll('.autkMark');
-        const cls = d3.selectAll('.autkClear');
+        const svgs = d3.select(this._div).selectAll('.autkMark');
+        const cls = d3.select(this._div).selectAll('.autkClear');
 
         const plot = this;
 
@@ -61,8 +61,8 @@ export abstract class PlotD3 extends AutkPlot {
     }
 
     brushEvent(): void {
-        const brushable = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
-        const marksGroup = d3.selectAll<SVGGElement, unknown>('.autkMarksGroup');
+        const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
+        const marksGroup = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkMarksGroup');
 
         const plot = this;
 
@@ -105,14 +105,14 @@ export abstract class PlotD3 extends AutkPlot {
     }
 
     brushXEvent(): void {
-        const brushable = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
-        const marksGroup = d3.selectAll<SVGGElement, unknown>('.autkMarksGroup');
+        const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
+        const marksGroup = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkMarksGroup');
 
         const plot = this;
 
         const nBrush = brushable.size();
-        const extent: [[number, number], [number, number]] = (nBrush > 1) ? 
-            [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]] :        
+        const extent: [[number, number], [number, number]] = (nBrush > 1) ?
+            [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]] :
             [[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]];
 
         brushable
@@ -123,10 +123,21 @@ export abstract class PlotD3 extends AutkPlot {
                     .extent(extent)
                     .on("start end", function (event: any) {
                         if (event.selection) {
-                            const x0 = event.selection[0][0];
-                            const y0 = event.selection[0][1];
-                            const x1 = event.selection[1][0];
-                            const y1 = event.selection[1][1];
+                            const cDelta = cBrush.attr("transform")?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+                            const cX = cDelta ? parseFloat(cDelta[1]) : 0;
+                            const cY = cDelta ? parseFloat(cDelta[2]) : 0;
+
+                            const mDelta = marksGroup.attr("transform")?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+                            const mX = mDelta ? parseFloat(mDelta[1]) : 0;
+                            const mY = mDelta ? parseFloat(mDelta[2]) : 0;
+
+                            const shiftX = cX - mX;
+                            const shiftY = cY - mY;
+
+                            const x0 = event.selection[0] + shiftX;
+                            const y0 = -10 + shiftY; // Assuming height padding is approx -10 to +height+10
+                            const x1 = event.selection[1] + shiftX;
+                            const y1 = plot._height + shiftY;
 
                             const nextSel = new Set<number>();
 
@@ -154,14 +165,14 @@ export abstract class PlotD3 extends AutkPlot {
     }
 
     brushYEvent(): void {
-        const brushable = d3.selectAll<SVGGElement, unknown>('.autkBrushable');
-        const marksGroup = d3.selectAll<SVGGElement, unknown>('.autkMarksGroup');
+        const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
+        const marksGroup = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkMarksGroup');
 
         const plot = this;
 
         const nBrush = brushable.size();
-        const extent: [[number, number], [number, number]] = (nBrush > 1) ? 
-            [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]] :        
+        const extent: [[number, number], [number, number]] = (nBrush > 1) ?
+            [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]] :
             [[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]];
 
         brushable
@@ -172,12 +183,23 @@ export abstract class PlotD3 extends AutkPlot {
                     .extent(extent)
                     .on("start end", function (event: any) {
                         if (event.selection) {
-                            const delta = cBrush.attr("transform").match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+                            const cDelta = cBrush.attr("transform")?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+                            const cX = cDelta ? parseFloat(cDelta[1]) : 0;
+                            const cY = cDelta ? parseFloat(cDelta[2]) : 0;
 
-                            const x0 = (delta ? parseFloat(delta[1]) : 0);
-                            const y0 = event.selection[0];
-                            const x1 = (cBrush.node()?.getBBox().width || 0) + (delta ? parseFloat(delta[1]) : 0);
-                            const y1 = event.selection[1];
+                            const mDelta = marksGroup.attr("transform")?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+                            const mX = mDelta ? parseFloat(mDelta[1]) : 0;
+                            const mY = mDelta ? parseFloat(mDelta[2]) : 0;
+
+                            const shiftX = cX - mX;
+                            const shiftY = cY - mY;
+
+                            // For brushY, the x extent is typically [-10, 10]
+                            const extWidth = 10;
+                            const x0 = shiftX - extWidth;
+                            const y0 = event.selection[0] + shiftY;
+                            const x1 = shiftX + extWidth;
+                            const y1 = event.selection[1] + shiftY;
 
                             const nextSel = new Set<number>();
 
@@ -205,7 +227,8 @@ export abstract class PlotD3 extends AutkPlot {
     }
 
     updatePlotSelection(): void {
-        const svgs = d3.selectAll('.autkMark');
+        const svgs = d3.select(this._div).selectAll('.autkMark');
+
         svgs.style('fill', (_d: unknown, id: number) => {
 
             if (this.selection.includes(id)) {
@@ -214,6 +237,11 @@ export abstract class PlotD3 extends AutkPlot {
                 return PlotStyle.default;
             }
         });
+    }
+
+    protected getNestedValue(obj: any, path: string): any {
+        if (!obj || !path) return undefined;
+        return path.split('.').reduce((acc, part) => acc && acc[part] !== undefined ? acc[part] : undefined, obj);
     }
 
     // Check if node geometry intersects the brush rectangle.
@@ -243,11 +271,6 @@ export abstract class PlotD3 extends AutkPlot {
 
                 for (let i = 0; i <= steps; i++) {
                     const p = geomNode.getPointAtLength((i / steps) * total) as DOMPoint;
-                    if (i == 0 ) {
-                        console.log( {p} );
-                        console.log( {geomNode} );
-                        console.log( {x0, x1, y0, y1} );
-                    }
                     // Check if point is inside brush rect
                     if (p.x >= rx0 && p.x <= rx1 && p.y >= ry0 && p.y <= ry1) {
                         return true;

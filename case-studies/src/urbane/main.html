@@ -3,20 +3,74 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
+    <title>Autark (Urbane)</title>
     <link rel="stylesheet" href="/src/urbane/main.css">
 </head>
 
 <body>
     <div id="app">
         <canvas> </canvas>
+        <div id="plotToggle">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                <path d="M 19 21 L 19 7 A 14 14 0 1 0 33 21 Z" fill="#666" />
+                <path d="M 22 18 L 22 4 A 14 14 0 0 1 36 18 Z" fill="#666" />
+            </svg>
+        </div>
         <div id="plot">
             <div id="plotBar"></div>
-            <div id="plotBody"></div>
+            <div id="plotBodyParallel"></div>
+            <div id="plotBodyTable"></div>
         </div>
     </div>
 </body>
 
 <script type="module" src="/src/urbane/main.ts"></script>
+
+<script>
+    function floatingPlot() {
+        let newX = 0,
+            newY = 0,
+            startX = 0,
+            startY = 0;
+
+        const plot = document.querySelector('#plot');
+        const bar = document.querySelector('#plotBar');
+
+        bar.addEventListener('mousedown', mouseDown);
+        plot.classList.add('hidden-plot');
+
+        const toggleBtn = document.querySelector('#plotToggle');
+        toggleBtn.addEventListener('click', () => {
+            plot.classList.toggle('hidden-plot');
+        });
+
+        function mouseDown(e) {
+            startX = e.clientX;
+            startY = e.clientY;
+
+            document.addEventListener('mousemove', mouseMove);
+            document.addEventListener('mouseup', mouseUp);
+        }
+
+        function mouseMove(e) {
+            newX = startX - e.clientX;
+            newY = startY - e.clientY;
+
+            startX = e.clientX;
+            startY = e.clientY;
+
+            plot.style.top = plot.offsetTop - newY + 'px';
+            plot.style.left = plot.offsetLeft - newX + 'px';
+
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function mouseUp() {
+            document.removeEventListener('mousemove', mouseMove);
+        }
+    }
+    floatingPlot();
+</script>
 
 </html>

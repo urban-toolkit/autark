@@ -27,7 +27,7 @@ export abstract class AutkPlot {
         this._plotEvents = new PlotEvents(config.events);
 
         this._data = config.data.features.map((f) => f.properties);
-        this._margins = config.margins || { left: 60, right: 20, top: 50, bottom: 50 };
+        this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
         this._width = config.width || 800;
         this._height = config.height || 500;
 
@@ -59,7 +59,6 @@ export abstract class AutkPlot {
 
     public setHighlightedIds(selection: number[]) {
         this._selection = selection;
-
         this.updatePlotSelection();
     }
 
