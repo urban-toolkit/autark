@@ -1,5 +1,5 @@
 
-import { FeatureCollection } from 'geojson';
+import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
@@ -14,7 +14,6 @@ export class MapParallelCoordinates {
 
     protected neighs!: FeatureCollection;
 
-
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
         await this.loadAutkDb();
         await this.loadAutkMap(canvas);
@@ -22,6 +21,7 @@ export class MapParallelCoordinates {
 
         this.updateMapListeners();
         this.updatePlotListeners();
+        this.setupThematicDropdown();
     }
 
     protected async loadAutkDb() {
@@ -53,7 +53,6 @@ export class MapParallelCoordinates {
         this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
         this.map.draw();
     }
-
 
     protected async loadAutkPlot(plotDivParallel: HTMLElement, plotDivTable: HTMLElement) {
         this.parallel = new ParallelCoordinates({
@@ -98,6 +97,36 @@ export class MapParallelCoordinates {
             layer!.setHighlightedIds(selection);
             this.table.setHighlightedIds(selection);
         });
+    }
+
+    protected setupThematicDropdown() {
+        const select = document.querySelector('#thematicSelect') as HTMLSelectElement;
+        if (!select) return;
+
+        select.addEventListener('change', () => {
+            const column = select.value;
+            this.updateThematicData(column);
+        });
+    }
+
+    protected updateThematicData(column: string) {
+        if (!column) {
+            // "None" selected — clear thematic data
+            const getFnv = (_feature: Feature) => 0;
+            this.map.updateGeoJsonLayerThematic('neighborhoods', this.neighs, getFnv);
+        } else {
+            const getFnv = (feature: Feature) => {
+                const properties = feature.properties as GeoJsonProperties;
+                // Navigate nested properties using dot notation
+                const parts = column.split('.');
+                let value: any = properties;
+                for (const part of parts) {
+                    value = value?.[part];
+                }
+                return value || 0;
+            };
+            this.map.updateGeoJsonLayerThematic('neighborhoods', this.neighs, getFnv);
+        }
     }
 
     async loadAndJoin(geojson: string, csv: string) {
