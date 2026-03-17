@@ -35,9 +35,6 @@ export class Urbane {
 
         this.updateMapListeners();
         this.updatePlotListeners();
-
-        this.setupThematicDropdown();
-        this.setupLevelButton();
     }
 
     //-- Db initialization
@@ -225,7 +222,7 @@ export class Urbane {
 
     //-- Drill-down
 
-    protected async buildBuildingsSelection() {
+    protected async updateBuildingsSelection() {
         const source = this.selectedNeighIds.length > 0
             ? this.selectedNeighIds.map(id => this.neighs.features[id])
             : this.neighs.features;
@@ -282,7 +279,7 @@ export class Urbane {
         if (this.currentLevel === 'neighborhoods') {
             this.currentLevel = 'active_buildings';
 
-            await this.buildBuildingsSelection();
+            await this.updateBuildingsSelection();
             this.map.loadGeoJsonLayer('active_buildings', this.activeBuildings, LayerType.AUTK_OSM_BUILDINGS);
 
             this.map.updateRenderInfoProperty('neighborhoods', 'isSkip', true);
@@ -319,22 +316,6 @@ export class Urbane {
 
         btn.disabled = false;
     }
-
-    protected setupLevelButton() {
-        const btn = document.querySelector('#levelBtn') as HTMLButtonElement;
-        if (!btn) return;
-        btn.addEventListener('click', () => this.drillDown());
-    }
-
-    protected setupThematicDropdown() {
-        const select = document.querySelector('#thematicSelect') as HTMLSelectElement;
-        if (!select) return;
-
-        select.addEventListener('change', () => {
-            const column = select.value;
-            this.updateThematicData(column);
-        });
-    }
 }
 
 
@@ -348,7 +329,9 @@ async function main() {
         return;
     }
 
-    const example = new Urbane();
-    await example.run(canvas, plotBdyParallel, plotBdyTable);
+    const urbane = new Urbane();
+    await urbane.run(canvas, plotBdyParallel, plotBdyTable);
+
+    (window as any).urbane = urbane;
 }
 main();

@@ -16,9 +16,9 @@
                 <path d="M 22 18 L 22 4 A 14 14 0 0 1 36 18 Z" fill="#666" />
             </svg>
         </div>
-        <button id="levelBtn" title="Drill into buildings">&#x25BC;</button>
+        <button id="levelBtn" title="Drill into buildings" onclick="urbane.drillDown()">&#x25BC;</button>
 
-        <select id="thematicSelect">
+        <select id="thematicSelect" onchange="urbane.updateThematicData(this.value)">
             <option value="sjoin.count.noise">Noise</option>
             <option value="sjoin.count.parking">Parking</option>
             <option value="sjoin.count.permit">Permit</option>
