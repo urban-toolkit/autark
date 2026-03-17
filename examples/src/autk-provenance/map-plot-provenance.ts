@@ -58,6 +58,35 @@ async function main() {
 
   const provenance = createAutarkProvenance({ map, plot, db });
 
+  const exportBtn = document.querySelector('#exportBtn') as HTMLButtonElement;
+  const importBtn = document.querySelector('#importBtn') as HTMLButtonElement;
+  const importFile = document.querySelector('#importFile') as HTMLInputElement;
+
+  exportBtn.addEventListener('click', () => {
+    const json = provenance.exportGraph();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `provenance-session-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  importBtn.addEventListener('click', () => importFile.click());
+
+  importFile.addEventListener('change', () => {
+    const file = importFile.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const json = e.target?.result as string;
+      provenance.importGraph(json);
+    };
+    reader.readAsText(file);
+    importFile.value = '';
+  });
+
   if (trailContainer) {
     renderProvenanceTrailUI({
       provenance,

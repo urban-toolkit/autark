@@ -60,7 +60,7 @@ export function createProvenanceCore(
 ): ProvenanceCoreApi<AutarkProvenanceState> {
   const { initialState } = options;
   const nodes = new Map<string, ProvenanceNode<AutarkProvenanceState>>();
-  const rootId = generateId();
+  let rootId = generateId();
   let currentId = rootId;
   const observers: Array<(node: ProvenanceNode<AutarkProvenanceState>) => void> = [];
 
@@ -197,6 +197,7 @@ export function createProvenanceCore(
       for (const [id, node] of parsed.nodes) {
         nodes.set(id, node);
       }
+      rootId = parsed.rootId;
       currentId = parsed.currentId;
       notify();
     } catch {
@@ -239,7 +240,7 @@ export function createProvenanceCoreGeneric<T extends Record<string, unknown>>(
 ): ProvenanceCoreApi<T> {
   const { initialState, mergeState } = options;
   const nodes = new Map<string, ProvenanceNode<T>>();
-  const rootId = generateId();
+  let rootId = generateId();
   let currentId = rootId;
   const observers: Array<(node: ProvenanceNode<T>) => void> = [];
 
@@ -371,6 +372,7 @@ export function createProvenanceCoreGeneric<T extends Record<string, unknown>>(
       for (const [id, node] of parsed.nodes) {
         nodes.set(id, node);
       }
+      rootId = parsed.rootId;
       currentId = parsed.currentId;
       notify();
     } catch {

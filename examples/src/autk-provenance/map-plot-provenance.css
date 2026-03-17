@@ -138,6 +138,30 @@ svg {
   max-height: 920px;
 }
 
+.session-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.session-actions button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.session-actions button:hover {
+  background: var(--bg);
+}
+
 #sidebar .panel-body {
   height: calc(100% - 46px);
   padding: 10px;
