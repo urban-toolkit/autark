@@ -175,6 +175,15 @@ export class LayerManager {
     }
 
     /**
+     * Removes a layer by its ID.
+     * @param {string} layerId - The ID of the layer to remove.
+     */
+    public removeLayerById(layerId: string): void {
+        this._vectorLayers = this._vectorLayers.filter(l => l.layerInfo.id !== layerId);
+        this._rasterLayers = this._rasterLayers.filter(l => l.layerInfo.id !== layerId);
+    }
+
+    /**
      * Searches for a layer by its ID.
      * @param {string} layerId - The ID of the layer to search for.
      * @returns {Layer | null} - The found layer or null if not found.

@@ -20,16 +20,17 @@ export class Urbane {
 
     protected datasets: string[] = ['noise', 'parking', 'permit', 'taxi'];
 
-    protected plotDivParallel!: HTMLElement;
+    protected mapCanvas!: HTMLCanvasElement;
     protected plotDivTable!: HTMLElement;
+    protected plotDivParallel!: HTMLElement;
 
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
+        this.mapCanvas = canvas;
         this.plotDivParallel = plotDivParallel;
         this.plotDivTable = plotDivTable;
 
         await this.loadAutkDb();
-        await this.loadAutkMap(canvas);
-
+        await this.loadAutkMap();
         this.loadAutkPlot();
 
         this.updateMapListeners();
@@ -117,8 +118,8 @@ export class Urbane {
 
     //-- Map initialization
 
-    protected async loadAutkMap(canvas: HTMLCanvasElement) {
-        this.map = new AutkMap(canvas);
+    protected async loadAutkMap() {
+        this.map = new AutkMap(this.mapCanvas);
         await this.map.init();
 
         for (const layerData of this.db.getLayerTables()) {
@@ -270,6 +271,11 @@ export class Urbane {
     }
 
     protected async drillDown() {
+        if (this.currentLevel === 'neighborhoods' && this.selectedNeighIds.length === 0) {
+            alert('Please select at least one neighborhood to drill down into its buildings.');
+            return;
+        }
+
         const btn = document.querySelector('#levelBtn') as HTMLButtonElement;
         btn.disabled = true;
 
@@ -293,6 +299,10 @@ export class Urbane {
         } 
         else {
             this.currentLevel = 'neighborhoods';
+            this.selectedNeighIds = [];
+
+            await this.db.removeLayer('active_buildings');
+            this.map.layerManager.removeLayerById('active_buildings');
 
             this.map.updateRenderInfoProperty('neighborhoods', 'isSkip', false);
             this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
