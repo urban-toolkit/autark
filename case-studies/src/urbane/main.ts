@@ -5,7 +5,7 @@ import { SpatialDb } from 'autk-db';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 
-export class MapParallelCoordinates {
+export class Urbane {
     protected map!: AutkMap;
     protected db!: SpatialDb;
 
@@ -13,20 +13,49 @@ export class MapParallelCoordinates {
     protected parallel!: ParallelCoordinates;
 
     protected neighs!: FeatureCollection;
+    protected activeBuildings!: FeatureCollection;
+
+    protected currentLevel: 'neighborhoods' | 'active_buildings' = 'neighborhoods';
+    protected selectedNeighIds: number[] = [];
+
+    protected datasets: string[] = ['noise', 'parking', 'permit', 'taxi'];
+
+    protected plotDivParallel!: HTMLElement;
+    protected plotDivTable!: HTMLElement;
 
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
+        this.plotDivParallel = plotDivParallel;
+        this.plotDivTable = plotDivTable;
+
         await this.loadAutkDb();
         await this.loadAutkMap(canvas);
-        await this.loadAutkPlot(plotDivParallel, plotDivTable);
+
+        this.loadAutkPlot();
 
         this.updateMapListeners();
         this.updatePlotListeners();
+
         this.setupThematicDropdown();
+        this.setupLevelButton();
     }
 
-    protected async loadAutkDb() {
-        this.db = new SpatialDb();
-        await this.db.init();
+    //-- Db initialization
+
+    protected async loadPhysicalLayers() {
+        await this.db.loadOsmFromOverpassApi({
+            queryArea: {
+                geocodeArea: 'New York',
+                areas: ['Manhattan Island'],
+            },
+            outputTableName: 'table_osm',
+            autoLoadLayers: {
+                coordinateFormat: 'EPSG:3395',
+                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
+                >,
+                dropOsmTable: true,
+            },
+        });
 
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
@@ -34,69 +63,257 @@ export class MapParallelCoordinates {
             coordinateFormat: 'EPSG:3395'
         });
 
-        // available data
-        const datasets = ['noise', 'parking', 'permit', 'taxi'];
-        for (const dataset of datasets) {
-            await this.loadAndJoin('neighborhoods', dataset);
+        await this.db.spatialJoin({
+            tableRootName: 'table_osm_buildings',
+            tableJoinName: 'neighborhoods',
+            spatialPredicate: 'INTERSECT',
+            output: {
+                type: 'MODIFY_ROOT',
+            },
+            joinType: 'LEFT'
+        });
+
+    }
+
+    protected async loadAndJoinThematicData() {
+        for (const dataset of this.datasets) {
+            await this.db.loadCsv({
+                csvFileUrl: `http://localhost:5173/data/${dataset}.csv`,
+                outputTableName: dataset,
+                geometryColumns: {
+                    latColumnName: 'Latitude',
+                    longColumnName: 'Longitude',
+                    coordinateFormat: 'EPSG:3395',
+                }
+            });
+            await this.db.spatialJoin({
+                tableRootName: 'neighborhoods',
+                tableJoinName: dataset,
+                spatialPredicate: 'INTERSECT',
+                output: {
+                    type: 'MODIFY_ROOT',
+                },
+                joinType: 'LEFT',
+                groupBy: {
+                    selectColumns: [
+                        {
+                            tableName: dataset,
+                            column: 'Unique Key',
+                            aggregateFn: 'count',
+                        },
+                    ],
+                },
+            });
         }
     }
+
+    protected async loadAutkDb() {
+        this.db = new SpatialDb();
+        await this.db.init();
+
+        await this.loadPhysicalLayers();
+        await this.loadAndJoinThematicData();
+    }
+
+    //-- Map initialization
 
     protected async loadAutkMap(canvas: HTMLCanvasElement) {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
         for (const layerData of this.db.getLayerTables()) {
+            if (layerData.name === 'table_osm_buildings') continue;
+
             const geojson = await this.db.getLayer(layerData.name);
             this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
-            this.neighs = geojson;
         }
+
+        this.neighs = await this.db.getLayer('neighborhoods');
+        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
         this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
+
         this.map.draw();
     }
 
-    protected async loadAutkPlot(plotDivParallel: HTMLElement, plotDivTable: HTMLElement) {
+    protected updateThematicData(column: string) {
+        const getFnv: (feature: Feature) => number = (feature: Feature) => {
+                const properties = feature.properties as GeoJsonProperties;
+                const parts = column.split('.');
+
+                let value: any = properties;
+                for (const part of parts) {
+                    value = value?.[part];
+                }
+                return value || 0;
+            };
+
+        if (this.currentLevel === 'neighborhoods') {
+            this.map.updateGeoJsonLayerThematic('neighborhoods', this.neighs, getFnv);
+        }
+        if(this.currentLevel === 'active_buildings') {
+            this.map.updateGeoJsonLayerThematic('active_buildings', this.activeBuildings, getFnv, true);
+        }
+    }
+
+    //-- Plot initialization
+
+    protected loadAutkPlot() {
+        this.plotDivParallel.innerHTML = '';
+        this.plotDivTable.innerHTML = '';
+
+        const axisLabels = this.datasets.map(d => `sjoin.count.${d}`);
+        const titleCol = (this.currentLevel === 'neighborhoods') ? 'ntaname' : 'addr:street';
+        const plotData = (this.currentLevel === 'neighborhoods') ? this.neighs : this.activeBuildings;
+
         this.parallel = new ParallelCoordinates({
-            div: plotDivParallel,
-            data: this.neighs,
-            labels: {
-                axis: ['sjoin.count.noise', 'sjoin.count.parking', 'sjoin.count.permit', 'sjoin.count.taxi'],
-                title: 'Neighborhood Characteristics'
+            div: this.plotDivParallel,
+            data: plotData,
+            labels: { 
+                axis: axisLabels, 
+                title: `${this.currentLevel} Characteristics` 
             },
             width: 790,
             events: [PlotEvent.BRUSH_Y]
         });
 
         this.table = new TableVis({
-            div: plotDivTable,
-            data: this.neighs,
+            div: this.plotDivTable,
+            data: plotData,
             labels: {
-                axis: ['ntaname', 'sjoin.count.noise', 'sjoin.count.parking', 'sjoin.count.permit', 'sjoin.count.taxi'],
-                title: 'Neighborhood Characteristics'
+                axis: [titleCol, ...axisLabels],
+                title: `${this.currentLevel} Characteristics`
             },
             width: 790,
             events: [PlotEvent.CLICK]
         });
     }
 
+    //-- Event listeners
+
     protected async updateMapListeners() {
         this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[]) => {
+            if (this.currentLevel === 'neighborhoods') 
+                this.selectedNeighIds = selection;
 
             this.table.setHighlightedIds(selection);
             this.parallel.setHighlightedIds(selection);
         });
     }
 
-    protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
-
+    protected updatePlotListeners() {
         this.table.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[]) => {
+            if (this.currentLevel === 'neighborhoods') 
+                this.selectedNeighIds = selection;
+
+            const layer = <VectorLayer>this.map.layerManager.searchByLayerId(this.currentLevel);
             layer!.setHighlightedIds(selection);
+
             this.parallel.setHighlightedIds(selection);
         });
+
         this.parallel.plotEvents.addEventListener(PlotEvent.BRUSH_Y, (selection: number[]) => {
+            if (this.currentLevel === 'neighborhoods') 
+                this.selectedNeighIds = selection;
+
+            const layer = <VectorLayer>this.map.layerManager.searchByLayerId(this.currentLevel);
             layer!.setHighlightedIds(selection);
+
             this.table.setHighlightedIds(selection);
         });
+    }
+
+    //-- Drill-down
+
+    protected async buildBuildingsSelection() {
+        const source = this.selectedNeighIds.length > 0
+            ? this.selectedNeighIds.map(id => this.neighs.features[id])
+            : this.neighs.features;
+
+        const inList = [...new Set(source.map(f => f?.properties?.ntaname))]
+            .map(n => `'${n.replace(/'/g, "''")}'`)
+            .join(', ');
+
+        await this.db.rawQuery({
+            query: `
+                WITH grouped AS (
+                    SELECT building_id,
+                           ST_Union_Agg(geometry) AS geometry,
+                           ANY_VALUE(properties)  AS properties
+                    FROM   table_osm_buildings
+                    WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
+                    GROUP  BY building_id
+                )
+                SELECT geometry, properties, (ROW_NUMBER() OVER () - 1) AS building_id
+                FROM   grouped
+            `,
+            output: { type: 'CREATE_TABLE', tableName: 'active_buildings', source: 'osm', tableType: LayerType.AUTK_OSM_BUILDINGS },
+        });
+
+        for (const dataset of this.datasets) {
+            await this.db.spatialJoin({
+                tableRootName: 'active_buildings',
+                tableJoinName: dataset,
+                spatialPredicate: 'NEAR',
+                nearDistance: 500, // meters
+                output: { type: 'MODIFY_ROOT' },
+                joinType: 'LEFT',
+                groupBy: {
+                    selectColumns: [{
+                        tableName: dataset,
+                        column: 'Unique Key',
+                        aggregateFn: 'count',
+                    }],
+                },
+            });
+        }
+        this.activeBuildings = await this.db.getLayer('active_buildings');
+    }
+
+    protected async drillDown() {
+        const btn = document.querySelector('#levelBtn') as HTMLButtonElement;
+        btn.disabled = true;
+
+        if (this.currentLevel === 'neighborhoods') {
+            this.currentLevel = 'active_buildings';
+
+            await this.buildBuildingsSelection();
+            this.map.loadGeoJsonLayer('active_buildings', this.activeBuildings, LayerType.AUTK_OSM_BUILDINGS);
+
+            this.map.updateRenderInfoProperty('neighborhoods', 'isSkip', true);
+            this.map.updateRenderInfoProperty('neighborhoods', 'isPick', false);
+            this.map.updateRenderInfoProperty('active_buildings', 'isSkip', false);
+            this.map.updateRenderInfoProperty('active_buildings', 'isPick', true);
+            this.map.draw();
+
+            this.loadAutkPlot();
+            this.updatePlotListeners();
+
+            btn.innerHTML = '&#x25B2;';
+            btn.title = 'Back to neighborhoods';
+        } 
+        else {
+            this.currentLevel = 'neighborhoods';
+
+            this.map.updateRenderInfoProperty('neighborhoods', 'isSkip', false);
+            this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
+            this.map.updateRenderInfoProperty('active_buildings', 'isSkip', true);
+            this.map.updateRenderInfoProperty('active_buildings', 'isPick', false);
+            this.map.draw();
+
+            this.loadAutkPlot();
+            this.updatePlotListeners();
+
+            btn.innerHTML = '&#x25BC;';
+            btn.title = 'Drill into buildings';
+        }
+
+        btn.disabled = false;
+    }
+
+    protected setupLevelButton() {
+        const btn = document.querySelector('#levelBtn') as HTMLButtonElement;
+        if (!btn) return;
+        btn.addEventListener('click', () => this.drillDown());
     }
 
     protected setupThematicDropdown() {
@@ -106,56 +323,6 @@ export class MapParallelCoordinates {
         select.addEventListener('change', () => {
             const column = select.value;
             this.updateThematicData(column);
-        });
-    }
-
-    protected updateThematicData(column: string) {
-        if (!column) {
-            // "None" selected — clear thematic data
-            const getFnv = (_feature: Feature) => 0;
-            this.map.updateGeoJsonLayerThematic('neighborhoods', this.neighs, getFnv);
-        } else {
-            const getFnv = (feature: Feature) => {
-                const properties = feature.properties as GeoJsonProperties;
-                // Navigate nested properties using dot notation
-                const parts = column.split('.');
-                let value: any = properties;
-                for (const part of parts) {
-                    value = value?.[part];
-                }
-                return value || 0;
-            };
-            this.map.updateGeoJsonLayerThematic('neighborhoods', this.neighs, getFnv);
-        }
-    }
-
-    async loadAndJoin(geojson: string, csv: string) {
-        await this.db.loadCsv({
-            csvFileUrl: `http://localhost:5173/data/${csv}.csv`,
-            outputTableName: csv,
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
-        await this.db.spatialJoin({
-            tableRootName: geojson,
-            tableJoinName: csv,
-            spatialPredicate: 'INTERSECT',
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: csv,
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
-                    },
-                ],
-            },
         });
     }
 }
@@ -171,7 +338,7 @@ async function main() {
         return;
     }
 
-    const example = new MapParallelCoordinates();
+    const example = new Urbane();
     await example.run(canvas, plotBdyParallel, plotBdyTable);
 }
 main();

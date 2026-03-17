@@ -50,6 +50,29 @@ canvas {
     cursor: pointer;
 }
 
+#levelBtn {
+    position: absolute;
+    top: 10px;
+    right: 190px;
+    width: 40px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 11;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+#levelBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 #thematicSelect {
     position: absolute;
     top: 10px;
