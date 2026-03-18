@@ -9,21 +9,32 @@
 
 <body>
     <div id="app">
-        <canvas> </canvas>
-        <div id="plotToggle">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-                <path d="M 19 21 L 19 7 A 14 14 0 1 0 33 21 Z" fill="#666" />
-                <path d="M 22 18 L 22 4 A 14 14 0 0 1 36 18 Z" fill="#666" />
-            </svg>
-        </div>
-        <button id="levelBtn" title="Drill into buildings" onclick="urbane.drillDown()">&#x25BC;</button>
+        <canvas></canvas>
 
-        <select id="thematicSelect" onchange="urbane.updateThematicData(this.value)">
-            <option value="sjoin.count.noise">Noise</option>
-            <option value="sjoin.count.parking">Parking</option>
-            <option value="sjoin.count.permit">Permit</option>
-            <option value="sjoin.count.taxi">Taxi</option>
-        </select>
+        <div id="controls">
+            <button id="levelBtn" title="Drill into buildings" onclick="urbane.drillDown()">
+                <svg id="levelBtnDown" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 40 40">
+                    <path d="M8 14 L20 26 L32 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+                <svg id="levelBtnUp" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 40 40" style="display:none">
+                    <path d="M8 26 L20 14 L32 26" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+            </button>
+
+            <select id="thematicSelect" onchange="urbane.updateThematicData(this.value)"></select>
+
+            <button id="plotToggle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                    <path d="M 19 21 L 19 7 A 14 14 0 1 0 33 21 Z" fill="#666" />
+                    <path d="M 22 18 L 22 4 A 14 14 0 0 1 36 18 Z" fill="#666" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="weightsPanel">
+            <div id="weightsPanelTitle">Dataset Weights</div>
+            <div id="weightsSliders"></div>
+        </div>
 
         <div id="plot">
             <div id="plotBar"></div>
@@ -36,50 +47,97 @@
 <script type="module" src="/src/urbane/main.ts"></script>
 
 <script>
-    function floatingPlot() {
-        let newX = 0,
-            newY = 0,
-            startX = 0,
-            startY = 0;
-
+    // Floating plot panel — drag via pointer capture
+    (function () {
         const plot = document.querySelector('#plot');
         const bar = document.querySelector('#plotBar');
+        let startX = 0, startY = 0;
 
-        bar.addEventListener('mousedown', mouseDown);
         plot.classList.add('hidden-plot');
 
-        const toggleBtn = document.querySelector('#plotToggle');
-        toggleBtn.addEventListener('click', () => {
+        document.querySelector('#plotToggle').addEventListener('click', () => {
             plot.classList.toggle('hidden-plot');
         });
 
-        function mouseDown(e) {
+        bar.addEventListener('pointerdown', e => {
             startX = e.clientX;
             startY = e.clientY;
+            bar.setPointerCapture(e.pointerId);
+        });
 
-            document.addEventListener('mousemove', mouseMove);
-            document.addEventListener('mouseup', mouseUp);
-        }
-
-        function mouseMove(e) {
-            newX = startX - e.clientX;
-            newY = startY - e.clientY;
-
+        bar.addEventListener('pointermove', e => {
+            if (!bar.hasPointerCapture(e.pointerId)) return;
+            plot.style.left = plot.offsetLeft + (e.clientX - startX) + 'px';
+            plot.style.top  = plot.offsetTop  + (e.clientY - startY) + 'px';
             startX = e.clientX;
             startY = e.clientY;
+        });
 
-            plot.style.top = plot.offsetTop - newY + 'px';
-            plot.style.left = plot.offsetLeft - newX + 'px';
+        bar.addEventListener('pointerup', e => bar.releasePointerCapture(e.pointerId));
+    })();
 
-            e.preventDefault();
-            e.stopPropagation();
-        }
+    // Populate UI once urbane is ready
+    window.addEventListener('urbane-ready', () => {
+        // Thematic select options
+        const select = document.querySelector('#thematicSelect');
 
-        function mouseUp() {
-            document.removeEventListener('mousemove', mouseMove);
-        }
-    }
-    floatingPlot();
+        [{ value: 'none', text: 'None' }, { value: 'compute.score', text: 'Score' }].forEach(({ value, text }) => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = text;
+            select.appendChild(opt);
+        });
+
+        urbane.datasets.forEach(dataset => {
+            const opt = document.createElement('option');
+            opt.value = `sjoin.count.${dataset}`;
+            opt.textContent = dataset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            select.appendChild(opt);
+        });
+
+        // Weight sliders
+        const slidersContainer = document.querySelector('#weightsSliders');
+
+        urbane.datasets.forEach((dataset, i) => {
+            const col = document.createElement('div');
+            col.className = 'weight-col';
+
+            const valueLabel = document.createElement('span');
+            valueLabel.className = 'weight-value';
+            valueLabel.textContent = urbane.weights[i].toFixed(2);
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = '0';
+            slider.max = '1';
+            slider.step = '0.01';
+            slider.value = urbane.weights[i];
+            slider.className = 'weight-slider';
+            slider.addEventListener('input', () => {
+                const allSliders = [...document.querySelectorAll('.weight-slider')];
+                const othersSum = allSliders.filter(s => s !== slider).reduce((sum, s) => sum + +s.value, 0);
+                const maxVal = +Math.max(0, 1 - othersSum).toFixed(2);
+                if (+slider.value > maxVal) slider.value = maxVal;
+                valueLabel.textContent = (+slider.value).toFixed(2);
+            });
+
+            const nameLabel = document.createElement('span');
+            nameLabel.className = 'weight-label';
+            nameLabel.textContent = dataset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+            col.append(valueLabel, slider, nameLabel);
+            slidersContainer.appendChild(col);
+        });
+
+        const computeBtn = document.createElement('button');
+        computeBtn.id = 'weightsCompute';
+        computeBtn.textContent = 'Compute Score';
+        computeBtn.addEventListener('click', () => {
+            const weights = [...document.querySelectorAll('.weight-slider')].map(s => +s.value);
+            urbane.updateWeights(weights);
+        });
+        document.querySelector('#weightsPanel').appendChild(computeBtn);
+    });
 </script>
 
 </html>

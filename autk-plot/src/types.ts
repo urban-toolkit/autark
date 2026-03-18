@@ -6,13 +6,14 @@ import { PlotEvent } from './constants';
 export type PlotMargins = { left: number; right: number; top: number; bottom: number };
 
 export type PlotConfig = {
-    div: HTMLElement, 
-    data: FeatureCollection<Geometry, GeoJsonProperties>, 
+    div: HTMLElement,
+    data: FeatureCollection<Geometry, GeoJsonProperties>,
     events: PlotEvent[],
     margins?: PlotMargins,
     width?: number,
     height?: number,
-    labels?: { axis: string[]; title: string }
+    labels?: { axis: string[]; title: string },
+    attributes?: string[],
 }
 
 export type PlotEventListener = (selection: number[]) => void;

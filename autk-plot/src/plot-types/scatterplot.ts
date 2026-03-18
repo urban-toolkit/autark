@@ -53,10 +53,10 @@ export class Scatterplot extends PlotD3   {
             .text((d) => d);
 
         // ---- Escalas
-        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._axis[0]) || 0 : 0);
+        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._attributes[0]) || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._axis[1]) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Eixos
@@ -128,8 +128,8 @@ export class Scatterplot extends PlotD3   {
             .data(this.data)
             .join('circle')
             .attr('class', 'autkMark')
-            .attr('cx', (d) => this.mapX(d ? +this.getNestedValue(d, this._axis[0]) || 0 : 0))
-            .attr('cy', (d) => this.mapY(d ? +this.getNestedValue(d, this._axis[1]) || 0 : 0))
+            .attr('cx', (d) => this.mapX(d ? +this.getNestedValue(d, this._attributes[0]) || 0 : 0))
+            .attr('cy', (d) => this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
             .attr('r', 6)
             .style('fill', PlotStyle.default)
             .style('visibility', 'inherit');

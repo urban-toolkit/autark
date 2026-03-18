@@ -57,7 +57,7 @@ export class ParallelCoordinates extends PlotD3 {
         }
 
         // ---- Scales for each dimension
-        const dimensions = this._axis;
+        const dimensions = this._attributes;
 
         // Build a scale for each dimension based on data type
         dimensions.forEach((dim) => {
@@ -140,7 +140,7 @@ export class ParallelCoordinates extends PlotD3 {
             .style('fill', '#000')
             .style('font-weight', '600')
             .style('visibility', 'visible')
-            .text((d) => d);
+            .text((_d, i) => this._axis[i] ?? _d);
 
         // ---- Add clear area for deselection
         foreground
@@ -258,7 +258,7 @@ export class ParallelCoordinates extends PlotD3 {
 
     // Helper function to generate path for each data point
     protected path(d: any): string {
-        const dimensions = this._axis;
+        const dimensions = this._attributes;
         const lineGenerator = d3.line<[number, number]>();
         const points: [number, number][] = dimensions.map((dim) => {
             const x = this.axisPositions(dim) || 0;

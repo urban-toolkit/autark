@@ -10,6 +10,7 @@ export abstract class AutkPlot {
     protected _data!: GeoJsonProperties[];
 
     protected _axis!: string[];
+    protected _attributes!: string[];
     protected _title!: string;
 
     protected _width: number = 800;
@@ -31,7 +32,10 @@ export abstract class AutkPlot {
         this._width = config.width || 800;
         this._height = config.height || 500;
 
-        this._axis = config.labels?.axis || [];
+        const axisLabels = config.labels?.axis ?? [];
+        const attributes = config.attributes ?? axisLabels;
+        this._axis = axisLabels.length > 0 ? axisLabels : attributes;
+        this._attributes = attributes;
         this._title = config.labels?.title || 'Autk Plot';
     }
 

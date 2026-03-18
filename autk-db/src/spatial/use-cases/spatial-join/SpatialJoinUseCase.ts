@@ -82,7 +82,7 @@ export class SpatialJoinUseCase {
     groupBy: SpatialJoinParams['groupBy'],
     tables: Table[],
   ): {
-    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>;
+    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string; normalize?: boolean }>;
   } | null {
     if (!groupBy) return null;
 
@@ -96,6 +96,7 @@ export class SpatialJoinUseCase {
           column: column.column,
           aggregateFn: column.aggregateFn,
           aggregateFnResultColumnName: column.aggregateFnResultColumnName,
+          normalize: column.normalize,
         };
       }),
     };

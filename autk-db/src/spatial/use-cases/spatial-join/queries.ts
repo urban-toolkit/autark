@@ -1,6 +1,8 @@
 import { Table } from '../../../shared/interfaces';
 import { isLayerType } from '../load-layer/interfaces';
 
+type InternalColumn = { table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string; normalize?: boolean };
+
 interface Params {
   tableRoot: Table;
   tableJoin: Table;
@@ -9,9 +11,7 @@ interface Params {
   joinType: string;
   spatialPredicate: string;
   nearDistance?: number;
-  groupBy: {
-    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>;
-  } | null;
+  groupBy: { selectColumns: Array<InternalColumn> } | null;
   outputTableName: string;
 }
 
@@ -60,32 +60,41 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
 
   const groupByString = getGroupByString(params.tableRoot);
 
-  // For NEAR queries: prepend a CTE that pre-filters the join table using an
-  // ST_Intersects WHERE clause. DuckDB's R-tree index only fires on WHERE-clause
-  // spatial predicates — not JOIN ON conditions — so this is the only way to
-  // leverage the index that was created on the CSV geometry column.
-  //
-  // The CTE computes a single bounding envelope for the entire root table
-  // (expanded by nearDistance), then filters the join table rows to only those
-  // whose geometry intersects that envelope. This shrinks the join table from
-  // potentially millions of rows down to a small local candidate set before the
-  // precise ST_Distance check runs per-row in the outer join.
-  const ctePrefix = isNear
-    ? `WITH ${NEAR_CTE_ALIAS} AS (
+  // For NEAR queries: a CTE that pre-filters the join table using an ST_Intersects
+  // WHERE clause so the R-tree index fires. Stored separately so it can be combined
+  // with a normalization CTE when needed.
+  const nearCtePart = isNear
+    ? `${NEAR_CTE_ALIAS} AS (
         SELECT * FROM ${params.tableJoin.name}
         WHERE ST_Intersects(
           (SELECT ST_Union_Agg(ST_Expand("${params.geometricColumnRoot}", ${params.nearDistance})) FROM ${params.tableRoot.name}),
           ${params.tableJoin.name}."${params.geometricColumnJoin}"
         )
       )`
-    : '';
+    : null;
 
-  return `
-    ${ctePrefix}
+  const innerQuery = `
     ${selectString}
     FROM ${params.tableRoot.name}
     ${joinString}
-    ${params.groupBy ? groupByString : ''};
+    ${params.groupBy ? groupByString : ''}
+  `;
+
+  const normalizedColumns = effectiveGroupBy?.selectColumns.filter((col) => col.normalize) ?? [];
+
+  if (normalizedColumns.length > 0) {
+    const cteParts = [...(nearCtePart ? [nearCtePart] : []), `sjoin_base AS (${innerQuery})`];
+    const normPatch = buildNormalizationMergePatch(normalizedColumns);
+    return `
+      WITH ${cteParts.join(',\n')}
+      SELECT * REPLACE (${normPatch} AS properties)
+      FROM sjoin_base;
+    `;
+  }
+
+  return `
+    ${nearCtePart ? `WITH ${nearCtePart}` : ''}
+    ${innerQuery};
   `;
 };
 
@@ -94,9 +103,7 @@ function getSelectString(params: {
   tableRoot: Table;
   tableJoin: Table;
   geometricColumnJoin: string;
-  groupBy: {
-    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>;
-  } | null;
+  groupBy: { selectColumns: Array<InternalColumn> } | null;
 }) {
   if (params.groupBy) {
     const { aggregatesByFunction, nonAggregateColumns } = groupColumnsByAggregateFunction(params.groupBy.selectColumns);
@@ -127,9 +134,7 @@ function getSelectString(params: {
   return buildSimpleJoinSelect(params.tableRoot, params.tableJoin, params.geometricColumnJoin);
 }
 
-function groupColumnsByAggregateFunction(
-  selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string }>,
-) {
+function groupColumnsByAggregateFunction(selectColumns: Array<InternalColumn>) {
   const aggregatesByFunction: Record<
     string,
     Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>
@@ -222,6 +227,45 @@ function generateValueExpression(table: Table, columnName: string, aggregateFunc
     return `${aggregateFunction}(map_extract("${columnName}", ${table.name}.properties))`;
   }
   return `${aggregateFunction}(${table.name}."${columnName}")`;
+}
+
+function buildNormalizationMergePatch(normalizedColumns: Array<InternalColumn>): string {
+  // Group columns by aggregateFn so we can build the nested sjoin JSON structure
+  const byAggFn: Record<string, Array<{ colKey: string; jsonPath: string }>> = {};
+
+  for (const col of normalizedColumns) {
+    const funcName = col.aggregateFn?.toLowerCase() ?? 'value';
+    const colKey =
+      funcName === 'count'
+        ? (col.aggregateFnResultColumnName ?? col.table.name)
+        : (col.aggregateFnResultColumnName ?? `${col.table.name}.${col.column}`);
+    const jsonPath = `$.sjoin.${funcName}.${colKey}`;
+
+    if (!byAggFn[funcName]) byAggFn[funcName] = [];
+    byAggFn[funcName].push({ colKey, jsonPath });
+  }
+
+  const aggFnParts = Object.entries(byAggFn)
+    .map(([funcName, cols]) => {
+      const colParts = cols
+        .map(({ colKey, jsonPath }) => {
+          const rawVal = `COALESCE(json_extract(properties, '${jsonPath}')::DOUBLE, 0)`;
+          const normExpr =
+            `(${rawVal} - MIN(${rawVal}) OVER ()) / ` +
+            `NULLIF(MAX(${rawVal}) OVER () - MIN(${rawVal}) OVER (), 0)`;
+          return `'${colKey}_norm', ${normExpr}`;
+        })
+        .join(',\n          ');
+      return `'${funcName}', json_object(${colParts})`;
+    })
+    .join(',\n      ');
+
+  return `json_merge_patch(
+      properties,
+      json_object('sjoin', json_object(
+        ${aggFnParts}
+      ))
+    )`;
 }
 
 function buildSimpleJoinSelect(tableRoot: Table, tableJoin: Table, geometricColumnJoin: string): string {

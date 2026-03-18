@@ -58,6 +58,7 @@ export class TableVis extends PlotD3 {
             .style('background-color', '#f8f8f8')
             .style('position', 'sticky')
             .style('top', '0')
+            .style('text-align', 'center')
             .text((d) => String(d));
 
         // ---- Body
@@ -74,13 +75,14 @@ export class TableVis extends PlotD3 {
         rows
             .selectAll('td')
             .data((row) => {
-                return this._axis.map(col => {
-                    return { column: col, value: row ? this.getNestedValue(row, col) : 'unknown' };
+                return this._attributes.map((attr, i) => {
+                    return { column: this._axis[i] ?? attr, value: row ? this.getNestedValue(row, attr) : 'unknown' };
                 });
             })
             .join('td')
             .style('padding', '6px 8px')
-            .text((d) => String(d.value));
+            .style('text-align', 'center')
+            .text((d) => typeof d.value === 'number' ? +d.value.toFixed(4) : String(d.value));
 
         this.configureSignalListeners();
     }

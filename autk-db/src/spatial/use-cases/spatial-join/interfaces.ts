@@ -16,6 +16,7 @@ export interface SpatialJoinParams {
       column: string;
       aggregateFn?: AggregateFunction;
       aggregateFnResultColumnName?: string; // Optional custom name for the aggregation result
+      normalize?: boolean; // When true, normalizes the aggregated value between 0 and 1
     }>;
   };
 }

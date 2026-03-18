@@ -1,5 +1,4 @@
-html,
-body {
+html, body {
     margin: 0;
     padding: 0;
     width: 100%;
@@ -14,12 +13,9 @@ body {
     align-items: flex-start;
 }
 
-/* app area */
-
 #app {
     width: 100%;
     height: 100%;
-
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -31,41 +27,31 @@ canvas {
     display: block;
 }
 
-/* plot window */
+/* ── Top-right controls ────────────────────────────────────────────────────── */
 
-#plotToggle {
+#controls {
     position: absolute;
     top: 10px;
     right: 10px;
-    width: 40px;
-    height: 40px;
     display: flex;
+    gap: 8px;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     z-index: 11;
-    background-color: #fff;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    cursor: pointer;
 }
 
-#levelBtn {
-    position: absolute;
-    top: 10px;
-    right: 178px;
+#levelBtn,
+#plotToggle {
     width: 40px;
     height: 42px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 11;
-    background-color: #fff;
+    background: #fff;
     border: 1px solid #ccc;
     border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     cursor: pointer;
+    font-size: 16px;
 }
 
 #levelBtn:disabled {
@@ -74,34 +60,110 @@ canvas {
 }
 
 #thematicSelect {
-    position: absolute;
-    top: 10px;
-    right: 60px;
+    width: 144px;
     height: 42px;
     padding: 0 28px 0 12px;
     font-size: 14px;
     font-family: sans-serif;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 11;
-    background-color: #fff;
+    background: #fff;
     border: 1px solid #ccc;
     border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     cursor: pointer;
 }
+
+/* ── Weights panel ─────────────────────────────────────────────────────────── */
+
+#weightsPanel {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px 14px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+    z-index: 12;
+}
+
+#weightsPanelTitle {
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    text-align: center;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+#weightsSliders {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.weight-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 44px;
+}
+
+.weight-value {
+    font-size: 11px;
+    color: #666;
+    font-family: monospace;
+}
+
+.weight-slider {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 28px;
+    height: 100px;
+    cursor: pointer;
+    accent-color: #555;
+}
+
+.weight-label {
+    font-size: 10px;
+    color: #555;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    text-align: left;
+}
+
+#weightsCompute {
+    margin-top: 4px;
+    width: 100%;
+    padding: 6px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: #555;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+}
+
+#weightsCompute:hover { background: #333; }
+
+/* ── Floating plot panel ───────────────────────────────────────────────────── */
 
 #plot {
     position: fixed;
     z-index: 10;
-    background-color: #ffffff;
+    background: #fff;
     opacity: 0.85;
     border: 1px solid #bfbfbf;
-    border-radius: 10px 10px 0px 0px;
+    border-radius: 10px 10px 0 0;
 }
 
-.hidden-plot {
-    visibility: hidden !important;
-}
-
+.hidden-plot,
 .hidden-plot * {
     visibility: hidden !important;
 }
@@ -110,10 +172,10 @@ canvas {
     width: 100%;
     height: 30px;
     cursor: move;
-    background-color: #bfbfbf;
-    border-radius: 10px 10px 0px 0px;
+    background: #bfbfbf;
+    border-radius: 10px 10px 0 0;
     border-bottom: 1px solid #bbb;
-    box-shadow: 0px 1px 3px #666;
+    box-shadow: 0 1px 3px #666;
 }
 
 #plotBodyParallel,
@@ -122,6 +184,8 @@ canvas {
     width: 800px;
     height: 500px;
 }
+
+/* ── D3 overrides ──────────────────────────────────────────────────────────── */
 
 svg {
     width: calc(100% - 10px);
