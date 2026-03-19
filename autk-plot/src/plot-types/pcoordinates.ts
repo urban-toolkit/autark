@@ -10,6 +10,7 @@ export class ParallelCoordinates extends PlotD3 {
     protected scales: Map<string, d3.ScaleLinear<number, number> | d3.ScalePoint<string>> = new Map();
     protected axisPositions: d3.ScalePoint<string>;
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
+    protected colorDimension: string | null = null;
 
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
@@ -100,10 +101,11 @@ export class ParallelCoordinates extends PlotD3 {
             .data(this.data)
             .join('path')
             .attr('class', 'autkMark')
+            .attr('data-idx', (_d, i) => i)
             .attr('d', (d) => this.path(d))
             .style('fill', 'none')
             .style('stroke', PlotStyle.default)
-            .style('stroke-width', 1.5)
+            .style('stroke-width', 2)
             .style('opacity', 0.7)
             .style('visibility', 'inherit');
 
@@ -131,17 +133,6 @@ export class ParallelCoordinates extends PlotD3 {
             }
         });
 
-        // Add axis labels
-        axisGroups
-            .append('text')
-            .attr('class', 'axis-label')
-            .attr('text-anchor', 'middle')
-            .attr('y', -9)
-            .style('fill', '#000')
-            .style('font-weight', '600')
-            .style('visibility', 'visible')
-            .text((_d, i) => this._axis[i] ?? _d);
-
         // ---- Add clear area for deselection
         foreground
             .selectAll('.autkClear')
@@ -157,36 +148,93 @@ export class ParallelCoordinates extends PlotD3 {
             .lower();
 
         this.configureSignalListeners();
-    }
 
-    // Override updatePlotSelection to handle line styling
-    public updatePlotSelection(): void {
-        const lines = d3.selectAll('.autkMark');
-        lines
-            .style('stroke', (_d: unknown, id: number) => {
-                if (this.selection.includes(id)) {
-                    return PlotStyle.highlight;
-                } else {
-                    return PlotStyle.default;
-                }
-            })
-            .style('opacity', (_d: unknown, id: number) => {
-                if (this.selection.includes(id)) {
-                    return 1;
-                } else {
-                    return 0.7;
-                }
-            })
-            .style('stroke-width', (_d: unknown, id: number) => {
-                if (this.selection.includes(id)) {
-                    return 2.5;
-                } else {
-                    return 1.5;
-                }
+        // ---- Axis labels in a separate top-level group so they always render
+        // above brush overlay rects (which are re-appended on every brush event)
+        svg
+            .selectAll('.autkAxisLabels')
+            .data([0])
+            .join('g')
+            .attr('class', 'autkAxisLabels')
+            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
+            .selectAll<SVGTextElement, string>('.axis-label')
+            .data(dimensions)
+            .join('text')
+            .attr('class', 'axis-label')
+            .attr('text-anchor', 'middle')
+            .attr('x', (d) => this.axisPositions(d) || 0)
+            .attr('y', -9)
+            .style('font-weight', '600')
+            .style('cursor', 'pointer')
+            .style('visibility', 'visible')
+            .text((_d, i) => this._axis[i] ?? _d)
+            .on('click', (_event, dim) => {
+                this.colorDimension = this.colorDimension === dim ? null : dim;
+                this.updateAxisLabelStyles();
+                this.updatePlotSelection();
             });
     }
 
-    // Override brushYEvent for correct multi-axis line intersection brushing
+    public updatePlotSelection(): void {
+        const lines = d3.select(this._div).selectAll<SVGPathElement, unknown>('.autkMark');
+        const sel = this.selection;
+
+        // Read the stable original index from the data-idx attribute, not the DOM position
+        // (DOM order changes after .raise(), so the id parameter cannot be trusted here).
+        const idx = (node: SVGPathElement) => +(d3.select(node).attr('data-idx') ?? -1);
+
+        let strokeFn: (this: SVGPathElement, d: unknown) => string;
+
+        if (this.colorDimension) {
+            const dim = this.colorDimension;
+            const scale = this.scales.get(dim);
+            const dimType = this.dimensionTypes.get(dim);
+
+            const plot = this;
+            if (dimType === 'numerical' && scale) {
+                const numScale = scale as d3.ScaleLinear<number, number>;
+                const [lo, hi] = numScale.domain();
+                strokeFn = function (this: SVGPathElement, d: unknown) {
+                    if (sel.includes(idx(this))) return PlotStyle.highlight;
+                    const v = +plot.getNestedValue(d, dim) || 0;
+                    const t = hi === lo ? 0.5 : (v - lo) / (hi - lo);
+                    return d3.interpolateReds(0.15 + t * 0.85);
+                };
+            } else if (dimType === 'categorical' && scale) {
+                const catScale = scale as d3.ScalePoint<string>;
+                const domain = catScale.domain();
+                strokeFn = function (this: SVGPathElement, d: unknown) {
+                    if (sel.includes(idx(this))) return PlotStyle.highlight;
+                    const val = String(plot.getNestedValue(d, dim));
+                    const i = domain.indexOf(val);
+                    const t = domain.length <= 1 ? 0.5 : i / (domain.length - 1);
+                    return d3.interpolateReds(0.15 + t * 0.85);
+                };
+            } else {
+                strokeFn = function (this: SVGPathElement) {
+                    return sel.includes(idx(this)) ? PlotStyle.highlight : PlotStyle.default;
+                };
+            }
+        } else {
+            strokeFn = function (this: SVGPathElement) {
+                return sel.includes(idx(this)) ? PlotStyle.highlight : PlotStyle.default;
+            };
+        }
+
+        lines
+            .style('stroke', strokeFn)
+            .style('opacity', function (this: SVGPathElement) { return sel.includes(idx(this)) ? 1 : 0.7; })
+            .style('stroke-width', function (this: SVGPathElement) { return sel.includes(idx(this)) ? 3 : 2; });
+
+        lines.filter(function (this: SVGPathElement) { return sel.includes(idx(this)); }).raise();
+    }
+
+    protected updateAxisLabelStyles(): void {
+        d3.select(this._div).selectAll<SVGTextElement, string>('.axis-label')
+            .style('fill', (dim) => this.colorDimension === dim ? d3.interpolateReds(0.7) : '#000')
+            .style('text-decoration', (dim) => this.colorDimension === dim ? 'underline' : 'none');
+    }
+
     public brushYEvent(): void {
         const brushable = d3.selectAll<SVGGElement, string>('.autkBrushable');
         const plot = this;
@@ -256,7 +304,6 @@ export class ParallelCoordinates extends PlotD3 {
         });
     }
 
-    // Helper function to generate path for each data point
     protected path(d: any): string {
         const dimensions = this._attributes;
         const lineGenerator = d3.line<[number, number]>();

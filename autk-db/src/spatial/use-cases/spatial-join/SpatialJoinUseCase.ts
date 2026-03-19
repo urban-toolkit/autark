@@ -28,6 +28,11 @@ export class SpatialJoinUseCase {
     const joinType = params.joinType || 'INNER';
     const spatialPredicate = params.spatialPredicate || 'INTERSECT';
 
+    let nearUseCentroid = params.nearUseCentroid;
+    if (nearUseCentroid === undefined && spatialPredicate === 'NEAR') {
+      nearUseCentroid = await this.isPolygonTable(tableRoot.name, geometricColumnRoot);
+    }
+
     const outputTableName = (params.output.type === 'CREATE_NEW' ? params.output.tableName : tableRoot.name) as string;
     const query = SPATIAL_JOIN_QUERY({
       tableRoot,
@@ -38,6 +43,7 @@ export class SpatialJoinUseCase {
       spatialPredicate,
       groupBy: this.addTablesToGroupBy(params.groupBy, tables),
       nearDistance: params.nearDistance,
+      nearUseCentroid,
       outputTableName,
     });
 
@@ -65,6 +71,16 @@ export class SpatialJoinUseCase {
    * For building tables, prioritizes 'agg_geometry' if available, otherwise falls back to 'geometry'.
    * For other tables, returns the first geometry column found.
    */
+  private async isPolygonTable(tableName: string, geomColumn: string): Promise<boolean> {
+    const result = await this.conn.query(
+      `SELECT ST_GeometryType("${geomColumn}") AS geom_type FROM ${tableName} WHERE "${geomColumn}" IS NOT NULL LIMIT 1`
+    );
+    const rows = result.toArray();
+    if (rows.length === 0) return false;
+    const geomType = String(rows[0].geom_type).toUpperCase();
+    return geomType === 'POLYGON' || geomType === 'MULTIPOLYGON';
+  }
+
   private getGeometryColumnName(table: Table): string | undefined {
     if (table.source === 'osm' && table.type === 'buildings') {
       const aggGeometryColumn = table.columns.find(

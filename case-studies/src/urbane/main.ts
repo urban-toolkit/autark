@@ -24,7 +24,7 @@ export class Urbane {
     protected plotDivParallel!: HTMLElement;
 
     public datasets: string[] = ['arrest', 'new_building', 'noise', 'restaurants', 'school', 'subway', 'tree'];
-    public weights: number[] = [0.1, 0.2, 0.2, 0.1, 0.2, 0.1, 0.2];
+    public weights: number[] = [0.3, 0.2, 0.0, 0.5, 0.0, 0.0, 0.0];
 
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
         this.mapCanvas = canvas;
@@ -107,7 +107,8 @@ export class Urbane {
         const variableMapping = Object.fromEntries(
             this.datasets.map(d => [d, `sjoin.count.${d}_norm`])
         );
-        const wglsFunction = `return ${this.datasets.map((d, i) => `${d} * ${this.weights[i]}`).join(' + ')};`;
+        const invertedDatasets = new Set(['arrest', 'noise']);
+        const wglsFunction = `return ${this.datasets.map((d, i) => `${invertedDatasets.has(d) ? `(1.0 - ${d})` : d} * ${this.weights[i]}`).join(' + ')};`;
 
         return new GeojsonCompute().computeFunctionIntoProperties({
             geojson,
@@ -124,13 +125,13 @@ export class Urbane {
         await this.map.init();
 
         for (const layerData of this.db.getLayerTables()) {
-            if (layerData.name === 'table_osm_buildings') continue;
             const geojson = layerData.name === 'neighborhoods'
                 ? this.neighs
                 : await this.db.getLayer(layerData.name);
             this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
         }
 
+        this.map.updateRenderInfoProperty('table_osm_buildings', 'isSkip', true);
         this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
         this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
         this.map.draw();
@@ -269,6 +270,7 @@ export class Urbane {
                 tableJoinName: dataset,
                 spatialPredicate: 'NEAR',
                 nearDistance: this.distance,
+                nearUseCentroid: true,
                 output: { type: 'MODIFY_ROOT' },
                 joinType: 'LEFT',
                 groupBy: {

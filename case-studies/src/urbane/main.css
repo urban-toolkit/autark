@@ -78,6 +78,8 @@ canvas {
     position: fixed;
     bottom: 20px;
     left: 20px;
+    width: 402px;
+    height: 270px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -87,6 +89,7 @@ canvas {
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
     z-index: 12;
+    box-sizing: border-box;
 }
 
 #weightsPanelTitle {

@@ -11,6 +11,7 @@ interface Params {
   joinType: string;
   spatialPredicate: string;
   nearDistance?: number;
+  nearUseCentroid?: boolean;
   groupBy: { selectColumns: Array<InternalColumn> } | null;
   outputTableName: string;
 }
@@ -44,7 +45,9 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
   const selectString = getSelectString({
     tableRoot: params.tableRoot,
     tableJoin: effectiveJoinTable,
+    geometricColumnRoot: params.geometricColumnRoot,
     geometricColumnJoin: params.geometricColumnJoin,
+    nearUseCentroid: params.nearUseCentroid,
     groupBy: effectiveGroupBy,
   });
 
@@ -56,6 +59,7 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
     geometricColumnRoot: params.geometricColumnRoot,
     geometricColumnJoin: params.geometricColumnJoin,
     nearDistance: params.nearDistance,
+    nearUseCentroid: params.nearUseCentroid,
   });
 
   const groupByString = getGroupByString(params.tableRoot);
@@ -63,11 +67,14 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
   // For NEAR queries: a CTE that pre-filters the join table using an ST_Intersects
   // WHERE clause so the R-tree index fires. Stored separately so it can be combined
   // with a normalization CTE when needed.
+  const rootGeomExpr = (col: string) =>
+    params.nearUseCentroid ? `ST_Centroid("${col}")` : `"${col}"`;
+
   const nearCtePart = isNear
     ? `${NEAR_CTE_ALIAS} AS (
         SELECT * FROM ${params.tableJoin.name}
         WHERE ST_Intersects(
-          (SELECT ST_Union_Agg(ST_Expand("${params.geometricColumnRoot}", ${params.nearDistance})) FROM ${params.tableRoot.name}),
+          (SELECT ST_Union_Agg(ST_Expand(${rootGeomExpr(params.geometricColumnRoot)}, ${params.nearDistance})) FROM ${params.tableRoot.name}),
           ${params.tableJoin.name}."${params.geometricColumnJoin}"
         )
       )`
@@ -102,12 +109,20 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
 function getSelectString(params: {
   tableRoot: Table;
   tableJoin: Table;
+  geometricColumnRoot: string;
   geometricColumnJoin: string;
+  nearUseCentroid?: boolean;
   groupBy: { selectColumns: Array<InternalColumn> } | null;
 }) {
   if (params.groupBy) {
     const { aggregatesByFunction, nonAggregateColumns } = groupColumnsByAggregateFunction(params.groupBy.selectColumns);
-    const sjoinObjectSql = buildSjoinObject(aggregatesByFunction, nonAggregateColumns);
+    const sjoinObjectSql = buildSjoinObject(aggregatesByFunction, nonAggregateColumns, {
+      tableRoot: params.tableRoot,
+      tableJoin: params.tableJoin,
+      geometricColumnRoot: params.geometricColumnRoot,
+      geometricColumnJoin: params.geometricColumnJoin,
+      nearUseCentroid: params.nearUseCentroid,
+    });
 
     // Get all additional columns from tableRoot (excluding geometry and properties)
     const additionalColumns = params.tableRoot.columns
@@ -167,6 +182,7 @@ function groupColumnsByAggregateFunction(selectColumns: Array<InternalColumn>) {
 function buildSjoinObject(
   aggregatesByFunction: Record<string, Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>>,
   nonAggregateColumns: Array<{ table: Table; column: string; aggregateFnResultColumnName?: string }>,
+  geomContext: { tableRoot: Table; tableJoin: Table; geometricColumnRoot: string; geometricColumnJoin: string; nearUseCentroid?: boolean },
 ): string {
   const sjoinParts: string[] = [];
 
@@ -174,6 +190,8 @@ function buildSjoinObject(
   Object.entries(aggregatesByFunction).forEach(([funcName, columns]) => {
     if (funcName === 'count') {
       sjoinParts.push(buildCountExpression(columns[0]));
+    } else if (funcName === 'weighted') {
+      sjoinParts.push(buildWeightedExpression(columns[0], geomContext));
     } else {
       sjoinParts.push(buildNestedFunctionExpression(funcName, columns));
     }
@@ -185,6 +203,21 @@ function buildSjoinObject(
   }
 
   return sjoinParts.join(', ');
+}
+
+function buildWeightedExpression(
+  column: { table: Table; column: string; aggregateFnResultColumnName?: string },
+  geomContext: { tableRoot: Table; tableJoin: Table; geometricColumnRoot: string; geometricColumnJoin: string; nearUseCentroid?: boolean },
+): string {
+  const { tableRoot, tableJoin, geometricColumnRoot, geometricColumnJoin, nearUseCentroid } = geomContext;
+  const rootGeom = nearUseCentroid
+    ? `ST_Centroid(${tableRoot.name}."${geometricColumnRoot}")`
+    : `${tableRoot.name}."${geometricColumnRoot}"`;
+  const joinGeom = nearUseCentroid
+    ? `ST_Centroid(${tableJoin.name}."${geometricColumnJoin}")`
+    : `${tableJoin.name}."${geometricColumnJoin}"`;
+  const columnName = column.aggregateFnResultColumnName ?? column.table.name;
+  return `'weighted', json_object('${columnName}', SUM(1.0 / GREATEST(ST_Distance(${rootGeom}, ${joinGeom}), 1e-6)))`;
 }
 
 function buildCountExpression(column: { table: Table; column: string; aggregateFnResultColumnName?: string }): string {
@@ -307,6 +340,7 @@ function getJoinString({
   geometricColumnRoot,
   geometricColumnJoin,
   nearDistance,
+  nearUseCentroid,
 }: {
   spatialPredicate: string;
   joinType: string;
@@ -315,13 +349,17 @@ function getJoinString({
   geometricColumnRoot: string;
   geometricColumnJoin: string;
   nearDistance?: number;
+  nearUseCentroid?: boolean;
 }) {
-  if (spatialPredicate === 'NEAR')
-    // The join table here is already the CTE alias (csv_candidates), which has been
-    // pre-filtered to the local bounding box. The R-tree index on the original CSV
-    // table was used in the CTE's WHERE clause. Here we only need the precise distance
-    // check against the small surviving candidate set.
-    return `${joinType || ''} JOIN ${tableJoin.name} ON ST_Distance(${tableRoot.name}."${geometricColumnRoot}", ${tableJoin.name}."${geometricColumnJoin}") <= ${nearDistance}`;
+  if (spatialPredicate === 'NEAR') {
+    const rootExpr = nearUseCentroid
+      ? `ST_Centroid(${tableRoot.name}."${geometricColumnRoot}")`
+      : `${tableRoot.name}."${geometricColumnRoot}"`;
+    const joinExpr = nearUseCentroid
+      ? `ST_Centroid(${tableJoin.name}."${geometricColumnJoin}")`
+      : `${tableJoin.name}."${geometricColumnJoin}"`;
+    return `${joinType || ''} JOIN ${tableJoin.name} ON ST_Distance(${rootExpr}, ${joinExpr}) <= ${nearDistance}`;
+  }
 
   return `${joinType || ''} JOIN ${tableJoin.name} ON ST_Intersects( ${tableRoot.name}."${geometricColumnRoot}", ${tableJoin.name}."${geometricColumnJoin}")`;
 }

@@ -1,4 +1,4 @@
-type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max';
+type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted';
 
 export interface SpatialJoinParams {
   tableRootName: string;
@@ -10,6 +10,7 @@ export interface SpatialJoinParams {
   spatialPredicate?: 'INTERSECT' | 'NEAR';
   joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
   nearDistance?: number;
+  nearUseCentroid?: boolean; // When true, centroid-to-centroid distance is used. Defaults to true when root table contains polygons.
   groupBy?: {
     selectColumns: Array<{
       tableName: string;
