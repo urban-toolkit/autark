@@ -1,7 +1,5 @@
 // TODO: filter CSV data based on the osm data polygon.
 
-import { Feature, GeoJsonProperties } from 'geojson';
-
 import { SpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
@@ -44,15 +42,15 @@ export class GeojsonVis {
             nearDistance: 1000,
             outputTableName: 'heatmap',
             grid: {
-                rows: 256,
-                columns: 256,
+                rows: 20,
+                columns: 20,
             },
             groupBy: {
                 selectColumns: [
                     {
                         tableName: 'noise',
                         column: 'Unique Key',
-                        aggregateFn: 'count',
+                        aggregateFn: 'weighted'
                     },
                 ],
             },
@@ -65,39 +63,26 @@ export class GeojsonVis {
 
             await this.map.init();
             await this.loadLayers();
-
-            const heatMap = await this.db.getLayer('heatmap');
-            console.log({ heatMap });
-            await this.map.loadGeoTiffLayer(
-                'heatmap',
-                heatMap,
-                LayerType.AUTK_RASTER,
-            );
-
-            this.map.updateRenderInfoProperty('heatmap', 'opacity', 0.5);
             this.map.draw();
         }
     }
 
     protected async loadLayers(): Promise<void> {
+        const getFnc = (cell: unknown) => (cell as { weighted: { noise: number } })?.weighted?.noise || 0;
+
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+
+            if (layerData.type === LayerType.AUTK_RASTER) {
+                this.map.loadGeoTiffLayer(layerData.name, geojson, layerData.type as LayerType, getFnc);
+            } 
+            else {
+                this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            }
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
-        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
-    }
-
-    protected async updateThematicData() {
-        const geojson = await this.db.getLayer('table_grid');
-
-        const getFnv = (feature: Feature) => {
-            const properties = feature.properties as GeoJsonProperties;
-            return properties?.sjoin.count.parking || 0;
-        };
-
-        this.map.updateGeoJsonLayerThematic('table_grid', geojson, getFnv);
+        this.map.updateRenderInfoProperty('heatmap', 'opacity', 0.5);
     }
 }
 

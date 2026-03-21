@@ -73,14 +73,12 @@ export class BuildHeatmapUseCase {
         rows: number,
         columns: number
     ): Promise<void> {
-        // Transform the grid table into a single row with raster array
-        // The raster will contain all aggregation results from properties.sjoin
         const transformQuery = `
             CREATE OR REPLACE TABLE ${tableName} AS
             SELECT 
                 ST_Point(0, 0) AS geometry,
                 {
-                    'raster': list(properties.sjoin ORDER BY properties.row, properties."column"),
+                    'raster': list(properties.sjoin ORDER BY CAST(properties->>'row' AS INTEGER), CAST(properties->>'column' AS INTEGER)),
                     'rasterResX': ${columns},
                     'rasterResY': ${rows}
                 } AS properties

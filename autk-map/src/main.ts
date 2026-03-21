@@ -283,15 +283,18 @@ export class AutkMap {
      * @param layerName The name of the layer
      * @param geotiff The GeoTIFF data to load
      * @param typeLayer The type of the layer
+     * @param getFnv Optional function to extract a numeric value from each raster cell.
+     *               Use this when raster cells contain nested objects (e.g. from a spatial join).
+     *               If omitted, cell values are used directly as numbers.
      */
-    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection, typeLayer: LayerType | null = null) {
+    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection, typeLayer: LayerType | null = null, getFnv: (cell: unknown) => number) {
 
         // TODO: Validate geotiff input
         // Allow the user to provide a geotiff and parse using geotiff.js library
 
         switch (typeLayer) {
             case LayerType.AUTK_RASTER:
-                this.createRasterLayer(layerName, geotiff);
+                this.createRasterLayer(layerName, geotiff, getFnv);
                 break;
             default:
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
@@ -729,7 +732,7 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geotiff The GeoJSON data.
      */
-    private createRasterLayer(layerName: string, geotiff: FeatureCollection) {
+    private createRasterLayer(layerName: string, geotiff: FeatureCollection, getFnv: (cell: unknown) => number) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(LayerType.AUTK_RASTER),
@@ -757,13 +760,24 @@ export class AutkMap {
             return;
         }
 
+        const rawRaster: number[] = props.raster.map((row: unknown) => getFnv(row));
+        const rasterMin = rawRaster.reduce((a, b) => Math.min(a, b), Infinity);
+        const rasterMax = rawRaster.reduce((a, b) => Math.max(a, b), -Infinity);
+
+        console.log(`Raster min: ${rasterMin}, Raster max: ${rasterMax}`);
+
+        const rasterRange = rasterMax - rasterMin;
+        const normalizedRaster = rawRaster.map((v) =>
+            v <= 0 ? 0 : rasterRange > 0 ? (v - rasterMin) / rasterRange : 1
+        );
+
         const layerData: ILayerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
             raster: [{
                 rasterResX: props.rasterResX,
                 rasterResY: props.rasterResY,
-                rasterValues: props.raster
+                rasterValues: normalizedRaster,
             }],
         };
 

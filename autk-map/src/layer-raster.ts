@@ -245,12 +245,14 @@ export class RasterLayer extends Layer {
 
                 layer.rasterValues.forEach((d) => {
                     const t = (d - min) / range;
+
                     const color = ColorMap.getColor(t, this._layerRenderInfo.colorMapInterpolator);
+                    const alpha = d <= 0 ? 0 : Math.max(0, Math.min(255, Math.round(t * 255)));
 
                     rasterData.push(color.r);
                     rasterData.push(color.g);
                     rasterData.push(color.b);
-                    rasterData.push(255);
+                    rasterData.push(alpha);
                 });
             }
             else {

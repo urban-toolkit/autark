@@ -217,7 +217,7 @@ function buildWeightedExpression(
     ? `ST_Centroid(${tableJoin.name}."${geometricColumnJoin}")`
     : `${tableJoin.name}."${geometricColumnJoin}"`;
   const columnName = column.aggregateFnResultColumnName ?? column.table.name;
-  return `'weighted', json_object('${columnName}', SUM(1.0 / GREATEST(ST_Distance(${rootGeom}, ${joinGeom}), 1e-6)))`;
+  return `'weighted', json_object('${columnName}', SUM(1.0 / (ST_Distance(${rootGeom}, ${joinGeom}) + 1.0)))`;
 }
 
 function buildCountExpression(column: { table: Table; column: string; aggregateFnResultColumnName?: string }): string {

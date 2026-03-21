@@ -1,4 +1,4 @@
-type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max';
+type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted';
 
 export interface BuildHeatmapParams {
     tableJoinName: string;

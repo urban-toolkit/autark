@@ -7,5 +7,6 @@
 fn main(@location(0) inTexCoord: vec2f) -> @location(0) vec4f {
     var color = textureSample(rasterData, rasterSampler, inTexCoord);
 
-    return vec4f(color.rgb * opacity, color.a * opacity);
+    let alpha = color.a * opacity;
+    return vec4f(color.rgb * alpha, alpha);
 }

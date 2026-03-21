@@ -58,12 +58,32 @@ export class Shadows {
             },
         });
 
+        await this.db.buildHeatmap({
+            tableJoinName: 'shadows',
+            outputTableName: 'heatmap',
+            nearDistance: 200,
+            grid: {
+                rows: 100,
+                columns: 100,
+            },
+            groupBy: {
+                selectColumns: [
+                    {
+                        tableName: 'shadows',
+                        column: 'jun',
+                        aggregateFn: 'avg',
+                    },
+                ],
+            },
+        });
+
+
         for (const month of ['jun', 'sep', 'dez']) {
             await this.db.spatialJoin({
                 tableRootName: 'table_osm_roads',
                 tableJoinName: 'shadows',
                 spatialPredicate: 'NEAR',
-                nearDistance: 100,
+                nearDistance: 200,
                 output: { type: 'MODIFY_ROOT' },
                 joinType: 'LEFT',
                 groupBy: {
@@ -87,9 +107,22 @@ export class Shadows {
         await this.map.init();
 
         for (const layerData of this.db.getLayerTables()) {
+            if (layerData.name === 'heatmap') continue;
+
             const geojson = await this.db.getLayer(layerData.name);
             this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
         }
+
+        const heatMap = await this.db.getLayer('heatmap');
+        await this.map.loadGeoTiffLayer(
+            'heatmap',
+            heatMap,
+            LayerType.AUTK_RASTER,
+            (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0
+        );
+
+        this.map.updateRenderInfoProperty('heatmap', 'opacity', 0.5);
+        this.map.updateRenderInfoProperty('heatmap', 'isColorMap', true);
         this.map.draw();
     }
 
@@ -112,7 +145,7 @@ export class Shadows {
         this.map.draw();
     }
 
-    public changeMonth(month: string): void {
+    public async changeMonth(month: string): Promise<void> {
         this.currentMonth = month;
         this.updateThematicData(month);
         this.reloadHistogram(month);
