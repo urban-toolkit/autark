@@ -1,6 +1,6 @@
 {
   "name": "autk-db",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "files": [
     "dist"
@@ -21,7 +21,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "doc": "typedoc --options typedoc.json --watch"
+    "doc": "typedoc --options typedoc.json"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
@@ -33,6 +33,7 @@
     "prettier": "^3.6.2",
     "tsx": "^4.21.0",
     "typedoc": "^0.28.14",
+    "typedoc-plugin-markdown": "^4.11.0",
     "typedoc-theme-oxide": "^0.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
