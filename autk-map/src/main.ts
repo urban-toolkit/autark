@@ -419,6 +419,7 @@ export class AutkMap {
                     break;
                 case 'isColorMap':
                     layer.layerRenderInfo.isColorMap = value as boolean;
+                    this._ui.refreshLegend(layer);
                     break;
                 case 'isSkip':
                     layer.layerRenderInfo.isSkip = value as boolean;
