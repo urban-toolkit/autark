@@ -1,6 +1,6 @@
 {
   "name": "autk-plot",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "files": [
     "dist"
@@ -12,7 +12,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/autk-plot.js",
-      "require": "./dist/autk-plot.umd.cjs"
+      "require": "./dist/autk-plot.umd.cjs",
+      "doc": "typedoc --options typedoc.json"
     }
   },
   "scripts": {
@@ -20,7 +21,8 @@
     "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "doc": "typedoc --options typedoc.json --watch"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
@@ -31,6 +33,9 @@
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
     "ts-loader": "^9.5.4",
+    "typedoc": "^0.28.17",
+    "typedoc-plugin-markdown": "^4.11.0",
+    "typedoc-theme-oxide": "^0.2.5",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
     "vite-plugin-dts": "^4.5.4"

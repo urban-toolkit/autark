@@ -1,11 +1,11 @@
 // typedoc.json
 {
-    "readme": "README.md",
-    "plugin": ["typedoc-theme-oxide"],
-    "theme": "oxide",
-    "out": "docs",
-    "entryPoints": ["src"],
-    "navigationLinks": {
-        "Github": "https://github.com/urban-toolkit/autark"
-    },
+  "readme": "README.md",
+  "plugin": ["typedoc-theme-oxide", "typedoc-plugin-markdown"],
+  "theme": "oxide",
+  "out": "docs",
+  "entryPoints": ["src"],
+  "navigationLinks": {
+    "Github": "https://github.com/urban-toolkit/autark"
+  }
 }

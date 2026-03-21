@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "doc": "typedoc --options typedoc.json --watch",
+    "doc": "typedoc --options typedoc.json",
     "dev": "vite",
     "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",
@@ -36,6 +36,7 @@
     "prettier": "^3.6.2",
     "ts-loader": "^9.5.4",
     "typedoc": "^0.28.14",
+    "typedoc-plugin-markdown": "^4.11.0",
     "typedoc-theme-oxide": "^0.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
