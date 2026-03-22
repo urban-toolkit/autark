@@ -12,8 +12,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/autk-plot.js",
-      "require": "./dist/autk-plot.umd.cjs",
-      "doc": "typedoc --options typedoc.json"
+      "require": "./dist/autk-plot.umd.cjs"
     }
   },
   "scripts": {

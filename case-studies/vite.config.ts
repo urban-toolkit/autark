@@ -20,6 +20,9 @@ export default defineConfig({
   },
 
   server: {
+    fs: {
+      allow: ['..'],
+    },
     // @ts-ignore
     open: process.env.VITE_OPEN || '/src/urbane/main.html',
     cors: {
