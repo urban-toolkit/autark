@@ -2,48 +2,54 @@ import { FeatureCollection } from 'geojson';
 
 export interface ComputeFunctionIntoPropertiesParams {
   geojson: FeatureCollection;
-  variableMapping: Record<string, string>; // { variableName: propertyPath }
+  /** Per-feature scalars: maps WGSL variable name → feature property path. */
+  attributes: Record<string, string>;
+  /** Per-feature arrays: variable name → fixed element count. */
+  attributeArrays?: Record<string, number>;
   /**
-   * Optional: Declare which variables are arrays and their fixed length.
-   * All features must have arrays of this length (or will be padded with zeros).
-   *
-   * Example: { myArray: 10, embeddings: 128 }
+   * Per-feature matrices: variable name → { rows, cols }.
+   * Use `rows: 'auto'` to infer the row count per feature at runtime.
    */
-  arrayVariables?: Record<string, number>;
+  attributeMatrices?: Record<string, { rows: number | 'auto'; cols: number }>;
   /**
-   * Optional: Declare which variables are matrices and their dimensions (rows × cols).
-   * All features must have matrices of these dimensions (or will be padded with zeros).
+   * Global variables shared across all features — uploaded once to the GPU, not replicated
+   * per feature. Ideal for values that are the same for every invocation (e.g. a building
+   * height, a sun angle, a day-of-year).
    *
-   * Example: { transformMatrix: { rows: 3, cols: 3 }, heatmap: { rows: 10, cols: 10 } }
+   * uniforms        — single f32 values:        { bld_height: 42.0, doy: 172 }
+   * uniformArrays   — flat f32 arrays:           { weights: [0.1, 0.9] }
+   * uniformMatrices — 2-D arrays (rows × cols):  { ring: { data: [[x,y],...], cols: 2 } }
+   *
+   * In WGSL these are available as parameters with the same signatures as per-feature
+   * counterparts (scalar: f32; array: array<f32,N> + length u32;
+   * matrix: array<f32,rows*cols> + rows u32 + cols u32).
    */
-  matrixVariables?: Record<string, { rows: number; cols: number }>;
-  outputColumnName: string;
+  uniforms?: Record<string, number>;
+  uniformArrays?: Record<string, number[]>;
+  uniformMatrices?: Record<string, { data: number[][]; cols: number }>;
   /**
-   * WGSL function body that returns a f32 value. The function receives the mapped variables as parameters.
+   * Name(s) of the output column(s) written into feature.properties.compute.
    *
-   * Scalar variables are passed as f32 values.
-   * Array variables are passed as: arrayName (array<f32, N>) and arrayName_length (u32)
-   * Matrix variables are passed as: matrixName (array<f32, rows*cols>), matrixName_rows (u32), matrixName_cols (u32)
-   *   - Matrices are flattened in row-major order
-   *   - Access element at (row, col): matrixName[row * matrixName_cols + col]
+   * Single output  — outputColumnName: 'shadow'
+   *   The WGSL function body must return an f32.
    *
-   * Examples:
-   * Simple scalar: "return x * y;"
-   * With arrays: `
-   *   var sum = 0.0;
-   *   for (var i = 0u; i < myArray_length; i++) {
-   *     sum += myArray[i];
-   *   }
-   *   return x * sum;
-   * `
-   * With matrices: `
-   *   // Calculate trace (sum of diagonal elements)
-   *   var trace = 0.0;
-   *   for (var i = 0u; i < matrix_rows; i++) {
-   *     trace += matrix[i * matrix_cols + i];
-   *   }
-   *   return trace;
-   * `
+   * Multiple outputs — outputColumns: ['shadow', 'contribution']
+   *   The WGSL function body must return an OutputArray (alias auto-generated as
+   *   array<f32, N>). Write each value by index and return:
+   *     var out: OutputArray;
+   *     out[0] = shadow_minutes;
+   *     out[1] = percentage;
+   *     return out;
+   */
+  outputColumnName?: string;
+  outputColumns?: string[];
+  /**
+   * WGSL function body. All attribute and uniform variables are available as parameters.
+   *
+   * Scalar:  f32
+   * Array:   array<f32, N>  +  name_length: u32
+   * Matrix:  array<f32, rows*cols>  +  name_rows: u32  +  name_cols: u32
+   *          (row-major: element at (r,c) = name[r * name_cols + c])
    */
   wglsFunction: string;
 }

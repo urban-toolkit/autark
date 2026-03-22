@@ -12,6 +12,11 @@
         <canvas></canvas>
 
         <div id="controls">
+            <div id="displayMode">
+                <label><input type="radio" name="mode" value="heatmap" checked onchange="shadows.changeDisplayMode(this.value)"> Shadow heatmap</label>
+                <label><input type="radio" name="mode" value="compute" onchange="shadows.changeDisplayMode(this.value)"> Building shadow (min)</label>
+                <label><input type="radio" name="mode" value="contribution" onchange="shadows.changeDisplayMode(this.value)"> Building shadow (%)</label>
+            </div>
             <select id="monthSelect" onchange="shadows.changeMonth(this.value)"></select>
         </div>
 
@@ -28,10 +33,9 @@
     window.addEventListener('shadows-ready', () => {
         const select = document.querySelector('#monthSelect');
         [
-            { value: 'none', text: 'None' },
-            { value: 'jun', text: 'June' },
-            { value: 'sep', text: 'September' },
-            { value: 'dez', text: 'December' },
+            { value: 'jun', text: 'June 21 (summer solstice)' },
+            { value: 'sep', text: 'September 22 (autumnal equinox)' },
+            { value: 'dez', text: 'December 21 (winter solstice)' },
         ].forEach(({ value, text }) => {
             const opt = document.createElement('option');
             opt.value = value;

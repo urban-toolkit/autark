@@ -48,10 +48,10 @@ export class PropertyArrayFunc {
     console.log('\n=== Example 1: Array Average ===');
     let result1 = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         values: 'measurements',
       },
-      arrayVariables: {
+      attributeArrays: {
         values: 5, // Fixed length of 5
       },
       outputColumnName: 'avg_measurement',
@@ -72,11 +72,11 @@ export class PropertyArrayFunc {
     console.log('\n=== Example 2: Scalar * Array Sum ===');
     let result2 = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         temp: 'temperature',
         values: 'measurements',
       },
-      arrayVariables: {
+      attributeArrays: {
         values: 5,
       },
       outputColumnName: 'weighted_by_temp',
@@ -97,11 +97,11 @@ export class PropertyArrayFunc {
     console.log('\n=== Example 3: Dot Product of Two Arrays ===');
     let result3 = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         a: 'measurements',
         b: 'weights',
       },
-      arrayVariables: {
+      attributeArrays: {
         a: 5,
         b: 3,
       },
@@ -124,10 +124,10 @@ export class PropertyArrayFunc {
     console.log('\n=== Example 4: Maximum Value in Array ===');
     let result4 = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         values: 'measurements',
       },
-      arrayVariables: {
+      attributeArrays: {
         values: 5,
       },
       outputColumnName: 'max_measurement',

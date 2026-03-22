@@ -282,6 +282,11 @@ export class RasterLayer extends Layer {
      * @param {Camera} camera - The camera instance.
      */
     public renderPass(camera: Camera): void {
+        if (this._dataIsDirty) {
+            (this._pipeline as PipelineTriangleRaster).updateRasterUniforms(this);
+            this._dataIsDirty = false;
+        }
+
         if (this._renderInfoIsDirty) {
             this._pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;

@@ -304,6 +304,39 @@ export class AutkMap {
     }
 
     /**
+     * Updates the raster values of an existing GeoTiff layer in place.
+     *
+     * Use this instead of removing and re-adding the layer when only the raster
+     * values change (e.g. switching the month in a heatmap). The geometry and
+     * render settings of the layer are preserved.
+     *
+     * @param layerName The name of the existing raster layer
+     * @param geotiff The new GeoTIFF FeatureCollection
+     * @param getFnv Function to extract a numeric value from each raster cell
+     */
+    public updateGeoTiffLayerData(layerName: string, geotiff: FeatureCollection, getFnv: (cell: unknown) => number): void {
+        const layer = this._layerManager.searchByLayerId(layerName) as RasterLayer;
+        if (!layer) {
+            console.error(`Layer ${layerName} not found.`);
+            return;
+        }
+
+        const props = geotiff.features[0].properties;
+        if (!props) {
+            console.error('GeoTIFF properties are missing.');
+            return;
+        }
+
+        layer.loadRaster([{
+            rasterResX: props.rasterResX,
+            rasterResY: props.rasterResY,
+            rasterValues: props.raster.map((row: unknown) => getFnv(row)),
+        }]);
+
+        layer.makeLayerDataDirty();
+    }
+
+    /**
      * Updates the thematic information of a layer based on a GeoJSON source.
      * 
      * This method extracts thematic values from the GeoJSON features using the provided function,
@@ -350,9 +383,10 @@ export class AutkMap {
 
             this.updateRenderInfoProperty(layerName, 'colorMapLabels', [`${valMin}`, `${valMax}`]);
 
+            const range = valMax - valMin;
             for (let i = 0; i < thematicData.length; i++) {
                 const val = +thematicData[i].values[0];
-                thematicData[i].values = [(val - valMin) / (valMax - valMin)];
+                thematicData[i].values = [range > 0 ? (val - valMin) / range : 0];
             }
         }
 
@@ -532,6 +566,7 @@ export class AutkMap {
         this._layerManager.vectorLayers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
                 const [x, y] = layer.layerRenderInfo.pickedComps;
+                layer.layerRenderInfo.pickedComps = undefined;
                 layer.getPickedId(x, y).then((id) => {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if (id >= 0) {
@@ -541,7 +576,6 @@ export class AutkMap {
                         layer.clearHighlightedIds();
                         this._mapEvents.emit(MapEvent.PICK, [], layer.layerInfo.id);
                     }
-                    layer.layerRenderInfo.pickedComps = undefined;
                 });
             }
         });

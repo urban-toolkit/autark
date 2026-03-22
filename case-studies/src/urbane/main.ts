@@ -112,7 +112,7 @@ export class Urbane {
 
         return new GeojsonCompute().computeFunctionIntoProperties({
             geojson,
-            variableMapping,
+            attributes: variableMapping,
             outputColumnName: 'score',
             wglsFunction,
         });

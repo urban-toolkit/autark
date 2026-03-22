@@ -65,12 +65,12 @@ export class PropertyLinearRegression {
     console.log('\n=== Running Linear Regression Prediction on GPU ===');
     const result = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         x_values: 'x_train',
         y_values: 'y_train',
         x_pred: 'x_predict',
       },
-      arrayVariables: {
+      attributeArrays: {
         x_values: 7, // 7 training points
         y_values: 7,
       },

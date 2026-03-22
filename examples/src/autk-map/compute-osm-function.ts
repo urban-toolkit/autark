@@ -31,7 +31,7 @@ export class ComputeOsm {
         const geojsonCompute = new GeojsonCompute();
         geojson = await geojsonCompute.computeFunctionIntoProperties({
             geojson,
-            variableMapping: {
+            attributes: {
                 x: 'lanes',
             },
             outputColumnName: 'result',

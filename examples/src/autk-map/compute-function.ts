@@ -34,7 +34,7 @@ export class ComputeFunction {
         const geojsonCompute = new GeojsonCompute();
         geojson = await geojsonCompute.computeFunctionIntoProperties({
             geojson,
-            variableMapping: {
+            attributes: {
                 x: 'shape_area',
                 y: 'shape_leng',
             },

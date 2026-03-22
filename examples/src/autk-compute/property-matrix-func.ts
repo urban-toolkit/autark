@@ -48,10 +48,10 @@ export class PropertyMatrixFunc {
     console.log('\n=== Calculating Color Percentage in Images ===');
     const result = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         img: 'image',
       },
-      matrixVariables: {
+      attributeMatrices: {
         img: { rows: imageHeight, cols: imageWidth },
       },
       outputColumnName: 'color_percentage',

@@ -27,7 +27,7 @@ export class LoadGeojson {
     const geojsonCompute = new GeojsonCompute();
     geojson = await geojsonCompute.computeFunctionIntoProperties({
       geojson,
-      variableMapping: {
+      attributes: {
         x: 'height',
         y: 'height',
       },

@@ -2,28 +2,46 @@
 import { Feature, FeatureCollection } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
-import { AutkMap, LayerType, VectorLayer } from 'autk-map';
+import { GeojsonCompute } from 'autk-compute';
+import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { Barchart, PlotEvent } from 'autk-plot';
+
+import splitRoadsQuery from './split-roads.sql?raw';
+import shadowShader from './shadow-shader.wgsl?raw';
 
 export class Shadows {
     protected map!: AutkMap;
     protected db!: SpatialDb;
     protected histogram!: Barchart;
 
-    protected roads!: FeatureCollection;
-    protected currentMonth: string = 'none';
+    protected readonly ROADS_LAYER = 'table_roads_20m';
 
-    protected mapCanvas!: HTMLCanvasElement;
+    protected roads!: FeatureCollection;
+    protected buildings!: FeatureCollection;
+    protected computedRoads?: FeatureCollection;
+
+    protected selectedBuildingId: number | null = null;
+    protected selectedBuildingRing: number[][] | null = null;
+    protected selectedBuildingHeight: number = 0;
+
+    protected currentMonth: string = 'jun';
+    protected displayMode: 'heatmap' | 'compute' | 'contribution' = 'heatmap';
+
+    // Maps GPU component index (group index) → first feature index for that group.
+    // The GPU pick ID is a group index (features sharing building_id are collapsed into
+    // one group by TriangulatorBuildings), so we cannot use it directly as a feature index.
+    protected buildingGroupToFeatureIndex: Map<number, number> = new Map();
+
     protected histogramDiv!: HTMLElement;
 
     public async run(canvas: HTMLCanvasElement, histogramDiv: HTMLElement): Promise<void> {
-        this.mapCanvas = canvas;
         this.histogramDiv = histogramDiv;
 
         await this.loadDb();
-        await this.loadMap();
+        await this.loadMap(canvas);
 
-        this.reloadHistogram(this.currentMonth);
+        this.updateThematicData();
+        this.reloadHistogram();
         this.updateHistogramListeners();
     }
 
@@ -41,8 +59,8 @@ export class Shadows {
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: ['surface', 'parks', 'water', 'roads'] as Array<
-                    'surface' | 'parks' | 'water' | 'roads'
+                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
                 dropOsmTable: true,
             },
@@ -58,29 +76,19 @@ export class Shadows {
             },
         });
 
-        await this.db.buildHeatmap({
-            tableJoinName: 'shadows',
-            outputTableName: 'heatmap',
-            nearDistance: 200,
-            grid: {
-                rows: 100,
-                columns: 100,
-            },
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'shadows',
-                        column: 'jun',
-                        aggregateFn: 'avg',
-                    },
-                ],
+        await this.db.rawQuery({
+            query: splitRoadsQuery,
+            output: {
+                type: 'CREATE_TABLE',
+                tableName: this.ROADS_LAYER,
+                source: 'user',
+                tableType: LayerType.AUTK_OSM_ROADS,
             },
         });
 
-
         for (const month of ['jun', 'sep', 'dez']) {
             await this.db.spatialJoin({
-                tableRootName: 'table_osm_roads',
+                tableRootName: this.ROADS_LAYER,
                 tableJoinName: 'shadows',
                 spatialPredicate: 'NEAR',
                 nearDistance: 200,
@@ -97,64 +105,201 @@ export class Shadows {
             });
         }
 
-        this.roads = await this.db.getLayer('table_osm_roads');
+        this.roads     = await this.db.getLayer(this.ROADS_LAYER);
+        this.buildings = await this.db.getLayer('table_osm_buildings');
+        this.computeBuildingGroupMapping();
+    }
+
+    protected computeBuildingGroupMapping(): void {
+        let groupIdx = 0;
+        const seenBuildingIds = new Set<string>();
+        for (let i = 0; i < this.buildings.features.length; i++) {
+            const props = this.buildings.features[i].properties;
+            const key = props ? String(props['building_id'] ?? '-1') : '-1';
+            if (!seenBuildingIds.has(key)) {
+                this.buildingGroupToFeatureIndex.set(groupIdx, i);
+                seenBuildingIds.add(key);
+                groupIdx++;
+            }
+        }
+    }
+
+    protected monthToDoy(month: string): number {
+        const map: Record<string, number> = {
+            jun: 172,  // June 21 — summer solstice
+            sep: 265,  // September 22 — autumnal equinox
+            dez: 355,  // December 21 — winter solstice
+        };
+        return map[month] ?? 172;
+    }
+
+    public async computeShadows(footprint: number[][], height: number, month: string): Promise<void> {
+        const doy = this.monthToDoy(month);
+
+        // seg, sjoin_avg are per-feature. bld_height, doy, ring are global uniforms.
+        // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
+        //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
+        const geojsonCompute = new GeojsonCompute();
+        const result = await geojsonCompute.computeFunctionIntoProperties({
+            geojson: this.roads,
+            attributes: {
+                seg:       'geometry.coordinates',
+                sjoin_avg: `sjoin.avg.${month}`,
+            },
+            attributeMatrices: {
+                seg: { rows: 'auto', cols: 2 },
+            },
+            uniforms: {
+                bld_height: height,
+                doy,
+            },
+            uniformMatrices: {
+                ring: { data: footprint, cols: 2 },
+            },
+            outputColumns: ['shadow', 'contribution'],
+            wglsFunction: shadowShader,
+        });
+
+        this.computedRoads = result;
     }
 
     // ── Map ───────────────────────────────────────────────────────────────────
 
-    protected async loadMap(): Promise<void> {
-        this.map = new AutkMap(this.mapCanvas);
+    protected async loadMap(canvas: HTMLCanvasElement): Promise<void> {
+        this.map = new AutkMap(canvas);
         await this.map.init();
 
+        // vector layers
         for (const layerData of this.db.getLayerTables()) {
-            if (layerData.name === 'heatmap') continue;
+            // Skip the original un-split roads; we use the 20 m version instead.
+            if (layerData.name === 'table_osm_roads') continue;
 
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            const layer = await this.db.getLayer(layerData.name);
+
+            if (layerData.name === 'heatmap') {
+                await this.map.loadGeoTiffLayer(layerData.name, layer, LayerType.AUTK_RASTER,
+                    (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0
+                );
+                this.map.updateRenderInfoProperty(layerData.name, 'opacity', 0.5);
+                this.map.updateRenderInfoProperty(layerData.name, 'isColorMap', true);
+                this.map.updateRenderInfoProperty(layerData.name, 'isSkip', true);
+            }
+            else {
+                this.map.loadGeoJsonLayer(layerData.name, layer, layerData.type as LayerType);
+            }
+
         }
 
-        const heatMap = await this.db.getLayer('heatmap');
-        await this.map.loadGeoTiffLayer(
-            'heatmap',
-            heatMap,
-            LayerType.AUTK_RASTER,
-            (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0
-        );
+        this.map.updateRenderInfoProperty('table_osm_buildings', 'isPick', true);
+        this.map.mapEvents.addEventListener(MapEvent.PICK, (ids, layerId) => {
+            if (layerId !== 'table_osm_buildings') return;
 
-        this.map.updateRenderInfoProperty('heatmap', 'opacity', 0.5);
-        this.map.updateRenderInfoProperty('heatmap', 'isColorMap', true);
+            if (ids.length === 0) {
+                // Building was deselected — clear stored geometry and computed result.
+                this.selectedBuildingId     = null;
+                this.selectedBuildingRing   = null;
+                this.selectedBuildingHeight = 0;
+                this.computedRoads          = undefined;
+                if (this.displayMode === 'compute' || this.displayMode === 'contribution') {
+                    this.updateThematicData();
+                }
+                return;
+            }
+
+            // ids is the post-toggle highlighted set. Find the newly added building
+            // (the one that differs from the previously selected one).
+            const newId = ids.find(id => id !== this.selectedBuildingId) ?? ids[0];
+            this.onBuildingPick(newId);
+        });
+
         this.map.draw();
     }
 
-    protected updateThematicData(month: string): void {
-        if (month === 'none') {
-            this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', false);
+    protected async onBuildingPick(id: number): Promise<void> {
+        const featureIndex = this.buildingGroupToFeatureIndex.get(id) ?? id;
+        const feature = this.buildings.features[featureIndex];
+        if (!feature) return;
+
+        this.selectedBuildingId = id;
+
+        // Enforce single-selection: clear any previously highlighted building.
+        const buildingsLayer = this.map.layerManager.searchByLayerId('table_osm_buildings') as VectorLayer;
+        buildingsLayer?.setHighlightedIds([id]);
+
+        // Extract outer ring of the footprint (handles Polygon and MultiPolygon).
+        const geom = feature.geometry as any;
+        const ring: number[][] = geom.type === 'MultiPolygon'
+            ? geom.coordinates[0][0]
+            : geom.coordinates[0];
+
+        // Building height: use OSM `height` tag, fall back to `building:levels` × 3 m, then 20 m.
+        const props = feature.properties ?? {};
+        const rawHeight  = parseFloat(props['height']);
+        const rawLevels  = parseFloat(props['building:levels']) * 3;
+        const height = isFinite(rawHeight) && rawHeight > 0 ? rawHeight
+                   : isFinite(rawLevels) && rawLevels > 0 ? rawLevels
+                   : 20;
+
+        this.selectedBuildingRing   = ring;
+        this.selectedBuildingHeight = height;
+
+        await this.computeShadows(ring, height, this.currentMonth);
+
+        if (this.displayMode === 'compute' || this.displayMode === 'contribution') {
+            this.updateThematicData();
+        }
+    }
+
+    protected updateThematicData(): void {
+        if (this.displayMode === 'heatmap') {
+            const getFnv = (feature: Feature) =>
+                (feature.properties?.sjoin as any)?.avg?.[this.currentMonth] || 0;
+            this.map.updateGeoJsonLayerThematic(this.ROADS_LAYER, this.roads, getFnv);
+            this.map.updateRenderInfoProperty(this.ROADS_LAYER, 'isPick', true);
+            this.map.updateRenderInfoProperty(this.ROADS_LAYER, 'isColorMap', true);
             this.map.draw();
             return;
         }
 
-        const getFnv = (feature: Feature) => {
-            return (feature.properties?.sjoin as any)?.avg?.[month] || 0;
-        };
-
-        this.map.updateGeoJsonLayerThematic('table_osm_roads', this.roads, getFnv);
-
-        this.map.updateRenderInfoProperty('table_osm_roads', 'isPick', true);
-        this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
-
+        // 'compute' or 'contribution' mode
+        const key = this.displayMode === 'compute' ? 'shadow' : 'contribution';
+        const source = this.computedRoads ?? this.roads;
+        const getFnv = this.computedRoads
+            ? (feature: Feature) => feature.properties?.compute?.[key] ?? 0
+            : () => 0;
+        this.map.updateGeoJsonLayerThematic(this.ROADS_LAYER, source, getFnv);
+        this.map.updateRenderInfoProperty(this.ROADS_LAYER, 'isColorMap', true);
         this.map.draw();
     }
 
     public async changeMonth(month: string): Promise<void> {
         this.currentMonth = month;
-        this.updateThematicData(month);
-        this.reloadHistogram(month);
+
+        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
+        roadsLayer?.clearHighlightedIds();
+
+        // Recompute accumulated shadows for the new date if a building is selected.
+        if (this.selectedBuildingRing) {
+            await this.computeShadows(this.selectedBuildingRing, this.selectedBuildingHeight, month);
+        }
+
+        this.reloadHistogram();
         this.updateHistogramListeners();
+        this.updateThematicData();
+    }
+
+    public changeDisplayMode(mode: 'heatmap' | 'compute' | 'contribution'): void {
+        this.displayMode = mode;
+
+        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
+        roadsLayer?.clearHighlightedIds();
+
+        this.updateThematicData();
     }
 
     // ── Histogram ─────────────────────────────────────────────────────────────
 
-    protected reloadHistogram(month: string): void {
+    protected reloadHistogram(): void {
         this.histogramDiv.innerHTML = '';
 
         this.histogram = new Barchart({
@@ -165,7 +310,7 @@ export class Shadows {
             height: 380,
             events: [PlotEvent.BRUSH_X],
             histogram: {
-                column: `sjoin.avg.${month}`,
+                column: `sjoin.avg.${this.currentMonth}`,
                 numBins: 13,
                 divisor: 60,
                 labelSuffix: 'h',
@@ -175,7 +320,7 @@ export class Shadows {
 
     protected updateHistogramListeners(): void {
         this.histogram.plotEvents.addEventListener(PlotEvent.BRUSH_X, (roadIds: number[]) => {
-            const layer = this.map.layerManager.searchByLayerId('table_osm_roads');
+            const layer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER);
             (<VectorLayer>layer)?.setHighlightedIds(roadIds);
             this.map.draw();
         });
