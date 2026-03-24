@@ -1,0 +1,11 @@
+run,neighborhood_count,neighborhoods,osm_element_count,boundary_element_count,osm_processing_ms,boundaries_processing_ms,db_total_ms,map_init_ms,map_total_ms
+1,1,"Battery Park City",22509,73,190.7,4.0,344.6,2.8,35.6
+2,2,"Battery Park City; Financial District",71122,218,310.6,4.7,713.7,1.6,107.2
+3,3,"Battery Park City; Financial District; Tribeca",91093,273,369.6,4.0,880.6,1.5,150.8
+4,4,"Battery Park City; Financial District; Tribeca; SoHo",98598,299,406.1,3.6,1015.8,1.5,165.4
+5,5,"Battery Park City; Financial District; Tribeca; SoHo; Greenwich Village",111769,317,443.0,3.9,1159.7,1.5,192.5
+6,6,"Battery Park City; Financial District; Tribeca; SoHo; Greenwich Village; Chelsea",144472,448,546.8,4.5,1618.3,1.5,294.6
+7,7,"Battery Park City; Financial District; Tribeca; SoHo; Greenwich Village; Chelsea; Hell's Kitchen",167366,557,612.9,5.1,1865.9,1.6,351.1
+8,8,"Battery Park City; Financial District; Tribeca; SoHo; Greenwich Village; Chelsea; Hell's Kitchen; East Village",198027,600,716.9,5.1,2301.8,1.8,421.6
+9,9,"Battery Park City; Financial District; Tribeca; SoHo; Greenwich Village; Chelsea; Hell's Kitchen; East Village; Lower East Side",218924,628,778.5,5.7,2528.1,1.7,509.9
+10,10,"Battery Park City; Financial District; Tribeca; SoHo; Greenwich Village; Chelsea; Hell's Kitchen; East Village; Lower East Side; Harlem",273419,804,888.0,6.5,3105.4,4.3,613.8

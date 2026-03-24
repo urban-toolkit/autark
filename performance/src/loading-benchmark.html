@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>autk-db Loading Benchmark</title>
+    <link rel="stylesheet" href="./loading-benchmark.css" />
+  </head>
+  <body>
+    <h1>autk-db — OSM Loading Benchmark</h1>
+    <p class="subtitle">
+      Cumulative load of Manhattan neighborhoods (1 → N). Measures DuckDB
+      processing time only (HTTP transfer excluded). Results are persisted to
+      <code>public/data/</code> automatically.
+    </p>
+
+    <div class="controls">
+      <button id="start-btn">▶ Start Benchmark</button>
+      <button id="download-csv-btn" disabled>⬇ CSV</button>
+      <button id="download-png-btn" disabled>⬇ PNG</button>
+    </div>
+
+    <div class="status-bar" id="status">Loading…</div>
+
+    <div class="progress-track">
+      <div id="progress-bar"></div>
+      <span id="progress-text">0 / 0</span>
+    </div>
+
+    <div id="charts-section" style="display:none">
+      <div class="chart-wrap" id="chart-time"></div>
+      <div class="chart-wrap" id="chart-features"></div>
+      <div class="chart-wrap" id="chart-scatter"></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>N</th>
+          <th>OSM elements</th>
+          <th>OSM proc. (ms)</th>
+          <th>Boundaries (ms)</th>
+          <th>DB total (ms)</th>
+          <th>Map total (ms)</th>
+          <th>DB+Map (ms)</th>
+          <th>Layers</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+
+    <script type="module" src="./loading-benchmark.ts"></script>
+  </body>
+</html>

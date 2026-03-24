@@ -2,6 +2,14 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { Params, OsmElement, OnLoadingProgress } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
+
+interface OsmExecResult {
+  tables: OsmTable[];
+  osmElementCount: number;
+  boundaryElementCount: number;
+  osmDataProcessingMs: number;
+  boundariesProcessingMs: number;
+}
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from './queries';
 import { HttpCache } from '../../../shared/HttpCache';
@@ -30,41 +38,43 @@ export class LoadOsmFromOverpassApiUseCase {
     return `overpass-${type}-${queryArea.geocodeArea}-${areas}`;
   }
 
-  async exec(params: Params): Promise<OsmTable[]> {
+  async exec(params: Params): Promise<OsmExecResult> {
     if (!params.queryArea) throw new Error('queryArea must be provided');
     const workspace = params.workspace || 'main';
     const onProgress = params.onProgress;
 
-    // 1. Fetch OSM data from query area
+    // 1. Fetch OSM data from query area (HTTP may be cached)
     const osmData = await this.fetchOsmWithinArea(params.queryArea, onProgress);
     onProgress?.('processing-osm-data');
+    const t0 = performance.now();
     await this.insertOsmDataUsingJson(params.outputTableName, osmData, workspace);
+    const osmDataProcessingMs = performance.now() - t0;
     console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
-    // 2. Fetch OSM data just for boundaries
+    // 2. Fetch OSM data just for boundaries (HTTP may be cached)
     const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea, onProgress);
     onProgress?.('processing-boundaries');
+    const t1 = performance.now();
     await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData, workspace, true);
+    const boundariesProcessingMs = performance.now() - t1;
     console.log(
       `Successfully inserted ${boundariesData.elements.length} boundaries into ${params.outputTableName}_boundaries`,
     );
 
     const qualifiedTableName = `${workspace}.${params.outputTableName}`;
     const tableDescribeResponse = await this.conn.query(`DESCRIBE ${qualifiedTableName}`);
-    return [
-      {
-        source: 'osm',
-        type: 'pointset',
-        name: params.outputTableName,
-        columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-      },
-      {
-        source: 'osm',
-        type: 'pointset',
-        name: `${params.outputTableName}_boundaries`,
-        columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-      },
-    ];
+    const columns = getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray());
+
+    return {
+      tables: [
+        { source: 'osm', type: 'pointset', name: params.outputTableName, columns },
+        { source: 'osm', type: 'pointset', name: `${params.outputTableName}_boundaries`, columns },
+      ],
+      osmElementCount: osmData.elements.length,
+      boundaryElementCount: boundariesData.elements.length,
+      osmDataProcessingMs,
+      boundariesProcessingMs,
+    };
   }
 
   /**
@@ -179,6 +189,67 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
+   * Fetch a URL from the Overpass API with automatic retry.
+   *
+   * Retryable conditions (per Overpass API docs):
+   *  - 429 Too Many Requests – no concurrent slots; wait ≥15 s before retry.
+   *  - 503 Service Unavailable – transient server overload.
+   *  - 504 Gateway Timeout – can be a transient overload (not just a heavy
+   *    query), especially when it follows a 429. Retried with a longer delay.
+   *  - Network-level errors (fetch throws) – connection reset, timeout, etc.
+   *
+   * Backoff per status:
+   *  - 429 / 503 / network: 15 s → 30 s → 60 s → 120 s (±10 % jitter)
+   *  - 504: 30 s → 60 s → 120 s → 180 s (server needs more recovery time)
+   */
+  private async fetchWithRetry(url: string): Promise<Response> {
+    const MAX_RETRIES = 4;
+    const BACKOFF_429_MS = [15_000, 30_000,  60_000, 120_000];
+    const BACKOFF_504_MS = [30_000, 60_000, 120_000, 180_000];
+
+    const jitter = (ms: number) => ms * (0.9 + Math.random() * 0.2); // ±10 %
+    const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    const isRetryable = (status: number) => status === 429 || status === 503 || status === 504;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      let response: Response;
+
+      try {
+        response = await fetch(url);
+      } catch (networkErr) {
+        // fetch() itself threw – likely a connection reset or browser timeout.
+        if (attempt < MAX_RETRIES) {
+          const ms = jitter(BACKOFF_429_MS[attempt] ?? 120_000);
+          console.warn(
+            `[autk-db] Overpass API network error (attempt ${attempt + 1}/${MAX_RETRIES + 1}): ${networkErr}. ` +
+            `Retrying in ${(ms / 1000).toFixed(0)} s…`,
+          );
+          await wait(ms);
+          continue;
+        }
+        throw networkErr;
+      }
+
+      if (response.ok) return response;
+
+      if (isRetryable(response.status) && attempt < MAX_RETRIES) {
+        const backoff = response.status === 504 ? BACKOFF_504_MS : BACKOFF_429_MS;
+        const ms = jitter(backoff[attempt] ?? 180_000);
+        console.warn(
+          `[autk-db] Overpass API ${response.status} (attempt ${attempt + 1}/${MAX_RETRIES + 1}). ` +
+          `Retrying in ${(ms / 1000).toFixed(0)} s…`,
+        );
+        await wait(ms);
+        continue;
+      }
+
+      throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
+    }
+
+    throw new Error('Overpass API: max retries exceeded');
+  }
+
+  /**
    * Fetch OSM data within a geocode area from the Overpass API (with caching)
    */
   private async fetchOsmWithinArea(
@@ -229,10 +300,7 @@ export class LoadOsmFromOverpassApiUseCase {
     console.log('Fetching OSM data from Overpass API...');
     onProgress?.('querying-osm-server');
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
-    }
+    const response = await this.fetchWithRetry(url);
 
     onProgress?.('downloading-osm-data');
     const data = await response.json();
@@ -309,10 +377,7 @@ export class LoadOsmFromOverpassApiUseCase {
     console.log('Fetching OSM boundaries from Overpass API...');
     onProgress?.('querying-osm-boundaries');
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
-    }
+    const response = await this.fetchWithRetry(url);
 
     onProgress?.('downloading-boundaries');
     const data = await response.json();

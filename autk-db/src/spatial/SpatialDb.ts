@@ -17,6 +17,7 @@ import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/trans
 import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
 import { isLayerType } from './use-cases/load-layer/interfaces';
 import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
+import type { OsmLoadTimings } from './use-cases/load-osm-from-overpass-api/interfaces';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
 import { GridLayerTable } from '../shared/interfaces';
 import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces';
@@ -184,7 +185,7 @@ export class SpatialDb {
    * @returns A promise that resolves when the OSM data and layers are fully loaded.
    * @throws Error if the database or connection is not initialized.
    */
-  async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<void> {
+  async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<OsmLoadTimings> {
     if (
       !this.db ||
       !this.conn ||
@@ -196,16 +197,24 @@ export class SpatialDb {
     )
       throw new Error('Database not initialized. Please call init() first.');
 
-    const tables = await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
-    for (const table of tables) {
+    const execResult = await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
+    for (const table of execResult.tables) {
       this._registerTable(table);
     }
 
+    const timings: OsmLoadTimings = {
+      osmElementCount: execResult.osmElementCount,
+      boundaryElementCount: execResult.boundaryElementCount,
+      osmDataProcessingMs: execResult.osmDataProcessingMs,
+      boundariesProcessingMs: execResult.boundariesProcessingMs,
+      layers: [],
+    };
+
     if (params.autoLoadLayers) {
       const boundaryTableName = `${params.outputTableName}_boundaries`;
-      const rawBoundingBox = await this.getBoundingBoxFromOsmUseCase.exec({ 
+      const rawBoundingBox = await this.getBoundingBoxFromOsmUseCase.exec({
         osmTableName: boundaryTableName,
-        workspace: this.currentWorkspace 
+        workspace: this.currentWorkspace
       });
 
       const workspaceData = this.getCurrentWorkspaceData();
@@ -224,7 +233,17 @@ export class SpatialDb {
         };
 
         layerParams.boundingBox = shouldCrop ? workspaceData.osmBoudingBox : undefined;
+
+        const t0 = performance.now();
         const layerTable = await this.loadLayer(layerParams);
+        const loadMs = performance.now() - t0;
+
+        const countResult = await this.conn.query(
+          `SELECT COUNT(*) as cnt FROM ${this.currentWorkspace}.${layerTable.name}`
+        );
+        const featureCount = Number(countResult.toArray()[0].cnt);
+
+        timings.layers.push({ layerName: layerTable.name, layerType: layer, loadMs, featureCount });
 
         // Polygonize surface layer
         if (layer === 'surface') {
@@ -238,13 +257,16 @@ export class SpatialDb {
       }
 
       if (params.autoLoadLayers.dropOsmTable) {
-        for (const table of tables) {
+        for (const table of execResult.tables) {
           await this.dropTableUseCase.exec({ tableName: table.name, workspace: this.currentWorkspace });
           workspaceData.tables = workspaceData.tables.filter((t) => t.name !== table.name);
         }
       }
 
-      console.log(`OSM data loaded and completed in workspace '${this.currentWorkspace}'!`)    }
+      console.log(`OSM data loaded and completed in workspace '${this.currentWorkspace}'!`);
+    }
+
+    return timings;
   }
 
   /**

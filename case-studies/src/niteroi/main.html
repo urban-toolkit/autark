@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Shadows)</title>
+    <link rel="stylesheet" href="/src/shadows/main.css">
+</head>
+
+<body>
+    <div id="app">
+        <canvas></canvas>
+
+        <div id="plotPanel">
+            <div id="plotBar"></div>
+            <div id="plotBody"></div>
+        </div>
+    </div>
+</body>
+
+<script type="module" src="/src/shadows/main.ts"></script>
+
+<script>
+    // Draggable histogram panel
+    (function () {
+        const panel = document.querySelector('#plotPanel');
+        const bar = document.querySelector('#plotBar');
+        let startX = 0, startY = 0;
+
+        bar.addEventListener('pointerdown', e => {
+            startX = e.clientX;
+            startY = e.clientY;
+            bar.setPointerCapture(e.pointerId);
+        });
+
+        bar.addEventListener('pointermove', e => {
+            if (!bar.hasPointerCapture(e.pointerId)) return;
+            const newLeft = panel.offsetLeft + (e.clientX - startX);
+            const newTop  = panel.offsetTop  + (e.clientY - startY);
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+            panel.style.left = newLeft + 'px';
+            panel.style.top  = newTop + 'px';
+            startX = e.clientX;
+            startY = e.clientY;
+        });
+
+        bar.addEventListener('pointerup', e => bar.releasePointerCapture(e.pointerId));
+    })();
+</script>
+
+</html>
