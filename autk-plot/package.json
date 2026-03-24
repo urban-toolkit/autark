@@ -25,25 +25,25 @@
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.46.2",
-    "eslint": "^9.38.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
+    "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
-    "globals": "^16.4.0",
-    "prettier": "^3.6.2",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
     "ts-loader": "^9.5.4",
-    "typedoc": "^0.28.17",
+    "typedoc": "^0.28.18",
     "typedoc-plugin-markdown": "^4.11.0",
     "typedoc-theme-oxide": "^0.2.5",
     "typescript": "^5.9.3",
-    "vite": "^7.1.12",
+    "vite": "^8.0.2",
     "vite-plugin-dts": "^4.5.4"
   },
   "dependencies": {
-    "@turf/turf": "^7.2.0",
+    "@turf/turf": "^7.3.4",
     "d3": "^7.9.0",
     "vega": "^6.2.0",
     "vega-embed": "^7.1.0",
-    "vega-lite": "^6.4.1"
+    "vega-lite": "^6.4.2"
   }
 }

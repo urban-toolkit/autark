@@ -34,7 +34,7 @@ export class SpatialJoinNear {
             },
         });
 
-        await this.db.spatialJoin({
+    await this.db.spatialJoin({
             tableRootName: 'table_osm_roads',
             tableJoinName: 'noise',
             spatialPredicate: 'NEAR',

@@ -36,6 +36,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/main.ts'),
       name: 'autk-db',
+      formats: ['es'],
     },
     copyPublicDir: false,
     emptyOutDir: false,

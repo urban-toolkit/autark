@@ -1,5 +1,5 @@
 
-import { FeatureCollection, Feature, LineString, MultiLineString } from 'geojson';
+import { FeatureCollection, Feature, Geometry, LineString, MultiLineString } from 'geojson';
 
 import { ILayerGeometry, ILayerComponent } from './interfaces';
 
@@ -18,7 +18,7 @@ export class TriangulatorRaster {
      * @param {number[]} origin The origin point for translation
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
      */
-    static buildMesh(geotiff: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
+    static buildMesh(geotiff: FeatureCollection<Geometry | null>, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 

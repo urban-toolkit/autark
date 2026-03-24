@@ -1,8 +1,9 @@
 import { LayerType } from '../spatial/use-cases/load-layer/interfaces';
 
 export type GridLayerTable = CommonTable & { source: 'user'; type: LayerType };
+export type GeoTiffTable   = CommonTable & { source: 'geotiff'; type: 'raster' };
 
-export type Table = OsmTable | LayerTable | CsvTable | JsonTable | CustomLayerTable | GridLayerTable | AnyTable;
+export type Table = OsmTable | LayerTable | CsvTable | JsonTable | CustomLayerTable | GridLayerTable | GeoTiffTable | AnyTable;
 
 export type OsmTable = CommonTable & { source: 'osm'; type: 'pointset' }; // TODO: which type?
 export type LayerTable = CommonTable & { source: 'osm'; type: LayerType };

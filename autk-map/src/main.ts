@@ -5,6 +5,7 @@ import {
     Feature,
     FeatureCollection,
     GeoJsonProperties,
+    Geometry,
 } from 'geojson';
 
 import {
@@ -287,7 +288,7 @@ export class AutkMap {
      *               Use this when raster cells contain nested objects (e.g. from a spatial join).
      *               If omitted, cell values are used directly as numbers.
      */
-    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection, typeLayer: LayerType | null = null, getFnv: (cell: unknown) => number) {
+    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, typeLayer: LayerType | null = null, getFnv: (cell: unknown) => number) {
 
         // TODO: Validate geotiff input
         // Allow the user to provide a geotiff and parse using geotiff.js library
@@ -766,7 +767,7 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geotiff The GeoJSON data.
      */
-    private createRasterLayer(layerName: string, geotiff: FeatureCollection, getFnv: (cell: unknown) => number) {
+    private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, getFnv: (cell: unknown) => number) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(LayerType.AUTK_RASTER),

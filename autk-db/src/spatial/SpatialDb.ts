@@ -19,7 +19,8 @@ import { isLayerType } from './use-cases/load-layer/interfaces';
 import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 import type { OsmLoadTimings } from './use-cases/load-osm-from-overpass-api/interfaces';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
-import { GridLayerTable } from '../shared/interfaces';
+import { GridLayerTable, GeoTiffTable } from '../shared/interfaces';
+import { LoadGeoTiffUseCase, LoadGeoTiffParams } from './use-cases/load-geotiff';
 import { RawQueryOutput, RawQueryParams } from './use-cases/raw-query/interfaces';
 import { RawQueryUseCase } from './use-cases/raw-query';
 import { GetBoundingBoxFromOsmUseCase } from './shared/use-cases/get-bounding-box-from-osm/GetBoundingBoxFromOsmUseCase';
@@ -27,10 +28,12 @@ import { PolygonizeSurfaceLayerUseCase } from './use-cases/polygonize-surface-la
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
 import { GetTableDataParams, GetTableDataOutput, GetTableDataUseCase } from './use-cases/get-table-data';
 import { UpdateTableUseCase, UpdateTableParams } from './use-cases/update-table';
+import { toPlain } from './shared/utils';
 
 interface WorkspaceData {
   tables: Array<Table>;
   osmBoudingBox?: BoundingBox;
+  osmBoudingBoxWgs84?: BoundingBox;
 }
 
 /**
@@ -63,6 +66,7 @@ export class SpatialDb {
   private dropTableUseCase?: DropTableUseCase;
   private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
   private loadGridLayerUseCase?: LoadGridLayerUseCase;
+  private loadGeoTiffUseCase?: LoadGeoTiffUseCase;
   private rawQueryUseCase?: RawQueryUseCase;
   private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
   private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
@@ -112,6 +116,7 @@ export class SpatialDb {
     this.dropTableUseCase = new DropTableUseCase(this.conn);
     this.transformBoundingBoxCoordinatesUseCase = new TransformBoundingBoxCoordinatesUseCase(this.conn);
     this.loadGridLayerUseCase = new LoadGridLayerUseCase(this.conn);
+    this.loadGeoTiffUseCase = new LoadGeoTiffUseCase(this.db, this.conn);
     this.rawQueryUseCase = new RawQueryUseCase(this.conn);
     this.getBoundingBoxFromOsmUseCase = new GetBoundingBoxFromOsmUseCase(this.conn);
     this.polygonizeSurfaceLayerUseCase = new PolygonizeSurfaceLayerUseCase(this.db, this.conn);
@@ -218,6 +223,7 @@ export class SpatialDb {
       });
 
       const workspaceData = this.getCurrentWorkspaceData();
+      workspaceData.osmBoudingBoxWgs84 = rawBoundingBox;
       workspaceData.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: rawBoundingBox,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
@@ -357,14 +363,100 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const workspaceData = this.getCurrentWorkspaceData();
-    const table = await this.loadGridLayerUseCase.exec({ 
-      ...params, 
+    const table = await this.loadGridLayerUseCase.exec({
+      ...params,
       boundingBox: params.boundingBox || workspaceData.osmBoudingBox,
-      workspace: this.currentWorkspace 
+      workspace: this.currentWorkspace
     });
     this._registerTable(table);
 
     return table;
+  }
+
+  /**
+   * Loads a GeoTIFF raster file into the database.
+   * Uses DuckDB's spatial extension (GDAL-backed ST_Read) to parse the file.
+   * The resulting table has a `geometry` column (cell centroids) and a
+   * `properties` struct column containing one field per raster band.
+   * @param params - Parameters including the file URL or ArrayBuffer, output table name,
+   *   and optional coordinate transformation settings.
+   * @returns A promise that resolves to the created GeoTiffTable.
+   */
+  async loadGeoTiff(params: LoadGeoTiffParams): Promise<GeoTiffTable> {
+    if (!this.db || !this.conn || !this.loadGeoTiffUseCase)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = await this.loadGeoTiffUseCase.exec({
+      ...params,
+      workspace: this.currentWorkspace,
+    });
+    this._registerTable(table);
+
+    return table;
+  }
+
+  /**
+   * Retrieves a loaded GeoTIFF table as a FeatureCollection suitable for rendering with autk-map.
+   *
+   * The returned collection has a single feature whose `properties.raster` is an array of per-pixel
+   * property objects (one per cell, in row-major top-to-bottom order), plus `rasterResX` / `rasterResY`
+   * dimensions and a `bbox`.
+   *
+   * Pass the result directly to `AutkMap.loadGeoTiffLayer()` and supply a `getFnv` callback that
+   * extracts the numeric band value you want to visualise, e.g. `(cell) => cell.band_1 ?? 0`.
+   *
+   * @param tableName - The name of the GeoTiff table (as given to `loadGeoTiff`).
+   * @returns A promise that resolves to a packed raster FeatureCollection.
+   */
+  async getGeoTiffLayer(tableName: string): Promise<FeatureCollection<null>> {
+    if (!this.db || !this.conn)
+      throw new Error('Database not initialized. Please call init() first.');
+
+    const table = this.tables.find((t) => t.name === tableName);
+    if (!table || table.source !== 'geotiff')
+      throw new Error(`Table ${tableName} is not a GeoTiff table.`);
+
+    const qualifiedName = `${this.currentWorkspace}.${tableName}`;
+
+    const result = await this.conn.query(`
+      WITH pixels AS (
+        SELECT
+          t.properties AS properties,
+          ST_X(t.geometry) AS px,
+          ST_Y(t.geometry) AS py
+        FROM ${qualifiedName} t
+      )
+      SELECT
+        COUNT(DISTINCT ROUND(px, 8))::INTEGER AS res_x,
+        COUNT(DISTINCT ROUND(py, 8))::INTEGER AS res_y,
+        MIN(px) AS min_lon,
+        MIN(py) AS min_lat,
+        MAX(px) AS max_lon,
+        MAX(py) AS max_lat,
+        list(properties ORDER BY py ASC, px ASC) AS raster
+      FROM pixels
+    `);
+
+    const row = toPlain(result.toArray()[0]?.toJSON());
+    if (!row) throw new Error(`No data found in GeoTiff table ${tableName}.`);
+
+    const { res_x, res_y, min_lon, min_lat, max_lon, max_lat, raster } = row;
+
+    return {
+      type: 'FeatureCollection',
+      bbox: [min_lon, min_lat, max_lon, max_lat],
+      features: [
+        {
+          type: 'Feature',
+          geometry: null,
+          properties: {
+            rasterResX: res_x,
+            rasterResY: res_y,
+            raster,
+          },
+        },
+      ],
+    };
   }
 
   // GETTER'S
@@ -417,6 +509,15 @@ export class SpatialDb {
       workspaceData.osmBoudingBox.maxLon,
       workspaceData.osmBoudingBox.maxLat,
     ]
+  }
+
+  /**
+   * Returns the OSM bounding box in WGS84 (EPSG:4326) as loaded from the Overpass API.
+   * Useful for clipping raster files (e.g. GeoTIFF) that are stored in EPSG:4326.
+   * @returns The bounding box or null if no OSM data has been loaded.
+   */
+  getOsmBoundingBoxWgs84(): BoundingBox | null {
+    return this.getCurrentWorkspaceData().osmBoudingBoxWgs84 ?? null;
   }
 
   /**
