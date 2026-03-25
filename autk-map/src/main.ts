@@ -259,7 +259,7 @@ export class AutkMap {
 
             case LayerType.AUTK_OSM_ROADS:
             case LayerType.AUTK_GEO_POLYLINES:
-                const offset = (typeLayer === LayerType.AUTK_OSM_ROADS) ? 300 : 1000;
+                const offset = (typeLayer === LayerType.AUTK_OSM_ROADS) ? TriangulatorPolylines.offset : TriangulatorPolylines.offset * 3;
                 this.createPolylinesLayer(layerName, geojson, typeLayer, offset);
                 break;
 
@@ -643,7 +643,7 @@ export class AutkMap {
      * @param {string} layerName The name of the layer.
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number = 1000) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -795,16 +795,7 @@ export class AutkMap {
             return;
         }
 
-        const rawRaster: number[] = props.raster.map((row: unknown) => getFnv(row));
-        const rasterMin = rawRaster.reduce((a, b) => Math.min(a, b), Infinity);
-        const rasterMax = rawRaster.reduce((a, b) => Math.max(a, b), -Infinity);
-
-        console.log(`Raster min: ${rasterMin}, Raster max: ${rasterMax}`);
-
-        const rasterRange = rasterMax - rasterMin;
-        const normalizedRaster = rawRaster.map((v) =>
-            v <= 0 ? 0 : rasterRange > 0 ? (v - rasterMin) / rasterRange : 1
-        );
+        const rasterValues: number[] = props.raster.map((row: unknown) => getFnv(row));
 
         const layerData: ILayerData = {
             geometry: layerMesh[0],
@@ -812,7 +803,7 @@ export class AutkMap {
             raster: [{
                 rasterResX: props.rasterResX,
                 rasterResY: props.rasterResY,
-                rasterValues: normalizedRaster,
+                rasterValues,
             }],
         };
 

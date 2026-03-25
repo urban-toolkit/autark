@@ -442,9 +442,15 @@ export class SpatialDb {
 
     const { res_x, res_y, min_lon, min_lat, max_lon, max_lat, raster } = row;
 
+    // Expand bbox by half a pixel on each side so single-column/row rasters don't collapse to zero width/height.
+    const spacingX = Number(res_x) > 1 ? Math.abs((Number(max_lon) - Number(min_lon)) / (Number(res_x) - 1)) : null;
+    const spacingY = Number(res_y) > 1 ? Math.abs((Number(max_lat) - Number(min_lat)) / (Number(res_y) - 1)) : null;
+    const halfX = (spacingX ?? spacingY ?? 0) / 2;
+    const halfY = (spacingY ?? spacingX ?? 0) / 2;
+
     return {
       type: 'FeatureCollection',
-      bbox: [min_lon, min_lat, max_lon, max_lat],
+      bbox: [Number(min_lon) - halfX, Number(min_lat) - halfY, Number(max_lon) + halfX, Number(max_lat) + halfY],
       features: [
         {
           type: 'Feature',

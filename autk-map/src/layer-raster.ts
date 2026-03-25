@@ -239,8 +239,8 @@ export class RasterLayer extends Layer {
 
             const isRGBA = layer.rasterValues.length === layer.rasterResX * layer.rasterResY * 4;
             if (!isRGBA) {
-                const min = Math.min(...layer.rasterValues);
-                const max = Math.max(...layer.rasterValues);
+                const min = layer.rasterValues.reduce((a, b) => isNaN(b) ? a : Math.min(a, b), Infinity);
+                const max = layer.rasterValues.reduce((a, b) => isNaN(b) ? a : Math.max(a, b), -Infinity);
                 const range = max - min;
 
                 layer.rasterValues.forEach((d) => {

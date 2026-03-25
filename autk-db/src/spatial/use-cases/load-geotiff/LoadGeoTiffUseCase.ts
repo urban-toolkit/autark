@@ -61,19 +61,41 @@ export class LoadGeoTiffUseCase {
     const originY = origin[1];
     const resX = resolution[0];
     const resY = resolution[1]; // negative
-    const fullWidth = image.getWidth();
-    const fullHeight = image.getHeight();
-    const bandCount = image.getSamplesPerPixel();
+    const fullWidth = Number(image.getWidth());
+    const fullHeight = Number(image.getHeight());
+    const bandCount = Number(image.getSamplesPerPixel());
 
     // 3. Compute pixel window from optional bounding box
+    // Detect 0-360 longitude convention: originX >= 0 and raster spans > 180 degrees
+    const rasterMaxX = originX + fullWidth * resX;
+    const is0To360 = originX >= 0 && rasterMaxX > 180;
+
     let window: [number, number, number, number] | undefined;
     if (boundingBox) {
-      const xMin = Math.max(0, Math.floor((boundingBox.minLon - originX) / resX));
-      const xMax = Math.min(fullWidth, Math.ceil((boundingBox.maxLon - originX) / resX));
+      let minLon = boundingBox.minLon;
+      let maxLon = boundingBox.maxLon;
+
+      // Convert -180/180 bounding box to 0-360 if the raster uses that convention
+      if (is0To360) {
+        if (minLon < 0) minLon += 360;
+        if (maxLon < 0) maxLon += 360;
+      }
+
+      const xMin = Math.max(0, Math.floor((minLon - originX) / resX));
+      const xMax = Math.min(fullWidth, Math.ceil((maxLon - originX) / resX));
       // resY is negative so the lat comparison is inverted
       const yMin = Math.max(0, Math.floor((boundingBox.maxLat - originY) / resY));
       const yMax = Math.min(fullHeight, Math.ceil((boundingBox.minLat - originY) / resY));
-      window = [xMin, yMin, xMax, yMax];
+      if (xMin >= xMax || yMin >= yMax) {
+        console.warn(
+          `[LoadGeoTiff] Bounding box does not overlap with raster extent — loading full raster. ` +
+          `Computed window [${xMin}, ${yMin}, ${xMax}, ${yMax}] is invalid. ` +
+          `Raster uses ${is0To360 ? '0–360' : '-180–180'} longitude convention, ` +
+          `origin: (${originX}, ${originY}), size: ${fullWidth}×${fullHeight}.`
+        );
+      } else {
+        window = [xMin, yMin, xMax, yMax];
+      }
     }
 
     const windowWidth  = window ? window[2] - window[0] : fullWidth;
@@ -109,7 +131,7 @@ export class LoadGeoTiffUseCase {
         const idx = row * windowWidth + col;
         const lon = originX + (colOffset + col + 0.5) * resX;
         const lat = originY + (rowOffset + row + 0.5) * resY;
-        const bands = bandData.map((b) => b[idx]).join(',');
+        const bands = bandData.map((b) => { const v = b[idx]; return isNaN(v) ? '' : v; }).join(',');
         lines.push(`${lon},${lat},${bands}`);
       }
     }
