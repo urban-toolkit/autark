@@ -15,6 +15,7 @@ export class GetLayerGeojsonUseCase {
     const query = GET_LAYER_AS_GEOJSON_QUERY(table, workspace);
     const response = await this.conn.query(query);
 
-    return JSON.parse(response.toArray()[0]?.geojson) as FeatureCollection;
+    const raw: string = response.toArray()[0]?.geojson ?? '{"type":"FeatureCollection","features":[]}';
+    return JSON.parse(raw.replace(/\bNaN\b/g, 'null')) as FeatureCollection;
   }
 }

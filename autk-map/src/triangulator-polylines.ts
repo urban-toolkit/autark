@@ -15,7 +15,7 @@ export class TriangulatorPolylines {
      * The offset distance for the polyline extrusion.
      * @type {number}
      */
-    static offset: number = 300;
+    static offset: number = 5;
 
     /**
      * Builds a mesh from GeoJSON features representing polylines.
@@ -75,8 +75,8 @@ export class TriangulatorPolylines {
         const base = <LineString>feature.geometry;
         base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
 
-        const top = lineOffset(base, offset).geometry.coordinates;
-        const bot = lineOffset(base, -offset).geometry.coordinates;
+        const top = lineOffset(base, offset, { units: 'degrees' }).geometry.coordinates;
+        const bot = lineOffset(base, -offset, { units: 'degrees' }).geometry.coordinates;
 
         bot.forEach((cord: number[]) => top.unshift(cord));
         top.push(top[0]);
@@ -102,8 +102,8 @@ export class TriangulatorPolylines {
             const base = lineString(ls).geometry;
             base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
 
-            const top = lineOffset(base, offset).geometry.coordinates;
-            const bot = lineOffset(base, -offset).geometry.coordinates;
+            const top = lineOffset(base, offset, { units: 'degrees' }).geometry.coordinates;
+            const bot = lineOffset(base, -offset, { units: 'degrees' }).geometry.coordinates;
 
             bot.forEach((cord: number[]) => top.unshift(cord));
             top.push(top[0]);
