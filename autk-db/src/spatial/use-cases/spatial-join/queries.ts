@@ -246,9 +246,11 @@ function buildNonAggregateColumns(
 ): string {
   return nonAggregateColumns
     .map((column) => {
-      const valueExpression = isLayerType(column.table.type)
-        ? `map_extract("${column.column}", ${column.table.name}.properties)`
-        : `${column.table.name}."${column.column}"`;
+      const valueExpression = column.table.source === 'geotiff'
+        ? `${column.table.name}.properties.${column.column}`
+        : isLayerType(column.table.type)
+          ? `map_extract("${column.column}", ${column.table.name}.properties)`
+          : `${column.table.name}."${column.column}"`;
       const columnName = column.aggregateFnResultColumnName || column.column;
       return `'${columnName}', ${valueExpression}`;
     })
@@ -256,6 +258,9 @@ function buildNonAggregateColumns(
 }
 
 function generateValueExpression(table: Table, columnName: string, aggregateFunction: string): string {
+  if (table.source === 'geotiff') {
+    return `${aggregateFunction}(${table.name}.properties.${columnName})`;
+  }
   if (isLayerType(table.type)) {
     return `${aggregateFunction}(map_extract("${columnName}", ${table.name}.properties))`;
   }

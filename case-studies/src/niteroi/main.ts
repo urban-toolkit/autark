@@ -30,7 +30,7 @@ export class OsmLayersApi {
         // getOsmBoundingBoxWgs84 returns the bbox in EPSG:4326, matching the GeoTIFF source CRS.
         const boundingBox = this.db.getOsmBoundingBoxWgs84() ?? undefined;
 
-        this.db.loadGeoTiff({
+        await this.db.loadGeoTiff({
             geotiffFileUrl: '/data/elevation.tif',
             outputTableName: 'elevation',
             sourceCrs: 'EPSG:4326',
@@ -38,9 +38,30 @@ export class OsmLayersApi {
             boundingBox,
         });
 
+        await this.db.spatialJoin({
+            tableRootName: 'table_osm_roads',
+            tableJoinName: 'elevation',
+            spatialPredicate: 'NEAR',
+            nearDistance: 200,
+            output: {
+                type: 'MODIFY_ROOT',
+            },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [
+                    {
+                        tableName: 'elevation',
+                        column: 'band_1',
+                        aggregateFn: 'avg',
+                    },
+                ],
+            },
+        });
+
         this.map = new AutkMap(canvas);
         await this.map.init();
         await this.loadLayers();
+        await this.applyRoadsElevationThematic();
         await this.loadGeoTiffLayer('elevation');
         this.map.draw();
     }
@@ -51,6 +72,14 @@ export class OsmLayersApi {
             this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
+    }
+
+    protected async applyRoadsElevationThematic(): Promise<void> {
+        const geojson = await this.db.getLayer('table_osm_roads');
+        this.map.updateGeoJsonLayerThematic('table_osm_roads', geojson, (feature) => {
+            return feature.properties?.sjoin?.avg?.['elevation'] ?? 0;
+        });
+        this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
     }
 
     protected async loadGeoTiffLayer(tableName: string): Promise<void> {
