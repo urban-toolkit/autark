@@ -6,8 +6,6 @@ export class PlotStyle {
     protected static _default: ColorHEX = '#bfbfbf';
     // default highlight color
     protected static _highlight: ColorHEX = '#5dade2';
-    // default special color
-    protected static _special: ColorHEX = '#089000';
 
     static get default(): ColorHEX {
         return PlotStyle._default;
@@ -17,9 +15,6 @@ export class PlotStyle {
         return PlotStyle._highlight;
     }
 
-    static get special(): ColorHEX {
-        return PlotStyle._special;
-    }
     
     public static setHighlightColor(color: ColorHEX): void {
         PlotStyle._highlight = color;

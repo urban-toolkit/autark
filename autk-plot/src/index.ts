@@ -11,3 +11,4 @@ export * from './plot-types/scatterplot';
 export * from './plot-types/barchart';
 export * from './plot-types/pcoordinates';
 export * from './plot-types/tablevis';
+export * from './plot-types/linechart';

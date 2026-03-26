@@ -15,7 +15,7 @@ export class TriangulatorPolylines {
      * The offset distance for the polyline extrusion.
      * @type {number}
      */
-    static offset: number = 5;
+    static offset: number = 7;
 
     /**
      * Builds a mesh from GeoJSON features representing polylines.

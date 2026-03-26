@@ -119,7 +119,7 @@ export class ColorMap {
         else if (color === ColorMapInterpolator.DIVERGING_RED_BLUE) {
             const scale = d3_scale.scaleDiverging(d3_scheme[ColorMapInterpolator.DIVERGING_RED_BLUE])
             return (t: number) => scale.domain([
-                0.0, 0.5, 1.0
+                1.0, 0.5, 0.0
             ])(t);
         }
         else if (color === ColorMapInterpolator.OBSERVABLE10) {

@@ -3,7 +3,8 @@ import { BoundingBox } from '../../../shared/interfaces';
 export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string, workspace: string) => {
   const qualifiedTableName = `${workspace}.${featureCollectionTableName}`;
   return `
-    CREATE OR REPLACE TABLE ${qualifiedTableName} AS SELECT * FROM '${geojsonFileUrl}';
+    CREATE OR REPLACE TABLE ${qualifiedTableName} AS
+    SELECT * FROM read_json('${geojsonFileUrl}', maximum_object_size=104857600);
   `;
 };
 

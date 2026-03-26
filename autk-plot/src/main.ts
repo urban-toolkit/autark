@@ -12,6 +12,7 @@ export abstract class AutkPlot {
     protected _axis!: string[];
     protected _attributes!: string[];
     protected _title!: string;
+    protected _tickFormats!: string[];
 
     protected _width: number = 800;
     protected _height: number = 500;
@@ -37,6 +38,7 @@ export abstract class AutkPlot {
         this._axis = axisLabels.length > 0 ? axisLabels : attributes;
         this._attributes = attributes;
         this._title = config.labels?.title || 'Autk Plot';
+        this._tickFormats = config.tickFormats ?? ['.2s', '.2s'];
     }
 
 

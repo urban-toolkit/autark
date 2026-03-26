@@ -275,6 +275,8 @@ export class AutkMap {
                 console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
                 break;
         }
+
+        this._ui.refreshLayerList();
     }
 
     /**
@@ -302,6 +304,7 @@ export class AutkMap {
                 break;
         }
 
+        this._ui.refreshLayerList();
     }
 
     /**
@@ -458,19 +461,24 @@ export class AutkMap {
                 case 'isColorMap':
                     layer.layerRenderInfo.isColorMap = value as boolean;
                     this._ui.refreshLegend(layer);
+                    this._ui.refreshLayerList();
                     break;
                 case 'isSkip':
                     layer.layerRenderInfo.isSkip = value as boolean;
+                    this._ui.refreshLayerList();
                     break;
                 case 'isPick':
                     layer.layerRenderInfo.isPick = value as boolean;
                     if (value === false) { (layer as VectorLayer).clearHighlightedIds(); }
+                    this._ui.refreshLayerList();
                     break;
                 case 'colorMapInterpolator':
                     layer.layerRenderInfo.colorMapInterpolator = value as ColorMapInterpolator;
+                    this._ui.refreshLegend(layer);
                     break;
                 case 'colorMapLabels':
                     layer.layerRenderInfo.colorMapLabels = value as string[];
+                    this._ui.refreshLegend(layer);
                     break;
                 case 'pickedComps':
                     layer.layerRenderInfo.pickedComps = value as number[];

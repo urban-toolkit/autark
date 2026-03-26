@@ -22,6 +22,7 @@ export type PlotConfig = {
     labels?: { axis: string[]; title: string },
     attributes?: string[],
     histogram?: PlotHistogramConfig,
+    tickFormats?: string[], // d3-format specifier per axis, e.g. ['.1f', '.4f']
 }
 
 export type PlotEventListener = (selection: number[]) => void;

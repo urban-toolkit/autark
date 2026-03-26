@@ -1,9 +1,13 @@
 import { ColorMap } from './colormap.js';
-import { ColorMapInterpolator } from './index.js';
+import { ColorMapInterpolator, LayerType } from './index.js';
 import { Layer } from './layer.js';
 import { AutkMap } from './main.js';
 
 import * as d3 from 'd3';
+
+const EYE_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><path d="M8 3C4.134 3 1 8 1 8s3.134 5 7 5 7-5 7-5-3.134-5-7-5zm0 8.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>`;
+const RAMP_SVG  = `<svg viewBox="0 0 16 16" width="20" height="20"><rect x="1"   y="6" width="3.5" height="5" rx="1" fill="#4169e1"/><rect x="4.5" y="6" width="3"   height="5"        fill="#44cccc"/><rect x="7.5" y="6" width="3"   height="5"        fill="#fdd34d"/><rect x="10.5" y="6" width="3.5" height="5" rx="1" fill="#e04444"/></svg>`;
+const CURSOR_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><path d="M2 1l4.5 13 2.1-5.1L14 6.8z"/></svg>`;
 
 export class AutkMapUi {
     protected _map: AutkMap;
@@ -12,7 +16,6 @@ export class AutkMapUi {
     protected _menuIcon: HTMLDivElement | null = null;
     protected _subMenu: HTMLDivElement | null = null;
     protected _legend: HTMLDivElement | null = null;
-    private _docClickHandler: (() => void) | null = null;
 
     constructor(map: AutkMap) {
         this._map = map;
@@ -47,62 +50,48 @@ export class AutkMapUi {
     public changeActiveLayer(layer: Layer | null): void {
         if (!layer) return;
         this._activeLayer = layer;
-        console.log(`Active layer: ${this._activeLayer.layerInfo.id}`);
 
-        // Disable picking/thematic on all other vector layers
+        // Exclusive isPick: disable on all other vector layers
         this.map.layerManager.vectorLayers.forEach(l => {
-            if (l.layerInfo.id === this._activeLayer?.layerInfo.id) return;
-            this.map.updateRenderInfoProperty(l.layerInfo.id, 'isPick', false);
-            this.map.updateRenderInfoProperty(l.layerInfo.id, 'isColorMap', false);
+            if (l.layerInfo.id !== layer.layerInfo.id) {
+                this.map.updateRenderInfoProperty(l.layerInfo.id, 'isPick', false);
+            }
         });
 
-        this.map.updateRenderInfoProperty(this._activeLayer.layerInfo.id, 'isPick', true);
-
-        // Reflect checkbox state onto the newly active layer
-        const check = this._subMenu?.querySelector('#showThematicCheckbox') as HTMLInputElement | null;
-        if (check) {
-            this.map.updateRenderInfoProperty(this._activeLayer.layerInfo.id, 'isColorMap', check.checked);
-        }
-
+        this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', true);
         this.updateLegendContent();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /**
-     * Build all UI elements once. Called from AutkMap.init().
-     */
     public buildUi(): void {
         this.buildMenuIcon();
         this.buildSubMenu();
-        this.buildVisibleLayersDropdown();
-        this.buildActiveLayerDropdown();
-        this.buildLegendCheckbox();
+        this.buildLayerList();
         this.buildLegend();
-        this.addDocClickHandler();
     }
 
     /**
-     * Called externally (e.g. from updateRenderInfoProperty) when isColorMap changes.
-     * Updates the legend and checkbox to reflect the new state.
+     * Called from updateRenderInfoProperty when isColorMap / colorMapLabels /
+     * colorMapInterpolator changes. Updates the legend to reflect new state.
      */
     public refreshLegend(layer: Layer | null): void {
-        // Only take ownership of _activeLayer when a layer is being made thematic
         if (layer && layer.layerRenderInfo.isColorMap) {
             this._activeLayer = layer;
         }
         this.syncLegendVisibility();
-        this.syncCheckbox();
     }
 
-    // ── State sync (called on menu open and on external state changes) ─────────
-
-    protected syncCheckbox(): void {
-        const checkbox = this._subMenu?.querySelector('#showThematicCheckbox') as HTMLInputElement | null;
-        if (checkbox) {
-            checkbox.checked = this._activeLayer?.layerRenderInfo.isColorMap ?? false;
-        }
+    /**
+     * Called from updateRenderInfoProperty when isSkip / isPick / isColorMap
+     * changes. Re-renders the layer list rows if the menu is open.
+     */
+    public refreshLayerList(): void {
+        if (this._subMenu?.style.visibility !== 'visible') return;
+        this.populateLayerList();
     }
+
+    // ── State sync ────────────────────────────────────────────────────────────
 
     protected syncLegendVisibility(): void {
         if (!this._legend) return;
@@ -111,12 +100,7 @@ export class AutkMapUi {
         this.updateLegendContent();
     }
 
-    protected syncLayerLists(): void {
-        this.populateVisibleLayersList();
-        this.populateActiveLayersList();
-    }
-
-    // ── Build structure (each method is idempotent) ────────────────────────────
+    // ── Build structure (idempotent) ───────────────────────────────────────────
 
     protected buildMenuIcon(): void {
         if (this._menuIcon) return;
@@ -126,8 +110,9 @@ export class AutkMapUi {
         Object.assign(this._menuIcon.style, {
             width: '40px', height: '40px', position: 'absolute', display: 'flex',
             alignItems: 'center', justifyContent: 'center', zIndex: '11',
-            backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '6px',
-            cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            backgroundColor: '#fff', border: 'none', borderRadius: '10px',
+            cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            fontFamily: 'system-ui, sans-serif',
             top:  (this.map.canvas.offsetTop  + this._uiMargin) + 'px',
             left: (this.map.canvas.offsetLeft + this._uiMargin) + 'px',
         });
@@ -144,10 +129,7 @@ export class AutkMapUi {
             e.stopPropagation();
             if (!this._subMenu) return;
             const opening = this._subMenu.style.visibility !== 'visible';
-            if (opening) {
-                this.syncLayerLists();
-                this.syncCheckbox();
-            }
+            if (opening) this.populateLayerList();
             this._subMenu.style.visibility = opening ? 'visible' : 'hidden';
         });
     }
@@ -158,9 +140,12 @@ export class AutkMapUi {
         this._subMenu = document.createElement('div');
         this._subMenu.id = 'autkMapSubMenu';
         Object.assign(this._subMenu.style, {
-            position: 'absolute', width: '300px', display: 'block', zIndex: '11',
-            backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '8px',
-            padding: '10px', visibility: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            position: 'absolute', width: '260px', display: 'block', zIndex: '11',
+            backgroundColor: '#fff', border: 'none', borderRadius: '10px',
+            padding: '0', visibility: 'hidden',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            fontFamily: 'system-ui, sans-serif', fontSize: '14px',
+            overflow: 'hidden',
             top:  (this.map.canvas.offsetTop  + 35 + 2 * this._uiMargin) + 'px',
             left: (this.map.canvas.offsetLeft + this._uiMargin) + 'px',
         });
@@ -168,56 +153,15 @@ export class AutkMapUi {
         this.map.canvas.parentElement?.appendChild(this._subMenu);
     }
 
-    protected buildVisibleLayersDropdown(): void {
-        if (!this._subMenu || this._subMenu.querySelector('#visibleLayersTitle')) return;
+    protected buildLayerList(): void {
+        if (!this._subMenu || this._subMenu.querySelector('#layersTitle')) return;
 
-        this._subMenu.appendChild(this.makeHeading('visibleLayersTitle', 'Visible Layers', '0 0 10px 0'));
-        this._subMenu.appendChild(this.makeSeparator('visibleLayersSeparator'));
+        this._subMenu.appendChild(this.makeHeading('layersTitle', 'Layers'));
 
-        const { container } = this.makeDropdownShell(
-            'visibleLayerDropdownContainer',
-            'visibleLayerDropdownButton',
-            'visibleLayerDropdownList',
-        );
-        this._subMenu.appendChild(container);
-    }
-
-    protected buildActiveLayerDropdown(): void {
-        if (!this._subMenu || this._subMenu.querySelector('#activeLayersTitle')) return;
-
-        this._subMenu.appendChild(this.makeHeading('activeLayersTitle', 'Active Layer', '30px 0 10px 0'));
-        this._subMenu.appendChild(this.makeSeparator('activeLayersSeparator'));
-
-        const { container } = this.makeDropdownShell(
-            'activeLayersDropdownContainer',
-            'activeLayersDropdownButton',
-            'activeLayersDropdownList',
-        );
-        this._subMenu.appendChild(container);
-    }
-
-    protected buildLegendCheckbox(): void {
-        if (!this._subMenu || this._subMenu.querySelector('#showThematicCheckboxLabel')) return;
-
-        const label = document.createElement('label');
-        label.id = 'showThematicCheckboxLabel';
-        Object.assign(label.style, { display: 'flex', alignItems: 'center', cursor: 'pointer' });
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'showThematicCheckbox';
-        checkbox.style.marginRight = '10px';
-        checkbox.checked = this._activeLayer?.layerRenderInfo.isColorMap ?? false;
-
-        checkbox.addEventListener('change', (e) => {
-            if (!this._activeLayer) return;
-            const checked = (e.target as HTMLInputElement).checked;
-            this.map.updateRenderInfoProperty(this._activeLayer.layerInfo.id, 'isColorMap', checked);
-        });
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode('Thematic Data'));
-        this._subMenu.appendChild(label);
+        const section = document.createElement('div');
+        section.id = 'layerListSection';
+        Object.assign(section.style, { padding: '4px 0 6px' });
+        this._subMenu.appendChild(section);
     }
 
     protected buildLegend(width = 250, height = 80): void {
@@ -227,8 +171,9 @@ export class AutkMapUi {
         this._legend.id = 'autkMapLegend';
         Object.assign(this._legend.style, {
             position: 'absolute', display: 'block', zIndex: '11', visibility: 'hidden',
-            backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '8px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            backgroundColor: '#fff', border: 'none', borderRadius: '10px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            fontFamily: 'system-ui, sans-serif', fontSize: '14px',
             width: width + 'px', height: height + 'px',
             left: (this.map.canvas.offsetLeft + this.map.canvas.clientWidth  - 2 - width  - this._uiMargin) + 'px',
             top:  (this.map.canvas.offsetTop  + this.map.canvas.clientHeight - 2 - height - this._uiMargin) + 'px',
@@ -237,57 +182,17 @@ export class AutkMapUi {
         this.map.canvas.parentElement?.appendChild(this._legend);
     }
 
-    // ── List population (called each time the menu opens) ─────────────────────
+    // ── Layer list population ─────────────────────────────────────────────────
 
-    protected populateVisibleLayersList(): void {
-        const list = this._subMenu?.querySelector('#visibleLayerDropdownList') as HTMLDivElement | null;
-        if (!list) return;
-        list.innerHTML = '';
+    protected populateLayerList(): void {
+        const section = this._subMenu?.querySelector('#layerListSection') as HTMLDivElement | null;
+        if (!section) return;
+        section.innerHTML = '';
 
         const all: Layer[] = [...this.map.layerManager.vectorLayers, ...this.map.layerManager.rasterLayers];
         for (const layer of all) {
-            const { label, checkbox } = this.makeCheckboxRow(layer.layerInfo.id, !layer.layerRenderInfo.isSkip);
-            checkbox.addEventListener('change', (e) => {
-                layer.layerRenderInfo.isSkip = !(e.target as HTMLInputElement).checked;
-            });
-            list.appendChild(label);
+            section.appendChild(this.makeLayerRow(layer));
         }
-    }
-
-    protected populateActiveLayersList(): void {
-        const list = this._subMenu?.querySelector('#activeLayersDropdownList') as HTMLDivElement | null;
-        if (!list) return;
-        list.innerHTML = '';
-
-        const layers: Layer[] = this.map.layerManager.vectorLayers;
-        layers.forEach((layer, idx) => {
-            const isActive = this._activeLayer
-                ? layer.layerInfo.id === this._activeLayer.layerInfo.id
-                : idx === layers.length - 1;
-
-            const label = document.createElement('label');
-            Object.assign(label.style, { display: 'flex', alignItems: 'center', padding: '4px 12px', cursor: 'pointer' });
-
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = 'activeLayerRadio';
-            radio.className = 'active-layer-radio';
-            radio.value = layer.layerInfo.id;
-            radio.checked = isActive;
-            radio.style.marginRight = '8px';
-
-            if (isActive && !this._activeLayer) {
-                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
-            }
-
-            radio.addEventListener('change', () => {
-                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
-            });
-
-            label.appendChild(radio);
-            label.appendChild(document.createTextNode(layer.layerInfo.id));
-            list.appendChild(label);
-        });
     }
 
     // ── Legend content ────────────────────────────────────────────────────────
@@ -297,9 +202,12 @@ export class AutkMapUi {
 
         this._legend.innerHTML = '';
 
-        const title = document.createElement('h4');
+        const title = document.createElement('div');
         title.textContent = this._activeLayer.layerInfo.id;
-        Object.assign(title.style, { margin: `${this._uiMargin}px`, fontSize: '14px', color: '#333', textAlign: 'center' });
+        Object.assign(title.style, {
+            padding: '10px 14px 6px', fontWeight: '600', fontSize: '14px',
+            color: '#222', borderBottom: '1px solid #e8e8e8', textAlign: 'center',
+        });
         this._legend.appendChild(title);
 
         const padding     = this._uiMargin;
@@ -340,74 +248,64 @@ export class AutkMapUi {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private addDocClickHandler(): void {
-        if (this._docClickHandler) return;
-        this._docClickHandler = () => {
-            const vList = this._subMenu?.querySelector('#visibleLayerDropdownList') as HTMLElement | null;
-            const aList = this._subMenu?.querySelector('#activeLayersDropdownList') as HTMLElement | null;
-            if (vList) vList.style.display = 'none';
-            if (aList) aList.style.display = 'none';
-        };
-        document.addEventListener('click', this._docClickHandler);
-    }
-
-    private makeHeading(id: string, text: string, margin: string): HTMLHeadingElement {
-        const h = document.createElement('h3');
-        h.id = id;
-        h.textContent = text;
-        Object.assign(h.style, { margin, fontSize: '16px', color: '#333' });
-        return h;
-    }
-
-    private makeSeparator(id: string): HTMLHRElement {
-        const hr = document.createElement('hr');
-        hr.id = id;
-        hr.style.margin = '10px 0';
-        return hr;
-    }
-
-    private makeDropdownShell(containerId: string, buttonId: string, listId: string) {
-        const container = document.createElement('div');
-        container.id = containerId;
-        Object.assign(container.style, { position: 'relative', marginBottom: '10px' });
-
-        const button = document.createElement('button');
-        button.id = buttonId;
-        button.textContent = 'Select Layers';
-        Object.assign(button.style, {
-            width: '100%', padding: '6px 12px', border: '1px solid #ccc',
-            borderRadius: '4px', background: '#f9f9f9', cursor: 'pointer', textAlign: 'left',
-        });
-        container.appendChild(button);
-
-        const list = document.createElement('div');
-        list.id = listId;
-        Object.assign(list.style, {
-            position: 'absolute', top: '110%', left: '0', width: '99%',
-            background: '#f9f9f9', border: '1px solid #ccc', borderRadius: '4px',
-            display: 'none', zIndex: '12', maxHeight: '200px', overflowY: 'auto', padding: '8px 0',
-        });
-        container.appendChild(list);
-
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            list.style.display = list.style.display === 'block' ? 'none' : 'block';
+    private makeLayerRow(layer: Layer): HTMLDivElement {
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+            display: 'flex', alignItems: 'center', gap: '2px',
+            padding: '4px 10px 4px 14px',
         });
 
-        return { container, button, list };
+        const eyeBtn = this.makeIconButton(EYE_SVG, !layer.layerRenderInfo.isSkip, () => {
+            this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isSkip', !layer.layerRenderInfo.isSkip);
+        });
+
+        const paletteBtn = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
+            this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isColorMap', !layer.layerRenderInfo.isColorMap);
+        });
+
+        const isRaster = layer.layerInfo.typeLayer === LayerType.AUTK_RASTER;
+        const cursorBtn = isRaster
+            ? (() => { const s = document.createElement('span'); s.style.width = '28px'; s.style.flexShrink = '0'; return s; })()
+            : this.makeIconButton(CURSOR_SVG, layer.layerRenderInfo.isPick ?? false, () => {
+                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
+            });
+
+        const nameEl = document.createElement('span');
+        nameEl.textContent = layer.layerInfo.id;
+        Object.assign(nameEl.style, {
+            flex: '1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: '13px', color: '#333', marginLeft: '4px',
+        });
+
+        row.appendChild(eyeBtn);
+        row.appendChild(paletteBtn);
+        row.appendChild(cursorBtn);
+        row.appendChild(nameEl);
+        return row;
     }
 
-    private makeCheckboxRow(labelText: string, checked: boolean) {
-        const label = document.createElement('label');
-        Object.assign(label.style, { display: 'flex', alignItems: 'center', padding: '4px 12px', cursor: 'pointer' });
+    private makeIconButton(svg: string, active: boolean, onClick: () => void): HTMLButtonElement {
+        const btn = document.createElement('button');
+        btn.innerHTML = svg;
+        Object.assign(btn.style, {
+            width: '28px', height: '28px', flexShrink: '0',
+            border: 'none', borderRadius: '4px', cursor: 'pointer',
+            background: 'none', padding: '2px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            opacity: active ? '1' : '0.25',
+        });
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = checked;
-        checkbox.style.marginRight = '8px';
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(labelText));
-        return { label, checkbox };
+    private makeHeading(id: string, text: string): HTMLDivElement {
+        const d = document.createElement('div');
+        d.id = id;
+        d.textContent = text;
+        Object.assign(d.style, {
+            padding: '10px 14px 6px', fontWeight: '600', fontSize: '14px',
+            color: '#222', borderBottom: '1px solid #e8e8e8',
+        });
+        return d;
     }
 }

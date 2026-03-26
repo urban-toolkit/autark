@@ -34,6 +34,8 @@ export class Scatterplot extends PlotD3   {
             throw new Error('SVG element could not be created.');
         }
 
+        svg.attr('width', this._width).attr('height', this._height);
+
         // ---- Tamanho do Gráfico
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
@@ -60,7 +62,7 @@ export class Scatterplot extends PlotD3   {
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Eixos
-        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(d3.format('.2s'));
+        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(d3.format(this._tickFormats[0]));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisX')
@@ -68,9 +70,10 @@ export class Scatterplot extends PlotD3   {
             .join('g')
             .attr('id', 'axisX')
             .attr('class', 'x axis')
-            .attr('transform', `translate(${this._margins.left}, ${500 - this._margins.bottom})`)
+            .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
         xAxisSelection.call(xAxis);
+        xAxisSelection.selectAll<SVGLineElement, unknown>('.tick line').style('stroke', '#e0e0e0');
 
         // Add X axis label:
         xAxisSelection
@@ -82,7 +85,7 @@ export class Scatterplot extends PlotD3   {
             .style('visibility', 'visible')
             .text(this._axis[0]);
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format('.2s'));
+        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisY')
@@ -93,6 +96,7 @@ export class Scatterplot extends PlotD3   {
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');
         yAxisSelection.call(yAxis);
+        yAxisSelection.selectAll<SVGLineElement, unknown>('.tick line').style('stroke', '#e0e0e0');
 
         // Y axis label:
         yAxisSelection
@@ -130,7 +134,7 @@ export class Scatterplot extends PlotD3   {
             .attr('class', 'autkMark')
             .attr('cx', (d) => this.mapX(d ? +this.getNestedValue(d, this._attributes[0]) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
-            .attr('r', 6)
+            .attr('r', 3)
             .style('fill', PlotStyle.default)
             .style('visibility', 'inherit');
 

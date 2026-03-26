@@ -95,4 +95,12 @@ export class MapStyle {
     public static getHighlightColor(): ColorRGB {
         return ColorMap.hexToRgb(MapStyle._highlight);
     }
+
+    /**
+     * Set the highlight color
+     * @param {ColorHEX} color The new highlight color in hex format
+     */
+    public static setHighlightColor(color: ColorHEX): void {
+        MapStyle._highlight = color;
+    }
 }
