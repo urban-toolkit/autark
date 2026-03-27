@@ -1,5 +1,9 @@
 
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
+import { SpatialDb } from 'autk-db';
+import { AutkMap, ColorMapInterpolator, LayerType, MapEvent, VectorLayer } from 'autk-map';
+import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
+import { GeojsonCompute, RenderCompute } from 'autk-compute';
 
 function setLoadingState(message: string, note?: string): void {
     const text = document.getElementById('loading-text');
@@ -24,11 +28,6 @@ function showError(message: string, note?: string): void {
     if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
 }
 
-import { SpatialDb } from 'autk-db';
-import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
-import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
-import { GeojsonCompute } from 'autk-compute';
-
 export class Urbane {
     protected map!: AutkMap;
     protected db!: SpatialDb;
@@ -37,6 +36,7 @@ export class Urbane {
 
     protected neighs!: FeatureCollection;
     protected activeBuildings!: FeatureCollection;
+    protected roadsWithSVF?: FeatureCollection;
 
     protected distance: number = 1000;
     protected currentLevel: 'neighborhoods' | 'active_buildings' = 'neighborhoods';
@@ -127,6 +127,16 @@ export class Urbane {
 
         setLoadingState('Computing livability score...', 'Applying weighted GPU function over neighborhood data.');
         this.neighs = await this.computeScore(await this.db.getLayer('neighborhoods'));
+
+        setLoadingState('Computing sky view factor...', 'Running render-based GPU analysis for road segments.');
+        const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
+        const roadsGeoJson     = await this.db.getLayer('table_osm_roads');
+        const rc = new RenderCompute();
+        this.roadsWithSVF = await rc.renderIntoMetrics({
+            layers:     [{ geojson: buildingsGeoJson, color: [0.8, 0.3, 0.1, 1.0] }],
+            viewpoints: roadsGeoJson,
+            tileSize:   64,
+        });
     }
 
     // ── Compute ───────────────────────────────────────────────────────────────
@@ -165,6 +175,15 @@ export class Urbane {
         this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
         this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
         this.map.draw();
+
+        if (this.roadsWithSVF) {
+            this.map.updateGeoJsonLayerThematic(
+                'table_osm_roads',
+                this.roadsWithSVF,
+                (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
+            );
+            this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
+        }
     }
 
     protected updateThematicData(column: string): void {
