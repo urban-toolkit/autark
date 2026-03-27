@@ -1,6 +1,29 @@
 
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 
+function setLoadingState(message: string, note?: string): void {
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? '';
+}
+
+function hideLoading(): void {
+    document.getElementById('loading-overlay')?.classList.add('hidden');
+}
+
+function showError(message: string, note?: string): void {
+    const overlay = document.getElementById('loading-overlay');
+    const title = document.getElementById('loading-title');
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    overlay?.classList.remove('hidden');
+    overlay?.classList.add('error');
+    if (title) title.textContent = 'Loading Error';
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
+}
+
 import { SpatialDb } from 'autk-db';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
@@ -42,9 +65,11 @@ export class Urbane {
     // ── Database ──────────────────────────────────────────────────────────────
 
     protected async loadDb(): Promise<void> {
+        setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
         this.db = new SpatialDb();
         await this.db.init();
 
+        setLoadingState('Loading OpenStreetMap data...', 'Fetching Manhattan from Overpass API.');
         await this.db.loadOsmFromOverpassApi({
             queryArea: { geocodeArea: 'New York', areas: ['Manhattan Island'] },
             outputTableName: 'table_osm',
@@ -57,6 +82,7 @@ export class Urbane {
             },
         });
 
+        setLoadingState('Loading neighborhood dataset...', 'Importing Manhattan neighborhood boundaries.');
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
             outputTableName: 'neighborhoods',
@@ -71,6 +97,7 @@ export class Urbane {
             joinType: 'LEFT',
         });
 
+        setLoadingState('Loading urban datasets...', 'Importing arrests, schools, restaurants, and other datasets.');
         for (const dataset of this.datasets) {
             await this.db.loadCsv({
                 csvFileUrl: `http://localhost:5173/data/${dataset}_manhattan_clean.csv`,
@@ -98,6 +125,7 @@ export class Urbane {
             });
         }
 
+        setLoadingState('Computing livability score...', 'Applying weighted GPU function over neighborhood data.');
         this.neighs = await this.computeScore(await this.db.getLayer('neighborhoods'));
     }
 
@@ -121,9 +149,11 @@ export class Urbane {
     // ── Map ───────────────────────────────────────────────────────────────────
 
     protected async loadMap(): Promise<void> {
+        setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
         this.map = new AutkMap(this.mapCanvas);
         await this.map.init();
 
+        setLoadingState('Rendering layers...', 'Uploading geometry to the GPU.');
         for (const layerData of this.db.getLayerTables()) {
             const geojson = layerData.name === 'neighborhoods'
                 ? this.neighs
@@ -337,19 +367,24 @@ export class Urbane {
 }
 
 async function main() {
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const plotDivParallel = document.querySelector('#plotBodyParallel') as HTMLElement;
-    const plotDivTable = document.querySelector('#plotBodyTable') as HTMLElement;
+    try {
+        const canvas = document.querySelector('canvas');
+        const plotDivParallel = document.querySelector('#plotBodyParallel') as HTMLElement;
+        const plotDivTable = document.querySelector('#plotBodyTable') as HTMLElement;
 
-    if (!canvas || !plotDivParallel || !plotDivTable) {
-        console.error('Canvas or plot body element not found');
-        return;
+        if (!(canvas instanceof HTMLCanvasElement) || !plotDivParallel || !plotDivTable) {
+            throw new Error('Canvas or plot body element not found.');
+        }
+
+        const urbane = new Urbane();
+        await urbane.run(canvas, plotDivParallel, plotDivTable);
+
+        (window as any).urbane = urbane;
+        hideLoading();
+        window.dispatchEvent(new CustomEvent('urbane-ready'));
+    } catch (error) {
+        console.error(error);
+        showError('Failed to load the Urbane case study.', 'Please verify the dataset paths and reload the page.');
     }
-
-    const urbane = new Urbane();
-    await urbane.run(canvas, plotDivParallel, plotDivTable);
-
-    (window as any).urbane = urbane;
-    window.dispatchEvent(new CustomEvent('urbane-ready'));
 }
 main();

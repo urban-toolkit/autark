@@ -1,6 +1,29 @@
 
 import { Feature, FeatureCollection } from 'geojson';
 
+function setLoadingState(message: string, note?: string): void {
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? '';
+}
+
+function hideLoading(): void {
+    document.getElementById('loading-overlay')?.classList.add('hidden');
+}
+
+function showError(message: string, note?: string): void {
+    const overlay = document.getElementById('loading-overlay');
+    const title = document.getElementById('loading-title');
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    overlay?.classList.remove('hidden');
+    overlay?.classList.add('error');
+    if (title) title.textContent = 'Loading Error';
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
+}
+
 import { SpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
@@ -48,9 +71,11 @@ export class Shadows {
     // ── Database ──────────────────────────────────────────────────────────────
 
     protected async loadDb(): Promise<void> {
+        setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
         this.db = new SpatialDb();
         await this.db.init();
 
+        setLoadingState('Loading OpenStreetMap data...', 'Fetching Chicago Loop from Overpass API.');
         await this.db.loadOsmFromOverpassApi({
             queryArea: {
                 geocodeArea: 'Chicago',
@@ -66,6 +91,7 @@ export class Shadows {
             },
         });
 
+        setLoadingState('Loading shadow measurements...', 'Importing accumulated shadow data.');
         await this.db.loadCsv({
             csvFileUrl: `http://localhost:5173/data/shadows_chicago.csv`,
             outputTableName: 'shadows',
@@ -76,6 +102,7 @@ export class Shadows {
             },
         });
 
+        setLoadingState('Splitting road segments...', 'Dividing roads into 20 m segments.');
         await this.db.rawQuery({
             query: splitRoadsQuery,
             output: {
@@ -86,6 +113,7 @@ export class Shadows {
             },
         });
 
+        setLoadingState('Computing shadow joins...', 'Linking shadow measurements to road segments for each season.');
         for (const month of ['jun', 'sep', 'dez']) {
             await this.db.spatialJoin({
                 tableRootName: this.ROADS_LAYER,
@@ -166,10 +194,11 @@ export class Shadows {
     // ── Map ───────────────────────────────────────────────────────────────────
 
     protected async loadMap(canvas: HTMLCanvasElement): Promise<void> {
+        setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        // vector layers
+        setLoadingState('Rendering layers...', 'Uploading geometry to the GPU.');
         for (const layerData of this.db.getLayerTables()) {
             // Skip the original un-split roads; we use the 20 m version instead.
             if (layerData.name === 'table_osm_roads') continue;
@@ -329,18 +358,23 @@ export class Shadows {
 }
 
 async function main() {
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const histogramDiv = document.querySelector('#histogramBody') as HTMLElement;
+    try {
+        const canvas = document.querySelector('canvas');
+        const histogramDiv = document.querySelector('#histogramBody') as HTMLElement;
 
-    if (!canvas || !histogramDiv) {
-        console.error('Canvas or histogram element not found');
-        return;
+        if (!(canvas instanceof HTMLCanvasElement) || !histogramDiv) {
+            throw new Error('Canvas or histogram element not found.');
+        }
+
+        const shadows = new Shadows();
+        await shadows.run(canvas, histogramDiv);
+
+        (window as any).shadows = shadows;
+        hideLoading();
+        window.dispatchEvent(new CustomEvent('shadows-ready'));
+    } catch (error) {
+        console.error(error);
+        showError('Failed to load the Shadows case study.', 'Please verify the dataset paths and reload the page.');
     }
-
-    const shadows = new Shadows();
-    await shadows.run(canvas, histogramDiv);
-
-    (window as any).shadows = shadows;
-    window.dispatchEvent(new CustomEvent('shadows-ready'));
 }
 main();
