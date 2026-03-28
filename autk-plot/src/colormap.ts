@@ -2,7 +2,7 @@ import * as d3_color from 'd3-color';
 import * as d3_scale from 'd3-scale-chromatic';
 
 import { ColorHEX, ColorRGB, ColorTEX } from './types';
-import { ColorMapInterpolator } from './constants';
+import { ColorMapInterpolator, NormalizationMode } from './constants';
 
 export class ColorMap {
     protected static _interpolator: (t: number) => string;
@@ -36,6 +36,46 @@ export class ColorMap {
         }
 
         return tex;
+    }
+
+    /**
+     * Compute the value at a given percentile from an array of numbers.
+     * @param values The array of numbers
+     * @param p The percentile in [0, 1]
+     * @returns The value at the given percentile
+     */
+    private static computePercentile(values: number[], p: number): number {
+        if (values.length === 0) return 0;
+        const sorted = [...values].sort((a, b) => a - b);
+        const idx = p * (sorted.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+    }
+
+    /**
+     * Compute the normalization range [min, max] for a set of values.
+     * In MIN_MAX mode returns the actual min and max.
+     * In PERCENTILE mode returns the values at the given percentile bounds.
+     * @param values The array of numbers to normalize
+     * @param mode The normalization mode
+     * @param lowerPercentile The lower percentile bound (default 0.02)
+     * @param upperPercentile The upper percentile bound (default 0.98)
+     * @returns A tuple [min, max] representing the normalization range
+     */
+    public static computeNormalizationRange(
+        values: number[],
+        mode: NormalizationMode = NormalizationMode.MIN_MAX,
+        lowerPercentile?: number,
+        upperPercentile?: number,
+    ): [number, number] {
+        if (mode === NormalizationMode.PERCENTILE) {
+            return [
+                ColorMap.computePercentile(values, lowerPercentile ?? 0.02),
+                ColorMap.computePercentile(values, upperPercentile ?? 0.98),
+            ];
+        }
+        return [Math.min(...values), Math.max(...values)];
     }
 
     public static rgbToHex(color: ColorRGB): ColorHEX {

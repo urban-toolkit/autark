@@ -1,7 +1,7 @@
 
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
-import { PlotEvent } from './constants';
+import { NormalizationMode, PlotEvent } from './constants';
 
 export type PlotMargins = { left: number; right: number; top: number; bottom: number };
 
@@ -23,6 +23,7 @@ export type PlotConfig = {
     attributes?: string[],
     histogram?: PlotHistogramConfig,
     tickFormats?: string[], // d3-format specifier per axis, e.g. ['.1f', '.4f']
+    normalization?: { mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number };
 }
 
 export type PlotEventListener = (selection: number[]) => void;

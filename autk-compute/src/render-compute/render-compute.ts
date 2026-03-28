@@ -181,13 +181,13 @@ export class RenderCompute {
                 size:  mesh.positions.byteLength,
                 usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             });
-            device.queue.writeBuffer(vBuf, 0, mesh.positions);
+            device.queue.writeBuffer(vBuf, 0, mesh.positions as Float32Array<ArrayBuffer>);
 
             const iBuf = device.createBuffer({
                 size:  mesh.indices.byteLength,
                 usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
             });
-            device.queue.writeBuffer(iBuf, 0, mesh.indices);
+            device.queue.writeBuffer(iBuf, 0, mesh.indices as Uint32Array<ArrayBuffer>);
 
             const colorBuf = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
             device.queue.writeBuffer(colorBuf, 0, new Float32Array(color));

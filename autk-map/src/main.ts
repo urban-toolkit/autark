@@ -12,6 +12,7 @@ import {
     ColorMapInterpolator,
     LayerType,
     MapEvent,
+    NormalizationMode,
     ThematicAggregationLevel,
 } from './constants';
 
@@ -23,6 +24,7 @@ import {
     ILayerThematic,
 } from './interfaces';
 
+import { ColorMap } from './colormap';
 import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { KeyEvents } from './key-events';
@@ -350,8 +352,9 @@ export class AutkMap {
      * @param {(feature: Feature) => number | string} getFnv A function that extracts a numeric value from a GeoJSON feature
      * @param {FeatureCollection} geojson The GeoJSON data containing the features
      * @param {boolean} [groupById=false] Whether to group features by their 'building_id' property to ensure uniqueness
+     * @param {{ mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number }} [normalization] How to map raw values to [0, 1]. Defaults to MIN_MAX.
      */
-    updateGeoJsonLayerThematic(layerName: string, geojson: FeatureCollection, getFnv: (feature: Feature) => number | string, groupById: boolean = false) {
+    updateGeoJsonLayerThematic(layerName: string, geojson: FeatureCollection, getFnv: (feature: Feature) => number | string, groupById: boolean = false, normalization: { mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number } = { mode: NormalizationMode.MIN_MAX }) {
         const thematicData: ILayerThematic[] = [];
 
         let filtered: Feature[] = geojson.features;
@@ -382,15 +385,20 @@ export class AutkMap {
                 });
             }
 
-            const valMin = Math.min(...thematicData.map(d => +d.values[0]));
-            const valMax = Math.max(...thematicData.map(d => +d.values[0]));
+            const rawValues = thematicData.map(d => +d.values[0]);
+            const [valMin, valMax] = ColorMap.computeNormalizationRange(
+                rawValues,
+                normalization.mode,
+                normalization.lowerPercentile,
+                normalization.upperPercentile,
+            );
 
             this.updateRenderInfoProperty(layerName, 'colorMapLabels', [`${valMin}`, `${valMax}`]);
 
             const range = valMax - valMin;
             for (let i = 0; i < thematicData.length; i++) {
                 const val = +thematicData[i].values[0];
-                thematicData[i].values = [range > 0 ? (val - valMin) / range : 0];
+                thematicData[i].values = [range > 0 ? Math.max(0, Math.min(1, (val - valMin) / range)) : 0];
             }
         }
 

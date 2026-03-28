@@ -1,7 +1,7 @@
 
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 import { SpatialDb } from 'autk-db';
-import { AutkMap, ColorMapInterpolator, LayerType, MapEvent, VectorLayer } from 'autk-map';
+import { AutkMap, ColorMapInterpolator, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
 
@@ -181,6 +181,8 @@ export class Urbane {
                 'table_osm_roads',
                 this.roadsWithSVF,
                 (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
+                false,
+                { mode: NormalizationMode.PERCENTILE },
             );
             this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
         }
