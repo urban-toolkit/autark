@@ -1,9 +1,10 @@
 
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
+
 import { SpatialDb } from 'autk-db';
-import { AutkMap, ColorMapInterpolator, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
-import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
+import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
+import { AutkMap, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
 
 function setLoadingState(message: string, note?: string): void {
     const text = document.getElementById('loading-text');
@@ -36,7 +37,7 @@ export class Urbane {
 
     protected neighs!: FeatureCollection;
     protected activeBuildings!: FeatureCollection;
-    protected roadsWithSVF?: FeatureCollection;
+    protected roadsWithSky?: FeatureCollection;
 
     protected distance: number = 1000;
     protected currentLevel: 'neighborhoods' | 'active_buildings' = 'neighborhoods';
@@ -48,6 +49,7 @@ export class Urbane {
 
     public datasets: string[] = ['arrest', 'new_building', 'noise', 'restaurants', 'school', 'subway', 'tree'];
     public weights: number[] = [0.3, 0.2, 0.0, 0.5, 0.0, 0.0, 0.0];
+    public skyExposureWeight: number = 0.0;
 
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
         this.mapCanvas = canvas;
@@ -125,34 +127,72 @@ export class Urbane {
             });
         }
 
-        setLoadingState('Computing livability score...', 'Applying weighted GPU function over neighborhood data.');
-        this.neighs = await this.computeScore(await this.db.getLayer('neighborhoods'));
-
         setLoadingState('Computing sky view factor...', 'Running render-based GPU analysis for road segments.');
         const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
         const roadsGeoJson     = await this.db.getLayer('table_osm_roads');
         const rc = new RenderCompute();
-        this.roadsWithSVF = await rc.renderIntoMetrics({
+        this.roadsWithSky = await rc.renderIntoMetrics({
             layers:     [{ geojson: buildingsGeoJson, color: [0.8, 0.3, 0.1, 1.0] }],
             viewpoints: roadsGeoJson,
             tileSize:   64,
         });
+
+        setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
+        await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });
+
+        await this.db.spatialJoin({
+            tableRootName: 'neighborhoods',
+            tableJoinName: 'table_osm_roads',
+            spatialPredicate: 'INTERSECT',
+            output: { type: 'MODIFY_ROOT' },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [{
+                    tableName: 'table_osm_roads',
+                    column: 'compute.skyViewFactor',
+                    aggregateFn: 'avg',
+                    aggregateFnResultColumnName: 'skyExposure',
+                    normalize: true,
+                }],
+            },
+        });
+
+        setLoadingState('Computing livability score...', 'Applying weighted GPU function over neighborhood data.');
+        this.neighs = await this.computeScore(await this.db.getLayer('neighborhoods'));
     }
 
     // ── Compute ───────────────────────────────────────────────────────────────
 
     protected async computeScore(geojson: FeatureCollection): Promise<FeatureCollection> {
-        const variableMapping = Object.fromEntries(
-            this.datasets.map(d => [d, `sjoin.count.${d}_norm`])
-        );
+        // Pack all normalised inputs into one array per feature so the GPU uses
+        // 3 storage buffers (vals + weights + output) instead of one per attribute,
+        // staying well within the WebGPU per-stage limit of 8.
         const invertedDatasets = new Set(['arrest', 'noise']);
-        const wglsFunction = `return ${this.datasets.map((d, i) => `${invertedDatasets.has(d) ? `(1.0 - ${d})` : d} * ${this.weights[i]}`).join(' + ')};`;
+        const N = this.datasets.length + 1; // 7 datasets + sky exposure = 8
+
+        for (const f of geojson.features) {
+            const p = f.properties as any;
+            const vals = this.datasets.map(d => {
+                const v: number = p?.sjoin?.count?.[`${d}_norm`] ?? 0;
+                return invertedDatasets.has(d) ? 1 - v : v;
+            });
+            vals.push(p?.sjoin?.avg?.skyExposure_norm ?? 0); // index 7; 0 for buildings
+            p.scoreInputs = vals;
+        }
 
         return new GeojsonCompute().computeFunctionIntoProperties({
             geojson,
-            attributes: variableMapping,
+            attributes: { vals: 'scoreInputs' },
+            attributeArrays: { vals: N },
+            uniformArrays: { weights: [...this.weights, this.skyExposureWeight] },
             outputColumnName: 'score',
-            wglsFunction,
+            wglsFunction: `
+                var s = 0.0;
+                for (var i = 0u; i < vals_length; i++) {
+                    s += vals[i] * weights[i];
+                }
+                return s;
+            `,
         });
     }
 
@@ -176,10 +216,10 @@ export class Urbane {
         this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
         this.map.draw();
 
-        if (this.roadsWithSVF) {
+        if (this.roadsWithSky) {
             this.map.updateGeoJsonLayerThematic(
                 'table_osm_roads',
-                this.roadsWithSVF,
+                this.roadsWithSky,
                 (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
                 false,
                 { mode: NormalizationMode.PERCENTILE },
@@ -215,8 +255,16 @@ export class Urbane {
         this.plotDivParallel.innerHTML = '';
         this.plotDivTable.innerHTML = '';
 
-        const attributes = [...this.datasets.map(d => `sjoin.count.${d}`), 'compute.score'];
-        const axisLabels = [...this.datasets, 'Score'];
+        const attributes = [
+            ...this.datasets.map(d => `sjoin.count.${d}`),
+            'sjoin.avg.skyExposure',
+            'compute.score',
+        ];
+        const axisLabels = [
+            ...this.datasets,
+            'sky exposure',
+            'score',
+        ];
         const plotData = this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
         const titleCol = this.currentLevel === 'neighborhoods' ? 'ntaname' : 'addr:street';
         const title = `${this.currentLevel} characteristics`;
@@ -273,7 +321,8 @@ export class Urbane {
     // ── Weights ───────────────────────────────────────────────────────────────
 
     public async updateWeights(newWeights: number[]): Promise<void> {
-        this.weights = newWeights;
+        this.weights = newWeights.slice(0, this.datasets.length);
+        this.skyExposureWeight = newWeights[this.datasets.length] ?? 0;
 
         const rawLayer = await this.db.getLayer(this.currentLevel);
         if (this.currentLevel === 'neighborhoods')
@@ -301,16 +350,9 @@ export class Urbane {
 
         await this.db.rawQuery({
             query: `
-                WITH grouped AS (
-                    SELECT building_id,
-                           ST_Union_Agg(geometry) AS geometry,
-                           ANY_VALUE(properties)  AS properties
-                    FROM   table_osm_buildings
-                    WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
-                    GROUP  BY building_id
-                )
-                SELECT geometry, properties, (ROW_NUMBER() OVER () - 1) AS building_id
-                FROM   grouped
+                SELECT geometry, properties, building_id
+                FROM   table_osm_buildings
+                WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
             `,
             output: { type: 'CREATE_TABLE', tableName: 'active_buildings', source: 'osm', tableType: LayerType.AUTK_OSM_BUILDINGS },
         });
@@ -334,6 +376,25 @@ export class Urbane {
                 },
             });
         }
+
+        await this.db.spatialJoin({
+            tableRootName: 'active_buildings',
+            tableJoinName: 'table_osm_roads',
+            spatialPredicate: 'NEAR',
+            nearDistance: 300,
+            nearUseCentroid: true,
+            output: { type: 'MODIFY_ROOT' },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [{
+                    tableName: 'table_osm_roads',
+                    column: 'compute.skyViewFactor',
+                    aggregateFn: 'avg',
+                    aggregateFnResultColumnName: 'skyExposure',
+                    normalize: true,
+                }],
+            },
+        });
 
         this.activeBuildings = await this.computeScore(await this.db.getLayer('active_buildings'));
     }

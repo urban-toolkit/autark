@@ -249,7 +249,7 @@ function buildNonAggregateColumns(
       const valueExpression = column.table.source === 'geotiff'
         ? `${column.table.name}.properties.${column.column}`
         : isLayerType(column.table.type)
-          ? `map_extract("${column.column}", ${column.table.name}.properties)`
+          ? buildJsonExtract(column.table.name, column.column)
           : `${column.table.name}."${column.column}"`;
       const columnName = column.aggregateFnResultColumnName || column.column;
       return `'${columnName}', ${valueExpression}`;
@@ -262,9 +262,23 @@ function generateValueExpression(table: Table, columnName: string, aggregateFunc
     return `${aggregateFunction}(${table.name}.properties.${columnName})`;
   }
   if (isLayerType(table.type)) {
-    return `${aggregateFunction}(map_extract("${columnName}", ${table.name}.properties))`;
+    const extract = buildJsonExtract(table.name, columnName);
+    const castExpr = aggregateFunction === 'COUNT' ? extract : `CAST(${extract} AS DOUBLE)`;
+    return `${aggregateFunction}(${castExpr})`;
   }
   return `${aggregateFunction}(${table.name}."${columnName}")`;
+}
+
+/**
+ * Builds a DuckDB JSON/STRUCT extraction expression for a (possibly nested) column path.
+ * Supports dot-notation paths like 'compute.skyViewFactor'.
+ * Uses chained -> / ->> operators which work for both DuckDB STRUCT and JSON column types.
+ */
+function buildJsonExtract(tableName: string, columnPath: string): string {
+  const parts = columnPath.split('.');
+  const last = parts.pop()!;
+  const chain = parts.reduce((acc, p) => `${acc}->'${p}'`, `${tableName}.properties`);
+  return `${chain}->>'${last}'`;
 }
 
 function buildNormalizationMergePatch(normalizedColumns: Array<InternalColumn>): string {

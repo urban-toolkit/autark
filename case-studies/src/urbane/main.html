@@ -104,6 +104,11 @@
             select.appendChild(opt);
         });
 
+        const svfOpt = document.createElement('option');
+        svfOpt.value = 'sjoin.avg.skyExposure';
+        svfOpt.textContent = 'Sky Exposure';
+        select.appendChild(svfOpt);
+
         // Weight sliders
         const slidersContainer = document.querySelector('#weightsSliders');
 
@@ -137,6 +142,36 @@
             col.append(valueLabel, slider, nameLabel);
             slidersContainer.appendChild(col);
         });
+
+        // Sky exposure weight slider
+        const svfCol = document.createElement('div');
+        svfCol.className = 'weight-col';
+
+        const svfValueLabel = document.createElement('span');
+        svfValueLabel.className = 'weight-value';
+        svfValueLabel.textContent = urbane.skyExposureWeight.toFixed(2);
+
+        const svfSlider = document.createElement('input');
+        svfSlider.type = 'range';
+        svfSlider.min = '0';
+        svfSlider.max = '1';
+        svfSlider.step = '0.01';
+        svfSlider.value = urbane.skyExposureWeight;
+        svfSlider.className = 'weight-slider';
+        svfSlider.addEventListener('input', () => {
+            const allSliders = [...document.querySelectorAll('.weight-slider')];
+            const othersSum = allSliders.filter(s => s !== svfSlider).reduce((sum, s) => sum + +s.value, 0);
+            const maxVal = +Math.max(0, 1 - othersSum).toFixed(2);
+            if (+svfSlider.value > maxVal) svfSlider.value = maxVal;
+            svfValueLabel.textContent = (+svfSlider.value).toFixed(2);
+        });
+
+        const svfNameLabel = document.createElement('span');
+        svfNameLabel.className = 'weight-label';
+        svfNameLabel.textContent = 'Sky Exposure';
+
+        svfCol.append(svfValueLabel, svfSlider, svfNameLabel);
+        slidersContainer.appendChild(svfCol);
 
         const computeBtn = document.createElement('button');
         computeBtn.id = 'weightsCompute';
