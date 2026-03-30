@@ -99,6 +99,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
 export class RenderCompute {
     private devicePromise: Promise<GPUDevice> | null = null;
+    private hasTimestamps = false;
 
     private async getOrCreateDevice(): Promise<GPUDevice> {
         if (!this.devicePromise) {
@@ -106,7 +107,9 @@ export class RenderCompute {
                 if (!('gpu' in navigator)) throw new Error('WebGPU not supported.');
                 const adapter = await navigator.gpu.requestAdapter();
                 if (!adapter) throw new Error('Failed to get GPU adapter.');
+                this.hasTimestamps = adapter.features.has('timestamp-query');
                 return adapter.requestDevice({
+                    requiredFeatures: this.hasTimestamps ? ['timestamp-query'] : [],
                     requiredLimits: {
                         maxBufferSize: adapter.limits.maxBufferSize,
                         maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
@@ -141,6 +144,8 @@ export class RenderCompute {
         const N = viewpoints.features.length;
         if (N === 0) return viewpoints;
 
+        const t0 = performance.now();
+
         // ── 1. Origin + triangulation ─────────────────────────────────────────
         const origin = computeOrigin(layers[0].geojson);
 
@@ -148,6 +153,8 @@ export class RenderCompute {
             mesh:  triangulateBuildings(l.geojson, origin),
             color: l.color,
         }));
+
+        const t1 = performance.now();
 
         // ── 2. Camera matrices ────────────────────────────────────────────────
         const cameras = buildRoadCameras(viewpoints, origin, eyeHeight, fov, near, far);
@@ -164,6 +171,8 @@ export class RenderCompute {
 
         const device    = await this.getOrCreateDevice();
         const alignment = device.limits.minUniformBufferOffsetAlignment; // ≥ 256
+
+        const t2 = performance.now();
 
         // ── 4. GPU resources ──────────────────────────────────────────────────
 
@@ -339,12 +348,24 @@ export class RenderCompute {
         // Copy results to staging
         encoder.copyBufferToBuffer(resultsBuf, 0, stagingBuf, 0, N * 4);
 
+        const t3 = performance.now();
         device.queue.submit([encoder.finish()]);
 
         // ── 7. Readback ───────────────────────────────────────────────────────
         await stagingBuf.mapAsync(GPUMapMode.READ);
         const rawResults = new Uint32Array(stagingBuf.getMappedRange().slice(0));
         stagingBuf.unmap();
+
+        const t4 = performance.now();
+
+        console.log(
+            `[RenderCompute] N=${N}  tex=${texSize}×${texSize}  tileSize=${tileSize}\n` +
+            `  triangulate : ${(t1 - t0).toFixed(1)} ms\n` +
+            `  setup (GPU) : ${(t2 - t1).toFixed(1)} ms\n` +
+            `  encode      : ${(t3 - t2).toFixed(1)} ms\n` +
+            `  GPU+readback: ${(t4 - t3).toFixed(1)} ms\n` +
+            `  total       : ${(t4 - t0).toFixed(1)} ms`,
+        );
 
         // ── 8. Cleanup ────────────────────────────────────────────────────────
         tileTexture.destroy();
