@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
+const NUM_REPETITIONS = 10;
 const SAMPLE_PERCENTAGES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 const NOISE_CSV_URL = `${window.location.origin}/data/noise.csv`;
 const NEIGHBORHOODS_GEOJSON_URL = `${window.location.origin}/data/mnt_neighs.geojson`;
@@ -13,9 +14,43 @@ const LON_COLUMN = 'Longitude';
 
 interface RunResult {
     run: number;
+    repetition: number;
     samplePercentage: number;
     noiseCount: number;
     joinTimeMs: number;
+}
+
+interface StatsPoint {
+    samplePercentage: number;
+    noiseCountMean: number;
+    joinTimeMean: number;
+    joinTimeStd: number;
+}
+
+// ── Stats helpers ─────────────────────────────────────────────────────────────
+
+function mean(vals: number[]): number {
+    return vals.reduce((s, v) => s + v, 0) / vals.length;
+}
+
+function stddev(vals: number[]): number {
+    if (vals.length < 2) return 0;
+    const avg = mean(vals);
+    return Math.sqrt(vals.reduce((s, v) => s + (v - avg) ** 2, 0) / (vals.length - 1));
+}
+
+function computeStats(runs: RunResult[]): StatsPoint[] {
+    const percentages = [...new Set(runs.map((r) => r.samplePercentage))].sort((a, b) => a - b);
+    return percentages.map((pct) => {
+        const group = runs.filter((r) => r.samplePercentage === pct);
+        const joinTimes = group.map((r) => r.joinTimeMs);
+        return {
+            samplePercentage: pct,
+            noiseCountMean: mean(group.map((r) => r.noiseCount)),
+            joinTimeMean: mean(joinTimes),
+            joinTimeStd: stddev(joinTimes),
+        };
+    });
 }
 
 // ── Scientific colour palette ─────────────────────────────────────────────────
@@ -142,17 +177,43 @@ function addLineLegend(
     });
 }
 
-// ── Chart 1 – Time per layer + total vs. neighborhood count ───────────────────
+// ── Std-dev band helper ───────────────────────────────────────────────────────
+
+function addStdBand(
+    g: d3.Selection<SVGGElement, unknown, HTMLElement, unknown>,
+    data: StatsPoint[],
+    x: d3.ScaleLinear<number, number>,
+    y: d3.ScaleLinear<number, number>,
+    xVal: (d: StatsPoint) => number,
+    meanVal: (d: StatsPoint) => number,
+    stdVal: (d: StatsPoint) => number,
+    clr: string,
+) {
+    if (data.length < 2) return;
+    g.append('path')
+        .datum(data)
+        .attr('fill', clr)
+        .attr('fill-opacity', 0.15)
+        .attr('stroke', 'none')
+        .attr('d', d3.area<StatsPoint>()
+            .x((d) => x(xVal(d)))
+            .y0((d) => y(Math.max(0, meanVal(d) - stdVal(d))))
+            .y1((d) => y(meanVal(d) + stdVal(d)))
+            .curve(d3.curveLinear));
+}
+
+// ── Chart 1 – Join time (mean ± 1σ) vs. sample percentage ────────────────────
 
 function chartTime(runs: RunResult[]) {
     if (runs.length === 0) return;
     const { g, w, h } = makeSvg('chart-time');
+    const stats = computeStats(runs);
 
-    const x = d3.scaleLinear()
-        .domain([0, 100])
-        .range([0, w]);
-
-    const y = d3.scaleLinear().domain([0, d3.max(runs, (r) => r.joinTimeMs)! * 1.15]).range([h, 0]);
+    const x = d3.scaleLinear().domain([0, 100]).range([0, w]);
+    const maxY = stats.length > 0
+        ? d3.max(stats, (d) => d.joinTimeMean + d.joinTimeStd)! * 1.15
+        : d3.max(runs, (r) => r.joinTimeMs)! * 1.15;
+    const y = d3.scaleLinear().domain([0, maxY]).range([h, 0]);
 
     addHGrid(g, y, w);
 
@@ -162,39 +223,60 @@ function chartTime(runs: RunResult[]) {
         .call(d3.axisLeft(y).ticks(5).tickFormat((v) => `${+v / 1000}s`));
     applyAxisStyle(xAxisSel); applyAxisStyle(yAxisSel);
 
-    const lineGen = d3.line<RunResult>()
-        .x((r) => x(r.samplePercentage))
-        .y((r) => y(r.joinTimeMs))
-        .curve(d3.curveLinear);
+    // ±1σ band
+    addStdBand(g, stats, x, y,
+        (d) => d.samplePercentage, (d) => d.joinTimeMean, (d) => d.joinTimeStd,
+        color('join'));
 
+    // Individual rep dots (faint)
+    g.selectAll<SVGCircleElement, RunResult>('circle.raw')
+        .data(runs)
+        .join('circle')
+        .attr('class', 'raw')
+        .attr('cx', (r) => x(r.samplePercentage))
+        .attr('cy', (r) => y(r.joinTimeMs))
+        .attr('r', 2)
+        .attr('fill', color('join'))
+        .attr('opacity', 0.3);
+
+    // Mean line
     g.append('path')
-        .datum(runs)
+        .datum(stats)
         .attr('fill', 'none')
         .attr('stroke', color('join'))
         .attr('stroke-width', 2)
-        .attr('d', lineGen);
+        .attr('d', d3.line<StatsPoint>()
+            .x((d) => x(d.samplePercentage))
+            .y((d) => y(d.joinTimeMean))
+            .curve(d3.curveLinear));
 
-    g.selectAll('circle')
-        .data(runs)
+    // Mean dots
+    g.selectAll<SVGCircleElement, StatsPoint>('circle.mean')
+        .data(stats)
         .join('circle')
-        .attr('cx', (r) => x(r.samplePercentage))
-        .attr('cy', (r) => y(r.joinTimeMs))
+        .attr('class', 'mean')
+        .attr('cx', (d) => x(d.samplePercentage))
+        .attr('cy', (d) => y(d.joinTimeMean))
         .attr('r', 3.5)
         .attr('fill', color('join'));
 
-    addLineLegend(g, [{ key: 'join', label: 'Join Time' }], 20, 0);
+    addLineLegend(g, [{ key: 'join', label: `Join Time (mean ± 1σ, n=${NUM_REPETITIONS})` }], 20, 0);
     addAxisLabels(g, w, h, 'Sample Percentage', 'Join Time (ms)');
     addTitle(g, w, 'Join Time vs. Sample Percentage');
 }
 
-// ── Chart 2 – Feature count per layer vs. neighborhood count ──────────────────
+// ── Chart 2 – Noise count (mean ± 1σ) vs. sample percentage ──────────────────
 
 function chartFeatures(runs: RunResult[]) {
     if (runs.length === 0) return;
     const { g, w, h } = makeSvg('chart-features');
+    const stats = computeStats(runs);
 
     const x = d3.scaleLinear().domain([0, 100]).range([0, w]);
-    const y = d3.scaleLinear().domain([0, d3.max(runs, (d) => d.noiseCount)! * 1.15]).range([h, 0]);
+    const maxY = stats.length > 0
+        ? d3.max(stats, (d) => d.noiseCountMean)! * 1.15
+        : d3.max(runs, (d) => d.noiseCount)! * 1.15;
+    const y = d3.scaleLinear().domain([0, maxY]).range([h, 0]);
 
     addHGrid(g, y, w);
 
@@ -203,34 +285,54 @@ function chartFeatures(runs: RunResult[]) {
     const yAxisSel = g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat((v) => `${+v / 1e6}M`));
     applyAxisStyle(xAxisSel); applyAxisStyle(yAxisSel);
 
-    const lineGen = d3.line<RunResult>()
-        .x((d) => x(d.samplePercentage))
-        .y((d) => y(d.noiseCount))
-        .curve(d3.curveLinear);
-
-    g.append('path').datum(runs)
-        .attr('fill', 'none').attr('stroke', color('features')).attr('stroke-width', 2)
-        .attr('d', lineGen);
-
-    g.selectAll('circle')
-        .data(runs).join('circle')
+    // Individual rep dots (faint)
+    g.selectAll<SVGCircleElement, RunResult>('circle.raw')
+        .data(runs)
+        .join('circle')
+        .attr('class', 'raw')
         .attr('cx', (d) => x(d.samplePercentage))
         .attr('cy', (d) => y(d.noiseCount))
+        .attr('r', 2)
+        .attr('fill', color('features'))
+        .attr('opacity', 0.3);
+
+    // Mean line
+    g.append('path').datum(stats)
+        .attr('fill', 'none').attr('stroke', color('features')).attr('stroke-width', 2)
+        .attr('d', d3.line<StatsPoint>()
+            .x((d) => x(d.samplePercentage))
+            .y((d) => y(d.noiseCountMean))
+            .curve(d3.curveLinear));
+
+    // Mean dots
+    g.selectAll<SVGCircleElement, StatsPoint>('circle.mean')
+        .data(stats).join('circle')
+        .attr('class', 'mean')
+        .attr('cx', (d) => x(d.samplePercentage))
+        .attr('cy', (d) => y(d.noiseCountMean))
         .attr('r', 3.5).attr('fill', color('features'));
 
-    addLineLegend(g, [{ key: 'features', label: 'Complaints' }], 20, 0);
+    addLineLegend(g, [{ key: 'features', label: `Complaints (mean, n=${NUM_REPETITIONS})` }], 20, 0);
     addAxisLabels(g, w, h, 'Sample Percentage', 'Complaints (count)');
     addTitle(g, w, 'Complaints vs. Sample Percentage');
 }
 
-// ── Chart 3 – Layer load time vs. feature count (scatter) ────────────────────
+// ── Chart 3 – Join time (mean ± 1σ) vs. complaint count ──────────────────────
 
 function chartScatter(runs: RunResult[]) {
     if (runs.length === 0) return;
     const { g, w, h } = makeSvg('chart-scatter');
+    const stats = computeStats(runs);
 
-    const x = d3.scaleLinear().domain([0, d3.max(runs, (d) => d.noiseCount)! * 1.1]).range([0, w]);
-    const y = d3.scaleLinear().domain([0, d3.max(runs, (d) => d.joinTimeMs)! * 1.1]).range([h, 0]);
+    const maxX = stats.length > 0
+        ? d3.max(stats, (d) => d.noiseCountMean)! * 1.1
+        : d3.max(runs, (d) => d.noiseCount)! * 1.1;
+    const maxY = stats.length > 0
+        ? d3.max(stats, (d) => d.joinTimeMean + d.joinTimeStd)! * 1.1
+        : d3.max(runs, (d) => d.joinTimeMs)! * 1.1;
+
+    const x = d3.scaleLinear().domain([0, maxX]).range([0, w]);
+    const y = d3.scaleLinear().domain([0, maxY]).range([h, 0]);
 
     addHGrid(g, y, w);
 
@@ -240,26 +342,43 @@ function chartScatter(runs: RunResult[]) {
         .call(d3.axisLeft(y).ticks(5).tickFormat((v) => `${+v / 1000}s`));
     applyAxisStyle(xAxisSel); applyAxisStyle(yAxisSel);
 
-    const lineGen = d3.line<RunResult>()
-        .x((d) => x(d.noiseCount))
-        .y((d) => y(d.joinTimeMs))
-        .curve(d3.curveLinear);
+    // ±1σ band (vertical, over noise count mean)
+    addStdBand(g, stats, x, y,
+        (d) => d.noiseCountMean, (d) => d.joinTimeMean, (d) => d.joinTimeStd,
+        color('join'));
 
+    // Individual rep dots (faint)
+    g.selectAll<SVGCircleElement, RunResult>('circle.raw')
+        .data(runs)
+        .join('circle')
+        .attr('class', 'raw')
+        .attr('cx', (d) => x(d.noiseCount))
+        .attr('cy', (d) => y(d.joinTimeMs))
+        .attr('r', 2)
+        .attr('fill', color('join'))
+        .attr('opacity', 0.3);
+
+    // Mean line
     g.append('path')
-        .datum(runs)
+        .datum(stats)
         .attr('fill', 'none')
         .attr('stroke', color('join'))
         .attr('stroke-width', 2)
-        .attr('d', lineGen);
+        .attr('d', d3.line<StatsPoint>()
+            .x((d) => x(d.noiseCountMean))
+            .y((d) => y(d.joinTimeMean))
+            .curve(d3.curveLinear));
 
-    g.selectAll('circle')
-        .data(runs).join('circle')
-        .attr('cx', (d) => x(d.noiseCount))
-        .attr('cy', (d) => y(d.joinTimeMs))
+    // Mean dots
+    g.selectAll<SVGCircleElement, StatsPoint>('circle.mean')
+        .data(stats).join('circle')
+        .attr('class', 'mean')
+        .attr('cx', (d) => x(d.noiseCountMean))
+        .attr('cy', (d) => y(d.joinTimeMean))
         .attr('r', 3.5)
         .attr('fill', color('join'));
 
-    addLineLegend(g, [{ key: 'join', label: 'Spatial join' }], 20, 0);
+    addLineLegend(g, [{ key: 'join', label: `Spatial join (mean ± 1σ, n=${NUM_REPETITIONS})` }], 20, 0);
     addAxisLabels(g, w, h, 'Complaint count', 'Spatial join time');
     addTitle(g, w, 'Autark\'s spatial join performance');
 }
@@ -309,9 +428,9 @@ async function tryLoadExistingData(): Promise<{ runs: RunResult[] } | null> {
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 
 function buildRunsCsv(results: RunResult[]): string {
-    const header = 'run,sample_percentage,noise_count,join_time_ms';
+    const header = 'run,repetition,sample_percentage,noise_count,join_time_ms';
     const rows = results.map((r) =>
-        [r.run, r.samplePercentage, r.noiseCount, r.joinTimeMs.toFixed(1)].join(','),
+        [r.run, r.repetition, r.samplePercentage, r.noiseCount, r.joinTimeMs.toFixed(1)].join(','),
     );
     return [header, ...rows].join('\n');
 }
@@ -320,9 +439,10 @@ function parseRunsCsv(text: string): RunResult[] {
     const lines = text.trim().split('\n').slice(1);
     return lines.map((line) => {
         const match = line.split(',');
-        if (match.length < 4) return null;
+        if (match.length < 5) return null;
         return {
-            run: +match[0], samplePercentage: +match[1], noiseCount: +match[2], joinTimeMs: +match[3],
+            run: +match[0], repetition: +match[1], samplePercentage: +match[2],
+            noiseCount: +match[3], joinTimeMs: +match[4],
         } as RunResult;
     }).filter((r): r is RunResult => r !== null);
 }
@@ -399,14 +519,15 @@ class LoadingBenchmark {
 
             await this.loadBaseData(db);
 
+            const totalSteps = SAMPLE_PERCENTAGES.length * NUM_REPETITIONS;
             for (let i = 0; i < SAMPLE_PERCENTAGES.length; i++) {
                 const percent = SAMPLE_PERCENTAGES[i];
                 const run = i + 1;
 
-                await this.executeJoinForSample(db, run, percent);
+                await this.executeJoinForSample(db, run, percent, totalSteps);
             }
 
-            this.setProgress(SAMPLE_PERCENTAGES.length, SAMPLE_PERCENTAGES.length);
+            this.setProgress(totalSteps, totalSteps);
 
             try {
                 await saveDataFiles(this.runResults);
@@ -445,16 +566,16 @@ class LoadingBenchmark {
 
         await db.rawQuery({
             query: `
-          SELECT *, 
+          SELECT *,
                  ST_Transform(
                    ST_Point(
-                     CAST(regexp_replace(CAST("${LON_COLUMN}" AS VARCHAR), ',', '.') AS DOUBLE), 
+                     CAST(regexp_replace(CAST("${LON_COLUMN}" AS VARCHAR), ',', '.') AS DOUBLE),
                      CAST(regexp_replace(CAST("${LAT_COLUMN}" AS VARCHAR), ',', '.') AS DOUBLE)
-                   ), 
-                   'EPSG:4326', 
+                   ),
+                   'EPSG:4326',
                    'EPSG:3395'
-                 ) AS geometry 
-          FROM noise_raw 
+                 ) AS geometry
+          FROM noise_raw
           WHERE "${LON_COLUMN}" IS NOT NULL AND "${LAT_COLUMN}" IS NOT NULL
             AND TRIM(CAST("${LON_COLUMN}" AS VARCHAR)) <> ''
             AND TRIM(CAST("${LAT_COLUMN}" AS VARCHAR)) <> ''
@@ -468,84 +589,117 @@ class LoadingBenchmark {
         this.renderBaseLoadRow(geojsonLoadMs, csvLoadMs);
     }
 
-    private async executeJoinForSample(db: SpatialDb, run: number, percent: number) {
-        this.setStatus(`Run ${run} / ${SAMPLE_PERCENTAGES.length} — sampling ${percent}% of noise data...`);
-        this.setProgress(run - 1, SAMPLE_PERCENTAGES.length);
+    private async executeJoinForSample(db: SpatialDb, run: number, percent: number, totalSteps: number) {
+        const completedBefore = (run - 1) * NUM_REPETITIONS;
 
-        try {
-            await db.rawQuery({
-                query: `SELECT * FROM noise USING SAMPLE ${percent} PERCENT`,
-                output: { type: 'CREATE_TABLE', tableName: `noise_sample_${percent}` }
-            });
+        for (let rep = 1; rep <= NUM_REPETITIONS; rep++) {
+            this.setStatus(`Run ${run} / ${SAMPLE_PERCENTAGES.length}, rep ${rep} / ${NUM_REPETITIONS} — sampling ${percent}% of noise data...`);
+            this.setProgress(completedBefore + rep - 1, totalSteps);
 
-            const countRes = await db.rawQuery<{ c: number }[]>({
-                query: `SELECT COUNT(*) as c FROM noise_sample_${percent}`,
-                output: { type: 'RETURN_OBJECT' }
-            }) as { c: number }[];
-            const noiseCount = Number(countRes[0].c);
+            const tag = `${percent}_r${rep}`;
+            try {
+                await db.rawQuery({
+                    query: `SELECT * FROM noise USING SAMPLE ${percent} PERCENT`,
+                    output: { type: 'CREATE_TABLE', tableName: `noise_sample_${tag}` }
+                });
 
-            this.setStatus(`Run ${run} / ${SAMPLE_PERCENTAGES.length} — joining ${noiseCount} noise points with neighborhoods...`);
-            const tJoin0 = performance.now();
-            await db.spatialJoin({
-                tableRootName: 'neighborhoods',
-                tableJoinName: `noise_sample_${percent}`,
-                spatialPredicate: 'INTERSECT',
-                output: {
-                    type: 'CREATE_NEW',
-                    tableName: `join_result_${percent}`
-                },
-                joinType: 'LEFT',
-                groupBy: {
-                    selectColumns: [
-                        {
-                            tableName: `noise_sample_${percent}`,
-                            column: 'Unique Key',
-                            aggregateFn: 'count',
-                        },
-                    ],
-                },
-            });
-            const joinTimeMs = performance.now() - tJoin0;
+                const countRes = await db.rawQuery<{ c: number }[]>({
+                    query: `SELECT COUNT(*) as c FROM noise_sample_${tag}`,
+                    output: { type: 'RETURN_OBJECT' }
+                }) as { c: number }[];
+                const noiseCount = Number(countRes[0].c);
 
-            // Clean up temporary tables to prevent memory exhaustion
-            await db.removeLayer(`noise_sample_${percent}`);
-            await db.removeLayer(`join_result_${percent}`);
+                this.setStatus(`Run ${run} / ${SAMPLE_PERCENTAGES.length}, rep ${rep} / ${NUM_REPETITIONS} — joining ${noiseCount} noise points with neighborhoods...`);
+                const tJoin0 = performance.now();
+                await db.spatialJoin({
+                    tableRootName: 'neighborhoods',
+                    tableJoinName: `noise_sample_${tag}`,
+                    spatialPredicate: 'INTERSECT',
+                    output: {
+                        type: 'CREATE_NEW',
+                        tableName: `join_result_${tag}`
+                    },
+                    joinType: 'LEFT',
+                    groupBy: {
+                        selectColumns: [
+                            {
+                                tableName: `noise_sample_${tag}`,
+                                column: 'Unique Key',
+                                aggregateFn: 'count',
+                            },
+                        ],
+                    },
+                });
+                const joinTimeMs = performance.now() - tJoin0;
 
-            const result: RunResult = { run, samplePercentage: percent, noiseCount, joinTimeMs };
-            this.runResults.push(result);
-            this.renderTableRow(result);
-            renderCharts(this.runResults);
+                // Clean up temporary tables to prevent memory exhaustion
+                await db.removeLayer(`noise_sample_${tag}`);
+                await db.removeLayer(`join_result_${tag}`);
 
-        } catch (err) {
-            console.error(`Run ${run} failed:`, err);
-            this.appendErrorRow(run, String(err));
+                const result: RunResult = { run, repetition: rep, samplePercentage: percent, noiseCount, joinTimeMs };
+                this.runResults.push(result);
+                this.renderRepRow(result);
+                renderCharts(this.runResults);
+
+            } catch (err) {
+                console.error(`Run ${run} rep ${rep} failed:`, err);
+                this.appendErrorRow(run, rep, String(err));
+            }
         }
+
+        // Stats summary row after all reps for this sample percentage
+        const repsForPct = this.runResults.filter((r) => r.samplePercentage === percent);
+        if (repsForPct.length > 0) {
+            this.renderStatsRow(percent, repsForPct);
+        }
+
+        this.setProgress(completedBefore + NUM_REPETITIONS, totalSteps);
     }
 
     private renderBaseLoadRow(geojsonMs: number, csvMs: number) {
         const tr = document.createElement('tr');
         tr.style.backgroundColor = '#fafafa';
         tr.innerHTML = `
-      <td colspan="2"><b>Base Data Load</b></td>
+      <td colspan="2"><b>Base Data Load</b></td><td>—</td>
       <td>GeoJSON: ${geojsonMs.toFixed(0)} ms</td>
       <td>CSV: ${csvMs.toFixed(0)} ms</td>`;
         this.tableBody.appendChild(tr);
     }
 
-    private renderTableRow(t: RunResult) {
+    private renderRepRow(t: RunResult) {
         const tr = document.createElement('tr');
+        tr.style.color = '#888';
         tr.innerHTML = `
       <td>${t.run}</td>
+      <td>${t.repetition}</td>
       <td>${t.samplePercentage}%</td>
       <td>${t.noiseCount.toLocaleString()}</td>
       <td>${t.joinTimeMs.toFixed(0)}</td>`;
         this.tableBody.appendChild(tr);
     }
 
-    private appendErrorRow(run: number, message: string) {
+    private renderStatsRow(percent: number, reps: RunResult[]) {
+        const joinTimes = reps.map((r) => r.joinTimeMs);
+        const noiseCounts = reps.map((r) => r.noiseCount);
+        const avgTime = mean(joinTimes);
+        const sdTime = stddev(joinTimes);
+        const avgNoise = mean(noiseCounts);
+        const tr = document.createElement('tr');
+        tr.style.fontWeight = 'bold';
+        tr.style.backgroundColor = '#f0f4ff';
+        tr.innerHTML = `
+      <td>—</td>
+      <td>μ ± σ</td>
+      <td>${percent}%</td>
+      <td>${Math.round(avgNoise).toLocaleString()}</td>
+      <td>${avgTime.toFixed(0)} ± ${sdTime.toFixed(0)}</td>`;
+        this.tableBody.appendChild(tr);
+    }
+
+    private appendErrorRow(run: number, rep: number, message: string) {
         const tr = document.createElement('tr');
         tr.className = 'error-row';
-        tr.innerHTML = `<td>${run}</td><td colspan="6">ERROR: ${message}</td>`;
+        tr.innerHTML = `<td>${run}</td><td>${rep}</td><td colspan="5">ERROR: ${message}</td>`;
         this.tableBody.appendChild(tr);
     }
 
@@ -559,10 +713,18 @@ class LoadingBenchmark {
 
     loadFromData(runs: RunResult[]) {
         this.runResults = runs;
-        runs.forEach((r) => {
-            this.renderTableRow(r);
-        });
-        this.setProgress(runs.length, SAMPLE_PERCENTAGES.length);
+        const bySample = new Map<number, RunResult[]>();
+        for (const r of runs) {
+            const arr = bySample.get(r.samplePercentage) ?? [];
+            arr.push(r);
+            bySample.set(r.samplePercentage, arr);
+        }
+        for (const [percent, reps] of [...bySample.entries()].sort((a, b) => a[0] - b[0])) {
+            reps.forEach((r) => this.renderRepRow(r));
+            this.renderStatsRow(percent, reps);
+        }
+        const totalSteps = SAMPLE_PERCENTAGES.length * NUM_REPETITIONS;
+        this.setProgress(runs.length, totalSteps);
         this.downloadCsvBtn.disabled = false;
         this.downloadPngBtn.disabled = false;
     }

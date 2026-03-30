@@ -4,6 +4,7 @@ import { PlotD3 } from "../plot-d3";
 import { PlotConfig } from "../types";
 import { PlotStyle } from "../plot-style";
 import { PlotEvent } from "../constants";
+import { ColorMap } from "../colormap";
 
 export class ParallelCoordinates extends PlotD3 {
 
@@ -192,12 +193,17 @@ export class ParallelCoordinates extends PlotD3 {
 
             const plot = this;
             if (dimType === 'numerical' && scale) {
-                const numScale = scale as d3.ScaleLinear<number, number>;
-                const [lo, hi] = numScale.domain();
+                const dimValues = plot.data.map(d => d ? +plot.getNestedValue(d, dim) || 0 : 0);
+                const [lo, hi] = ColorMap.computeNormalizationRange(
+                    dimValues,
+                    plot._normalization.mode,
+                    plot._normalization.lowerPercentile,
+                    plot._normalization.upperPercentile,
+                );
                 strokeFn = function (this: SVGPathElement, d: unknown) {
                     if (sel.includes(idx(this))) return PlotStyle.highlight;
                     const v = +plot.getNestedValue(d, dim) || 0;
-                    const t = hi === lo ? 0.5 : (v - lo) / (hi - lo);
+                    const t = hi === lo ? 0.5 : Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
                     return d3.interpolateReds(0.15 + t * 0.85);
                 };
             } else if (dimType === 'categorical' && scale) {

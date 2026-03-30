@@ -33,7 +33,7 @@ export class ColormapDiv {
         }
     }
 
-    protected async updateThematicData(layer: string = 'neighborhoods', groupById: boolean = false): Promise<void> {
+    protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
 
         const getFnv = (feature: Feature): number => {
@@ -42,7 +42,7 @@ export class ColormapDiv {
         };
 
         this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.DIVERGING_RED_BLUE);
-        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv, groupById);
+        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv);
     }
 
 }

@@ -2,9 +2,32 @@
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 
 import { SpatialDb } from 'autk-db';
-import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
+import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
-import { GeojsonCompute } from 'autk-compute';
+import { AutkMap, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
+
+function setLoadingState(message: string, note?: string): void {
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? '';
+}
+
+function hideLoading(): void {
+    document.getElementById('loading-overlay')?.classList.add('hidden');
+}
+
+function showError(message: string, note?: string): void {
+    const overlay = document.getElementById('loading-overlay');
+    const title = document.getElementById('loading-title');
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    overlay?.classList.remove('hidden');
+    overlay?.classList.add('error');
+    if (title) title.textContent = 'Loading Error';
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
+}
 
 export class Urbane {
     protected map!: AutkMap;
@@ -14,6 +37,7 @@ export class Urbane {
 
     protected neighs!: FeatureCollection;
     protected activeBuildings!: FeatureCollection;
+    protected roadsWithSky?: FeatureCollection;
 
     protected distance: number = 1000;
     protected currentLevel: 'neighborhoods' | 'active_buildings' = 'neighborhoods';
@@ -25,6 +49,7 @@ export class Urbane {
 
     public datasets: string[] = ['arrest', 'new_building', 'noise', 'restaurants', 'school', 'subway', 'tree'];
     public weights: number[] = [0.3, 0.2, 0.0, 0.5, 0.0, 0.0, 0.0];
+    public skyExposureWeight: number = 0.0;
 
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
         this.mapCanvas = canvas;
@@ -42,9 +67,11 @@ export class Urbane {
     // ── Database ──────────────────────────────────────────────────────────────
 
     protected async loadDb(): Promise<void> {
+        setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
         this.db = new SpatialDb();
         await this.db.init();
 
+        setLoadingState('Loading OpenStreetMap data...', 'Fetching Manhattan from Overpass API.');
         await this.db.loadOsmFromOverpassApi({
             queryArea: { geocodeArea: 'New York', areas: ['Manhattan Island'] },
             outputTableName: 'table_osm',
@@ -57,6 +84,7 @@ export class Urbane {
             },
         });
 
+        setLoadingState('Loading neighborhood dataset...', 'Importing Manhattan neighborhood boundaries.');
         await this.db.loadCustomLayer({
             geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
             outputTableName: 'neighborhoods',
@@ -71,6 +99,7 @@ export class Urbane {
             joinType: 'LEFT',
         });
 
+        setLoadingState('Loading urban datasets...', 'Importing arrests, schools, restaurants, and other datasets.');
         for (const dataset of this.datasets) {
             await this.db.loadCsv({
                 csvFileUrl: `http://localhost:5173/data/${dataset}_manhattan_clean.csv`,
@@ -98,32 +127,83 @@ export class Urbane {
             });
         }
 
+        setLoadingState('Computing sky view factor...', 'Running render-based GPU analysis for road segments.');
+        const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
+        const roadsGeoJson     = await this.db.getLayer('table_osm_roads');
+        const rc = new RenderCompute();
+        this.roadsWithSky = await rc.renderIntoMetrics({
+            layers:     [{ geojson: buildingsGeoJson, color: [0.8, 0.3, 0.1, 1.0] }],
+            viewpoints: roadsGeoJson,
+            tileSize:   64,
+        });
+
+        setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
+        await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });
+
+        await this.db.spatialJoin({
+            tableRootName: 'neighborhoods',
+            tableJoinName: 'table_osm_roads',
+            spatialPredicate: 'INTERSECT',
+            output: { type: 'MODIFY_ROOT' },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [{
+                    tableName: 'table_osm_roads',
+                    column: 'compute.skyViewFactor',
+                    aggregateFn: 'avg',
+                    aggregateFnResultColumnName: 'skyExposure',
+                    normalize: true,
+                }],
+            },
+        });
+
+        setLoadingState('Computing livability score...', 'Applying weighted GPU function over neighborhood data.');
         this.neighs = await this.computeScore(await this.db.getLayer('neighborhoods'));
     }
 
     // ── Compute ───────────────────────────────────────────────────────────────
 
     protected async computeScore(geojson: FeatureCollection): Promise<FeatureCollection> {
-        const variableMapping = Object.fromEntries(
-            this.datasets.map(d => [d, `sjoin.count.${d}_norm`])
-        );
+        // Pack all normalised inputs into one array per feature so the GPU uses
+        // 3 storage buffers (vals + weights + output) instead of one per attribute,
+        // staying well within the WebGPU per-stage limit of 8.
         const invertedDatasets = new Set(['arrest', 'noise']);
-        const wglsFunction = `return ${this.datasets.map((d, i) => `${invertedDatasets.has(d) ? `(1.0 - ${d})` : d} * ${this.weights[i]}`).join(' + ')};`;
+        const N = this.datasets.length + 1; // 7 datasets + sky exposure = 8
+
+        for (const f of geojson.features) {
+            const p = f.properties as any;
+            const vals = this.datasets.map(d => {
+                const v: number = p?.sjoin?.count?.[`${d}_norm`] ?? 0;
+                return invertedDatasets.has(d) ? 1 - v : v;
+            });
+            vals.push(p?.sjoin?.avg?.skyExposure_norm ?? 0); // index 7; 0 for buildings
+            p.scoreInputs = vals;
+        }
 
         return new GeojsonCompute().computeFunctionIntoProperties({
             geojson,
-            attributes: variableMapping,
+            attributes: { vals: 'scoreInputs' },
+            attributeArrays: { vals: N },
+            uniformArrays: { weights: [...this.weights, this.skyExposureWeight] },
             outputColumnName: 'score',
-            wglsFunction,
+            wglsFunction: `
+                var s = 0.0;
+                for (var i = 0u; i < vals_length; i++) {
+                    s += vals[i] * weights[i];
+                }
+                return s;
+            `,
         });
     }
 
     // ── Map ───────────────────────────────────────────────────────────────────
 
     protected async loadMap(): Promise<void> {
+        setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
         this.map = new AutkMap(this.mapCanvas);
         await this.map.init();
 
+        setLoadingState('Rendering layers...', 'Uploading geometry to the GPU.');
         for (const layerData of this.db.getLayerTables()) {
             const geojson = layerData.name === 'neighborhoods'
                 ? this.neighs
@@ -135,6 +215,16 @@ export class Urbane {
         this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
         this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
         this.map.draw();
+
+        if (this.roadsWithSky) {
+            this.map.updateGeoJsonLayerThematic(
+                'table_osm_roads',
+                this.roadsWithSky,
+                (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
+                { mode: NormalizationMode.PERCENTILE },
+            );
+            this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
+        }
     }
 
     protected updateThematicData(column: string): void {
@@ -154,7 +244,7 @@ export class Urbane {
             return value || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv, this.currentLevel === 'active_buildings');
+        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv);
         this.map.updateRenderInfoProperty(layerId, 'isColorMap', true);
     }
 
@@ -164,8 +254,16 @@ export class Urbane {
         this.plotDivParallel.innerHTML = '';
         this.plotDivTable.innerHTML = '';
 
-        const attributes = [...this.datasets.map(d => `sjoin.count.${d}`), 'compute.score'];
-        const axisLabels = [...this.datasets, 'Score'];
+        const attributes = [
+            ...this.datasets.map(d => `sjoin.count.${d}`),
+            'sjoin.avg.skyExposure',
+            'compute.score',
+        ];
+        const axisLabels = [
+            ...this.datasets,
+            'sky exposure',
+            'score',
+        ];
         const plotData = this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
         const titleCol = this.currentLevel === 'neighborhoods' ? 'ntaname' : 'addr:street';
         const title = `${this.currentLevel} characteristics`;
@@ -222,7 +320,8 @@ export class Urbane {
     // ── Weights ───────────────────────────────────────────────────────────────
 
     public async updateWeights(newWeights: number[]): Promise<void> {
-        this.weights = newWeights;
+        this.weights = newWeights.slice(0, this.datasets.length);
+        this.skyExposureWeight = newWeights[this.datasets.length] ?? 0;
 
         const rawLayer = await this.db.getLayer(this.currentLevel);
         if (this.currentLevel === 'neighborhoods')
@@ -250,16 +349,9 @@ export class Urbane {
 
         await this.db.rawQuery({
             query: `
-                WITH grouped AS (
-                    SELECT building_id,
-                           ST_Union_Agg(geometry) AS geometry,
-                           ANY_VALUE(properties)  AS properties
-                    FROM   table_osm_buildings
-                    WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
-                    GROUP  BY building_id
-                )
-                SELECT geometry, properties, (ROW_NUMBER() OVER () - 1) AS building_id
-                FROM   grouped
+                SELECT geometry, properties, building_id
+                FROM   table_osm_buildings
+                WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
             `,
             output: { type: 'CREATE_TABLE', tableName: 'active_buildings', source: 'osm', tableType: LayerType.AUTK_OSM_BUILDINGS },
         });
@@ -283,6 +375,25 @@ export class Urbane {
                 },
             });
         }
+
+        await this.db.spatialJoin({
+            tableRootName: 'active_buildings',
+            tableJoinName: 'table_osm_roads',
+            spatialPredicate: 'NEAR',
+            nearDistance: 300,
+            nearUseCentroid: true,
+            output: { type: 'MODIFY_ROOT' },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [{
+                    tableName: 'table_osm_roads',
+                    column: 'compute.skyViewFactor',
+                    aggregateFn: 'avg',
+                    aggregateFnResultColumnName: 'skyExposure',
+                    normalize: true,
+                }],
+            },
+        });
 
         this.activeBuildings = await this.computeScore(await this.db.getLayer('active_buildings'));
     }
@@ -337,19 +448,24 @@ export class Urbane {
 }
 
 async function main() {
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const plotDivParallel = document.querySelector('#plotBodyParallel') as HTMLElement;
-    const plotDivTable = document.querySelector('#plotBodyTable') as HTMLElement;
+    try {
+        const canvas = document.querySelector('canvas');
+        const plotDivParallel = document.querySelector('#plotBodyParallel') as HTMLElement;
+        const plotDivTable = document.querySelector('#plotBodyTable') as HTMLElement;
 
-    if (!canvas || !plotDivParallel || !plotDivTable) {
-        console.error('Canvas or plot body element not found');
-        return;
+        if (!(canvas instanceof HTMLCanvasElement) || !plotDivParallel || !plotDivTable) {
+            throw new Error('Canvas or plot body element not found.');
+        }
+
+        const urbane = new Urbane();
+        await urbane.run(canvas, plotDivParallel, plotDivTable);
+
+        (window as any).urbane = urbane;
+        hideLoading();
+        window.dispatchEvent(new CustomEvent('urbane-ready'));
+    } catch (error) {
+        console.error(error);
+        showError('Failed to load the Urbane case study.', 'Please verify the dataset paths and reload the page.');
     }
-
-    const urbane = new Urbane();
-    await urbane.run(canvas, plotDivParallel, plotDivTable);
-
-    (window as any).urbane = urbane;
-    window.dispatchEvent(new CustomEvent('urbane-ready'));
 }
 main();

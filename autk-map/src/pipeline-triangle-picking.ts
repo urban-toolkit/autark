@@ -322,7 +322,8 @@ export class PipelineTrianglePicking extends Pipeline {
         passEncoder.setBindGroup(0, this._cameraBindGroup);
 
         // draw command
-        passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
+        const indexCount = this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT;
+        if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
         passEncoder.end();
     }
 }

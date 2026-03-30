@@ -43,6 +43,16 @@ export enum ThematicAggregationLevel {
 }
 
 /**
+ * Normalization modes for mapping data values to the [0, 1] color range.
+ * @property {string} MIN_MAX - Normalize using the minimum and maximum values of the dataset.
+ * @property {string} PERCENTILE - Normalize using percentile bounds, clamping outliers to the color range edges.
+ */
+export enum NormalizationMode {
+  MIN_MAX = 'minMax',
+  PERCENTILE = 'percentile',
+}
+
+/**
  * Color map interpolators for thematic data visualization.
  * @property {string} SEQUENTIAL_REDS - Red color interpolation.
  * @property {string} SEQUENTIAL_BLUES - Blue color interpolation.

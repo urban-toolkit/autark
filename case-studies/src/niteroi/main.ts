@@ -4,9 +4,31 @@ import { GeojsonCompute } from 'autk-compute';
 import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
 
+function setLoadingState(message: string, note?: string): void {
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? '';
+}
+
+function hideLoading(): void {
+    document.getElementById('loading-overlay')?.classList.add('hidden');
+}
+
+function showError(message: string, note?: string): void {
+    const overlay = document.getElementById('loading-overlay');
+    const title = document.getElementById('loading-title');
+    const text = document.getElementById('loading-text');
+    const noteEl = document.getElementById('loading-note');
+    overlay?.classList.remove('hidden');
+    overlay?.classList.add('error');
+    if (title) title.textContent = 'Loading Error';
+    if (text) text.textContent = message;
+    if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
+}
+
 const BAND_COUNT = 24;
 const START_YEAR = 2001;
-const MAX_LOT_SHAPE_AREA = 0.00001;
 const HIGHLIGHT_COLOR = '#1a7a2e';
 
 export class OsmLayersApi {
@@ -19,9 +41,11 @@ export class OsmLayersApi {
     protected computedRoadsGeojson: any;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
+        setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
         this.db = new SpatialDb();
         await this.db.init();
 
+        setLoadingState('Loading OpenStreetMap data...', 'Fetching Niterói area from Overpass API.');
         await this.db.loadOsmFromOverpassApi({
             queryArea: {
                 geocodeArea: 'Rio de Janeiro',
@@ -37,6 +61,7 @@ export class OsmLayersApi {
 
         const boundingBox = this.db.getOsmBoundingBoxWgs84() ?? undefined;
 
+        setLoadingState('Loading temperature dataset...', 'Importing 24-year land surface temperature raster.');
         await this.db.loadGeoTiff({
             geotiffFileUrl: '/data/niteroi_lst_verao_2001_2024.tif',
             outputTableName: 'lst',
@@ -45,6 +70,7 @@ export class OsmLayersApi {
             boundingBox,
         });
 
+        setLoadingState('Joining LST to road segments...', 'Averaging temperature bands within 1 km of each road.');
         await this.db.spatialJoin({
             tableRootName: 'table_osm_roads',
             tableJoinName: 'lst',
@@ -64,12 +90,14 @@ export class OsmLayersApi {
 
         await this.applyLstCompute();
 
+        setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
         this.map = new AutkMap(canvas);
         await this.map.init();
 
         MapStyle.setHighlightColor(HIGHLIGHT_COLOR);
         PlotStyle.setHighlightColor(HIGHLIGHT_COLOR);
 
+        setLoadingState('Rendering layers...', 'Uploading geometry to the GPU.');
         await this.loadLayers();
         await this.applyRoadslstThematic();
         await this.loadGeoTiffLayer('lst');
@@ -79,6 +107,7 @@ export class OsmLayersApi {
         this.setupPickListener();
 
         this.map.draw();
+        hideLoading();
     }
 
     protected async loadLayers(): Promise<void> {
@@ -89,6 +118,7 @@ export class OsmLayersApi {
     }
 
     protected async applyLstCompute(): Promise<void> {
+        setLoadingState('Merging temperature bands...', 'Building per-road LST timeseries.');
         const bandSelects = Array.from({ length: BAND_COUNT }, (_, i) =>
             `COALESCE(json_extract(properties, '$.sjoin.avg.band_${i + 1}')::DOUBLE, 0)`
         ).join(', ');
@@ -106,6 +136,7 @@ export class OsmLayersApi {
             output: { type: 'CREATE_TABLE', tableName: 'table_osm_roads', source: 'osm', tableType: LayerType.AUTK_OSM_ROADS },
         });
 
+        setLoadingState('Running GPU regression...', 'Computing OLS slope and intercept on the GPU.');
         const compute = new GeojsonCompute();
         const geojson = await this.db.getLayer('table_osm_roads');
 
@@ -198,7 +229,7 @@ export class OsmLayersApi {
             div: document.getElementById('plotBody') as HTMLElement,
             data: this.computedRoadsGeojson,
             attributes: ['compute.intercept', 'compute.angle'],
-            labels: { axis: ['Baseline LST (°C)', 'Warming angle (°)'], title: 'LST regression — Niterói roads' },
+            labels: { axis: ['Baseline LST (°C)', 'Warming angle (°)'], title: 'LST regression' },
             tickFormats: ['.1~f', '.3~f'],
             width: 600,
             height: 380,
@@ -215,7 +246,7 @@ export class OsmLayersApi {
             div: document.getElementById('lineChartBody') as HTMLElement,
             data: this.computedRoadsGeojson,
             attributes: ['lst_timeseries', 'compute.angle', 'compute.intercept'],
-            labels: { axis: ['Year', 'LST (°C)'], title: 'LST timeseries — picked road segment' },
+            labels: { axis: ['Year', 'LST (°C)'], title: 'Selected Road LST timeseries' },
             tickFormats: ['.0f', '.1f'],
             width: 600,
             height: 280,
@@ -234,11 +265,16 @@ export class OsmLayersApi {
 }
 
 async function main() {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) throw new Error('No canvas found');
+    try {
+        const canvas = document.querySelector('canvas');
+        if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas element not found.');
 
-    const example = new OsmLayersApi();
-    await example.run(canvas);
+        const example = new OsmLayersApi();
+        await example.run(canvas);
+    } catch (error) {
+        console.error(error);
+        showError('Failed to load the Niterói case study.', 'Please verify the dataset paths and reload the page.');
+    }
 }
 
 main();

@@ -1,16 +1,21 @@
 
-import { FeatureCollection, Feature, LineString, MultiLineString, MultiPolygon, Polygon } from "geojson";
+import { FeatureCollection, Feature, LineString, MultiLineString, MultiPolygon, Polygon, GeometryCollection, GeoJsonProperties } from "geojson";
 
 import { ILayerComponent, ILayerGeometry } from "./interfaces";
 import { extrudePolygons } from "poly-extrude";
 
 /**
  * Class for triangulating buildings from GeoJSON features.
- * It provides methods to convert different geometry types into building meshes.
+ * Each feature must have a GeometryCollection geometry (one sub-geometry per building part)
+ * and a 'parts' property array whose indices align with geometry.geometries.
  */
 export class TriangulatorBuildings {
     /**
      * Builds a mesh from GeoJSON features representing buildings.
+     * Each feature is one building; its geometry is a GeometryCollection of part polygons
+     * and its properties.parts array holds the per-part OSM properties (height, min_height, etc.).
+     * One ILayerComponent is emitted per building feature.
+     *
      * @param {FeatureCollection} geojson The GeoJSON feature collection
      * @param {number[]} origin The origin point for translation
      * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
@@ -19,40 +24,41 @@ export class TriangulatorBuildings {
         const mesh: ILayerGeometry[] = [];
         const comps: ILayerComponent[] = [];
 
-        // translate based on origin
-        const groups: Feature[][] = this.groupBuildings(geojson);
+        for (const feature of geojson.features) {
+            if (feature.geometry?.type !== 'GeometryCollection') {
+                console.warn('Expected GeometryCollection for building feature, got:', feature.geometry?.type);
+                continue;
+            }
 
-        let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
-
-        // iterate over groups
-        for (let gId = 0; gId < groups.length; gId++) {
+            const geometries = (feature.geometry as GeometryCollection).geometries;
+            const parts = (feature.properties?.parts ?? []) as GeoJsonProperties[];
 
             let nPoints = 0;
             let nTriangles = 0;
 
-            // for each feature of the group
-            for (let fId=0; fId<groups[gId].length; fId++) {
-                // gets the feature
-                const feature = groups[gId][fId];
-
-                // get the heights
-                const heightInfo = TriangulatorBuildings.computeBuildingHeights(feature);
+            for (let i = 0; i < geometries.length; i++) {
+                const partGeom = geometries[i];
+                const partProps = parts[i] ?? {};
+                const heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
                 if (!heightInfo.length) { continue; }
 
-                if (feature.geometry.type === 'LineString') {
-                    meshes = TriangulatorBuildings.lineStringToBuildingMesh(feature, heightInfo, origin);
+                const partFeature: Feature = { type: 'Feature', geometry: partGeom, properties: partProps };
+                let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
 
-                } else if (feature.geometry.type === 'MultiLineString') {
-                    meshes = TriangulatorBuildings.multiLineStringToBuilding(feature, heightInfo, origin);
+                if (partGeom.type === 'LineString') {
+                    meshes = TriangulatorBuildings.lineStringToBuildingMesh(partFeature, heightInfo, origin);
 
-                } else if (feature.geometry.type === 'Polygon') {
-                    meshes = TriangulatorBuildings.polygonToBuilding(feature, heightInfo, origin);
+                } else if (partGeom.type === 'MultiLineString') {
+                    meshes = TriangulatorBuildings.multiLineStringToBuilding(partFeature, heightInfo, origin);
 
-                } else if (feature.geometry.type === 'MultiPolygon') {
-                    meshes = TriangulatorBuildings.multiPolygonToBuilding(feature, heightInfo, origin);
+                } else if (partGeom.type === 'Polygon') {
+                    meshes = TriangulatorBuildings.polygonToBuilding(partFeature, heightInfo, origin);
+
+                } else if (partGeom.type === 'MultiPolygon') {
+                    meshes = TriangulatorBuildings.multiPolygonToBuilding(partFeature, heightInfo, origin);
 
                 } else {
-                    console.warn('Unsupported geometry type:', feature.geometry.type);
+                    console.warn('Unsupported geometry type in building part:', partGeom.type);
                     continue;
                 }
 
@@ -76,37 +82,14 @@ export class TriangulatorBuildings {
     //---------------------------------------------------------------------------
 
     /**
-     * Groups buildings based on their id.
-     * @param {FeatureCollection} geojson The GeoJSON feature collection
-     * @returns {Feature[][]} An array of grouped features
+     * Computes the extrusion heights for a building part from its OSM properties.
+     * @param {GeoJsonProperties} props The properties of the building part
+     * @returns {number[]} [min_height, max_height], or empty array if properties are null
      */
-    private static groupBuildings(geojson: FeatureCollection): Feature[][] {
-
-        const groups: { [key: string]: Feature[] } = {};
-        for (const feat of geojson.features) {
-            let key = feat.properties ? feat.properties.building_id as string : '-1';
-
-            if (!groups[key]) {
-                groups[key] = [];
-            }
-            groups[key].push(feat);
-        }
-
-        return Object.values(groups);
-    }
-
-    /**
-     * Computes the heights of a building feature.
-     * @param {Feature} feature The GeoJSON feature representing a building
-     * @returns {number[]} An array containing the minimum and maximum heights
-     */
-    private static computeBuildingHeights(feature: Feature): number[] {
+    private static computeBuildingHeights(props: GeoJsonProperties): number[] {
         const z_SCALE = 1.0;
         const FLOOR_HEIGHT = 3.4; // in meters
 
-        const props = feature.properties;
-
-        // unavailable building info
         if (props === null) {
             return [];
         }
@@ -238,7 +221,7 @@ export class TriangulatorBuildings {
                 return cord;
             });
             const flatIds = Array.from(result.indices);
-            
+
             meshes.push({ flatCoords, flatIds });
         }
 
