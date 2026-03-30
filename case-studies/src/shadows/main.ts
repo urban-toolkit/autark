@@ -255,16 +255,25 @@ export class Shadows {
         const buildingsLayer = this.map.layerManager.searchByLayerId('table_osm_buildings') as VectorLayer;
         buildingsLayer?.setHighlightedIds([id]);
 
-        // Extract outer ring of the footprint (handles Polygon and MultiPolygon).
+        // Extract outer ring of the footprint (handles GeometryCollection, Polygon, MultiPolygon).
         const geom = feature.geometry as any;
-        const ring: number[][] = geom.type === 'MultiPolygon'
-            ? geom.coordinates[0][0]
-            : geom.coordinates[0];
+        let ring: number[][];
+        if (geom.type === 'GeometryCollection') {
+            const firstPart = geom.geometries?.[0];
+            ring = firstPart?.type === 'MultiPolygon'
+                ? firstPart.coordinates[0][0]
+                : firstPart?.coordinates?.[0] ?? [];
+        } else {
+            ring = geom.type === 'MultiPolygon'
+                ? geom.coordinates[0][0]
+                : geom.coordinates[0];
+        }
 
         // Building height: use OSM `height` tag, fall back to `building:levels` × 3 m, then 20 m.
         const props = feature.properties ?? {};
-        const rawHeight  = parseFloat(props['height']);
-        const rawLevels  = parseFloat(props['building:levels']) * 3;
+        const partProps = Array.isArray(props['parts']) ? (props['parts'][0] ?? {}) : props;
+        const rawHeight  = parseFloat(partProps['height'] ?? props['height']);
+        const rawLevels  = parseFloat(partProps['building:levels'] ?? props['building:levels']) * 3;
         const height = isFinite(rawHeight) && rawHeight > 0 ? rawHeight
                    : isFinite(rawLevels) && rawLevels > 0 ? rawLevels
                    : 20;
