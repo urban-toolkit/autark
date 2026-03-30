@@ -1,6 +1,7 @@
 {
   "name": "autk-map",
   "version": "1.3.0",
+  "keywords": ["visualization", "urban", "3D"],
   "type": "module",
   "files": [
     "dist"
