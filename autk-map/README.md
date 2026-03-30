@@ -1,7 +1,7 @@
 # autk-map: 3D Map Visualization Library
 
 <div align="center">
-  <img src="../logo.png" alt="Autark Logo" height="200"/></br>
+  <img src="https://raw.githubusercontent.com/urban-toolkit/utk-serverless/main/logo.png" alt="Autark Logo" height="200"/></br>
 </div>
 <br>
 
