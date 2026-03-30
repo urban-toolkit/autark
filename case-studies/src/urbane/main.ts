@@ -221,7 +221,6 @@ export class Urbane {
                 'table_osm_roads',
                 this.roadsWithSky,
                 (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
-                false,
                 { mode: NormalizationMode.PERCENTILE },
             );
             this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
@@ -245,7 +244,7 @@ export class Urbane {
             return value || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv, this.currentLevel === 'active_buildings');
+        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv);
         this.map.updateRenderInfoProperty(layerId, 'isColorMap', true);
     }
 

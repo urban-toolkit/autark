@@ -37,7 +37,6 @@ export class SpatialJoinNear {
         });
 
         const layer = 'table_osm_roads';
-        const groupById = false;
 
         await this.db.spatialJoin({
             tableRootName: layer,
@@ -63,7 +62,7 @@ export class SpatialJoinNear {
         await this.map.init();
 
         await this.loadLayers();
-        await this.updateThematicData(layer, groupById);
+        await this.updateThematicData(layer);
 
         this.map.draw();
     }
@@ -76,7 +75,7 @@ export class SpatialJoinNear {
         }
     }
 
-    protected async updateThematicData(layer: string = 'table_osm_buildings', groupById: boolean = false) {
+    protected async updateThematicData(layer: string = 'table_osm_buildings') {
         const geojson = await this.db.getLayer(layer);
 
         const getFnv = (feature: Feature) => {
@@ -84,7 +83,7 @@ export class SpatialJoinNear {
             return properties?.sjoin.count.noise || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv, groupById);
+        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv);
     }
 }
 
