@@ -263,7 +263,7 @@ export class AutkMapUi {
             this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isColorMap', !layer.layerRenderInfo.isColorMap);
         });
 
-        const isRaster = layer.layerInfo.typeLayer === LayerType.AUTK_RASTER;
+        const isRaster = layer.layerInfo.typeLayer === 'raster';
         const cursorBtn = isRaster
             ? (() => { const s = document.createElement('span'); s.style.width = '28px'; s.style.flexShrink = '0'; return s; })()
             : this.makeIconButton(CURSOR_SVG, layer.layerRenderInfo.isPick ?? false, () => {

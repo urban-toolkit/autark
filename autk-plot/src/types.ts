@@ -1,7 +1,8 @@
-
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import { NormalizationMode, ColorHEX, ColorRGB, ColorTEX, NormalizationConfig } from 'autk-types';
+import { PlotEvent } from './constants';
 
-import { NormalizationMode, PlotEvent } from './constants';
+export { ColorHEX, ColorRGB, ColorTEX, NormalizationConfig };
 
 export type PlotMargins = { left: number; right: number; top: number; bottom: number };
 
@@ -23,11 +24,7 @@ export type PlotConfig = {
     attributes?: string[],
     histogram?: PlotHistogramConfig,
     tickFormats?: string[], // d3-format specifier per axis, e.g. ['.1f', '.4f']
-    normalization?: { mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number };
+    normalization?: NormalizationConfig;
 }
 
 export type PlotEventListener = (selection: number[]) => void;
-
-export type ColorHEX = `#${string}`;
-export type ColorRGB = { r: number; g: number; b: number; opacity: number };
-export type ColorTEX = number[];

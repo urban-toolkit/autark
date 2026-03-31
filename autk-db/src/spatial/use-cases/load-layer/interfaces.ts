@@ -1,15 +1,6 @@
-import { BoundingBox } from '../../../shared/interfaces';
+import { LayerType, BoundingBox } from 'autk-types';
 
-export type LayerType =
-  | 'surface'
-  | 'water'
-  | 'parks'
-  | 'roads'
-  | 'buildings'
-  | 'points'
-  | 'polygons'
-  | 'polylines'
-  | 'raster';
+export type { LayerType };
 
 export function isLayerType(value: string): value is LayerType {
   return ['surface', 'water', 'parks', 'roads', 'buildings', 'points', 'polygons', 'polylines', 'raster'].includes(

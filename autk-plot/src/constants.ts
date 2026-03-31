@@ -1,12 +1,4 @@
-export enum ColorMapInterpolator {
-    SEQUENTIAL_REDS = 'interpolateReds',
-    SEQUENTIAL_BLUES = 'interpolateBlues',
-}
-
-export enum NormalizationMode {
-    MIN_MAX = 'minMax',
-    PERCENTILE = 'percentile',
-}
+export { ColorMapInterpolator, NormalizationMode } from 'autk-types';
 
 export enum PlotEvent {
     CLICK = 'click',

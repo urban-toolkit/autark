@@ -1,7 +1,11 @@
 {
   "name": "autk-compute",
   "version": "1.3.0",
-  "keywords": ["urban", "data management", "WebGPU"],
+  "keywords": [
+    "urban",
+    "data management",
+    "WebGPU"
+  ],
   "type": "module",
   "files": [
     "dist"
@@ -39,5 +43,8 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.2",
     "vite-plugin-dts": "^4.5.4"
+  },
+  "dependencies": {
+    "autk-types": "*"
   }
 }

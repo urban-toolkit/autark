@@ -238,38 +238,38 @@ export class AutkMap {
             switch (geoType) {
                 case 'Point':
                 case 'MultiPoint':
-                    typeLayer = LayerType.AUTK_GEO_POINTS;
+                    typeLayer = 'points';
                     break;
                 case 'LineString':
                 case 'MultiLineString':
-                    typeLayer = LayerType.AUTK_GEO_POLYLINES;
+                    typeLayer = 'polylines';
                     break;
                 case 'Polygon':
                 case 'MultiPolygon':
-                    typeLayer = LayerType.AUTK_GEO_POLYGONS;
+                    typeLayer = 'polygons';
                     break;
             }
         }
 
         switch (typeLayer) {
-            case LayerType.AUTK_OSM_SURFACE:
-            case LayerType.AUTK_OSM_WATER:
-            case LayerType.AUTK_OSM_PARKS:
-            case LayerType.AUTK_GEO_POLYGONS:
+            case 'surface':
+            case 'water':
+            case 'parks':
+            case 'polygons':
                 this.createPolygonsLayer(layerName, geojson, typeLayer);
                 break;
 
-            case LayerType.AUTK_OSM_ROADS:
-            case LayerType.AUTK_GEO_POLYLINES:
-                const offset = (typeLayer === LayerType.AUTK_OSM_ROADS) ? TriangulatorPolylines.offset : TriangulatorPolylines.offset * 3;
+            case 'roads':
+            case 'polylines':
+                const offset = (typeLayer === 'roads') ? TriangulatorPolylines.offset : TriangulatorPolylines.offset * 3;
                 this.createPolylinesLayer(layerName, geojson, typeLayer, offset);
                 break;
 
-            case LayerType.AUTK_GEO_POINTS:
+            case 'points':
                 this.createPointsLayer(layerName, geojson, typeLayer);
                 break;
 
-            case LayerType.AUTK_OSM_BUILDINGS:
+            case 'buildings':
                 this.createBuildingsLayer(layerName, geojson, typeLayer);
                 break;
 
@@ -298,7 +298,7 @@ export class AutkMap {
         // Allow the user to provide a geotiff and parse using geotiff.js library
 
         switch (typeLayer) {
-            case LayerType.AUTK_RASTER:
+            case 'raster':
                 this.createRasterLayer(layerName, geotiff, getFnv);
                 break;
             default:
@@ -615,7 +615,7 @@ export class AutkMap {
         }
 
         let layerBorder = null;
-        if (typeLayer === LayerType.AUTK_GEO_POLYGONS) {
+        if (typeLayer === 'polygons') {
             layerBorder = TriangulatorPolygons.buildBorder(geojson, this.origin);
             if (layerBorder[0].length === 0 || layerBorder[1].length === 0) {
                 console.error('Invalid Polygon Layer border.');
@@ -733,7 +733,7 @@ export class AutkMap {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
-            typeLayer: LayerType.AUTK_OSM_BUILDINGS,
+            typeLayer: 'buildings',
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -773,8 +773,8 @@ export class AutkMap {
     private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, getFnv: (cell: unknown) => number) {
         const layerInfo: ILayerInfo = {
             id: `${layerName}`,
-            zIndex: this._layerManager.computeZindex(LayerType.AUTK_RASTER),
-            typeLayer: LayerType.AUTK_RASTER,
+            zIndex: this._layerManager.computeZindex('raster'),
+            typeLayer: 'raster',
         };
 
         const layerRenderInfo: ILayerRenderInfo = {
@@ -822,7 +822,7 @@ export class AutkMap {
     private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
         let layer: VectorLayer | RasterLayer;
 
-        if (layerInfo.typeLayer === LayerType.AUTK_RASTER) {
+        if (layerInfo.typeLayer === 'raster') {
             layer = this._layerManager.addRasterLayer(layerInfo, layerRenderInfo, layerData) as RasterLayer;
         }
         else {

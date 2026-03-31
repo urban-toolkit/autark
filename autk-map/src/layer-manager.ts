@@ -108,7 +108,7 @@ export class LayerManager {
         let layer = null;
 
         switch (layerInfo.typeLayer) {
-            case LayerType.AUTK_OSM_BUILDINGS:
+            case 'buildings':
                 layer = new Triangles3DLayer(layerInfo, layerRender, layerData);
                 break;
             default:
@@ -136,7 +136,7 @@ export class LayerManager {
         let layer = null;
 
         switch (layerInfo.typeLayer) {
-            case LayerType.AUTK_RASTER:
+            case 'raster':
                 layer = new RasterLayer(layerInfo, layerRender, layerData);
                 break;
         }
@@ -218,31 +218,31 @@ export class LayerManager {
         let zIndex = 0;
         
         switch (layerType) {
-            case LayerType.AUTK_OSM_SURFACE:
+            case 'surface':
                 zIndex = 0;
                 break;
-            case LayerType.AUTK_OSM_PARKS:
+            case 'parks':
                 zIndex = 0.1;
                 break;
-            case LayerType.AUTK_OSM_WATER:
+            case 'water':
                 zIndex = 0.2;
                 break;
-            case LayerType.AUTK_OSM_ROADS:
+            case 'roads':
                 zIndex = 0.3;
                 break;
-            case LayerType.AUTK_OSM_BUILDINGS:
+            case 'buildings':
                 zIndex = 1.0;
                 break;
-            case LayerType.AUTK_RASTER:
+            case 'raster':
                 zIndex = 0.4;
                 break;
-            case LayerType.AUTK_GEO_POLYGONS:
+            case 'polygons':
                 zIndex = 0.5;
                 break;
-            case LayerType.AUTK_GEO_POLYLINES:
+            case 'polylines':
                 zIndex = 0.6;
                 break;
-            case LayerType.AUTK_GEO_POINTS:
+            case 'points':
                 zIndex = 0.7;
                 break;
         }

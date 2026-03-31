@@ -1,0 +1,15 @@
+{
+  "name": "autark",
+  "private": true,
+  "workspaces": [
+    "autk-types",
+    "autk-core",
+    "autk-db",
+    "autk-map",
+    "autk-compute",
+    "autk-plot",
+    "gallery",
+    "usecases",
+    "performance"
+  ]
+}
