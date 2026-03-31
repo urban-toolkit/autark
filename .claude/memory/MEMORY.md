@@ -1,0 +1,1 @@
+- [API Uniformity & New Packages Refactor](project_api_refactor.md) — 30-item plan to unify APIs, add autk-types + autk-core, align with paper's feature-centric public API

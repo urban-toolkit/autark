@@ -3,7 +3,7 @@
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
-APP ?= examples
+APP ?= gallery
 
 install:
 	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd autk-compute && npm install"
@@ -51,8 +51,9 @@ clean:
 		"cd autk-db && $(RIMRAF) dist build node_modules" \
 		"cd autk-plot && $(RIMRAF) dist build node_modules" \
 		"cd autk-compute && $(RIMRAF) dist build node_modules" \
-		"cd examples && $(RIMRAF) dist build node_modules" \
-		"cd case-studies && $(RIMRAF) dist build node_modules"
+		"cd gallery && $(RIMRAF) dist build node_modules" \
+		"cd usecases && $(RIMRAF) dist build node_modules" \
+		"cd performance && $(RIMRAF) dist build node_modules"
 
 publish:
 	@if [ -z "$(LIB)" ]; then \
