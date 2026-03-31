@@ -14,7 +14,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
       attributes,
       attributeArrays = {},
       attributeMatrices = {},
-      wglsFunction,
+      wgslFunction,
     } = params;
 
     const outputColumns = params.outputColumns ?? (params.outputColumnName ? [params.outputColumnName] : []);
@@ -37,7 +37,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
     const { globalVarNames, globalInputArrays, globalMeta } = this.extractGlobalData(params);
 
     // Build shader and run GPU computation
-    const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wglsFunction, outputColumns.length);
+    const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wgslFunction, outputColumns.length);
 
     const allVarNames  = [...orderedVarNames,  ...globalVarNames];
     const allInputArrays = { ...inputArrays, ...globalInputArrays };
@@ -271,7 +271,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
     arrayVars: Array<{ name: string; length: number }>,
     matrixVars: Array<{ name: string; rows: number; cols: number; variableRows?: boolean; rowsVarName?: string }>,
     globalMeta: GlobalVarMeta[],
-    wglsFunction: string,
+    wgslFunction: string,
     numOutputs: number,
   ): string {
     let bindingIdx = 0;
@@ -404,7 +404,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
         ${outBufDecls.join('\n        ')}
 
         fn compute_value(${computeFunctionParams.join(', ')}) -> ${returnType} {
-            ${wglsFunction}
+            ${wgslFunction}
         }
 
         @compute @workgroup_size(64)

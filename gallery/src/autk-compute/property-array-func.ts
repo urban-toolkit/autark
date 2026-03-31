@@ -55,7 +55,7 @@ export class PropertyArrayFunc {
         values: 5, // Fixed length of 5
       },
       outputColumnName: 'avg_measurement',
-      wglsFunction: `
+      wgslFunction: `
         var sum = 0.0;
         for (var i = 0u; i < values_length; i++) {
           sum += values[i];
@@ -80,7 +80,7 @@ export class PropertyArrayFunc {
         values: 5,
       },
       outputColumnName: 'weighted_by_temp',
-      wglsFunction: `
+      wgslFunction: `
         var sum = 0.0;
         for (var i = 0u; i < values_length; i++) {
           sum += values[i];
@@ -106,7 +106,7 @@ export class PropertyArrayFunc {
         b: 3,
       },
       outputColumnName: 'dot_product',
-      wglsFunction: `
+      wgslFunction: `
         var dot = 0.0;
         let minLen = min(a_length, b_length);
         for (var i = 0u; i < minLen; i++) {
@@ -131,7 +131,7 @@ export class PropertyArrayFunc {
         values: 5,
       },
       outputColumnName: 'max_measurement',
-      wglsFunction: `
+      wgslFunction: `
         var maxVal = values[0];
         for (var i = 1u; i < values_length; i++) {
           let val = values[i];

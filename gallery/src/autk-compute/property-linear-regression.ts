@@ -75,7 +75,7 @@ export class PropertyLinearRegression {
         y_values: 7,
       },
       outputColumnName: 'predicted_value',
-      wglsFunction: `
+      wgslFunction: `
         // Simple Linear Regression: y = mx + b
         // Formulas:
         // slope (m) = (n*Σ(xy) - Σx*Σy) / (n*Σ(x²) - (Σx)²)

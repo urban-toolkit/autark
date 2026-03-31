@@ -1,7 +1,7 @@
 import { ColorHEX, ColorRGB } from './constants';
 
 import { ColorMap } from './colormap';
-import { IMapStyle } from './interfaces';
+import { MapStyle } from './interfaces';
 
 import light from './styles/light.json';
 import dark from './styles/dark.json';
@@ -10,7 +10,7 @@ export class MapStyle {
     /**
      * Default map style
      */
-    protected static _default: IMapStyle = {
+    protected static _default: MapStyle = {
         background: '#bed2d7',
         surface: '#EFEFEF',
         parks: '#C3D0B2',
@@ -34,7 +34,7 @@ export class MapStyle {
     /**
      * Current map style
      */
-    protected static _current: IMapStyle = MapStyle._default;
+    protected static _current: MapStyle = MapStyle._default;
     /**
      * Current map style id
      */
@@ -52,7 +52,7 @@ export class MapStyle {
      * Get the feature color
      * @param {string} type Feature type
      */
-    public static getColor(type: keyof IMapStyle): ColorRGB {
+    public static getColor(type: keyof MapStyle): ColorRGB {
         // uses the default style if available
         const style = MapStyle._current;
         const hex = style[type] || MapStyle._notFound;
@@ -65,14 +65,14 @@ export class MapStyle {
      * @param {string} style new map style in id: #rrggbb format
      */
     public static setPredefinedStyle(style: string) {
-        let styleObj: IMapStyle = MapStyle._default;
+        let styleObj: MapStyle = MapStyle._default;
         let styleSrt: string = 'default';
 
         if (style === 'light') {
-            styleObj = <IMapStyle>light;
+            styleObj = <MapStyle>light;
             styleSrt = 'light';
         } else if (style === 'dark') {
-            styleObj = <IMapStyle>dark;
+            styleObj = <MapStyle>dark;
             styleSrt = 'dark';
         }
 
@@ -84,7 +84,7 @@ export class MapStyle {
      * Set the feature color
      * @param {string} style new map style json
      */
-    public static setCustomStyle(style: IMapStyle) {
+    public static setCustomStyle(style: MapStyle) {
         MapStyle._current = style;
     }
 

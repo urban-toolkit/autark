@@ -1,4 +1,4 @@
-import { ILayerInfo, ILayerRenderInfo, ILayerData } from './interfaces';
+import { LayerInfo, LayerRenderInfo, LayerData } from './interfaces';
 
 import { Renderer } from './renderer';
 
@@ -21,11 +21,11 @@ export class Triangles3DLayer extends VectorLayer {
 
     /**
      * Constructor for Triangles3DLayer
-     * @param {ILayerInfo} layerInfo - The layer information.
-     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {LayerInfo} layerInfo - The layer information.
+     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {LayerData} layerData - The layer data.
      */
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo, layerData, 3);
         this.computeNormals();
     }

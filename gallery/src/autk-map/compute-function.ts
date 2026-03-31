@@ -39,7 +39,7 @@ export class ComputeFunction {
                 y: 'shape_leng',
             },
             outputColumnName: 'result',
-            wglsFunction: 'return x / y;',
+            wgslFunction: 'return x / y;',
         });
 
         this.map = new AutkMap(canvas);

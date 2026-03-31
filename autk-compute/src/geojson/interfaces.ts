@@ -51,7 +51,7 @@ export interface ComputeFunctionIntoPropertiesParams {
    * Matrix:  array<f32, rows*cols>  +  name_rows: u32  +  name_cols: u32
    *          (row-major: element at (r,c) = name[r * name_cols + c])
    */
-  wglsFunction: string;
+  wgslFunction: string;
 }
 
 export interface ComputeResult {

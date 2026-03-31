@@ -1,6 +1,6 @@
 import { FeatureCollection, Feature, Point, MultiPoint  } from 'geojson';
 
-import { ILayerGeometry, ILayerComponent } from './interfaces';
+import { LayerGeometry, LayerComponent } from './interfaces';
 
 /**
  * Class for triangulating points from GeoJSON features.
@@ -11,11 +11,11 @@ export class TriangulatorPoints {
      * Builds a mesh from GeoJSON features representing points.
      * @param {FeatureCollection} geojson The GeoJSON feature collection
      * @param {number[]} origin The origin point for translation
-     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     * @returns {[LayerGeometry[], LayerComponent[]]} An array of geometries and components
      */
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
-        const mesh: ILayerGeometry[] = [];
-        const comps: ILayerComponent[] = [];
+    static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
+        const mesh: LayerGeometry[] = [];
+        const comps: LayerComponent[] = [];
 
         const collection: Feature[] = geojson['features'];
 

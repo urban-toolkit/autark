@@ -35,7 +35,7 @@ export class ComputeOsm {
                 x: 'lanes',
             },
             outputColumnName: 'result',
-            wglsFunction: `
+            wgslFunction: `
                 if (x <= 0) {
                     return 1;
                 }

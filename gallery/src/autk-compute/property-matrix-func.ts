@@ -55,7 +55,7 @@ export class PropertyMatrixFunc {
         img: { rows: imageHeight, cols: imageWidth },
       },
       outputColumnName: 'color_percentage',
-      wglsFunction: `
+      wgslFunction: `
         // Count pixels that match the exact target color (128.0)
         let targetColor = 128.0;
         var matchCount = 0u;

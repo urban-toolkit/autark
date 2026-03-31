@@ -1,6 +1,6 @@
 import {
-    ILayerInfo,
-    ILayerRenderInfo
+    LayerInfo,
+    LayerRenderInfo
 } from './interfaces';
 
 /**
@@ -13,15 +13,15 @@ import {
 export abstract class Layer {
     /**
      * Layer information.
-     * @type {ILayerInfo}
+     * @type {LayerInfo}
      */
-    protected _layerInfo!: ILayerInfo;
+    protected _layerInfo!: LayerInfo;
 
     /**
      * Layer rendering information.
-     * @type {ILayerRenderInfo}
+     * @type {LayerRenderInfo}
      */
-    protected _layerRenderInfo!: ILayerRenderInfo;
+    protected _layerRenderInfo!: LayerRenderInfo;
 
     /**
      * Indicates if the layer's rendering information is dirty.
@@ -39,10 +39,10 @@ export abstract class Layer {
 
     /**
      * Constructor for Layer
-     * @param {ILayerInfo} layerInfo - The layer information.
-     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {LayerInfo} layerInfo - The layer information.
+     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
      */
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo) {
+    constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo) {
         this._layerInfo = layerInfo;
         this._layerRenderInfo = layerRenderInfo;
     }
@@ -51,31 +51,31 @@ export abstract class Layer {
      * Gets the information of the layer.
      * @returns {string} The information of the layer.
      */
-    get layerInfo(): ILayerInfo {
+    get layerInfo(): LayerInfo {
         return this._layerInfo;
     }
 
     /**
      * Sets the information of the layer.
-     * @param {ILayerInfo} layerInfo - The info to set for the layer.
+     * @param {LayerInfo} layerInfo - The info to set for the layer.
      */
-    set layerInfo(layerInfo: ILayerInfo) {
+    set layerInfo(layerInfo: LayerInfo) {
         this._layerInfo = layerInfo;
     }
 
     /**
      * Gets the rendering information of the layer.
-     * @returns {ILayerRenderInfo} The rendering information of the layer.
+     * @returns {LayerRenderInfo} The rendering information of the layer.
      */
-    get layerRenderInfo(): ILayerRenderInfo {
+    get layerRenderInfo(): LayerRenderInfo {
         return this._layerRenderInfo;
     }
 
     /**
      * Sets the rendering information of the layer.
-     * @param {ILayerRenderInfo} layerRenderInfo - The rendering info to set for the layer.
+     * @param {LayerRenderInfo} layerRenderInfo - The rendering info to set for the layer.
      */
-    set layerRenderInfo(layerRenderInfo: ILayerRenderInfo) {
+    set layerRenderInfo(layerRenderInfo: LayerRenderInfo) {
         this._layerRenderInfo = layerRenderInfo;
     }
 

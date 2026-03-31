@@ -17,11 +17,11 @@ import {
 } from './constants';
 
 import {
-    ILayerData,
-    ILayerGeometry,
-    ILayerInfo,
-    ILayerRenderInfo,
-    ILayerThematic,
+    LayerData,
+    LayerGeometry,
+    LayerInfo,
+    LayerRenderInfo,
+    LayerThematic,
 } from './interfaces';
 
 import { ColorMap } from './colormap';
@@ -354,7 +354,7 @@ export class AutkMap {
      * @param {{ mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number }} [normalization] How to map raw values to [0, 1]. Defaults to MIN_MAX.
      */
     updateGeoJsonLayerThematic(layerName: string, geojson: FeatureCollection, getFnv: (feature: Feature) => number | string, normalization: { mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number } = { mode: NormalizationMode.MIN_MAX }) {
-        const thematicData: ILayerThematic[] = [];
+        const thematicData: LayerThematic[] = [];
 
         const filtered: Feature[] = geojson.features;
 
@@ -367,7 +367,7 @@ export class AutkMap {
 
                 const val = +getFnv(feature);
                 thematicData.push({
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    level: ThematicAggregationLevel.COMPONENT,
                     values: [val],
                 });
             }
@@ -399,7 +399,7 @@ export class AutkMap {
 
                 const val = 0.1 * strCats.indexOf(getFnv(feature) as string);
                 thematicData.push({
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    level: ThematicAggregationLevel.COMPONENT,
                     values: [val],
                 });
             }
@@ -412,9 +412,9 @@ export class AutkMap {
      * Updates the thematic information of a layer.
      * 
      * @param {string} layerName The name of the layer
-     * @param {ILayerThematic[]} layerThematic The thematic information to update
+     * @param {LayerThematic[]} layerThematic The thematic information to update
      */
-    updateLayerThematic(layerName: string, layerThematic: ILayerThematic[]) {
+    updateLayerThematic(layerName: string, layerThematic: LayerThematic[]) {
         const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer;
 
         if (layer) {
@@ -427,9 +427,9 @@ export class AutkMap {
      * Updates the geometry of a layer.
      * 
      * @param {string} layerName The name of the layer
-     * @param {ILayerGeometry[]} layerGeometry The geometry data to update
+     * @param {LayerGeometry[]} layerGeometry The geometry data to update
      */
-    public updateLayerGeometry(layerName: string, layerGeometry: ILayerGeometry[]) {
+    public updateLayerGeometry(layerName: string, layerGeometry: LayerGeometry[]) {
         const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
 
         if (layer) {
@@ -442,10 +442,10 @@ export class AutkMap {
      * Updates the render information of a layer.
      * 
      * @param {string} layerName The name of the layer
-     * @param {ILayerRenderInfo} property The property to update
+     * @param {LayerRenderInfo} property The property to update
      * @param {unknown} value The new value for the property
      */
-    public updateRenderInfoProperty(layerName: string, property: keyof ILayerRenderInfo, value: unknown) {
+    public updateRenderInfoProperty(layerName: string, property: keyof LayerRenderInfo, value: unknown) {
         const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
 
         if (layer) {
@@ -593,13 +593,13 @@ export class AutkMap {
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
     private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
-        const layerInfo: ILayerInfo = {
+        const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
-        const layerRenderInfo: ILayerRenderInfo = {
+        const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -632,7 +632,7 @@ export class AutkMap {
             borderComponents: layerBorder[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -647,13 +647,13 @@ export class AutkMap {
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
     private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number) {
-        const layerInfo: ILayerInfo = {
+        const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
-        const layerRenderInfo: ILayerRenderInfo = {
+        const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -674,7 +674,7 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -689,13 +689,13 @@ export class AutkMap {
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
     private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
-        const layerInfo: ILayerInfo = {
+        const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
-        const layerRenderInfo: ILayerRenderInfo = {
+        const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -715,7 +715,7 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -730,13 +730,13 @@ export class AutkMap {
      * @param {FeatureCollection} geojson The GeoJSON data.
      */
     private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
-        const layerInfo: ILayerInfo = {
+        const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: 'buildings',
         };
 
-        const layerRenderInfo: ILayerRenderInfo = {
+        const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -756,7 +756,7 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.AGGREGATION_COMPONENT,
+                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -771,13 +771,13 @@ export class AutkMap {
      * @param {FeatureCollection} geotiff The GeoJSON data.
      */
     private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, getFnv: (cell: unknown) => number) {
-        const layerInfo: ILayerInfo = {
+        const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex('raster'),
             typeLayer: 'raster',
         };
 
-        const layerRenderInfo: ILayerRenderInfo = {
+        const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
             colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
             colorMapLabels: ['0.0', '1.0'],
@@ -800,7 +800,7 @@ export class AutkMap {
 
         const rasterValues: number[] = props.raster.map((row: unknown) => getFnv(row));
 
-        const layerData: ILayerData = {
+        const layerData: LayerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
             raster: [{
@@ -815,11 +815,11 @@ export class AutkMap {
 
     /**
      * Creates a layer from the provided information.
-     * @param {ILayerInfo} layerInfo The information about the layer.
-     * @param {ILayerRenderInfo} layerRenderInfo The rendering information for the layer.
-     * @param {ILayerData} layerData The data for the layer.
+     * @param {LayerInfo} layerInfo The information about the layer.
+     * @param {LayerRenderInfo} layerRenderInfo The rendering information for the layer.
+     * @param {LayerData} layerData The data for the layer.
      */
-    private createLayer(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    private createLayer(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         let layer: VectorLayer | RasterLayer;
 
         if (layerInfo.typeLayer === 'raster') {

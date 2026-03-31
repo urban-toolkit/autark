@@ -1,7 +1,7 @@
 
 import { FeatureCollection, Feature, LineString, MultiLineString, MultiPolygon, Polygon, GeometryCollection, GeoJsonProperties } from "geojson";
 
-import { ILayerComponent, ILayerGeometry } from "./interfaces";
+import { LayerComponent, LayerGeometry } from "./interfaces";
 import { extrudePolygons } from "poly-extrude";
 
 /**
@@ -14,15 +14,15 @@ export class TriangulatorBuildings {
      * Builds a mesh from GeoJSON features representing buildings.
      * Each feature is one building; its geometry is a GeometryCollection of part polygons
      * and its properties.parts array holds the per-part OSM properties (height, min_height, etc.).
-     * One ILayerComponent is emitted per building feature.
+     * One LayerComponent is emitted per building feature.
      *
      * @param {FeatureCollection} geojson The GeoJSON feature collection
      * @param {number[]} origin The origin point for translation
-     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     * @returns {[LayerGeometry[], LayerComponent[]]} An array of geometries and components
      */
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
-        const mesh: ILayerGeometry[] = [];
-        const comps: ILayerComponent[] = [];
+    static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
+        const mesh: LayerGeometry[] = [];
+        const comps: LayerComponent[] = [];
 
         for (const feature of geojson.features) {
             if (feature.geometry?.type !== 'GeometryCollection') {

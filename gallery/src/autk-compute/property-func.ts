@@ -32,7 +32,7 @@ export class LoadGeojson {
         y: 'height',
       },
       outputColumnName: 'height_sq',
-      wglsFunction: 'return x * y;',
+      wgslFunction: 'return x * y;',
     });
 
     console.log({ computedGeojson: geojson });

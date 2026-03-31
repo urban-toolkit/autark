@@ -186,7 +186,7 @@ export class Urbane {
             attributeArrays: { vals: N },
             uniformArrays: { weights: [...this.weights, this.skyExposureWeight] },
             outputColumnName: 'score',
-            wglsFunction: `
+            wgslFunction: `
                 var s = 0.0;
                 for (var i = 0u; i < vals_length; i++) {
                     s += vals[i] * weights[i];

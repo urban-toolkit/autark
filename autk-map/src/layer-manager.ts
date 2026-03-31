@@ -3,9 +3,9 @@ import {
 } from 'geojson';
 
 import { 
-    ILayerData,
-    ILayerInfo,
-    ILayerRenderInfo
+    LayerData,
+    LayerInfo,
+    LayerRenderInfo
 } from './interfaces';
 
 import { LayerType } from './constants';
@@ -99,12 +99,12 @@ export class LayerManager {
 
     /**
      * Adds a layer to the map.
-     * @param {ILayerInfo} layerInfo - The information about the layer.
-     * @param {ILayerRenderInfo} layerRender - The rendering information for the layer.
-     * @param {ILayerData} layerData - The data associated with the layer.
+     * @param {LayerInfo} layerInfo - The information about the layer.
+     * @param {LayerRenderInfo} layerRender - The rendering information for the layer.
+     * @param {LayerData} layerData - The data associated with the layer.
      * @returns {Layer | null} - The created layer or null if the type is unknown.
      */
-    public addVectorLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): VectorLayer | null {
+    public addVectorLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): VectorLayer | null {
         let layer = null;
 
         switch (layerInfo.typeLayer) {
@@ -127,12 +127,12 @@ export class LayerManager {
 
     /**
      * Adds a raster layer to the map.
-     * @param {ILayerInfo} layerInfo - The information about the layer.
-     * @param {ILayerRenderInfo} layerRender - The rendering information for the layer.
-     * @param {ILayerData} layerData - The data associated with the layer.
+     * @param {LayerInfo} layerInfo - The information about the layer.
+     * @param {LayerRenderInfo} layerRender - The rendering information for the layer.
+     * @param {LayerData} layerData - The data associated with the layer.
      * @returns {Layer | null} - The created layer or null if the type is unknown.
      */
-    public addRasterLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): RasterLayer | null {
+    public addRasterLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): RasterLayer | null {
         let layer = null;
 
         switch (layerInfo.typeLayer) {

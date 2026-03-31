@@ -1,10 +1,10 @@
 import { 
-    ILayerInfo,
-    ILayerRenderInfo,
-    ILayerData,
-    ILayerGeometry,
-    ILayerComponent,
-    IRasterData
+    LayerInfo,
+    LayerRenderInfo,
+    LayerData,
+    LayerGeometry,
+    LayerComponent,
+    RasterData
 } from "./interfaces";
 
 import { Layer } from "./layer";
@@ -37,9 +37,9 @@ export class RasterLayer extends Layer {
 
     /**
      * Components of the layer.
-     * @type {ILayerComponent[]}
+     * @type {LayerComponent[]}
      */
-    protected _components: ILayerComponent[] = [];
+    protected _components: LayerComponent[] = [];
 
 
 
@@ -57,7 +57,7 @@ export class RasterLayer extends Layer {
 
     /**
      * The raster data for the layer.
-     * @type {IRasterData}
+     * @type {RasterData}
      */
     protected _rasterData!: number[];
 
@@ -73,11 +73,11 @@ export class RasterLayer extends Layer {
 
     /**
      * Constructor for Raster
-     * @param {ILayerInfo} layerInfo - The layer information.
-     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {LayerInfo} layerInfo - The layer information.
+     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {LayerData} layerData - The layer data.
      */
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData) {
+    constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo);
 
         this.loadLayerData(layerData);
@@ -111,9 +111,9 @@ export class RasterLayer extends Layer {
 
     /**
      * Get the components of the layer.
-     * @returns {ILayerComponent[]} - The components of the layer.
+     * @returns {LayerComponent[]} - The components of the layer.
      */
-    get components(): ILayerComponent[] {
+    get components(): LayerComponent[] {
         return this._components;
     }
 
@@ -137,7 +137,7 @@ export class RasterLayer extends Layer {
 
     /**
      * Get the raster data.
-     * @returns {IRasterData} - The raster data.
+     * @returns {RasterData} - The raster data.
      */
     get rasterData(): number[] {
         return this._rasterData;
@@ -147,9 +147,9 @@ export class RasterLayer extends Layer {
 
     /**
      * Load the layer data.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {LayerData} layerData - The layer data.
      */
-    public loadLayerData(layerData: ILayerData): void {
+    public loadLayerData(layerData: LayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
 
@@ -160,9 +160,9 @@ export class RasterLayer extends Layer {
 
     /**
      * Load the texture coordinates from the layer data.
-     * @param {ILayerGeometry[]} layerGeometry - The layer data.
+     * @param {LayerGeometry[]} layerGeometry - The layer data.
      */
-    public loadGeometry(layerGeometry: ILayerGeometry[]): void {
+    public loadGeometry(layerGeometry: LayerGeometry[]): void {
         const position: number[] = [];
         const indices: number[] = [];
         const texCoord: number[] = [];
@@ -197,9 +197,9 @@ export class RasterLayer extends Layer {
 
     /**
      * Load the components of the layer.
-     * @param {ILayerComponent[]} layerComponents - The components to load.
+     * @param {LayerComponent[]} layerComponents - The components to load.
      */
-    public loadComponent(layerComponents: ILayerComponent[]): void {
+    public loadComponent(layerComponents: LayerComponent[]): void {
         this._components = [];
 
         const accum = { nPoints: 0, nTriangles: 0 };
@@ -218,9 +218,9 @@ export class RasterLayer extends Layer {
 
     /**
      * Load the raster data from the layer data.
-     * @param {IRasterData[]} layerRaster - The layer data.
+     * @param {RasterData[]} layerRaster - The layer data.
      */
-    public loadRaster(layerRaster: IRasterData[]): void {
+    public loadRaster(layerRaster: RasterData[]): void {
         const rasterData: number[] = [];
 
         for (let id = 0; id < layerRaster.length; id++) {

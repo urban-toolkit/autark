@@ -185,7 +185,7 @@ export class Shadows {
                 ring: { data: footprint, cols: 2 },
             },
             outputColumns: ['shadow', 'contribution'],
-            wglsFunction: shadowShader,
+            wgslFunction: shadowShader,
         });
 
         this.computedRoads = result;

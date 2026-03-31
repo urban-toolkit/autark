@@ -16,7 +16,7 @@ import {
  * @property {ColorHEX} features - Color of the map's features.
  * @property {ColorHEX} lines - Color of the map's lines.
  */
-export interface IMapStyle {
+export interface MapStyle {
     background: ColorHEX;
     surface: ColorHEX;
     parks: ColorHEX;
@@ -35,7 +35,7 @@ export interface IMapStyle {
  * @property {LayerGeometryType} typeGeometry - Type of geometry used in the layer.
  * @property {LayerType} typeLayer - Type of layer.
  */
-export interface ILayerInfo {
+export interface LayerInfo {
     id: string;
     zIndex: number;
     typeLayer: LayerType;
@@ -51,7 +51,7 @@ export interface ILayerInfo {
  * @property {boolean} [isSkip] - Indicates if the layer should be skipped in rendering.
  * @property {boolean} [isPick] - Indicates if the layer is for picking
  */
-export interface ILayerRenderInfo {
+export interface LayerRenderInfo {
     opacity: number;
     isColorMap?: boolean;
     colorMapInterpolator: ColorMapInterpolator;
@@ -63,21 +63,21 @@ export interface ILayerRenderInfo {
 
 /**
  * Interface for layer border information.
- * @property {ILayerGeometry[]} geometry - Array of geometries for the layer.
- * @property {ILayerComponent[]} components - Array of components for the layer.
+ * @property {LayerGeometry[]} geometry - Array of geometries for the layer.
+ * @property {LayerComponent[]} components - Array of components for the layer.
  * @property {ILayerBorder[]} [border] - Array of borders for the layer.
- * @property {ILayerBorderComponent[]} [borderComponents] - Array of border components for the layer.
- * @property {IRasterData} [raster] - Raster data for the layer.
- * @property {ILayerThematic[]} [thematic] - Thematic data for the layer.
+ * @property {LayerBorderComponent[]} [borderComponents] - Array of border components for the layer.
+ * @property {RasterData} [raster] - Raster data for the layer.
+ * @property {LayerThematic[]} [thematic] - Thematic data for the layer.
  * @property {number[]} [highlighted] - Indices of highlighted components in the layer.
  */
-export interface ILayerData {
-    geometry: ILayerGeometry[];
-    components: ILayerComponent[];
+export interface LayerData {
+    geometry: LayerGeometry[];
+    components: LayerComponent[];
     border?: ILayerBorder[];
-    borderComponents?: ILayerBorderComponent[];
-    raster?: IRasterData[];
-    thematic?: ILayerThematic[];
+    borderComponents?: LayerBorderComponent[];
+    raster?: RasterData[];
+    thematic?: LayerThematic[];
     highlighted?: number[];
 }
 
@@ -88,7 +88,7 @@ export interface ILayerData {
  * @property {number[]} [indices] - Optional array of indices for the geometry.
  * @property {number[]} [texCoord] - Optional array of texture coordinates for the geometry.
  */
-export interface ILayerGeometry {
+export interface LayerGeometry {
     position: number[];
     normal?: number[];
     indices?: number[];
@@ -100,7 +100,7 @@ export interface ILayerGeometry {
  * @property {ThematicAggregationLevel} level - Thematic aggregation level.
  * @property {number[]} values - Array of values for the thematic layer.
  */
-export interface ILayerThematic {
+export interface LayerThematic {
     level: ThematicAggregationLevel;
     values: number[];
 }
@@ -111,7 +111,7 @@ export interface ILayerThematic {
  * @property {number} rasterResY - Height of the raster.
  * @property {number[]} values - Array of raster values.
  */
-export interface IRasterData {
+export interface RasterData {
     rasterResX: number;
     rasterResY: number;
     rasterValues: number[];
@@ -122,7 +122,7 @@ export interface IRasterData {
  * @property {number} nPoints - Number of points in the layer component.
  * @property {number} nTriangles - Number of triangles in the layer component.
  */
-export interface ILayerComponent {
+export interface LayerComponent {
     nPoints: number;
     nTriangles: number;
 }
@@ -142,7 +142,7 @@ export interface ILayerBorder {
  * @property {number[]} nPoints - Number of points in the layer component.
  * @property {number[]} nLines - Number of lines in the layer component.
  */
-export interface ILayerBorderComponent {
+export interface LayerBorderComponent {
     nPoints: number;
     nLines: number;
 }
@@ -153,7 +153,7 @@ export interface ILayerBorderComponent {
  * @property {number[]} eye - Position of the camera.
  * @property {number[]} lookAt - Point the camera is looking at.
  */
-export interface ICameraData {
+export interface CameraData {
     up: number[];
     eye: number[];
     lookAt: number[];

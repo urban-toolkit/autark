@@ -1,5 +1,5 @@
 import { vec3, mat4 } from 'gl-matrix';
-import { ICameraData } from './interfaces';
+import { CameraData } from './interfaces';
 
 /**
  * Camera class for managing the view parameters and transformations in a 3D space.
@@ -66,7 +66,7 @@ export class Camera {
     /**
      * Default camera parameters.
      */
-    private static defaultParams: ICameraData = {
+    private static defaultParams: CameraData = {
         up: [0, 1, 0],
         eye: [0, 0, 10000],
         lookAt: [0, 0, 0],
@@ -76,9 +76,9 @@ export class Camera {
      * Constructs a Camera instance with the specified parameters.
      * If no parameters are provided, it uses the default camera parameters.
      * 
-     * @param {ICameraData} [params=Camera.defaultParams] - The initial camera parameters.
+     * @param {CameraData} [params=Camera.defaultParams] - The initial camera parameters.
      */
-    constructor(params: ICameraData = Camera.defaultParams) {
+    constructor(params: CameraData = Camera.defaultParams) {
         this.resetCamera(params.up, params.lookAt, params.eye);
     }
 

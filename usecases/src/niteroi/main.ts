@@ -145,7 +145,7 @@ export class OsmLayersApi {
             attributes: { bands: 'lst_timeseries' },
             attributeArrays: { bands: BAND_COUNT },
             outputColumns: ['angle', 'intercept'],
-            wglsFunction: lstRegressionShader,
+            wgslFunction: lstRegressionShader,
         });
     }
 

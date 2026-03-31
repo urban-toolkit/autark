@@ -34,7 +34,7 @@ export class MouseEvents {
         this._map = map;
         this._lastPoint = [0, 0];
 
-        this._status = MouseStatus.MOUSE_IDLE;
+        this._status = MouseStatus.IDLE;
     }
 
     /**
@@ -72,7 +72,7 @@ export class MouseEvents {
         if (event.button == 0 || event.button == 1) {
             // left click
             this._lastPoint = [event.offsetX, event.offsetY];
-            this._status = MouseStatus.MOUSE_DRAG;
+            this._status = MouseStatus.DRAG;
         }
     }
 
@@ -89,7 +89,7 @@ export class MouseEvents {
         const canvas = this._map.renderer.canvas;
 
         // left click drag
-        if (this._status === MouseStatus.MOUSE_DRAG) {
+        if (this._status === MouseStatus.DRAG) {
             const dx = -event.offsetX + this._lastPoint[0];
             const dy = event.offsetY - this._lastPoint[1];
 
@@ -115,7 +115,7 @@ export class MouseEvents {
         event.stopPropagation();
 
         // changes the values
-        this._status = MouseStatus.MOUSE_IDLE;
+        this._status = MouseStatus.IDLE;
     }
 
     /**

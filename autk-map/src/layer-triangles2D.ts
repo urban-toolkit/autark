@@ -1,4 +1,4 @@
-import { ILayerBorder, ILayerBorderComponent, ILayerData, ILayerInfo, ILayerRenderInfo } from './interfaces';
+import { ILayerBorder, LayerBorderComponent, LayerData, LayerInfo, LayerRenderInfo } from './interfaces';
 
 import { Camera } from './camera';
 import { Renderer } from './renderer';
@@ -25,9 +25,9 @@ export class Triangles2DLayer extends VectorLayer {
 
     /**
      * Components of the layer.
-     * @type {ILayerComponent[]}
+     * @type {LayerComponent[]}
      */
-    protected _borderComponents: ILayerBorderComponent[] = [];
+    protected _borderComponents: LayerBorderComponent[] = [];
 
     /**
      * Pipeline for rendering borders.
@@ -39,12 +39,12 @@ export class Triangles2DLayer extends VectorLayer {
 
     /**
      * Constructor for Triangles2DBorder
-     * @param {ILayerInfo} layerInfo - The layer information.
-     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {LayerInfo} layerInfo - The layer information.
+     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {LayerData} layerData - The layer data.
      * @param {number} dimension - The dimension of the layer (2 or 3).
      */
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
+    constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData, dimension: number = 2) {
         super(layerInfo, layerRenderInfo, layerData);
         this._dimension = dimension;
 
@@ -84,9 +84,9 @@ export class Triangles2DLayer extends VectorLayer {
 
     /**
      * Load the layer data, specifically the border information.
-     * @param {ILayerData} layerData - The data associated with the layer.
+     * @param {LayerData} layerData - The data associated with the layer.
      */
-    public loadLayerData(layerData: ILayerData): void {
+    public loadLayerData(layerData: LayerData): void {
         super.loadLayerData(layerData);
 
         this.loadBorderGeometry(layerData.border || []);
@@ -130,9 +130,9 @@ export class Triangles2DLayer extends VectorLayer {
 
     /**
      * Load the border components for the layer.
-     * @param {ILayerBorderComponent[]} borderComponent - The border components to load.
+     * @param {LayerBorderComponent[]} borderComponent - The border components to load.
      */
-    public loadBorderComponent(borderComponent: ILayerBorderComponent[]): void {
+    public loadBorderComponent(borderComponent: LayerBorderComponent[]): void {
         this._borderComponents = [];
 
         const accum = { nPoints: 0, nLines: 0 };

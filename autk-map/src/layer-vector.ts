@@ -1,12 +1,12 @@
 import { ThematicAggregationLevel } from './constants';
 
 import { 
-    ILayerComponent, 
-    ILayerData, 
-    ILayerGeometry, 
-    ILayerInfo, 
-    ILayerRenderInfo, 
-    ILayerThematic 
+    LayerComponent, 
+    LayerData, 
+    LayerGeometry, 
+    LayerInfo, 
+    LayerRenderInfo, 
+    LayerThematic 
 } from './interfaces';
 
 import { Layer } from './layer';
@@ -51,9 +51,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Components of the layer.
-     * @type {ILayerComponent[]}
+     * @type {LayerComponent[]}
      */
-    protected _components: ILayerComponent[] = [];
+    protected _components: LayerComponent[] = [];
 
 
 
@@ -102,12 +102,12 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Constructor for Triangles2DLayer
-     * @param {ILayerInfo} layerInfo - The layer information.
-     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {ILayerData} layerData - The layer data.
+     * @param {LayerInfo} layerInfo - The layer information.
+     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
+     * @param {LayerData} layerData - The layer data.
      * @param {number} dimension - The dimension of the layer (2 or 3).
      */
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
+    constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData, dimension: number = 2) {
         super(layerInfo, layerRenderInfo);
 
         this._dimension = dimension;
@@ -143,9 +143,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Get the components of the layer.
-     * @returns {ILayerComponent[]} - The components of the layer.
+     * @returns {LayerComponent[]} - The components of the layer.
      */
-    get components(): ILayerComponent[] {
+    get components(): LayerComponent[] {
         return this._components;
     }
 
@@ -186,9 +186,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Load the layer data, including geometry and components.
-     * @param {ILayerData} layerData - The data associated with the layer.
+     * @param {LayerData} layerData - The data associated with the layer.
      */
-    public loadLayerData(layerData: ILayerData): void {
+    public loadLayerData(layerData: LayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
 
@@ -205,9 +205,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Load the geometry data for the layer.
-     * @param {ILayerGeometry[]} layerGeometry - The geometry data to load.
+     * @param {LayerGeometry[]} layerGeometry - The geometry data to load.
      */
-    public loadGeometry(layerGeometry: ILayerGeometry[]): void {
+    public loadGeometry(layerGeometry: LayerGeometry[]): void {
         const position: number[] = [];
         const indices: number[] = [];
 
@@ -245,9 +245,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Load the components of the layer.
-     * @param {ILayerComponent[]} layerComponents - The components to load.
+     * @param {LayerComponent[]} layerComponents - The components to load.
      */
-    public loadComponent(layerComponents: ILayerComponent[]): void {
+    public loadComponent(layerComponents: LayerComponent[]): void {
         this._components = [];
 
         const accum = { nPoints: 0, nTriangles: 0 };
@@ -266,22 +266,22 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Load the thematic data for the layer.
-     * @param {ILayerThematic[]} layerThematic - The thematic data to load.
+     * @param {LayerThematic[]} layerThematic - The thematic data to load.
      */
-    public loadThematic(layerThematic: ILayerThematic[]): void {
+    public loadThematic(layerThematic: LayerThematic[]): void {
         const thematic: number[] = [];
 
         for (let compId = 0; compId < layerThematic.length; compId++) {
             let aggr: number[] = [];
 
             switch (layerThematic[compId].level) {
-                case ThematicAggregationLevel.AGGREGATION_POINT:
+                case ThematicAggregationLevel.POINT:
                     aggr = this.aggregateThematicPoint(layerThematic[compId]);
                     break;
-                case ThematicAggregationLevel.AGGREGATION_PRIMITIVE:
+                case ThematicAggregationLevel.PRIMITIVE:
                     aggr = this.aggregateThematicPrimitive(compId, layerThematic[compId]);
                     break;
-                case ThematicAggregationLevel.AGGREGATION_COMPONENT:
+                case ThematicAggregationLevel.COMPONENT:
                     aggr = this.aggregateThematicComponenet(compId, layerThematic[compId]);
                     break;
                 default:
@@ -479,20 +479,20 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Aggregate thematic data for point level.
-     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
+     * @param {LayerThematic} layerThematic - The thematic data to aggregate.
      * @returns {number[]} - The aggregated thematic data.
      */
-    private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
+    private aggregateThematicPoint(layerThematic: LayerThematic): number[] {
         return layerThematic.values;
     }
 
     /**
      * Aggregate thematic data for primitive level.
      * @param {number} component - The component index.
-     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
+     * @param {LayerThematic} layerThematic - The thematic data to aggregate.
      * @returns {number[]} - The aggregated thematic data.
      */
-    private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): number[] {
+    private aggregateThematicPrimitive(component: number, layerThematic: LayerThematic): number[] {
         // component points: start/end indices and number of points
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;
@@ -517,10 +517,10 @@ export abstract class VectorLayer extends Layer {
     /**
      * Aggregate thematic data for component level.
      * @param {number} component - The component index.
-     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
+     * @param {LayerThematic} layerThematic - The thematic data to aggregate.
      * @returns {number[]} - The aggregated thematic data.
      */
-    private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): number[] {
+    private aggregateThematicComponenet(component: number, layerThematic: LayerThematic): number[] {
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;
         const nPoint = ePoint - sPoint;

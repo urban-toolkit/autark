@@ -1,7 +1,7 @@
 
 import { FeatureCollection, Feature, Geometry, LineString, MultiLineString } from 'geojson';
 
-import { ILayerGeometry, ILayerComponent } from './interfaces';
+import { LayerGeometry, LayerComponent } from './interfaces';
 
 import { lineOffset, lineString } from '@turf/turf';
 import earcut from 'earcut';
@@ -16,11 +16,11 @@ export class TriangulatorRaster {
      * Builds a mesh from GeoJSON features representing polylines.
      * @param {FeatureCollection} geotiff The GeoJSON feature collection
      * @param {number[]} origin The origin point for translation
-     * @returns {[ILayerGeometry[], ILayerComponent[]]} An array of geometries and components
+     * @returns {[LayerGeometry[], LayerComponent[]]} An array of geometries and components
      */
-    static buildMesh(geotiff: FeatureCollection<Geometry | null>, origin: number[]): [ILayerGeometry[], ILayerComponent[]] {
-        const mesh: ILayerGeometry[] = [];
-        const comps: ILayerComponent[] = [];
+    static buildMesh(geotiff: FeatureCollection<Geometry | null>, origin: number[]): [LayerGeometry[], LayerComponent[]] {
+        const mesh: LayerGeometry[] = [];
+        const comps: LayerComponent[] = [];
 
         const bbox = geotiff.bbox;
 
@@ -59,7 +59,7 @@ export class TriangulatorRaster {
      * @param {Feature} feature The GeoJSON feature representing a LineString
      * @param {number[]} origin The origin point for translation
      * @param {number} offset The offset distance for the polyline extrusion
-     * @returns {ILayerGeometry[]} An array of geometries
+     * @returns {LayerGeometry[]} An array of geometries
      */
     static lineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
         const base = <LineString>feature.geometry;
@@ -82,7 +82,7 @@ export class TriangulatorRaster {
      * @param {Feature} feature The GeoJSON feature representing a MultiLineString
      * @param {number[]} origin The origin point for translation
      * @param {number} offset The offset distance for the polyline extrusion
-     * @returns {ILayerGeometry[]} An array of geometries
+     * @returns {LayerGeometry[]} An array of geometries
      */
     static multiLineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
