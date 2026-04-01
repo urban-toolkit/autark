@@ -1,12 +1,32 @@
+export { 
+    NormalizationMode,
+    ColorMapInterpolator
+} from './types';
+
+export type { 
+    ColorHEX,
+    ColorRGB,
+    ColorTEX,
+    BoundingBox,
+    LayerType,
+    NormalizationConfig
+} from './types';
+
+export type { 
+    LayerGeometry,
+    LayerComponent,
+    LayerBorder,
+    LayerBorderComponent
+} from './mesh-types';
+
 export { EventEmitter } from './event-emitter';
 export type { EventListener } from './event-emitter';
 
-export { ColorMap } from './colormap';
-
-export type { LayerGeometry, LayerComponent, LayerBorder, LayerBorderComponent } from './mesh-types';
-
+export { Camera } from './camera';
 export type { CameraData, ViewProjectionParams } from './camera';
-export { buildViewProjection, Camera } from './camera';
+
+export { ColorMap } from './colormap';
+export type { SequentialDomain, DivergingDomain, CategoricalDomain } from './colormap';
 
 export { TriangulatorPoints } from './triangulator-points';
 export { TriangulatorPolylines } from './triangulator-polylines';

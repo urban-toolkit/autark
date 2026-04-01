@@ -7,8 +7,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@turf/turf": "^7.3.4",
-    "autk-types": "*",
-    "d3-color": "^3.1.0",
+"d3-color": "^3.1.0",
     "d3-scale": "^4.0.2",
     "d3-scale-chromatic": "^3.1.0",
     "earcut": "^3.0.2",

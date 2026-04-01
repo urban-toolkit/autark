@@ -42,7 +42,7 @@ export class ColormapCat {
             return ['primary', 'secondary'].includes(properties?.highway) ? properties?.highway : 'other';
         };
 
-        this.map.updateLayerRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.OBSERVABLE10 });
+        this.map.updateRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.OBSERVABLE10 });
         this.map.updateThematic({ id: layer, collection: geojson, getFnv });
     }
 

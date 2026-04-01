@@ -192,9 +192,9 @@ export class Urbane {
             this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
         }
 
-        this.map.updateLayerRenderInfo('table_osm_buildings', { isSkip: true });
-        this.map.updateLayerRenderInfo('neighborhoods', { opacity: 0.75 });
-        this.map.updateLayerRenderInfo('neighborhoods', { isPick: true });
+        this.map.updateRenderInfo('table_osm_buildings', { isSkip: true });
+        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75 });
+        this.map.updateRenderInfo('neighborhoods', { isPick: true });
         this.map.draw();
 
         if (this.roadsWithSky) {
@@ -204,7 +204,7 @@ export class Urbane {
                 getFnv: (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
                 normalization: { mode: NormalizationMode.PERCENTILE },
             });
-            this.map.updateLayerRenderInfo('table_osm_roads', { isColorMap: true });
+            this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
         }
     }
 
@@ -213,7 +213,7 @@ export class Urbane {
         const geojson = this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
 
         if (column === 'none') {
-            this.map.updateLayerRenderInfo(layerId, { isColorMap: false });
+            this.map.updateRenderInfo(layerId, { isColorMap: false });
             this.map.draw();
             return;
         }
@@ -226,7 +226,7 @@ export class Urbane {
         };
 
         this.map.updateThematic({ id: layerId, collection: geojson, getFnv });
-        this.map.updateLayerRenderInfo(layerId, { isColorMap: true });
+        this.map.updateRenderInfo(layerId, { isColorMap: true });
     }
 
     // ── Plot ──────────────────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ export class Urbane {
     // ── Event Listeners ───────────────────────────────────────────────────────
 
     protected updateMapListeners(): void {
-        this.map.events.addListener(MapEvent.PICKING, ({ selection }) => {
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
             if (this.currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
@@ -397,10 +397,10 @@ export class Urbane {
             await this.updateBuildingsSelection();
 
             this.map.loadCollection({ id: 'active_buildings', collection: this.activeBuildings, type: 'buildings' });
-            this.map.updateLayerRenderInfo('neighborhoods', { isSkip: true });
-            this.map.updateLayerRenderInfo('neighborhoods', { isPick: false });
-            this.map.updateLayerRenderInfo('active_buildings', { isSkip: false });
-            this.map.updateLayerRenderInfo('active_buildings', { isPick: true });
+            this.map.updateRenderInfo('neighborhoods', { isSkip: true });
+            this.map.updateRenderInfo('neighborhoods', { isPick: false });
+            this.map.updateRenderInfo('active_buildings', { isSkip: false });
+            this.map.updateRenderInfo('active_buildings', { isPick: true });
 
             iconDown.style.display = 'none';
             iconUp.style.display = '';
@@ -411,8 +411,8 @@ export class Urbane {
 
             await this.db.removeLayer('active_buildings');
             this.map.layerManager.removeLayerById('active_buildings');
-            this.map.updateLayerRenderInfo('neighborhoods', { isSkip: false });
-            this.map.updateLayerRenderInfo('neighborhoods', { isPick: true });
+            this.map.updateRenderInfo('neighborhoods', { isSkip: false });
+            this.map.updateRenderInfo('neighborhoods', { isPick: true });
 
             iconDown.style.display = '';
             iconUp.style.display = 'none';

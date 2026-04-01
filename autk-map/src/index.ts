@@ -1,4 +1,5 @@
 export {
+    Camera,
     ColorMap,
     TriangulatorBuildings, 
     TriangulatorPoints, 
@@ -7,7 +8,6 @@ export {
     TriangulatorRaster 
 } from 'autk-core';
 
-export { Camera } from 'autk-core';
 export * from './constants';
 export * from './interfaces';
 export * from './key-events';
@@ -19,10 +19,10 @@ export * from './layer-vector';
 export * from './layer-manager';
 export * from './layer';
 export * from './main';
-export * from './map-events';
 export * from './map-style';
 export * from './map-ui';
 export * from './mouse-events';
+export * from './resize-events';
 export * from './pipeline-triangle-border';
 export * from './pipeline-triangle-flat';
 export * from './pipeline-triangle-picking';

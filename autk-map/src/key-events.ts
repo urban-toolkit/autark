@@ -10,7 +10,9 @@ export class KeyEvents {
      * Reference to the AutkMap instance.
      * @type {AutkMap}
      */
-    private _map!: AutkMap
+    private _map!: AutkMap;
+    /** Bound keyup handler reference used for safe add/remove listener calls. */
+    private _onKeyUp: (event: KeyboardEvent) => void;
 
     /**
      * Constructor for KeyEvents
@@ -18,29 +20,37 @@ export class KeyEvents {
      */
     constructor(map: AutkMap) {
         this._map = map;
+        this._onKeyUp = this.keyUp.bind(this);
     }
 
     /**
      * Key events binding function
      */
     public bindEvents(): void {
-        document.removeEventListener('keyup', this.keyUp.bind(this), false);
-        document.addEventListener('keyup', this.keyUp.bind(this), false);
+        window.removeEventListener('keyup', this._onKeyUp, false);
+        window.addEventListener('keyup', this._onKeyUp, false);
+    }
+
+    /**
+     * Removes keyboard listeners registered by this controller.
+     */
+    public destroyEvents(): void {
+        window.removeEventListener('keyup', this._onKeyUp, false);
     }
 
     /**
      * Handles key up event
      * @param {KeyboardEvent} event The fired event
      */
-    async keyUp(event: KeyboardEvent) {
-        if (event.key == 's') {
+    keyUp(event: KeyboardEvent) {
+        if (event.key.toLowerCase() === 's') {
             const styles = ['default', 'light'];
             const current = MapStyle.currentStyle;
 
-            const id = (styles.indexOf(current) + 1) % 3;
+            const id = (styles.indexOf(current) + 1) % styles.length;
             MapStyle.setPredefinedStyle(styles[id]);
 
-            for (const layer of this._map.layerManager.vectorLayers) {
+            for (const layer of this._map.layerManager.layers) {
                 layer.makeLayerRenderInfoDirty();
             }
         }

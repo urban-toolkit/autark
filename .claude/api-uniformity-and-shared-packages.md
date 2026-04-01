@@ -21,7 +21,7 @@ The four Autark packages (`autk-db`, `autk-map`, `autk-compute`, `autk-plot`) ha
 | 5 | `GeoJSON` casing (`GeoJson`/`Geojson` → `GeoJSON`) | Low | Breaking | 2 |
 | 6 | `wglsFunction` typo → `wgslFunction`; update all callers in `gallery/` and `usecases/` | Trivial | Breaking | 2 |
 | 7 | `autk-compute`: `GeojsonCompute` + `RenderCompute` → single `AutkComputeEngine` facade | Low | Breaking | 6 |
-| 8 | `updateRenderInfoProperty(name, key, value: unknown)` → `updateLayerRenderInfo(name, info: Partial<LayerRenderInfo>)` | Low | Breaking | 3 |
+| 8 | `updateRenderInfoProperty(name, key, value: unknown)` → `updateRenderInfo(name, info: Partial<LayerRenderInfo>)` | Low | Breaking | 3 |
 | 9 | Inline `normalization` shape → `NormalizationConfig` in `autk-types`; use in all 3 packages | Low | Breaking | 1 |
 | 10 | Asymmetric event listener signatures → single event object in both modules | Low | Breaking | 3/4 |
 | 11 | Remove `I`-prefix from all `autk-map` interfaces | Low | Breaking | 2 |
@@ -153,7 +153,7 @@ loadCollection(params: LoadCollectionParams): void
 // LoadCollectionParams: { layerName: string; collection: FeatureCollection; layerType?: LayerType }
 ```
 
-Apply same pattern to: `loadRasterCollection` (was `loadGeoTiffLayer`), `updateThematic` (was `updateGeoJsonLayerThematic`), `updateLayerRenderInfo` (was `updateRenderInfoProperty`).
+Apply same pattern to: `loadRasterCollection` (was `loadGeoTiffLayer`), `updateThematic` (was `updateGeoJsonLayerThematic`), `updateRenderInfo` (was `updateRenderInfoProperty`).
 
 **Feature-centric renames (items 23, 24):**
 ```typescript
@@ -169,7 +169,7 @@ updateGeoTiffLayerData     → updateRasterData
 updateRenderInfoProperty(layerName: string, property: keyof ILayerRenderInfo, value: unknown): void
 
 // after
-updateLayerRenderInfo(layerName: string, info: Partial<LayerRenderInfo>): void
+updateRenderInfo(layerName: string, info: Partial<LayerRenderInfo>): void
 ```
 
 **Event API (items 17, 27, 28):**

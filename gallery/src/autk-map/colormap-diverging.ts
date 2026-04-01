@@ -41,7 +41,7 @@ export class ColormapDiv {
             return +properties?.shape_area || 0;
         };
 
-        this.map.updateLayerRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.DIVERGING_RED_BLUE });
+        this.map.updateRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.DIVERGING_RED_BLUE });
         this.map.updateThematic({ id: layer, collection: geojson, getFnv });
     }
 

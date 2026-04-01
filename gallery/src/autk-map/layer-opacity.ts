@@ -44,7 +44,7 @@ export class LayerOpacity {
             this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-        this.map.updateLayerRenderInfo('neighborhoods', { opacity: 0.75 });
+        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75 });
     }
 }
 

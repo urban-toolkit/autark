@@ -74,7 +74,7 @@ export class GeojsonVis {
             const geojson = await this.db.getLayer(layerData.name);
 
             if (layerData.type === 'raster') {
-                this.map.loadRasterCollection({ id: layerData.name, collection: geojson, getFnv: getFnc });
+                this.map.loadCollection({ id: layerData.name, collection: geojson, type: 'raster', getFnv: getFnc });
             }
             else {
                 this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
@@ -82,7 +82,7 @@ export class GeojsonVis {
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
-        this.map.updateLayerRenderInfo('heatmap', { opacity: 0.5 });
+        this.map.updateRenderInfo('heatmap', { opacity: 0.5 });
     }
 }
 

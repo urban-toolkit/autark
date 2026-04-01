@@ -1,8 +1,8 @@
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
-import type { ColorHEX, ColorRGB, ColorTEX, NormalizationConfig } from 'autk-types';
-import { PlotEvent } from './constants';
+import type { ColorHEX, ColorRGB, ColorTEX, SequentialDomain } from 'autk-core';
+import { ColorMapInterpolator, PlotEvent } from './constants';
 
-export type { ColorHEX, ColorRGB, ColorTEX, NormalizationConfig };
+export type { ColorHEX, ColorRGB, ColorTEX, SequentialDomain };
 
 export type PlotMargins = { left: number; right: number; top: number; bottom: number };
 
@@ -24,7 +24,9 @@ export type PlotConfig = {
     attributes?: string[],
     histogram?: HistogramConfig,
     tickFormats?: string[], // d3-format specifier per axis, e.g. ['.1f', '.4f']
-    normalization?: NormalizationConfig;
+    /** Explicit data domain `[min, max]` for numerical color encoding. If omitted, computed from the data. */
+    domain?: SequentialDomain;
+    colorMapInterpolator?: ColorMapInterpolator;
 }
 
 export type PlotEventListener = (event: { selection: number[] }) => void;

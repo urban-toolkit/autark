@@ -1,8 +1,7 @@
 /// <reference types="@webgpu/types" />
 
 import { FeatureCollection, LineString, MultiLineString } from 'geojson';
-import { ColorRGB } from 'autk-types';
-import { buildViewProjection } from 'autk-core';
+import { ColorRGB, Camera } from 'autk-core';
 import { computeOrigin, triangulateBuildings } from './triangulate';
 
 // ── Public interfaces ─────────────────────────────────────────────────────────
@@ -439,7 +438,7 @@ function buildRoadCameras(
         const ndx  = dlen > 0 ? dx / dlen : 1;
         const ndy  = dlen > 0 ? dy / dlen : 0;
 
-        const mat = buildViewProjection({
+        const mat = Camera.buildViewProjection({
             eye:    [mx, my, eyeHeight],
             lookAt: [mx + ndx, my + ndy, eyeHeight],
             up:     [0, 0, 1],

@@ -24,7 +24,7 @@ export class MapD3 {
         await this.map.init();
 
         this.map.loadCollection({ id: 'neighborhoods', collection: this.geojson });
-        this.map.updateLayerRenderInfo('neighborhoods', { isPick: true });
+        this.map.updateRenderInfo('neighborhoods', { isPick: true });
 
         this.map.draw();
     }
@@ -41,7 +41,7 @@ export class MapD3 {
     }
 
     protected async updateMapListeners() {
-        this.map.events.addListener(MapEvent.PICKING, ({ selection }) => {
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
             this.plot.setHighlightedIds(selection as number[]);
         });
     }

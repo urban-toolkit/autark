@@ -6,12 +6,7 @@ RIMRAF := npx rimraf
 APP ?= gallery
 
 install:
-	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd autk-compute && npm install"
-
-install-app:
-	cd $(APP) && npm install
-
-
+	npm install
 
 build:
 	$(CONCURRENTLY) \
@@ -23,7 +18,6 @@ build:
 
 dev:
 	make install
-	make install-app
 	make build
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \
@@ -33,27 +27,28 @@ dev:
 		"cd $(APP) && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 map:
-	$(CONCURRENTLY) "cd autk-map && npm run build"
+	cd autk-map && npm run build
 
 db:
-	$(CONCURRENTLY) "cd autk-db && npm run build"
+	cd autk-db && npm run build
 
 plot:
-	$(CONCURRENTLY) "cd autk-plot && npm run build"
+	cd autk-plot && npm run build
 
 compute:
-	$(CONCURRENTLY) "cd autk-compute && npm run build"
+	cd autk-compute && npm run build
 
 
 clean:
+	$(RIMRAF) node_modules
 	$(CONCURRENTLY) \
-		"cd autk-map && $(RIMRAF) dist build node_modules" \
-		"cd autk-db && $(RIMRAF) dist build node_modules" \
-		"cd autk-plot && $(RIMRAF) dist build node_modules" \
-		"cd autk-compute && $(RIMRAF) dist build node_modules" \
-		"cd gallery && $(RIMRAF) dist build node_modules" \
-		"cd usecases && $(RIMRAF) dist build node_modules" \
-		"cd performance && $(RIMRAF) dist build node_modules"
+		"cd autk-map && $(RIMRAF) dist build" \
+		"cd autk-db && $(RIMRAF) dist build" \
+		"cd autk-plot && $(RIMRAF) dist build" \
+		"cd autk-compute && $(RIMRAF) dist build" \
+		"cd gallery && $(RIMRAF) dist build" \
+		"cd usecases && $(RIMRAF) dist build" \
+		"cd performance && $(RIMRAF) dist build"
 
 publish:
 	@if [ -z "$(LIB)" ]; then \

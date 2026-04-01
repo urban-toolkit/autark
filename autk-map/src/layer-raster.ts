@@ -4,17 +4,15 @@ import {
     LayerData,
     LayerGeometry,
     LayerComponent,
-    RasterData
 } from "./interfaces";
 
 import { Layer } from "./layer";
 
-import { Camera } from 'autk-core';
+import { Camera, ColorMap } from 'autk-core';
 import { Renderer } from "./renderer";
 
 import { Pipeline } from "./pipeline";
 import { PipelineTriangleRaster } from "./pipeline-triangle-raster";
-import { ColorMap } from 'autk-core';
 
 export class RasterLayer extends Layer {
     /**
@@ -153,6 +151,11 @@ export class RasterLayer extends Layer {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
 
+        if (layerData.rasterResX !== undefined && layerData.rasterResY !== undefined) {
+            this._rasterResX = layerData.rasterResX;
+            this._rasterResY = layerData.rasterResY;
+        }
+
         if (layerData.raster && layerData.raster.length) {
             this.loadRaster(layerData.raster);
         }
@@ -220,47 +223,38 @@ export class RasterLayer extends Layer {
      * Load the raster data from the layer data.
      * @param {RasterData[]} layerRaster - The layer data.
      */
-    public loadRaster(layerRaster: RasterData[]): void {
+    /**
+     * Load raster values and rebuild the texture.
+     * @param rasterValues Flattened raster values to colorize.
+     */
+    public loadRaster(rasterValues: number[]): void {
         const rasterData: number[] = [];
 
-        for (let id = 0; id < layerRaster.length; id++) {
-            const layer = layerRaster[id];
+        if (!rasterValues || rasterValues.length === 0) {
+            return;
+        }
 
-            if (!layer.rasterValues) {
-                continue;
-            }
+        const isRGBA = rasterValues.length === this._rasterResX * this._rasterResY * 4;
+        if (!isRGBA) {
+            const min = rasterValues.reduce((a, b) => isNaN(b) ? a : Math.min(a, b), Infinity);
+            const max = rasterValues.reduce((a, b) => isNaN(b) ? a : Math.max(a, b), -Infinity);
+            const range = max - min;
 
-            if (this._rasterResX === undefined) {
-                this._rasterResX = layer.rasterResX;
-            }
-            if (this._rasterResY === undefined) {
-                this._rasterResY = layer.rasterResY;
-            }
+            rasterValues.forEach((d) => {
+                const color = ColorMap.getColor(d, this._layerRenderInfo.colorMapInterpolator, [min, max]);
+                const t = range > 0 ? (d - min) / range : 0;
+                const alpha = d <= 0 ? 0 : Math.max(0, Math.min(255, Math.round(t * 255)));
 
-            const isRGBA = layer.rasterValues.length === layer.rasterResX * layer.rasterResY * 4;
-            if (!isRGBA) {
-                const min = layer.rasterValues.reduce((a, b) => isNaN(b) ? a : Math.min(a, b), Infinity);
-                const max = layer.rasterValues.reduce((a, b) => isNaN(b) ? a : Math.max(a, b), -Infinity);
-                const range = max - min;
-
-                layer.rasterValues.forEach((d) => {
-                    const t = (d - min) / range;
-
-                    const color = ColorMap.getColor(t, this._layerRenderInfo.colorMapInterpolator);
-                    const alpha = d <= 0 ? 0 : Math.max(0, Math.min(255, Math.round(t * 255)));
-
-                    rasterData.push(color.r);
-                    rasterData.push(color.g);
-                    rasterData.push(color.b);
-                    rasterData.push(alpha);
-                });
-            }
-            else {
-                layer.rasterValues.forEach((d) => {
-                    rasterData.push(d);
-                });
-            }
-
+                rasterData.push(color.r);
+                rasterData.push(color.g);
+                rasterData.push(color.b);
+                rasterData.push(alpha);
+            });
+        }
+        else {
+            rasterValues.forEach((d) => {
+                rasterData.push(d);
+            });
         }
 
         this._rasterData = rasterData;

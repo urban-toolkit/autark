@@ -1,7 +1,7 @@
 import { GeoJsonProperties } from "geojson";
 
-import { PlotConfig, PlotMargins } from "./types";
-import { NormalizationMode } from "./constants";
+import { PlotConfig, PlotMargins, SequentialDomain } from "./types";
+import { ColorMapInterpolator } from "./constants";
 import { PlotEvents } from "./plot-events";
 
 export abstract class AutkChart {
@@ -24,7 +24,8 @@ export abstract class AutkChart {
 
     protected _plotEvents!: PlotEvents;
 
-    protected _normalization: { mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number } = { mode: NormalizationMode.MIN_MAX };
+    protected _domain: SequentialDomain | undefined = undefined;
+    protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQUENTIAL_REDS;
 
 
     constructor(config: PlotConfig) {
@@ -42,7 +43,8 @@ export abstract class AutkChart {
         this._attributes = attributes;
         this._title = config.labels?.title || 'Autk Plot';
         this._tickFormats = config.tickFormats ?? ['.2s', '.2s'];
-        this._normalization = config.normalization ?? { mode: NormalizationMode.MIN_MAX };
+        this._domain = config.domain;
+        this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQUENTIAL_REDS;
     }
 
 

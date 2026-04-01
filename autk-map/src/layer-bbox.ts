@@ -1,156 +1,100 @@
 import { BBox, FeatureCollection } from "geojson";
 
-export class LayerBbox  {
-
+/**
+ * Utility class for computing the geographic bounding box of a GeoJSON feature collection.
+ */
+export class LayerBbox {
+    /**
+     * Computes the bounding box of a feature collection.
+     *
+     * @param features - The GeoJSON feature collection to process.
+     * @returns A GeoJSON `BBox` tuple `[minLon, minLat, maxLon, maxLat]`.
+     * @throws If the feature collection is empty or contains no valid coordinates.
+     */
     static build(features: FeatureCollection): BBox {
         if (features.features.length === 0) {
             throw new Error("Feature collection is empty");
         }
 
-        const type = features.features[0].geometry.type;
-
-        switch (type) {
-            case "Point":
-                return LayerBbox.buildFromPoints(features);
-            case "LineString":
-                return LayerBbox.buildFromLines(features);
-            case "MultiLineString":
-                return LayerBbox.buildFromMultiLines(features);
-            case "Polygon":
-                return LayerBbox.buildFromPolygons(features);
-            case "MultiPolygon":
-                return LayerBbox.buildFromMultiPolygons(features);
-            default:
-                throw new Error(`Unsupported geometry type: ${type}`);
-        }
+        const allCoords = this.extractCoordinates(features);
+        return this.computeBBox(allCoords);
     }
 
-    static buildFromPoints(points : FeatureCollection) : BBox {
-        let minLon = Number.POSITIVE_INFINITY;
-        let minLat = Number.POSITIVE_INFINITY;
-        let maxLon = Number.NEGATIVE_INFINITY;
-        let maxLat = Number.NEGATIVE_INFINITY;
+    /**
+     * Extracts all coordinate pairs from every feature in the collection,
+     * flattening across geometry types and geometry collections.
+     *
+     * @param features - The GeoJSON feature collection to extract coordinates from.
+     * @returns A flat array of `[longitude, latitude]` pairs.
+     */
+    private static extractCoordinates(features: FeatureCollection): number[][] {
+        const coords: number[][] = [];
 
-        for (const feature of points.features) {
-            if (feature.geometry.type === "Point") {
-                const coords = feature.geometry.coordinates;
-
-                const x = coords[0];
-                const y = coords[1];
-
-                minLon = Math.min(minLon, x);
-                minLat = Math.min(minLat, y);
-                maxLon = Math.max(maxLon, x);
-                maxLat = Math.max(maxLat, y);
+        for (const feature of features.features) {
+            if (feature.geometry) {
+                this.processGeometry(feature.geometry, coords);
             }
         }
 
-        return [minLon, minLat, maxLon, maxLat];
+        return coords;
     }
 
-    static buildFromLines(lines : FeatureCollection) : BBox {
-        let minLon = Number.POSITIVE_INFINITY;
-        let minLat = Number.POSITIVE_INFINITY;
-        let maxLon = Number.NEGATIVE_INFINITY;
-        let maxLat = Number.NEGATIVE_INFINITY;
-
-        for (const feature of lines.features) {
-            if (feature.geometry.type === "LineString") {
-                const coordsArray = feature.geometry.coordinates;
-
-                for (const coords of coordsArray) {
-                    const x = coords[0];
-                    const y = coords[1];
-
-                    minLon = Math.min(minLon, x);
-                    minLat = Math.min(minLat, y);
-                    maxLon = Math.max(maxLon, x);
-                    maxLat = Math.max(maxLat, y);
-                }
+    /**
+     * Recursively extracts coordinates from a geometry, handling `GeometryCollection`
+     * by processing each sub-geometry individually.
+     *
+     * @param geom - A GeoJSON geometry object.
+     * @param coords - Accumulator array to push coordinate pairs into.
+     */
+    private static processGeometry(geom: any, coords: number[][]): void {
+        if (geom.type === "GeometryCollection") {
+            for (const subGeom of geom.geometries) {
+                this.processGeometry(subGeom, coords);
             }
+        } else if (geom.coordinates) {
+            this.flattenCoordinates(geom.coordinates, coords);
+        }
+    }
+
+    /**
+     * Recursively flattens a nested coordinate array down to individual
+     * `[longitude, latitude]` pairs.
+     *
+     * @param coords - A coordinate value — either a nested array or a leaf `[lon, lat]` pair.
+     * @param result - Accumulator array to push leaf coordinate pairs into.
+     */
+    private static flattenCoordinates(coords: any, result: number[][]): void {
+        if (Array.isArray(coords[0])) {
+            for (const coord of coords) {
+                this.flattenCoordinates(coord, result);
+            }
+        } else if (typeof coords[0] === "number") {
+            result.push(coords);
+        }
+    }
+
+    /**
+     * Computes the bounding box from a flat array of coordinate pairs.
+     *
+     * @param coords - Array of `[longitude, latitude]` pairs.
+     * @returns A GeoJSON `BBox` tuple `[minLon, minLat, maxLon, maxLat]`.
+     * @throws If the coordinate array is empty.
+     */
+    private static computeBBox(coords: number[][]): BBox {
+        if (coords.length === 0) {
+            throw new Error("No valid coordinates found");
         }
 
-        return [minLon, minLat, maxLon, maxLat];
-    }
+        let minLon = coords[0][0];
+        let maxLon = coords[0][0];
+        let minLat = coords[0][1];
+        let maxLat = coords[0][1];
 
-    static buildFromMultiLines(multiLines : FeatureCollection) : BBox {
-        let minLon = Number.POSITIVE_INFINITY;
-        let minLat = Number.POSITIVE_INFINITY;
-        let maxLon = Number.NEGATIVE_INFINITY;
-        let maxLat = Number.NEGATIVE_INFINITY;
-
-        for (const feature of multiLines.features) {
-            if (feature.geometry.type === "MultiLineString") {
-                const linesArray = feature.geometry.coordinates;
-
-                for (const coordsArray of linesArray) {
-                    for (const coords of coordsArray) {
-                        const x = coords[0];
-                        const y = coords[1];
-
-                        minLon = Math.min(minLon, x);
-                        minLat = Math.min(minLat, y);
-                        maxLon = Math.max(maxLon, x);
-                        maxLat = Math.max(maxLat, y);
-                    }
-                }
-            }
-        }
-
-        return [minLon, minLat, maxLon, maxLat];
-    }
-
-    static buildFromPolygons(polygons : FeatureCollection) : BBox {
-        let minLon = Number.POSITIVE_INFINITY;
-        let minLat = Number.POSITIVE_INFINITY;
-        let maxLon = Number.NEGATIVE_INFINITY;
-        let maxLat = Number.NEGATIVE_INFINITY;
-
-        for (const feature of polygons.features) {
-            if (feature.geometry.type === "Polygon") {
-                const ringsArray = feature.geometry.coordinates;
-
-                for (const coordsArray of ringsArray) {
-                    for (const coords of coordsArray) {
-                        const x = coords[0];
-                        const y = coords[1];
-
-                        minLon = Math.min(minLon, x);
-                        minLat = Math.min(minLat, y);
-                        maxLon = Math.max(maxLon, x);
-                        maxLat = Math.max(maxLat, y);
-                    }
-                }
-            }
-        }
-
-        return [minLon, minLat, maxLon, maxLat];
-    }
-
-    static buildFromMultiPolygons(multiPolygons : FeatureCollection) : BBox {
-        let minLon = Number.POSITIVE_INFINITY;
-        let minLat = Number.POSITIVE_INFINITY;
-        let maxLon = Number.NEGATIVE_INFINITY;
-        let maxLat = Number.NEGATIVE_INFINITY;
-
-        for (const feature of multiPolygons.features) {
-            if (feature.geometry.type === "MultiPolygon") {
-                const polygonsArray = feature.geometry.coordinates;
-
-                for (const ringsArray of polygonsArray) {
-                    for (const coordsArray of ringsArray) {
-                        for (const coords of coordsArray) {
-                            const x = coords[0];
-                            const y = coords[1];
-
-                            minLon = Math.min(minLon, x);
-                            minLat = Math.min(minLat, y);
-                            maxLon = Math.max(maxLon, x);
-                            maxLat = Math.max(maxLat, y);
-                        }
-                    }
-                }
-            }
+        for (const [lon, lat] of coords) {
+            minLon = Math.min(minLon, lon);
+            maxLon = Math.max(maxLon, lon);
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
         }
 
         return [minLon, minLat, maxLon, maxLat];

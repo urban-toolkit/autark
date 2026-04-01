@@ -194,27 +194,24 @@ export class ParallelCoordinates extends PlotD3 {
             const plot = this;
             if (dimType === 'numerical' && scale) {
                 const dimValues = plot.data.map(d => d ? +plot.getNestedValue(d, dim) || 0 : 0);
-                const [lo, hi] = ColorMap.computeNormalizationRange(
-                    dimValues,
-                    plot._normalization.mode,
-                    plot._normalization.lowerPercentile,
-                    plot._normalization.upperPercentile,
-                );
+                const lo = plot._domain?.[0] ?? dimValues.reduce((a, b) => Math.min(a, b), Infinity);
+                const hi = plot._domain?.[1] ?? dimValues.reduce((a, b) => Math.max(a, b), -Infinity);
                 strokeFn = function (this: SVGPathElement, d: unknown) {
                     if (sel.includes(idx(this))) return PlotStyle.highlight;
                     const v = +plot.getNestedValue(d, dim) || 0;
-                    const t = hi === lo ? 0.5 : Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
-                    return d3.interpolateReds(0.15 + t * 0.85);
+                    const { r, g, b } = ColorMap.getColor(v, plot._colorMapInterpolator, [lo, hi]);
+                    return `rgb(${r},${g},${b})`;
                 };
             } else if (dimType === 'categorical' && scale) {
                 const catScale = scale as d3.ScalePoint<string>;
-                const domain = catScale.domain();
+                const categories = catScale.domain();
                 strokeFn = function (this: SVGPathElement, d: unknown) {
                     if (sel.includes(idx(this))) return PlotStyle.highlight;
                     const val = String(plot.getNestedValue(d, dim));
-                    const i = domain.indexOf(val);
-                    const t = domain.length <= 1 ? 0.5 : i / (domain.length - 1);
-                    return d3.interpolateReds(0.15 + t * 0.85);
+                    const i = categories.indexOf(val);
+                    const t = categories.length <= 1 ? 0.5 : i / (categories.length - 1);
+                    const { r, g, b } = ColorMap.getColor(t, plot._colorMapInterpolator);
+                    return `rgb(${r},${g},${b})`;
                 };
             } else {
                 strokeFn = function (this: SVGPathElement) {
@@ -237,7 +234,7 @@ export class ParallelCoordinates extends PlotD3 {
 
     protected updateAxisLabelStyles(): void {
         d3.select(this._div).selectAll<SVGTextElement, string>('.axis-label')
-            .style('fill', (dim) => this.colorDimension === dim ? d3.interpolateReds(0.7) : '#000')
+            .style('fill', (dim) => { if (this.colorDimension !== dim) return '#000'; const { r, g, b } = ColorMap.getColor(0.7, this._colorMapInterpolator); return `rgb(${r},${g},${b})`; })
             .style('text-decoration', (dim) => this.colorDimension === dim ? 'underline' : 'none');
     }
 

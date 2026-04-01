@@ -1,4 +1,4 @@
-export type { LayerType, BoundingBox } from 'autk-types';
+export type { LayerType, BoundingBox } from 'autk-core';
 export type { Layer } from './spatial/use-cases/load-layer/interfaces';
 export type { LoadGeoTiffParams } from './spatial/use-cases/load-geotiff';
 export type { GeoTiffTable } from './shared/interfaces';

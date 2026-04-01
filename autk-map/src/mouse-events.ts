@@ -1,59 +1,89 @@
 import { MouseStatus } from './constants';
 import { AutkMap } from './main';
 
-/** 
- * MouseEvents class handles mouse interactions with the map.
- * It allows for panning, zooming, and picking features on the map.
+/**
+ * Handles pointer interactions for the map canvas.
+ *
+ * This controller wires DOM mouse events to camera operations
+ * (pan, rotate, zoom) and feature picking.
  */
 export class MouseEvents {
     /**
-     * Reference to the AutkMap instance.
-     * @type {AutkMap}
+     * Parent map instance used to access camera, renderer, and layers.
      */
     private _map!: AutkMap;
 
     /**
-     * Last mouse position in pixels.
-     * This is used to calculate the movement of the mouse for panning.
-     * @type {number[]}
+     * Last pointer position in canvas pixel coordinates.
      */
     private _lastPoint: number[];
 
     /**
-     * Current mouse status.
-     * This indicates whether the mouse is idle, dragging, or performing another action.
-     * @type {MouseStatus}
+     * Current interaction state.
      */
     private _status: MouseStatus;
 
+    /** Bound wheel handler used for add/remove listener symmetry. */
+    private _onWheel: (e: WheelEvent) => void;
+    /** Bound mouse down handler used for add/remove listener symmetry. */
+    private _onMouseDown: (e: MouseEvent) => void;
+    /** Bound mouse up handler used for add/remove listener symmetry. */
+    private _onMouseUp: (e: MouseEvent) => void;
+    /** Bound context menu handler used for add/remove listener symmetry. */
+    private _onContextMenu: (e: MouseEvent) => void;
+    /** Bound mouse move handler used for add/remove listener symmetry. */
+    private _onMouseMove: (e: MouseEvent) => void;
+    /** Bound double click handler used for add/remove listener symmetry. */
+    private _onDblClick: (e: MouseEvent) => void;
+
     /**
-     * Constructor for MouseEvents
-     * @param {AutkMap} map The map instance
+     * Creates a mouse interaction controller for a map instance.
+     *
+     * @param map Target map instance.
      */
     constructor(map: AutkMap) {
         this._map = map;
         this._lastPoint = [0, 0];
-
         this._status = MouseStatus.IDLE;
+
+        this._onWheel = this.mouseWheel.bind(this);
+        this._onMouseDown = this.mouseDown.bind(this);
+        this._onMouseUp = this.mouseUp.bind(this);
+        this._onContextMenu = this.contextMenu.bind(this);
+        this._onMouseMove = this.mouseMove.bind(this);
+        this._onDblClick = this.mouseDoubleClick.bind(this);
     }
 
     /**
-     * Mouse events binding function
+     * Attaches all mouse listeners to the renderer canvas.
      */
     bindEvents(): void {
-        // sets the canvas listeners
-        this._map.renderer.canvas.addEventListener('wheel', this.mouseWheel.bind(this), { passive: false });
-
-        this._map.renderer.canvas.addEventListener('mousedown', this.mouseDown.bind(this), false);
-        this._map.renderer.canvas.addEventListener('mouseup', this.mouseUp.bind(this), false);
-        this._map.renderer.canvas.addEventListener('contextmenu', this.contextMenu.bind(this), false);
-        this._map.renderer.canvas.addEventListener('mousemove', this.mouseMove.bind(this), false);
-        this._map.renderer.canvas.addEventListener('dblclick', this.mouseDoubleClick.bind(this), false);
+        const canvas = this._map.renderer.canvas;
+        canvas.addEventListener('wheel', this._onWheel, { passive: false });
+        canvas.addEventListener('mousedown', this._onMouseDown, false);
+        canvas.addEventListener('mouseup', this._onMouseUp, false);
+        canvas.addEventListener('contextmenu', this._onContextMenu, false);
+        canvas.addEventListener('mousemove', this._onMouseMove, false);
+        canvas.addEventListener('dblclick', this._onDblClick, false);
     }
 
     /**
-     * Handles mouse right click event
-     * @param {MouseEvent} event The fired event
+     * Removes all mouse listeners from the map canvas.
+     */
+    destroyEvents(): void {
+        const canvas = this._map.renderer.canvas;
+        canvas.removeEventListener('wheel', this._onWheel);
+        canvas.removeEventListener('mousedown', this._onMouseDown);
+        canvas.removeEventListener('mouseup', this._onMouseUp);
+        canvas.removeEventListener('contextmenu', this._onContextMenu);
+        canvas.removeEventListener('mousemove', this._onMouseMove);
+        canvas.removeEventListener('dblclick', this._onDblClick);
+    }
+
+    /**
+     * Prevents the browser context menu on the map canvas.
+     *
+     * @param event Native mouse event.
      */
     contextMenu(event: MouseEvent): void {
         event.preventDefault();
@@ -61,40 +91,37 @@ export class MouseEvents {
     }
 
     /**
-     * Handles mouse down event
-     * @param {MouseEvent} event The fired event
+     * Starts a drag interaction for left or middle mouse button.
+     *
+     * @param event Native mouse event.
      */
     mouseDown(event: MouseEvent): void {
-        // captures the event.
         event.preventDefault();
         event.stopPropagation();
 
         if (event.button == 0 || event.button == 1) {
-            // left click
             this._lastPoint = [event.offsetX, event.offsetY];
             this._status = MouseStatus.DRAG;
         }
     }
 
     /**
-     * Handles mouse move event
-     * @param {MouseEvent} event The fired event
+     * Applies camera pan or orbit while dragging.
+     *
+     * Hold Shift + left drag to orbit; otherwise drag pans.
+     *
+     * @param event Native mouse event.
      */
     mouseMove(event: MouseEvent): void {
-        // captures the event.
-        event.preventDefault();
-        event.stopPropagation();
-
-        // gets the map canvas
         const canvas = this._map.renderer.canvas;
 
-        // left click drag
         if (this._status === MouseStatus.DRAG) {
+            event.preventDefault();
+            event.stopPropagation();
             const dx = -event.offsetX + this._lastPoint[0];
             const dy = event.offsetY - this._lastPoint[1];
 
             if (event.buttons === 1 && event.shiftKey) {
-                // left button
                 this._map.camera.yaw(dx / canvas.offsetWidth);
                 this._map.camera.pitch(dy / canvas.offsetHeight);
             } else {
@@ -106,31 +133,28 @@ export class MouseEvents {
     }
 
     /**
-     * Handles mouse up event
-     * @param {MouseEvent} event The fired event
+     * Ends the current drag interaction.
+     *
+     * @param event Native mouse event.
      */
     mouseUp(event: MouseEvent): void {
-        // captures the event.
         event.preventDefault();
         event.stopPropagation();
 
-        // changes the values
         this._status = MouseStatus.IDLE;
     }
 
     /**
-     * Handles mouse down event
-     * @param {WheelEvent} event The fired event
+     * Zooms the camera around the cursor position.
+     *
+     * @param event Native wheel event.
      */
     mouseWheel(event: WheelEvent) {
-        // captures the event.
         event.preventDefault();
         event.stopPropagation();
 
-        // gets the map canvas
         const canvas = this._map.renderer.canvas;
 
-        // changes the values
         const rect = canvas.getBoundingClientRect();
         const x = (event.clientX - rect.left) / canvas.offsetWidth;
         const y = 1.0 - (event.clientY - rect.top) / canvas.offsetHeight;
@@ -139,25 +163,30 @@ export class MouseEvents {
     }
 
     /**
-     * Handles mouse double click event
-     * @param {MouseEvent} event The fired event
+     * Queues a picking request at the double-clicked canvas position.
+     *
+     * The position is converted from CSS pixels to the actual backing
+     * canvas resolution before being stored.
+     *
+     * @param event Native mouse event.
      */
     mouseDoubleClick(event: MouseEvent) {
+        event.preventDefault();
+        event.stopPropagation();
+
         const canvas = this._map.renderer.canvas;
         const rect = canvas.getBoundingClientRect();
 
-        // Mouse position relative to canvas
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
 
-        // Scale factors from CSS size to actual canvas resolution
         const scaleX = canvas.width / canvas.offsetWidth;
         const scaleY = canvas.height / canvas.offsetHeight;
 
         const adjustedX = Math.floor(mouseX * scaleX);
         const adjustedY = Math.floor(mouseY * scaleY);
 
-        this._map.layerManager.vectorLayers.forEach((layer) => {
+        this._map.layerManager.layers.forEach((layer) => {
             if (layer.layerRenderInfo.isPick) {
                 layer.layerRenderInfo.pickedComps = [adjustedX, adjustedY];
             }

@@ -1,4 +1,4 @@
-import { LayerType, BoundingBox } from 'autk-types';
+import { LayerType, BoundingBox } from 'autk-core';
 
 export type { BoundingBox };
 

@@ -1,95 +1,54 @@
-import {
-    LayerInfo,
-    LayerRenderInfo
-} from './interfaces';
+import { Camera } from 'autk-core';
+import { LayerInfo, LayerRenderInfo } from './interfaces';
+import { Renderer } from './renderer';
 
 /**
  * Base class for map layers.
- * This class provides the basic structure and functionality for all map layers.
- * 
- * It includes methods for loading data, geometry, components, and thematic data,
- * as well as rendering and picking operations.
-*/
+ *
+ * Defines the contract for rendering, pipeline creation, and picking so that
+ * all layer types can be stored and iterated uniformly.
+ */
 export abstract class Layer {
-    /**
-     * Layer information.
-     * @type {LayerInfo}
-     */
     protected _layerInfo!: LayerInfo;
-
-    /**
-     * Layer rendering information.
-     * @type {LayerRenderInfo}
-     */
     protected _layerRenderInfo!: LayerRenderInfo;
-
-    /**
-     * Indicates if the layer's rendering information is dirty.
-     * This is used to determine if uniforms need to be reloaded.
-     * @type {boolean}
-     */
     protected _renderInfoIsDirty: boolean = false;
-
-    /**
-     * Indicates if the layer's data is dirty.
-     * This is used to determine if VOBs need to be reconstructed.
-     * @type {boolean}
-     */
     protected _dataIsDirty: boolean = false;
 
-    /**
-     * Constructor for Layer
-     * @param {LayerInfo} layerInfo - The layer information.
-     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
-     */
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo) {
         this._layerInfo = layerInfo;
         this._layerRenderInfo = layerRenderInfo;
     }
 
+    get layerInfo(): LayerInfo { return this._layerInfo; }
+    set layerInfo(layerInfo: LayerInfo) { this._layerInfo = layerInfo; }
+
+    get layerRenderInfo(): LayerRenderInfo { return this._layerRenderInfo; }
+    set layerRenderInfo(layerRenderInfo: LayerRenderInfo) { this._layerRenderInfo = layerRenderInfo; }
+
+    makeLayerDataDirty(): void { this._dataIsDirty = true; }
+    makeLayerRenderInfoDirty(): void { this._renderInfoIsDirty = true; }
+
+    /** Initializes the GPU pipeline for this layer. */
+    abstract createPipeline(renderer: Renderer): void;
+
+    /** Executes the normal render pass for this layer. */
+    abstract renderPass(camera: Camera): void;
+
     /**
-     * Gets the information of the layer.
-     * @returns {string} The information of the layer.
+     * Executes the picking render pass. No-op for layers that do not support picking.
      */
-    get layerInfo(): LayerInfo {
-        return this._layerInfo;
+    renderPickingPass(_camera: Camera): void {}
+
+    /**
+     * Reads the picked feature ID at the given canvas coordinates.
+     * Returns `-1` for layers that do not support picking.
+     */
+    getPickedId(_x: number, _y: number): Promise<number> {
+        return Promise.resolve(-1);
     }
 
     /**
-     * Sets the information of the layer.
-     * @param {LayerInfo} layerInfo - The info to set for the layer.
+     * Clears all highlighted features. No-op for layers that do not support highlighting.
      */
-    set layerInfo(layerInfo: LayerInfo) {
-        this._layerInfo = layerInfo;
-    }
-
-    /**
-     * Gets the rendering information of the layer.
-     * @returns {LayerRenderInfo} The rendering information of the layer.
-     */
-    get layerRenderInfo(): LayerRenderInfo {
-        return this._layerRenderInfo;
-    }
-
-    /**
-     * Sets the rendering information of the layer.
-     * @param {LayerRenderInfo} layerRenderInfo - The rendering info to set for the layer.
-     */
-    set layerRenderInfo(layerRenderInfo: LayerRenderInfo) {
-        this._layerRenderInfo = layerRenderInfo;
-    }
-
-    /**
-     * Marks the layer's data as dirty, indicating that VOBs need to be reconstructed.
-     */
-    public makeLayerDataDirty() {
-        this._dataIsDirty = true;
-    }
-
-    /**
-     * Marks the layer's rendering information as dirty, indicating uniforms need to be reloaded.
-     */
-    public makeLayerRenderInfoDirty() {
-        this._renderInfoIsDirty = true;
-    }
+    clearHighlightedIds(): void {}
 }

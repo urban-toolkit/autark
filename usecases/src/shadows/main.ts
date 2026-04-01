@@ -186,14 +186,15 @@ export class Shadows {
             const layer = await this.db.getLayer(layerData.name);
 
             if (layerData.name === 'heatmap') {
-                await this.map.loadRasterCollection({
+                await this.map.loadCollection({
                     id: layerData.name,
                     collection: layer,
+                    type: 'raster',
                     getFnv: (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0,
                 });
-                this.map.updateLayerRenderInfo(layerData.name, { opacity: 0.5 });
-                this.map.updateLayerRenderInfo(layerData.name, { isColorMap: true });
-                this.map.updateLayerRenderInfo(layerData.name, { isSkip: true });
+                this.map.updateRenderInfo(layerData.name, { opacity: 0.5 });
+                this.map.updateRenderInfo(layerData.name, { isColorMap: true });
+                this.map.updateRenderInfo(layerData.name, { isSkip: true });
             }
             else {
                 this.map.loadCollection({ id: layerData.name, collection: layer, type: layerData.type as LayerType });
@@ -201,8 +202,8 @@ export class Shadows {
 
         }
 
-        this.map.updateLayerRenderInfo('table_osm_buildings', { isPick: true });
-        this.map.events.addListener(MapEvent.PICKING, ({ selection: ids, layerId }) => {
+        this.map.updateRenderInfo('table_osm_buildings', { isPick: true });
+        this.map.events.on(MapEvent.PICKING, ({ selection: ids, layerId }) => {
             if (layerId !== 'table_osm_buildings') return;
 
             if (ids.length === 0) {
@@ -275,8 +276,8 @@ export class Shadows {
             const getFnv = (feature: Feature) =>
                 (feature.properties?.sjoin as any)?.avg?.[this.currentMonth] || 0;
             this.map.updateThematic({ id: this.ROADS_LAYER, collection: this.roads, getFnv });
-            this.map.updateLayerRenderInfo(this.ROADS_LAYER, { isPick: true });
-            this.map.updateLayerRenderInfo(this.ROADS_LAYER, { isColorMap: true });
+            this.map.updateRenderInfo(this.ROADS_LAYER, { isPick: true });
+            this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
             this.map.draw();
             return;
         }
@@ -288,7 +289,7 @@ export class Shadows {
             ? (feature: Feature) => feature.properties?.compute?.[key] ?? 0
             : () => 0;
         this.map.updateThematic({ id: this.ROADS_LAYER, collection: source, getFnv });
-        this.map.updateLayerRenderInfo(this.ROADS_LAYER, { isColorMap: true });
+        this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
         this.map.draw();
     }
 

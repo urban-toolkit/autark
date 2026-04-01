@@ -1,34 +1,52 @@
-export { 
-    NormalizationMode, 
-    ColorMapInterpolator 
-} from 'autk-types';
-
-export type { LayerType, NormalizationConfig, ColorHEX, ColorRGB, ColorTEX, BoundingBox } from 'autk-types';
+/**
+ * Runtime exports re-exposed from `autk-core` for map styling and normalization.
+ */
+export {
+    NormalizationMode,
+    ColorMapInterpolator
+} from 'autk-core';
 
 /**
- * Map events for interaction.
- * @property {string} PICKING - Event triggered when a feature is picked.
+ * Shared type exports re-exposed from `autk-core` for map layer configuration.
+ */
+export type {
+    LayerType,
+    SequentialDomain,
+    ColorHEX,
+    ColorRGB,
+    ColorTEX,
+    BoundingBox
+} from 'autk-core';
+
+/**
+ * Map event names emitted by interactive map components.
  */
 export enum MapEvent {
-  PICKING = 'pick',
+  /** Fired when one or more features are picked from a layer. */
+  PICKING = 'picking',
 }
 
 /**
- * Mouse status for interaction state.
- * @property {string} IDLE - Mouse is idle.
- * @property {string} DRAG - Mouse is dragging.
+ * Mouse interaction states tracked by the map.
  */
 export enum MouseStatus {
+  /** The pointer is not currently dragging the map. */
   IDLE = 'mouseIdle',
+  /** The pointer is actively dragging the map. */
   DRAG = 'mouseDrag',
 }
 
 /**
- * Map event listener type.
- * @param {object} event - The event object.
- * @param {number[]} event.selection - The selected feature identifiers.
- * @param {string} event.layerId - The ID of the layer associated with the event.
+ * Payload emitted for feature-picking map events.
  */
-export type MapEventListener = (
-    event: { selection: number[]; layerId: string }
-) => void;
+export interface MapEventData {
+    /** Currently selected feature identifiers for the emitted layer. */
+    selection: number[];
+    /** Identifier of the layer that emitted the event. */
+    layerId: string;
+}
+
+/**
+ * Event map consumed by the typed map event emitter.
+ */
+export type MapEventRecord = Record<MapEvent, MapEventData>;

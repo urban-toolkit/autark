@@ -1,4 +1,4 @@
-export { ColorMapInterpolator, NormalizationMode } from 'autk-types';
+export { ColorMapInterpolator, NormalizationMode } from 'autk-core';
 
 export enum PlotEvent {
     CLICK = 'click',

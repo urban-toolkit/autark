@@ -135,8 +135,8 @@ export class OsmLayersApi {
             ? ColorMapInterpolator.DIVERGING_RED_BLUE
             : ColorMapInterpolator.SEQUENTIAL_REDS;
 
-        this.map.updateLayerRenderInfo('table_osm_roads', { colorMapInterpolator: interpolator });
-        this.map.updateLayerRenderInfo('table_osm_roads', { isColorMap: true });
+        this.map.updateRenderInfo('table_osm_roads', { colorMapInterpolator: interpolator });
+        this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
 
         this.map.updateThematic({
             id: 'table_osm_roads',
@@ -157,7 +157,7 @@ export class OsmLayersApi {
         const fmt = mode === 'slope'
             ? (v: number) => v.toExponential(2)
             : (v: number) => v.toFixed(1);
-        this.map.updateLayerRenderInfo('table_osm_roads', { colorMapLabels: [fmt(valMin), fmt(valMax)] });
+        this.map.updateRenderInfo('table_osm_roads', { colorMapLabels: [fmt(valMin), fmt(valMax)] });
     }
 
     protected async applyRoadslstThematic(): Promise<void> {
@@ -171,9 +171,10 @@ export class OsmLayersApi {
 
         const yearSelect = document.getElementById('yearSelect') as HTMLSelectElement;
         const defaultBand = `band_${parseInt(yearSelect.value, 10) - START_YEAR + 1}`;
-        this.map.loadRasterCollection({
+        this.map.loadCollection({
             id: tableName,
             collection: geotiff,
+            type: 'raster',
             getFnv: (cell) => {
                 if (!cell) return 0;
                 const props = cell as Record<string, number | bigint | string | undefined>;
@@ -181,8 +182,8 @@ export class OsmLayersApi {
             },
         });
 
-        this.map.updateLayerRenderInfo(tableName, { isSkip: true });
-        this.map.updateLayerRenderInfo(tableName, { opacity: 0.65 });
+        this.map.updateRenderInfo(tableName, { isSkip: true });
+        this.map.updateRenderInfo(tableName, { opacity: 0.65 });
     }
 
     protected setupControls(): void {
@@ -201,7 +202,7 @@ export class OsmLayersApi {
             const bandName = `band_${year - START_YEAR + 1}`;
 
             if (this.geotiffData) {
-                this.map.updateRasterCollection({
+                this.map.updateThematic({
                     id: 'lst',
                     collection: this.geotiffData,
                     getFnv: (cell) => {
@@ -248,7 +249,7 @@ export class OsmLayersApi {
     }
 
     protected setupPickListener(): void {
-        this.map.events.addListener(MapEvent.PICKING, async ({ selection: ids, layerId }) => {
+        this.map.events.on(MapEvent.PICKING, async ({ selection: ids, layerId }) => {
             if (layerId === 'table_osm_roads') {
                 this.plot?.setHighlightedIds(ids);
                 this.linechart?.setHighlightedIds(ids);

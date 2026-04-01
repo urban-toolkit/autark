@@ -738,7 +738,7 @@ class LoadingBenchmark {
     canvas.style.visibility = 'hidden';
     document.body.appendChild(canvas);
     try {
-      const map = new AutkMap(canvas, false);
+      const map = new AutkMap(canvas);
       const t0 = performance.now();
       await map.init();
       const mapInitMs = performance.now() - t0;
