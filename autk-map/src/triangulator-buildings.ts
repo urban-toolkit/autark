@@ -127,7 +127,7 @@ export class TriangulatorBuildings {
      * Converts a LineString feature to a border representation.
      * @param {Feature} feature The GeoJSON feature representing a LineString
      * @param {number[]} origin The origin point for translation
-     * @returns {ILayerBorder[]} An array of borders
+     * @returns {LayerBorder[]} An array of borders
      */
     static lineStringToBuildingMesh(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
@@ -148,7 +148,7 @@ export class TriangulatorBuildings {
      * Converts a LineString feature to a border representation.
      * @param {Feature} feature The GeoJSON feature representing a LineString
      * @param {number[]} origin The origin point for translation
-     * @returns {ILayerBorder[]} An array of borders
+     * @returns {LayerBorder[]} An array of borders
      */
     static multiLineStringToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
@@ -174,7 +174,7 @@ export class TriangulatorBuildings {
      * Converts a LineString feature to a border representation.
      * @param {Feature} feature The GeoJSON feature representing a LineString
      * @param {number[]} origin The origin point for translation
-     * @returns {ILayerBorder[]} An array of borders
+     * @returns {LayerBorder[]} An array of borders
      */
     static polygonToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
@@ -200,7 +200,7 @@ export class TriangulatorBuildings {
      * Converts a LineString feature to a border representation.
      * @param {Feature} feature The GeoJSON feature representing a LineString
      * @param {number[]} origin The origin point for translation
-     * @returns {ILayerBorder[]} An array of borders
+     * @returns {LayerBorder[]} An array of borders
      */
     static multiPolygonToBuilding(feature: Feature, heightInfo: number[], origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const meshes = [];

@@ -1,14 +1,14 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 
 export class LoadGeojson {
-  protected db!: SpatialDb;
+  protected db!: AutkSpatialDb;
 
   public async run(): Promise<void> {
-    this.db = new SpatialDb();
+    this.db = new AutkSpatialDb();
     await this.db.init();
 
-    await this.db.loadOsmFromOverpassApi({
+    await this.db.loadOsm({
       queryArea: {
         geocodeArea: 'New York',
         areas: ['Battery Park City', 'Financial District'],
@@ -25,14 +25,14 @@ export class LoadGeojson {
     console.log({ initialGeojson: geojson });
 
     const geojsonCompute = new GeojsonCompute();
-    geojson = await geojsonCompute.computeFunctionIntoProperties({
-      geojson,
-      attributes: {
+    geojson = await geojsonCompute.analytical({
+      collection: geojson,
+      variableMapping: {
         x: 'height',
         y: 'height',
       },
-      outputColumnName: 'height_sq',
-      wgslFunction: 'return x * y;',
+      resultField: 'height_sq',
+      wgslBody: 'return x * y;',
     });
 
     console.log({ computedGeojson: geojson });

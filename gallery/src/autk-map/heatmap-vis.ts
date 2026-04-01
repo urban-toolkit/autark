@@ -1,17 +1,17 @@
 // TODO: filter CSV data based on the osm data polygon.
 
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
 export class GeojsonVis {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Battery Park City', 'Financial District'],
@@ -73,16 +73,16 @@ export class GeojsonVis {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
 
-            if (layerData.type === LayerType.AUTK_RASTER) {
-                this.map.loadGeoTiffLayer(layerData.name, geojson, layerData.type as LayerType, getFnc);
-            } 
+            if (layerData.type === 'raster') {
+                this.map.loadRasterCollection({ id: layerData.name, collection: geojson, getFnv: getFnc });
+            }
             else {
-                this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+                this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             }
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
-        this.map.updateRenderInfoProperty('heatmap', 'opacity', 0.5);
+        this.map.updateLayerRenderInfo('heatmap', { opacity: 0.5 });
     }
 }
 

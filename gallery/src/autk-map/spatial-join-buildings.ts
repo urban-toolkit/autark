@@ -1,17 +1,17 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
 import { Feature, GeoJsonProperties } from 'geojson';
 
 export class SpatialJoinNear {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Battery Park City', 'Financial District'],
@@ -38,7 +38,7 @@ export class SpatialJoinNear {
 
         const layer = 'table_osm_buildings';
 
-        await this.db.spatialJoin({
+        await this.db.spatialQuery({
             tableRootName: layer,
             tableJoinName: 'noise',
             spatialPredicate: 'NEAR',
@@ -70,7 +70,7 @@ export class SpatialJoinNear {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -83,7 +83,7 @@ export class SpatialJoinNear {
             return properties?.sjoin.count.noise || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv);
+        this.map.updateThematic({ id: layer, collection: geojson, getFnv });
     }
 }
 

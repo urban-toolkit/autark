@@ -1,21 +1,21 @@
 import { AutkMap, LayerType } from 'autk-map';
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 
 export class OsmLayersApi {
     protected map01!: AutkMap;
-    protected db01!: SpatialDb;
+    protected db01!: AutkSpatialDb;
 
     protected map02!: AutkMap;
-    protected db02!: SpatialDb;
+    protected db02!: AutkSpatialDb;
 
     public async run(canvas01: HTMLCanvasElement, canvas02: HTMLCanvasElement): Promise<void> {
-        this.db01 = new SpatialDb();
-        this.db02 = new SpatialDb();
+        this.db01 = new AutkSpatialDb();
+        this.db02 = new AutkSpatialDb();
 
         await this.db01.init();
         await this.db02.init();
 
-        await this.db01.loadOsmFromOverpassApi({
+        await this.db01.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Battery Park City'],
@@ -30,7 +30,7 @@ export class OsmLayersApi {
             },
         });
 
-        await this.db02.loadOsmFromOverpassApi({
+        await this.db02.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Financial District'],
@@ -58,10 +58,10 @@ export class OsmLayersApi {
         await this.loadLayers(this.db02, this.map02);
     }
     
-    protected async loadLayers(db: SpatialDb, map: AutkMap): Promise<void> {
+    protected async loadLayers(db: AutkSpatialDb, map: AutkMap): Promise<void> {
         for (const layerData of db.getLayerTables()) {
             const geojson = await db.getLayer(layerData.name);
-            map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }

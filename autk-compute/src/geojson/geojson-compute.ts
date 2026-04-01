@@ -10,12 +10,12 @@ export class GeojsonCompute {
   }
 
   /**
-   * Executes a WGSL function on feature properties and adds the result to properties.compute[outputColumnName]
+   * Executes a WGSL function on feature properties and adds the result to properties.compute[resultField].
    *
    * @param params - Parameters for the computation
    * @returns Promise<FeatureCollection> - New FeatureCollection with computed values
    */
-  async computeFunctionIntoProperties(params: ComputeFunctionIntoPropertiesParams): Promise<FeatureCollection> {
+  async analytical(params: ComputeFunctionIntoPropertiesParams): Promise<FeatureCollection> {
     return this.computeFunctionIntoPropertiesUseCase.exec(params);
   }
 }

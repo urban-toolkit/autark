@@ -14,13 +14,13 @@ export class PlotEvents {
         return this._listeners;
     }
 
-    addEventListener(event: PlotEvent, listener: PlotEventListener): void {
+    addListener(event: PlotEvent, listener: PlotEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event].push(listener);
         }
     }
 
-    removeEventListener(event: PlotEvent, listener: PlotEventListener): void {
+    removeListener(event: PlotEvent, listener: PlotEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event] = this._listeners[event].filter(l => l !== listener);
         }
@@ -28,7 +28,7 @@ export class PlotEvents {
 
     emit(event: PlotEvent, selection: number[]): void {
         if (this._listeners[event]) {
-            this._listeners[event].forEach(listener => listener(selection));
+            this._listeners[event].forEach(listener => listener({ selection }));
         }
     }
 }

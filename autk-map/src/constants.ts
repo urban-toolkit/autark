@@ -1,13 +1,5 @@
-export {
-    LayerType,
-    NormalizationMode,
-    NormalizationConfig,
-    ColorMapInterpolator,
-    ColorHEX,
-    ColorRGB,
-    ColorTEX,
-    BoundingBox,
-} from 'autk-types';
+export { NormalizationMode, ColorMapInterpolator } from 'autk-types';
+export type { LayerType, NormalizationConfig, ColorHEX, ColorRGB, ColorTEX, BoundingBox } from 'autk-types';
 
 /**
  * Map events for interaction.
@@ -41,10 +33,10 @@ export enum MouseStatus {
 
 /**
  * Map event listener type.
- * @param {number[]} selection - The selected feature identifiers.
- * @param {string} layerId - The ID of the layer associated with the event.
+ * @param {object} event - The event object.
+ * @param {number[]} event.selection - The selected feature identifiers.
+ * @param {string} event.layerId - The ID of the layer associated with the event.
  */
 export type MapEventListener = (
-    selection: number[],
-    layerId: string
+    event: { selection: number[]; layerId: string }
 ) => void;

@@ -1,10 +1,10 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 
 export class LoadCsv {
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         await this.db.loadCsv({

@@ -9,7 +9,7 @@ import { LoadJsonUseCase, LoadJsonParams } from './use-cases/load-json';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
-import { SpatialJoinParams } from './use-cases/spatial-join/interfaces';
+import { SpatialQueryParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
 import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase';
 import { BoundingBox } from '../shared/interfaces';
@@ -45,7 +45,7 @@ interface WorkspaceData {
  * 
  * Supports multiple isolated workspaces, each with its own schema and data.
  */
-export class SpatialDb {
+export class AutkSpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
   private currentWorkspace: string = 'main';
@@ -190,7 +190,7 @@ export class SpatialDb {
    * @returns A promise that resolves when the OSM data and layers are fully loaded.
    * @throws Error if the database or connection is not initialized.
    */
-  async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<OsmLoadTimings> {
+  async loadOsm(params: LoadOsmFromOverpassApiParams): Promise<OsmLoadTimings> {
     if (
       !this.db ||
       !this.conn ||
@@ -402,7 +402,7 @@ export class SpatialDb {
    * property objects (one per cell, in row-major top-to-bottom order), plus `rasterResX` / `rasterResY`
    * dimensions and a `bbox`.
    *
-   * Pass the result directly to `AutkMap.loadGeoTiffLayer()` and supply a `getFnv` callback that
+   * Pass the result directly to `AutkMap.loadRasterCollection()` and supply a `getFnv` callback that
    * extracts the numeric band value you want to visualise, e.g. `(cell) => cell.band_1 ?? 0`.
    *
    * @param tableName - The name of the GeoTiff table (as given to `loadGeoTiff`).
@@ -636,7 +636,7 @@ export class SpatialDb {
    * @returns A promise that resolves to the resulting table after the spatial join.
    * @throws Error if the database or connection is not initialized.
    */
-  async spatialJoin(params: SpatialJoinParams): Promise<Table> {
+  async spatialQuery(params: SpatialQueryParams): Promise<Table> {
     if (!this.db || !this.conn || !this.spatialJoinUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 

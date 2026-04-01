@@ -24,8 +24,8 @@ export class MapD3 {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        this.map.loadGeoJsonLayer('neighborhoods', this.geojson);
-        this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
+        this.map.loadCollection({ id: 'neighborhoods', collection: this.geojson });
+        this.map.updateLayerRenderInfo('neighborhoods', { isPick: true });
 
         this.map.draw();
     }
@@ -33,7 +33,7 @@ export class MapD3 {
     protected async loadAutkPlot(plotDiv: HTMLElement) {
         this.plot = new Scatterplot({
             div: plotDiv,
-            data: this.geojson,
+            collection: this.geojson,
             labels: { axis: ['shape_area', 'shape_leng'], title: 'Plot example' },
             width: 790,
             events: [PlotEvent.CLICK]
@@ -41,13 +41,13 @@ export class MapD3 {
     }
 
     protected async updateMapListeners() {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[]) => {
+        this.map.events.addListener(MapEvent.PICKING, ({ selection }) => {
             this.plot.setHighlightedIds(selection);
         });
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[]) => {
+        this.plot.events.addListener(PlotEvent.CLICK, ({ selection }) => {
             const layer = <VectorLayer> this.map.layerManager.searchByLayerId(layerId);
             layer!.setHighlightedIds(selection);
         });

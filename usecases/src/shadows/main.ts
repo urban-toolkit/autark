@@ -24,7 +24,7 @@ function showError(message: string, note?: string): void {
     if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
 }
 
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { Barchart, PlotEvent } from 'autk-plot';
@@ -34,7 +34,7 @@ import shadowShader from './shadow-shader.wgsl?raw';
 
 export class Shadows {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
     protected histogram!: Barchart;
 
     protected readonly ROADS_LAYER = 'table_roads_20m';
@@ -72,11 +72,11 @@ export class Shadows {
 
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Chicago Loop from Overpass API.');
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'Chicago',
                 areas: ['Loop', 'Near South Side'],
@@ -109,13 +109,13 @@ export class Shadows {
                 type: 'CREATE_TABLE',
                 tableName: this.ROADS_LAYER,
                 source: 'user',
-                tableType: LayerType.AUTK_OSM_ROADS,
+                tableType: 'roads',
             },
         });
 
         setLoadingState('Computing shadow joins...', 'Linking shadow measurements to road segments for each season.');
         for (const month of ['jun', 'sep', 'dez']) {
-            await this.db.spatialJoin({
+            await this.db.spatialQuery({
                 tableRootName: this.ROADS_LAYER,
                 tableJoinName: 'shadows',
                 spatialPredicate: 'NEAR',
@@ -168,9 +168,9 @@ export class Shadows {
         // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
         //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
         const geojsonCompute = new GeojsonCompute();
-        const result = await geojsonCompute.computeFunctionIntoProperties({
-            geojson: this.roads,
-            attributes: {
+        const result = await geojsonCompute.analytical({
+            collection: this.roads,
+            variableMapping: {
                 seg:       'geometry.coordinates',
                 sjoin_avg: `sjoin.avg.${month}`,
             },
@@ -185,7 +185,7 @@ export class Shadows {
                 ring: { data: footprint, cols: 2 },
             },
             outputColumns: ['shadow', 'contribution'],
-            wgslFunction: shadowShader,
+            wgslBody: shadowShader,
         });
 
         this.computedRoads = result;
@@ -206,21 +206,23 @@ export class Shadows {
             const layer = await this.db.getLayer(layerData.name);
 
             if (layerData.name === 'heatmap') {
-                await this.map.loadGeoTiffLayer(layerData.name, layer, LayerType.AUTK_RASTER,
-                    (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0
-                );
-                this.map.updateRenderInfoProperty(layerData.name, 'opacity', 0.5);
-                this.map.updateRenderInfoProperty(layerData.name, 'isColorMap', true);
-                this.map.updateRenderInfoProperty(layerData.name, 'isSkip', true);
+                await this.map.loadRasterCollection({
+                    id: layerData.name,
+                    collection: layer,
+                    getFnv: (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0,
+                });
+                this.map.updateLayerRenderInfo(layerData.name, { opacity: 0.5 });
+                this.map.updateLayerRenderInfo(layerData.name, { isColorMap: true });
+                this.map.updateLayerRenderInfo(layerData.name, { isSkip: true });
             }
             else {
-                this.map.loadGeoJsonLayer(layerData.name, layer, layerData.type as LayerType);
+                this.map.loadCollection({ id: layerData.name, collection: layer, type: layerData.type as LayerType });
             }
 
         }
 
-        this.map.updateRenderInfoProperty('table_osm_buildings', 'isPick', true);
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (ids, layerId) => {
+        this.map.updateLayerRenderInfo('table_osm_buildings', { isPick: true });
+        this.map.events.addListener(MapEvent.PICKING, ({ selection: ids, layerId }) => {
             if (layerId !== 'table_osm_buildings') return;
 
             if (ids.length === 0) {
@@ -292,9 +294,9 @@ export class Shadows {
         if (this.displayMode === 'heatmap') {
             const getFnv = (feature: Feature) =>
                 (feature.properties?.sjoin as any)?.avg?.[this.currentMonth] || 0;
-            this.map.updateGeoJsonLayerThematic(this.ROADS_LAYER, this.roads, getFnv);
-            this.map.updateRenderInfoProperty(this.ROADS_LAYER, 'isPick', true);
-            this.map.updateRenderInfoProperty(this.ROADS_LAYER, 'isColorMap', true);
+            this.map.updateThematic({ id: this.ROADS_LAYER, collection: this.roads, getFnv });
+            this.map.updateLayerRenderInfo(this.ROADS_LAYER, { isPick: true });
+            this.map.updateLayerRenderInfo(this.ROADS_LAYER, { isColorMap: true });
             this.map.draw();
             return;
         }
@@ -305,8 +307,8 @@ export class Shadows {
         const getFnv = this.computedRoads
             ? (feature: Feature) => feature.properties?.compute?.[key] ?? 0
             : () => 0;
-        this.map.updateGeoJsonLayerThematic(this.ROADS_LAYER, source, getFnv);
-        this.map.updateRenderInfoProperty(this.ROADS_LAYER, 'isColorMap', true);
+        this.map.updateThematic({ id: this.ROADS_LAYER, collection: source, getFnv });
+        this.map.updateLayerRenderInfo(this.ROADS_LAYER, { isColorMap: true });
         this.map.draw();
     }
 
@@ -342,7 +344,7 @@ export class Shadows {
 
         this.histogram = new Barchart({
             div: this.histogramDiv,
-            data: this.roads,
+            collection: this.roads,
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,
             height: 380,
@@ -357,7 +359,7 @@ export class Shadows {
     }
 
     protected updateHistogramListeners(): void {
-        this.histogram.plotEvents.addEventListener(PlotEvent.BRUSH_X, (roadIds: number[]) => {
+        this.histogram.events.addListener(PlotEvent.BRUSH_X, ({ selection: roadIds }) => {
             const layer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER);
             (<VectorLayer>layer)?.setHighlightedIds(roadIds);
             this.map.draw();

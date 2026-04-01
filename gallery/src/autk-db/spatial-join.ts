@@ -1,12 +1,12 @@
 import { FeatureCollection } from 'geojson';
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 
 export class SpatialJoin {
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
     protected geojson!: FeatureCollection;
 
     public async run(): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         await this.db.loadCustomLayer({
@@ -25,7 +25,7 @@ export class SpatialJoin {
             },
         });
 
-        await this.db.spatialJoin({
+        await this.db.spatialQuery({
             tableRootName: 'neighborhoods',
             tableJoinName: 'noise',
             spatialPredicate: 'INTERSECT',

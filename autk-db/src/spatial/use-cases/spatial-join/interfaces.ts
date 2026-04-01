@@ -1,6 +1,6 @@
 type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted';
 
-export interface SpatialJoinParams {
+export interface SpatialQueryParams {
   tableRootName: string;
   tableJoinName: string;
   output: {

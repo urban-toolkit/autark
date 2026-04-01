@@ -84,14 +84,14 @@ export class Barchart extends PlotD3 {
                 } else {
                     plot.selection.push(binIdx);
                 }
-                plot.plotEvents.emit(PlotEvent.CLICK, plot.getSelectedFeatureIds());
+                plot.events.emit(PlotEvent.CLICK, plot.getSelectedFeatureIds());
                 plot.updatePlotSelection();
             });
         });
 
         cls.on('click', function () {
             plot.selection = [];
-            plot.plotEvents.emit(PlotEvent.CLICK, []);
+            plot.events.emit(PlotEvent.CLICK, []);
             plot.updatePlotSelection();
         });
     }
@@ -127,11 +127,11 @@ export class Barchart extends PlotD3 {
                         });
 
                         plot.selection = Array.from(nextSel);
-                        plot.plotEvents.emit(PlotEvent.BRUSH_X, plot.getSelectedFeatureIds());
+                        plot.events.emit(PlotEvent.BRUSH_X, plot.getSelectedFeatureIds());
                         plot.updatePlotSelection();
                     } else {
                         plot.selection = [];
-                        plot.plotEvents.emit(PlotEvent.BRUSH_X, []);
+                        plot.events.emit(PlotEvent.BRUSH_X, []);
                         plot.updatePlotSelection();
                     }
                 });

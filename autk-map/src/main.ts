@@ -2,7 +2,6 @@
 
 import {
     BBox,
-    Feature,
     FeatureCollection,
     GeoJsonProperties,
     Geometry,
@@ -22,6 +21,10 @@ import {
     LayerInfo,
     LayerRenderInfo,
     LayerThematic,
+    LoadCollectionParams,
+    LoadRasterCollectionParams,
+    UpdateRasterCollectionParams,
+    UpdateThematicParams,
 } from './interfaces';
 
 import { ColorMap } from './colormap';
@@ -58,7 +61,7 @@ import { TriangulatorRaster } from './triangulator-raster';
  * await map.init(boundingBox);
  * 
  * const geojsonData = { \/* GeoJSON data *\/ };
- * map.loadGeoJsonLayer('my_data', LayerType.CUSTOM_FEATURES_LAYER, geojsonData);
+ * map.loadCollection({ id: 'my_data', collection: geojsonData });
  */
 export class AutkMap {
     /** The camera instance used for rendering the map */
@@ -94,7 +97,7 @@ export class AutkMap {
 
         this._keyEvents = new KeyEvents(this);
         this._mouseEvents = new MouseEvents(this);
-        this._mapEvents = new MapEvents([MapEvent.PICK]);
+        this._mapEvents = new MapEvents([MapEvent.PICKING]);
 
         this._ui = new AutkMapUi(this);
 
@@ -143,7 +146,7 @@ export class AutkMap {
      * Gets the map events instance used for handling map interactions.
      * @returns {MapEvents} The map events instance
      */
-    get mapEvents(): MapEvents {
+    get events(): MapEvents {
         return this._mapEvents;
     }
 
@@ -200,81 +203,73 @@ export class AutkMap {
     }
 
     /**
-     * Loads a GeoJSON layer into the map.
+     * Loads a GeoJSON feature collection as a map layer.
      *
-     * This method creates a layer based on the provided GeoJSON data and adds it to the map's layer manager.
-     * Supported OSM layer types include:
-     * - AUTK_OSM_SURFACE
-     * - AUTK_OSM_WATER
-     * - AUTK_OSM_PARKS
-     * - AUTK_OSM_ROADS
-     * - AUTK_OSM_BUILDINGS
+     * When `type` is omitted the layer type is inferred from the geometry of the
+     * first feature (Point → 'points', LineString → 'polylines', Polygon → 'polygons').
      *
-     * Custom layers can also be loaded with types:
-     * - AUTK_GEO_POINTS
-     * - AUTK_GEO_POLYLINES
-     * - AUTK_GEO_POLYGONS
-     * - AUTK_RASTER
+     * Supported layer types: 'surface', 'water', 'parks', 'roads', 'buildings',
+     * 'points', 'polylines', 'polygons'.
      *
-     * @param {string} layerName The name of the layer
-     * @param {LayerType} typeLayer The type of the layer
-     * @param {FeatureCollection} geojson The GeoJSON data to load
+     * @param {LoadCollectionParams} params
+     * @param {string}           params.id         Unique layer identifier
+     * @param {FeatureCollection} params.collection GeoJSON feature collection
+     * @param {LayerType}        [params.type]      Optional layer type override
      */
-    loadGeoJsonLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType | null = null) {
-        // Check if the bounding box is already set
+    loadCollection({ id, collection, type = null }: LoadCollectionParams): void {
         if (!this.boundingBox) {
-            if (geojson.bbox) {
-                this.boundingBox = geojson.bbox;
+            if (collection.bbox) {
+                this.boundingBox = collection.bbox;
             } else {
-                this.boundingBox = LayerBbox.build(geojson);
+                this.boundingBox = LayerBbox.build(collection);
             }
         }
 
-        // Check the layer type
-        if (typeLayer === null) {
-            const geoType = geojson.features.length > 0 && geojson.features[0].geometry?.type;
+        if (type === null) {
+            const geoType = collection.features.length > 0 && collection.features[0].geometry?.type;
             console.log('Detected geoType:', geoType);
 
             switch (geoType) {
                 case 'Point':
                 case 'MultiPoint':
-                    typeLayer = 'points';
+                    type = 'points';
                     break;
                 case 'LineString':
                 case 'MultiLineString':
-                    typeLayer = 'polylines';
+                    type = 'polylines';
                     break;
                 case 'Polygon':
                 case 'MultiPolygon':
-                    typeLayer = 'polygons';
+                    type = 'polygons';
                     break;
             }
         }
 
-        switch (typeLayer) {
+        switch (type) {
             case 'surface':
             case 'water':
             case 'parks':
             case 'polygons':
-                this.createPolygonsLayer(layerName, geojson, typeLayer);
+                this.createPolygonsLayer(id, collection, type);
                 break;
 
             case 'roads':
-            case 'polylines':
-                const offset = (typeLayer === 'roads') ? TriangulatorPolylines.offset : TriangulatorPolylines.offset * 3;
-                this.createPolylinesLayer(layerName, geojson, typeLayer, offset);
+            case 'polylines': {
+                const offset = (type === 'roads') ? TriangulatorPolylines.offset : TriangulatorPolylines.offset * 3;
+                this.createPolylinesLayer(id, collection, type, offset);
                 break;
+            }
 
             case 'points':
-                this.createPointsLayer(layerName, geojson, typeLayer);
+                this.createPointsLayer(id, collection, type);
                 break;
 
             case 'buildings':
-                this.createBuildingsLayer(layerName, geojson, typeLayer);
+                this.createBuildingsLayer(id, collection, type);
                 break;
 
             default:
-                console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
+                console.error(`Collection of layer ${id} has an unknown layer type: ${type}.`);
                 break;
         }
 
@@ -282,52 +277,39 @@ export class AutkMap {
     }
 
     /**
-     * Loads a GeoTIFF layer into the map.
-     * This method creates a layer based on the provided GeoTIFF data and adds it to the map's layer manager.
+     * Loads a raster (GeoTIFF-derived) feature collection as a map layer.
      *
-     * @param layerName The name of the layer
-     * @param geotiff The GeoTIFF data to load
-     * @param typeLayer The type of the layer
-     * @param getFnv Optional function to extract a numeric value from each raster cell.
-     *               Use this when raster cells contain nested objects (e.g. from a spatial join).
-     *               If omitted, cell values are used directly as numbers.
+     * @param {LoadRasterCollectionParams} params
+     * @param {string}                         params.id         Unique layer identifier
+     * @param {FeatureCollection<Geometry|null>} params.collection GeoTIFF-derived feature collection
+     * @param {(cell: unknown) => number}        params.getFnv     Extracts a numeric value from each raster cell
      */
-    public loadGeoTiffLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, typeLayer: LayerType | null = null, getFnv: (cell: unknown) => number) {
-
-        // TODO: Validate geotiff input
-        // Allow the user to provide a geotiff and parse using geotiff.js library
-
-        switch (typeLayer) {
-            case 'raster':
-                this.createRasterLayer(layerName, geotiff, getFnv);
-                break;
-            default:
-                console.error(`Geojson data of layer ${layerName} has an unknown layer type: ${typeLayer}.`);
-                break;
-        }
-
+    public loadRasterCollection({ id, collection, getFnv }: LoadRasterCollectionParams): void {
+        // TODO: Validate geotiff input — allow raw GeoTIFF parsed via geotiff.js
+        this.createRasterLayer(id, collection, getFnv);
         this._ui.refreshLayerList();
     }
 
     /**
-     * Updates the raster values of an existing GeoTiff layer in place.
+     * Updates the raster values of an existing raster layer in place.
      *
      * Use this instead of removing and re-adding the layer when only the raster
      * values change (e.g. switching the month in a heatmap). The geometry and
      * render settings of the layer are preserved.
      *
-     * @param layerName The name of the existing raster layer
-     * @param geotiff The new GeoTIFF FeatureCollection
-     * @param getFnv Function to extract a numeric value from each raster cell
+     * @param {UpdateRasterCollectionParams} params
+     * @param {string}           params.id         Name of the existing raster layer
+     * @param {FeatureCollection} params.collection New GeoTIFF-derived feature collection
+     * @param {(cell: unknown) => number} params.getFnv Extracts a numeric value from each raster cell
      */
-    public updateGeoTiffLayerData(layerName: string, geotiff: FeatureCollection, getFnv: (cell: unknown) => number): void {
-        const layer = this._layerManager.searchByLayerId(layerName) as RasterLayer;
+    public updateRasterCollection({ id, collection, getFnv }: UpdateRasterCollectionParams): void {
+        const layer = this._layerManager.searchByLayerId(id) as RasterLayer;
         if (!layer) {
-            console.error(`Layer ${layerName} not found.`);
+            console.error(`Layer ${id} not found.`);
             return;
         }
 
-        const props = geotiff.features[0].properties;
+        const props = collection.features[0].properties;
         if (!props) {
             console.error('GeoTIFF properties are missing.');
             return;
@@ -343,25 +325,24 @@ export class AutkMap {
     }
 
     /**
-     * Updates the thematic information of a layer based on a GeoJSON source.
+     * Updates the thematic (color-mapped) values of a layer from a feature collection.
      *
-     * This method extracts thematic values from the GeoJSON features using the provided function,
-     * normalizes these values, and updates the layer's thematic data accordingly.
+     * Values extracted by `getFnv` are automatically normalized to [0, 1] and
+     * uploaded to the GPU. Both numeric and categorical (string) data are supported.
      *
-     * @param {string} layerName The name of the layer to update
-     * @param {(feature: Feature) => number | string} getFnv A function that extracts a numeric value from a GeoJSON feature
-     * @param {FeatureCollection} geojson The GeoJSON data containing the features
-     * @param {{ mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number }} [normalization] How to map raw values to [0, 1]. Defaults to MIN_MAX.
+     * @param {UpdateThematicParams} params
+     * @param {string}            params.id           Layer identifier
+     * @param {FeatureCollection}  params.collection   Source feature collection
+     * @param {Function}           params.getFnv       Extracts a value from each feature
+     * @param {NormalizationConfig} [params.normalization] Normalization strategy (default: MIN_MAX)
      */
-    updateGeoJsonLayerThematic(layerName: string, geojson: FeatureCollection, getFnv: (feature: Feature) => number | string, normalization: { mode: NormalizationMode; lowerPercentile?: number; upperPercentile?: number } = { mode: NormalizationMode.MIN_MAX }) {
+    updateThematic({ id, collection, getFnv, normalization = { mode: NormalizationMode.MIN_MAX } }: UpdateThematicParams): void {
         const thematicData: LayerThematic[] = [];
-
-        const filtered: Feature[] = geojson.features;
-
-        const dataType = typeof getFnv(filtered[0]);
+        const features = collection.features;
+        const dataType = typeof getFnv(features[0]);
 
         if (dataType === 'number') {
-            for (const feature of filtered) {
+            for (const feature of features) {
                 const properties = feature.properties as GeoJsonProperties;
                 if (!properties) { continue; }
 
@@ -380,7 +361,7 @@ export class AutkMap {
                 normalization.upperPercentile,
             );
 
-            this.updateRenderInfoProperty(layerName, 'colorMapLabels', [`${valMin}`, `${valMax}`]);
+            this.updateLayerRenderInfo(id, { colorMapLabels: [`${valMin}`, `${valMax}`] });
 
             const range = valMax - valMin;
             for (let i = 0; i < thematicData.length; i++) {
@@ -390,10 +371,10 @@ export class AutkMap {
         }
 
         if (dataType === 'string') {
-            const strCats = Array.from(new Set(filtered.map(f => getFnv(f) as string)));
-            this.updateRenderInfoProperty(layerName, 'colorMapLabels', strCats);
+            const strCats = Array.from(new Set(features.map(f => getFnv(f) as string)));
+            this.updateLayerRenderInfo(id, { colorMapLabels: strCats });
 
-            for (const feature of filtered) {
+            for (const feature of features) {
                 const properties = feature.properties as GeoJsonProperties;
                 if (!properties) { continue; }
 
@@ -405,7 +386,7 @@ export class AutkMap {
             }
         }
 
-        this.updateLayerThematic(layerName, thematicData);
+        this.updateLayerThematic(id, thematicData);
     }
 
     /**
@@ -439,52 +420,47 @@ export class AutkMap {
     }
 
     /**
-     * Updates the render information of a layer.
-     * 
-     * @param {string} layerName The name of the layer
-     * @param {LayerRenderInfo} property The property to update
-     * @param {unknown} value The new value for the property
+     * Updates one or more render properties of a layer.
+     *
+     * @param {string} id - Layer identifier
+     * @param {Partial<LayerRenderInfo>} info - Render properties to update
      */
-    public updateRenderInfoProperty(layerName: string, property: keyof LayerRenderInfo, value: unknown) {
-        const layer = this._layerManager.searchByLayerId(layerName) as VectorLayer | RasterLayer;
+    public updateLayerRenderInfo(id: string, info: Partial<LayerRenderInfo>): void {
+        const layer = this._layerManager.searchByLayerId(id) as VectorLayer | RasterLayer;
+        if (!layer) { return; }
 
-        if (layer) {
-            switch (property) {
-                case 'opacity':
-                    layer.layerRenderInfo.opacity = value as number;
-                    break;
-                case 'isColorMap':
-                    layer.layerRenderInfo.isColorMap = value as boolean;
-                    this._ui.refreshLegend(layer);
-                    this._ui.refreshLayerList();
-                    break;
-                case 'isSkip':
-                    layer.layerRenderInfo.isSkip = value as boolean;
-                    this._ui.refreshLayerList();
-                    break;
-                case 'isPick':
-                    layer.layerRenderInfo.isPick = value as boolean;
-                    if (value === false) { (layer as VectorLayer).clearHighlightedIds(); }
-                    this._ui.refreshLayerList();
-                    break;
-                case 'colorMapInterpolator':
-                    layer.layerRenderInfo.colorMapInterpolator = value as ColorMapInterpolator;
-                    this._ui.refreshLegend(layer);
-                    break;
-                case 'colorMapLabels':
-                    layer.layerRenderInfo.colorMapLabels = value as string[];
-                    this._ui.refreshLegend(layer);
-                    break;
-                case 'pickedComps':
-                    layer.layerRenderInfo.pickedComps = value as number[];
-                    break;
-                default:
-                    console.warn(`Unknown property ${property} for layer ${layerName}.`);
-                    return;
-            }
+        let needsLegend = false;
+        let needsLayerList = false;
 
-            layer.makeLayerRenderInfoDirty();
+        if ('opacity' in info) { layer.layerRenderInfo.opacity = info.opacity!; }
+        if ('isColorMap' in info) {
+            layer.layerRenderInfo.isColorMap = info.isColorMap;
+            needsLegend = true;
+            needsLayerList = true;
         }
+        if ('isSkip' in info) {
+            layer.layerRenderInfo.isSkip = info.isSkip;
+            needsLayerList = true;
+        }
+        if ('isPick' in info) {
+            layer.layerRenderInfo.isPick = info.isPick;
+            if (info.isPick === false) { (layer as VectorLayer).clearHighlightedIds(); }
+            needsLayerList = true;
+        }
+        if ('colorMapInterpolator' in info) {
+            layer.layerRenderInfo.colorMapInterpolator = info.colorMapInterpolator!;
+            needsLegend = true;
+        }
+        if ('colorMapLabels' in info) {
+            layer.layerRenderInfo.colorMapLabels = info.colorMapLabels!;
+            needsLegend = true;
+        }
+        if ('pickedComps' in info) { layer.layerRenderInfo.pickedComps = info.pickedComps; }
+
+        if (needsLegend) { this._ui.refreshLegend(layer); }
+        if (needsLayerList) { this._ui.refreshLayerList(); }
+
+        layer.makeLayerRenderInfoDirty();
     }
 
     /**
@@ -575,10 +551,10 @@ export class AutkMap {
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if (id >= 0) {
                         layer.toggleHighlightedIds([id]);
-                        this._mapEvents.emit(MapEvent.PICK, layer.highlightedIds, layer.layerInfo.id);
+                        this._mapEvents.emit(MapEvent.PICKING, layer.highlightedIds, layer.layerInfo.id);
                     } else {
                         layer.clearHighlightedIds();
-                        this._mapEvents.emit(MapEvent.PICK, [], layer.layerInfo.id);
+                        this._mapEvents.emit(MapEvent.PICKING, [], layer.layerInfo.id);
                     }
                 });
             }

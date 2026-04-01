@@ -4,7 +4,7 @@ import { PlotConfig, PlotMargins } from "./types";
 import { NormalizationMode } from "./constants";
 import { PlotEvents } from "./plot-events";
 
-export abstract class AutkPlot {
+export abstract class AutkChart {
 
     protected _div!: HTMLElement;
 
@@ -31,7 +31,7 @@ export abstract class AutkPlot {
         this._div = config.div;
         this._plotEvents = new PlotEvents(config.events);
 
-        this._data = config.data.features.map((f) => f.properties);
+        this._data = config.collection.features.map((f) => f.properties);
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
         this._width = config.width || 800;
         this._height = config.height || 500;
@@ -63,7 +63,7 @@ export abstract class AutkPlot {
         this._selection = selection;
     }
 
-    get plotEvents(): PlotEvents {
+    get events(): PlotEvents {
         return this._plotEvents;
     }
 

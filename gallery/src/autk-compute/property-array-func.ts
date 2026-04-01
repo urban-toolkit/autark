@@ -46,16 +46,16 @@ export class PropertyArrayFunc {
 
     // Example 1: Calculate average of measurements array
     console.log('\n=== Example 1: Array Average ===');
-    let result1 = await geojsonCompute.computeFunctionIntoProperties({
-      geojson,
-      attributes: {
+    let result1 = await geojsonCompute.analytical({
+      collection: geojson,
+      variableMapping: {
         values: 'measurements',
       },
       attributeArrays: {
         values: 5, // Fixed length of 5
       },
-      outputColumnName: 'avg_measurement',
-      wgslFunction: `
+      resultField: 'avg_measurement',
+      wgslBody: `
         var sum = 0.0;
         for (var i = 0u; i < values_length; i++) {
           sum += values[i];
@@ -70,17 +70,17 @@ export class PropertyArrayFunc {
 
     // Example 2: Weighted sum using scalar and array
     console.log('\n=== Example 2: Scalar * Array Sum ===');
-    let result2 = await geojsonCompute.computeFunctionIntoProperties({
-      geojson,
-      attributes: {
+    let result2 = await geojsonCompute.analytical({
+      collection: geojson,
+      variableMapping: {
         temp: 'temperature',
         values: 'measurements',
       },
       attributeArrays: {
         values: 5,
       },
-      outputColumnName: 'weighted_by_temp',
-      wgslFunction: `
+      resultField: 'weighted_by_temp',
+      wgslBody: `
         var sum = 0.0;
         for (var i = 0u; i < values_length; i++) {
           sum += values[i];
@@ -95,9 +95,9 @@ export class PropertyArrayFunc {
 
     // Example 3: Dot product of two arrays
     console.log('\n=== Example 3: Dot Product of Two Arrays ===');
-    let result3 = await geojsonCompute.computeFunctionIntoProperties({
-      geojson,
-      attributes: {
+    let result3 = await geojsonCompute.analytical({
+      collection: geojson,
+      variableMapping: {
         a: 'measurements',
         b: 'weights',
       },
@@ -105,8 +105,8 @@ export class PropertyArrayFunc {
         a: 5,
         b: 3,
       },
-      outputColumnName: 'dot_product',
-      wgslFunction: `
+      resultField: 'dot_product',
+      wgslBody: `
         var dot = 0.0;
         let minLen = min(a_length, b_length);
         for (var i = 0u; i < minLen; i++) {
@@ -122,16 +122,16 @@ export class PropertyArrayFunc {
 
     // Example 4: Find maximum value in array
     console.log('\n=== Example 4: Maximum Value in Array ===');
-    let result4 = await geojsonCompute.computeFunctionIntoProperties({
-      geojson,
-      attributes: {
+    let result4 = await geojsonCompute.analytical({
+      collection: geojson,
+      variableMapping: {
         values: 'measurements',
       },
       attributeArrays: {
         values: 5,
       },
-      outputColumnName: 'max_measurement',
-      wgslFunction: `
+      resultField: 'max_measurement',
+      wgslBody: `
         var maxVal = values[0];
         for (var i = 1u; i < values_length; i++) {
           let val = values[i];

@@ -46,16 +46,16 @@ export class PropertyMatrixFunc {
 
     // Calculate percentage of pixels matching the target color
     console.log('\n=== Calculating Color Percentage in Images ===');
-    const result = await geojsonCompute.computeFunctionIntoProperties({
-      geojson,
-      attributes: {
+    const result = await geojsonCompute.analytical({
+      collection: geojson,
+      variableMapping: {
         img: 'image',
       },
       attributeMatrices: {
         img: { rows: imageHeight, cols: imageWidth },
       },
-      outputColumnName: 'color_percentage',
-      wgslFunction: `
+      resultField: 'color_percentage',
+      wgslBody: `
         // Count pixels that match the exact target color (128.0)
         let targetColor = 128.0;
         var matchCount = 0u;

@@ -1,5 +1,5 @@
 import { AutkMap, LayerType, ColorMapInterpolator, MapEvent, VectorLayer, MapStyle } from 'autk-map';
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
@@ -33,7 +33,7 @@ const HIGHLIGHT_COLOR = '#1a7a2e';
 
 export class OsmLayersApi {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
     protected plot!: Scatterplot;
     protected linechart!: Linechart;
     protected geotiffData: any;
@@ -42,11 +42,11 @@ export class OsmLayersApi {
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Niterói area from Overpass API.');
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'Rio de Janeiro',
                 areas: ['Niterói'],
@@ -71,7 +71,7 @@ export class OsmLayersApi {
         });
 
         setLoadingState('Joining LST to road segments...', 'Averaging temperature bands within 1 km of each road.');
-        await this.db.spatialJoin({
+        await this.db.spatialQuery({
             tableRootName: 'table_osm_roads',
             tableJoinName: 'lst',
             spatialPredicate: 'NEAR',
@@ -113,7 +113,7 @@ export class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
         }
     }
 
@@ -133,19 +133,19 @@ export class OsmLayersApi {
                     ) AS properties
                 FROM table_osm_roads
             `,
-            output: { type: 'CREATE_TABLE', tableName: 'table_osm_roads', source: 'osm', tableType: LayerType.AUTK_OSM_ROADS },
+            output: { type: 'CREATE_TABLE', tableName: 'table_osm_roads', source: 'osm', tableType: 'roads' },
         });
 
         setLoadingState('Running GPU regression...', 'Computing OLS slope and intercept on the GPU.');
         const compute = new GeojsonCompute();
         const geojson = await this.db.getLayer('table_osm_roads');
 
-        this.computedRoadsGeojson = await compute.computeFunctionIntoProperties({
-            geojson,
-            attributes: { bands: 'lst_timeseries' },
+        this.computedRoadsGeojson = await compute.analytical({
+            collection: geojson,
+            variableMapping: { bands: 'lst_timeseries' },
             attributeArrays: { bands: BAND_COUNT },
             outputColumns: ['angle', 'intercept'],
-            wgslFunction: lstRegressionShader,
+            wgslBody: lstRegressionShader,
         });
     }
 
@@ -154,12 +154,16 @@ export class OsmLayersApi {
             ? ColorMapInterpolator.DIVERGING_RED_BLUE
             : ColorMapInterpolator.SEQUENTIAL_REDS;
 
-        this.map.updateRenderInfoProperty('table_osm_roads', 'colorMapInterpolator', interpolator);
-        this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
+        this.map.updateLayerRenderInfo('table_osm_roads', { colorMapInterpolator: interpolator });
+        this.map.updateLayerRenderInfo('table_osm_roads', { isColorMap: true });
 
-        this.map.updateGeoJsonLayerThematic('table_osm_roads', this.roadsGeojson, (feature) => {
-            if (mode === 'slope') return feature.properties?.compute?.angle ?? 0;
-            return feature.properties?.lst_timeseries?.[year! - START_YEAR] ?? 0;
+        this.map.updateThematic({
+            id: 'table_osm_roads',
+            collection: this.roadsGeojson,
+            getFnv: (feature) => {
+                if (mode === 'slope') return feature.properties?.compute?.angle ?? 0;
+                return feature.properties?.lst_timeseries?.[year! - START_YEAR] ?? 0;
+            },
         });
 
         const vals: number[] = this.roadsGeojson.features.map((f: any) =>
@@ -172,7 +176,7 @@ export class OsmLayersApi {
         const fmt = mode === 'slope'
             ? (v: number) => v.toExponential(2)
             : (v: number) => v.toFixed(1);
-        this.map.updateRenderInfoProperty('table_osm_roads', 'colorMapLabels', [fmt(valMin), fmt(valMax)]);
+        this.map.updateLayerRenderInfo('table_osm_roads', { colorMapLabels: [fmt(valMin), fmt(valMax)] });
     }
 
     protected async applyRoadslstThematic(): Promise<void> {
@@ -186,14 +190,18 @@ export class OsmLayersApi {
 
         const yearSelect = document.getElementById('yearSelect') as HTMLSelectElement;
         const defaultBand = `band_${parseInt(yearSelect.value, 10) - START_YEAR + 1}`;
-        this.map.loadGeoTiffLayer(tableName, geotiff, LayerType.AUTK_RASTER, (cell) => {
-            if (!cell) return 0;
-            const props = cell as Record<string, number | bigint | string | undefined>;
-            return Number(props[defaultBand] ?? NaN);
+        this.map.loadRasterCollection({
+            id: tableName,
+            collection: geotiff,
+            getFnv: (cell) => {
+                if (!cell) return 0;
+                const props = cell as Record<string, number | bigint | string | undefined>;
+                return Number(props[defaultBand] ?? NaN);
+            },
         });
 
-        this.map.updateRenderInfoProperty(tableName, 'isSkip', true);
-        this.map.updateRenderInfoProperty(tableName, 'opacity', 0.65);
+        this.map.updateLayerRenderInfo(tableName, { isSkip: true });
+        this.map.updateLayerRenderInfo(tableName, { opacity: 0.65 });
     }
 
     protected setupControls(): void {
@@ -212,10 +220,14 @@ export class OsmLayersApi {
             const bandName = `band_${year - START_YEAR + 1}`;
 
             if (this.geotiffData) {
-                this.map.updateGeoTiffLayerData('lst', this.geotiffData, (cell) => {
-                    if (!cell) return 0;
-                    const props = cell as Record<string, number | bigint | string | undefined>;
-                    return Number(props[bandName] ?? NaN);
+                this.map.updateRasterCollection({
+                    id: 'lst',
+                    collection: this.geotiffData,
+                    getFnv: (cell) => {
+                        if (!cell) return 0;
+                        const props = cell as Record<string, number | bigint | string | undefined>;
+                        return Number(props[bandName] ?? NaN);
+                    },
                 });
             }
 
@@ -227,7 +239,7 @@ export class OsmLayersApi {
     protected setupPlot(): void {
         this.plot = new Scatterplot({
             div: document.getElementById('plotBody') as HTMLElement,
-            data: this.computedRoadsGeojson,
+            collection: this.computedRoadsGeojson,
             attributes: ['compute.intercept', 'compute.angle'],
             labels: { axis: ['Baseline LST (°C)', 'Warming angle (°)'], title: 'LST regression' },
             tickFormats: ['.1~f', '.3~f'],
@@ -236,7 +248,7 @@ export class OsmLayersApi {
             events: [PlotEvent.BRUSH],
         });
 
-        this.plot.plotEvents.addEventListener(PlotEvent.BRUSH, (ids: number[]) => {
+        this.plot.events.addListener(PlotEvent.BRUSH, ({ selection: ids }) => {
             const layer = this.map.layerManager.searchByLayerId('table_osm_roads') as VectorLayer;
             if (layer) layer.setHighlightedIds(ids);
             this.map.draw();
@@ -244,7 +256,7 @@ export class OsmLayersApi {
 
         this.linechart = new Linechart({
             div: document.getElementById('lineChartBody') as HTMLElement,
-            data: this.computedRoadsGeojson,
+            collection: this.computedRoadsGeojson,
             attributes: ['lst_timeseries', 'compute.angle', 'compute.intercept'],
             labels: { axis: ['Year', 'LST (°C)'], title: 'Selected Road LST timeseries' },
             tickFormats: ['.0f', '.1f'],
@@ -255,7 +267,7 @@ export class OsmLayersApi {
     }
 
     protected setupPickListener(): void {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, async (ids: number[], layerId: string) => {
+        this.map.events.addListener(MapEvent.PICKING, async ({ selection: ids, layerId }) => {
             if (layerId === 'table_osm_roads') {
                 this.plot?.setHighlightedIds(ids);
                 this.linechart?.setHighlightedIds(ids);

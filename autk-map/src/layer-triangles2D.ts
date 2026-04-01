@@ -1,4 +1,4 @@
-import { ILayerBorder, LayerBorderComponent, LayerData, LayerInfo, LayerRenderInfo } from './interfaces';
+import { LayerBorder, LayerBorderComponent, LayerData, LayerInfo, LayerRenderInfo } from './interfaces';
 
 import { Camera } from './camera';
 import { Renderer } from './renderer';
@@ -97,9 +97,9 @@ export class Triangles2DLayer extends VectorLayer {
 
     /**
      * Load the border geometry data for the layer.
-     * @param {ILayerBorder[]} border - The border geometry data to load.
+     * @param {LayerBorder[]} border - The border geometry data to load.
      */
-    public loadBorderGeometry(border: ILayerBorder[]): void {
+    public loadBorderGeometry(border: LayerBorder[]): void {
         const borders = border;
 
         const position: number[] = [];

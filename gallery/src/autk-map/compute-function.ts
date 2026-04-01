@@ -1,4 +1,4 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 
 import { AutkMap, LayerType } from 'autk-map';
@@ -7,10 +7,10 @@ import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson
 
 export class ComputeFunction {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         await this.db.loadCustomLayer({
@@ -32,14 +32,14 @@ export class ComputeFunction {
         let geojson = await this.db.getLayer('neighborhoods');
 
         const geojsonCompute = new GeojsonCompute();
-        geojson = await geojsonCompute.computeFunctionIntoProperties({
+        geojson = await geojsonCompute.analytical({
             geojson,
             attributes: {
                 x: 'shape_area',
                 y: 'shape_leng',
             },
-            outputColumnName: 'result',
-            wgslFunction: 'return x / y;',
+            resultField: 'result',
+            wgslBody: 'return x / y;',
         });
 
         this.map = new AutkMap(canvas);
@@ -54,7 +54,7 @@ export class ComputeFunction {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
 
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
@@ -67,7 +67,7 @@ export class ComputeFunction {
             return properties?.compute.result || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic('neighborhoods', geojson, getFnv);
+        this.map.updateThematic({ id: 'neighborhoods', collection: geojson, getFnv });
     }
 }
 

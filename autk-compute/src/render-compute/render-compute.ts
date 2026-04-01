@@ -1,6 +1,7 @@
 /// <reference types="@webgpu/types" />
 
 import { FeatureCollection, LineString, MultiLineString } from 'geojson';
+import { ColorRGB } from 'autk-types';
 import { buildViewProjection } from './camera';
 import { computeOrigin, triangulateBuildings } from './triangulate';
 
@@ -9,8 +10,8 @@ import { computeOrigin, triangulateBuildings } from './triangulate';
 export interface RenderLayer {
     /** GeoJSON buildings (Polygon / MultiPolygon / LineString footprints). */
     geojson: FeatureCollection;
-    /** Flat RGBA color [0-1] used to paint this layer's geometry. */
-    color: [number, number, number, number];
+    /** RGBA color used to paint this layer's geometry. r/g/b in [0-1], alpha in [0-1]. */
+    color: ColorRGB;
 }
 
 export interface RenderComputeParams {
@@ -199,7 +200,7 @@ export class RenderCompute {
             device.queue.writeBuffer(iBuf, 0, mesh.indices as Uint32Array<ArrayBuffer>);
 
             const colorBuf = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-            device.queue.writeBuffer(colorBuf, 0, new Float32Array(color));
+            device.queue.writeBuffer(colorBuf, 0, new Float32Array([color.r, color.g, color.b, color.alpha]));
 
             return { vBuf, iBuf, indexCount: mesh.indices.length, colorBuf };
         });

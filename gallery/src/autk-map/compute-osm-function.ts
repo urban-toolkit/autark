@@ -1,4 +1,4 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 
 import { AutkMap, LayerType } from 'autk-map';
@@ -7,13 +7,13 @@ import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson
 
 export class ComputeOsm {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Battery Park City', 'Financial District'],
@@ -29,13 +29,13 @@ export class ComputeOsm {
         let geojson = await this.db.getLayer('table_osm_roads');
 
         const geojsonCompute = new GeojsonCompute();
-        geojson = await geojsonCompute.computeFunctionIntoProperties({
+        geojson = await geojsonCompute.analytical({
             geojson,
             attributes: {
                 x: 'lanes',
             },
-            outputColumnName: 'result',
-            wgslFunction: `
+            resultField: 'result',
+            wgslBody: `
                 if (x <= 0) {
                     return 1;
                 }
@@ -55,7 +55,7 @@ export class ComputeOsm {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -66,7 +66,7 @@ export class ComputeOsm {
             return properties?.compute.result || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic('table_osm_roads', geojson, getFnv);
+        this.map.updateThematic({ id: 'table_osm_roads', collection: geojson, getFnv });
     }
 }
 

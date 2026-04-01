@@ -1,9 +1,11 @@
 import {
-    ColorHEX,
     ColorMapInterpolator,
     LayerType,
+    NormalizationConfig,
     ThematicAggregationLevel,
 } from './constants';
+
+import { Feature, FeatureCollection, Geometry } from 'geojson';
 
 /**
  * Interface for map styles.
@@ -16,18 +18,6 @@ import {
  * @property {ColorHEX} features - Color of the map's features.
  * @property {ColorHEX} lines - Color of the map's lines.
  */
-export interface MapStyle {
-    background: ColorHEX;
-    surface: ColorHEX;
-    parks: ColorHEX;
-    water: ColorHEX;
-    roads: ColorHEX;
-    buildings: ColorHEX;
-    points: ColorHEX;
-    polylines: ColorHEX;
-    polygons: ColorHEX;
-}
-
 /**
  * Interface for layer information.
  * @property {string} id - Unique identifier for the layer.
@@ -65,7 +55,7 @@ export interface LayerRenderInfo {
  * Interface for layer border information.
  * @property {LayerGeometry[]} geometry - Array of geometries for the layer.
  * @property {LayerComponent[]} components - Array of components for the layer.
- * @property {ILayerBorder[]} [border] - Array of borders for the layer.
+ * @property {LayerBorder[]} [border] - Array of borders for the layer.
  * @property {LayerBorderComponent[]} [borderComponents] - Array of border components for the layer.
  * @property {RasterData} [raster] - Raster data for the layer.
  * @property {LayerThematic[]} [thematic] - Thematic data for the layer.
@@ -74,7 +64,7 @@ export interface LayerRenderInfo {
 export interface LayerData {
     geometry: LayerGeometry[];
     components: LayerComponent[];
-    border?: ILayerBorder[];
+    border?: LayerBorder[];
     borderComponents?: LayerBorderComponent[];
     raster?: RasterData[];
     thematic?: LayerThematic[];
@@ -132,7 +122,7 @@ export interface LayerComponent {
  * @property {number[]} position - Position of the border.
  * @property {number[]} indices - Indices of the border.
  */
-export interface ILayerBorder {
+export interface LayerBorder {
     position: number[];
     indices: number[];
 }
@@ -157,4 +147,33 @@ export interface CameraData {
     up: number[];
     eye: number[];
     lookAt: number[];
+}
+
+/** Parameters for loading a GeoJSON feature collection as a map layer. */
+export interface LoadCollectionParams {
+    id: string;
+    collection: FeatureCollection;
+    type?: LayerType | null;
+}
+
+/** Parameters for loading a raster (GeoTIFF-derived) collection as a map layer. */
+export interface LoadRasterCollectionParams {
+    id: string;
+    collection: FeatureCollection<Geometry | null>;
+    getFnv: (cell: unknown) => number;
+}
+
+/** Parameters for updating a raster layer's values in place. */
+export interface UpdateRasterCollectionParams {
+    id: string;
+    collection: FeatureCollection;
+    getFnv: (cell: unknown) => number;
+}
+
+/** Parameters for updating a layer's thematic (color-mapped) values. */
+export interface UpdateThematicParams {
+    id: string;
+    collection: FeatureCollection;
+    getFnv: (feature: Feature) => number | string;
+    normalization?: NormalizationConfig;
 }

@@ -9,18 +9,18 @@ export class ColorMap {
 
     public static getColor(value: number, color: ColorMapInterpolator): ColorRGB {
         if (d3_scale[color] != undefined) {
-            ColorMap._interpolator = d3_scale[color];
+            ColorMap._interpolator = d3_scale[color] as (t: number) => string;
 
             const numberPattern = /\d+/g;
             const rgbStr = ColorMap._interpolator(value).match(numberPattern);
             if (rgbStr === null) {
-                return { r: 0, g: 0, b: 0, opacity: 1 };
+                return { r: 0, g: 0, b: 0, alpha: 1 };
             }
             const rgb = rgbStr.map((el) => +el);
-            return { r: rgb[0], g: rgb[1], b: rgb[2], opacity: 1 };
+            return { r: rgb[0], g: rgb[1], b: rgb[2], alpha: 1 };
         } else if (isNaN(d3_color.rgb(color).r) == false) {
             const val = d3_color.rgb(color);
-            return { r: val.r, g: val.g, b: val.b, opacity: 1 };
+            return { r: val.r, g: val.g, b: val.b, alpha: 1 };
         } else {
             throw Error('Color scale or color does not exist.');
         }
@@ -85,6 +85,6 @@ export class ColorMap {
 
     public static hexToRgb(color: ColorHEX): ColorRGB {
         const rgb = d3_color.rgb(color);
-        return { r: rgb.r, g: rgb.g, b: rgb.b, opacity: 1.0 };
+        return { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 1.0 };
     }
 }

@@ -1,7 +1,7 @@
 
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 import { AutkMap, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
@@ -31,7 +31,7 @@ function showError(message: string, note?: string): void {
 
 export class Urbane {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
     protected table!: TableVis;
     protected parallel!: ParallelCoordinates;
 
@@ -68,11 +68,11 @@ export class Urbane {
 
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Manhattan from Overpass API.');
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: { geocodeArea: 'New York', areas: ['Manhattan Island'] },
             outputTableName: 'table_osm',
             autoLoadLayers: {
@@ -91,7 +91,7 @@ export class Urbane {
             coordinateFormat: 'EPSG:3395',
         });
 
-        await this.db.spatialJoin({
+        await this.db.spatialQuery({
             tableRootName: 'table_osm_buildings',
             tableJoinName: 'neighborhoods',
             spatialPredicate: 'INTERSECT',
@@ -110,7 +110,7 @@ export class Urbane {
                     coordinateFormat: 'EPSG:3395',
                 },
             });
-            await this.db.spatialJoin({
+            await this.db.spatialQuery({
                 tableRootName: 'neighborhoods',
                 tableJoinName: dataset,
                 spatialPredicate: 'INTERSECT',
@@ -132,7 +132,7 @@ export class Urbane {
         const roadsGeoJson     = await this.db.getLayer('table_osm_roads');
         const rc = new RenderCompute();
         this.roadsWithSky = await rc.renderIntoMetrics({
-            layers:     [{ geojson: buildingsGeoJson, color: [0.8, 0.3, 0.1, 1.0] }],
+            layers:     [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 } }],
             viewpoints: roadsGeoJson,
             tileSize:   64,
         });
@@ -140,7 +140,7 @@ export class Urbane {
         setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
         await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });
 
-        await this.db.spatialJoin({
+        await this.db.spatialQuery({
             tableRootName: 'neighborhoods',
             tableJoinName: 'table_osm_roads',
             spatialPredicate: 'INTERSECT',
@@ -180,13 +180,13 @@ export class Urbane {
             p.scoreInputs = vals;
         }
 
-        return new GeojsonCompute().computeFunctionIntoProperties({
-            geojson,
-            attributes: { vals: 'scoreInputs' },
+        return new GeojsonCompute().analytical({
+            collection: geojson,
+            variableMapping: { vals: 'scoreInputs' },
             attributeArrays: { vals: N },
             uniformArrays: { weights: [...this.weights, this.skyExposureWeight] },
-            outputColumnName: 'score',
-            wgslFunction: `
+            resultField: 'score',
+            wgslBody: `
                 var s = 0.0;
                 for (var i = 0u; i < vals_length; i++) {
                     s += vals[i] * weights[i];
@@ -208,22 +208,22 @@ export class Urbane {
             const geojson = layerData.name === 'neighborhoods'
                 ? this.neighs
                 : await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
         }
 
-        this.map.updateRenderInfoProperty('table_osm_buildings', 'isSkip', true);
-        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
-        this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
+        this.map.updateLayerRenderInfo('table_osm_buildings', { isSkip: true });
+        this.map.updateLayerRenderInfo('neighborhoods', { opacity: 0.75 });
+        this.map.updateLayerRenderInfo('neighborhoods', { isPick: true });
         this.map.draw();
 
         if (this.roadsWithSky) {
-            this.map.updateGeoJsonLayerThematic(
-                'table_osm_roads',
-                this.roadsWithSky,
-                (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
-                { mode: NormalizationMode.PERCENTILE },
-            );
-            this.map.updateRenderInfoProperty('table_osm_roads', 'isColorMap', true);
+            this.map.updateThematic({
+                id: 'table_osm_roads',
+                collection: this.roadsWithSky,
+                getFnv: (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
+                normalization: { mode: NormalizationMode.PERCENTILE },
+            });
+            this.map.updateLayerRenderInfo('table_osm_roads', { isColorMap: true });
         }
     }
 
@@ -232,7 +232,7 @@ export class Urbane {
         const geojson = this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
 
         if (column === 'none') {
-            this.map.updateRenderInfoProperty(layerId, 'isColorMap', false);
+            this.map.updateLayerRenderInfo(layerId, { isColorMap: false });
             this.map.draw();
             return;
         }
@@ -244,8 +244,8 @@ export class Urbane {
             return value || 0;
         };
 
-        this.map.updateGeoJsonLayerThematic(layerId, geojson, getFnv);
-        this.map.updateRenderInfoProperty(layerId, 'isColorMap', true);
+        this.map.updateThematic({ id: layerId, collection: geojson, getFnv });
+        this.map.updateLayerRenderInfo(layerId, { isColorMap: true });
     }
 
     // ── Plot ──────────────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ export class Urbane {
 
         this.parallel = new ParallelCoordinates({
             div: this.plotDivParallel,
-            data: plotData,
+            collection: plotData,
             attributes,
             labels: { axis: axisLabels, title },
             width: 790,
@@ -279,7 +279,7 @@ export class Urbane {
 
         this.table = new TableVis({
             div: this.plotDivTable,
-            data: plotData,
+            collection: plotData,
             attributes: [titleCol, ...attributes],
             labels: { axis: ['Id', ...axisLabels], title },
             width: 790,
@@ -290,7 +290,7 @@ export class Urbane {
     // ── Event Listeners ───────────────────────────────────────────────────────
 
     protected updateMapListeners(): void {
-        this.map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[]) => {
+        this.map.events.addListener(MapEvent.PICKING, ({ selection }) => {
             if (this.currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
@@ -300,7 +300,7 @@ export class Urbane {
     }
 
     protected updatePlotListeners(): void {
-        this.table.plotEvents.addEventListener(PlotEvent.CLICK, (selection: number[]) => {
+        this.table.events.addListener(PlotEvent.CLICK, ({ selection }) => {
             if (this.currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
@@ -308,7 +308,7 @@ export class Urbane {
             this.parallel.setHighlightedIds(selection);
         });
 
-        this.parallel.plotEvents.addEventListener(PlotEvent.BRUSH_Y, (selection: number[]) => {
+        this.parallel.events.addListener(PlotEvent.BRUSH_Y, ({ selection }) => {
             if (this.currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
@@ -353,11 +353,11 @@ export class Urbane {
                 FROM   table_osm_buildings
                 WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
             `,
-            output: { type: 'CREATE_TABLE', tableName: 'active_buildings', source: 'osm', tableType: LayerType.AUTK_OSM_BUILDINGS },
+            output: { type: 'CREATE_TABLE', tableName: 'active_buildings', source: 'osm', tableType: 'buildings' },
         });
 
         for (const dataset of this.datasets) {
-            await this.db.spatialJoin({
+            await this.db.spatialQuery({
                 tableRootName: 'active_buildings',
                 tableJoinName: dataset,
                 spatialPredicate: 'NEAR',
@@ -376,7 +376,7 @@ export class Urbane {
             });
         }
 
-        await this.db.spatialJoin({
+        await this.db.spatialQuery({
             tableRootName: 'active_buildings',
             tableJoinName: 'table_osm_roads',
             spatialPredicate: 'NEAR',
@@ -415,11 +415,11 @@ export class Urbane {
             this.currentLevel = 'active_buildings';
             await this.updateBuildingsSelection();
 
-            this.map.loadGeoJsonLayer('active_buildings', this.activeBuildings, LayerType.AUTK_OSM_BUILDINGS);
-            this.map.updateRenderInfoProperty('neighborhoods', 'isSkip', true);
-            this.map.updateRenderInfoProperty('neighborhoods', 'isPick', false);
-            this.map.updateRenderInfoProperty('active_buildings', 'isSkip', false);
-            this.map.updateRenderInfoProperty('active_buildings', 'isPick', true);
+            this.map.loadCollection({ id: 'active_buildings', collection: this.activeBuildings, type: 'buildings' });
+            this.map.updateLayerRenderInfo('neighborhoods', { isSkip: true });
+            this.map.updateLayerRenderInfo('neighborhoods', { isPick: false });
+            this.map.updateLayerRenderInfo('active_buildings', { isSkip: false });
+            this.map.updateLayerRenderInfo('active_buildings', { isPick: true });
 
             iconDown.style.display = 'none';
             iconUp.style.display = '';
@@ -430,8 +430,8 @@ export class Urbane {
 
             await this.db.removeLayer('active_buildings');
             this.map.layerManager.removeLayerById('active_buildings');
-            this.map.updateRenderInfoProperty('neighborhoods', 'isSkip', false);
-            this.map.updateRenderInfoProperty('neighborhoods', 'isPick', true);
+            this.map.updateLayerRenderInfo('neighborhoods', { isSkip: false });
+            this.map.updateLayerRenderInfo('neighborhoods', { isPick: true });
 
             iconDown.style.display = '';
             iconUp.style.display = 'none';

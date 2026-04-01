@@ -1,15 +1,15 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
 export class LayerOpacity {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Manhattan Island'],
@@ -41,10 +41,10 @@ export class LayerOpacity {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-        this.map.updateRenderInfoProperty('neighborhoods', 'opacity', 0.75);
+        this.map.updateLayerRenderInfo('neighborhoods', { opacity: 0.75 });
     }
 }
 

@@ -1,11 +1,11 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 
 export class RawQueryJoin {
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
     protected geojson!: any;
 
     public async run(): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         await this.db.loadCustomLayer({

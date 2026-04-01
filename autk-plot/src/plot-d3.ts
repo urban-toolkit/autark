@@ -1,18 +1,18 @@
 import * as d3 from "d3";
 
-import { AutkPlot } from "./main";
+import { AutkChart } from "./main";
 
 import { PlotConfig } from "./types";
 import { PlotEvent } from "./constants";
 import { PlotStyle } from "./plot-style";
 
-export abstract class PlotD3 extends AutkPlot {
+export abstract class PlotD3 extends AutkChart {
     constructor(config: PlotConfig) {
         super(config);
     }
 
     configureSignalListeners(): void {
-        const listeners = this.plotEvents.listeners;
+        const listeners = this.events.listeners;
 
         for (const listener in listeners) {
             if (listener === PlotEvent.CLICK) {
@@ -46,7 +46,7 @@ export abstract class PlotD3 extends AutkPlot {
                             plot.selection.push(id);
                         }
 
-                        plot.plotEvents.emit(PlotEvent.CLICK, plot.selection);
+                        plot.events.emit(PlotEvent.CLICK, plot.selection);
                         plot.updatePlotSelection();
                     });
             });
@@ -55,7 +55,7 @@ export abstract class PlotD3 extends AutkPlot {
             .on('click', function () {
                 plot.selection = [];
 
-                plot.plotEvents.emit(PlotEvent.CLICK, plot.selection);
+                plot.events.emit(PlotEvent.CLICK, plot.selection);
                 plot.updatePlotSelection();
             });
     }
@@ -92,11 +92,11 @@ export abstract class PlotD3 extends AutkPlot {
                                 });
 
                             plot.selection = Array.from(nextSel);
-                            plot.plotEvents.emit(PlotEvent.BRUSH, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH, plot.selection);
                             plot.updatePlotSelection();
                         } else {
                             plot.selection = [];
-                            plot.plotEvents.emit(PlotEvent.BRUSH, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH, plot.selection);
                             plot.updatePlotSelection();
                         }
                     });
@@ -152,11 +152,11 @@ export abstract class PlotD3 extends AutkPlot {
                                 });
 
                             plot.selection = Array.from(nextSel);
-                            plot.plotEvents.emit(PlotEvent.BRUSH_X, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_X, plot.selection);
                             plot.updatePlotSelection();
                         } else {
                             plot.selection = [];
-                            plot.plotEvents.emit(PlotEvent.BRUSH_X, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_X, plot.selection);
                             plot.updatePlotSelection();
                         }
                     });
@@ -214,11 +214,11 @@ export abstract class PlotD3 extends AutkPlot {
                                 });
 
                             plot.selection = Array.from(nextSel);
-                            plot.plotEvents.emit(PlotEvent.BRUSH_Y, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_Y, plot.selection);
                             plot.updatePlotSelection();
                         } else {
                             plot.selection = [];
-                            plot.plotEvents.emit(PlotEvent.BRUSH_Y, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_Y, plot.selection);
                             plot.updatePlotSelection();
                         }
                     });

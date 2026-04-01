@@ -1,5 +1,5 @@
 import { ColorMap } from './colormap.js';
-import { ColorMapInterpolator, LayerType } from './index.js';
+import { ColorMapInterpolator } from './index.js';
 import { Layer } from './layer.js';
 import { AutkMap } from './main.js';
 
@@ -54,11 +54,11 @@ export class AutkMapUi {
         // Exclusive isPick: disable on all other vector layers
         this.map.layerManager.vectorLayers.forEach(l => {
             if (l.layerInfo.id !== layer.layerInfo.id) {
-                this.map.updateRenderInfoProperty(l.layerInfo.id, 'isPick', false);
+                this.map.updateLayerRenderInfo(l.layerInfo.id, { isPick: false });
             }
         });
 
-        this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isPick', true);
+        this.map.updateLayerRenderInfo(layer.layerInfo.id, { isPick: true });
         this.updateLegendContent();
     }
 
@@ -72,7 +72,7 @@ export class AutkMapUi {
     }
 
     /**
-     * Called from updateRenderInfoProperty when isColorMap / colorMapLabels /
+     * Called from updateLayerRenderInfo when isColorMap / colorMapLabels /
      * colorMapInterpolator changes. Updates the legend to reflect new state.
      */
     public refreshLegend(layer: Layer | null): void {
@@ -83,7 +83,7 @@ export class AutkMapUi {
     }
 
     /**
-     * Called from updateRenderInfoProperty when isSkip / isPick / isColorMap
+     * Called from updateLayerRenderInfo when isSkip / isPick / isColorMap
      * changes. Re-renders the layer list rows if the menu is open.
      */
     public refreshLayerList(): void {
@@ -256,11 +256,11 @@ export class AutkMapUi {
         });
 
         const eyeBtn = this.makeIconButton(EYE_SVG, !layer.layerRenderInfo.isSkip, () => {
-            this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isSkip', !layer.layerRenderInfo.isSkip);
+            this.map.updateLayerRenderInfo(layer.layerInfo.id, { isSkip: !layer.layerRenderInfo.isSkip });
         });
 
         const paletteBtn = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
-            this.map.updateRenderInfoProperty(layer.layerInfo.id, 'isColorMap', !layer.layerRenderInfo.isColorMap);
+            this.map.updateLayerRenderInfo(layer.layerInfo.id, { isColorMap: !layer.layerRenderInfo.isColorMap });
         });
 
         const isRaster = layer.layerInfo.typeLayer === 'raster';

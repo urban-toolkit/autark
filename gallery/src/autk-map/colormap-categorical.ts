@@ -1,13 +1,13 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
 import { Feature, GeoJsonProperties } from 'geojson';
 
 export class ColormapCat {
     protected map!: AutkMap;
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         await this.db.loadCustomLayer({
@@ -29,7 +29,7 @@ export class ColormapCat {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadGeoJsonLayer(layerData.name, geojson, layerData.type as LayerType);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -42,8 +42,8 @@ export class ColormapCat {
             return ['primary', 'secondary'].includes(properties?.highway) ? properties?.highway : 'other';
         };
 
-        this.map.updateRenderInfoProperty(layer, 'colorMapInterpolator', ColorMapInterpolator.OBSERVABLE10);
-        this.map.updateGeoJsonLayerThematic(layer, geojson, getFnv);
+        this.map.updateLayerRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.OBSERVABLE10 });
+        this.map.updateThematic({ id: layer, collection: geojson, getFnv });
     }
 
 }

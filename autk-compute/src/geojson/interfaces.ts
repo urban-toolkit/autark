@@ -1,9 +1,9 @@
 import { FeatureCollection } from 'geojson';
 
 export interface ComputeFunctionIntoPropertiesParams {
-  geojson: FeatureCollection;
+  collection: FeatureCollection;
   /** Per-feature scalars: maps WGSL variable name → feature property path. */
-  attributes: Record<string, string>;
+  variableMapping: Record<string, string>;
   /** Per-feature arrays: variable name → fixed element count. */
   attributeArrays?: Record<string, number>;
   /**
@@ -30,7 +30,7 @@ export interface ComputeFunctionIntoPropertiesParams {
   /**
    * Name(s) of the output column(s) written into feature.properties.compute.
    *
-   * Single output  — outputColumnName: 'shadow'
+   * Single output  — resultField: 'shadow'
    *   The WGSL function body must return an f32.
    *
    * Multiple outputs — outputColumns: ['shadow', 'contribution']
@@ -41,19 +41,19 @@ export interface ComputeFunctionIntoPropertiesParams {
    *     out[1] = percentage;
    *     return out;
    */
-  outputColumnName?: string;
+  resultField?: string;
   outputColumns?: string[];
   /**
-   * WGSL function body. All attribute and uniform variables are available as parameters.
+   * WGSL function body. All variableMapping and uniform variables are available as parameters.
    *
    * Scalar:  f32
    * Array:   array<f32, N>  +  name_length: u32
    * Matrix:  array<f32, rows*cols>  +  name_rows: u32  +  name_cols: u32
    *          (row-major: element at (r,c) = name[r * name_cols + c])
    */
-  wgslFunction: string;
+  wgslBody: string;
 }
 
 export interface ComputeResult {
-  geojson: FeatureCollection;
+  collection: FeatureCollection;
 }

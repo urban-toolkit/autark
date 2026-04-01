@@ -10,24 +10,24 @@ type GlobalVarMeta =
 export class ComputeFunctionIntoPropertiesUseCase {
   async exec(params: ComputeFunctionIntoPropertiesParams): Promise<FeatureCollection> {
     const {
-      geojson,
-      attributes,
+      collection,
+      variableMapping,
       attributeArrays = {},
       attributeMatrices = {},
-      wgslFunction,
+      wgslBody,
     } = params;
 
-    const outputColumns = params.outputColumns ?? (params.outputColumnName ? [params.outputColumnName] : []);
-    if (outputColumns.length === 0) throw new Error('outputColumnName or outputColumns must be provided');
+    const outputColumns = params.outputColumns ?? (params.resultField ? [params.resultField] : []);
+    if (outputColumns.length === 0) throw new Error('resultField or outputColumns must be provided');
 
-    const features = geojson.features ?? [];
+    const features = collection.features ?? [];
     const featureCount = features.length;
-    if (featureCount === 0) return geojson;
+    if (featureCount === 0) return collection;
 
     // Extract per-feature input data
     const { orderedVarNames, inputArrays, scalarVars, arrayVars, matrixVars } = this.extractInputData(
       features,
-      attributes,
+      variableMapping,
       attributeArrays,
       attributeMatrices,
       featureCount,
@@ -37,14 +37,14 @@ export class ComputeFunctionIntoPropertiesUseCase {
     const { globalVarNames, globalInputArrays, globalMeta } = this.extractGlobalData(params);
 
     // Build shader and run GPU computation
-    const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wgslFunction, outputColumns.length);
+    const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wgslBody, outputColumns.length);
 
     const allVarNames  = [...orderedVarNames,  ...globalVarNames];
     const allInputArrays = { ...inputArrays, ...globalInputArrays };
 
     const result = await this.runComputation(allVarNames, allInputArrays, shader, featureCount, outputColumns.length);
 
-    return this.applyResultsToFeatures(geojson, features, result, outputColumns);
+    return this.applyResultsToFeatures(collection, features, result, outputColumns);
   }
 
   // ── Per-feature data extraction ──────────────────────────────────────────────
@@ -271,7 +271,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
     arrayVars: Array<{ name: string; length: number }>,
     matrixVars: Array<{ name: string; rows: number; cols: number; variableRows?: boolean; rowsVarName?: string }>,
     globalMeta: GlobalVarMeta[],
-    wgslFunction: string,
+    wgslBody: string,
     numOutputs: number,
   ): string {
     let bindingIdx = 0;
@@ -404,7 +404,7 @@ export class ComputeFunctionIntoPropertiesUseCase {
         ${outBufDecls.join('\n        ')}
 
         fn compute_value(${computeFunctionParams.join(', ')}) -> ${returnType} {
-            ${wgslFunction}
+            ${wgslBody}
         }
 
         @compute @workgroup_size(64)

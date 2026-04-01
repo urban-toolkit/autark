@@ -23,10 +23,10 @@ export class MapEvents {
 
     /**
      * Adds an event listener for a specific map event.
-     * @param {string} event - The name of the event to listen for.
+     * @param {MapEvent} event - The event to listen for.
      * @param {MapEventListener} listener - The listener function to call when the event is emitted.
      */
-    public addEventListener(event: string, listener: MapEventListener): void {
+    public addListener(event: MapEvent, listener: MapEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event].push(listener);
         }
@@ -34,10 +34,10 @@ export class MapEvents {
 
     /**
      * Removes an event listener for a specific map event.
-     * @param {string} event - The name of the event to stop listening for.
+     * @param {MapEvent} event - The event to stop listening for.
      * @param {MapEventListener} listener - The listener function to remove.
      */
-    public removeEventListener(event: string, listener: MapEventListener): void {
+    public removeListener(event: MapEvent, listener: MapEventListener): void {
         if (this._listeners[event]) {
             this._listeners[event] = this._listeners[event].filter(l => l !== listener);
         }
@@ -45,13 +45,13 @@ export class MapEvents {
 
     /**
      * Emits an event with the provided selection and layer ID.
-     * @param {string} event - The name of the event to emit.
-     * @param {number[] | string[]} selection - The selection data to pass to the listeners.
+     * @param {MapEvent} event - The event to emit.
+     * @param {number[]} selection - The selection data to pass to the listeners.
      * @param {string} layerId - The ID of the layer associated with the event.
      */
-    public emit(event: string, selection: number[], layerId: string): void {
+    public emit(event: MapEvent, selection: number[], layerId: string): void {
         if (this._listeners[event]) {
-            this._listeners[event].forEach(listener => listener(selection, layerId));
+            this._listeners[event].forEach(listener => listener({ selection, layerId }));
         }
     }
 }

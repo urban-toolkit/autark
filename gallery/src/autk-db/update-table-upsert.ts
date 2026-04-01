@@ -1,9 +1,9 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import { FeatureCollection, Feature } from 'geojson';
 
 /**
  * Example that tests the updateTable method with 'update' strategy.
- * 
+ *
  * Flow:
  * 1. Load OSM data with loadOsmFromOverpassApi (buildings layer)
  * 2. Get the layer with getLayer → returns GeoJSON
@@ -14,7 +14,7 @@ import { FeatureCollection, Feature } from 'geojson';
  *    - Unmodified features are preserved (kept unchanged)
  */
 export class UpdateTableUpsertExample {
-    protected db!: SpatialDb;
+    protected db!: AutkSpatialDb;
     private outputDiv: HTMLElement | null = null;
     private originalFeatureCount: number = 0;
     private modifiedIds: string[] = [];
@@ -38,12 +38,12 @@ export class UpdateTableUpsertExample {
     private async step1_initAndLoadOsm(): Promise<void> {
         this.logStep(1, 'Initialize DB and load OSM data');
         
-        this.db = new SpatialDb();
+        this.db = new AutkSpatialDb();
         await this.db.init();
 
         this.log('Loading OSM data from Overpass API (this may take a moment)...');
         
-        await this.db.loadOsmFromOverpassApi({
+        await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Battery Park City'],

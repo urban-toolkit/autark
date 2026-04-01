@@ -265,7 +265,7 @@ export class ParallelCoordinates extends PlotD3 {
 
                     if (activeBrushes.size === 0) {
                         plot.selection = [];
-                        plot.plotEvents.emit(PlotEvent.BRUSH_Y, plot.selection);
+                        plot.events.emit(PlotEvent.BRUSH_Y, plot.selection);
                         plot.updatePlotSelection();
                         return;
                     }
@@ -302,7 +302,7 @@ export class ParallelCoordinates extends PlotD3 {
                     });
 
                     plot.selection = Array.from(nextSel);
-                    plot.plotEvents.emit(PlotEvent.BRUSH_Y, plot.selection);
+                    plot.events.emit(PlotEvent.BRUSH_Y, plot.selection);
                     plot.updatePlotSelection();
                 });
 

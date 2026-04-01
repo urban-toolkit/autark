@@ -6,7 +6,6 @@ import { Camera } from './camera';
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
 import { ColorMap } from './colormap';
-import { MapStyle } from './interfaces';
 
 /**
  * Abstract class representing a rendering pipeline.

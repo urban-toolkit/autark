@@ -3,7 +3,7 @@ import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 export type LinechartConfig = {
     div: HTMLElement;
-    data: FeatureCollection<Geometry, GeoJsonProperties>;
+    collection: FeatureCollection<Geometry, GeoJsonProperties>;
     /**
      * Attribute paths (nested dot-notation) in order:
      *   [0] timeseries array  (required)
@@ -43,7 +43,7 @@ export class Linechart {
 
     constructor(config: LinechartConfig) {
         this._div = config.div;
-        this._data = config.data.features.map(f => f.properties);
+        this._data = config.collection.features.map(f => f.properties);
         this._width = config.width ?? 600;
         this._height = config.height ?? 280;
         this._margins = config.margins ?? { left: 52, right: 20, top: 42, bottom: 44 };
