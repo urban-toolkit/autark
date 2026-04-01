@@ -1,5 +1,5 @@
 import { vec3, mat4 } from 'gl-matrix';
-import { CameraData } from './interfaces';
+import { CameraData } from 'autk-core';
 
 /**
  * Camera class for managing the view parameters and transformations in a 3D space.
