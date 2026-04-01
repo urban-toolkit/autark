@@ -6,7 +6,7 @@ export { ColorMap } from './colormap';
 export type { LayerGeometry, LayerComponent, LayerBorder, LayerBorderComponent } from './mesh-types';
 
 export type { CameraData, ViewProjectionParams } from './camera';
-export { buildViewProjection } from './camera';
+export { buildViewProjection, Camera } from './camera';
 
 export { TriangulatorPoints } from './triangulator-points';
 export { TriangulatorPolylines } from './triangulator-polylines';

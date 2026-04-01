@@ -6,7 +6,7 @@ import trianglesFragmentSource from './shaders/triangle-01.frag.wgsl';
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
-import { Camera } from './camera';
+import { Camera } from 'autk-core';
 
 import { VectorLayer } from './layer-vector';
 

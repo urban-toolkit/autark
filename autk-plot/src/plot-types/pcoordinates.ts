@@ -4,7 +4,7 @@ import { PlotD3 } from "../plot-d3";
 import { PlotConfig } from "../types";
 import { PlotStyle } from "../plot-style";
 import { PlotEvent } from "../constants";
-import { ColorMap } from "../colormap";
+import { ColorMap } from 'autk-core';
 
 export class ParallelCoordinates extends PlotD3 {
 

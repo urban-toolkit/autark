@@ -7,13 +7,24 @@ import {
     Geometry,
 } from 'geojson';
 
+
+import { 
+    ColorMap,
+    TriangulatorPoints,
+    TriangulatorPolygons,
+    TriangulatorPolylines,
+    TriangulatorBuildings,
+    TriangulatorRaster 
+} from 'autk-core';
+
+
 import {
     ColorMapInterpolator,
     LayerType,
     MapEvent,
     NormalizationMode,
-    ThematicAggregationLevel,
 } from './constants';
+
 
 import {
     LayerData,
@@ -27,25 +38,18 @@ import {
     UpdateThematicParams,
 } from './interfaces';
 
-import { ColorMap } from './colormap';
-import { Camera } from './camera';
+import { Camera } from 'autk-core';
 import { Renderer } from './renderer';
 import { KeyEvents } from './key-events';
 import { MouseEvents } from './mouse-events';
 import { MapEvents } from './map-events';
 import { LayerManager } from './layer-manager';
 
-import { TriangulatorPoints } from './triangulator-points';
-import { TriangulatorPolygons } from './triangulator-polygons';
-import { TriangulatorPolylines } from './triangulator-polylines';
-import { TriangulatorBuildings } from './triangulator-buildings';
-
 import { AutkMapUi } from './map-ui';
 import { LayerBbox } from './layer-bbox';
 
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
-import { TriangulatorRaster } from './triangulator-raster';
 
 /**
  * The main autark map class.
@@ -348,7 +352,6 @@ export class AutkMap {
 
                 const val = +getFnv(feature);
                 thematicData.push({
-                    level: ThematicAggregationLevel.COMPONENT,
                     values: [val],
                 });
             }
@@ -380,7 +383,6 @@ export class AutkMap {
 
                 const val = 0.1 * strCats.indexOf(getFnv(feature) as string);
                 thematicData.push({
-                    level: ThematicAggregationLevel.COMPONENT,
                     values: [val],
                 });
             }
@@ -608,7 +610,6 @@ export class AutkMap {
             borderComponents: layerBorder[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -650,7 +651,6 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -691,7 +691,6 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),
@@ -732,7 +731,6 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    level: ThematicAggregationLevel.COMPONENT,
                     values: [0],
                 };
             }),

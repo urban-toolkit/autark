@@ -6,8 +6,8 @@ import { ComputeFunctionIntoPropertiesParams } from './geojson/interfaces';
 export { GeojsonCompute };
 export { RenderCompute };
 export type { RenderLayer, RenderComputeParams } from './render-compute/render-compute';
-export { buildViewProjection } from './render-compute/camera';
-export type { ViewProjectionParams }             from './render-compute/camera';
+export { buildViewProjection } from 'autk-core';
+export type { ViewProjectionParams } from 'autk-core';
 export type { ComputeFunctionIntoPropertiesParams } from './geojson/interfaces';
 
 /**

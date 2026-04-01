@@ -1,3 +1,5 @@
+import { vec3, mat4 } from 'gl-matrix';
+
 /** Camera initialisation parameters for the interactive map camera. */
 export interface CameraData {
     up: number[];
@@ -84,4 +86,123 @@ function mat4Multiply(a: Float32Array, b: Float32Array): Float32Array {
         }
     }
     return out;
+}
+
+// ── Interactive map camera ────────────────────────────────────────────────────
+
+export class Camera {
+    protected wEye: vec3 = vec3.create();
+    protected wLookAt: vec3 = vec3.create();
+    protected wEyeDir: vec3 = vec3.create();
+    protected wUp: vec3 = vec3.create();
+    protected wNear: number = 0;
+    protected wFar: number = 0;
+    protected fovy = (45 * Math.PI) / 180.0;
+    protected mProjectionMatrix: mat4 = mat4.create();
+    protected mViewMatrix: mat4 = mat4.create();
+    protected mModelMatrix: mat4 = mat4.create();
+    private viewportWidth: number = 0;
+    private viewportHeight: number = 0;
+
+    private static defaultParams: CameraData = {
+        up: [0, 1, 0],
+        eye: [0, 0, 10000],
+        lookAt: [0, 0, 0],
+    };
+
+    constructor(params: CameraData = Camera.defaultParams) {
+        this.resetCamera(params.up, params.lookAt, params.eye);
+    }
+
+    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[]): void {
+        this.fovy = (45 * Math.PI) / 180.0;
+        this.mProjectionMatrix = mat4.create();
+        this.mViewMatrix = mat4.create();
+        this.mModelMatrix = mat4.create();
+        this.wNear = 1;
+        this.wFar = 1e10;
+        this.wLookAt = vec3.fromValues(wLookAt[0], wLookAt[1], wLookAt[2]);
+        this.wEye = vec3.fromValues(wEye[0], wEye[1], wEye[2]);
+        this.updateEyeDirAndLen();
+        this.wUp = vec3.fromValues(wUp[0], wUp[1], wUp[2]);
+    }
+
+    public getProjectionMatrix(): Float32Array | number[] {
+        return Array.from(this.mProjectionMatrix);
+    }
+
+    public getModelViewMatrix(): Float32Array | number[] {
+        const modelViewMatrix = mat4.mul(mat4.create(), this.mViewMatrix, this.mModelMatrix);
+        return Array.from(modelViewMatrix);
+    }
+
+    public resize(width: number, height: number): void {
+        this.viewportWidth = width;
+        this.viewportHeight = height;
+        this.update();
+    }
+
+    public zoom(delta: number, x: number, y: number): void {
+        delta = delta < 0 ? 100 * (this.wEye[2] * 0.001) : -100 * (this.wEye[2] * 0.001);
+        const dir = this.screenCoordToWorldDir(x, y);
+        vec3.scaleAndAdd(this.wEye, this.wEye, dir, delta);
+        vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
+    }
+
+    public translate(dx: number, dy: number): void {
+        const scale = this.wEye[2];
+        const X = vec3.create();
+        vec3.normalize(X, vec3.cross(X, this.wEyeDir, this.wUp));
+        const D = vec3.add(
+            vec3.create(),
+            vec3.scale(vec3.create(), X, dx * scale),
+            vec3.scale(vec3.create(), this.wUp, dy * scale),
+        );
+        vec3.add(this.wEye, this.wEye, D);
+        vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
+    }
+
+    public yaw(delta: number): void {
+        vec3.rotateZ(this.wEyeDir, this.wEyeDir, vec3.fromValues(0, 0, 0), delta);
+        vec3.rotateZ(this.wUp, this.wUp, vec3.fromValues(0, 0, 0), delta);
+        vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
+    }
+
+    public pitch(delta: number): void {
+        delta = -delta;
+        vec3.add(
+            this.wEyeDir,
+            vec3.scale(vec3.create(), this.wUp, Math.sin(delta)),
+            vec3.scale(vec3.create(), this.wEyeDir, Math.cos(delta)),
+        );
+        vec3.normalize(this.wEyeDir, this.wEyeDir);
+        vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
+        vec3.cross(this.wUp, vec3.cross(vec3.create(), this.wEyeDir, this.wUp), this.wEyeDir);
+        vec3.normalize(this.wUp, this.wUp);
+    }
+
+    public update(): void {
+        const aspect = this.viewportWidth / this.viewportHeight;
+        this.mModelMatrix = mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, 1));
+        mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wNear, this.wFar);
+    }
+
+    protected screenCoordToWorldDir(x: number, y: number): vec3 {
+        const wRight = vec3.create();
+        vec3.normalize(wRight, vec3.cross(wRight, this.wEyeDir, this.wUp));
+        const upOffset = vec3.scale(vec3.create(), this.wUp, Math.tan(this.fovy / 2) * (y - 0.5) * 2);
+        const aspect = this.viewportWidth / this.viewportHeight;
+        const rightOffset = vec3.scale(vec3.create(), wRight, Math.tan(this.fovy / 2) * (x - 0.5) * 2 * aspect);
+        const offset = vec3.add(vec3.create(), upOffset, rightOffset);
+        const dir = vec3.add(vec3.create(), this.wEyeDir, offset);
+        vec3.normalize(dir, dir);
+        return dir;
+    }
+
+    protected updateEyeDirAndLen(): void {
+        this.wEyeDir = vec3.create();
+        vec3.sub(this.wEyeDir, this.wLookAt, this.wEye);
+        vec3.normalize(this.wEyeDir, this.wEyeDir);
+    }
 }

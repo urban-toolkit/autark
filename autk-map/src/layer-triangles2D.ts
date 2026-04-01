@@ -1,6 +1,6 @@
 import { LayerBorder, LayerBorderComponent, LayerData, LayerInfo, LayerRenderInfo } from './interfaces';
 
-import { Camera } from './camera';
+import { Camera } from 'autk-core';
 import { Renderer } from './renderer';
 
 import { VectorLayer } from './layer-vector';

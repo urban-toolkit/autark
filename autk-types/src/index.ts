@@ -47,7 +47,6 @@ export enum ColorMapInterpolator {
 
 /**
  * Represents a color in hexadecimal format.
- * @example "#FF5733"
  */
 export type ColorHEX = `#${string}`;
 

@@ -2,10 +2,10 @@
 
 import { Layer } from './layer';
 
-import { Camera } from './camera';
+import { Camera } from 'autk-core';
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
-import { ColorMap } from './colormap';
+import { ColorMap } from 'autk-core';
 
 /**
  * Abstract class representing a rendering pipeline.

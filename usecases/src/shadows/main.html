@@ -36,6 +36,31 @@
     </div>
 </body>
 
+<script>
+    function setLoadingState(message, note) {
+        const text = document.getElementById('loading-text');
+        const noteEl = document.getElementById('loading-note');
+        if (text) text.textContent = message;
+        if (noteEl) noteEl.textContent = note ?? '';
+    }
+
+    function hideLoading() {
+        document.getElementById('loading-overlay')?.classList.add('hidden');
+    }
+
+    function showError(message, note) {
+        const overlay = document.getElementById('loading-overlay');
+        const title = document.getElementById('loading-title');
+        const text = document.getElementById('loading-text');
+        const noteEl = document.getElementById('loading-note');
+        overlay?.classList.remove('hidden');
+        overlay?.classList.add('error');
+        if (title) title.textContent = 'Loading Error';
+        if (text) text.textContent = message;
+        if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
+    }
+</script>
+
 <script type="module" src="/src/shadows/main.ts"></script>
 
 <script>

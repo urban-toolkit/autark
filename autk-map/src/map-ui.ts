@@ -1,4 +1,4 @@
-import { ColorMap } from './colormap.js';
+import { ColorMap } from 'autk-core';
 import { ColorMapInterpolator } from './index.js';
 import { Layer } from './layer.js';
 import { AutkMap } from './main.js';

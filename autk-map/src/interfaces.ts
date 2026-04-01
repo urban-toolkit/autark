@@ -1,11 +1,11 @@
+import { Feature, FeatureCollection, Geometry } from 'geojson';
+
+
 import {
     ColorMapInterpolator,
     LayerType,
     NormalizationConfig,
-    ThematicAggregationLevel,
 } from './constants';
-
-import { Feature, FeatureCollection, Geometry } from 'geojson';
 
 // Mesh types and camera params are defined in autk-core and re-exported here
 // so that autk-map consumers don't need to import from autk-core directly.
@@ -44,7 +44,6 @@ export interface LayerData {
 }
 
 export interface LayerThematic {
-    level: ThematicAggregationLevel;
     values: number[];
 }
 

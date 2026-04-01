@@ -1,5 +1,5 @@
 import { ColorHEX, ColorRGB } from './types';
-import { ColorMap } from './colormap';
+import { ColorMap } from 'autk-core';
 
 export class PlotStyle {
     // default color for unknown layers

@@ -6,28 +6,9 @@ import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 import { AutkMap, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
 
-function setLoadingState(message: string, note?: string): void {
-    const text = document.getElementById('loading-text');
-    const noteEl = document.getElementById('loading-note');
-    if (text) text.textContent = message;
-    if (noteEl) noteEl.textContent = note ?? '';
-}
-
-function hideLoading(): void {
-    document.getElementById('loading-overlay')?.classList.add('hidden');
-}
-
-function showError(message: string, note?: string): void {
-    const overlay = document.getElementById('loading-overlay');
-    const title = document.getElementById('loading-title');
-    const text = document.getElementById('loading-text');
-    const noteEl = document.getElementById('loading-note');
-    overlay?.classList.remove('hidden');
-    overlay?.classList.add('error');
-    if (title) title.textContent = 'Loading Error';
-    if (text) text.textContent = message;
-    if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
-}
+declare function setLoadingState(message: string, note?: string): void;
+declare function hideLoading(): void;
+declare function showError(message: string, note?: string): void;
 
 export class Urbane {
     protected map!: AutkMap;

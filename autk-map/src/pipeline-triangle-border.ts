@@ -6,7 +6,7 @@ import linesFragmentSource from './shaders/triangle-02.frag.wgsl';
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
-import { Camera } from './camera';
+import { Camera } from 'autk-core';
 
 import { Triangles2DLayer } from './layer-triangles2D';
 

@@ -2,7 +2,7 @@
 
 import { FeatureCollection, LineString, MultiLineString } from 'geojson';
 import { ColorRGB } from 'autk-types';
-import { buildViewProjection } from './camera';
+import { buildViewProjection } from 'autk-core';
 import { computeOrigin, triangulateBuildings } from './triangulate';
 
 // ── Public interfaces ─────────────────────────────────────────────────────────

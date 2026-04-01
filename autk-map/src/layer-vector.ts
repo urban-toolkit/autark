@@ -1,6 +1,4 @@
-import { ThematicAggregationLevel } from './constants';
-
-import { 
+import {
     LayerComponent, 
     LayerData, 
     LayerGeometry, 
@@ -11,7 +9,7 @@ import {
 
 import { Layer } from './layer';
 
-import { Camera } from './camera';
+import { Camera } from 'autk-core';
 import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
@@ -272,23 +270,7 @@ export abstract class VectorLayer extends Layer {
         const thematic: number[] = [];
 
         for (let compId = 0; compId < layerThematic.length; compId++) {
-            let aggr: number[] = [];
-
-            switch (layerThematic[compId].level) {
-                case ThematicAggregationLevel.POINT:
-                    aggr = this.aggregateThematicPoint(layerThematic[compId]);
-                    break;
-                case ThematicAggregationLevel.PRIMITIVE:
-                    aggr = this.aggregateThematicPrimitive(compId, layerThematic[compId]);
-                    break;
-                case ThematicAggregationLevel.COMPONENT:
-                    aggr = this.aggregateThematicComponenet(compId, layerThematic[compId]);
-                    break;
-                default:
-                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].level}.`);
-                    break;
-            }
-
+            const aggr = this.aggregateThematicComponenet(compId, layerThematic[compId]);
             for (let aId = 0; aId < aggr.length; aId++) {
                 thematic.push(aggr[aId]);
             }
@@ -475,44 +457,6 @@ export abstract class VectorLayer extends Layer {
     }
 
 
-
-
-    /**
-     * Aggregate thematic data for point level.
-     * @param {LayerThematic} layerThematic - The thematic data to aggregate.
-     * @returns {number[]} - The aggregated thematic data.
-     */
-    private aggregateThematicPoint(layerThematic: LayerThematic): number[] {
-        return layerThematic.values;
-    }
-
-    /**
-     * Aggregate thematic data for primitive level.
-     * @param {number} component - The component index.
-     * @param {LayerThematic} layerThematic - The thematic data to aggregate.
-     * @returns {number[]} - The aggregated thematic data.
-     */
-    private aggregateThematicPrimitive(component: number, layerThematic: LayerThematic): number[] {
-        // component points: start/end indices and number of points
-        const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
-        const ePoint = this._components[component].nPoints;
-        const nPoint = ePoint - sPoint;
-
-        // component triangles: start/end indices
-        const sTriangle = component > 0 ? this._components[component - 1].nTriangles : 0;
-        const eTriangle = this._components[component].nTriangles;
-
-        const thematic = new Array(nPoint);
-
-        for (let id = 3 * sTriangle; id < 3 * eTriangle; id++) {
-            const vid = this._indices[id] - sPoint;
-            const tid = Math.floor(id / 3) - sTriangle;
-
-            thematic[vid] = layerThematic.values[tid];
-        }
-
-        return thematic;
-    }
 
     /**
      * Aggregate thematic data for component level.

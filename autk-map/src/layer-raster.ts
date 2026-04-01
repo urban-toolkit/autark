@@ -9,12 +9,12 @@ import {
 
 import { Layer } from "./layer";
 
-import { Camera } from "./camera";
+import { Camera } from 'autk-core';
 import { Renderer } from "./renderer";
 
 import { Pipeline } from "./pipeline";
 import { PipelineTriangleRaster } from "./pipeline-triangle-raster";
-import { ColorMap } from "./colormap";
+import { ColorMap } from 'autk-core';
 
 export class RasterLayer extends Layer {
     /**

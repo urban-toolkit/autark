@@ -1,5 +1,13 @@
-export * from './camera';
-export * from './colormap';
+export {
+    ColorMap,
+    TriangulatorBuildings, 
+    TriangulatorPoints, 
+    TriangulatorPolygons, 
+    TriangulatorPolylines, 
+    TriangulatorRaster 
+} from 'autk-core';
+
+export { Camera } from 'autk-core';
 export * from './constants';
 export * from './interfaces';
 export * from './key-events';
@@ -22,8 +30,3 @@ export * from './pipeline-triangle-raster';
 export * from './pipeline-triangle-ssao';
 export * from './pipeline';
 export * from './renderer';
-export * from './triangulator-buildings';
-export * from './triangulator-points';
-export * from './triangulator-polygons';
-export * from './triangulator-polylines';
-export * from './triangulator-raster';

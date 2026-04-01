@@ -1,4 +1,8 @@
-export { NormalizationMode, ColorMapInterpolator } from 'autk-types';
+export { 
+    NormalizationMode, 
+    ColorMapInterpolator 
+} from 'autk-types';
+
 export type { LayerType, NormalizationConfig, ColorHEX, ColorRGB, ColorTEX, BoundingBox } from 'autk-types';
 
 /**
@@ -7,18 +11,6 @@ export type { LayerType, NormalizationConfig, ColorHEX, ColorRGB, ColorTEX, Boun
  */
 export enum MapEvent {
   PICKING = 'pick',
-}
-
-/**
- * Thematic aggregation levels for thematic data.
- * @property {string} POINT - Represents aggregation at the point level.
- * @property {string} PRIMITIVE - Represents aggregation at the primitive level.
- * @property {string} COMPONENT - Represents aggregation at the component level.
- */
-export enum ThematicAggregationLevel {
-  POINT = 'aggregationPoint',
-  PRIMITIVE = 'aggregationPrimitive',
-  COMPONENT = 'aggregationComponent',
 }
 
 /**
