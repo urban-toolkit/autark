@@ -4,7 +4,7 @@ import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
-import { AutkMap, LayerType, VectorLayer } from 'autk-map';
+import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { NormalizationMode } from 'autk-core';
 
 declare function setLoadingState(message: string, note?: string): void;
@@ -206,7 +206,7 @@ export class Urbane {
                     const f = item as Feature;
                     return f.properties?.compute?.skyViewFactor ?? 0;
                 },
-                normalization: { mode: NormalizationMode.PERCENTILE, lowerPercentile: 0.1, upperPercentile: 0.9 },
+                normalization: { mode: NormalizationMode.PERCENTILE, lowerPercentile: 0.15, upperPercentile: 0.85 },
             });
             this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
         }
@@ -276,8 +276,16 @@ export class Urbane {
     // ── Event Listeners ───────────────────────────────────────────────────────
 
     protected updateMapListeners(): void {
-        // Map picking events are handled through the map's internal event emitter
-        // Use the map's public API to handle interactions instead
+        this.map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+            if (layerId !== this.currentLevel) return;
+
+            if (this.currentLevel === 'neighborhoods') {
+                this.selectedNeighIds = selection;
+            }
+
+            this.table?.setHighlightedIds(selection);
+            this.parallel?.setHighlightedIds(selection);
+        });
     }
 
     protected updatePlotListeners(): void {

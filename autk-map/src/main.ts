@@ -135,6 +135,11 @@ export class AutkMap {
         return this._ui;
     }
 
+    /** Public typed map-event bus (e.g., picking). */
+    get events(): EventEmitter<MapEventRecord> {
+        return this._mapEvents;
+    }
+
     /**
      * Initializes renderer resources, event bindings, and UI.
      */
@@ -236,8 +241,9 @@ export class AutkMap {
      * @param params.collection Source feature collection.
      * @param params.getFnv Value extractor — receives a `Feature` for vector layers, a raster cell for raster layers.
      * @param params.domain Explicit color-scale domain. If omitted, computed from the data. Not applicable to raster layers.
+     * @param params.normalization Normalization configuration for automatic domain computation.
      */
-    updateThematic({ id, collection, getFnv, domain }: UpdateThematicParams): void {
+    updateThematic({ id, collection, getFnv, domain, normalization }: UpdateThematicParams): void {
         const layer = this._layerManager.searchByLayerId(id) as VectorLayer | null;
 
         if (!layer) { return; }
@@ -252,7 +258,19 @@ export class AutkMap {
 
         if (dataType === 'number') {
             const rawValues = features.map(f => getFnv(f) as number);
-            resolvedDomain = ColorMap.resolveNumericDomain(rawValues, domain);
+            
+            if (domain) {
+                resolvedDomain = domain;
+            } else if (normalization) {
+                resolvedDomain = ColorMap.computeNormalizationRange(
+                    rawValues,
+                    normalization.mode,
+                    normalization.lowerPercentile,
+                    normalization.upperPercentile
+                );
+            } else {
+                resolvedDomain = ColorMap.resolveNumericDomain(rawValues, undefined);
+            }
 
             const normalized = ColorMap.normalizeValues(rawValues, resolvedDomain as SequentialDomain | DivergingDomain);
             normalized.forEach(v => thematicData.push({ values: [v] }));
