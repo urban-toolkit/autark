@@ -5,6 +5,7 @@ import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 import { AutkMap, LayerType, VectorLayer } from 'autk-map';
+import { NormalizationMode } from 'autk-core';
 
 declare function setLoadingState(message: string, note?: string): void;
 declare function hideLoading(): void;
@@ -205,6 +206,7 @@ export class Urbane {
                     const f = item as Feature;
                     return f.properties?.compute?.skyViewFactor ?? 0;
                 },
+                normalization: { mode: NormalizationMode.PERCENTILE, lowerPercentile: 0.1, upperPercentile: 0.9 },
             });
             this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
         }

@@ -8,6 +8,7 @@ import type {
     DivergingDomain,
     CategoricalDomain,
     TransferFunction,
+    NormalizationConfig,
 } from 'autk-core';
 
 import type { LayerType } from './layer-types';
@@ -69,7 +70,9 @@ export interface UpdateThematicParams {
      * - `DivergingDomain`  — `[min, center, max]` for diverging scales.
      * - `CategoricalDomain` — ordered list of category strings.
      *
-     * If omitted, computed automatically from the data.
+     * When omitted, the domain is computed from values using `normalization` mode.
      */
     domain?: SequentialDomain | DivergingDomain | CategoricalDomain;
+    /** Normalization configuration for automatic domain computation. */
+    normalization?: NormalizationConfig;
 }
