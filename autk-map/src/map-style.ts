@@ -1,9 +1,32 @@
-import { ColorHEX, ColorRGB } from './constants';
+import { ColorHEX, ColorRGB } from './color-types';
 
 import { ColorMap } from 'autk-core';
 
+import defaultStyle from './styles/default.json';
 import light from './styles/light.json';
-import dark from './styles/dark.json';
+import google from './styles/google.json';
+import apple from './styles/apple.json';
+import osm from './styles/osm.json';
+
+/** Supported built-in style preset identifiers. */
+export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm';
+
+/** Ordered preset ids used for keyboard style cycling. */
+const PRESET_IDS: readonly MapStylePresetId[] = ['default', 'light', 'google', 'apple', 'osm'];
+/** Required keys for a valid map style object. */
+const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = [
+    'background',
+    'surface',
+    'parks',
+    'water',
+    'roads',
+    'buildings',
+    'points',
+    'polylines',
+    'polygons',
+];
+/** Accepts #RGB, #RRGGBB and #RRGGBBAA color literals. */
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 /** Shape of a map style object. */
 export interface MapStyleShape {
@@ -19,20 +42,19 @@ export interface MapStyleShape {
 }
 
 export class MapStyle {
+    /** Built-in style presets available by id. */
+    protected static _presets: Record<MapStylePresetId, MapStyleShape> = {
+        default: MapStyle._normalizeStyle(defaultStyle as MapStyleShape, 'default'),
+        light: MapStyle._normalizeStyle(light as MapStyleShape, 'light'),
+        google: MapStyle._normalizeStyle(google as MapStyleShape, 'google'),
+        apple: MapStyle._normalizeStyle(apple as MapStyleShape, 'apple'),
+        osm: MapStyle._normalizeStyle(osm as MapStyleShape, 'osm'),
+    };
+
     /**
      * Default map style
      */
-    protected static _default: MapStyleShape = {
-        background: '#bed2d7',
-        surface: '#EFEFEF',
-        parks: '#C3D0B2',
-        water: '#bed2d7',
-        roads: '#d9b504',
-        buildings: '#DFDFDF',
-        points: '#7f7f7fff',
-        polylines: '#DFDFDF',
-        polygons: '#DFDFDF',
-    };
+    protected static _default: MapStyleShape = defaultStyle as MapStyleShape;
 
     /**
      * Not found color
@@ -56,55 +78,53 @@ export class MapStyle {
      * Get the current map style id
      * @return {string} The current map style id
      */
-    public static get currentStyle(): string {
+    static get currentStyle(): string {
         return MapStyle._currentStyle;
     }
 
+    /** Returns the list of built-in preset ids. */
+    static get availableStyles(): MapStylePresetId[] {
+        return [...PRESET_IDS];
+    }
+
     /**
-     * Get the feature color
-     * @param {string} type Feature type
+     * Get the feature color for a style key.
+     * Unknown keys fall back to `_notFound`.
      */
-    public static getColor(type: keyof MapStyleShape): ColorRGB {
-        // uses the default style if available
+    static getColor(type: string): ColorRGB {
         const style = MapStyle._current;
-        const hex = style[type] || MapStyle._notFound;
+        const hex = (Object.prototype.hasOwnProperty.call(style, type)
+            ? style[type as keyof MapStyleShape]
+            : undefined) ?? MapStyle._notFound;
 
         return ColorMap.hexToRgb(hex);
     }
 
     /**
-     * Set the feature color
-     * @param {string} style new map style in id: #rrggbb format
+     * Applies one of the built-in map style presets.
+     * Unknown ids fall back to `default`.
+     * @param style Preset identifier.
      */
-    public static setPredefinedStyle(style: string) {
-        let styleObj: MapStyleShape = MapStyle._default;
-        let styleSrt: string = 'default';
-
-        if (style === 'light') {
-            styleObj = <MapStyleShape>light;
-            styleSrt = 'light';
-        } else if (style === 'dark') {
-            styleObj = <MapStyleShape>dark;
-            styleSrt = 'dark';
-        }
-
-        MapStyle._current = styleObj;
-        MapStyle._currentStyle = styleSrt;
+    static setPredefinedStyle(style: string): void {
+        const presetId: MapStylePresetId = MapStyle._isPresetId(style) ? style : 'default';
+        MapStyle._current = MapStyle._presets[presetId];
+        MapStyle._currentStyle = presetId;
     }
 
     /**
-     * Set the feature color
-     * @param {string} style new map style json
+     * Applies a runtime custom style after validation.
+     * @param style Style object with all required semantic color keys.
      */
-    public static setCustomStyle(style: MapStyleShape) {
-        MapStyle._current = style;
+    static setCustomStyle(style: MapStyleShape): void {
+        MapStyle._current = MapStyle._normalizeStyle(style, 'custom');
+        MapStyle._currentStyle = 'custom';
     }
 
     /**
      * Get the highlight color
      * @returns {ColorRGB} The highlight color
      */
-    public static getHighlightColor(): ColorRGB {
+    static getHighlightColor(): ColorRGB {
         return ColorMap.hexToRgb(MapStyle._highlight);
     }
 
@@ -112,7 +132,36 @@ export class MapStyle {
      * Set the highlight color
      * @param {ColorHEX} color The new highlight color in hex format
      */
-    public static setHighlightColor(color: ColorHEX): void {
+    static setHighlightColor(color: ColorHEX): void {
         MapStyle._highlight = color;
+    }
+
+    private static _isPresetId(style: string): style is MapStylePresetId {
+        return (PRESET_IDS as readonly string[]).includes(style);
+    }
+
+    /**
+     * Validates required keys and hex values.
+     * Throws on invalid input so callers fail fast with actionable errors.
+     */
+    private static _normalizeStyle(style: MapStyleShape, source: string): MapStyleShape {
+        const normalized: Partial<MapStyleShape> = {};
+
+        for (const key of MAP_STYLE_KEYS) {
+            const value = style[key];
+
+            if (typeof value !== 'string' || value.trim().length === 0) {
+                throw new Error(`MapStyle(${source}): missing required key "${key}".`);
+            }
+
+            const trimmed = value.trim();
+            if (!HEX_COLOR_RE.test(trimmed)) {
+                throw new Error(`MapStyle(${source}): key "${key}" must be a hex color (#RGB, #RRGGBB or #RRGGBBAA).`);
+            }
+
+            normalized[key] = trimmed as ColorHEX;
+        }
+
+        return normalized as MapStyleShape;
     }
 }

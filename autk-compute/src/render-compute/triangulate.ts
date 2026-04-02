@@ -17,7 +17,7 @@ const DEFAULT_FLOORS = 2;
 
 function getHeightsFromProps(p: GeoJsonProperties): [number, number] {
     const props = p ?? {};
-    let maxH = 0;
+    let maxH: number;
     if (props['height'] != null)                maxH = +props['height'];
     else if (props['levels'] != null)            maxH = FLOOR_HEIGHT * +props['levels'];
     else if (props['building:levels'] != null)   maxH = FLOOR_HEIGHT * +props['building:levels'];

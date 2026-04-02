@@ -119,6 +119,30 @@ export class PipelineBuildingSSAO extends Pipeline {
      */
     protected _texturesPass02BindGroupLayout!: GPUBindGroupLayout;
 
+    /** Backing texture for shared color attachment in pass 01. */
+    protected _colorsSharedTexture!: GPUTexture;
+    /** Backing texture for shared normal attachment in pass 01. */
+    protected _normalsSharedTexture!: GPUTexture;
+    /** Backing depth texture for pass 01. */
+    protected _depthTexturePass01!: GPUTexture;
+    /** Current width of pass-01 shared render targets. */
+    protected _sharedTargetsWidth: number = 0;
+    /** Current height of pass-01 shared render targets. */
+    protected _sharedTargetsHeight: number = 0;
+
+    /** Reused upload buffer for positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for normals. */
+    private _normalData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for thematic values. */
+    private _thematicData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for highlighted flags. */
+    private _highlightedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for skipped flags. */
+    private _skippedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
+
     /**
      * Constructor for PipelineBuildingSSAO
      * @param {Renderer} renderer The renderer instance
@@ -127,20 +151,37 @@ export class PipelineBuildingSSAO extends Pipeline {
         super(renderer);
     }
 
+    /** Releases GPU resources owned by this pipeline. */
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._normalBuffer?.destroy();
+        this._thematicBuffer?.destroy();
+        this._highlightedBuffer?.destroy();
+        this._skippedBuffer?.destroy();
+        this._indicesBuffer?.destroy();
+
+        this._colorsSharedTexture?.destroy();
+        this._normalsSharedTexture?.destroy();
+        this._depthTexturePass01?.destroy();
+
+        this._sharedTargetsWidth = 0;
+        this._sharedTargetsHeight = 0;
+
+        super.destroy();
+    }
+
     /**
      * Builds the pipeline with the provided mesh data.
      * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
      */
-    build(mesh: Triangles3DLayer) {
+    build(mesh: Triangles3DLayer): void {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
         this.createColorUniformBindGroup();
         this.createCameraUniformBindGroup();
 
-        this.createSharedTextures();
-        this.createDepthBufferPass01();
-        this.createTexturesBindGroupPass02();
+        this._ensureSharedTargets();
 
         this.updateVertexBuffers(mesh);
         this.updateColorUniforms(mesh);
@@ -229,7 +270,6 @@ export class PipelineBuildingSSAO extends Pipeline {
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
 
-        this.updateVertexBuffers(mesh);
     }
 
     /**
@@ -237,26 +277,34 @@ export class PipelineBuildingSSAO extends Pipeline {
      * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
      */
     updateVertexBuffers(mesh: Triangles3DLayer): void {
-        this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, new Float32Array(mesh.normal));
-        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(mesh.skippedVertices));
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
+        this._normalData = this._syncFloatData(this._normalData, mesh.normal as number[]);
+        this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
+        this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
+        this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);
+        this._positionData = this._syncFloatData(this._positionData, mesh.position);
+        this._indicesData = this._syncUintData(this._indicesData, mesh.indices);
+
+        this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, this._normalData);
+        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, this._thematicData);
+        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
     }
 
     /**
      * Creates the shared textures for the pipeline.
      */
-    createSharedTextures() {
+    createSharedTextures(width: number, height: number): void {
         const colorTextureDesc: GPUTextureDescriptor = {
             label: 'Shared colors texture',
-            size: [2 * this._renderer.canvas.width, 2 * this._renderer.canvas.height],
+            size: [width, height],
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
             format: 'rgba16float',
         };
-        const colorTexture = this._renderer.device.createTexture(colorTextureDesc);
-        const colorTextureView = colorTexture.createView();
+        this._colorsSharedTexture?.destroy();
+        this._colorsSharedTexture = this._renderer.device.createTexture(colorTextureDesc);
+        const colorTextureView = this._colorsSharedTexture.createView();
 
         this._colorsSharedBuffer = {
             view: colorTextureView,
@@ -267,13 +315,14 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         const normalsTextureDesc: GPUTextureDescriptor = {
             label: 'Shared normals texture',
-            size: [2 * this._renderer.canvas.width, 2 * this._renderer.canvas.height],
+            size: [width, height],
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
             format: 'rgba16float',
         };
         // GBuffer texture render targets
-        const normalsTexture = this._renderer.device.createTexture(normalsTextureDesc);
-        const normalsTextureView = normalsTexture.createView();
+        this._normalsSharedTexture?.destroy();
+        this._normalsSharedTexture = this._renderer.device.createTexture(normalsTextureDesc);
+        const normalsTextureView = this._normalsSharedTexture.createView();
 
         this._normalsSharedBuffer = {
             view: normalsTextureView,
@@ -286,16 +335,17 @@ export class PipelineBuildingSSAO extends Pipeline {
     /**
      * Creates the depth buffer for the first pass.
      */
-    createDepthBufferPass01() {
+    createDepthBufferPass01(width: number, height: number): void {
         // Depth texture
         const depthTextureDesc: GPUTextureDescriptor = {
             label: 'Pass 01 depth texture',
-            size: [2 * this._renderer.canvas.width, 2 * this._renderer.canvas.height],
+            size: [width, height],
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         };
-        const depthTexture = this._renderer.device.createTexture(depthTextureDesc);
-        const depthTextureView = depthTexture.createView();
+        this._depthTexturePass01?.destroy();
+        this._depthTexturePass01 = this._renderer.device.createTexture(depthTextureDesc);
+        const depthTextureView = this._depthTexturePass01.createView();
 
         this._depthBufferPass01 = {
             view: depthTextureView,
@@ -305,7 +355,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         };
     }
 
-    createTexturesBindGroupPass02() {
+    createTexturesBindGroupPass02(): void {
         const texSampler = this._renderer.device.createSampler({
             label: 'Pass 02 sampler',
             magFilter: 'linear',
@@ -451,7 +501,7 @@ export class PipelineBuildingSSAO extends Pipeline {
             fragment,
             primitive,
             depthStencil,
-            label: "Pipeline triangle ssao 01"
+            label: 'Pipeline triangle ssao 01',
         };
         this._pipeline01 = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -519,7 +569,7 @@ export class PipelineBuildingSSAO extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline triangle ssao 02"
+            label: 'Pipeline triangle ssao 02',
         };
         this._pipeline02 = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -528,7 +578,7 @@ export class PipelineBuildingSSAO extends Pipeline {
      * Renders the first pass of the SSAO pipeline.
      * @param {Camera} camera The camera instance
      */
-    pass01(camera: Camera) {
+    pass01(camera: Camera): void {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;
 
@@ -570,21 +620,12 @@ export class PipelineBuildingSSAO extends Pipeline {
     /**
      * Renders the second pass of the SSAO pipeline.
      */
-    pass02() {
+    pass02(): void {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;
 
-        // changes buffer behaviour
-        this._renderer.frameBuffer.loadOp = 'load';
-
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
-        };
-
         // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+        const passEncoder = this._beginMainRenderPass(commandEncoder);
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline02);
@@ -599,7 +640,26 @@ export class PipelineBuildingSSAO extends Pipeline {
     }
 
     renderPass(camera: Camera): void {
+        this._ensureSharedTargets();
         this.pass01(camera);
         this.pass02();
     }
+
+    /** Recreates shared pass-01 targets if canvas size changed. */
+    private _ensureSharedTargets(): void {
+        const width = 2 * this._renderer.canvas.width;
+        const height = 2 * this._renderer.canvas.height;
+
+        if (width === this._sharedTargetsWidth && height === this._sharedTargetsHeight) {
+            return;
+        }
+
+        this._sharedTargetsWidth = width;
+        this._sharedTargetsHeight = height;
+
+        this.createSharedTextures(width, height);
+        this.createDepthBufferPass01(width, height);
+        this.createTexturesBindGroupPass02();
+    }
+
 }

@@ -1,7 +1,6 @@
 /// <reference types="@webgpu/types" />
 
 import {
-    BBox,
     FeatureCollection,
     Geometry,
 } from 'geojson';
@@ -17,41 +16,38 @@ import {
     TriangulatorRaster,
 } from 'autk-core';
 
-
-import {
-    ColorMapInterpolator,
-    LayerType,
-    MapEvent,
-} from './constants';
-
-import type { 
-    MapEventRecord 
-} from './constants';
+import { ColorMapInterpolator } from './color-types';
+import { MapEvent } from './events-types';
+import type { MapEventRecord } from './events-types';
 
 import {
     LayerData,
     LayerInfo,
     LayerRenderInfo,
     LayerThematic,
-    LoadCollectionParams,
-    UpdateThematicParams,
+    LayerType,
     SequentialDomain,
     DivergingDomain,
     CategoricalDomain,
-} from './interfaces';
+} from './layer-types';
 
+import {
+    LoadCollectionParams,
+    UpdateRasterParams,
+    UpdateThematicParams,
+} from './api';
+
+import { KeyEvents } from './events-key';
+import { MouseEvents } from './events-mouse';
+import { ResizeEvents } from './events-resize';
 
 import { Renderer } from './renderer';
-import { KeyEvents } from './key-events';
-import { MouseEvents } from './mouse-events';
-import { ResizeEvents } from './resize-events';
+
 import { LayerManager } from './layer-manager';
-
-import { AutkMapUi } from './map-ui';
-import { LayerBbox } from './layer-bbox';
-
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
+
+import { AutkMapUi } from './map-ui';
 
 /**
  * Main map controller for rendering, interaction, and layer lifecycle.
@@ -69,26 +65,30 @@ import { RasterLayer } from './layer-raster';
  * map.loadCollection({ id: 'my_data', collection: geojsonData });
  */
 export class AutkMap {
-    /** The camera instance used for rendering the map */
+    /** View and projection camera. */
     protected _camera!: Camera;
-    /** The renderer instance used for rendering the map */
+    /** WebGPU renderer. */
     protected _renderer!: Renderer;
-    /** The layer manager instance used for managing map layers */
+    /** Manages the ordered layer stack. */
     protected _layerManager!: LayerManager;
 
-    /** The key events handler for keyboard interactions */
+    /** Keyboard interaction handler. */
     protected _keyEvents!: KeyEvents;
-    /** The mouse events handler for mouse interactions */
+    /** Mouse interaction handler. */
     protected _mouseEvents!: MouseEvents;
-    /** The resize events handler for window resize interactions */
+    /** Canvas resize handler. */
     protected _resizeEvents!: ResizeEvents;
-    /** The map events handler for map interactions */
+    /** Public event bus for map events. */
     protected _mapEvents!: EventEmitter<MapEventRecord>;
 
-    /** The UI instance for managing the map's user interface */
+    /** Map UI controller. */
     protected _ui!: AutkMapUi;
-    /** The canvas element used for rendering the map */
+    /** Backing WebGPU canvas. */
     protected _canvas!: HTMLCanvasElement;
+    /** Active requestAnimationFrame id, if draw loop is running. */
+    protected _animationFrameId: number | null = null;
+    /** Indicates whether this map instance has been destroyed. */
+    protected _isDestroyed: boolean = false;
 
     /**
      * Creates an instance of the AutkMap class.
@@ -110,75 +110,39 @@ export class AutkMap {
         this._ui = new AutkMapUi(this);
     }
 
-    /**
-     * Gets the camera instance used for rendering the map.
-     * @returns Camera instance.
-     */
+    /** View and projection camera. */
     get camera(): Camera {
         return this._camera;
     }
 
-    /**
-     * Gets the renderer instance used for rendering the map.
-     * @returns Renderer instance.
-     */
+    /** WebGPU renderer. */
     get renderer(): Renderer {
         return this._renderer;
     }
 
-    /**
-     * Gets the layer manager instance used for managing map layers.
-     * @returns Layer manager instance.
-     */
+    /** Ordered layer stack manager. */
     get layerManager(): LayerManager {
         return this._layerManager;
     }
 
-    /**
-     * Gets the canvas element used for rendering the map.
-     * @returns Backing canvas element.
-     */
+    /** Backing WebGPU canvas element. */
     get canvas(): HTMLCanvasElement {
         return this._canvas;
     }
 
-    /**
-     * Gets the UI instance used for managing the map's user interface.
-     * @returns UI controller instance.
-     */
+    /** Map UI controller. */
     get ui(): AutkMapUi {
         return this._ui;
-    }
-
-    /**
-     * Gets the origin of the map, which is the center of the bounding box.
-     * @returns Origin coordinates `[x, y]`.
-     */
-    get origin(): number[] {
-        return this._layerManager.origin;
-    }
-
-    /**
-     * Gets the bounding box of the map.
-     * @returns Bounding box tuple `[minLon, minLat, maxLon, maxLat]`.
-     */
-    get boundingBox(): BBox {
-        return this._layerManager.bboxAndOrigin;
-    }
-
-    /**
-     * Sets the map bounding box.
-     *
-     * @param bbox Bounding box tuple `[minLon, minLat, maxLon, maxLat]`.
-     */
-    set boundingBox(bbox: BBox) {
-        this._layerManager.bboxAndOrigin = bbox;
     }
 
     /**
      * Initializes renderer resources, event bindings, and UI.
      */
     async init() {
+        if (this._isDestroyed) {
+            return;
+        }
+
         await this._renderer.init();
 
         this._keyEvents.bindEvents();
@@ -199,20 +163,17 @@ export class AutkMap {
      * first feature (Point → 'points', LineString → 'polylines', Polygon → 'polygons').
      *
      * Supported layer types: 'surface', 'water', 'parks', 'roads', 'buildings',
-     * 'points', 'polylines', 'polygons'.
+     * 'points', 'polylines', 'polygons', 'raster'.
      *
      * @param params Load parameters.
      * @param params.id Unique layer identifier.
      * @param params.collection Source GeoJSON feature collection.
      * @param params.type Optional layer type override.
+     * @param params.getFnv Optional value extractor applied immediately as the initial thematic mapping.
      */
     loadCollection({ id, collection, type = null, getFnv }: LoadCollectionParams): void {
-        if (!this.boundingBox) {
-            if (collection.bbox) {
-                this.boundingBox = collection.bbox;
-            } else {
-                this.boundingBox = LayerBbox.build(collection as FeatureCollection);
-            }
+        if (!this.layerManager.bbox) {
+            this.layerManager.computeBboxAndOrigin(collection);
         }
 
         let sType = type ?? (collection.features.length > 0 ? collection.features[0].geometry?.type : null);
@@ -225,7 +186,7 @@ export class AutkMap {
             case 'parks':
             case 'polygons':
                 sType = sType === 'Polygon' || sType === 'MultiPolygon' ? 'polygons' : sType;
-                this.createPolygonsLayer(id, collection as FeatureCollection, sType);
+                this.createPolygonsLayer(id, collection as FeatureCollection, sType, getFnv);
                 break;
 
             case 'roads':
@@ -234,23 +195,23 @@ export class AutkMap {
             case 'polylines': {
                 const offset = TriangulatorPolylines.offset;
                 sType = sType === 'LineString' || sType === 'MultiLineString' ? 'polylines' : sType;
-                this.createPolylinesLayer(id, collection as FeatureCollection, sType, offset);
+                this.createPolylinesLayer(id, collection as FeatureCollection, sType, offset, getFnv);
                 break;
             }
             case 'Point':
             case 'MultiPoint':
             case 'points':
                 sType = sType === 'Point' || sType === 'MultiPoint' ? 'points' : sType;
-                this.createPointsLayer(id, collection as FeatureCollection, sType);
+                this.createPointsLayer(id, collection as FeatureCollection, sType, getFnv);
                 break;
 
             case 'buildings':
-                this.createBuildingsLayer(id, collection as FeatureCollection, sType);
+                this.createBuildingsLayer(id, collection as FeatureCollection, sType, getFnv);
                 break;
 
             case 'raster':
                 if (!getFnv) { console.error(`Layer "${id}": getFnv is required for raster layers.`); return; }
-                this.createRasterLayer(id, collection, getFnv);
+                this.createRasterLayer(id, collection, getFnv as (cell: unknown) => number);
                 break;
 
             default:
@@ -318,13 +279,21 @@ export class AutkMap {
     /**
      * Updates raster layer values and color domain.
      *
-     * @param id Layer identifier.
-     * @param rasterValues New raster values.
-     * @param domain Optional color-scale domain. If omitted, computed from values.
+     * @param params Update parameters.
+     * @param params.id Layer identifier.
+     * @param params.collection GeoTIFF-derived feature collection.
+     * @param params.getFnv Value extractor for each raster cell.
+     * @param params.domain Optional color-scale domain. If omitted, computed from values.
+     * @param params.transferFunction Optional opacity transfer-function configuration.
      */
-    updateRaster(id: string, rasterValues: number[], domain?: SequentialDomain | DivergingDomain): void {
+    updateRaster({ id, collection, getFnv, domain, transferFunction }: UpdateRasterParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || layer.layerInfo.typeLayer !== 'raster') { return; }
+
+        const props = collection.features[0].properties;
+        if (!props) { return; }
+
+        const rasterValues: number[] = props.raster.map((row: unknown) => getFnv(row));
 
         const rasterLayer = layer as RasterLayer;
         const resolvedDomain = ColorMap.resolveNumericDomain(rasterValues, domain);
@@ -332,6 +301,10 @@ export class AutkMap {
         this.updateRenderInfo(id, {
             colorMapLabels: ColorMap.computeLabels(resolvedDomain)
         });
+
+        if (transferFunction) {
+            rasterLayer.setTransferFunction(transferFunction);
+        }
 
         rasterLayer.loadRaster(rasterValues);
         rasterLayer.makeLayerDataDirty();
@@ -350,47 +323,56 @@ export class AutkMap {
         let needsLegend = false;
         let needsLayerList = false;
 
-        if ('opacity' in info) { layer.layerRenderInfo.opacity = info.opacity!; }
         if ('isColorMap' in info) {
-            layer.layerRenderInfo.isColorMap = info.isColorMap;
             needsLegend = true;
             needsLayerList = true;
         }
         if ('isSkip' in info) {
-            layer.layerRenderInfo.isSkip = info.isSkip;
             needsLayerList = true;
         }
         if ('isPick' in info) {
-            layer.layerRenderInfo.isPick = info.isPick;
-            if (info.isPick === false) { layer.clearHighlightedIds(); }
+            if (info.isPick === false) { 
+                layer.clearHighlightedIds(); 
+            }
             needsLayerList = true;
         }
         if ('colorMapInterpolator' in info) {
-            layer.layerRenderInfo.colorMapInterpolator = info.colorMapInterpolator!;
             needsLegend = true;
         }
         if ('colorMapLabels' in info) {
-            layer.layerRenderInfo.colorMapLabels = info.colorMapLabels!;
             needsLegend = true;
         }
-        if ('pickedComps' in info) { layer.layerRenderInfo.pickedComps = info.pickedComps; }
+
+        layer.updateLayerRenderInfo(info);
 
         if (needsLegend) { this._ui.refreshLegend(layer); }
         if (needsLayerList) { this._ui.refreshLayerList(); }
-
-        layer.makeLayerRenderInfoDirty();
     }
 
     /**
-     * Starts the drawing loop.
+     * Starts the continuous render loop.
      *
-     * @param fps Frames per second target.
+     * @param fps Target frames per second (default `60`). Pass `0` to render as fast as possible.
      */
     draw(fps: number = 60) {
+        if (this._isDestroyed) {
+            return;
+        }
+
+        if (this._animationFrameId !== null) {
+            cancelAnimationFrame(this._animationFrameId);
+            this._animationFrameId = null;
+        }
+
         let previousDelta = 0;
 
         const update = (currentDelta: number) => {
-            requestAnimationFrame(update);
+            if (this._isDestroyed) {
+                this._animationFrameId = null;
+                return;
+            }
+
+            this._animationFrameId = requestAnimationFrame(update);
             const delta = currentDelta - previousDelta;
 
             if (fps && delta < 1000 / fps) {
@@ -401,7 +383,34 @@ export class AutkMap {
             previousDelta = currentDelta;
         };
 
-        requestAnimationFrame(update);
+        this._animationFrameId = requestAnimationFrame(update);
+    }
+
+    /**
+     * Tears down map resources and event bindings.
+     * Cancels the render loop, detaches DOM listeners, and releases GPU resources.
+     */
+    destroy(): void {
+        if (this._isDestroyed) {
+            return;
+        }
+
+        if (this._animationFrameId !== null) {
+            cancelAnimationFrame(this._animationFrameId);
+            this._animationFrameId = null;
+        }
+
+        this._keyEvents.destroyEvents();
+        this._mouseEvents.destroyEvents();
+        this._resizeEvents.destroyEvents();
+
+        this._layerManager.layers.forEach((layer) => {
+            layer.destroy();
+        });
+
+        this._renderer.destroy();
+
+        this._isDestroyed = true;
     }
 
     /**
@@ -454,8 +463,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
+    * @param getFnv Optional value extractor used to initialize thematic data.
      */
-    private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
+    private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, getFnv?: (item: unknown) => number | string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -471,16 +481,16 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Polygon Layer');
             return;
         }
 
-        let layerBorder = null;
+        let layerBorder: [LayerData['border'], LayerData['borderComponents']];
         if (typeLayer === 'polygons') {
-            layerBorder = TriangulatorPolygons.buildBorder(geojson, this.origin);
-            if (layerBorder[0].length === 0 || layerBorder[1].length === 0) {
+            layerBorder = TriangulatorPolygons.buildBorder(geojson, this.layerManager.origin);
+            if (!layerBorder[0] || !layerBorder[1] || layerBorder[0].length === 0 || layerBorder[1].length === 0) {
                 console.error('Invalid Polygon Layer border.');
                 return;
             }
@@ -501,6 +511,10 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
+
+        if (getFnv) {
+            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        }
     }
 
     /**
@@ -510,8 +524,9 @@ export class AutkMap {
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
      * @param offset Polyline extrusion offset used by triangulation.
+    * @param getFnv Optional value extractor used to initialize thematic data.
      */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number, getFnv?: (item: unknown) => number | string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -528,7 +543,7 @@ export class AutkMap {
         };
 
         TriangulatorPolylines.offset = offset;
-        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer.');
             return;
@@ -545,6 +560,10 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
+
+        if (getFnv) {
+            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        }
     }
 
     /**
@@ -553,8 +572,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
+    * @param getFnv Optional value extractor used to initialize thematic data.
      */
-    private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
+    private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, getFnv?: (item: unknown) => number | string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -570,7 +590,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorPoints.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorPoints.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Points Layer.');
             return;
@@ -587,6 +607,10 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
+
+        if (getFnv) {
+            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        }
     }
 
     /**
@@ -594,9 +618,10 @@ export class AutkMap {
      *
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
-     * @param typeLayer Layer type hint.
+     * @param typeLayer Layer type.
+    * @param getFnv Optional value extractor used to initialize thematic data.
      */
-    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType) {
+    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, getFnv?: (item: unknown) => number | string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -612,7 +637,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.origin);
+        const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Building Layer.');
             return;
@@ -629,6 +654,10 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
+
+        if (getFnv) {
+            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        }
     }
 
     /**
@@ -654,7 +683,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorRaster.buildMesh(geotiff, this.origin);
+        const layerMesh = TriangulatorRaster.buildMesh(geotiff, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Feature Layer.');
             return;
@@ -666,17 +695,15 @@ export class AutkMap {
             return;
         }
 
-        const rasterValues: number[] = props.raster.map((row: unknown) => getFnv(row));
-
         const layerData: LayerData = {
             geometry: layerMesh[0],
             components: layerMesh[1],
             rasterResX: props.rasterResX,
             rasterResY: props.rasterResY,
-            raster: rasterValues,
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
+        this.updateRaster({ id: layerName, collection: geotiff, getFnv });
     }
 
     /**

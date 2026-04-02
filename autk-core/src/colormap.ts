@@ -19,13 +19,20 @@ export type DivergingDomain = [number, number, number];
 /** Domain for categorical color scales: ordered list of category keys. */
 export type CategoricalDomain = string[];
 
+/** Default number of texels used to sample continuous colormaps. */
+export const DEFAULT_COLORMAP_RESOLUTION = 256;
+
 export class ColorMap {
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         return ColorMap.interpolatorToRgb(interpolator, value);
     }
 
-    public static getColorMap(color: ColorMapInterpolator, res = 256, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorTEX {
+    public static getColorMap(
+        color: ColorMapInterpolator,
+        res: number = DEFAULT_COLORMAP_RESOLUTION,
+        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+    ): ColorTEX {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const tex: number[] = [];
         for (let id = 0; id < res; id++) {
@@ -35,7 +42,11 @@ export class ColorMap {
         return tex;
     }
 
-    public static getColorArray(color: ColorMapInterpolator, res = 256, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB[] {
+    public static getColorArray(
+        color: ColorMapInterpolator,
+        res: number = DEFAULT_COLORMAP_RESOLUTION,
+        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+    ): ColorRGB[] {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const result: ColorRGB[] = [];
         for (let id = 0; id < res; id++) {

@@ -67,6 +67,17 @@ export class PipelineTriangleFlat extends Pipeline {
      */
     protected _pipeline!: GPURenderPipeline;
 
+    /** Reused upload buffer for positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for thematic values. */
+    private _thematicData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for highlighted flags. */
+    private _highlightedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for skipped flags. */
+    private _skippedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
+
 
 
     /**
@@ -77,13 +88,23 @@ export class PipelineTriangleFlat extends Pipeline {
         super(renderer);
     }
 
+    /** Releases GPU resources owned by this pipeline. */
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._thematicBuffer?.destroy();
+        this._highlightedBuffer?.destroy();
+        this._skippedBuffer?.destroy();
+        this._indicesBuffer?.destroy();
+        super.destroy();
+    }
+
 
 
     /**
      * Builds the pipeline with the provided mesh data.
      * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    build(mesh: VectorLayer) {
+    build(mesh: VectorLayer): void {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -99,7 +120,7 @@ export class PipelineTriangleFlat extends Pipeline {
     /**
      * Creates the vertex and fragment shaders for the pipeline.
      */
-    createShaders() {
+    createShaders(): void {
         // Vertex shader
         const vsmDesc = {
             code: trianglesVertexSource,
@@ -117,7 +138,7 @@ export class PipelineTriangleFlat extends Pipeline {
      * Creates the vertex buffers for the pipeline.
      * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    createVertexBuffers(mesh: VectorLayer) {
+    createVertexBuffers(mesh: VectorLayer): void {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -158,23 +179,29 @@ export class PipelineTriangleFlat extends Pipeline {
      * Updates the vertex buffers with the provided mesh data.
      * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    updateVertexBuffers(mesh: VectorLayer) {
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
-        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(mesh.skippedVertices));
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
+    updateVertexBuffers(mesh: VectorLayer): void {
+        this._positionData = this._syncFloatData(this._positionData, mesh.position);
+        this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
+        this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
+        this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);
+        this._indicesData = this._syncUintData(this._indicesData, mesh.indices);
+
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, this._thematicData);
+        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
     }
 
     /**
      * Creates the render pipeline for drawing triangles.
      */
-    createPipeline() {
+    createPipeline(): void {
         // Vertex data
         const positionAttribDesc: GPUVertexAttribute = {
             shaderLocation: 0, // [[location(0)]]
             offset: 0,
-            format: 'float32x3',
+            format: 'float32x2',
         };
         const thematicAttribDesc: GPUVertexAttribute = {
             shaderLocation: 1, // [[location(1)]]
@@ -195,7 +222,7 @@ export class PipelineTriangleFlat extends Pipeline {
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
+            arrayStride: 4 * 2, // sizeof(float) * 2
             stepMode: 'vertex',
         };
         const thematicBufferDesc: GPUVertexBufferLayout = {
@@ -275,7 +302,7 @@ export class PipelineTriangleFlat extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline triangle flat"
+            label: 'Pipeline triangle flat',
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -284,21 +311,12 @@ export class PipelineTriangleFlat extends Pipeline {
      * Renders the triangle flat pipeline.
      * @param {Camera} camera The camera instance
      */
-    renderPass(camera: Camera) {
+    renderPass(camera: Camera): void {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;
 
-        // changes buffer behaviour
-        this._renderer.frameBuffer.loadOp = 'load';
-
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
-        };
-
         // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+        const passEncoder = this._beginMainRenderPass(commandEncoder);
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
@@ -324,4 +342,5 @@ export class PipelineTriangleFlat extends Pipeline {
         if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
         passEncoder.end();
     }
+
 }

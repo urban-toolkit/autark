@@ -36,7 +36,8 @@ export class ColormapDiv {
     protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
 
-        const getFnv = (feature: Feature): number => {
+        const getFnv = (item: unknown): number | string => {
+            const feature = item as Feature;
             const properties = feature.properties as GeoJsonProperties;
             return +properties?.shape_area || 0;
         };

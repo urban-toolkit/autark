@@ -10,25 +10,36 @@ const RAMP_SVG  = `<svg viewBox="0 0 16 16" width="20" height="20"><rect x="1"  
 const CURSOR_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><path d="M2 1l4.5 13 2.1-5.1L14 6.8z"/></svg>`;
 
 export class AutkMapUi {
+    /** Parent map instance used for UI interactions and layer updates. */
     protected _map: AutkMap;
+    /** Margin in CSS pixels used to place floating UI panels. */
     protected _uiMargin: number = 10;
+    /** Currently active layer shown in the legend panel. */
     protected _activeLayer: Layer | null = null;
+    /** Root menu icon element toggling submenu visibility. */
     protected _menuIcon: HTMLDivElement | null = null;
+    /** Submenu container listing layers and controls. */
     protected _subMenu: HTMLDivElement | null = null;
+    /** Legend panel for thematic colormap display. */
     protected _legend: HTMLDivElement | null = null;
 
     constructor(map: AutkMap) {
         this._map = map;
     }
 
+    /** Parent map reference. */
     get map(): AutkMap { return this._map; }
+    /** Updates the parent map reference. */
     set map(map: AutkMap) { this._map = map; }
+    /** Currently active legend layer. */
     get activeLayer(): Layer | null { return this._activeLayer; }
+    /** Sets the currently active legend layer. */
     set activeLayer(layer: Layer | null) { this._activeLayer = layer; }
 
     // ── Resize ────────────────────────────────────────────────────────────────
 
-    public handleResize(): void {
+    /** Repositions floating UI controls after canvas/layout changes. */
+    handleResize(): void {
         if (this._menuIcon) {
             this._menuIcon.style.top  = (this.map.canvas.offsetTop  + this._uiMargin) + 'px';
             this._menuIcon.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
@@ -47,7 +58,11 @@ export class AutkMapUi {
 
     // ── Active layer ──────────────────────────────────────────────────────────
 
-    public changeActiveLayer(layer: Layer | null): void {
+    /**
+     * Activates a layer for picking/legend and disables picking in other layers.
+     * @param layer Layer to activate.
+     */
+    changeActiveLayer(layer: Layer | null): void {
         if (!layer) return;
         this._activeLayer = layer;
 
@@ -64,7 +79,8 @@ export class AutkMapUi {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public buildUi(): void {
+    /** Builds all UI containers and controls (idempotent). */
+    buildUi(): void {
         this.buildMenuIcon();
         this.buildSubMenu();
         this.buildLayerList();
@@ -75,7 +91,7 @@ export class AutkMapUi {
      * Called from updateRenderInfo when isColorMap / colorMapLabels /
      * colorMapInterpolator changes. Updates the legend to reflect new state.
      */
-    public refreshLegend(layer: Layer | null): void {
+    refreshLegend(layer: Layer | null): void {
         if (layer && layer.layerRenderInfo.isColorMap) {
             this._activeLayer = layer;
         }
@@ -86,7 +102,7 @@ export class AutkMapUi {
      * Called from updateRenderInfo when isSkip / isPick / isColorMap
      * changes. Re-renders the layer list rows if the menu is open.
      */
-    public refreshLayerList(): void {
+    refreshLayerList(): void {
         if (this._subMenu?.style.visibility !== 'visible') return;
         this.populateLayerList();
     }

@@ -51,6 +51,13 @@ export class PipelineTriangleBorder extends Pipeline {
      */
     protected _pipeline!: GPURenderPipeline;
 
+    /** Reused upload buffer for border positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for border indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for skipped flags. */
+    private _skippedData: Float32Array<ArrayBuffer> | null = null;
+
     /**
      * Constructor for PipelineBorderFlat
      * @param {Renderer} renderer The renderer instance
@@ -59,11 +66,19 @@ export class PipelineTriangleBorder extends Pipeline {
         super(renderer);
     }
 
+    /** Releases GPU resources owned by this pipeline. */
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._borderIndicesBuffer?.destroy();
+        this._skippedBuffer?.destroy();
+        super.destroy();
+    }
+
     /**
      * Builds the pipeline with the provided border data.
      * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
-    build(borders: Triangles2DLayer) {
+    build(borders: Triangles2DLayer): void {
         this.createShaders();
 
         this.createVertexBuffers(borders);
@@ -78,7 +93,7 @@ export class PipelineTriangleBorder extends Pipeline {
     /**
      * Creates the vertex and fragment shaders for the pipeline.
      */
-    createShaders() {
+    createShaders(): void {
         // Vertex shader
         const vsmDesc = {
             code: linesVertexSource,
@@ -96,7 +111,7 @@ export class PipelineTriangleBorder extends Pipeline {
      * Creates the vertex buffers for the pipeline.
      * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
-    createVertexBuffers(borders: Triangles2DLayer) {
+    createVertexBuffers(borders: Triangles2DLayer): void {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -116,32 +131,37 @@ export class PipelineTriangleBorder extends Pipeline {
             label: 'Skipped data buffer',
             size: borders.skippedVertices.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });    }
+        });
+    }
 
     /**
      * Updates the vertex buffers with the provided border data.
      * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
-    updateVertexBuffers(borders: Triangles2DLayer) {
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
-        this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(borders.skippedVertices));
+    updateVertexBuffers(borders: Triangles2DLayer): void {
+        this._positionData = this._syncFloatData(this._positionData, borders.borderPos as number[]);
+        this._indicesData = this._syncUintData(this._indicesData, borders.borderIds as number[]);
+        this._skippedData = this._syncFloatData(this._skippedData, borders.skippedVertices);
+
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, this._indicesData);
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
     }
 
     /**
      * Creates the render pipeline for drawing borders.
      */
-    createPipeline() {
+    createPipeline(): void {
         // Vertex data
         const positionAttribDesc: GPUVertexAttribute = {
             shaderLocation: 0, // [[location(0)]]
             offset: 0,
-            format: 'float32x3',
+            format: 'float32x2',
         };
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
+            arrayStride: 4 * 2, // sizeof(float) * 2
             stepMode: 'vertex',
         };
 
@@ -216,7 +236,7 @@ export class PipelineTriangleBorder extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline border flat"
+            label: 'Pipeline border flat',
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -225,21 +245,12 @@ export class PipelineTriangleBorder extends Pipeline {
      * Renders the border flat pipeline.
      * @param {Camera} camera The camera instance
      */
-    renderPass(camera: Camera) {
+    renderPass(camera: Camera): void {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;
 
-        // changes buffer behaviour
-        this._renderer.frameBuffer.loadOp = 'load';
-
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
-        };
-
         // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+        const passEncoder = this._beginMainRenderPass(commandEncoder);
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
@@ -258,7 +269,9 @@ export class PipelineTriangleBorder extends Pipeline {
         passEncoder.setBindGroup(0, this._renderInfoBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
 
-        passEncoder.drawIndexed(this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
+        const indexCount = this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT;
+        if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
         passEncoder.end();
     }
+
 }

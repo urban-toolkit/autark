@@ -1,3 +1,5 @@
+import { Camera } from 'autk-core';
+
 import {
     LayerComponent, 
     LayerData, 
@@ -5,11 +7,10 @@ import {
     LayerInfo, 
     LayerRenderInfo, 
     LayerThematic 
-} from './interfaces';
+} from './layer-types';
 
 import { Layer } from './layer';
 
-import { Camera } from 'autk-core';
 import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
@@ -26,8 +27,6 @@ export abstract class VectorLayer extends Layer {
      * @type {number}
      */
     protected _dimension: number;
-
-
 
     /**
      * Positions of the triangles.
@@ -52,8 +51,6 @@ export abstract class VectorLayer extends Layer {
      * @type {LayerComponent[]}
      */
     protected _components: LayerComponent[] = [];
-
-
 
     /**
      * Highlighted IDs of the layer.
@@ -81,8 +78,6 @@ export abstract class VectorLayer extends Layer {
      */
     protected _skippedVertices!: number[];
 
-
-
     /**
      * Rendering pipeline for the layer.
      * @type {Pipeline}
@@ -95,11 +90,13 @@ export abstract class VectorLayer extends Layer {
      */
     protected _pipelinePicking!: PipelineTrianglePicking;
 
-
-
+    /** Number of vertices in the position buffer. */
+    protected get _vertexCount(): number {
+        return this._position.length / this._dimension;
+    }
 
     /**
-     * Constructor for Triangles2DLayer
+     * Creates a vector layer.
      * @param {LayerInfo} layerInfo - The layer information.
      * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
      * @param {LayerData} layerData - The layer data.
@@ -112,8 +109,11 @@ export abstract class VectorLayer extends Layer {
         this.loadLayerData(layerData);
     }
 
+    /** Vector layers support picking interactions. */
+    get supportsPicking(): boolean { return true; }
 
-
+    /** Vector layers support feature highlighting. */
+    get supportsHighlight(): boolean { return true; }
 
     /**
      * Get the positions of the triangles.
@@ -179,61 +179,38 @@ export abstract class VectorLayer extends Layer {
         return this._skippedVertices;
     }
 
-
-
-
     /**
      * Load the layer data, including geometry and components.
      * @param {LayerData} layerData - The data associated with the layer.
      */
-    public loadLayerData(layerData: LayerData): void {
+    loadLayerData(layerData: LayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
+        this._resetInteractionState();
 
         if (layerData.thematic && layerData.thematic.length) {
             this.loadThematic(layerData.thematic);
         }
-
-        this._highlightedVertices = new Array(this._position.length / 3).fill(0);
-        this._highlightedIds = new Set<number>();
-
-        this._skippedVertices = new Array(this._position.length / 3).fill(0);
-        this._skippedIds = new Set<number>();
     }
 
     /**
      * Load the geometry data for the layer.
      * @param {LayerGeometry[]} layerGeometry - The geometry data to load.
      */
-    public loadGeometry(layerGeometry: LayerGeometry[]): void {
+    loadGeometry(layerGeometry: LayerGeometry[]): void {
         const position: number[] = [];
         const indices: number[] = [];
 
         for (let id = 0; id < layerGeometry.length; id++) {
             // fix the index count
             layerGeometry[id].indices?.forEach((a) => {
-                const b = a + position.length / 3;
+                const b = a + position.length / this._dimension;
                 indices.push(b);
             });
 
             // merges the position data
-            layerGeometry[id].position.forEach((d, id) => {
-                if (this._dimension === 2) {
-                    position.push(d);
-
-                    if (id % 2 === 1) {
-                        const z = this._layerInfo.zIndex;
-                        position.push(z);
-                    }
-                }
-
-                if (this._dimension === 3) {
-                    if (id % 3 === 2) {
-                        d += this._layerInfo.zIndex;
-                    }
-
-                    position.push(d);
-                }
+            layerGeometry[id].position.forEach((d) => {
+                position.push(d);
             });
         }
 
@@ -245,7 +222,7 @@ export abstract class VectorLayer extends Layer {
      * Load the components of the layer.
      * @param {LayerComponent[]} layerComponents - The components to load.
      */
-    public loadComponent(layerComponents: LayerComponent[]): void {
+    loadComponent(layerComponents: LayerComponent[]): void {
         this._components = [];
 
         const accum = { nPoints: 0, nTriangles: 0 };
@@ -266,32 +243,29 @@ export abstract class VectorLayer extends Layer {
      * Load the thematic data for the layer.
      * @param {LayerThematic[]} layerThematic - The thematic data to load.
      */
-    public loadThematic(layerThematic: LayerThematic[]): void {
+    loadThematic(layerThematic: LayerThematic[]): void {
         const thematic: number[] = [];
 
         for (let compId = 0; compId < layerThematic.length; compId++) {
-            const aggr = this.aggregateThematicComponenet(compId, layerThematic[compId]);
+            const aggr = this.aggregateThematicComponent(compId, layerThematic[compId]);
             for (let aId = 0; aId < aggr.length; aId++) {
                 thematic.push(aggr[aId]);
             }
         }
 
-        console.assert(thematic.length === this._position.length / 3);
+        console.assert(thematic.length === this._vertexCount);
         this._thematic = thematic;
     }
-
-
-
 
     /**
      * Create the rendering pipeline for the layer.
      * @param {Renderer} renderer - The renderer instance.
      */
-    public createPipeline(renderer: Renderer): void {
+    createPipeline(renderer: Renderer): void {
         this._pipeline = new PipelineTriangleFlat(renderer);
         this._pipeline.build(this);
 
-        this._pipelinePicking = new PipelineTrianglePicking(renderer);
+        this._pipelinePicking = new PipelineTrianglePicking(renderer, this._dimension);
         this._pipelinePicking.build(this);
     }
 
@@ -299,7 +273,7 @@ export abstract class VectorLayer extends Layer {
      * Render the layer for the current pass.
      * @param {Camera} camera - The camera instance.
      */
-    public renderPass(camera: Camera): void {
+    renderPass(camera: Camera): void {
         if (this._renderInfoIsDirty) {
             this._pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
@@ -307,9 +281,11 @@ export abstract class VectorLayer extends Layer {
 
         if (this._dataIsDirty) {
             this._pipeline.updateVertexBuffers(this);
+            this._pipelinePicking.updateVertexBuffers(this);
             this._dataIsDirty = false;
         }
 
+        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         this._pipeline.renderPass(camera);
     }
 
@@ -317,12 +293,10 @@ export abstract class VectorLayer extends Layer {
      * Render the picking pass for the layer.
      * @param {Camera} camera - The camera instance.
      */
-    public renderPickingPass(camera: Camera): void {
+    renderPickingPass(camera: Camera): void {
+        this._pipelinePicking.updateZIndex(this._layerInfo.zIndex);
         this._pipelinePicking.renderPass(camera);
     }
-
-
-
 
     /**
      * Get the picked ID at the specified screen coordinates.
@@ -330,7 +304,7 @@ export abstract class VectorLayer extends Layer {
      * @param y - The y-coordinate of the screen position.
      * @returns {Promise<number>} - A promise that resolves to the picked ID.
      */
-    public getPickedId(x: number, y: number): Promise<number> {
+    getPickedId(x: number, y: number): Promise<number> {
         return this._pipelinePicking.readPickedId(x, y);
     }
 
@@ -338,8 +312,7 @@ export abstract class VectorLayer extends Layer {
      * Toggle highlighted IDs for the layer.
      * @param {number[]} ids - The IDs to highlight.
      */
-    public toggleHighlightedIds(ids: number[]): void {
-        // If id is already in highlightedIds, remove it (i.e., toggle it off)
+    toggleHighlightedIds(ids: number[]): void {
         ids.forEach(id => {
             if (this._highlightedIds.has(id)) {
                 this._highlightedIds.delete(id);
@@ -349,22 +322,9 @@ export abstract class VectorLayer extends Layer {
             }
         });
 
-        const toggled = new Set<number>();
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
-                const vertexIndex = this._indices[i];
-
-                if (!toggled.has(vertexIndex)) {
-                    this._highlightedVertices[vertexIndex] = 1 - this._highlightedVertices[vertexIndex];
-                    toggled.add(vertexIndex);
-                }
-            }
-        }
+        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
+            this._highlightedVertices[vertexIndex] = 1 - this._highlightedVertices[vertexIndex];
+        });
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
@@ -374,34 +334,24 @@ export abstract class VectorLayer extends Layer {
      * Set highlighted IDs for the layer.
      * @param {number[]} ids - The IDs to highlight.
      */
-    public setHighlightedIds(ids: number[]): void {
+    setHighlightedIds(ids: number[]): void {
         this.clearHighlightedIds();
         
         this._highlightedIds = new Set(ids);
 
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
-                const vertexIndex = this._indices[i];
-                this._highlightedVertices[vertexIndex] = 1;
-            }
-        }
+        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
+            this._highlightedVertices[vertexIndex] = 1;
+        });
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }    
 
-
     /**
      * Set skipped IDs for the layer.
      * @param {number[]} ids - The IDs to skip.
      */
-    public setSkippedIds(ids: number[]): void {
-        // If id is already in skippedIds, remove it (i.e., toggle it off)
+    setSkippedIds(ids: number[]): void {
         ids.forEach(id => {
             if (this._skippedIds.has(id)) {
                 this._skippedIds.delete(id);
@@ -411,33 +361,18 @@ export abstract class VectorLayer extends Layer {
             }
         });
 
-        const toggled = new Set<number>();
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
-                const vertexIndex = this._indices[i];
-
-                if (!toggled.has(vertexIndex)) {
-                    this._skippedVertices[vertexIndex] = 1 - this._skippedVertices[vertexIndex];
-                    toggled.add(vertexIndex);
-                }
-            }
-        }
+        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
+            this._skippedVertices[vertexIndex] = 1 - this._skippedVertices[vertexIndex];
+        });
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }
 
-
-
     /**
      * Clears the highlighted components of the layer.
      */
-    public clearHighlightedIds() {
+    clearHighlightedIds(): void {
         this._highlightedVertices.fill(0);
         this._highlightedIds.clear();
 
@@ -448,7 +383,7 @@ export abstract class VectorLayer extends Layer {
     /**
      * Clears the skipped components of the layer.
      */
-    public clearSkippedIds() {
+    clearSkippedIds(): void {
         this._skippedVertices.fill(0);
         this._skippedIds.clear();
 
@@ -456,25 +391,61 @@ export abstract class VectorLayer extends Layer {
         this.makeLayerDataDirty();
     }
 
-
+    /** Releases GPU resources owned by vector pipelines. */
+    override destroy(): void {
+        this._pipeline?.destroy();
+        this._pipelinePicking?.destroy();
+    }
 
     /**
-     * Aggregate thematic data for component level.
+     * Expands scalar thematic value to all vertices of a component.
      * @param {number} component - The component index.
      * @param {LayerThematic} layerThematic - The thematic data to aggregate.
      * @returns {number[]} - The aggregated thematic data.
      */
-    private aggregateThematicComponenet(component: number, layerThematic: LayerThematic): number[] {
+    private aggregateThematicComponent(component: number, layerThematic: LayerThematic): number[] {
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;
         const nPoint = ePoint - sPoint;
 
         const thematic = new Array(nPoint);
+        const value = layerThematic.values[0] ?? 0;
 
         for (let vId = 0; vId < nPoint; vId++) {
-            thematic[vId] = layerThematic.values[0];
+            thematic[vId] = value;
         }
 
         return thematic;
+    }
+
+    /**
+     * Resets highlight/skip state after full layer-data reload (geometry/components changed).
+     */
+    private _resetInteractionState(): void {
+        this._highlightedVertices = new Array(this._vertexCount).fill(0);
+        this._highlightedIds = new Set<number>();
+        this._skippedVertices = new Array(this._vertexCount).fill(0);
+        this._skippedIds = new Set<number>();
+    }
+
+    /**
+     * Iterates each unique vertex used by the given component ids.
+     */
+    private _forEachUniqueVertexInComponents(ids: number[], fn: (vertexIndex: number) => void): void {
+        const visited = new Set<number>();
+
+        for (const id of ids) {
+            if (id < 0 || id >= this._components.length) { continue; }
+
+            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
+            const eTriangle = this._components[id].nTriangles;
+
+            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
+                const vertexIndex = this._indices[i];
+                if (visited.has(vertexIndex)) { continue; }
+                visited.add(vertexIndex);
+                fn(vertexIndex);
+            }
+        }
     }
 }

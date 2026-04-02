@@ -2,6 +2,7 @@
 
 import pickingVertexSource from './shaders/picking.vert.wgsl';
 import pickingFragmentSource from './shaders/picking.frag.wgsl';
+import picking3dVertexSource from './shaders/picking-3d.vert.wgsl';
 
 import { Camera } from 'autk-core';
 import { Renderer } from './renderer';
@@ -50,11 +51,33 @@ export class PipelineTrianglePicking extends Pipeline {
     protected _fragModule!: GPUShaderModule;
 
     /**
+     * Vertex dimension: 2 for 2D layers (xy), 3 for 3D buildings (xyz).
+     */
+    private _dimension: number;
+
+    /** Reused upload buffer for positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for encoded object-id colors. */
+    private _objectIdsData: Float32Array<ArrayBuffer> | null = null;
+
+    /**
      * Constructor for PipelineTrianglePicking
      * @param {Renderer} renderer The renderer instance
+     * @param {number} dimension Vertex dimension — 2 for 2D layers, 3 for 3D buildings.
      */
-    constructor(renderer: Renderer) {
+    constructor(renderer: Renderer, dimension: number = 2) {
         super(renderer);
+        this._dimension = dimension;
+    }
+
+    /** Releases GPU resources owned by this pipeline. */
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._objectIdsBuffer?.destroy();
+        this._indicesBuffer?.destroy();
+        super.destroy();
     }
 
     /**
@@ -74,10 +97,10 @@ export class PipelineTrianglePicking extends Pipeline {
     /**
      * Creates the vertex and fragment shaders for the pipeline.
      */
-    createShaders() {
+    createShaders(): void {
         // Vertex shader
         const vsmDesc = {
-            code: pickingVertexSource,
+            code: this._dimension === 3 ? picking3dVertexSource : pickingVertexSource,
         };
         this._vertModule = this._renderer.device.createShaderModule(vsmDesc);
 
@@ -101,7 +124,7 @@ export class PipelineTrianglePicking extends Pipeline {
 
         this._objectIdsBuffer = this._renderer.device.createBuffer({
             label: 'Object id buffer',
-            size: mesh.position.length * 4,
+            size: (mesh.position.length / this._dimension) * 3 * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
@@ -117,12 +140,16 @@ export class PipelineTrianglePicking extends Pipeline {
      * @param {VectorLayer} layer The mesh data containing positions, thematic, and indices
      */
     updateVertexBuffers(layer: VectorLayer): void {
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(layer.position));
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(layer.indices));
+        this._positionData = this._syncFloatData(this._positionData, layer.position);
+        this._indicesData = this._syncUintData(this._indicesData, layer.indices);
+
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
 
         // Prepare per-vertex object IDs
-        const numVertices = layer.position.length / 3;
-        const encodedColors: number[] = new Array(numVertices * 3).fill(0);
+        const numVertices = layer.position.length / this._dimension;
+        this._objectIdsData = this._syncFloatLength(this._objectIdsData, numVertices * 3);
+        this._objectIdsData.fill(0);
 
         for (let compId = 0; compId < layer.components.length; compId++) {
             const color = this._encodeIdToRGB(compId);
@@ -134,13 +161,13 @@ export class PipelineTrianglePicking extends Pipeline {
             for (let t = sTri * 3; t < eTri * 3; t++) {
                 const vertexIndex = layer.indices[t];
                 const base = vertexIndex * 3;
-                encodedColors[base + 0] = color[0];
-                encodedColors[base + 1] = color[1];
-                encodedColors[base + 2] = color[2];
+                this._objectIdsData[base + 0] = color[0];
+                this._objectIdsData[base + 1] = color[1];
+                this._objectIdsData[base + 2] = color[2];
             }
         }
 
-        this._renderer.device.queue.writeBuffer(this._objectIdsBuffer, 0, new Float32Array(encodedColors));
+        this._renderer.device.queue.writeBuffer(this._objectIdsBuffer, 0, this._objectIdsData);
     }
 
     /**
@@ -150,6 +177,8 @@ export class PipelineTrianglePicking extends Pipeline {
      * @returns {Promise<number>} The picked object ID
      */
     async readPickedId(x: number, y: number): Promise<number> {
+        const px = Math.max(0, Math.min(this._renderer.canvas.width - 1, Math.floor(x)));
+        const py = Math.max(0, Math.min(this._renderer.canvas.height - 1, Math.floor(y)));
 
         const alignedBytesPerRow = 256; // Must be multiple of 256
         const bufferSize = alignedBytesPerRow * 1; // height = 1
@@ -164,7 +193,7 @@ export class PipelineTrianglePicking extends Pipeline {
         commandEncoder.copyTextureToBuffer(
             {
                 texture: this._renderer.pickingTexture,
-                origin: { x: x, y: y },
+                origin: { x: px, y: py },
             },
             {
                 buffer: readBuffer,
@@ -174,12 +203,17 @@ export class PipelineTrianglePicking extends Pipeline {
         );
         this._renderer.device.queue.submit([commandEncoder.finish()]);
 
-        await readBuffer.mapAsync(GPUMapMode.READ);
-        const arrayBuffer = readBuffer.getMappedRange();
-        const data = new Uint8Array(arrayBuffer);
-        const id = this._decodeColorToId(data[0], data[1], data[2]);
-        readBuffer.unmap();
-        return id;
+        try {
+            await readBuffer.mapAsync(GPUMapMode.READ);
+            const arrayBuffer = readBuffer.getMappedRange();
+            const data = new Uint8Array(arrayBuffer);
+            return this._decodeColorToId(data[0], data[1], data[2]);
+        } finally {
+            if (readBuffer.mapState === 'mapped') {
+                readBuffer.unmap();
+            }
+            readBuffer.destroy();
+        }
     }
 
     /**
@@ -214,7 +248,7 @@ export class PipelineTrianglePicking extends Pipeline {
         const positionAttribDesc: GPUVertexAttribute = {
             shaderLocation: 0,
             offset: 0,
-            format: 'float32x3',
+            format: this._dimension === 3 ? 'float32x3' : 'float32x2',
         };
         const idAttribDesc: GPUVertexAttribute = {
             shaderLocation: 1, // [[location(1)]]
@@ -224,7 +258,7 @@ export class PipelineTrianglePicking extends Pipeline {
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
+            arrayStride: 4 * this._dimension,
             stepMode: 'vertex',
         };
 
@@ -279,7 +313,7 @@ export class PipelineTrianglePicking extends Pipeline {
             fragment,
             primitive,
             depthStencil,
-            label: "Pipeline triangle picking"
+            label: 'Pipeline triangle picking',
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -326,4 +360,5 @@ export class PipelineTrianglePicking extends Pipeline {
         if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
         passEncoder.end();
     }
+
 }

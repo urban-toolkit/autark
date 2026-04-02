@@ -1,26 +1,53 @@
-import { BBox } from 'geojson';
+import { BBox, FeatureCollection, Geometry } from 'geojson';
 
-import { LayerData, LayerInfo, LayerRenderInfo } from './interfaces';
-import { LayerType } from './constants';
+import { LayerData, LayerInfo, LayerRenderInfo } from './layer-types';
+import type { LayerType } from './layer-types';
+
 import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
+import { LayerBbox } from './layer-bbox';
+
+
+/**
+ * OSM base layer types with a fixed bottom-up render order.
+ * 'buildings' is always rendered last; everything else goes here
+ * and is ordered by load insertion.
+ */
+const OSM_BASE: LayerType[] = ['surface', 'parks', 'water', 'roads'];
+
 
 /**
  * Manages all map layers as a single ordered list.
  */
 export class LayerManager {
+    /** Registered layers sorted by render order. */
     protected _layers: Layer[] = [];
+    /** Bounding box of the loaded dataset. */
     protected _bbox!: BBox;
+    /** World-space origin derived from the bounding box center. */
     protected _origin!: number[];
 
+    /** Layer ids of non-OSM, non-buildings layers in insertion order. */
+    private _dynamicOrder: string[] = [];
+
+    /** Registered layers sorted by z-index. */
     get layers(): Layer[] { return this._layers; }
 
+    /** World-space origin derived from the current bounding box center. */
     get origin(): number[] { return this._origin; }
 
-    get bboxAndOrigin(): BBox { return this._bbox; }
-    set bboxAndOrigin(bbox: BBox) {
+    /** Bounding box of the loaded data `[minLon, minLat, maxLon, maxLat]`. */
+    get bbox(): BBox { return this._bbox; }
+
+    /**
+     * Computes the bounding box from a collection and recomputes the derived origin.
+     * Uses `collection.bbox` when available, otherwise computes it from geometry.
+     * @param collection Source feature collection.
+     */
+    computeBboxAndOrigin(collection: FeatureCollection<Geometry | null>): void {
+        const bbox = collection.bbox ?? LayerBbox.build(collection as FeatureCollection);
         this._bbox = bbox;
         this._origin = [
             (bbox[2] + bbox[0]) * 0.5,
@@ -29,61 +56,98 @@ export class LayerManager {
     }
 
     /**
-     * Creates and registers a layer based on `layerInfo.typeLayer`.
-     * Returns the created layer, or `null` if the type is unrecognised.
+        * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
+        * Dynamic layer z-indices are recomputed after insertion.
+        * @param layerInfo Layer identity and type metadata.
+        * @param layerRender Initial render configuration.
+        * @param layerData Geometry and auxiliary layer payload.
+        * @returns The created layer, or `null` if the type is not recognized.
      */
     addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
-        let layer: Layer | null = null;
+        const layer: Layer = layerInfo.typeLayer === 'buildings'
+            ? new Triangles3DLayer(layerInfo, layerRender, layerData)
+            : layerInfo.typeLayer === 'raster'
+                ? new RasterLayer(layerInfo, layerRender, layerData)
+                : new Triangles2DLayer(layerInfo, layerRender, layerData);
 
-        switch (layerInfo.typeLayer) {
-            case 'buildings':
-                layer = new Triangles3DLayer(layerInfo, layerRender, layerData);
-                break;
-            case 'raster':
-                layer = new RasterLayer(layerInfo, layerRender, layerData);
-                break;
-            default:
-                layer = new Triangles2DLayer(layerInfo, layerRender, layerData);
-                break;
+        if (!OSM_BASE.includes(layerInfo.typeLayer) && layerInfo.typeLayer !== 'buildings') {
+            this._dynamicOrder.push(layerInfo.id);
         }
-
-        if (layer) {
-            this._layers.push(layer);
-            this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
-        }
+        this._layers.push(layer);
+        this._recomputeZIndices();
+        this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
 
         return layer;
     }
 
-    /** Removes the first layer matching `layerId`. */
+    /**
+     * Removes the first layer matching `layerId` and recomputes dynamic z-order.
+     * @param layerId Layer identifier to remove.
+     */
     delLayer(layerId: string): void {
         const idx = this._layers.findIndex(l => l.layerInfo.id === layerId);
-        if (idx !== -1) this._layers.splice(idx, 1);
+        if (idx !== -1) {
+            this._layers[idx].destroy();
+            this._layers.splice(idx, 1);
+        }
+        this._dynamicOrder = this._dynamicOrder.filter(id => id !== layerId);
+        this._recomputeZIndices();
     }
 
-    /** Removes all layers matching `layerId`. */
+    /**
+     * Removes all layers matching `layerId` and recomputes dynamic z-order.
+     * @param layerId Layer identifier to remove.
+     */
     removeLayerById(layerId: string): void {
+        this._layers.forEach((layer) => {
+            if (layer.layerInfo.id === layerId) {
+                layer.destroy();
+            }
+        });
         this._layers = this._layers.filter(l => l.layerInfo.id !== layerId);
+        this._dynamicOrder = this._dynamicOrder.filter(id => id !== layerId);
+        this._recomputeZIndices();
     }
 
-    /** Returns the layer with the given `layerId`, or `null` if not found. */
+    /**
+     * Returns the layer with the given `layerId`, or `null` if not found.
+     * @param layerId Layer identifier to search for.
+     */
     searchByLayerId(layerId: string): Layer | null {
         return this._layers.find(l => l.layerInfo.id === layerId) ?? null;
     }
 
-    /** Computes the z-index for a given layer type. */
+    /**
+     * Returns a preliminary z-index placeholder used when constructing `LayerInfo`.
+     * The definitive value is assigned by `_recomputeZIndices` inside `addLayer`.
+     * @param layerType Layer type to place in the render stack.
+     * @returns Fixed base-slot index for OSM layers, otherwise `0` as a placeholder.
+     */
     computeZindex(layerType: LayerType): number {
-        switch (layerType) {
-            case 'surface':   return 0;
-            case 'parks':     return 0.1;
-            case 'water':     return 0.2;
-            case 'roads':     return 0.3;
-            case 'raster':    return 0.4;
-            case 'polygons':  return 0.5;
-            case 'polylines': return 0.6;
-            case 'points':    return 0.7;
-            case 'buildings': return 1.0;
-            default:          return 0;
+        const osmIdx = OSM_BASE.indexOf(layerType);
+        return osmIdx !== -1 ? osmIdx : 0;
+    }
+
+    /**
+     * Reassigns z-indices across all registered layers:
+     * - OSM base types: fixed slots 0…N-1 (by `OSM_BASE` order)
+     * - Dynamic layers: slots N, N+1, … in load-insertion order
+     * - Buildings: always last (N + dynamic count)
+     */
+    private _recomputeZIndices(): void {
+        const buildingsZ = OSM_BASE.length + this._dynamicOrder.length;
+
+        for (const layer of this._layers) {
+            const { typeLayer, id } = layer.layerInfo;
+            const osmIdx = OSM_BASE.indexOf(typeLayer);
+
+            if (osmIdx !== -1) {
+                layer.layerInfo.zIndex = osmIdx;
+            } else if (typeLayer === 'buildings') {
+                layer.layerInfo.zIndex = buildingsZ;
+            } else {
+                layer.layerInfo.zIndex = OSM_BASE.length + this._dynamicOrder.indexOf(id);
+            }
         }
     }
 }

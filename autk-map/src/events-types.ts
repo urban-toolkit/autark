@@ -1,24 +1,4 @@
 /**
- * Runtime exports re-exposed from `autk-core` for map styling and normalization.
- */
-export {
-    NormalizationMode,
-    ColorMapInterpolator
-} from 'autk-core';
-
-/**
- * Shared type exports re-exposed from `autk-core` for map layer configuration.
- */
-export type {
-    LayerType,
-    SequentialDomain,
-    ColorHEX,
-    ColorRGB,
-    ColorTEX,
-    BoundingBox
-} from 'autk-core';
-
-/**
  * Map event names emitted by interactive map components.
  */
 export enum MapEvent {

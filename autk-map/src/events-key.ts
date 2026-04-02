@@ -26,7 +26,7 @@ export class KeyEvents {
     /**
      * Key events binding function
      */
-    public bindEvents(): void {
+    bindEvents(): void {
         window.removeEventListener('keyup', this._onKeyUp, false);
         window.addEventListener('keyup', this._onKeyUp, false);
     }
@@ -34,7 +34,7 @@ export class KeyEvents {
     /**
      * Removes keyboard listeners registered by this controller.
      */
-    public destroyEvents(): void {
+    destroyEvents(): void {
         window.removeEventListener('keyup', this._onKeyUp, false);
     }
 
@@ -44,7 +44,7 @@ export class KeyEvents {
      */
     keyUp(event: KeyboardEvent) {
         if (event.key.toLowerCase() === 's') {
-            const styles = ['default', 'light'];
+            const styles: string[] = MapStyle.availableStyles;
             const current = MapStyle.currentStyle;
 
             const id = (styles.indexOf(current) + 1) % styles.length;

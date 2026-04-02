@@ -14,7 +14,7 @@ export class TriangulatorPolylines {
 
         const collection: Feature[] = geojson['features'];
 
-        let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
+        let meshes: { flatCoords: number[], flatIds: number[] }[];
         for (let fId = 0; fId < collection.length; fId++) {
             const feature = collection[fId];
 

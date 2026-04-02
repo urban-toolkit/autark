@@ -8,9 +8,9 @@ struct VSOut {
  };
 
 @vertex
-fn main(@builtin(vertex_index) i: u32, @location(0) inPosition: vec2f, @location(1) objectId: vec3<f32>) -> VSOut {
+fn main(@builtin(vertex_index) i: u32, @location(0) inPosition: vec3f, @location(1) objectId: vec3<f32>) -> VSOut {
     var vsOut: VSOut;
-    vsOut.position = projection * modelView * vec4f(inPosition.x, inPosition.y, zIndex, 1);
+    vsOut.position = projection * modelView * vec4f(inPosition.x, inPosition.y, inPosition.z + zIndex, 1);
     vsOut.color = objectId;
 
     return vsOut;

@@ -2,10 +2,11 @@
 
 import { Layer } from './layer';
 
-import { Camera } from 'autk-core';
+import { Camera, ColorMap, DEFAULT_COLORMAP_RESOLUTION } from 'autk-core';
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
-import { ColorMap } from 'autk-core';
+
+const COLORMAP_HEIGHT = 1;
 
 /**
  * Abstract class representing a rendering pipeline.
@@ -19,7 +20,6 @@ export abstract class Pipeline {
      */
     protected _renderer: Renderer;
 
-
     /**
      * ModelView matrix uniform buffer
      */
@@ -28,9 +28,8 @@ export abstract class Pipeline {
     /**
      * Projection matrix uniform buffer
      */
-    protected _projcBuffer!: GPUBuffer;
-
-
+    protected _projectionBuffer!: GPUBuffer;
+    protected _zIndexBuffer!: GPUBuffer;
 
     /**
      * Camera bind group
@@ -41,8 +40,6 @@ export abstract class Pipeline {
      * Camera bind group layout
      */
     protected _cameraBindGroupLayout!: GPUBindGroupLayout;
-
-
 
     /**
      * Color uniform buffer
@@ -59,9 +56,6 @@ export abstract class Pipeline {
      */
     protected _cMapTexture!: GPUTexture;
 
-
-
-
     /**
      * Use color map uniform buffer
      */
@@ -77,9 +71,6 @@ export abstract class Pipeline {
      */
     protected _opacity!: GPUBuffer;
 
-
-
-
     /**
      * Render information bind group
      */
@@ -90,8 +81,22 @@ export abstract class Pipeline {
      */
     protected _renderInfoBindGroupLayout!: GPUBindGroupLayout;
 
-
-
+    /** Cached matrix uniform data to avoid per-frame allocations. */
+    private _mviewData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(16 * Float32Array.BYTES_PER_ELEMENT));
+    /** Cached projection matrix data to avoid per-frame allocations. */
+    private _projectionData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(16 * Float32Array.BYTES_PER_ELEMENT));
+    /** Cached z-index uniform payload. */
+    private _zIndexData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
+    /** Cached fixed-color uniform payload (rgba). */
+    private _colorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
+    /** Cached highlight-color uniform payload (rgba). */
+    private _highlightColorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
+    /** Cached use-colormap flag uniform payload. */
+    private _useColorMapData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
+    /** Cached use-highlight flag uniform payload. */
+    private _useHighlightData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
+    /** Cached opacity uniform payload. */
+    private _opacityData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
 
     /**
      * Pipeline constructor
@@ -101,21 +106,25 @@ export abstract class Pipeline {
         this._renderer = renderer;
     }
 
-
-
     /**
      * Creates the camera uniform bind group.
      */
-    createCameraUniformBindGroup() {
+    createCameraUniformBindGroup(): void {
         this._mviewBuffer = this._renderer.device.createBuffer({
             label: 'ModelView matrix buffer',
             size: 16 * 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
-        this._projcBuffer = this._renderer.device.createBuffer({
+        this._projectionBuffer = this._renderer.device.createBuffer({
             label: 'Projection matrix buffer',
             size: 16 * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        this._zIndexBuffer = this._renderer.device.createBuffer({
+            label: 'Z index buffer',
+            size: 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
@@ -131,6 +140,11 @@ export abstract class Pipeline {
                     visibility: GPUShaderStage.VERTEX,
                     buffer: {},
                 },
+                {
+                    binding: 2, // zIndex
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {},
+                },
             ],
         });
 
@@ -143,7 +157,11 @@ export abstract class Pipeline {
                 },
                 {
                     binding: 1,
-                    resource: { buffer: this._projcBuffer },
+                    resource: { buffer: this._projectionBuffer },
+                },
+                {
+                    binding: 2,
+                    resource: { buffer: this._zIndexBuffer },
                 },
             ],
         });
@@ -153,20 +171,24 @@ export abstract class Pipeline {
      * Updates the camera uniform buffers with the current camera state.
      * @param {Camera} camera The camera instance
      */
-    updateCameraUniforms(camera: Camera) {
-        const mview = new Float32Array(camera.getModelViewMatrix());
-        const projc = new Float32Array(camera.getProjectionMatrix());
+    updateCameraUniforms(camera: Camera): void {
+        this._mviewData.set(camera.getModelViewMatrix());
+        this._projectionData.set(camera.getProjectionMatrix());
 
-        this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, mview);
-        this._renderer.device.queue.writeBuffer(this._projcBuffer, 0, projc);
+        this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, this._mviewData);
+        this._renderer.device.queue.writeBuffer(this._projectionBuffer, 0, this._projectionData);
     }
 
-
+    /** Writes the layer z-index to the uniform buffer used by vertex shaders. */
+    updateZIndex(value: number): void {
+        this._zIndexData[0] = value;
+        this._renderer.device.queue.writeBuffer(this._zIndexBuffer, 0, this._zIndexData);
+    }
 
     /**
      * Creates the color uniform bind group.
      */
-    createColorUniformBindGroup() {
+    createColorUniformBindGroup(): void {
         this._colorBuffer = this._renderer.device.createBuffer({
             label: 'Fixed color buffer',
             size: 4 * 4,
@@ -193,7 +215,7 @@ export abstract class Pipeline {
 
         this._cMapTexture = this._renderer.device.createTexture({
             label: 'Colormap texture',
-            size: { width: 256, height: 1 },
+            size: { width: DEFAULT_COLORMAP_RESOLUTION, height: COLORMAP_HEIGHT },
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
             format: 'rgba8unorm',
         });
@@ -281,8 +303,8 @@ export abstract class Pipeline {
                 },
                 {
                     binding: 6,
-                    resource: { buffer: this._opacity},
-                }
+                    resource: { buffer: this._opacity },
+                },
             ],
         });
     }
@@ -291,37 +313,121 @@ export abstract class Pipeline {
      * Updates the color uniform buffers with the current layer state.
      * @param {Layer} layer The layer instance
      */
-    updateColorUniforms(layer: Layer) {
+    updateColorUniforms(layer: Layer): void {
         const colors = {
-            color: MapStyle.getColor(layer.layerInfo.typeLayer as keyof MapStyle),
+            color: MapStyle.getColor(layer.layerInfo.typeLayer),
             highlightColor: MapStyle.getHighlightColor(),
             colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
-            useColorMap: <boolean>layer.layerRenderInfo.isColorMap,
-            useHighlight: <boolean>layer.layerRenderInfo.isPick,
-            opacity: layer.layerRenderInfo.opacity
+            useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
+            useHighlight: Boolean(layer.layerRenderInfo.isPick),
+            opacity: layer.layerRenderInfo.opacity,
         };
 
-        const color = new Float32Array(Object.values(colors.color));
-        const highlightColor = new Float32Array(Object.values(colors.highlightColor));
-        const useColorMap = new Float32Array([colors.useColorMap ? 1.0 : 0.0]);
-        const useHighlight = new Float32Array([colors.useHighlight ? 1.0 : 0.0]);
-        const colorMapTexture = new Uint8Array(colors.colorMap);
-        const opacity = new Float32Array([colors.opacity]);
+        this._colorData[0] = colors.color.r;
+        this._colorData[1] = colors.color.g;
+        this._colorData[2] = colors.color.b;
+        this._colorData[3] = 1.0;
 
-        this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, color);
-        this._renderer.device.queue.writeBuffer(this._highlightColorBuffer, 0, highlightColor);
-        this._renderer.device.queue.writeBuffer(this._useHighlight, 0, useHighlight);
-        this._renderer.device.queue.writeBuffer(this._useColorMap, 0, useColorMap);
+        this._highlightColorData[0] = colors.highlightColor.r;
+        this._highlightColorData[1] = colors.highlightColor.g;
+        this._highlightColorData[2] = colors.highlightColor.b;
+        this._highlightColorData[3] = 1.0;
+
+        this._useColorMapData[0] = colors.useColorMap ? 1.0 : 0.0;
+        this._useHighlightData[0] = colors.useHighlight ? 1.0 : 0.0;
+        this._opacityData[0] = colors.opacity;
+
+        const colorMapTexture = new Uint8Array(colors.colorMap);
+
+        this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, this._colorData);
+        this._renderer.device.queue.writeBuffer(this._highlightColorBuffer, 0, this._highlightColorData);
+        this._renderer.device.queue.writeBuffer(this._useHighlight, 0, this._useHighlightData);
+        this._renderer.device.queue.writeBuffer(this._useColorMap, 0, this._useColorMapData);
         this._renderer.device.queue.writeTexture(
             { texture: this._cMapTexture },
             colorMapTexture,
             {},
-            { width: 256, height: 1 },
+            { width: DEFAULT_COLORMAP_RESOLUTION, height: COLORMAP_HEIGHT },
         );
-        this._renderer.device.queue.writeBuffer(this._opacity, 0, opacity);
+        this._renderer.device.queue.writeBuffer(this._opacity, 0, this._opacityData);
     }
 
+    /**
+     * Releases GPU resources owned by this base pipeline.
+     * Subclasses should `override` and call `super.destroy()`.
+     */
+    destroy(): void {
+        this._mviewBuffer?.destroy();
+        this._projectionBuffer?.destroy();
+        this._zIndexBuffer?.destroy();
 
+        this._colorBuffer?.destroy();
+        this._highlightColorBuffer?.destroy();
+        this._useColorMap?.destroy();
+        this._useHighlight?.destroy();
+        this._opacity?.destroy();
+        this._cMapTexture?.destroy();
+    }
+
+    /**
+     * Begins a standard main-scene render pass using renderer frame/depth buffers.
+     * Sets the color attachment load operation to `load` so pipelines can layer draws.
+     */
+    protected _beginMainRenderPass(commandEncoder: GPUCommandEncoder): GPURenderPassEncoder {
+        this._renderer.frameBuffer.loadOp = 'load';
+        const renderPassDesc: GPURenderPassDescriptor = {
+            colorAttachments: [this._renderer.frameBuffer],
+            depthStencilAttachment: this._renderer.depthBuffer,
+        };
+        return commandEncoder.beginRenderPass(renderPassDesc);
+    }
+
+    /** Reuses or reallocates a float32 cache and copies source values into it. */
+    protected _syncFloatData(
+        cache: Float32Array<ArrayBuffer> | null,
+        source: ArrayLike<number>,
+    ): Float32Array<ArrayBuffer> {
+        if (!cache || cache.length !== source.length) {
+            cache = new Float32Array(new ArrayBuffer(source.length * Float32Array.BYTES_PER_ELEMENT));
+        }
+        cache.set(source);
+        return cache;
+    }
+
+    /** Reuses or reallocates a uint32 cache and copies source values into it. */
+    protected _syncUintData(
+        cache: Uint32Array<ArrayBuffer> | null,
+        source: ArrayLike<number>,
+    ): Uint32Array<ArrayBuffer> {
+        if (!cache || cache.length !== source.length) {
+            cache = new Uint32Array(new ArrayBuffer(source.length * Uint32Array.BYTES_PER_ELEMENT));
+        }
+        cache.set(source);
+        return cache;
+    }
+
+    /** Reuses or reallocates a uint8 cache and copies source values into it. */
+    protected _syncU8Data(
+        cache: Uint8Array<ArrayBuffer> | null,
+        source: ArrayLike<number>,
+    ): Uint8Array<ArrayBuffer> {
+        if (!cache || cache.length !== source.length) {
+            cache = new Uint8Array(new ArrayBuffer(source.length * Uint8Array.BYTES_PER_ELEMENT));
+        }
+        cache.set(source);
+        return cache;
+    }
+
+    /** Reuses or reallocates a float32 cache with the requested length. */
+    protected _syncFloatLength(
+        cache: Float32Array<ArrayBuffer> | null,
+        length: number,
+    ): Float32Array<ArrayBuffer> {
+        if (!cache || cache.length !== length) {
+            cache = new Float32Array(new ArrayBuffer(length * Float32Array.BYTES_PER_ELEMENT));
+        }
+        return cache;
+    }
 
     /**
      * Builds the pipeline.
@@ -341,8 +447,6 @@ export abstract class Pipeline {
      */
     abstract updateVertexBuffers(data: Layer): void;
 
-    /**
-     * Creates the shaders for the pipeline.
-     */
+    /** Executes one render pass for this pipeline. */
     abstract renderPass(camera: Camera): void;
 }

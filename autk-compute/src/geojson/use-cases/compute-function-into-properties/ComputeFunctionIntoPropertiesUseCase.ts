@@ -72,11 +72,10 @@ export class ComputeFunctionIntoPropertiesUseCase {
         const { rows, cols } = matrixVariables[varName];
         const isAutoRows = rows === 'auto';
         let maxRows: number;
-        let actualRowCounts: Float32Array | null = null;
 
         if (isAutoRows) {
           const sourceData: any[][] = new Array(featureCount);
-          actualRowCounts = new Float32Array(featureCount);
+          const actualRowCounts = new Float32Array(featureCount);
           maxRows = 0;
           for (let i = 0; i < featureCount; i++) {
             const value = this.readPathValue(features[i], path);

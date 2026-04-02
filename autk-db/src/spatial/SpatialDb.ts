@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { CsvTable, CustomLayerTable, LayerTable, JsonTable, Table } from '../shared/interfaces';

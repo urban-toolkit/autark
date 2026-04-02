@@ -1,14 +1,25 @@
 {
-  "name": "autark",
-  "private": true,
-  "workspaces": [
-"autk-core",
-    "autk-db",
-    "autk-map",
-    "autk-compute",
-    "autk-plot",
-    "gallery",
-    "usecases",
-    "performance"
-  ]
+    "name": "autark",
+    "private": true,
+    "scripts": {
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix"
+    },
+    "workspaces": [
+        "autk-core",
+        "autk-db",
+        "autk-map",
+        "autk-compute",
+        "autk-plot",
+        "gallery",
+        "usecases",
+        "performance"
+    ],
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@typescript-eslint/eslint-plugin": "^8.58.0",
+        "@typescript-eslint/parser": "^8.58.0",
+        "eslint": "^10.1.0",
+        "globals": "^17.4.0"
+    }
 }

@@ -1,4 +1,4 @@
-import { MouseStatus } from './constants';
+import { MouseStatus } from './events-types';
 import { AutkMap } from './main';
 
 /**

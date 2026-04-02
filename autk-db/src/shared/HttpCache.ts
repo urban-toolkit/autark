@@ -22,7 +22,7 @@ export class HttpCache<T = any> {
         if ('caches' in self && !this.cache) {
             try {
                 this.cache = await caches.open(this.cacheName);
-            } catch (e) {
+            } catch {
                 this.cache = null;
             }
         }
@@ -49,7 +49,7 @@ export class HttpCache<T = any> {
             }
 
             return cached.data as T;
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -72,7 +72,7 @@ export class HttpCache<T = any> {
             });
 
             await this.cache.put(key, response);
-        } catch (e) {
+        } catch {
             // Ignore cache errors
         }
     }
@@ -86,7 +86,7 @@ export class HttpCache<T = any> {
 
         try {
             await this.cache.delete(key);
-        } catch (e) {
+        } catch {
             // Ignore errors
         }
     }
@@ -101,7 +101,7 @@ export class HttpCache<T = any> {
         try {
             const keys = await this.cache.keys();
             await Promise.all(keys.map((request) => this.cache!.delete(request)));
-        } catch (e) {
+        } catch {
             // Ignore errors
         }
     }

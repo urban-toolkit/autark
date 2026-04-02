@@ -22,7 +22,7 @@ export class PipelineTriangleRaster extends Pipeline {
     protected _positionBuffer!: GPUBuffer;
 
     /**
-     * Buffer for primitive indices.
+        * Buffer for texture coordinates.
      * @type {GPUBuffer}
      */
     protected _texCoordBuffer!: GPUBuffer;
@@ -65,19 +65,37 @@ export class PipelineTriangleRaster extends Pipeline {
      */
     protected _rasterBindGroupLayout!: GPUBindGroupLayout;
 
+    /** Reused upload buffer for positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for texcoords. */
+    private _texCoordData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
+    /** Reused upload texture payload for raster RGBA data. */
+    private _rasterTextureData: Uint8Array<ArrayBuffer> | null = null;
+
     /**
-     * Constructor for PipelineTriangleFlat
+        * Constructor for PipelineTriangleRaster.
      * @param {Renderer} renderer The renderer instance
      */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
+    /** Releases GPU resources owned by this pipeline. */
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._texCoordBuffer?.destroy();
+        this._indicesBuffer?.destroy();
+        this._rasterBuffer?.destroy();
+        super.destroy();
+    }
+
     /**
      * Builds the pipeline with the provided mesh data.
      * @param {RasterLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    build(mesh: RasterLayer) {
+    build(mesh: RasterLayer): void {
         this.createShaders();
 
         this.createVertexBuffers(mesh);
@@ -96,7 +114,7 @@ export class PipelineTriangleRaster extends Pipeline {
     /**
      * Creates the vertex and fragment shaders for the pipeline.
      */
-    createShaders() {
+    createShaders(): void {
         // Vertex shader
         const vsmDesc = {
             code: rasterVertexSource,
@@ -114,7 +132,7 @@ export class PipelineTriangleRaster extends Pipeline {
      * Creates the vertex buffers for the pipeline.
      * @param {RasterLayer} raster The mesh data containing positions, thematic, and indices
      */
-    override createVertexBuffers(raster: RasterLayer) {
+    override createVertexBuffers(raster: RasterLayer): void {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -141,16 +159,20 @@ export class PipelineTriangleRaster extends Pipeline {
      * Updates the vertex buffers with the provided mesh data.
      * @param {RasterLayer} mesh The mesh data containing positions, thematic, and indices
      */
-    override updateVertexBuffers(mesh: RasterLayer) {
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
-        this._renderer.device.queue.writeBuffer(this._texCoordBuffer, 0, new Float32Array(mesh.texCoord));
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
+    override updateVertexBuffers(mesh: RasterLayer): void {
+        this._positionData = this._syncFloatData(this._positionData, mesh.position);
+        this._texCoordData = this._syncFloatData(this._texCoordData, mesh.texCoord);
+        this._indicesData = this._syncUintData(this._indicesData, mesh.indices);
+
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._texCoordBuffer, 0, this._texCoordData);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
     }
 
     /**
      * Creates the raster uniform bind group.
      */
-    createRasterUniformBindGroup(raster: RasterLayer) {
+    createRasterUniformBindGroup(raster: RasterLayer): void {
         this._rasterBuffer = this._renderer.device.createTexture({
             label: 'Raster texture',
             size: { width: raster.rasterResX, height: raster.rasterResY },
@@ -204,15 +226,17 @@ export class PipelineTriangleRaster extends Pipeline {
      * Updates the raster uniform buffer with the provided raster data.
      * @param {RasterLayer} raster The raster layer containing raster data
      */
-    updateRasterUniforms(raster: RasterLayer) {
-        const rasterTexture = new Uint8Array(raster.rasterData);
+    updateRasterUniforms(raster: RasterLayer): void {
+        if (!raster.rasterData || raster.rasterData.length === 0) { return; }
+
+        this._rasterTextureData = this._syncU8Data(this._rasterTextureData, raster.rasterData);
 
         this._renderer.device.queue.writeTexture(
             { texture: this._rasterBuffer },
-            rasterTexture,
+            this._rasterTextureData,
             {
                 bytesPerRow: raster.rasterResX * 4,
-                rowsPerImage: raster.rasterResY 
+                rowsPerImage: raster.rasterResY,
             },
             { width: raster.rasterResX, height: raster.rasterResY },
         );
@@ -221,12 +245,12 @@ export class PipelineTriangleRaster extends Pipeline {
     /**
      * Creates the render pipeline for drawing triangles.
      */
-    createPipeline() {
+    createPipeline(): void {
         // Vertex data
         const positionAttribDesc: GPUVertexAttribute = {
             shaderLocation: 0, // [[location(0)]]
             offset: 0,
-            format: 'float32x3',
+            format: 'float32x2',
         };
 
         // Vertex data
@@ -238,7 +262,7 @@ export class PipelineTriangleRaster extends Pipeline {
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
+            arrayStride: 4 * 2, // sizeof(float) * 2
             stepMode: 'vertex',
         };
 
@@ -309,7 +333,7 @@ export class PipelineTriangleRaster extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline Raster"
+            label: 'Pipeline Raster',
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
@@ -318,21 +342,12 @@ export class PipelineTriangleRaster extends Pipeline {
      * Renders the triangle flat pipeline.
      * @param {Camera} camera The camera instance
      */
-    renderPass(camera: Camera) {
+    renderPass(camera: Camera): void {
         // Create a new command encoder
         const commandEncoder = this._renderer.commandEncoder;
 
-        // changes buffer behaviour
-        this._renderer.frameBuffer.loadOp = 'load';
-
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
-        };
-
         // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+        const passEncoder = this._beginMainRenderPass(commandEncoder);
 
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
@@ -353,7 +368,9 @@ export class PipelineTriangleRaster extends Pipeline {
         passEncoder.setBindGroup(2, this._rasterBindGroup);
 
         // draw command
-        passEncoder.drawIndexed(this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
+        const indexCount = this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT;
+        if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
         passEncoder.end();
     }
+
 }

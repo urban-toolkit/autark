@@ -1,5 +1,6 @@
 @group(1) @binding(0) var<uniform> modelView: mat4x4f;
 @group(1) @binding(1) var<uniform> projection: mat4x4f;
+@group(1) @binding(2) var<uniform> zIndex: f32;
 
 struct VSOut {
     @builtin(position) outPosition: vec4<f32>,
@@ -13,7 +14,7 @@ struct VSOut {
 fn main(@location(0) inPosition: vec3f, @location(1) inNormal: vec3f, @location(2) inThematic: f32, @location(3) inHighlighted: f32, @location(4) inSkipped: f32) -> VSOut {
     var vsOut: VSOut;
 
-    vsOut.outPosition = projection * modelView * vec4f(inPosition, 1);
+    vsOut.outPosition = projection * modelView * vec4f(inPosition.x, inPosition.y, inPosition.z + zIndex, 1);
     vsOut.outNormal = inNormal;
     vsOut.outThematic = inThematic;
     vsOut.outHighlighted = inHighlighted;

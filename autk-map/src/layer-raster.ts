@@ -4,11 +4,18 @@ import {
     LayerData,
     LayerGeometry,
     LayerComponent,
-} from "./interfaces";
+} from "./layer-types";
 
 import { Layer } from "./layer";
 
-import { Camera, ColorMap } from 'autk-core';
+import {
+    Camera,
+    ColorMap,
+    DEFAULT_TRANSFER_FUNCTION,
+    buildTransferContext,
+    computeAlphaByte,
+} from 'autk-core';
+import type { TransferFunction, RequiredTransferFunction } from 'autk-core';
 import { Renderer } from "./renderer";
 
 import { Pipeline } from "./pipeline";
@@ -39,8 +46,6 @@ export class RasterLayer extends Layer {
      */
     protected _components: LayerComponent[] = [];
 
-
-
     /**
      * The raster resolution in X direction.
      * @type {number}
@@ -59,15 +64,13 @@ export class RasterLayer extends Layer {
      */
     protected _rasterData!: number[];
 
-
+    /** Opacity transfer-function configuration used while rebuilding raster RGBA data. */
+    protected _transferFunction: RequiredTransferFunction = { ...DEFAULT_TRANSFER_FUNCTION };
 
     /**
-     * Pipeline for rendering borders.
-     * @type {PipelineTriangleBorder}
+        * Pipeline used to render raster layers.
      */
     protected _pipeline!: Pipeline;
-
-
 
     /**
      * Constructor for Raster
@@ -80,8 +83,6 @@ export class RasterLayer extends Layer {
 
         this.loadLayerData(layerData);
     }
-
-
 
     /**
      * Get the positions of the triangles.
@@ -115,8 +116,6 @@ export class RasterLayer extends Layer {
         return this._components;
     }
 
-
-
     /**
      * Get the raster resolution in X direction.
      * @returns {number} - The raster resolution in X direction.
@@ -141,13 +140,21 @@ export class RasterLayer extends Layer {
         return this._rasterData;
     }
 
-
+    /**
+     * Updates the transfer-function configuration used to map scalar values to opacity.
+     */
+    setTransferFunction(config: TransferFunction): void {
+        this._transferFunction = {
+            ...this._transferFunction,
+            ...config,
+        };
+    }
 
     /**
      * Load the layer data.
      * @param {LayerData} layerData - The layer data.
      */
-    public loadLayerData(layerData: LayerData): void {
+    loadLayerData(layerData: LayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
 
@@ -165,7 +172,7 @@ export class RasterLayer extends Layer {
      * Load the texture coordinates from the layer data.
      * @param {LayerGeometry[]} layerGeometry - The layer data.
      */
-    public loadGeometry(layerGeometry: LayerGeometry[]): void {
+    loadGeometry(layerGeometry: LayerGeometry[]): void {
         const position: number[] = [];
         const indices: number[] = [];
         const texCoord: number[] = [];
@@ -173,18 +180,13 @@ export class RasterLayer extends Layer {
         for (let id = 0; id < layerGeometry.length; id++) {
             // fix the index count
             layerGeometry[id].indices?.forEach((a) => {
-                const b = a + position.length / 3;
+                const b = a + position.length / 2;
                 indices.push(b);
             });
 
             // merges the position data
-            layerGeometry[id].position.forEach((d, id) => {
+            layerGeometry[id].position.forEach((d) => {
                 position.push(d);
-
-                if (id % 2 === 1) {
-                    const z = this._layerInfo.zIndex;
-                    position.push(z);
-                }
             });
 
             // merges the texture coordinate data
@@ -192,6 +194,11 @@ export class RasterLayer extends Layer {
                 texCoord.push(d);
             });
         }
+
+        // Raster triangles are expected to be 2D vertices and 2D UV pairs.
+        console.assert(position.length % 2 === 0, 'Raster geometry position length must be a multiple of 2.');
+        console.assert(texCoord.length % 2 === 0, 'Raster geometry texCoord length must be a multiple of 2.');
+        console.assert(position.length === texCoord.length, 'Raster geometry and texCoord arrays should have matching lengths.');
         
         this._position = position;
         this._indices = indices;
@@ -202,7 +209,7 @@ export class RasterLayer extends Layer {
      * Load the components of the layer.
      * @param {LayerComponent[]} layerComponents - The components to load.
      */
-    public loadComponent(layerComponents: LayerComponent[]): void {
+    loadComponent(layerComponents: LayerComponent[]): void {
         this._components = [];
 
         const accum = { nPoints: 0, nTriangles: 0 };
@@ -220,14 +227,10 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Load the raster data from the layer data.
-     * @param {RasterData[]} layerRaster - The layer data.
-     */
-    /**
      * Load raster values and rebuild the texture.
      * @param rasterValues Flattened raster values to colorize.
      */
-    public loadRaster(rasterValues: number[]): void {
+    loadRaster(rasterValues: number[]): void {
         const rasterData: number[] = [];
 
         if (!rasterValues || rasterValues.length === 0) {
@@ -236,14 +239,25 @@ export class RasterLayer extends Layer {
 
         const isRGBA = rasterValues.length === this._rasterResX * this._rasterResY * 4;
         if (!isRGBA) {
-            const min = rasterValues.reduce((a, b) => isNaN(b) ? a : Math.min(a, b), Infinity);
-            const max = rasterValues.reduce((a, b) => isNaN(b) ? a : Math.max(a, b), -Infinity);
-            const range = max - min;
+            const validValues = rasterValues.filter(v => !isNaN(v));
+            const transferContext = buildTransferContext(validValues, this._transferFunction);
+
+            if (transferContext.validCount === 0) {
+                rasterValues.forEach(() => {
+                    rasterData.push(0, 0, 0, 0);
+                });
+                this._rasterData = rasterData;
+                return;
+            }
 
             rasterValues.forEach((d) => {
-                const color = ColorMap.getColor(d, this._layerRenderInfo.colorMapInterpolator, [min, max]);
-                const t = range > 0 ? (d - min) / range : 0;
-                const alpha = d <= 0 ? 0 : Math.max(0, Math.min(255, Math.round(t * 255)));
+                if (isNaN(d)) {
+                    rasterData.push(0, 0, 0, 0);
+                    return;
+                }
+
+                const color = ColorMap.getColor(d, this._layerRenderInfo.colorMapInterpolator, [transferContext.min, transferContext.max]);
+                const alpha = computeAlphaByte(d, transferContext);
 
                 rasterData.push(color.r);
                 rasterData.push(color.g);
@@ -260,13 +274,11 @@ export class RasterLayer extends Layer {
         this._rasterData = rasterData;
     }
 
-
-
     /**
      * Create the rendering pipeline for the layer.
      * @param {Renderer} renderer - The renderer instance.
      */
-    public createPipeline(renderer: Renderer): void {
+    createPipeline(renderer: Renderer): void {
         this._pipeline = new PipelineTriangleRaster(renderer);
         this._pipeline.build(this);
     }
@@ -275,9 +287,11 @@ export class RasterLayer extends Layer {
      * Render the layer for the current pass.
      * @param {Camera} camera - The camera instance.
      */
-    public renderPass(camera: Camera): void {
+    renderPass(camera: Camera): void {
         if (this._dataIsDirty) {
-            (this._pipeline as PipelineTriangleRaster).updateRasterUniforms(this);
+            const rasterPipeline = this._pipeline as PipelineTriangleRaster;
+            rasterPipeline.updateVertexBuffers(this);
+            rasterPipeline.updateRasterUniforms(this);
             this._dataIsDirty = false;
         }
 
@@ -286,7 +300,13 @@ export class RasterLayer extends Layer {
             this._renderInfoIsDirty = false;
         }
 
+        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         this._pipeline.renderPass(camera);
+    }
+
+    /** Releases GPU resources owned by the raster pipeline. */
+    override destroy(): void {
+        this._pipeline?.destroy();
     }
 }
  

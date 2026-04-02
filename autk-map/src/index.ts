@@ -8,9 +8,11 @@ export {
     TriangulatorRaster 
 } from 'autk-core';
 
-export * from './constants';
-export * from './interfaces';
-export * from './key-events';
+export * from './api';
+export * from './color-types';
+export * from './events-types';
+export * from './layer-types';
+export * from './events-key';
 export * from './layer-bbox';
 export * from './layer-raster';
 export * from './layer-triangles2D';
@@ -21,8 +23,8 @@ export * from './layer';
 export * from './main';
 export * from './map-style';
 export * from './map-ui';
-export * from './mouse-events';
-export * from './resize-events';
+export * from './events-mouse';
+export * from './events-resize';
 export * from './pipeline-triangle-border';
 export * from './pipeline-triangle-flat';
 export * from './pipeline-triangle-picking';

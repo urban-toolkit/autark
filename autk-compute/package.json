@@ -31,8 +31,8 @@
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
     "@types/rbush": "^4.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.57.2",
-    "@typescript-eslint/parser": "^8.57.2",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
     "@webgpu/types": "^0.1.69",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
@@ -41,7 +41,7 @@
     "typedoc-plugin-markdown": "^4.11.0",
     "typedoc-theme-oxide": "^0.2.5",
     "typescript": "^5.9.3",
-    "vite": "^8.0.2",
+    "vite": "^8.0.3",
     "vite-plugin-dts": "^4.5.4"
   },
   "dependencies": {

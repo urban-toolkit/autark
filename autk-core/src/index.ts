@@ -25,8 +25,20 @@ export type { EventListener } from './event-emitter';
 export { Camera } from './camera';
 export type { CameraData, ViewProjectionParams } from './camera';
 
-export { ColorMap } from './colormap';
+export { ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './colormap';
 export type { SequentialDomain, DivergingDomain, CategoricalDomain } from './colormap';
+
+export {
+    DEFAULT_TRANSFER_FUNCTION,
+    buildTransferContext,
+    computeAlphaByte,
+} from './transfer-function';
+
+export type {
+    TransferFunction,
+    TransferContext,
+    RequiredTransferFunction,
+} from './transfer-function';
 
 export { TriangulatorPoints } from './triangulator-points';
 export { TriangulatorPolylines } from './triangulator-polylines';

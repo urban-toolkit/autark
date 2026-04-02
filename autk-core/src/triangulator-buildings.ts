@@ -27,7 +27,7 @@ export class TriangulatorBuildings {
                 if (!heightInfo.length) { continue; }
 
                 const partFeature: Feature = { type: 'Feature', geometry: partGeom, properties: partProps };
-                let meshes: { flatCoords: number[], flatIds: number[] }[] = [];
+                let meshes: { flatCoords: number[], flatIds: number[] }[];
 
                 if (partGeom.type === 'LineString') {
                     meshes = TriangulatorBuildings.lineStringToBuildingMesh(partFeature, heightInfo, origin);

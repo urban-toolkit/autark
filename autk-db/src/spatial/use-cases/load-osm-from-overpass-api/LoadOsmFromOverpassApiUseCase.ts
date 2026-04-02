@@ -265,7 +265,7 @@ export class LoadOsmFromOverpassApiUseCase {
     const geocodeAlias = 'areaMain'; // alias without leading dot
 
     // 1. Main geocode area
-    const geocodeLine = `area[\"name\"=\"${queryArea.geocodeArea}\"]->.${geocodeAlias};`;
+    const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.${geocodeAlias};`;
 
     // 2. Build a set of lines for each requested sub-area
     const subAreaLines: string[] = [];
@@ -273,7 +273,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
-      subAreaLines.push(`relation[\"name\"=\"${areaName}\"](area.${geocodeAlias})->.rel${i};`);
+      subAreaLines.push(`relation["name"="${areaName}"](area.${geocodeAlias})->.rel${i};`);
       subAreaLines.push(`.rel${i} map_to_area->.area${i};`);
       subAreaLines.push(`way(area.area${i})->.ways${i};`);
 
