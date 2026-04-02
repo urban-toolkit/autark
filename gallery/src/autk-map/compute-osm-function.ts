@@ -30,8 +30,8 @@ export class ComputeOsm {
 
         const geojsonCompute = new GeojsonCompute();
         geojson = await geojsonCompute.analytical({
-            geojson,
-            attributes: {
+            collection: geojson,
+            variableMapping: {
                 x: 'lanes',
             },
             resultField: 'result',
@@ -61,7 +61,8 @@ export class ComputeOsm {
     }
 
     protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
-        const getFnv = (feature: Feature) => {
+        const getFnv = (item: any) => {
+            const feature = item as Feature;
             const properties = feature.properties as GeoJsonProperties;
             return properties?.compute.result || 0;
         };

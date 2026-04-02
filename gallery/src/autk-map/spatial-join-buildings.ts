@@ -78,7 +78,8 @@ export class SpatialJoinNear {
     protected async updateThematicData(layer: string = 'table_osm_buildings') {
         const geojson = await this.db.getLayer(layer);
 
-        const getFnv = (feature: Feature) => {
+        const getFnv = (item: any) => {
+            const feature = item as Feature;
             const properties = feature.properties as GeoJsonProperties;
             return properties?.sjoin.count.noise || 0;
         };

@@ -95,7 +95,8 @@ export class SpatialJoin {
     protected async updateThematicData(property: string) {
         const geojson = await this.db.getLayer('neighborhoods');
 
-        const getFnv = (feature: Feature) => {
+        const getFnv = (item: any) => {
+            const feature = item as Feature;
             const properties = feature.properties as GeoJsonProperties;
             return properties?.sjoin.count[property] || 0;
         };

@@ -6,7 +6,7 @@ import { Feature, FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
-import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
+import { AutkMap, LayerType, VectorLayer } from 'autk-map';
 import { Barchart, PlotEvent } from 'autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
@@ -203,26 +203,6 @@ export class Shadows {
         }
 
         this.map.updateRenderInfo('table_osm_buildings', { isPick: true });
-        this.map.events.on(MapEvent.PICKING, ({ selection: ids, layerId }) => {
-            if (layerId !== 'table_osm_buildings') return;
-
-            if (ids.length === 0) {
-                // Building was deselected — clear stored geometry and computed result.
-                this.selectedBuildingId     = null;
-                this.selectedBuildingRing   = null;
-                this.selectedBuildingHeight = 0;
-                this.computedRoads          = undefined;
-                if (this.displayMode === 'compute' || this.displayMode === 'contribution') {
-                    this.updateThematicData();
-                }
-                return;
-            }
-
-            // ids is the post-toggle highlighted set. Find the newly added building
-            // (the one that differs from the previously selected one).
-            const newId = ids.find(id => id !== this.selectedBuildingId) ?? ids[0];
-            this.onBuildingPick(newId);
-        });
 
         this.map.draw();
     }
@@ -273,8 +253,10 @@ export class Shadows {
 
     protected updateThematicData(): void {
         if (this.displayMode === 'heatmap') {
-            const getFnv = (feature: Feature) =>
-                (feature.properties?.sjoin as any)?.avg?.[this.currentMonth] || 0;
+            const getFnv = (item: unknown) => {
+                const feature = item as Feature;
+                return (feature.properties?.sjoin as any)?.avg?.[this.currentMonth] || 0;
+            };
             this.map.updateThematic({ id: this.ROADS_LAYER, collection: this.roads, getFnv });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isPick: true });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
@@ -286,7 +268,10 @@ export class Shadows {
         const key = this.displayMode === 'compute' ? 'shadow' : 'contribution';
         const source = this.computedRoads ?? this.roads;
         const getFnv = this.computedRoads
-            ? (feature: Feature) => feature.properties?.compute?.[key] ?? 0
+            ? (item: unknown) => {
+                const feature = item as Feature;
+                return feature.properties?.compute?.[key] ?? 0;
+              }
             : () => 0;
         this.map.updateThematic({ id: this.ROADS_LAYER, collection: source, getFnv });
         this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });

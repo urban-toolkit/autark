@@ -37,7 +37,8 @@ export class ColormapCat {
     protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
 
-        const getFnv = (feature: Feature): string => {
+        const getFnv = (item: any): string => {
+            const feature = item as Feature;
             const properties = feature.properties as GeoJsonProperties;
             return ['primary', 'secondary'].includes(properties?.highway) ? properties?.highway : 'other';
         };

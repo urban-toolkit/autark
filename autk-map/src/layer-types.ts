@@ -3,11 +3,10 @@ import type {
     LayerBorderComponent,
     LayerComponent,
     LayerGeometry,
+    LayerType,
 } from 'autk-core';
 
 import { ColorMapInterpolator } from './color-types';
-
-import type { LayerType } from 'autk-core';
 
 /**
  * Shared type exports re-exposed from `autk-core` for map layer configuration.

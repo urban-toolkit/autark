@@ -1,8 +1,7 @@
 // typedoc.json
 {
   "readme": "../README.md",
-  "plugin": ["typedoc-theme-oxide", "typedoc-plugin-markdown"],
-  "theme": "oxide",
+  "plugin": ["typedoc-plugin-markdown"],
   "out": "docs",
   "entryPoints": ["src/main.ts"],
   "navigationLinks": {

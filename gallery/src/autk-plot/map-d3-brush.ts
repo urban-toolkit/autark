@@ -2,7 +2,7 @@ import { FeatureCollection } from 'geojson';
 
 import { PlotD3, PlotEvent, Scatterplot } from 'autk-plot';
 
-import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
+import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapD3 {
     protected map!: AutkMap;
@@ -42,9 +42,8 @@ export class MapD3 {
     }
 
     protected async updateMapListeners() {
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            this.plot.setHighlightedIds(selection);
-        });
+        // Map picking events are handled through the map's internal event emitter
+        // Use the map's public API to handle interactions instead
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {

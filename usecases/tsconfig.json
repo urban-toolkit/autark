@@ -5,6 +5,14 @@
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "autk-core": ["../autk-core/src/index.ts"],
+      "autk-compute": ["../autk-compute/src/main.ts"],
+      "autk-db": ["../autk-db/src/main.ts"],
+      "autk-map": ["../autk-map/src/index.ts"],
+      "autk-plot": ["../autk-plot/src/index.ts"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",

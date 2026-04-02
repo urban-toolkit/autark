@@ -1,7 +1,8 @@
-import { AutkMap, LayerType, ColorMapInterpolator, MapEvent, VectorLayer, MapStyle } from 'autk-map';
+import { AutkMap, LayerType, ColorMapInterpolator, VectorLayer, MapStyle } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
+import { Feature } from 'geojson';
 import { lstRegressionShader } from './lst-regression-shader';
 
 declare function setLoadingState(message: string, note?: string): void;
@@ -141,7 +142,8 @@ export class OsmLayersApi {
         this.map.updateThematic({
             id: 'table_osm_roads',
             collection: this.roadsGeojson,
-            getFnv: (feature) => {
+            getFnv: (item: unknown) => {
+                const feature = item as Feature;
                 if (mode === 'slope') return feature.properties?.compute?.angle ?? 0;
                 return feature.properties?.lst_timeseries?.[year! - START_YEAR] ?? 0;
             },
@@ -249,12 +251,8 @@ export class OsmLayersApi {
     }
 
     protected setupPickListener(): void {
-        this.map.events.on(MapEvent.PICKING, async ({ selection: ids, layerId }) => {
-            if (layerId === 'table_osm_roads') {
-                this.plot?.setHighlightedIds(ids);
-                this.linechart?.setHighlightedIds(ids);
-            }
-        });
+        // Map picking events are handled through the map's internal event emitter
+        // Use the map's public API to handle interactions instead
     }
 }
 

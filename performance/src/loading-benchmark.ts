@@ -1,6 +1,6 @@
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from 'autk-db';
 import type { OsmLoadTimings } from 'autk-db';
-import { AutkMap, LayerType } from 'autk-map';
+import { AutkMap } from 'autk-map';
 import * as d3 from 'd3';
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -130,12 +130,12 @@ const COLORS: Record<string, string> = {
   buildings: '#9467bd',
 };
 
-const LAYER_TYPE_MAP: Record<string, LayerType> = {
-  surface:   LayerType.AUTK_OSM_SURFACE,
-  parks:     LayerType.AUTK_OSM_PARKS,
-  water:     LayerType.AUTK_OSM_WATER,
-  roads:     LayerType.AUTK_OSM_ROADS,
-  buildings: LayerType.AUTK_OSM_BUILDINGS,
+const LAYER_TYPE_MAP: Record<string, string> = {
+  surface:   'surface',
+  parks:     'parks',
+  water:     'water',
+  roads:     'roads',
+  buildings: 'buildings',
 };
 
 const color = (key: string) => COLORS[key] ?? '#8c8c8c';
@@ -717,10 +717,10 @@ class LoadingBenchmark {
     }
   }
 
-  private async execRun(runIndex: number, areas: string[]): Promise<{ timings: OsmLoadTimings; db: SpatialDb }> {
-    const db = new SpatialDb();
+  private async execRun(runIndex: number, areas: string[]): Promise<{ timings: OsmLoadTimings; db: AutkSpatialDb }> {
+    const db = new AutkSpatialDb();
     await db.init();
-    const timings = await db.loadOsmFromOverpassApi({
+    const timings = await db.loadOsm({
       queryArea: { geocodeArea: GEOCODE_AREA, areas },
       outputTableName: `table_osm_run${runIndex}`,
       autoLoadLayers: { coordinateFormat: COORDINATE_FORMAT, layers: [...LAYERS], dropOsmTable: true },
@@ -728,7 +728,7 @@ class LoadingBenchmark {
     return { timings, db };
   }
 
-  private async execMapRun(db: SpatialDb, timings: OsmLoadTimings): Promise<{ mapInitMs: number; mapLayerMs: Record<string, number> }> {
+  private async execMapRun(db: AutkSpatialDb, timings: OsmLoadTimings): Promise<{ mapInitMs: number; mapLayerMs: Record<string, number> }> {
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 600;
@@ -747,7 +747,7 @@ class LoadingBenchmark {
       for (const layer of timings.layers) {
         const t1 = performance.now();
         const geojson = await db.getLayer(layer.layerName);
-        map.loadGeoJsonLayer(layer.layerName, geojson, LAYER_TYPE_MAP[layer.layerType] ?? null);
+        map.loadCollection({ id: layer.layerName, collection: geojson, type: (LAYER_TYPE_MAP[layer.layerType] ?? null) as any });
         mapLayerMs[layer.layerName] = performance.now() - t1;
       }
 

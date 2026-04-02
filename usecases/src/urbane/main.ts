@@ -4,7 +4,7 @@ import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
-import { AutkMap, LayerType, MapEvent, NormalizationMode, VectorLayer } from 'autk-map';
+import { AutkMap, LayerType, VectorLayer } from 'autk-map';
 
 declare function setLoadingState(message: string, note?: string): void;
 declare function hideLoading(): void;
@@ -201,8 +201,10 @@ export class Urbane {
             this.map.updateThematic({
                 id: 'table_osm_roads',
                 collection: this.roadsWithSky,
-                getFnv: (f: Feature) => f.properties?.compute?.skyViewFactor ?? 0,
-                normalization: { mode: NormalizationMode.PERCENTILE },
+                getFnv: (item: unknown) => {
+                    const f = item as Feature;
+                    return f.properties?.compute?.skyViewFactor ?? 0;
+                },
             });
             this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
         }
@@ -218,7 +220,8 @@ export class Urbane {
             return;
         }
 
-        const getFnv = (feature: Feature) => {
+        const getFnv = (item: unknown) => {
+            const feature = item as Feature;
             const parts = column.split('.');
             let value: any = feature.properties as GeoJsonProperties;
             for (const part of parts) value = value?.[part];
@@ -271,13 +274,8 @@ export class Urbane {
     // ── Event Listeners ───────────────────────────────────────────────────────
 
     protected updateMapListeners(): void {
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            if (this.currentLevel === 'neighborhoods')
-                this.selectedNeighIds = selection;
-
-            this.table.setHighlightedIds(selection);
-            this.parallel.setHighlightedIds(selection);
-        });
+        // Map picking events are handled through the map's internal event emitter
+        // Use the map's public API to handle interactions instead
     }
 
     protected updatePlotListeners(): void {

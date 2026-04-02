@@ -21,7 +21,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "doc": "typedoc --options typedoc.json --watch"
+    "doc": "typedoc --options typedoc.json",
+    "doc:watch": "typedoc --options typedoc.json --watch"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
