@@ -132,7 +132,7 @@ export class TableVis extends PlotD3 {
                 } else {
                     plot.selection.push(id);
                 }
-                plot.events.emit(PlotEvent.CLICK, plot.selection);
+                plot.events.emit(PlotEvent.CLICK, plot.getSelectedSourceIndices());
                 plot.updatePlotSelection();
             });
 

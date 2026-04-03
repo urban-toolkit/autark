@@ -62,6 +62,11 @@ export class AutkChart {
         this._plot.setSelection(selection);
     }
 
+    /** @deprecated Use setSelection instead. */
+    public setHighlightedIds(selection: number[]): void {
+        this.setSelection(selection);
+    }
+
     public async draw(): Promise<void> {
         if (this.hasDraw(this._plot)) {
             await this._plot.draw();
@@ -86,19 +91,19 @@ export class AutkChart {
         switch (config.type) {
             case 'scatterplot': {
                 const chartConfig = this.omitType(config);
-                return new Scatterplot({ div, events: [PlotEvent.CLICK], ...chartConfig });
+                return new Scatterplot({ div, ...chartConfig });
             }
             case 'barchart': {
                 const chartConfig = this.omitType(config);
-                return new Barchart({ div, events: [PlotEvent.CLICK], ...chartConfig });
+                return new Barchart({ div, ...chartConfig });
             }
             case 'parallel-coordinates': {
                 const chartConfig = this.omitType(config);
-                return new ParallelCoordinates({ div, events: [PlotEvent.CLICK], ...chartConfig });
+                return new ParallelCoordinates({ div, ...chartConfig });
             }
             case 'table': {
                 const chartConfig = this.omitType(config);
-                return new TableVis({ div, events: [PlotEvent.CLICK], ...chartConfig });
+                return new TableVis({ div, ...chartConfig });
             }
             case 'linechart': {
                 const chartConfig = this.omitType(config);
