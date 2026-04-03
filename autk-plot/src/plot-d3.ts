@@ -1,12 +1,12 @@
 import * as d3 from "d3";
 
-import { AutkChart } from "./main";
+import { BaseChart } from "./main";
 
 import { PlotConfig } from "./types";
 import { PlotEvent } from "./constants";
 import { PlotStyle } from "./plot-style";
 
-export abstract class PlotD3 extends AutkChart {
+export abstract class PlotD3 extends BaseChart {
     constructor(config: PlotConfig) {
         super(config);
     }

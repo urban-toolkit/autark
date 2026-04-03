@@ -4,7 +4,7 @@ import { PlotConfig, PlotMargins } from "./types";
 import { ColorMapInterpolator } from "./constants";
 import { PlotEvents } from "./plot-events";
 
-export abstract class AutkChart {
+export abstract class BaseChart {
 
     protected _div!: HTMLElement;
 
@@ -30,7 +30,7 @@ export abstract class AutkChart {
 
     constructor(config: PlotConfig) {
         this._div = config.div;
-        this._plotEvents = new PlotEvents(config.events);
+        this._plotEvents = new PlotEvents(config.events ?? []);
 
         this._data = config.collection.features.map((f) => f.properties);
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
@@ -69,7 +69,7 @@ export abstract class AutkChart {
         return this._plotEvents;
     }
 
-    public setHighlightedIds(selection: number[]) {
+    public setSelection(selection: number[]) {
         this._selection = selection;
         this.updatePlotSelection();
     }

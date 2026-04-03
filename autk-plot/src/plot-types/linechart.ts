@@ -25,8 +25,8 @@ export type LinechartConfig = {
  *
  * Usage:
  *   const chart = new Linechart({ div, data: geojson, attributes: ['lst_timeseries', 'compute.angle', 'compute.intercept'], startYear: 2001 });
- *   chart.setHighlightedIds([42]);   // show feature 42
- *   chart.setHighlightedIds([]);     // clear to empty state
+ *   chart.setSelection([42]);         // show feature 42
+ *   chart.setSelection([]);           // clear to empty state
  */
 export class Linechart {
     private _div: HTMLElement;
@@ -59,7 +59,7 @@ export class Linechart {
 
     // ── public API (consistent with other autk-plot charts) ──────────────────
 
-    public setHighlightedIds(ids: number[]): void {
+    public setSelection(ids: number[]): void {
         const id = ids.length > 0 ? ids[0] : null;
         this._draw(id);
     }

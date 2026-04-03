@@ -1,4 +1,5 @@
 export * from './main'
+export * from './chart';
 export { ColorMap } from 'autk-core';
 export * from './constants'
 export * from './plot-d3';

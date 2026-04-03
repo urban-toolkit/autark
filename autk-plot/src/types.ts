@@ -1,5 +1,6 @@
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import type { ColorHEX, ColorRGB, ColorTEX } from 'autk-core';
+import type { LinechartConfig } from './plot-types/linechart';
 import { ColorMapInterpolator, PlotEvent } from './constants';
 
 export type { ColorHEX, ColorRGB, ColorTEX };
@@ -16,7 +17,7 @@ export type HistogramConfig = {
 export type PlotConfig = {
     div: HTMLElement,
     collection: FeatureCollection<Geometry, GeoJsonProperties>,
-    events: PlotEvent[],
+    events?: PlotEvent[],
     margins?: PlotMargins,
     width?: number,
     height?: number,
@@ -29,4 +30,38 @@ export type PlotConfig = {
     colorMapInterpolator?: ColorMapInterpolator;
 }
 
-export type PlotEventListener = (event: { selection: number[] }) => void;
+export type PlotSelectionPayload = { selection: number[] };
+
+export type PlotEventListener = (event: PlotSelectionPayload) => void;
+
+export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart';
+
+type SharedChartConfig = Omit<PlotConfig, 'div'>;
+
+export type ScatterplotChartConfig = SharedChartConfig & {
+    type: 'scatterplot';
+    attributes: [string, string];
+};
+
+export type BarchartChartConfig = SharedChartConfig & {
+    type: 'barchart';
+};
+
+export type ParallelCoordinatesChartConfig = SharedChartConfig & {
+    type: 'parallel-coordinates';
+};
+
+export type TableChartConfig = SharedChartConfig & {
+    type: 'table';
+};
+
+export type LinechartUnifiedConfig = Omit<LinechartConfig, 'div'> & {
+    type: 'linechart';
+};
+
+export type UnifiedChartConfig =
+    | ScatterplotChartConfig
+    | BarchartChartConfig
+    | ParallelCoordinatesChartConfig
+    | TableChartConfig
+    | LinechartUnifiedConfig;
