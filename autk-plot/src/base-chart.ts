@@ -9,7 +9,7 @@ import { EventEmitter } from "./core-types";
  * Shared base class for all chart implementations.
  *
  * Handles data extraction, sizing defaults, selection state,
- * and transformed-to-source selection index mapping.
+ * and source-id based selection mapping via `autkIds`.
  */
 export abstract class BaseChart {
 
@@ -28,7 +28,6 @@ export abstract class BaseChart {
     protected _margins!: ChartMargins;
 
     protected _selection: number[] = [];
-    protected _selectionSourceMap: Map<number, number[]> = new Map();
 
     protected _chartEvents!: ChartEvents;
     protected _enabledEvents: ChartEvent[] = [];
@@ -47,7 +46,6 @@ export abstract class BaseChart {
         this._enabledEvents = config.events ?? [];
 
         this._data = this.ensureAutkIds(config.collection.features.map((f) => f.properties as AutkDatum));
-        this.resetSelectionSourceMap();
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
         this._width = config.width || 800;
         this._height = config.height || 500;
@@ -72,26 +70,25 @@ export abstract class BaseChart {
     }
 
     /**
-     * Replaces internal data rows and resets default selection mapping.
+     * Replaces internal data rows.
      * @param data New rendered rows.
      */
     set data(data: GeoJsonProperties[]) {
         this._data = this.ensureAutkIds(data as AutkDatum[]);
-        this.resetSelectionSourceMap();
     }
 
 
     /**
-     * Returns selected row indices in the rendered dataset.
-     * @returns Current rendered-row indices selected in the chart.
+     * Returns selected source feature indices.
+     * @returns Current source feature indices selected in the chart.
      */
     get selection(): number[] {
         return this._selection;
     }
 
     /**
-     * Updates selected row indices in the rendered dataset.
-     * @param selection Rendered-row indices to mark as selected.
+     * Updates selected source feature indices.
+     * @param selection Source feature indices to mark as selected.
      */
     set selection(selection: number[]) {
         this._selection = selection;
@@ -115,7 +112,7 @@ export abstract class BaseChart {
 
     /**
      * Applies a new selection and refreshes mark styles.
-     * @param selection Source or rendered indices, depending on chart context.
+     * @param selection Source feature indices.
      */
     public setSelection(selection: number[]) {
         this._selection = selection;
@@ -123,13 +120,12 @@ export abstract class BaseChart {
     }
 
     /**
-     * Resolves selected rendered indices to source feature indices.
-     * @param selection Optional rendered-row selection. Uses current state when omitted.
+     * Resolves selected source ids to a unique normalized array.
+     * @param selection Optional source-id selection. Uses current state when omitted.
      * @returns Unique source feature indices represented by the selection.
      */
     public getSelectedSourceIndices(selection: number[] = this._selection): number[] {
-        const sourceIndices = selection.flatMap((idx) => this._selectionSourceMap.get(idx) ?? [idx]);
-        return Array.from(new Set(sourceIndices));
+        return Array.from(new Set(selection.filter((idx) => Number.isFinite(idx))));
     }
 
     /**
@@ -156,23 +152,6 @@ export abstract class BaseChart {
     }
 
     /**
-     * Sets custom rendered-index to source-index mapping.
-     * @param map Mapping from rendered mark index to one or more source feature indices.
-     */
-    protected setSelectionSourceMap(map: Map<number, number[]>): void {
-        this._selectionSourceMap = map;
-    }
-
-    /**
-     * Restores identity mapping where each rendered row maps to itself.
-     */
-    protected resetSelectionSourceMap(): void {
-        this._selectionSourceMap = new Map(
-            this._data.map((_d, idx) => [idx, [idx]])
-        );
-    }
-
-    /**
      * Ensures every row carries the source-id contract field.
      * @param data Render rows.
      */
@@ -183,21 +162,13 @@ export abstract class BaseChart {
         });
     }
 
-
     /**
-     * Transforms `this._data` and updates `_selectionSourceMap` before rendering.
+     * Transforms `this._data` before rendering.
      *
-     * The default implementation is the identity: each rendered index maps to
-     * itself. Override this method to aggregate or reorder data while preserving
-     * the ability to recover original source feature indices from any selection.
-     *
-     * Rules when overriding:
-     *   1. Assign `this.data = transformedRows` first (resets the map to identity).
-     *   2. Call `this.setSelectionSourceMap(map)` after to register the real mapping.
+     * The default implementation is a no-op. Override this method to aggregate
+     * or reorder data while preserving `autkIds` on each rendered datum.
      */
-    protected computeTransform(): void {
-        this.resetSelectionSourceMap();
-    }
+    protected computeTransform(): void {}
 
     /**
      * Template method. Calls `computeTransform()` then `render()`.
