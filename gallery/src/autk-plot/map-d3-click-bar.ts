@@ -1,6 +1,6 @@
 import { FeatureCollection } from 'geojson';
 
-import { AutkChart, PlotEvent } from 'autk-plot';
+import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapD3 {
@@ -36,7 +36,7 @@ export class MapD3 {
             labels: { axis: ['ntaname', 'shape_area'], title: 'Plot example' },
             margins: { left: 60, right: 20, top: 50, bottom: 200 },
             width: 790,
-            events: [PlotEvent.CLICK]
+            events: [ChartEvent.CLICK]
         });
     }
 
@@ -46,7 +46,7 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.addListener(PlotEvent.CLICK, ({ selection }) => {
+        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
             const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.setHighlightedIds(selection);

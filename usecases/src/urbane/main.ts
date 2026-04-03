@@ -3,7 +3,7 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
-import { AutkChart, PlotEvent } from 'autk-plot';
+import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
@@ -294,7 +294,7 @@ export class Urbane {
             attributes,
             labels: { axis: axisLabels, title },
             width: 790,
-            events: [PlotEvent.BRUSH_Y],
+            events: [ChartEvent.BRUSH_Y],
         });
 
         this.table = new AutkChart(this.plotDivTable, {
@@ -303,7 +303,7 @@ export class Urbane {
             attributes: [titleCol, ...attributes],
             labels: { axis: ['Id', ...axisLabels], title },
             width: 790,
-            events: [PlotEvent.CLICK],
+            events: [ChartEvent.CLICK],
         });
     }
 
@@ -328,7 +328,7 @@ export class Urbane {
      * and the other plot.
      */
     protected updatePlotListeners(): void {
-        this.table.events.addListener(PlotEvent.CLICK, ({ selection }) => {
+        this.table.events.on(ChartEvent.CLICK, ({ selection }) => {
             if (this._currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
@@ -336,7 +336,7 @@ export class Urbane {
             this.parallel.setSelection(selection);
         });
 
-        this.parallel.events.addListener(PlotEvent.BRUSH_Y, ({ selection }) => {
+        this.parallel.events.on(ChartEvent.BRUSH_Y, ({ selection }) => {
             if (this._currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 

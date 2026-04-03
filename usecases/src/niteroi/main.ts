@@ -1,7 +1,7 @@
 import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
-import { AutkChart, PlotEvent, PlotStyle } from 'autk-plot';
+import { AutkChart, ChartEvent, ChartStyle } from 'autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
 
 declare function setLoadingState(message: string, note?: string): void;
@@ -76,7 +76,7 @@ export class OsmLayersApi {
         await this.map.init();
 
         MapStyle.setHighlightColor(HIGHLIGHT_COLOR);
-        PlotStyle.setHighlightColor(HIGHLIGHT_COLOR);
+        ChartStyle.setHighlightColor(HIGHLIGHT_COLOR);
 
         setLoadingState('Rendering layers...', 'Uploading geometry to the GPU.');
         await this.loadLayers();
@@ -216,10 +216,10 @@ export class OsmLayersApi {
             tickFormats: ['.1~f', '.3~f'],
             width: 600,
             height: 380,
-            events: [PlotEvent.BRUSH],
+            events: [ChartEvent.BRUSH],
         });
 
-        this.plot.events.addListener(PlotEvent.BRUSH, ({ selection: ids }) => {
+        this.plot.events.on(ChartEvent.BRUSH, ({ selection: ids }) => {
             const layer = this.map.layerManager.searchByLayerId('table_osm_roads') as VectorLayer;
             if (layer) layer.setHighlightedIds(ids);
             this.map.draw();

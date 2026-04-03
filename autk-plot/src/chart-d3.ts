@@ -1,77 +1,98 @@
 import * as d3 from "d3";
 
-import { BaseChart } from "./main";
+import { BaseChart } from "./base-chart";
 
-import { PlotConfig } from "./types";
-import { PlotEvent } from "./constants";
-import { PlotStyle } from "./plot-style";
+import type { ChartConfig } from "./api";
+import { ChartEvent } from "./events-types";
+import { ChartStyle } from "./chart-style";
+import { valueAtPath } from "autk-core";
 
-export abstract class PlotD3 extends BaseChart {
-    constructor(config: PlotConfig) {
+/**
+ * Base class for D3-driven chart implementations.
+ *
+ * Provides shared interaction handlers and selection styling behavior.
+ */
+export abstract class ChartD3 extends BaseChart {
+    /**
+     * Builds a D3 chart from generic plot configuration.
+     * @param config Plot configuration for this chart instance.
+     */
+    constructor(config: ChartConfig) {
         super(config);
     }
 
+    /**
+     * Attaches only the interaction handlers requested in the event config.
+     *
+     * The enabled events are defined by the chart's configuration.
+     */
     configureSignalListeners(): void {
-        const listeners = this.events.listeners;
+        const enabledEvents = this.enabledEvents;
 
-        for (const listener in listeners) {
-            if (listener === PlotEvent.CLICK) {
+        for (const event of enabledEvents) {
+            if (event === ChartEvent.CLICK) {
                 this.clickEvent();
             }
-            if (listener === PlotEvent.BRUSH) {
+            if (event === ChartEvent.BRUSH) {
                 this.brushEvent();
             }
-            if (listener === PlotEvent.BRUSH_X) {
+            if (event === ChartEvent.BRUSH_X) {
                 this.brushXEvent();
             }
-            if (listener === PlotEvent.BRUSH_Y) {
+            if (event === ChartEvent.BRUSH_Y) {
                 this.brushYEvent();
             }
         }
     }
 
+    /**
+     * Enables click-based mark selection and clear interactions.
+     */
     clickEvent(): void {
         const svgs = d3.select(this._div).selectAll('.autkMark');
         const cls = d3.select(this._div).selectAll('.autkClear');
 
-        const plot = this;
+        const chart = this;
 
         svgs
             .each(function (_d, id: number) {
                 d3.select(this)
                     .on('click', function () {
-                        if (plot.selection.includes(id)) {
-                            plot.selection = plot.selection.filter(loc => loc !== id);
+                        if (chart.selection.includes(id)) {
+                            chart.selection = chart.selection.filter(loc => loc !== id);
                         } else {
-                            plot.selection.push(id);
+                            chart.selection.push(id);
                         }
 
-                        plot.events.emit(PlotEvent.CLICK, plot.getSelectedSourceIndices());
-                        plot.updatePlotSelection();
+                        chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
+                        chart.updateChartSelection();
                     });
             });
 
         cls
             .on('click', function () {
-                plot.selection = [];
+                chart.selection = [];
 
-                plot.events.emit(PlotEvent.CLICK, []);
-                plot.updatePlotSelection();
+                chart.events.emit(ChartEvent.CLICK, { selection: [] });
+                chart.updateChartSelection();
             });
     }
 
+    /**
+     * Enables 2D rectangular brushing interactions.
+     */
     brushEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
         const marksGroup = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkMarksGroup');
 
-        const plot = this;
+        const chart = this;
 
         brushable
             .each(function () {
                 const cBrush = d3.select<SVGGElement, unknown>(this);
 
                 const brush = d3.brush()
-                    .extent([[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]])
+                    .extent([[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]])
                     .on("start end", function (event: any) {
                         if (event.selection) {
                             const x0 = event.selection[0][0];
@@ -86,34 +107,37 @@ export abstract class PlotD3 extends BaseChart {
                                     const node = d3.select(this).node() as SVGGeometryElement | null;
                                     if (!node) return;
 
-                                    if (plot.nodeIntersectsRect(node, x0, y0, x1, y1)) {
+                                    if (chart.nodeIntersectsRect(node, x0, y0, x1, y1)) {
                                         nextSel.add(id);
                                     }
                                 });
 
-                            plot.selection = Array.from(nextSel);
-                            plot.events.emit(PlotEvent.BRUSH, plot.getSelectedSourceIndices());
-                            plot.updatePlotSelection();
+                            chart.selection = Array.from(nextSel);
+                            chart.events.emit(ChartEvent.BRUSH, { selection: chart.getSelectedSourceIndices() });
+                            chart.updateChartSelection();
                         } else {
-                            plot.selection = [];
-                            plot.events.emit(PlotEvent.BRUSH, []);
-                            plot.updatePlotSelection();
+                            chart.selection = [];
+                            chart.events.emit(ChartEvent.BRUSH, { selection: [] });
+                            chart.updateChartSelection();
                         }
                     });
                 cBrush.call(brush);
             });
     }
 
+    /**
+     * Enables horizontal brushing interactions.
+     */
     brushXEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
         const marksGroup = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkMarksGroup');
 
-        const plot = this;
+        const chart = this;
 
         const nBrush = brushable.size();
         const extent: [[number, number], [number, number]] = (nBrush > 1) ?
-            [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]] :
-            [[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]];
+            [[-10, 0], [10, chart._height - chart._margins.top - chart._margins.bottom]] :
+            [[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]];
 
         brushable
             .each(function () {
@@ -137,7 +161,7 @@ export abstract class PlotD3 extends BaseChart {
                             const x0 = event.selection[0] + shiftX;
                             const y0 = -10 + shiftY; // Assuming height padding is approx -10 to +height+10
                             const x1 = event.selection[1] + shiftX;
-                            const y1 = plot._height + shiftY;
+                            const y1 = chart._height + shiftY;
 
                             const nextSel = new Set<number>();
 
@@ -146,34 +170,37 @@ export abstract class PlotD3 extends BaseChart {
                                     const node = d3.select(this).node() as SVGGeometryElement | null;
                                     if (!node) return;
 
-                                    if (plot.nodeIntersectsRect(node, x0, y0, x1, y1)) {
+                                    if (chart.nodeIntersectsRect(node, x0, y0, x1, y1)) {
                                         nextSel.add(id);
                                     }
                                 });
 
-                            plot.selection = Array.from(nextSel);
-                            plot.events.emit(PlotEvent.BRUSH_X, plot.getSelectedSourceIndices());
-                            plot.updatePlotSelection();
+                            chart.selection = Array.from(nextSel);
+                            chart.events.emit(ChartEvent.BRUSH_X, { selection: chart.getSelectedSourceIndices() });
+                            chart.updateChartSelection();
                         } else {
-                            plot.selection = [];
-                            plot.events.emit(PlotEvent.BRUSH_X, []);
-                            plot.updatePlotSelection();
+                            chart.selection = [];
+                            chart.events.emit(ChartEvent.BRUSH_X, { selection: [] });
+                            chart.updateChartSelection();
                         }
                     });
                 cBrush.call(brush);
             });
     }
 
+    /**
+     * Enables vertical brushing interactions.
+     */
     brushYEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
         const marksGroup = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkMarksGroup');
 
-        const plot = this;
+        const chart = this;
 
         const nBrush = brushable.size();
         const extent: [[number, number], [number, number]] = (nBrush > 1) ?
-            [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]] :
-            [[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]];
+            [[-10, 0], [10, chart._height - chart._margins.top - chart._margins.bottom]] :
+            [[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]];
 
         brushable
             .each(function () {
@@ -208,43 +235,62 @@ export abstract class PlotD3 extends BaseChart {
                                     const node = d3.select(this).node() as SVGGeometryElement | null;
                                     if (!node) return;
 
-                                    if (plot.nodeIntersectsRect(node, x0, y0, x1, y1)) {
+                                    if (chart.nodeIntersectsRect(node, x0, y0, x1, y1)) {
                                         nextSel.add(id);
                                     }
                                 });
 
-                            plot.selection = Array.from(nextSel);
-                            plot.events.emit(PlotEvent.BRUSH_Y, plot.getSelectedSourceIndices());
-                            plot.updatePlotSelection();
+                            chart.selection = Array.from(nextSel);
+                            chart.events.emit(ChartEvent.BRUSH_Y, { selection: chart.getSelectedSourceIndices() });
+                            chart.updateChartSelection();
                         } else {
-                            plot.selection = [];
-                            plot.events.emit(PlotEvent.BRUSH_Y, []);
-                            plot.updatePlotSelection();
+                            chart.selection = [];
+                            chart.events.emit(ChartEvent.BRUSH_Y, { selection: [] });
+                            chart.updateChartSelection();
                         }
                     });
                 cBrush.call(brush);
             });
     }
 
-    updatePlotSelection(): void {
+    /**
+     * Applies selection styles on marks using the default/highlight palette.
+     *
+     * Subclasses can override this when selected styling is not fill-based.
+     */
+    updateChartSelection(): void {
         const svgs = d3.select(this._div).selectAll('.autkMark');
 
         svgs.style('fill', (_d: unknown, id: number) => {
 
             if (this.selection.includes(id)) {
-                return PlotStyle.highlight;
+                return ChartStyle.highlight;
             } else {
-                return PlotStyle.default;
+                return ChartStyle.default;
             }
         });
     }
 
+    /**
+     * Reads a nested value from an object using dot-notation paths.
+     * @param obj Source object.
+     * @param path Dot-notation path, for example `compute.angle`.
+     * @returns The resolved value or `undefined` when any path segment is missing.
+     */
     protected getNestedValue(obj: any, path: string): any {
         if (!obj || !path) return undefined;
-        return path.split('.').reduce((acc, part) => acc && acc[part] !== undefined ? acc[part] : undefined, obj);
+        return valueAtPath(obj, path);
     }
 
-    // Check if node geometry intersects the brush rectangle.
+    /**
+     * Tests whether a mark geometry intersects a brush rectangle.
+     * @param node SVG geometry node being tested.
+     * @param x0 Rectangle corner X.
+     * @param y0 Rectangle corner Y.
+     * @param x1 Opposite rectangle corner X.
+     * @param y1 Opposite rectangle corner Y.
+     * @returns `true` when node geometry intersects the brush rectangle.
+     */
     private nodeIntersectsRect(node: SVGGeometryElement, x0: number, y0: number, x1: number, y1: number): boolean {
         const rx0 = Math.min(x0, x1);
         const rx1 = Math.max(x0, x1);

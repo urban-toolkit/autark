@@ -1,18 +1,17 @@
 import * as d3 from "d3";
 
-import { PlotD3 } from "../plot-d3";
-import { PlotConfig } from "../types";
-import { PlotStyle } from "../plot-style";
-import { PlotEvent } from "../constants";
+import { ChartD3 } from "../chart-d3";
+import type { ChartConfig, HistogramConfig } from "../api";
+import { ChartStyle } from "../chart-style";
+import { ChartEvent } from "../events-types";
 
-interface HistogramConfig {
-    column: string;
-    numBins: number;
-    divisor: number;
-    labelSuffix: string;
-}
-
-export class Barchart extends PlotD3 {
+/**
+ * Bar chart implementation supporting categorical values and histogram mode.
+ *
+ * In histogram mode, rendered bins are mapped back to original source feature
+ * indices so interaction payloads remain stable across transformations.
+ */
+export class Barchart extends ChartD3 {
 
     protected mapX!: d3.ScaleBand<string>;
     protected mapY!: d3.ScaleLinear<number, number>;
@@ -21,8 +20,12 @@ export class Barchart extends PlotD3 {
     private _binToFeatureIds: Map<number, number[]> = new Map();
     private _rawData!: any[];
 
-    constructor(config: PlotConfig) {
-        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
+    /**
+     * Creates a bar chart instance and performs the initial draw.
+     * @param config Plot configuration with categorical axes or histogram settings.
+     */
+    constructor(config: ChartConfig) {
+        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
         super(config);
 
         if (config.histogram) {
@@ -39,10 +42,18 @@ export class Barchart extends PlotD3 {
         this.draw();
     }
 
-    // ── Histogram computation ─────────────────────────────────────────────────
+    /**
+     * Transforms raw feature values into histogram bins and updates the
+     * selection source map so selections resolve back to original feature indices.
+     * Falls back to identity mapping when not in histogram mode.
+     */
+    protected override computeTransform(): void {
+        if (!this._histogramConfig) {
+            super.computeTransform();
+            return;
+        }
 
-    private computeBins(): void {
-        const { column, numBins, divisor, labelSuffix } = this._histogramConfig!;
+        const { column, numBins, divisor = 1, labelSuffix = '' } = this._histogramConfig;
 
         const binCounts = new Array(numBins).fill(0);
         this._binToFeatureIds = new Map();
@@ -56,7 +67,6 @@ export class Barchart extends PlotD3 {
             this._binToFeatureIds.get(bin)!.push(idx);
         });
 
-        // Replace data and attributes with bin-level summaries for rendering
         this.data = Array.from({ length: numBins }, (_, i) => ({
             label: `${i}-${i + 1}${labelSuffix}`,
             count: binCounts[i],
@@ -65,43 +75,50 @@ export class Barchart extends PlotD3 {
         this.setSelectionSourceMap(new Map(this._binToFeatureIds));
     }
 
-    // ── Event overrides (histogram mode emits original feature indices) ────────
-
+    /**
+     * Overrides click handling in histogram mode to preserve bin selection
+     * behavior while emitting source feature indices.
+     * @returns Nothing. Registers click handlers on marks.
+     */
     override clickEvent(): void {
         if (!this._histogramConfig) { super.clickEvent(); return; }
 
         const svgs = d3.select(this._div).selectAll('.autkMark');
         const cls = d3.select(this._div).selectAll('.autkClear');
-        const plot = this;
+        const chart = this;
 
         svgs.each(function (_d, binIdx: number) {
             d3.select(this).on('click', function () {
-                if (plot.selection.includes(binIdx)) {
-                    plot.selection = plot.selection.filter(x => x !== binIdx);
+                if (chart.selection.includes(binIdx)) {
+                    chart.selection = chart.selection.filter(x => x !== binIdx);
                 } else {
-                    plot.selection.push(binIdx);
+                    chart.selection.push(binIdx);
                 }
-                plot.events.emit(PlotEvent.CLICK, plot.getSelectedSourceIndices());
-                plot.updatePlotSelection();
+                chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
+                chart.updateChartSelection();
             });
         });
 
         cls.on('click', function () {
-            plot.selection = [];
-            plot.events.emit(PlotEvent.CLICK, []);
-            plot.updatePlotSelection();
+            chart.selection = [];
+            chart.events.emit(ChartEvent.CLICK, { selection: [] });
+            chart.updateChartSelection();
         });
     }
 
+    /**
+     * Overrides horizontal brushing in histogram mode using band intersection.
+     * @returns Nothing. Registers brush handlers on the brush layer.
+     */
     override brushXEvent(): void {
         if (!this._histogramConfig) { super.brushXEvent(); return; }
 
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
-        const plot = this;
+        const chart = this;
 
         const extent: [[number, number], [number, number]] = [
             [0, 0],
-            [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom],
+            [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom],
         ];
 
         brushable.each(function () {
@@ -115,21 +132,21 @@ export class Barchart extends PlotD3 {
                         const nextSel = new Set<number>();
 
                         // Intersect brush x-range with each bar's x-range via the band scale
-                        plot.data.forEach((_d: any, binIdx: number) => {
-                            const label = String(plot.getNestedValue(_d, plot._attributes[0]));
-                            const barX = plot.mapX(label) ?? 0;
-                            if (barX + plot.mapX.bandwidth() > x0 && barX < x1) {
+                        chart.data.forEach((_d: any, binIdx: number) => {
+                            const label = String(chart.getNestedValue(_d, chart._attributes[0]));
+                            const barX = chart.mapX(label) ?? 0;
+                            if (barX + chart.mapX.bandwidth() > x0 && barX < x1) {
                                 nextSel.add(binIdx);
                             }
                         });
 
-                        plot.selection = Array.from(nextSel);
-                        plot.events.emit(PlotEvent.BRUSH_X, plot.getSelectedSourceIndices());
-                        plot.updatePlotSelection();
+                        chart.selection = Array.from(nextSel);
+                        chart.events.emit(ChartEvent.BRUSH_X, { selection: chart.getSelectedSourceIndices() });
+                        chart.updateChartSelection();
                     } else {
-                        plot.selection = [];
-                        plot.events.emit(PlotEvent.BRUSH_X, []);
-                        plot.updatePlotSelection();
+                        chart.selection = [];
+                        chart.events.emit(ChartEvent.BRUSH_X, { selection: [] });
+                        chart.updateChartSelection();
                     }
                 });
 
@@ -137,13 +154,11 @@ export class Barchart extends PlotD3 {
         });
     }
 
-    // ── Draw ──────────────────────────────────────────────────────────────────
-
-    public async draw(): Promise<void> {
-        if (this._histogramConfig) {
-            this.computeBins();
-        }
-
+    /**
+     * Renders chart scaffolding, axes, and bar marks.
+     * @returns Promise resolved when SVG nodes are synchronized.
+     */
+    public async render(): Promise<void> {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
@@ -264,7 +279,7 @@ export class Barchart extends PlotD3 {
             .attr('y', (d) => this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
             .attr('height', (d) => height - this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
             .attr('width', this.mapX.bandwidth())
-            .style('fill', PlotStyle.default)
+            .style('fill', ChartStyle.default)
             .style('stroke', '#2f2f2f')
             .style('visibility', 'inherit');
 

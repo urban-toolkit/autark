@@ -1,27 +1,40 @@
 import * as d3 from "d3";
 
-import { PlotD3 } from "../plot-d3";
-import { PlotConfig } from "../types";
-import { PlotStyle } from "../plot-style";
-import { PlotEvent } from "../constants";
-import { ColorMap } from 'autk-core';
+import { ChartD3 } from "../chart-d3";
+import type { ChartConfig } from "../api";
+import { ChartStyle } from "../chart-style";
+import { ChartEvent } from "../events-types";
+import { ColorMap } from '../core-types';
 
-export class ParallelCoordinates extends PlotD3 {
+/**
+ * Parallel coordinates chart for multivariate feature exploration.
+ *
+ * Supports mixed numeric/categorical dimensions and multi-axis brushing.
+ */
+export class ParallelCoordinates extends ChartD3 {
 
     protected scales: Map<string, d3.ScaleLinear<number, number> | d3.ScalePoint<string>> = new Map();
     protected axisPositions: d3.ScalePoint<string>;
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
     protected colorDimension: string | null = null;
 
-    constructor(config: PlotConfig) {
-        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
+    /**
+     * Creates a parallel coordinates chart and performs the initial draw.
+     * @param config Plot configuration for parallel coordinates rendering.
+     */
+    constructor(config: ChartConfig) {
+        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
         super(config);
 
         this.axisPositions = d3.scalePoint();
         this.draw();
     }
 
-    public async draw(): Promise<void> {
+    /**
+     * Renders axes, paths, labels, and interaction layers.
+     * @returns Promise resolved when chart nodes are synchronized.
+     */
+    public async render(): Promise<void> {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
@@ -105,7 +118,7 @@ export class ParallelCoordinates extends PlotD3 {
             .attr('data-idx', (_d, i) => i)
             .attr('d', (d) => this.path(d))
             .style('fill', 'none')
-            .style('stroke', PlotStyle.default)
+            .style('stroke', ChartStyle.default)
             .style('stroke-width', 2)
             .style('opacity', 0.7)
             .style('visibility', 'inherit');
@@ -172,11 +185,15 @@ export class ParallelCoordinates extends PlotD3 {
             .on('click', (_event, dim) => {
                 this.colorDimension = this.colorDimension === dim ? null : dim;
                 this.updateAxisLabelStyles();
-                this.updatePlotSelection();
+                this.updateChartSelection();
             });
     }
 
-    public updatePlotSelection(): void {
+    /**
+     * Re-applies line style based on current selection and color dimension.
+     * @returns Nothing. Updates SVG styles in place.
+     */
+    public updateChartSelection(): void {
         const lines = d3.select(this._div).selectAll<SVGPathElement, unknown>('.autkMark');
         const sel = this.selection;
 
@@ -191,36 +208,36 @@ export class ParallelCoordinates extends PlotD3 {
             const scale = this.scales.get(dim);
             const dimType = this.dimensionTypes.get(dim);
 
-            const plot = this;
+            const chart = this;
             if (dimType === 'numerical' && scale) {
-                const dimValues = plot.data.map(d => d ? +plot.getNestedValue(d, dim) || 0 : 0);
-                const lo = plot._domain?.[0] ?? dimValues.reduce((a, b) => Math.min(a, b), Infinity);
-                const hi = plot._domain?.[1] ?? dimValues.reduce((a, b) => Math.max(a, b), -Infinity);
+                const dimValues = chart.data.map(d => d ? +chart.getNestedValue(d, dim) || 0 : 0);
+                const lo = chart._domain?.[0] ?? dimValues.reduce((a, b) => Math.min(a, b), Infinity);
+                const hi = chart._domain?.[1] ?? dimValues.reduce((a, b) => Math.max(a, b), -Infinity);
                 strokeFn = function (this: SVGPathElement, d: unknown) {
-                    if (sel.includes(idx(this))) return PlotStyle.highlight;
-                    const v = +plot.getNestedValue(d, dim) || 0;
-                    const { r, g, b } = ColorMap.getColor(v, plot._colorMapInterpolator, [lo, hi]);
+                    if (sel.includes(idx(this))) return ChartStyle.highlight;
+                    const v = +chart.getNestedValue(d, dim) || 0;
+                    const { r, g, b } = ColorMap.getColor(v, chart._colorMapInterpolator, [lo, hi]);
                     return `rgb(${r},${g},${b})`;
                 };
             } else if (dimType === 'categorical' && scale) {
                 const catScale = scale as d3.ScalePoint<string>;
                 const categories = catScale.domain();
                 strokeFn = function (this: SVGPathElement, d: unknown) {
-                    if (sel.includes(idx(this))) return PlotStyle.highlight;
-                    const val = String(plot.getNestedValue(d, dim));
+                    if (sel.includes(idx(this))) return ChartStyle.highlight;
+                    const val = String(chart.getNestedValue(d, dim));
                     const i = categories.indexOf(val);
                     const t = categories.length <= 1 ? 0.5 : i / (categories.length - 1);
-                    const { r, g, b } = ColorMap.getColor(t, plot._colorMapInterpolator);
+                    const { r, g, b } = ColorMap.getColor(t, chart._colorMapInterpolator);
                     return `rgb(${r},${g},${b})`;
                 };
             } else {
                 strokeFn = function (this: SVGPathElement) {
-                    return sel.includes(idx(this)) ? PlotStyle.highlight : PlotStyle.default;
+                    return sel.includes(idx(this)) ? ChartStyle.highlight : ChartStyle.default;
                 };
             }
         } else {
             strokeFn = function (this: SVGPathElement) {
-                return sel.includes(idx(this)) ? PlotStyle.highlight : PlotStyle.default;
+                return sel.includes(idx(this)) ? ChartStyle.highlight : ChartStyle.default;
             };
         }
 
@@ -232,20 +249,28 @@ export class ParallelCoordinates extends PlotD3 {
         lines.filter(function (this: SVGPathElement) { return sel.includes(idx(this)); }).raise();
     }
 
+    /**
+     * Updates axis label style to reflect the active color dimension.
+     * @returns Nothing. Updates label styles in place.
+     */
     protected updateAxisLabelStyles(): void {
         d3.select(this._div).selectAll<SVGTextElement, string>('.axis-label')
             .style('fill', (dim) => { if (this.colorDimension !== dim) return '#000'; const { r, g, b } = ColorMap.getColor(0.7, this._colorMapInterpolator); return `rgb(${r},${g},${b})`; })
             .style('text-decoration', (dim) => this.colorDimension === dim ? 'underline' : 'none');
     }
 
+    /**
+     * Enables per-axis vertical brushing and emits source feature indices.
+     * @returns Nothing. Registers brush handlers for each axis.
+     */
     public brushYEvent(): void {
         const brushable = d3.selectAll<SVGGElement, string>('.autkBrushable');
-        const plot = this;
+        const chart = this;
 
         // Store active brushes extents (min/max Y values per dimension)
         const activeBrushes = new Map<string, [number, number]>();
 
-        const brushHeight = plot._height - plot._margins.top - plot._margins.bottom;
+        const brushHeight = chart._height - chart._margins.top - chart._margins.bottom;
 
         brushable.each(function () {
             const cBrush = d3.select<SVGGElement, unknown>(this);
@@ -261,29 +286,29 @@ export class ParallelCoordinates extends PlotD3 {
                     }
 
                     if (activeBrushes.size === 0) {
-                        plot.selection = [];
-                        plot.events.emit(PlotEvent.BRUSH_Y, []);
-                        plot.updatePlotSelection();
+                        chart.selection = [];
+                        chart.events.emit(ChartEvent.BRUSH_Y, { selection: [] });
+                        chart.updateChartSelection();
                         return;
                     }
 
                     const nextSel = new Set<number>();
 
                     // For each data point check if it intersects ALL active brushes
-                    plot.data.forEach((d, id) => {
+                    chart.data.forEach((d, id) => {
                         let isSelected = true;
 
                         for (const [activeDim, brushExtent] of activeBrushes) {
-                            const scale = plot.scales.get(activeDim);
-                            const dimType = plot.dimensionTypes.get(activeDim);
+                            const scale = chart.scales.get(activeDim);
+                            const dimType = chart.dimensionTypes.get(activeDim);
 
                             let y = 0;
                             if (scale && dimType === 'numerical') {
                                 const numScale = scale as d3.ScaleLinear<number, number>;
-                                y = numScale(+plot.getNestedValue(d, activeDim) || 0);
+                                y = numScale(+chart.getNestedValue(d, activeDim) || 0);
                             } else if (scale && dimType === 'categorical') {
                                 const catScale = scale as d3.ScalePoint<string>;
-                                y = catScale(String(plot.getNestedValue(d, activeDim))) ?? 0;
+                                y = catScale(String(chart.getNestedValue(d, activeDim))) ?? 0;
                             }
 
                             // If y is outside the brush extent for THIS dimension, line is not selected
@@ -298,15 +323,20 @@ export class ParallelCoordinates extends PlotD3 {
                         }
                     });
 
-                    plot.selection = Array.from(nextSel);
-                    plot.events.emit(PlotEvent.BRUSH_Y, plot.getSelectedSourceIndices());
-                    plot.updatePlotSelection();
+                    chart.selection = Array.from(nextSel);
+                    chart.events.emit(ChartEvent.BRUSH_Y, { selection: chart.getSelectedSourceIndices() });
+                    chart.updateChartSelection();
                 });
 
             cBrush.call(brush);
         });
     }
 
+    /**
+     * Generates the polyline path through all configured dimensions.
+     * @param d Render row object.
+     * @returns SVG path string for the row.
+     */
     protected path(d: any): string {
         const dimensions = this._attributes;
         const lineGenerator = d3.line<[number, number]>();

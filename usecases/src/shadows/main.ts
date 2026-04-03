@@ -7,7 +7,7 @@ import { FeatureCollection } from 'geojson';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { AutkMap, LayerType, VectorLayer } from 'autk-map';
-import { AutkChart, PlotEvent } from 'autk-plot';
+import { AutkChart, ChartEvent } from 'autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
 import shadowShader from './shadow-shader.wgsl?raw';
@@ -309,7 +309,7 @@ export class Shadows {
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,
             height: 380,
-            events: [PlotEvent.BRUSH_X],
+            events: [ChartEvent.BRUSH_X],
             histogram: {
                 column: `sjoin.avg.${this.currentMonth}`,
                 numBins: 13,
@@ -320,7 +320,7 @@ export class Shadows {
     }
 
     protected updateHistogramListeners(): void {
-        this.histogram.events.addListener(PlotEvent.BRUSH_X, ({ selection: roadIds }) => {
+        this.histogram.events.on(ChartEvent.BRUSH_X, ({ selection: roadIds }) => {
             const layer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER);
             (<VectorLayer>layer)?.setHighlightedIds(roadIds);
             this.map.draw();

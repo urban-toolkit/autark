@@ -1,23 +1,40 @@
 import * as d3 from "d3";
 
-import { PlotD3 } from "../plot-d3";
-import { PlotConfig } from "../types";
-import { PlotStyle } from "../plot-style";
-import { PlotEvent } from "../constants";
+import { ChartD3 } from "../chart-d3";
+import type { ChartConfig } from "../api";
+import { ChartStyle } from "../chart-style";
+import { ChartEvent } from "../events-types";
 
-export class Scatterplot extends PlotD3   {
+/**
+ * Two-dimensional scatter plot with optional click/brush interactions.
+ *
+ * Expects two numeric attributes: x and y.
+ */
+export class Scatterplot extends ChartD3   {
 
     protected mapX!: d3.ScaleLinear<number, number>;
     protected mapY!: d3.ScaleLinear<number, number>;
 
-    constructor(config: PlotConfig) {
-        if(config.events === undefined) { config.events = [PlotEvent.CLICK]; }
+    /**
+     * Creates a scatter plot instance and performs the initial draw.
+     * @param config Plot configuration containing two attributes and optional events.
+     */
+    constructor(config: ChartConfig) {
+        if(config.events === undefined) { config.events = [ChartEvent.CLICK]; }
         super(config);
+
+        if (this._attributes.length < 2) {
+            throw new Error('Scatterplot requires two dimensions. Provide `attributes: [x, y]` or `labels.axis: [x, y]`.');
+        }
 
         this.draw();
     }
 
-    public async draw(): Promise<void> {
+    /**
+     * Renders chart scaffolding, axes, and point marks.
+     * @returns Promise resolved when SVG nodes are synchronized.
+     */
+    public async render(): Promise<void> {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
@@ -135,7 +152,7 @@ export class Scatterplot extends PlotD3   {
             .attr('cx', (d) => this.mapX(d ? +this.getNestedValue(d, this._attributes[0]) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
             .attr('r', 3)
-            .style('fill', PlotStyle.default)
+            .style('fill', ChartStyle.default)
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();

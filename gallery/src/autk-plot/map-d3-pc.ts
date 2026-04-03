@@ -1,7 +1,7 @@
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkChart, PlotEvent } from 'autk-plot';
+import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapParallelCoordinates {
@@ -39,7 +39,7 @@ export class MapParallelCoordinates {
                 title: 'Neighborhood Characteristics' 
             },
             width: 790,
-            events: [PlotEvent.BRUSH_Y]
+            events: [ChartEvent.BRUSH_Y]
         });
     }
 
@@ -49,7 +49,7 @@ export class MapParallelCoordinates {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.addListener(PlotEvent.BRUSH_Y, ({ selection }) => {
+        this.plot.events.on(ChartEvent.BRUSH_Y, ({ selection }) => {
             const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.setHighlightedIds(selection);

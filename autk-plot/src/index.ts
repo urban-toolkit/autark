@@ -1,6 +1,11 @@
-export * from './chart';
-export { ColorMap } from 'autk-core';
-export * from './constants'
-export * from './plot-events';
-export * from './plot-style';
-export * from './types';
+/**
+ * Public entrypoint for the autk-plot package.
+ *
+ * Exposes the unified chart API, event constants, style helpers,
+ * and shared type definitions.
+ */
+export * from './main';
+export * from './core-types';
+export * from './api';
+export * from './events-types';
+export * from './chart-style';

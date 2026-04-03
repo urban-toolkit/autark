@@ -1,8 +1,9 @@
 import { FeatureCollection } from 'geojson';
 
-import { AutkChart, PlotEvent } from 'autk-plot';
+import { AutkChart, ChartEvent } from 'autk-plot';
 
 import { AutkMap, VectorLayer } from 'autk-map';
+import { MapEvent } from 'autk-map';
 
 export class MapD3 {
     protected map!: AutkMap;
@@ -38,17 +39,22 @@ export class MapD3 {
             collection: this.geojson,
             labels: { axis: ['ntaname', 'shape_area', 'shape_leng'], title: 'Table Visualization' },
             width: 790,
-            events: [PlotEvent.CLICK]
+            events: [ChartEvent.CLICK]
         });
     }
 
     protected async updateMapListeners() {
-        // Map picking events are handled through the map's internal event emitter
-        // Use the map's public API to handle interactions instead
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
+            if (selection.length > 0) {
+                this.plot.setSelection(selection);
+            } else {
+                this.plot.setSelection([]);
+            }
+        });
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.addListener(PlotEvent.CLICK, ({ selection }) => {
+        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
             const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
             layer!.setHighlightedIds(selection);
         });

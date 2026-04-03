@@ -1,6 +1,16 @@
 import * as d3 from 'd3';
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import { EventEmitter } from '../core-types';
+import type { ChartEventRecord, ChartEvents } from '../api';
 
+/**
+ * Configuration for the linechart implementation.
+ *
+ * Attributes are interpreted as:
+ * 1) timeseries array path
+ * 2) optional regression angle path
+ * 3) optional regression intercept path
+ */
 export type LinechartConfig = {
     div: HTMLElement;
     collection: FeatureCollection<Geometry, GeoJsonProperties>;
@@ -31,6 +41,7 @@ export type LinechartConfig = {
 export class Linechart {
     private _div: HTMLElement;
     private _data: GeoJsonProperties[];
+    private _selection: number[] = [];
     private _width: number;
     private _height: number;
     private _margins: { left: number; right: number; top: number; bottom: number };
@@ -40,7 +51,12 @@ export class Linechart {
     private _title: string;
     private _tickFormats: [string, string];
     private _startYear: number;
+    public events: ChartEvents = new EventEmitter<ChartEventRecord>();
 
+    /**
+     * Creates a line chart instance and renders the initial state.
+     * @param config Linechart configuration.
+     */
     constructor(config: LinechartConfig) {
         this._div = config.div;
         this._data = config.collection.features.map(f => f.properties);
@@ -54,23 +70,50 @@ export class Linechart {
         this._tickFormats = config.tickFormats ?? ['.0f', '.1f'];
         this._startYear = config.startYear ?? 0;
 
-        this._draw(null);
+        this.draw();
     }
 
-    // ── public API (consistent with other autk-plot charts) ──────────────────
+    /**
+     * Returns the active selection for the linechart.
+     * @returns Selected source feature indices.
+     */
+    public get selection(): number[] {
+        return this._selection;
+    }
 
+    /**
+     * Updates the selected feature index used to render the timeseries.
+     * @param ids Source feature indices. Only the first index is rendered.
+     */
     public setSelection(ids: number[]): void {
+        this._selection = [...ids];
         const id = ids.length > 0 ? ids[0] : null;
         this._draw(id);
     }
 
-    // ── private helpers ───────────────────────────────────────────────────────
+    /**
+     * Triggers a redraw using the current selection.
+     */
+    public async draw(): Promise<void> {
+        const id = this._selection.length > 0 ? this._selection[0] : null;
+        this._draw(id);
+    }
 
+    /**
+     * Resolves nested values from dot-notation property paths.
+     * @param obj Source object.
+     * @param path Dot-notation path.
+     * @returns Resolved value or undefined.
+     */
     private _getNestedValue(obj: any, path: string): any {
         if (!obj || !path) return undefined;
         return path.split('.').reduce((acc, part) => acc?.[part], obj);
     }
 
+    /**
+     * Draws the chart for the provided feature id, or empty state when null.
+     * @param featureId Source feature index to visualize, or null for empty state.
+     */
     private _draw(featureId: number | null): void {
         const props = featureId !== null ? this._data[featureId] : null;
 

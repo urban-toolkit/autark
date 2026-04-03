@@ -1,22 +1,35 @@
 import * as d3 from "d3";
 
-import { PlotD3 } from "../plot-d3";
-import { PlotConfig } from "../types";
-import { PlotStyle } from "../plot-style";
-import { PlotEvent } from "../constants";
+import { ChartD3 } from "../chart-d3";
+import type { ChartConfig } from "../api";
+import { ChartStyle } from "../chart-style";
+import { ChartEvent } from "../events-types";
 
-export class TableVis extends PlotD3 {
+/**
+ * Table-based visualization with sorting and row selection interactions.
+ *
+ * Selected rows are pinned to the top and keep stable source index mapping.
+ */
+export class TableVis extends ChartD3 {
 
     protected sortColumn: string | null = null;
 
-    constructor(config: PlotConfig) {
-        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
+    /**
+     * Creates a table visualization and performs the initial draw.
+     * @param config Plot configuration for table rendering.
+     */
+    constructor(config: ChartConfig) {
+        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
         super(config);
 
         this.draw();
     }
 
-    public async draw(): Promise<void> {
+    /**
+     * Renders table structure, headers, and rows.
+     * @returns Promise resolved when table nodes are synchronized.
+     */
+    public async render(): Promise<void> {
         const container = d3
             .select(this._div)
             .selectAll('.autk-table-container')
@@ -46,7 +59,7 @@ export class TableVis extends PlotD3 {
 
         // ---- Headers
         const thead = table.selectAll('thead').data([0]).join('thead');
-        const plot = this;
+        const chart = this;
 
         thead
             .selectAll('tr')
@@ -65,11 +78,11 @@ export class TableVis extends PlotD3 {
             .style('user-select', 'none')
             .text((d) => String(d))
             .on('click', (_event, axisLabel) => {
-                const attrIdx = plot._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? plot._attributes[attrIdx] : axisLabel;
-                plot.sortColumn = plot.sortColumn === attr ? null : attr;
-                plot.updateHeaderStyles();
-                plot.updatePlotSelection();
+                const attrIdx = chart._axis.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
+                chart.sortColumn = chart.sortColumn === attr ? null : attr;
+                chart.updateHeaderStyles();
+                chart.updateChartSelection();
             });
 
         // ---- Body
@@ -84,9 +97,16 @@ export class TableVis extends PlotD3 {
         this.updateHeaderStyles();
     }
 
-    // clickEvent is handled directly in renderRows to preserve original indices
+    /**
+     * Click handling is implemented in row rendering to preserve row indices.
+     * @returns Nothing.
+     */
     override clickEvent(): void { /* no-op */ }
 
+    /**
+     * Returns rows ordered by current selection and optional sort column.
+     * @returns Row descriptors with stable source indices.
+     */
     private getDisplayRows(): { idx: number; row: any }[] {
         const highlighted = this.selection
             .map(idx => ({ idx, row: this.data[idx] }))
@@ -112,9 +132,13 @@ export class TableVis extends PlotD3 {
         return [...highlighted, ...rest];
     }
 
+    /**
+     * Renders data rows and row-level interaction handlers.
+     * @param tbody Target tbody selection.
+     */
     private renderRows(tbody: d3.Selection<HTMLTableSectionElement, unknown, any, unknown>): void {
         const displayRows = this.getDisplayRows();
-        const plot = this;
+        const chart = this;
 
         const rows = tbody
             .selectAll<HTMLTableRowElement, { idx: number; row: any }>('tr')
@@ -123,24 +147,24 @@ export class TableVis extends PlotD3 {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => plot.selection.includes(d.idx) ? PlotStyle.highlight : 'transparent')
-            .style('color', (d) => plot.selection.includes(d.idx) ? '#ffffff' : '#000000')
+            .style('background-color', (d) => chart.selection.includes(d.idx) ? ChartStyle.highlight : 'transparent')
+            .style('color', (d) => chart.selection.includes(d.idx) ? '#ffffff' : '#000000')
             .on('click', function (_event, d) {
                 const id = d.idx;
-                if (plot.selection.includes(id)) {
-                    plot.selection = plot.selection.filter(loc => loc !== id);
+                if (chart.selection.includes(id)) {
+                    chart.selection = chart.selection.filter(loc => loc !== id);
                 } else {
-                    plot.selection.push(id);
+                    chart.selection.push(id);
                 }
-                plot.events.emit(PlotEvent.CLICK, plot.getSelectedSourceIndices());
-                plot.updatePlotSelection();
+                chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
+                chart.updateChartSelection();
             });
 
         rows
             .selectAll('td')
-            .data((d) => plot._attributes.map((attr, i) => ({
-                column: plot._axis[i] ?? attr,
-                value: d.row ? plot.getNestedValue(d.row, attr) : 'unknown'
+            .data((d) => chart._attributes.map((attr, i) => ({
+                column: chart._axis[i] ?? attr,
+                value: d.row ? chart.getNestedValue(d.row, attr) : 'unknown'
             })))
             .join('td')
             .style('padding', '6px 8px')
@@ -148,26 +172,34 @@ export class TableVis extends PlotD3 {
             .text((d) => typeof d.value === 'number' ? +d.value.toFixed(4) : String(d.value));
     }
 
-    override updatePlotSelection(): void {
+    /**
+     * Re-renders rows to reflect latest selection state.
+     * @returns Nothing.
+     */
+    override updateChartSelection(): void {
         const tbody = d3.select(this._div).select<HTMLTableSectionElement>('.autk-table tbody');
         if (tbody.node()) {
             this.renderRows(tbody);
         }
     }
 
+    /**
+     * Updates header styling based on active sort column.
+     * @returns Nothing.
+     */
     protected updateHeaderStyles(): void {
-        const plot = this;
+        const chart = this;
         d3.select(this._div)
             .selectAll<HTMLTableCellElement, string>('th')
             .style('color', (axisLabel) => {
-                const attrIdx = plot._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? plot._attributes[attrIdx] : axisLabel;
-                return plot.sortColumn === attr ? '#cc3300' : '#000';
+                const attrIdx = chart._axis.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
+                return chart.sortColumn === attr ? '#cc3300' : '#000';
             })
             .style('text-decoration', (axisLabel) => {
-                const attrIdx = plot._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? plot._attributes[attrIdx] : axisLabel;
-                return plot.sortColumn === attr ? 'underline' : 'none';
+                const attrIdx = chart._axis.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
+                return chart.sortColumn === attr ? 'underline' : 'none';
             });
     }
 }
