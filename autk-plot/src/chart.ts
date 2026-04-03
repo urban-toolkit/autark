@@ -62,11 +62,6 @@ export class AutkChart {
         this._plot.setSelection(selection);
     }
 
-    /** @deprecated Use setSelection instead. */
-    public setHighlightedIds(selection: number[]): void {
-        this.setSelection(selection);
-    }
-
     public async draw(): Promise<void> {
         if (this.hasDraw(this._plot)) {
             await this._plot.draw();

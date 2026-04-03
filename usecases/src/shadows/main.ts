@@ -7,7 +7,7 @@ import { FeatureCollection } from 'geojson';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { AutkMap, LayerType, VectorLayer } from 'autk-map';
-import { Barchart, PlotEvent } from 'autk-plot';
+import { AutkChart, PlotEvent } from 'autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
 import shadowShader from './shadow-shader.wgsl?raw';
@@ -15,7 +15,7 @@ import shadowShader from './shadow-shader.wgsl?raw';
 export class Shadows {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
-    protected histogram!: Barchart;
+    protected histogram!: AutkChart;
 
     protected readonly ROADS_LAYER = 'table_roads_20m';
 
@@ -303,8 +303,8 @@ export class Shadows {
     protected reloadHistogram(): void {
         this.histogramDiv.innerHTML = '';
 
-        this.histogram = new Barchart({
-            div: this.histogramDiv,
+        this.histogram = new AutkChart(this.histogramDiv, {
+            type: 'barchart',
             collection: this.roads,
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,

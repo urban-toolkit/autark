@@ -1,11 +1,11 @@
 import { FeatureCollection } from 'geojson';
 
-import { Barchart, PlotEvent } from 'autk-plot';
+import { AutkChart, PlotEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapD3 {
     protected map!: AutkMap;
-    protected plot!: Barchart;
+    protected plot!: AutkChart;
 
     protected geojson!: FeatureCollection;
 
@@ -30,8 +30,8 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new Barchart({
-            div: plotDiv,
+        this.plot = new AutkChart(plotDiv, {
+            type: 'barchart',
             collection: this.geojson,
             labels: { axis: ['ntaname', 'shape_area'], title: 'Plot example' },
             margins: { left: 60, right: 20, top: 50, bottom: 200 },

@@ -77,11 +77,6 @@ export abstract class BaseChart {
         this.updatePlotSelection();
     }
 
-    /** @deprecated Use setSelection instead. */
-    public setHighlightedIds(selection: number[]) {
-        this.setSelection(selection);
-    }
-
     public getSelectedSourceIndices(selection: number[] = this._selection): number[] {
         const sourceIndices = selection.flatMap((idx) => this._selectionSourceMap.get(idx) ?? [idx]);
         return Array.from(new Set(sourceIndices));

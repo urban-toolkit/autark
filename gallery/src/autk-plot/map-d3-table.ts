@@ -1,12 +1,12 @@
 import { FeatureCollection } from 'geojson';
 
-import { PlotD3, PlotEvent, TableVis } from 'autk-plot';
+import { AutkChart, PlotEvent } from 'autk-plot';
 
 import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapD3 {
     protected map!: AutkMap;
-    protected plot!: PlotD3;
+    protected plot!: AutkChart;
 
     protected geojson!: FeatureCollection;
 
@@ -33,8 +33,8 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new TableVis({
-            div: plotDiv,
+        this.plot = new AutkChart(plotDiv, {
+            type: 'table',
             collection: this.geojson,
             labels: { axis: ['ntaname', 'shape_area', 'shape_leng'], title: 'Table Visualization' },
             width: 790,

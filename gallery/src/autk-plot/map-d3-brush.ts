@@ -1,12 +1,12 @@
 import { FeatureCollection } from 'geojson';
 
-import { PlotD3, PlotEvent, Scatterplot } from 'autk-plot';
+import { AutkChart, PlotEvent } from 'autk-plot';
 
 import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapD3 {
     protected map!: AutkMap;
-    protected plot!: PlotD3;
+    protected plot!: AutkChart;
 
     protected geojson!: FeatureCollection;
 
@@ -32,8 +32,8 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new Scatterplot({
-            div: plotDiv,
+        this.plot = new AutkChart(plotDiv, {
+            type: 'scatterplot',
             collection: this.geojson,
             labels: { axis: ['shape_area', 'shape_leng'], title: 'Plot example' },
             width: 790,

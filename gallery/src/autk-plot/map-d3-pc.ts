@@ -1,12 +1,12 @@
 
 import { FeatureCollection } from 'geojson';
 
-import { ParallelCoordinates, PlotEvent } from 'autk-plot';
+import { AutkChart, PlotEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 
 export class MapParallelCoordinates {
     protected map!: AutkMap;
-    protected plot!: ParallelCoordinates;
+    protected plot!: AutkChart;
 
     protected geojson!: FeatureCollection;
 
@@ -31,8 +31,8 @@ export class MapParallelCoordinates {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new ParallelCoordinates({
-            div: plotDiv,
+        this.plot = new AutkChart(plotDiv, {
+            type: 'parallel-coordinates',
             collection: this.geojson,
             labels: { 
                 axis: ['shape_area', 'shape_leng', 'cdta2020'], 
@@ -49,7 +49,7 @@ export class MapParallelCoordinates {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.addListener(PlotEvent.CLICK, ({ selection }) => {
+        this.plot.events.addListener(PlotEvent.BRUSH_Y, ({ selection }) => {
             const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.setHighlightedIds(selection);

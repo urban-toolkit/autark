@@ -3,7 +3,7 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
-import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
+import { AutkChart, PlotEvent } from 'autk-plot';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
@@ -19,8 +19,8 @@ declare function setLoadingState(message: string, note?: string): void;
 export class Urbane {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
-    protected table!: TableVis;
-    protected parallel!: ParallelCoordinates;
+    protected table!: AutkChart;
+    protected parallel!: AutkChart;
 
     protected neighs!: FeatureCollection;
     protected activeBuildings!: FeatureCollection;
@@ -288,8 +288,8 @@ export class Urbane {
         const titleCol = this._currentLevel === 'neighborhoods' ? 'ntaname' : 'addr:street';
         const title = `${this._currentLevel} characteristics`;
 
-        this.parallel = new ParallelCoordinates({
-            div: this.plotDivParallel,
+        this.parallel = new AutkChart(this.plotDivParallel, {
+            type: 'parallel-coordinates',
             collection: plotData,
             attributes,
             labels: { axis: axisLabels, title },
@@ -297,8 +297,8 @@ export class Urbane {
             events: [PlotEvent.BRUSH_Y],
         });
 
-        this.table = new TableVis({
-            div: this.plotDivTable,
+        this.table = new AutkChart(this.plotDivTable, {
+            type: 'table',
             collection: plotData,
             attributes: [titleCol, ...attributes],
             labels: { axis: ['Id', ...axisLabels], title },
@@ -318,8 +318,8 @@ export class Urbane {
                 this.selectedNeighIds = selection;
             }
 
-            this.table?.setHighlightedIds(selection);
-            this.parallel?.setHighlightedIds(selection);
+            this.table?.setSelection(selection);
+            this.parallel?.setSelection(selection);
         });
     }
 
@@ -333,7 +333,7 @@ export class Urbane {
                 this.selectedNeighIds = selection;
 
             (<VectorLayer>this.map.layerManager.searchByLayerId(this._currentLevel))!.setHighlightedIds(selection);
-            this.parallel.setHighlightedIds(selection);
+            this.parallel.setSelection(selection);
         });
 
         this.parallel.events.addListener(PlotEvent.BRUSH_Y, ({ selection }) => {
@@ -341,7 +341,7 @@ export class Urbane {
                 this.selectedNeighIds = selection;
 
             (<VectorLayer>this.map.layerManager.searchByLayerId(this._currentLevel))!.setHighlightedIds(selection);
-            this.table.setHighlightedIds(selection);
+            this.table.setSelection(selection);
         });
     }
 

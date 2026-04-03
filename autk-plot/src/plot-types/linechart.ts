@@ -64,11 +64,6 @@ export class Linechart {
         this._draw(id);
     }
 
-    /** @deprecated Use setSelection instead. */
-    public setHighlightedIds(ids: number[]): void {
-        this.setSelection(ids);
-    }
-
     // ── private helpers ───────────────────────────────────────────────────────
 
     private _getNestedValue(obj: any, path: string): any {

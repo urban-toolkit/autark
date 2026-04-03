@@ -1,7 +1,7 @@
 import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
-import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
+import { AutkChart, PlotEvent, PlotStyle } from 'autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
 
 declare function setLoadingState(message: string, note?: string): void;
@@ -15,8 +15,8 @@ const HIGHLIGHT_COLOR = '#1a7a2e';
 export class OsmLayersApi {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
-    protected plot!: Scatterplot;
-    protected linechart!: Linechart;
+    protected plot!: AutkChart;
+    protected linechart!: AutkChart;
     protected geotiffData: any;
     protected roadsGeojson: any;
     protected computedRoadsGeojson: any;
@@ -208,8 +208,8 @@ export class OsmLayersApi {
     }
 
     protected setupPlot(): void {
-        this.plot = new Scatterplot({
-            div: document.getElementById('plotBody') as HTMLElement,
+        this.plot = new AutkChart(document.getElementById('plotBody') as HTMLElement, {
+            type: 'scatterplot',
             collection: this.computedRoadsGeojson,
             attributes: ['compute.intercept', 'compute.angle'],
             labels: { axis: ['Baseline LST (°C)', 'Warming angle (°)'], title: 'LST regression' },
@@ -225,8 +225,8 @@ export class OsmLayersApi {
             this.map.draw();
         });
 
-        this.linechart = new Linechart({
-            div: document.getElementById('lineChartBody') as HTMLElement,
+        this.linechart = new AutkChart(document.getElementById('lineChartBody') as HTMLElement, {
+            type: 'linechart',
             collection: this.computedRoadsGeojson,
             attributes: ['lst_timeseries', 'compute.angle', 'compute.intercept'],
             labels: { axis: ['Year', 'LST (°C)'], title: 'Selected Road LST timeseries' },
