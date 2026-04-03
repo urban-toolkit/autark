@@ -1,4 +1,4 @@
-export { ColorMapInterpolator, ColorMapDomainMode } from 'autk-core';
+export { ColorMapInterpolator, ColorMapDomainStrategy } from 'autk-core';
 
 export enum PlotEvent {
     CLICK = 'click',

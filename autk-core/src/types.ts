@@ -13,33 +13,24 @@ export type LayerType =
   | 'raster';
 
 /**
- * Domain construction modes for colormap configuration.
+ * Strategy modes for colormap domain construction.
  */
-export enum ColorMapDomainMode {
+export enum ColorMapDomainStrategy {
   USER = 'user',
   MIN_MAX = 'minMax',
   PERCENTILE = 'percentile',
 }
 
-/** Domain for sequential color scales: `[min, max]`. */
-export type SequentialDomain = [number, number];
-
-/** Domain for diverging color scales: `[min, center, max]`. */
-export type DivergingDomain = [number, number, number];
-
-/** Domain for categorical color scales: ordered list of category keys. */
-export type CategoricalDomain = string[];
-
-/** Any valid domain supported by the colormap module. */
-export type ValidDomain = SequentialDomain | DivergingDomain | CategoricalDomain;
+/** The resolved / computed domain returned by the colormap engine. */
+export type ResolvedDomain = number[] | string[];
 
 /**
- * Domain configuration for colormap generation.
+ * Specification for how the colormap domain should be derived from data.
  */
-export type ColorMapDomain =
-  | { type: ColorMapDomainMode.USER; params: number[] | string[] }
-  | { type: ColorMapDomainMode.MIN_MAX }
-  | { type: ColorMapDomainMode.PERCENTILE; params?: [number, number] };
+export type ColorMapDomainSpec =
+  | { type: ColorMapDomainStrategy.USER; params: number[] | string[] }
+  | { type: ColorMapDomainStrategy.MIN_MAX }
+  | { type: ColorMapDomainStrategy.PERCENTILE; params?: [number, number] };
 
 /**
  * Color map interpolators for thematic data visualization.
@@ -61,8 +52,8 @@ export enum ColorMapInterpolator {
 export type ColorMapConfig = {
   /** Interpolator used to convert normalized values into colors. */
   interpolator: ColorMapInterpolator;
-  /** Domain strategy used to compute or provide a colormap domain from data. */
-  domain: ColorMapDomain;
+  /** Specification of how the colormap domain should be derived from data. */
+  domainSpec: ColorMapDomainSpec;
 };
 
 /**

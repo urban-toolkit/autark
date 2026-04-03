@@ -7,9 +7,10 @@ import {
 
 import {
     Camera,
-    ColorMapDomainMode,
+    ColorMapDomainStrategy,
     ColorMapConfig,
     ColorMap,
+    ColorMapInterpolator,
     EventEmitter,
     isNumericLike,
     TriangulatorPoints,
@@ -18,9 +19,9 @@ import {
     TriangulatorBuildings,
     TriangulatorRaster,
     valueAtPath,
-} from 'autk-core';
-
-import { ColorMapInterpolator } from './color-types';
+    LayerType,
+    ResolvedDomain,
+} from './core-types';
 import { MapEvent } from './events-types';
 import type { MapEventRecord } from './events-types';
 
@@ -29,8 +30,6 @@ import {
     LayerInfo,
     LayerRenderInfo,
     LayerThematic,
-    LayerType,
-    ValidDomain,
 } from './layer-types';
 
 import {
@@ -268,7 +267,7 @@ export class AutkMap {
 
         const dataType = isNumericLike(sample) ? 'number' : typeof sample;
 
-        let resolvedDomain: ValidDomain = [];
+        let resolvedDomain: ResolvedDomain = [];
 
         const colorMap = layer.layerRenderInfo.colormap.config;
 
@@ -357,7 +356,7 @@ export class AutkMap {
 
         const mergedColorMap: ColorMapConfig = {
             interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQUENTIAL_BLUES,
-            domain: colorMap.domain ?? currentConfig.domain ?? { type: ColorMapDomainMode.MIN_MAX },
+            domainSpec: colorMap.domainSpec ?? currentConfig.domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
         };
 
         const nextColormap = {
@@ -779,7 +778,7 @@ export class AutkMap {
     private defaultColorMap(): ColorMapConfig {
         return {
             interpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            domain: { type: ColorMapDomainMode.MIN_MAX },
+            domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
         };
     }
 

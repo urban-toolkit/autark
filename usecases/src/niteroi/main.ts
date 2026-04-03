@@ -1,4 +1,4 @@
-import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainMode, VectorLayer, MapStyle } from 'autk-map';
+import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
@@ -139,9 +139,9 @@ export class OsmLayersApi {
             id: 'table_osm_roads',
             colorMap: {
                 interpolator,
-                domain: mode === 'slope'
-                    ? { type: ColorMapDomainMode.PERCENTILE, params: [0.02, 0.98] }
-                    : { type: ColorMapDomainMode.MIN_MAX },
+                domainSpec: mode === 'slope'
+                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [0.02, 0.98] }
+                    : { type: ColorMapDomainStrategy.MIN_MAX },
             },
         });
         this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });

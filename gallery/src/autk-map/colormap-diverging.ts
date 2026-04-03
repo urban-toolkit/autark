@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, ColorMapDomainMode, ColorMapInterpolator, LayerType } from 'autk-map';
+import { AutkMap, ColorMapDomainStrategy, ColorMapInterpolator, LayerType } from 'autk-map';
 
 export class ColormapDiv {
     protected map!: AutkMap;
@@ -38,7 +38,7 @@ export class ColormapDiv {
             id: layer,
             colorMap: {
                 interpolator: ColorMapInterpolator.DIVERGING_RED_BLUE,
-                domain: { type: ColorMapDomainMode.MIN_MAX },
+                domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
             },
         });
         this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.shape_area' });

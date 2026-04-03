@@ -2,20 +2,25 @@ import {
     LayerInfo,
     LayerRenderInfo,
     LayerData,
-    LayerGeometry,
-    LayerComponent,
 } from "./layer-types";
 
 import { Layer } from "./layer";
 
 import {
     Camera,
+    LayerGeometry,
+    LayerComponent,
     ColorMap,
     DEFAULT_TRANSFER_FUNCTION,
     buildTransferContext,
     computeAlphaByte,
-} from 'autk-core';
-import type { TransferFunction, RequiredTransferFunction } from 'autk-core';
+} from './core-types';
+
+import type { 
+    TransferFunction,
+    RequiredTransferFunction
+} from './core-types';
+
 import { Renderer } from "./renderer";
 
 import { Pipeline } from "./pipeline";

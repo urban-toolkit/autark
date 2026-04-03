@@ -4,23 +4,25 @@ import * as d3_scale from 'd3-scale';
 import * as d3_scheme from 'd3-scale-chromatic';
 
 import {
-    ColorMapDomainMode,
+    ColorMapDomainStrategy,
     ColorMapConfig,
     ColorHEX,
     ColorMapInterpolator,
-    CategoricalDomain,
-    DivergingDomain,
+    ResolvedDomain,
     ColorRGB,
     ColorTEX,
-    SequentialDomain,
-    ValidDomain,
 } from './types';
+
+// Internal shape aliases kept private to this module
+type SequentialDomain = [number, number];
+type DivergingDomain = [number, number, number];
+type CategoricalDomain = string[];
 
 /** Default number of texels used to sample continuous colormaps. */
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
 
 export class ColorMap {
-    private static _domainCache = new Map<string, ValidDomain>();
+    private static _domainCache = new Map<string, ResolvedDomain>();
 
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
@@ -108,10 +110,10 @@ export class ColorMap {
         config: ColorMapConfig,
         interpolator: ColorMapInterpolator,
     ): SequentialDomain | DivergingDomain {
-        const mode = config.domain.type;
+        const mode = config.domainSpec.type;
 
-        if (mode === ColorMapDomainMode.USER) {
-            const params = config.domain.params;
+        if (mode === ColorMapDomainStrategy.USER) {
+            const params = config.domainSpec.params;
             if (!params.length || params.some(v => typeof v !== 'number')) {
                 throw new Error('ColorMap USER domain for numeric interpolators must be number[].');
             }
@@ -130,8 +132,8 @@ export class ColorMap {
             return [numeric[0], numeric[numeric.length - 1]];
         }
 
-        if (mode === ColorMapDomainMode.PERCENTILE) {
-            const [lowerPercentile, upperPercentile] = config.domain.params ?? [0.02, 0.98];
+        if (mode === ColorMapDomainStrategy.PERCENTILE) {
+            const [lowerPercentile, upperPercentile] = config.domainSpec.params ?? [0.02, 0.98];
             const low = ColorMap.computePercentile(values, lowerPercentile);
             const high = ColorMap.computePercentile(values, upperPercentile);
             if (ColorMap.isDiverging(interpolator)) {
@@ -172,8 +174,8 @@ export class ColorMap {
         values: string[],
         config: ColorMapConfig,
     ): CategoricalDomain {
-        if (config.domain.type === ColorMapDomainMode.USER) {
-            return config.domain.params.map(v => String(v));
+        if (config.domainSpec.type === ColorMapDomainStrategy.USER) {
+            return config.domainSpec.params.map(v => String(v));
         }
         return ColorMap.resolveCategoricalDomain(values.map(v => String(v)));
     }
@@ -189,7 +191,7 @@ export class ColorMap {
      * @returns Ordered label strings suitable for a legend.
      */
     public static computeLabels(
-        domain: ValidDomain,
+        domain: ResolvedDomain,
     ): string[] {
         if (typeof domain[0] === 'string') return domain as string[];
 
@@ -207,14 +209,14 @@ export class ColorMap {
     public static resolveDomainFromData(
         values: number[] | string[],
         config: ColorMapConfig,
-    ): ValidDomain {
-        const cacheKey = `${config.interpolator}|${JSON.stringify(config.domain)}|${ColorMap.computeDataFingerprint(values)}`;
+    ): ResolvedDomain {
+        const cacheKey = `${config.interpolator}|${JSON.stringify(config.domainSpec)}|${ColorMap.computeDataFingerprint(values)}`;
         const cached = ColorMap._domainCache.get(cacheKey);
         if (cached) {
             return cached;
         }
 
-        let computed: ValidDomain;
+        let computed: ResolvedDomain;
         if (ColorMap.isCategorical(config.interpolator)) {
             computed = ColorMap.resolveCategoricalDomainFromConfig(values.map(v => String(v)), config);
         } else {

@@ -1,4 +1,4 @@
-import { Camera } from 'autk-core';
+import { Camera } from './core-types';
 import { LayerInfo, LayerRenderInfo } from './layer-types';
 import { Renderer } from './renderer';
 

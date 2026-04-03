@@ -6,9 +6,8 @@ import {
 import type {
     ColorMapConfig,
     TransferFunction,
-} from 'autk-core';
-
-import type { LayerType } from './layer-types';
+    LayerType,
+} from './core-types';
 
 /**
  * Dot-path accessor used by thematic mapping.

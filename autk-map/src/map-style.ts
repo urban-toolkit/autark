@@ -1,6 +1,4 @@
-import { ColorHEX, ColorRGB } from './color-types';
-
-import { ColorMap } from 'autk-core';
+import { ColorHEX, ColorRGB, ColorMap } from './core-types';
 
 import defaultStyle from './styles/default.json';
 import light from './styles/light.json';

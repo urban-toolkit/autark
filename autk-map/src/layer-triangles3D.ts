@@ -1,7 +1,7 @@
-import { LayerInfo, LayerRenderInfo, LayerData, LayerGeometry } from './layer-types';
+import { LayerInfo, LayerRenderInfo, LayerData } from './layer-types';
 
 import { Renderer } from './renderer';
-import { Camera } from 'autk-core';
+import { Camera, LayerGeometry } from './core-types';
 
 import { VectorLayer } from './layer-vector';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';

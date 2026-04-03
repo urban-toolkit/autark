@@ -5,7 +5,7 @@ import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
 import { ParallelCoordinates, TableVis, PlotEvent } from 'autk-plot';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
-import { ColorMapDomainMode } from 'autk-core';
+import { ColorMapDomainStrategy } from 'autk-core';
 
 declare function setLoadingState(message: string, note?: string): void;
 
@@ -226,7 +226,7 @@ export class Urbane {
             this.map.updateColorMap({
                 id: 'table_osm_roads',
                 colorMap: {
-                    domain: { type: ColorMapDomainMode.PERCENTILE, params: [0.15, 0.85] },
+                    domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [0.15, 0.85] },
                 },
             });
 
@@ -260,9 +260,9 @@ export class Urbane {
         this.map.updateColorMap({
             id: layerId,
             colorMap: {
-                domain: column.includes('skyExposure')
-                    ? { type: ColorMapDomainMode.PERCENTILE, params: [0.15, 0.85] }
-                    : { type: ColorMapDomainMode.MIN_MAX },
+                domainSpec: column.includes('skyExposure')
+                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [0.15, 0.85] }
+                    : { type: ColorMapDomainStrategy.MIN_MAX },
             },
         });
 

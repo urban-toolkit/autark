@@ -1,15 +1,18 @@
 export {
     Camera,
     ColorMap,
-    TriangulatorBuildings, 
-    TriangulatorPoints, 
-    TriangulatorPolygons, 
-    TriangulatorPolylines, 
-    TriangulatorRaster 
-} from 'autk-core';
+    ColorMapDomainStrategy,
+    ColorMapInterpolator,
+    TriangulatorBuildings,
+    TriangulatorPoints,
+    TriangulatorPolygons,
+    TriangulatorPolylines,
+    TriangulatorRaster,
+} from './core-types';
+
+export type { ColorHEX, ColorRGB, ColorTEX } from './core-types';
 
 export * from './api';
-export * from './color-types';
 export * from './events-types';
 export * from './layer-types';
 export * from './events-key';

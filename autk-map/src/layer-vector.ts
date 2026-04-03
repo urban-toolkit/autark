@@ -1,9 +1,7 @@
-import { Camera } from 'autk-core';
+import { Camera, LayerComponent, LayerGeometry } from './core-types';
 
 import {
-    LayerComponent, 
     LayerData, 
-    LayerGeometry, 
     LayerInfo, 
     LayerRenderInfo, 
     LayerThematic 

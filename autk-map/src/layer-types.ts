@@ -1,26 +1,12 @@
 import type {
     ColorMapConfig,
-    ValidDomain,
+    ResolvedDomain,
     LayerBorder,
     LayerBorderComponent,
     LayerComponent,
     LayerGeometry,
     LayerType,
-} from 'autk-core';
-
-/**
- * Shared type exports re-exposed from `autk-core` for map layer configuration.
- */
-export type {
-    LayerGeometry,
-    LayerComponent,
-    LayerBorder,
-    LayerBorderComponent,
-    CameraData,
-    ValidDomain,
-    LayerType,
-    BoundingBox,
-} from 'autk-core';
+} from './core-types';
 
 /**
  * Minimal metadata used to identify and order a layer in the map stack.
@@ -41,7 +27,7 @@ export interface LayerColormap {
     /** User colormap configuration (interpolator + domain mode). */
     config: ColorMapConfig;
     /** Domain computed from loaded thematic/raster data. */
-    computedDomain?: ValidDomain;
+    computedDomain?: ResolvedDomain;
     /** Labels computed from the current computed domain. */
     computedLabels?: string[];
 }

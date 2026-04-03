@@ -1,6 +1,6 @@
 import { GeoJsonProperties } from "geojson";
 
-import { PlotConfig, PlotMargins, SequentialDomain } from "./types";
+import { PlotConfig, PlotMargins } from "./types";
 import { ColorMapInterpolator } from "./constants";
 import { PlotEvents } from "./plot-events";
 
@@ -24,7 +24,7 @@ export abstract class AutkChart {
 
     protected _plotEvents!: PlotEvents;
 
-    protected _domain: SequentialDomain | undefined = undefined;
+    protected _domain: [number, number] | undefined = undefined;
     protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQUENTIAL_REDS;
 
 

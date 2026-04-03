@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, ColorMapDomainMode, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
+import { AutkMap, ColorMapDomainStrategy, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
 
 export class ColormapCat {
     protected map!: AutkMap;
@@ -47,7 +47,7 @@ export class ColormapCat {
             id: layer,
             colorMap: {
                 interpolator: ColorMapInterpolator.OBSERVABLE10,
-                domain: { type: ColorMapDomainMode.USER, params: ['primary', 'secondary', 'other'] },
+                domainSpec: { type: ColorMapDomainStrategy.USER, params: ['primary', 'secondary', 'other'] },
             },
         });
         this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.compute.highwayGroup' });

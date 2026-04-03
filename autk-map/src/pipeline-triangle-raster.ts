@@ -6,7 +6,7 @@ import rasterFragmentSource from './shaders/raster.frag.wgsl';
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
-import { Camera } from 'autk-core';
+import { Camera } from './core-types';
 
 import { RasterLayer } from './layer-raster';
 

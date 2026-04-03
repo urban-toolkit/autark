@@ -2,7 +2,7 @@
 
 import { Layer } from './layer';
 
-import { Camera, ColorMap, DEFAULT_COLORMAP_RESOLUTION } from 'autk-core';
+import { Camera, ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './core-types';
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
 
