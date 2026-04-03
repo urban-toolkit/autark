@@ -62,10 +62,7 @@ export class Barchart extends PlotD3 {
             count: binCounts[i],
         })) as any;
         this._attributes = ['label', 'count'];
-    }
-
-    private getSelectedFeatureIds(): number[] {
-        return this.selection.flatMap(binIdx => this._binToFeatureIds.get(binIdx) ?? []);
+        this.setSelectionSourceMap(new Map(this._binToFeatureIds));
     }
 
     // ── Event overrides (histogram mode emits original feature indices) ────────
@@ -84,7 +81,7 @@ export class Barchart extends PlotD3 {
                 } else {
                     plot.selection.push(binIdx);
                 }
-                plot.events.emit(PlotEvent.CLICK, plot.getSelectedFeatureIds());
+                plot.events.emit(PlotEvent.CLICK, plot.getSelectedSourceIndices());
                 plot.updatePlotSelection();
             });
         });
@@ -127,7 +124,7 @@ export class Barchart extends PlotD3 {
                         });
 
                         plot.selection = Array.from(nextSel);
-                        plot.events.emit(PlotEvent.BRUSH_X, plot.getSelectedFeatureIds());
+                        plot.events.emit(PlotEvent.BRUSH_X, plot.getSelectedSourceIndices());
                         plot.updatePlotSelection();
                     } else {
                         plot.selection = [];

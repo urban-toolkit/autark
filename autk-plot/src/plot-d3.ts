@@ -46,7 +46,7 @@ export abstract class PlotD3 extends BaseChart {
                             plot.selection.push(id);
                         }
 
-                        plot.events.emit(PlotEvent.CLICK, plot.selection);
+                        plot.events.emit(PlotEvent.CLICK, plot.getSelectedSourceIndices());
                         plot.updatePlotSelection();
                     });
             });
@@ -55,7 +55,7 @@ export abstract class PlotD3 extends BaseChart {
             .on('click', function () {
                 plot.selection = [];
 
-                plot.events.emit(PlotEvent.CLICK, plot.selection);
+                plot.events.emit(PlotEvent.CLICK, []);
                 plot.updatePlotSelection();
             });
     }
@@ -92,11 +92,11 @@ export abstract class PlotD3 extends BaseChart {
                                 });
 
                             plot.selection = Array.from(nextSel);
-                            plot.events.emit(PlotEvent.BRUSH, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH, plot.getSelectedSourceIndices());
                             plot.updatePlotSelection();
                         } else {
                             plot.selection = [];
-                            plot.events.emit(PlotEvent.BRUSH, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH, []);
                             plot.updatePlotSelection();
                         }
                     });
@@ -152,11 +152,11 @@ export abstract class PlotD3 extends BaseChart {
                                 });
 
                             plot.selection = Array.from(nextSel);
-                            plot.events.emit(PlotEvent.BRUSH_X, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_X, plot.getSelectedSourceIndices());
                             plot.updatePlotSelection();
                         } else {
                             plot.selection = [];
-                            plot.events.emit(PlotEvent.BRUSH_X, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_X, []);
                             plot.updatePlotSelection();
                         }
                     });
@@ -214,11 +214,11 @@ export abstract class PlotD3 extends BaseChart {
                                 });
 
                             plot.selection = Array.from(nextSel);
-                            plot.events.emit(PlotEvent.BRUSH_Y, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_Y, plot.getSelectedSourceIndices());
                             plot.updatePlotSelection();
                         } else {
                             plot.selection = [];
-                            plot.events.emit(PlotEvent.BRUSH_Y, plot.selection);
+                            plot.events.emit(PlotEvent.BRUSH_Y, []);
                             plot.updatePlotSelection();
                         }
                     });
