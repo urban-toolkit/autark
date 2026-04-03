@@ -7,8 +7,10 @@ import {
 
 import {
     Camera,
+    ColorMapConfig,
     ColorMap,
     EventEmitter,
+    NormalizationMode,
     TriangulatorPoints,
     TriangulatorPolygons,
     TriangulatorPolylines,
@@ -33,6 +35,7 @@ import {
 
 import {
     LoadCollectionParams,
+    UpdateColorMapParams,
     UpdateRasterParams,
     UpdateThematicParams,
 } from './api';
@@ -174,9 +177,9 @@ export class AutkMap {
      * @param params.id Unique layer identifier.
      * @param params.collection Source GeoJSON feature collection.
      * @param params.type Optional layer type override.
-     * @param params.getFnv Optional value extractor applied immediately as the initial thematic mapping.
+     * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
      */
-    loadCollection({ id, collection, type = null, getFnv }: LoadCollectionParams): void {
+    loadCollection({ id, collection, type = null, property }: LoadCollectionParams): void {
         if (!this.layerManager.bbox) {
             this.layerManager.computeBboxAndOrigin(collection);
         }
@@ -191,7 +194,7 @@ export class AutkMap {
             case 'parks':
             case 'polygons':
                 sType = sType === 'Polygon' || sType === 'MultiPolygon' ? 'polygons' : sType;
-                this.createPolygonsLayer(id, collection as FeatureCollection, sType, getFnv);
+                this.createPolygonsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
 
             case 'roads':
@@ -200,23 +203,23 @@ export class AutkMap {
             case 'polylines': {
                 const offset = TriangulatorPolylines.offset;
                 sType = sType === 'LineString' || sType === 'MultiLineString' ? 'polylines' : sType;
-                this.createPolylinesLayer(id, collection as FeatureCollection, sType, offset, getFnv);
+                this.createPolylinesLayer(id, collection as FeatureCollection, sType, offset, typeof property === 'string' ? property : undefined);
                 break;
             }
             case 'Point':
             case 'MultiPoint':
             case 'points':
                 sType = sType === 'Point' || sType === 'MultiPoint' ? 'points' : sType;
-                this.createPointsLayer(id, collection as FeatureCollection, sType, getFnv);
+                this.createPointsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
 
             case 'buildings':
-                this.createBuildingsLayer(id, collection as FeatureCollection, sType, getFnv);
+                this.createBuildingsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
 
             case 'raster':
-                if (!getFnv) { console.error(`Layer "${id}": getFnv is required for raster layers.`); return; }
-                this.createRasterLayer(id, collection, getFnv as (cell: unknown) => number);
+                if (typeof property !== 'string') { console.error(`Layer "${id}": property path string is required for raster layers.`); return; }
+                this.createRasterLayer(id, collection, property);
                 break;
 
             default:
@@ -231,19 +234,17 @@ export class AutkMap {
      * Updates the thematic (color-mapped) values of a layer from a feature collection.
      *
      * Normalization to `[0, 1]` (required by the GPU shader) and legend label
-     * generation are delegated to `ColorMap`. The caller supplies raw data values;
-     * the domain may be provided explicitly or is computed automatically.
+    * generation are delegated to `ColorMap` based on the active layer
+    * `colorMap` configuration.
      *
-     * For raster layers the raster texture is rebuilt from `getFnv`.
+     * For raster layers the raster texture is rebuilt from `property`.
      *
      * @param params Update parameters.
      * @param params.id Layer identifier.
      * @param params.collection Source feature collection.
-     * @param params.getFnv Value extractor — receives a `Feature` for vector layers, a raster cell for raster layers.
-     * @param params.domain Explicit color-scale domain. If omitted, computed from the data. Not applicable to raster layers.
-     * @param params.normalization Normalization configuration for automatic domain computation.
+     * @param params.property Dot-path accessor resolved from each feature.
      */
-    updateThematic({ id, collection, getFnv, domain, normalization }: UpdateThematicParams): void {
+    updateThematic({ id, collection, property }: UpdateThematicParams): void {
         const layer = this._layerManager.searchByLayerId(id) as VectorLayer | null;
 
         if (!layer) { return; }
@@ -252,42 +253,60 @@ export class AutkMap {
         const thematicData: LayerThematic[] = [];
 
         const features = collection.features;
-        const dataType = typeof getFnv(features[0]);
+        if (features.length === 0) { return; }
+
+        const valueAtPath = (item: unknown, path: string): unknown => {
+            return path.split('.').reduce<unknown>((acc, key) => {
+                if (acc == null || typeof acc !== 'object') return undefined;
+                return (acc as Record<string, unknown>)[key];
+            }, item);
+        };
+
+        const propertyResolver = (item: unknown) => valueAtPath(item, property);
+        const sample = features
+            .map(f => propertyResolver(f))
+            .find(v => v !== undefined && v !== null);
+
+        if (sample === undefined || sample === null) {
+            console.warn(`Thematic property not found on layer '${id}': ${property}`);
+            this.updateRenderInfo(id, { isColorMap: false });
+            return;
+        }
+
+        const dataType = typeof sample;
 
         let resolvedDomain: SequentialDomain | DivergingDomain | CategoricalDomain = [];
 
+        const colorMap = layer.layerRenderInfo.colorMap;
+        const colorMapWithoutDomain = { normalization: colorMap.normalization };
+
         if (dataType === 'number') {
-            const rawValues = features.map(f => getFnv(f) as number);
-            
-            if (domain) {
-                resolvedDomain = domain;
-            } else if (normalization) {
-                resolvedDomain = ColorMap.computeNormalizationRange(
-                    rawValues,
-                    normalization.mode,
-                    normalization.lowerPercentile,
-                    normalization.upperPercentile
-                );
-            } else {
-                resolvedDomain = ColorMap.resolveNumericDomain(rawValues, undefined);
-            }
+            const rawValues = features.map(f => Number(propertyResolver(f) ?? 0));
+
+            resolvedDomain = ColorMap.resolveNumericDomainFromConfig(rawValues, colorMapWithoutDomain);
 
             const normalized = ColorMap.normalizeValues(rawValues, resolvedDomain as SequentialDomain | DivergingDomain);
             normalized.forEach(v => thematicData.push({ values: [v] }));
         } 
         else if (dataType === 'string') {
-            const rawValues = features.map(f => getFnv(f) as string);
-            resolvedDomain = ColorMap.resolveCategoricalDomain(rawValues, domain);
+            const rawValues = features.map(f => String(propertyResolver(f) ?? ''));
+            resolvedDomain = ColorMap.resolveCategoricalDomainFromConfig(rawValues, colorMapWithoutDomain);
+            const domainSize = (resolvedDomain as CategoricalDomain).length;
+            const denominator = Math.max(1, domainSize - 1);
 
             rawValues.forEach(value => {
                 thematicData.push({ values: [
-                    (resolvedDomain as CategoricalDomain).indexOf(value) / ((resolvedDomain as CategoricalDomain).length - 1)
+                    (resolvedDomain as CategoricalDomain).indexOf(value) / denominator
                 ]});
             });
         }
 
-        this.updateRenderInfo(id, {
-            colorMapLabels: ColorMap.computeLabels(resolvedDomain)
+        this.updateColorMap({
+            id,
+            colorMap: {
+                domain: resolvedDomain,
+                labels: ColorMap.computeLabels(resolvedDomain),
+            },
         });
 
         layer.loadThematic(thematicData);
@@ -300,24 +319,34 @@ export class AutkMap {
      * @param params Update parameters.
      * @param params.id Layer identifier.
      * @param params.collection GeoTIFF-derived feature collection.
-     * @param params.getFnv Value extractor for each raster cell.
-     * @param params.domain Optional color-scale domain. If omitted, computed from values.
+     * @param params.property Dot-path accessor for each raster cell.
      * @param params.transferFunction Optional opacity transfer-function configuration.
      */
-    updateRaster({ id, collection, getFnv, domain, transferFunction }: UpdateRasterParams): void {
+    updateRaster({ id, collection, property, transferFunction }: UpdateRasterParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || layer.layerInfo.typeLayer !== 'raster') { return; }
 
         const props = collection.features[0].properties;
         if (!props) { return; }
 
-        const rasterValues: number[] = props.raster.map((row: unknown) => getFnv(row));
+        const valueAtPath = (item: unknown, path: string): unknown => {
+            return path.split('.').reduce<unknown>((acc, key) => {
+                if (acc == null || typeof acc !== 'object') return undefined;
+                return (acc as Record<string, unknown>)[key];
+            }, item);
+        };
+
+        const rasterValues: number[] = props.raster.map((row: unknown) => Number(valueAtPath(row, property) ?? 0));
 
         const rasterLayer = layer as RasterLayer;
-        const resolvedDomain = ColorMap.resolveNumericDomain(rasterValues, domain);
+        const resolvedDomain = ColorMap.resolveNumericDomainFromConfig(rasterValues, layer.layerRenderInfo.colorMap);
 
-        this.updateRenderInfo(id, {
-            colorMapLabels: ColorMap.computeLabels(resolvedDomain)
+        this.updateColorMap({
+            id,
+            colorMap: {
+                domain: resolvedDomain,
+                labels: ColorMap.computeLabels(resolvedDomain),
+            },
         });
 
         if (transferFunction) {
@@ -326,6 +355,28 @@ export class AutkMap {
 
         rasterLayer.loadRaster(rasterValues);
         rasterLayer.makeLayerDataDirty();
+    }
+
+    /**
+     * Updates color-map configuration for a layer.
+     *
+     * @param params Color-map update parameters.
+     */
+    updateColorMap({ id, colorMap }: UpdateColorMapParams): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if (!layer) { return; }
+
+        const currentConfig = layer.layerRenderInfo.colorMap;
+
+        const mergedColorMap: ColorMapConfig = {
+            interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQUENTIAL_BLUES,
+            domain: colorMap.domain,
+            labels: colorMap.labels,
+            normalization: colorMap.normalization ?? currentConfig.normalization ?? { mode: NormalizationMode.MIN_MAX },
+        };
+
+        layer.updateLayerRenderInfo({ colorMap: mergedColorMap });
+        this._ui.refreshLegend(layer);
     }
 
     /**
@@ -354,13 +405,6 @@ export class AutkMap {
             }
             needsLayerList = true;
         }
-        if ('colorMapInterpolator' in info) {
-            needsLegend = true;
-        }
-        if ('colorMapLabels' in info) {
-            needsLegend = true;
-        }
-
         layer.updateLayerRenderInfo(info);
 
         if (needsLegend) { this._ui.refreshLegend(layer); }
@@ -481,9 +525,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-    * @param getFnv Optional value extractor used to initialize thematic data.
+    * @param property Optional value extractor used to initialize thematic data.
      */
-    private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, getFnv?: (item: unknown) => number | string) {
+    private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -492,8 +536,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
+            colorMap: this.defaultColorMap(),
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -530,8 +573,8 @@ export class AutkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
-        if (getFnv) {
-            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        if (property) {
+            this.updateThematic({ id: layerName, collection: geojson, property });
         }
     }
 
@@ -542,9 +585,9 @@ export class AutkMap {
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
      * @param offset Polyline extrusion offset used by triangulation.
-    * @param getFnv Optional value extractor used to initialize thematic data.
+    * @param property Optional value extractor used to initialize thematic data.
      */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number, getFnv?: (item: unknown) => number | string) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -553,8 +596,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
+            colorMap: this.defaultColorMap(),
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -579,8 +621,8 @@ export class AutkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
-        if (getFnv) {
-            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        if (property) {
+            this.updateThematic({ id: layerName, collection: geojson, property });
         }
     }
 
@@ -590,9 +632,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-    * @param getFnv Optional value extractor used to initialize thematic data.
+    * @param property Optional value extractor used to initialize thematic data.
      */
-    private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, getFnv?: (item: unknown) => number | string) {
+    private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -601,8 +643,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
+            colorMap: this.defaultColorMap(),
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -626,8 +667,8 @@ export class AutkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
-        if (getFnv) {
-            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        if (property) {
+            this.updateThematic({ id: layerName, collection: geojson, property });
         }
     }
 
@@ -637,9 +678,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-    * @param getFnv Optional value extractor used to initialize thematic data.
+    * @param property Optional value extractor used to initialize thematic data.
      */
-    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, getFnv?: (item: unknown) => number | string) {
+    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -648,8 +689,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
+            colorMap: this.defaultColorMap(),
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -673,8 +713,8 @@ export class AutkMap {
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
-        if (getFnv) {
-            this.updateThematic({ id: layerName, collection: geojson, getFnv });
+        if (property) {
+            this.updateThematic({ id: layerName, collection: geojson, property });
         }
     }
 
@@ -683,9 +723,9 @@ export class AutkMap {
      *
      * @param layerName Target layer id.
      * @param geotiff GeoTIFF-derived feature collection.
-     * @param getFnv Value extractor for each raster row/cell payload.
+     * @param property Value extractor for each raster row/cell payload.
      */
-    private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, getFnv: (cell: unknown) => number) {
+    private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, property: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex('raster'),
@@ -694,8 +734,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            colorMapLabels: ['0.0', '1.0'],
+            colorMap: this.defaultColorMap(),
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -721,7 +760,15 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
-        this.updateRaster({ id: layerName, collection: geotiff, getFnv });
+        this.updateRaster({ id: layerName, collection: geotiff, property });
+    }
+
+    private defaultColorMap(): ColorMapConfig {
+        return {
+            interpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            labels: ['0.0', '1.0'],
+            normalization: { mode: NormalizationMode.MIN_MAX },
+        };
     }
 
     /**

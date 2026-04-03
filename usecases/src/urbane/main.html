@@ -21,7 +21,7 @@
         <canvas></canvas>
 
         <div id="controls">
-            <button id="levelBtn" title="Drill into buildings" onclick="urbane.drillDown()">
+            <button id="levelBtn" title="Drill into buildings">
                 <svg id="levelBtnDown" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 40 40">
                     <path d="M8 14 L20 26 L32 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
                 </svg>
@@ -30,7 +30,7 @@
                 </svg>
             </button>
 
-            <select id="thematicSelect" onchange="urbane.updateThematicData(this.value)"></select>
+            <select id="thematicSelect"></select>
 
             <button id="plotToggle">
                 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
@@ -53,160 +53,6 @@
     </div>
 </body>
 
-<script>
-    function setLoadingState(message, note) {
-        const text = document.getElementById('loading-text');
-        const noteEl = document.getElementById('loading-note');
-        if (text) text.textContent = message;
-        if (noteEl) noteEl.textContent = note ?? '';
-    }
-
-    function hideLoading() {
-        document.getElementById('loading-overlay')?.classList.add('hidden');
-    }
-
-    function showError(message, note) {
-        const overlay = document.getElementById('loading-overlay');
-        const title = document.getElementById('loading-title');
-        const text = document.getElementById('loading-text');
-        const noteEl = document.getElementById('loading-note');
-        overlay?.classList.remove('hidden');
-        overlay?.classList.add('error');
-        if (title) title.textContent = 'Loading Error';
-        if (text) text.textContent = message;
-        if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
-    }
-</script>
-
-<script type="module" src="/src/urbane/main.ts"></script>
-
-<script>
-    // Floating plot panel — drag via pointer capture
-    (function () {
-        const plot = document.querySelector('#plot');
-        const bar = document.querySelector('#plotBar');
-        let startX = 0, startY = 0;
-
-        plot.classList.add('hidden-plot');
-
-        document.querySelector('#plotToggle').addEventListener('click', () => {
-            plot.classList.toggle('hidden-plot');
-        });
-
-        bar.addEventListener('pointerdown', e => {
-            startX = e.clientX;
-            startY = e.clientY;
-            bar.setPointerCapture(e.pointerId);
-        });
-
-        bar.addEventListener('pointermove', e => {
-            if (!bar.hasPointerCapture(e.pointerId)) return;
-            plot.style.left = plot.offsetLeft + (e.clientX - startX) + 'px';
-            plot.style.top  = plot.offsetTop  + (e.clientY - startY) + 'px';
-            startX = e.clientX;
-            startY = e.clientY;
-        });
-
-        bar.addEventListener('pointerup', e => bar.releasePointerCapture(e.pointerId));
-    })();
-
-    // Populate UI once urbane is ready
-    window.addEventListener('urbane-ready', () => {
-        // Thematic select options
-        const select = document.querySelector('#thematicSelect');
-
-        [{ value: 'none', text: 'None' }, { value: 'compute.score', text: 'Score' }].forEach(({ value, text }) => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = text;
-            select.appendChild(opt);
-        });
-
-        urbane.datasets.forEach(dataset => {
-            const opt = document.createElement('option');
-            opt.value = `sjoin.count.${dataset}`;
-            opt.textContent = dataset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            select.appendChild(opt);
-        });
-
-        const svfOpt = document.createElement('option');
-        svfOpt.value = 'sjoin.avg.skyExposure';
-        svfOpt.textContent = 'Sky Exposure';
-        select.appendChild(svfOpt);
-
-        // Weight sliders
-        const slidersContainer = document.querySelector('#weightsSliders');
-
-        urbane.datasets.forEach((dataset, i) => {
-            const col = document.createElement('div');
-            col.className = 'weight-col';
-
-            const valueLabel = document.createElement('span');
-            valueLabel.className = 'weight-value';
-            valueLabel.textContent = urbane.weights[i].toFixed(2);
-
-            const slider = document.createElement('input');
-            slider.type = 'range';
-            slider.min = '0';
-            slider.max = '1';
-            slider.step = '0.01';
-            slider.value = urbane.weights[i];
-            slider.className = 'weight-slider';
-            slider.addEventListener('input', () => {
-                const allSliders = [...document.querySelectorAll('.weight-slider')];
-                const othersSum = allSliders.filter(s => s !== slider).reduce((sum, s) => sum + +s.value, 0);
-                const maxVal = +Math.max(0, 1 - othersSum).toFixed(2);
-                if (+slider.value > maxVal) slider.value = maxVal;
-                valueLabel.textContent = (+slider.value).toFixed(2);
-            });
-
-            const nameLabel = document.createElement('span');
-            nameLabel.className = 'weight-label';
-            nameLabel.textContent = dataset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-            col.append(valueLabel, slider, nameLabel);
-            slidersContainer.appendChild(col);
-        });
-
-        // Sky exposure weight slider
-        const svfCol = document.createElement('div');
-        svfCol.className = 'weight-col';
-
-        const svfValueLabel = document.createElement('span');
-        svfValueLabel.className = 'weight-value';
-        svfValueLabel.textContent = urbane.skyExposureWeight.toFixed(2);
-
-        const svfSlider = document.createElement('input');
-        svfSlider.type = 'range';
-        svfSlider.min = '0';
-        svfSlider.max = '1';
-        svfSlider.step = '0.01';
-        svfSlider.value = urbane.skyExposureWeight;
-        svfSlider.className = 'weight-slider';
-        svfSlider.addEventListener('input', () => {
-            const allSliders = [...document.querySelectorAll('.weight-slider')];
-            const othersSum = allSliders.filter(s => s !== svfSlider).reduce((sum, s) => sum + +s.value, 0);
-            const maxVal = +Math.max(0, 1 - othersSum).toFixed(2);
-            if (+svfSlider.value > maxVal) svfSlider.value = maxVal;
-            svfValueLabel.textContent = (+svfSlider.value).toFixed(2);
-        });
-
-        const svfNameLabel = document.createElement('span');
-        svfNameLabel.className = 'weight-label';
-        svfNameLabel.textContent = 'Sky Exposure';
-
-        svfCol.append(svfValueLabel, svfSlider, svfNameLabel);
-        slidersContainer.appendChild(svfCol);
-
-        const computeBtn = document.createElement('button');
-        computeBtn.id = 'weightsCompute';
-        computeBtn.textContent = 'Compute Score';
-        computeBtn.addEventListener('click', () => {
-            const weights = [...document.querySelectorAll('.weight-slider')].map(s => +s.value);
-            urbane.updateWeights(weights);
-        });
-        document.querySelector('#weightsPanel').appendChild(computeBtn);
-    });
-</script>
+<script type="module" src="/src/urbane/ui.ts"></script>
 
 </html>

@@ -9,7 +9,11 @@ export type {
     ColorTEX,
     BoundingBox,
     LayerType,
-    NormalizationConfig
+    NormalizationConfig,
+    SequentialDomain,
+    DivergingDomain,
+    CategoricalDomain,
+    ColorMapConfig,
 } from './types';
 
 export type { 
@@ -26,7 +30,6 @@ export { Camera } from './camera';
 export type { CameraData, ViewProjectionParams } from './camera';
 
 export { ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './colormap';
-export type { SequentialDomain, DivergingDomain, CategoricalDomain } from './colormap';
 
 export {
     DEFAULT_TRANSFER_FUNCTION,

@@ -402,7 +402,7 @@ export class AutkSpatialDb {
    * property objects (one per cell, in row-major top-to-bottom order), plus `rasterResX` / `rasterResY`
    * dimensions and a `bbox`.
    *
-   * Pass the result directly to `AutkMap.loadRasterCollection()` and supply a `getFnv` callback that
+   * Pass the result directly to `AutkMap.loadRasterCollection()` and supply a `property` callback that
    * extracts the numeric band value you want to visualise, e.g. `(cell) => cell.band_1 ?? 0`.
    *
    * @param tableName - The name of the GeoTiff table (as given to `loadGeoTiff`).

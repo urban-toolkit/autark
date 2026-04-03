@@ -2,7 +2,7 @@ declare function setLoadingState(message: string, note?: string): void;
 declare function hideLoading(): void;
 declare function showError(message: string, note?: string): void;
 
-import { Feature, FeatureCollection } from 'geojson';
+import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
@@ -190,7 +190,7 @@ export class Shadows {
                     id: layerData.name,
                     collection: layer,
                     type: 'raster',
-                    getFnv: (cell: unknown) => (cell as { avg: { shadows: number } })?.avg?.shadows || 0,
+                    property: 'avg.shadows',
                 });
                 this.map.updateRenderInfo(layerData.name, { opacity: 0.5 });
                 this.map.updateRenderInfo(layerData.name, { isColorMap: true });
@@ -253,11 +253,11 @@ export class Shadows {
 
     protected updateThematicData(): void {
         if (this.displayMode === 'heatmap') {
-            const getFnv = (item: unknown) => {
-                const feature = item as Feature;
-                return (feature.properties?.sjoin as any)?.avg?.[this.currentMonth] || 0;
-            };
-            this.map.updateThematic({ id: this.ROADS_LAYER, collection: this.roads, getFnv });
+            this.map.updateThematic({
+                id: this.ROADS_LAYER,
+                collection: this.roads,
+                property: `properties.sjoin.avg.${this.currentMonth}`,
+            });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isPick: true });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
             this.map.draw();
@@ -267,13 +267,8 @@ export class Shadows {
         // 'compute' or 'contribution' mode
         const key = this.displayMode === 'compute' ? 'shadow' : 'contribution';
         const source = this.computedRoads ?? this.roads;
-        const getFnv = this.computedRoads
-            ? (item: unknown) => {
-                const feature = item as Feature;
-                return feature.properties?.compute?.[key] ?? 0;
-              }
-            : () => 0;
-        this.map.updateThematic({ id: this.ROADS_LAYER, collection: source, getFnv });
+                const property = this.computedRoads ? `properties.compute.${key}` : 'properties.__missing__';
+                this.map.updateThematic({ id: this.ROADS_LAYER, collection: source, property });
         this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
         this.map.draw();
     }

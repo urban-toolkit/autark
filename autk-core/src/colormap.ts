@@ -3,21 +3,17 @@ import * as d3_scale from 'd3-scale';
 import * as d3_scheme from 'd3-scale-chromatic';
 
 import {
+    ColorMapConfig,
     ColorHEX,
     ColorMapInterpolator,
+    CategoricalDomain,
+    DivergingDomain,
+    NormalizationConfig,
+    NormalizationMode,
     ColorRGB,
     ColorTEX,
-    NormalizationMode
+    SequentialDomain,
 } from './types';
-
-/** Domain for sequential color scales: `[min, max]`. */
-export type SequentialDomain = [number, number];
-
-/** Domain for diverging color scales: `[min, center, max]`. */
-export type DivergingDomain = [number, number, number];
-
-/** Domain for categorical color scales: ordered list of category keys. */
-export type CategoricalDomain = string[];
 
 /** Default number of texels used to sample continuous colormaps. */
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
@@ -123,6 +119,40 @@ export class ColorMap {
     }
 
     /**
+     * Resolves a numeric domain from a color-map configuration.
+     *
+     * Priority order:
+     * 1. Explicit numeric `config.domain`
+     * 2. `config.normalization` computed range
+     * 3. Default min/max range
+     */
+    public static resolveNumericDomainFromConfig(
+        values: number[],
+        config?: Partial<ColorMapConfig>,
+    ): SequentialDomain | DivergingDomain {
+        const domain = config?.domain;
+        if (
+            Array.isArray(domain)
+            && domain.length > 0
+            && domain.every(v => typeof v === 'number')
+        ) {
+            return domain as SequentialDomain | DivergingDomain;
+        }
+
+        const normalization: NormalizationConfig | undefined = config?.normalization;
+        if (normalization) {
+            return ColorMap.computeNormalizationRange(
+                values,
+                normalization.mode,
+                normalization.lowerPercentile,
+                normalization.upperPercentile,
+            );
+        }
+
+        return ColorMap.computeNormalizationRange(values, NormalizationMode.MIN_MAX);
+    }
+
+    /**
      * Resolves a categorical domain, using the provided one when valid or computing
      * unique categories from values otherwise.
      */
@@ -138,6 +168,14 @@ export class ColorMap {
             return domain as CategoricalDomain;
         }
         return Array.from(new Set(values));
+    }
+
+    /** Resolves a categorical domain from a color-map configuration. */
+    public static resolveCategoricalDomainFromConfig(
+        values: string[],
+        config?: Partial<ColorMapConfig>,
+    ): CategoricalDomain {
+        return ColorMap.resolveCategoricalDomain(values, config?.domain);
     }
 
     /**

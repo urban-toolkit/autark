@@ -1,5 +1,5 @@
 
-import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
+import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute, RenderCompute } from 'autk-compute';
@@ -8,9 +8,14 @@ import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { NormalizationMode } from 'autk-core';
 
 declare function setLoadingState(message: string, note?: string): void;
-declare function hideLoading(): void;
-declare function showError(message: string, note?: string): void;
 
+/**
+ * Urbane use case — interactive livability explorer for Manhattan.
+ *
+ * Orchestrates the spatial database, GPU map renderer, and linked plots.
+ * Supports two exploration levels: neighborhood polygons and individual
+ * buildings within a selected neighborhood set.
+ */
 export class Urbane {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
@@ -21,9 +26,14 @@ export class Urbane {
     protected activeBuildings!: FeatureCollection;
     protected roadsWithSky?: FeatureCollection;
 
-    protected distance: number = 1000;
-    protected currentLevel: 'neighborhoods' | 'active_buildings' = 'neighborhoods';
+    protected distance: number = 300;
+    protected _currentLevel: 'neighborhoods' | 'active_buildings' = 'neighborhoods';
     protected selectedNeighIds: number[] = [];
+
+    /** Currently active exploration level. */
+    get currentLevel(): 'neighborhoods' | 'active_buildings' {
+        return this._currentLevel;
+    }
 
     protected mapCanvas!: HTMLCanvasElement;
     protected plotDivTable!: HTMLElement;
@@ -33,6 +43,14 @@ export class Urbane {
     public weights: number[] = [0.3, 0.2, 0.0, 0.5, 0.0, 0.0, 0.0];
     public skyExposureWeight: number = 0.0;
 
+    /**
+     * Entry point. Initialises the database, map, and plots, then wires up
+     * cross-component event listeners.
+     *
+     * @param canvas WebGPU canvas element.
+     * @param plotDivParallel Container for the parallel-coordinates plot.
+     * @param plotDivTable Container for the data table.
+     */
     public async run(canvas: HTMLCanvasElement, plotDivParallel: HTMLElement, plotDivTable: HTMLElement): Promise<void> {
         this.mapCanvas = canvas;
         this.plotDivParallel = plotDivParallel;
@@ -46,8 +64,11 @@ export class Urbane {
         this.updatePlotListeners();
     }
 
-    // ── Database ──────────────────────────────────────────────────────────────
-
+    /**
+     * Loads and prepares all data sources in the spatial database:
+     * OSM base layers, neighborhood boundaries, urban datasets, sky-view
+     * factor via GPU render, and the initial livability score.
+     */
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
         this.db = new AutkSpatialDb();
@@ -72,7 +93,6 @@ export class Urbane {
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395',
         });
-
         await this.db.spatialQuery({
             tableRootName: 'table_osm_buildings',
             tableJoinName: 'neighborhoods',
@@ -92,6 +112,7 @@ export class Urbane {
                     coordinateFormat: 'EPSG:3395',
                 },
             });
+
             await this.db.spatialQuery({
                 tableRootName: 'neighborhoods',
                 tableJoinName: dataset,
@@ -111,17 +132,17 @@ export class Urbane {
 
         setLoadingState('Computing sky view factor...', 'Running render-based GPU analysis for road segments.');
         const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
-        const roadsGeoJson     = await this.db.getLayer('table_osm_roads');
+        const roadsGeoJson = await this.db.getLayer('table_osm_roads');
         const rc = new RenderCompute();
-        this.roadsWithSky = await rc.renderIntoMetrics({
-            layers:     [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 } }],
-            viewpoints: roadsGeoJson,
-            tileSize:   64,
-        });
 
-        setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
+        this.roadsWithSky = await rc.renderIntoMetrics({
+            layers: [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 } }],
+            viewpoints: roadsGeoJson,
+            tileSize: 64,
+        });
         await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });
 
+        setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
         await this.db.spatialQuery({
             tableRootName: 'neighborhoods',
             tableJoinName: 'table_osm_roads',
@@ -139,18 +160,21 @@ export class Urbane {
             },
         });
 
-        setLoadingState('Computing livability score...', 'Applying weighted GPU function over neighborhood data.');
+        setLoadingState('Computing score...', 'Applying weighted GPU function over neighborhood data.');
         this.neighs = await this.computeScore(await this.db.getLayer('neighborhoods'));
     }
 
-    // ── Compute ───────────────────────────────────────────────────────────────
-
+    /**
+     * Computes a weighted livability score for each feature using a GPU
+     * analytical shader. Inputs are packed into a single `scoreInputs` array
+     * per feature (7 dataset counts + sky exposure) to stay within WebGPU
+     * buffer limits.
+     *
+     * @param geojson Source feature collection to annotate with `compute.score`.
+     */
     protected async computeScore(geojson: FeatureCollection): Promise<FeatureCollection> {
-        // Pack all normalised inputs into one array per feature so the GPU uses
-        // 3 storage buffers (vals + weights + output) instead of one per attribute,
-        // staying well within the WebGPU per-stage limit of 8.
         const invertedDatasets = new Set(['arrest', 'noise']);
-        const N = this.datasets.length + 1; // 7 datasets + sky exposure = 8
+        const N = this.datasets.length + 1;
 
         for (const f of geojson.features) {
             const p = f.properties as any;
@@ -158,7 +182,7 @@ export class Urbane {
                 const v: number = p?.sjoin?.count?.[`${d}_norm`] ?? 0;
                 return invertedDatasets.has(d) ? 1 - v : v;
             });
-            vals.push(p?.sjoin?.avg?.skyExposure_norm ?? 0); // index 7; 0 for buildings
+            vals.push(p?.sjoin?.avg?.skyExposure_norm ?? 0);
             p.scoreInputs = vals;
         }
 
@@ -178,8 +202,10 @@ export class Urbane {
         });
     }
 
-    // ── Map ───────────────────────────────────────────────────────────────────
-
+    /**
+     * Initialises the WebGPU map, loads all DB layers, and applies the
+     * initial sky-exposure thematic on the roads layer.
+     */
     protected async loadMap(): Promise<void> {
         setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
         this.map = new AutkMap(this.mapCanvas);
@@ -194,25 +220,34 @@ export class Urbane {
         }
 
         this.map.updateRenderInfo('table_osm_buildings', { isSkip: true });
-        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75 });
-        this.map.updateRenderInfo('neighborhoods', { isPick: true });
-        this.map.draw();
+        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75, isPick: true });
 
         if (this.roadsWithSky) {
+            this.map.updateColorMap({
+                id: 'table_osm_roads',
+                colorMap: {
+                    normalization: { mode: NormalizationMode.PERCENTILE, lowerPercentile: 0.15, upperPercentile: 0.85 },
+                },
+            });
+
             this.map.updateThematic({
                 id: 'table_osm_roads',
                 collection: this.roadsWithSky,
-                getFnv: (item: unknown) => {
-                    const f = item as Feature;
-                    return f.properties?.compute?.skyViewFactor ?? 0;
-                },
-                normalization: { mode: NormalizationMode.PERCENTILE, lowerPercentile: 0.15, upperPercentile: 0.85 },
+                property: 'properties.compute.skyViewFactor',
             });
             this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
         }
+
+        this.map.draw();
     }
 
-    protected updateThematicData(column: string): void {
+    /**
+     * Applies a thematic colour mapping for `column` on the active level layer.
+     * Sky-exposure columns use percentile normalisation; all others use min-max.
+     *
+     * @param column Dot-path property name, or `'none'` to disable the colour map.
+     */
+    public updateThematicData(column: string): void {
         const layerId = this.currentLevel;
         const geojson = this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
 
@@ -222,20 +257,23 @@ export class Urbane {
             return;
         }
 
-        const getFnv = (item: unknown) => {
-            const feature = item as Feature;
-            const parts = column.split('.');
-            let value: any = feature.properties as GeoJsonProperties;
-            for (const part of parts) value = value?.[part];
-            return value || 0;
-        };
+        this.map.updateColorMap({
+            id: layerId,
+            colorMap: {
+                normalization: column.includes('skyExposure')
+                    ? { mode: NormalizationMode.PERCENTILE, lowerPercentile: 0.15, upperPercentile: 0.85 }
+                    : { mode: NormalizationMode.MIN_MAX },
+            },
+        });
 
-        this.map.updateThematic({ id: layerId, collection: geojson, getFnv });
+        this.map.updateThematic({ id: layerId, collection: geojson, property: `properties.${column}` });
         this.map.updateRenderInfo(layerId, { isColorMap: true });
+        this.map.draw();
     }
 
-    // ── Plot ──────────────────────────────────────────────────────────────────
-
+    /**
+     * (Re)builds the parallel-coordinates and table plots for the active level.
+     */
     protected reloadPlot(): void {
         this.plotDivParallel.innerHTML = '';
         this.plotDivTable.innerHTML = '';
@@ -245,14 +283,10 @@ export class Urbane {
             'sjoin.avg.skyExposure',
             'compute.score',
         ];
-        const axisLabels = [
-            ...this.datasets,
-            'sky exposure',
-            'score',
-        ];
-        const plotData = this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
-        const titleCol = this.currentLevel === 'neighborhoods' ? 'ntaname' : 'addr:street';
-        const title = `${this.currentLevel} characteristics`;
+        const axisLabels = [...this.datasets, 'sky exposure', 'score'];
+        const plotData = this._currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
+        const titleCol = this._currentLevel === 'neighborhoods' ? 'ntaname' : 'addr:street';
+        const title = `${this._currentLevel} characteristics`;
 
         this.parallel = new ParallelCoordinates({
             div: this.plotDivParallel,
@@ -273,13 +307,14 @@ export class Urbane {
         });
     }
 
-    // ── Event Listeners ───────────────────────────────────────────────────────
-
+    /**
+     * Registers the map picking event to sync selections across plots.
+     */
     protected updateMapListeners(): void {
         this.map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
-            if (layerId !== this.currentLevel) return;
+            if (layerId !== this._currentLevel) return;
 
-            if (this.currentLevel === 'neighborhoods') {
+            if (this._currentLevel === 'neighborhoods') {
                 this.selectedNeighIds = selection;
             }
 
@@ -288,45 +323,53 @@ export class Urbane {
         });
     }
 
+    /**
+     * Registers plot interaction events to sync selections across the map
+     * and the other plot.
+     */
     protected updatePlotListeners(): void {
         this.table.events.addListener(PlotEvent.CLICK, ({ selection }) => {
-            if (this.currentLevel === 'neighborhoods')
+            if (this._currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
-            (<VectorLayer>this.map.layerManager.searchByLayerId(this.currentLevel))!.setHighlightedIds(selection);
+            (<VectorLayer>this.map.layerManager.searchByLayerId(this._currentLevel))!.setHighlightedIds(selection);
             this.parallel.setHighlightedIds(selection);
         });
 
         this.parallel.events.addListener(PlotEvent.BRUSH_Y, ({ selection }) => {
-            if (this.currentLevel === 'neighborhoods')
+            if (this._currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
-            (<VectorLayer>this.map.layerManager.searchByLayerId(this.currentLevel))!.setHighlightedIds(selection);
+            (<VectorLayer>this.map.layerManager.searchByLayerId(this._currentLevel))!.setHighlightedIds(selection);
             this.table.setHighlightedIds(selection);
         });
     }
 
-    // ── Weights ───────────────────────────────────────────────────────────────
-
-    public async updateWeights(newWeights: number[]): Promise<void> {
+    /**
+     * Updates scoring weights and refreshes the plots and active thematic.
+     *
+     * @param newWeights Array of dataset weights followed by the sky-exposure weight.
+     * @param thematicColumn Currently selected thematic column.
+     */
+    public async updateWeights(newWeights: number[], thematicColumn: string): Promise<void> {
         this.weights = newWeights.slice(0, this.datasets.length);
         this.skyExposureWeight = newWeights[this.datasets.length] ?? 0;
 
-        const rawLayer = await this.db.getLayer(this.currentLevel);
-        if (this.currentLevel === 'neighborhoods')
+        const rawLayer = await this.db.getLayer(this._currentLevel);
+        if (this._currentLevel === 'neighborhoods')
             this.neighs = await this.computeScore(rawLayer);
         else
             this.activeBuildings = await this.computeScore(rawLayer);
 
         this.reloadPlot();
         this.updatePlotListeners();
-
-        const thematicSelect = document.querySelector('#thematicSelect') as HTMLSelectElement;
-        this.updateThematicData(thematicSelect.value);
+        this.updateThematicData(thematicColumn);
     }
 
-    // ── Drill-down ────────────────────────────────────────────────────────────
-
+    /**
+     * Queries buildings within the selected neighborhoods and joins urban
+     * datasets and sky-exposure values to them.
+     */
     protected async updateBuildingsSelection(): Promise<void> {
         const source = this.selectedNeighIds.length > 0
             ? this.selectedNeighIds.map(id => this.neighs.features[id])
@@ -387,74 +430,38 @@ export class Urbane {
         this.activeBuildings = await this.computeScore(await this.db.getLayer('active_buildings'));
     }
 
-    public async drillDown(): Promise<void> {
-        if (this.currentLevel === 'neighborhoods' && this.selectedNeighIds.length === 0) {
+    /**
+     * Toggles between neighborhood and building exploration levels.
+     * Drilling down loads buildings for the selected neighborhoods;
+     * drilling up restores the neighborhood view.
+     *
+     * @param thematicColumn Currently selected thematic column.
+     */
+    public async drillDown(thematicColumn: string): Promise<void> {
+        if (this._currentLevel === 'neighborhoods' && this.selectedNeighIds.length === 0) {
             alert('Please select at least one neighborhood to drill down into its buildings.');
             return;
         }
 
-        const btn = document.querySelector('#levelBtn') as HTMLButtonElement;
-        const thematicSelect = document.querySelector('#thematicSelect') as HTMLSelectElement;
-        const iconDown = document.querySelector('#levelBtnDown') as HTMLElement;
-        const iconUp = document.querySelector('#levelBtnUp') as HTMLElement;
-
-        btn.disabled = true;
-
-        if (this.currentLevel === 'neighborhoods') {
-            this.currentLevel = 'active_buildings';
+        if (this._currentLevel === 'neighborhoods') {
+            this._currentLevel = 'active_buildings';
             await this.updateBuildingsSelection();
 
             this.map.loadCollection({ id: 'active_buildings', collection: this.activeBuildings, type: 'buildings' });
-            this.map.updateRenderInfo('neighborhoods', { isSkip: true });
-            this.map.updateRenderInfo('neighborhoods', { isPick: false });
-            this.map.updateRenderInfo('active_buildings', { isSkip: false });
-            this.map.updateRenderInfo('active_buildings', { isPick: true });
-
-            iconDown.style.display = 'none';
-            iconUp.style.display = '';
-            btn.title = 'Back to neighborhoods';
+            this.map.updateRenderInfo('neighborhoods', { isSkip: true, isPick: false });
+            this.map.updateRenderInfo('active_buildings', { isSkip: false, isPick: true });
         } else {
-            this.currentLevel = 'neighborhoods';
+            this._currentLevel = 'neighborhoods';
             this.selectedNeighIds = [];
 
             await this.db.removeLayer('active_buildings');
             this.map.layerManager.removeLayerById('active_buildings');
-            this.map.updateRenderInfo('neighborhoods', { isSkip: false });
-            this.map.updateRenderInfo('neighborhoods', { isPick: true });
-
-            iconDown.style.display = '';
-            iconUp.style.display = 'none';
-            btn.title = 'Drill into buildings';
+            this.map.updateRenderInfo('neighborhoods', { isSkip: false, isPick: true });
         }
 
         this.map.draw();
         this.reloadPlot();
         this.updatePlotListeners();
-        this.updateThematicData(thematicSelect.value);
-
-        btn.disabled = false;
+        this.updateThematicData(thematicColumn);
     }
 }
-
-async function main() {
-    try {
-        const canvas = document.querySelector('canvas');
-        const plotDivParallel = document.querySelector('#plotBodyParallel') as HTMLElement;
-        const plotDivTable = document.querySelector('#plotBodyTable') as HTMLElement;
-
-        if (!(canvas instanceof HTMLCanvasElement) || !plotDivParallel || !plotDivTable) {
-            throw new Error('Canvas or plot body element not found.');
-        }
-
-        const urbane = new Urbane();
-        await urbane.run(canvas, plotDivParallel, plotDivTable);
-
-        (window as any).urbane = urbane;
-        hideLoading();
-        window.dispatchEvent(new CustomEvent('urbane-ready'));
-    } catch (error) {
-        console.error(error);
-        showError('Failed to load the Urbane case study.', 'Please verify the dataset paths and reload the page.');
-    }
-}
-main();

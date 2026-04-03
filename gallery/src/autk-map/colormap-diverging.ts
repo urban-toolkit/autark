@@ -1,6 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, ColorMapInterpolator, LayerType } from 'autk-map';
-import { Feature, GeoJsonProperties } from 'geojson';
 
 export class ColormapDiv {
     protected map!: AutkMap;
@@ -35,15 +34,8 @@ export class ColormapDiv {
 
     protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
-
-        const getFnv = (item: unknown): number | string => {
-            const feature = item as Feature;
-            const properties = feature.properties as GeoJsonProperties;
-            return +properties?.shape_area || 0;
-        };
-
-        this.map.updateRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.DIVERGING_RED_BLUE });
-        this.map.updateThematic({ id: layer, collection: geojson, getFnv });
+        this.map.updateColorMap({ id: layer, colorMap: { interpolator: ColorMapInterpolator.DIVERGING_RED_BLUE } });
+        this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.shape_area' });
     }
 
 }

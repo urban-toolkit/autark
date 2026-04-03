@@ -31,6 +31,15 @@ export type NormalizationConfig = {
   upperPercentile?: number;
 };
 
+/** Domain for sequential color scales: `[min, max]`. */
+export type SequentialDomain = [number, number];
+
+/** Domain for diverging color scales: `[min, center, max]`. */
+export type DivergingDomain = [number, number, number];
+
+/** Domain for categorical color scales: ordered list of category keys. */
+export type CategoricalDomain = string[];
+
 /**
  * Color map interpolators for thematic data visualization.
  * @property SEQUENTIAL_REDS - Red color interpolation.
@@ -44,6 +53,20 @@ export enum ColorMapInterpolator {
   DIVERGING_RED_BLUE = 'interpolateRdBu',
   OBSERVABLE10 = 'schemeObservable10',
 }
+
+/**
+ * Unified color-map configuration used by map rendering and legend generation.
+ */
+export type ColorMapConfig = {
+  /** Interpolator used to convert normalized values into colors. */
+  interpolator: ColorMapInterpolator;
+  /** Labels displayed in the legend for the current map state. */
+  labels?: string[];
+  /** Explicit domain used when provided (takes precedence over normalization). */
+  domain?: SequentialDomain | DivergingDomain | CategoricalDomain;
+  /** Normalization strategy used to auto-compute domain when `domain` is omitted. */
+  normalization?: NormalizationConfig;
+};
 
 /**
  * Represents a color in hexadecimal format.

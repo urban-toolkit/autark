@@ -3,7 +3,7 @@ import { GeojsonCompute } from 'autk-compute';
 
 import { AutkMap, LayerType } from 'autk-map';
 
-import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 export class ComputeOsm {
     protected map!: AutkMap;
@@ -61,13 +61,7 @@ export class ComputeOsm {
     }
 
     protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
-        const getFnv = (item: any) => {
-            const feature = item as Feature;
-            const properties = feature.properties as GeoJsonProperties;
-            return properties?.compute.result || 0;
-        };
-
-        this.map.updateThematic({ id: 'table_osm_roads', collection: geojson, getFnv });
+        this.map.updateThematic({ id: 'table_osm_roads', collection: geojson, property: 'properties.compute.result' });
     }
 }
 

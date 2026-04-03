@@ -1,12 +1,11 @@
 import type {
+    ColorMapConfig,
     LayerBorder,
     LayerBorderComponent,
     LayerComponent,
     LayerGeometry,
     LayerType,
 } from 'autk-core';
-
-import { ColorMapInterpolator } from './color-types';
 
 /**
  * Shared type exports re-exposed from `autk-core` for map layer configuration.
@@ -44,16 +43,14 @@ export interface LayerRenderInfo {
     opacity: number;
     /** Enables thematic color interpolation when `true`. */
     isColorMap?: boolean;
-    /** Interpolator used to convert thematic values into colors. */
-    colorMapInterpolator: ColorMapInterpolator;
-    /** Labels displayed for the current color map legend. */
-    colorMapLabels: string[];
-    /** Indices of currently picked components, if any. */
-    pickedComps?: number[];
     /** Skips rendering work for this layer when `true`. */
     isSkip?: boolean;
     /** Enables picking for this layer when `true`. */
     isPick?: boolean;
+    /** Unified color-map configuration (interpolator, labels, domain, normalization). */
+    colorMap: ColorMapConfig;
+    /** Indices of currently picked components, if any. */
+    pickedComps?: number[];
 }
 
 /**

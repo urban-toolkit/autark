@@ -1,6 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
-import { Feature, GeoJsonProperties } from 'geojson';
 
 export class ColormapCat {
     protected map!: AutkMap;
@@ -37,14 +36,15 @@ export class ColormapCat {
     protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
 
-        const getFnv = (item: any): string => {
-            const feature = item as Feature;
-            const properties = feature.properties as GeoJsonProperties;
-            return ['primary', 'secondary'].includes(properties?.highway) ? properties?.highway : 'other';
-        };
+        geojson.features.forEach((feature: any) => {
+            const highway = feature?.properties?.highway;
+            feature.properties = feature.properties ?? {};
+            feature.properties.compute = feature.properties.compute ?? {};
+            feature.properties.compute.highwayGroup = ['primary', 'secondary'].includes(highway) ? highway : 'other';
+        });
 
-        this.map.updateRenderInfo(layer, { colorMapInterpolator: ColorMapInterpolator.OBSERVABLE10 });
-        this.map.updateThematic({ id: layer, collection: geojson, getFnv });
+        this.map.updateColorMap({ id: layer, colorMap: { interpolator: ColorMapInterpolator.OBSERVABLE10 } });
+        this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.compute.highwayGroup' });
     }
 
 }

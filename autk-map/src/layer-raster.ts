@@ -256,7 +256,20 @@ export class RasterLayer extends Layer {
                     return;
                 }
 
-                const color = ColorMap.getColor(d, this._layerRenderInfo.colorMapInterpolator, [transferContext.min, transferContext.max]);
+                const colorDomain = this._layerRenderInfo.colorMap.domain;
+                const numericDomain = (
+                    Array.isArray(colorDomain)
+                    && colorDomain.length > 0
+                    && colorDomain.every(v => typeof v === 'number')
+                )
+                    ? colorDomain as [number, number] | [number, number, number]
+                    : [transferContext.min, transferContext.max] as [number, number];
+
+                const color = ColorMap.getColor(
+                    d,
+                    this._layerRenderInfo.colorMap.interpolator,
+                    numericDomain,
+                );
                 const alpha = computeAlphaByte(d, transferContext);
 
                 rasterData.push(color.r);

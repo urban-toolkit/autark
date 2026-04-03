@@ -1,7 +1,6 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
-import { Feature, GeoJsonProperties } from 'geojson';
 
 export class SpatialJoin {
     protected map!: AutkMap;
@@ -66,13 +65,7 @@ export class SpatialJoin {
     protected async updateThematicData() {
         const geojson = await this.db.getLayer('neighborhoods');
 
-        const getFnv = (item: any) => {
-            const feature = item as Feature;
-            const properties = feature.properties as GeoJsonProperties;
-            return properties?.sjoin.count.noise || 0;
-        };
-
-        this.map.updateThematic({ id: 'neighborhoods', collection: geojson, getFnv });
+        this.map.updateThematic({ id: 'neighborhoods', collection: geojson, property: 'properties.sjoin.count.noise' });
     }
 }
 

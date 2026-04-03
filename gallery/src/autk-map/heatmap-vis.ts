@@ -68,13 +68,13 @@ export class GeojsonVis {
     }
 
     protected async loadLayers(): Promise<void> {
-        const getFnc = (cell: unknown) => (cell as { weighted: { noise: number } })?.weighted?.noise || 0;
+        const propertyPath = 'weighted.noise';
 
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
 
             if (layerData.type === 'raster') {
-                this.map.loadCollection({ id: layerData.name, collection: geojson, type: 'raster', getFnv: getFnc });
+                this.map.loadCollection({ id: layerData.name, collection: geojson, type: 'raster', property: propertyPath });
             }
             else {
                 this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });

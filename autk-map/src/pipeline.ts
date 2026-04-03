@@ -317,7 +317,7 @@ export abstract class Pipeline {
         const colors = {
             color: MapStyle.getColor(layer.layerInfo.typeLayer),
             highlightColor: MapStyle.getHighlightColor(),
-            colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMapInterpolator),
+            colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMap.interpolator),
             useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
             useHighlight: Boolean(layer.layerRenderInfo.isPick),
             opacity: layer.layerRenderInfo.opacity,

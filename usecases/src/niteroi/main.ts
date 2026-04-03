@@ -2,7 +2,6 @@ import { AutkMap, LayerType, ColorMapInterpolator, VectorLayer, MapStyle } from 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
-import { Feature } from 'geojson';
 import { lstRegressionShader } from './lst-regression-shader';
 
 declare function setLoadingState(message: string, note?: string): void;
@@ -136,17 +135,15 @@ export class OsmLayersApi {
             ? ColorMapInterpolator.DIVERGING_RED_BLUE
             : ColorMapInterpolator.SEQUENTIAL_REDS;
 
-        this.map.updateRenderInfo('table_osm_roads', { colorMapInterpolator: interpolator });
+        this.map.updateColorMap({ id: 'table_osm_roads', colorMap: { interpolator } });
         this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
 
         this.map.updateThematic({
             id: 'table_osm_roads',
             collection: this.roadsGeojson,
-            getFnv: (item: unknown) => {
-                const feature = item as Feature;
-                if (mode === 'slope') return feature.properties?.compute?.angle ?? 0;
-                return feature.properties?.lst_timeseries?.[year! - START_YEAR] ?? 0;
-            },
+            property: mode === 'slope'
+                ? 'properties.compute.angle'
+                : `properties.lst_timeseries.${year! - START_YEAR}`,
         });
 
         const vals: number[] = this.roadsGeojson.features.map((f: any) =>
@@ -159,7 +156,7 @@ export class OsmLayersApi {
         const fmt = mode === 'slope'
             ? (v: number) => v.toExponential(2)
             : (v: number) => v.toFixed(1);
-        this.map.updateRenderInfo('table_osm_roads', { colorMapLabels: [fmt(valMin), fmt(valMax)] });
+        this.map.updateColorMap({ id: 'table_osm_roads', colorMap: { labels: [fmt(valMin), fmt(valMax)] } });
     }
 
     protected async applyRoadslstThematic(): Promise<void> {
@@ -177,11 +174,7 @@ export class OsmLayersApi {
             id: tableName,
             collection: geotiff,
             type: 'raster',
-            getFnv: (cell) => {
-                if (!cell) return 0;
-                const props = cell as Record<string, number | bigint | string | undefined>;
-                return Number(props[defaultBand] ?? NaN);
-            },
+            property: defaultBand,
         });
 
         this.map.updateRenderInfo(tableName, { isSkip: true });
@@ -207,11 +200,7 @@ export class OsmLayersApi {
                 this.map.updateThematic({
                     id: 'lst',
                     collection: this.geotiffData,
-                    getFnv: (cell) => {
-                        if (!cell) return 0;
-                        const props = cell as Record<string, number | bigint | string | undefined>;
-                        return Number(props[bandName] ?? NaN);
-                    },
+                    property: `properties.${bandName}`,
                 });
             }
 

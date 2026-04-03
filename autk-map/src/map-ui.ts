@@ -88,8 +88,8 @@ export class AutkMapUi {
     }
 
     /**
-     * Called from updateRenderInfo when isColorMap / colorMapLabels /
-     * colorMapInterpolator changes. Updates the legend to reflect new state.
+        * Called when color-map or visibility state changes.
+        * Updates the legend to reflect new state.
      */
     refreshLegend(layer: Layer | null): void {
         if (layer && layer.layerRenderInfo.isColorMap) {
@@ -231,8 +231,8 @@ export class AutkMapUi {
         const innerWidth  = width - 4 * padding;
         const innerHeight = height - titleHeight;
 
-        const interpolator = this._activeLayer.layerRenderInfo.colorMapInterpolator;
-        const labels       = this._activeLayer.layerRenderInfo.colorMapLabels;
+        const interpolator = this._activeLayer.layerRenderInfo.colorMap.interpolator;
+        const labels       = this._activeLayer.layerRenderInfo.colorMap.labels ?? [];
         const res          = interpolator === ColorMapInterpolator.OBSERVABLE10 ? 10 : 100;
         const slc          = interpolator === ColorMapInterpolator.OBSERVABLE10 ? Math.min(labels.length, 10) : 100;
         const colorMap     = ColorMap.getColorArray(interpolator, res).slice(0, slc);
