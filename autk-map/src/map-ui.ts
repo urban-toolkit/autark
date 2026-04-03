@@ -231,8 +231,8 @@ export class AutkMapUi {
         const innerWidth  = width - 4 * padding;
         const innerHeight = height - titleHeight;
 
-        const interpolator = this._activeLayer.layerRenderInfo.colorMap.interpolator;
-        const labels       = this._activeLayer.layerRenderInfo.colorMap.labels ?? [];
+        const interpolator = this._activeLayer.layerRenderInfo.colormap.config.interpolator;
+        const labels       = this._activeLayer.layerRenderInfo.colormap.computedLabels ?? [];
         const res          = interpolator === ColorMapInterpolator.OBSERVABLE10 ? 10 : 100;
         const slc          = interpolator === ColorMapInterpolator.OBSERVABLE10 ? Math.min(labels.length, 10) : 100;
         const colorMap     = ColorMap.getColorArray(interpolator, res).slice(0, slc);
@@ -257,7 +257,7 @@ export class AutkMapUi {
         }));
 
         g.selectAll('text').data(textData).join('text')
-            .text((d) => d.label.substring(0, 3))
+            .text((d) => d.label)
             .attr('x', (d) => d.pos).attr('y', rectH + 12)
             .style('font-size', '12px').style('fill', '#333').style('text-anchor', 'middle');
     }

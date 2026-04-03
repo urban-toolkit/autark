@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, LayerType } from 'autk-map';
+import { AutkMap, ColorMapDomainMode, ColorMapInterpolator, LayerType } from 'autk-map';
 
 
 export class SpatialJoin {
@@ -64,6 +64,14 @@ export class SpatialJoin {
 
     protected async updateThematicData() {
         const geojson = await this.db.getLayer('neighborhoods');
+
+        this.map.updateColorMap({
+            id: 'neighborhoods',
+            colorMap: {
+                domain: { type: ColorMapDomainMode.MIN_MAX },
+                interpolator: ColorMapInterpolator.SEQUENTIAL_BLUES,
+            },
+        });
 
         this.map.updateThematic({ id: 'neighborhoods', collection: geojson, property: 'properties.sjoin.count.noise' });
     }

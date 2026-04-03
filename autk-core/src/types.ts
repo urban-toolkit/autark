@@ -13,23 +13,13 @@ export type LayerType =
   | 'raster';
 
 /**
- * Normalization modes for mapping data values to the [0, 1] color range.
- * @property MIN_MAX - Normalize using the minimum and maximum values of the dataset.
- * @property PERCENTILE - Normalize using percentile bounds, clamping outliers to the color range edges.
+ * Domain construction modes for colormap configuration.
  */
-export enum NormalizationMode {
+export enum ColorMapDomainMode {
+  USER = 'user',
   MIN_MAX = 'minMax',
   PERCENTILE = 'percentile',
 }
-
-/**
- * Normalization configuration shared across map, plot, and compute modules.
- */
-export type NormalizationConfig = {
-  mode: NormalizationMode;
-  lowerPercentile?: number;
-  upperPercentile?: number;
-};
 
 /** Domain for sequential color scales: `[min, max]`. */
 export type SequentialDomain = [number, number];
@@ -39,6 +29,17 @@ export type DivergingDomain = [number, number, number];
 
 /** Domain for categorical color scales: ordered list of category keys. */
 export type CategoricalDomain = string[];
+
+/** Any valid domain supported by the colormap module. */
+export type ValidDomain = SequentialDomain | DivergingDomain | CategoricalDomain;
+
+/**
+ * Domain configuration for colormap generation.
+ */
+export type ColorMapDomain =
+  | { type: ColorMapDomainMode.USER; params: number[] | string[] }
+  | { type: ColorMapDomainMode.MIN_MAX }
+  | { type: ColorMapDomainMode.PERCENTILE; params?: [number, number] };
 
 /**
  * Color map interpolators for thematic data visualization.
@@ -60,12 +61,8 @@ export enum ColorMapInterpolator {
 export type ColorMapConfig = {
   /** Interpolator used to convert normalized values into colors. */
   interpolator: ColorMapInterpolator;
-  /** Labels displayed in the legend for the current map state. */
-  labels?: string[];
-  /** Explicit domain used when provided (takes precedence over normalization). */
-  domain?: SequentialDomain | DivergingDomain | CategoricalDomain;
-  /** Normalization strategy used to auto-compute domain when `domain` is omitted. */
-  normalization?: NormalizationConfig;
+  /** Domain strategy used to compute or provide a colormap domain from data. */
+  domain: ColorMapDomain;
 };
 
 /**

@@ -1,5 +1,5 @@
 export {
-    NormalizationMode,
+    ColorMapDomainMode,
     ColorMapInterpolator,
 } from 'autk-core';
 

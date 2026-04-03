@@ -64,6 +64,9 @@ export class RasterLayer extends Layer {
      */
     protected _rasterData!: number[];
 
+    /** Canonical scalar raster payload used for domain recomputation. */
+    protected _rasterValues: number[] = [];
+
     /** Opacity transfer-function configuration used while rebuilding raster RGBA data. */
     protected _transferFunction: RequiredTransferFunction = { ...DEFAULT_TRANSFER_FUNCTION };
 
@@ -138,6 +141,11 @@ export class RasterLayer extends Layer {
      */
     get rasterData(): number[] {
         return this._rasterData;
+    }
+
+    /** Original scalar raster values (not normalized). */
+    get rasterValues(): number[] {
+        return this._rasterValues;
     }
 
     /**
@@ -237,6 +245,8 @@ export class RasterLayer extends Layer {
             return;
         }
 
+        this._rasterValues = [...rasterValues];
+
         const isRGBA = rasterValues.length === this._rasterResX * this._rasterResY * 4;
         if (!isRGBA) {
             const validValues = rasterValues.filter(v => !isNaN(v));
@@ -256,7 +266,7 @@ export class RasterLayer extends Layer {
                     return;
                 }
 
-                const colorDomain = this._layerRenderInfo.colorMap.domain;
+                const colorDomain = this._layerRenderInfo.colormap.computedDomain;
                 const numericDomain = (
                     Array.isArray(colorDomain)
                     && colorDomain.length > 0
@@ -267,7 +277,7 @@ export class RasterLayer extends Layer {
 
                 const color = ColorMap.getColor(
                     d,
-                    this._layerRenderInfo.colorMap.interpolator,
+                    this._layerRenderInfo.colormap.config.interpolator,
                     numericDomain,
                 );
                 const alpha = computeAlphaByte(d, transferContext);

@@ -7,15 +7,17 @@ import {
 
 import {
     Camera,
+    ColorMapDomainMode,
     ColorMapConfig,
     ColorMap,
     EventEmitter,
-    NormalizationMode,
+    isNumericLike,
     TriangulatorPoints,
     TriangulatorPolygons,
     TriangulatorPolylines,
     TriangulatorBuildings,
     TriangulatorRaster,
+    valueAtPath,
 } from 'autk-core';
 
 import { ColorMapInterpolator } from './color-types';
@@ -28,9 +30,7 @@ import {
     LayerRenderInfo,
     LayerThematic,
     LayerType,
-    SequentialDomain,
-    DivergingDomain,
-    CategoricalDomain,
+    ValidDomain,
 } from './layer-types';
 
 import {
@@ -255,13 +255,6 @@ export class AutkMap {
         const features = collection.features;
         if (features.length === 0) { return; }
 
-        const valueAtPath = (item: unknown, path: string): unknown => {
-            return path.split('.').reduce<unknown>((acc, key) => {
-                if (acc == null || typeof acc !== 'object') return undefined;
-                return (acc as Record<string, unknown>)[key];
-            }, item);
-        };
-
         const propertyResolver = (item: unknown) => valueAtPath(item, property);
         const sample = features
             .map(f => propertyResolver(f))
@@ -273,41 +266,40 @@ export class AutkMap {
             return;
         }
 
-        const dataType = typeof sample;
+        const dataType = isNumericLike(sample) ? 'number' : typeof sample;
 
-        let resolvedDomain: SequentialDomain | DivergingDomain | CategoricalDomain = [];
+        let resolvedDomain: ValidDomain = [];
 
-        const colorMap = layer.layerRenderInfo.colorMap;
-        const colorMapWithoutDomain = { normalization: colorMap.normalization };
+        const colorMap = layer.layerRenderInfo.colormap.config;
 
         if (dataType === 'number') {
-            const rawValues = features.map(f => Number(propertyResolver(f) ?? 0));
+            const rawValues = features.map(f => {
+                const numeric = Number(propertyResolver(f));
+                return Number.isFinite(numeric) ? numeric : 0;
+            });
 
-            resolvedDomain = ColorMap.resolveNumericDomainFromConfig(rawValues, colorMapWithoutDomain);
-
-            const normalized = ColorMap.normalizeValues(rawValues, resolvedDomain as SequentialDomain | DivergingDomain);
-            normalized.forEach(v => thematicData.push({ values: [v] }));
+            resolvedDomain = ColorMap.resolveDomainFromData(rawValues, colorMap);
+            rawValues.forEach(v => thematicData.push({ values: [v] }));
         } 
         else if (dataType === 'string') {
             const rawValues = features.map(f => String(propertyResolver(f) ?? ''));
-            resolvedDomain = ColorMap.resolveCategoricalDomainFromConfig(rawValues, colorMapWithoutDomain);
-            const domainSize = (resolvedDomain as CategoricalDomain).length;
-            const denominator = Math.max(1, domainSize - 1);
-
+            const categoricalDomain = ColorMap.resolveDomainFromData(rawValues, colorMap) as string[];
+            resolvedDomain = categoricalDomain;
             rawValues.forEach(value => {
                 thematicData.push({ values: [
-                    (resolvedDomain as CategoricalDomain).indexOf(value) / denominator
+                    categoricalDomain.indexOf(value)
                 ]});
             });
         }
 
-        this.updateColorMap({
-            id,
-            colorMap: {
-                domain: resolvedDomain,
-                labels: ColorMap.computeLabels(resolvedDomain),
+        layer.updateLayerRenderInfo({
+            colormap: {
+                ...layer.layerRenderInfo.colormap,
+                computedDomain: resolvedDomain,
+                computedLabels: ColorMap.computeLabels(resolvedDomain),
             },
         });
+        this._ui.refreshLegend(layer);
 
         layer.loadThematic(thematicData);
         layer.makeLayerDataDirty();
@@ -329,25 +321,20 @@ export class AutkMap {
         const props = collection.features[0].properties;
         if (!props) { return; }
 
-        const valueAtPath = (item: unknown, path: string): unknown => {
-            return path.split('.').reduce<unknown>((acc, key) => {
-                if (acc == null || typeof acc !== 'object') return undefined;
-                return (acc as Record<string, unknown>)[key];
-            }, item);
-        };
-
         const rasterValues: number[] = props.raster.map((row: unknown) => Number(valueAtPath(row, property) ?? 0));
 
         const rasterLayer = layer as RasterLayer;
-        const resolvedDomain = ColorMap.resolveNumericDomainFromConfig(rasterValues, layer.layerRenderInfo.colorMap);
+        const config = layer.layerRenderInfo.colormap.config;
+        const resolvedDomain = ColorMap.resolveDomainFromData(rasterValues, config);
 
-        this.updateColorMap({
-            id,
-            colorMap: {
-                domain: resolvedDomain,
-                labels: ColorMap.computeLabels(resolvedDomain),
+        layer.updateLayerRenderInfo({
+            colormap: {
+                ...layer.layerRenderInfo.colormap,
+                computedDomain: resolvedDomain,
+                computedLabels: ColorMap.computeLabels(resolvedDomain),
             },
         });
+        this._ui.refreshLegend(layer);
 
         if (transferFunction) {
             rasterLayer.setTransferFunction(transferFunction);
@@ -366,16 +353,42 @@ export class AutkMap {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
 
-        const currentConfig = layer.layerRenderInfo.colorMap;
+        const currentConfig = layer.layerRenderInfo.colormap.config;
 
         const mergedColorMap: ColorMapConfig = {
             interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQUENTIAL_BLUES,
-            domain: colorMap.domain,
-            labels: colorMap.labels,
-            normalization: colorMap.normalization ?? currentConfig.normalization ?? { mode: NormalizationMode.MIN_MAX },
+            domain: colorMap.domain ?? currentConfig.domain ?? { type: ColorMapDomainMode.MIN_MAX },
         };
 
-        layer.updateLayerRenderInfo({ colorMap: mergedColorMap });
+        const nextColormap = {
+            ...layer.layerRenderInfo.colormap,
+            config: mergedColorMap,
+        };
+
+        if (layer.layerInfo.typeLayer === 'raster') {
+            const rasterLayer = layer as RasterLayer;
+            const rasterValues = rasterLayer.rasterValues;
+            if (rasterValues.length > 0) {
+                const domain = ColorMap.resolveDomainFromData(rasterValues, mergedColorMap);
+                nextColormap.computedDomain = domain;
+                nextColormap.computedLabels = ColorMap.computeLabels(domain);
+                layer.updateLayerRenderInfo({ colormap: nextColormap });
+                rasterLayer.loadRaster(rasterValues);
+                rasterLayer.makeLayerDataDirty();
+                this._ui.refreshLegend(layer);
+                return;
+            }
+        } else {
+            const vectorLayer = layer as VectorLayer;
+            const thematicValues = vectorLayer.thematic;
+            if (thematicValues.length > 0) {
+                const domain = ColorMap.resolveDomainFromData(thematicValues, mergedColorMap);
+                nextColormap.computedDomain = domain;
+                nextColormap.computedLabels = ColorMap.computeLabels(domain);
+            }
+        }
+
+        layer.updateLayerRenderInfo({ colormap: nextColormap });
         this._ui.refreshLegend(layer);
     }
 
@@ -536,7 +549,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMap: this.defaultColorMap(),
+            colormap: { config: this.defaultColorMap() },
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -596,7 +609,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMap: this.defaultColorMap(),
+            colormap: { config: this.defaultColorMap() },
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -643,7 +656,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMap: this.defaultColorMap(),
+            colormap: { config: this.defaultColorMap() },
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -689,7 +702,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMap: this.defaultColorMap(),
+            colormap: { config: this.defaultColorMap() },
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -734,7 +747,7 @@ export class AutkMap {
 
         const layerRenderInfo: LayerRenderInfo = {
             opacity: 1.0,
-            colorMap: this.defaultColorMap(),
+            colormap: { config: this.defaultColorMap() },
             isColorMap: false,
             isPick: false,
             isSkip: false,
@@ -766,8 +779,7 @@ export class AutkMap {
     private defaultColorMap(): ColorMapConfig {
         return {
             interpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
-            labels: ['0.0', '1.0'],
-            normalization: { mode: NormalizationMode.MIN_MAX },
+            domain: { type: ColorMapDomainMode.MIN_MAX },
         };
     }
 

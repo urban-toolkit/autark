@@ -71,6 +71,9 @@ export abstract class Pipeline {
      */
     protected _opacity!: GPUBuffer;
 
+    /** Colormap domain parameters: [min, max, useNormalization, _pad]. */
+    protected _domainBuffer!: GPUBuffer;
+
     /**
      * Render information bind group
      */
@@ -97,6 +100,8 @@ export abstract class Pipeline {
     private _useHighlightData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
     /** Cached opacity uniform payload. */
     private _opacityData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
+    /** Cached domain uniform payload. */
+    private _domainData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
 
     /**
      * Pipeline constructor
@@ -234,6 +239,12 @@ export abstract class Pipeline {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
+        this._domainBuffer = this._renderer.device.createBuffer({
+            label: 'Colormap domain buffer',
+            size: 4 * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
         this._renderInfoBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [
                 {
@@ -271,6 +282,11 @@ export abstract class Pipeline {
                     visibility: GPUShaderStage.FRAGMENT,
                     buffer: {},
                 },
+                {
+                    binding: 7, // colormap domain params
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {},
+                },
             ],
         });
 
@@ -305,6 +321,10 @@ export abstract class Pipeline {
                     binding: 6,
                     resource: { buffer: this._opacity },
                 },
+                {
+                    binding: 7,
+                    resource: { buffer: this._domainBuffer },
+                },
             ],
         });
     }
@@ -317,11 +337,23 @@ export abstract class Pipeline {
         const colors = {
             color: MapStyle.getColor(layer.layerInfo.typeLayer),
             highlightColor: MapStyle.getHighlightColor(),
-            colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colorMap.interpolator),
+            colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colormap.config.interpolator),
             useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
             useHighlight: Boolean(layer.layerRenderInfo.isPick),
             opacity: layer.layerRenderInfo.opacity,
         };
+
+        const computedDomain = layer.layerRenderInfo.colormap.computedDomain;
+        const isNumericDomain = Array.isArray(computedDomain)
+            && computedDomain.length > 0
+            && computedDomain.every(v => typeof v === 'number');
+        const isCategoricalDomain = Array.isArray(computedDomain)
+            && computedDomain.length > 0
+            && computedDomain.every(v => typeof v === 'string');
+
+        const min = isNumericDomain ? Number(computedDomain[0]) : 0;
+        const max = isNumericDomain ? Number(computedDomain[computedDomain.length - 1]) : 1;
+        const categoryCount = isCategoricalDomain ? computedDomain.length : 0;
 
         this._colorData[0] = colors.color.r;
         this._colorData[1] = colors.color.g;
@@ -336,6 +368,10 @@ export abstract class Pipeline {
         this._useColorMapData[0] = colors.useColorMap ? 1.0 : 0.0;
         this._useHighlightData[0] = colors.useHighlight ? 1.0 : 0.0;
         this._opacityData[0] = colors.opacity;
+        this._domainData[0] = min;
+        this._domainData[1] = max;
+        this._domainData[2] = isNumericDomain ? 1.0 : (isCategoricalDomain ? 2.0 : 0.0);
+        this._domainData[3] = categoryCount;
 
         const colorMapTexture = new Uint8Array(colors.colorMap);
 
@@ -350,6 +386,7 @@ export abstract class Pipeline {
             { width: DEFAULT_COLORMAP_RESOLUTION, height: COLORMAP_HEIGHT },
         );
         this._renderer.device.queue.writeBuffer(this._opacity, 0, this._opacityData);
+        this._renderer.device.queue.writeBuffer(this._domainBuffer, 0, this._domainData);
     }
 
     /**
@@ -366,6 +403,7 @@ export abstract class Pipeline {
         this._useColorMap?.destroy();
         this._useHighlight?.destroy();
         this._opacity?.destroy();
+        this._domainBuffer?.destroy();
         this._cMapTexture?.destroy();
     }
 

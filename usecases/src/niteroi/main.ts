@@ -1,4 +1,4 @@
-import { AutkMap, LayerType, ColorMapInterpolator, VectorLayer, MapStyle } from 'autk-map';
+import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainMode, VectorLayer, MapStyle } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { Scatterplot, PlotEvent, Linechart, PlotStyle } from 'autk-plot';
@@ -135,7 +135,15 @@ export class OsmLayersApi {
             ? ColorMapInterpolator.DIVERGING_RED_BLUE
             : ColorMapInterpolator.SEQUENTIAL_REDS;
 
-        this.map.updateColorMap({ id: 'table_osm_roads', colorMap: { interpolator } });
+        this.map.updateColorMap({
+            id: 'table_osm_roads',
+            colorMap: {
+                interpolator,
+                domain: mode === 'slope'
+                    ? { type: ColorMapDomainMode.PERCENTILE, params: [0.02, 0.98] }
+                    : { type: ColorMapDomainMode.MIN_MAX },
+            },
+        });
         this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
 
         this.map.updateThematic({
@@ -146,17 +154,7 @@ export class OsmLayersApi {
                 : `properties.lst_timeseries.${year! - START_YEAR}`,
         });
 
-        const vals: number[] = this.roadsGeojson.features.map((f: any) =>
-            mode === 'slope'
-                ? (f.properties?.compute?.angle ?? 0)
-                : (f.properties?.lst_timeseries?.[year! - START_YEAR] ?? 0)
-        );
-        const valMin = vals.reduce((a, b) => Math.min(a, b),  Infinity);
-        const valMax = vals.reduce((a, b) => Math.max(a, b), -Infinity);
-        const fmt = mode === 'slope'
-            ? (v: number) => v.toExponential(2)
-            : (v: number) => v.toFixed(1);
-        this.map.updateColorMap({ id: 'table_osm_roads', colorMap: { labels: [fmt(valMin), fmt(valMax)] } });
+        // Labels are computed internally from data + current colormap domain mode.
     }
 
     protected async applyRoadslstThematic(): Promise<void> {

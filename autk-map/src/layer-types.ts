@@ -1,5 +1,6 @@
 import type {
     ColorMapConfig,
+    ValidDomain,
     LayerBorder,
     LayerBorderComponent,
     LayerComponent,
@@ -16,9 +17,7 @@ export type {
     LayerBorder,
     LayerBorderComponent,
     CameraData,
-    SequentialDomain,
-    DivergingDomain,
-    CategoricalDomain,
+    ValidDomain,
     LayerType,
     BoundingBox,
 } from 'autk-core';
@@ -38,6 +37,18 @@ export interface LayerInfo {
 /**
  * Runtime rendering state associated with a layer.
  */
+export interface LayerColormap {
+    /** User colormap configuration (interpolator + domain mode). */
+    config: ColorMapConfig;
+    /** Domain computed from loaded thematic/raster data. */
+    computedDomain?: ValidDomain;
+    /** Labels computed from the current computed domain. */
+    computedLabels?: string[];
+}
+
+/**
+ * Runtime rendering state associated with a layer.
+ */
 export interface LayerRenderInfo {
     /** Layer opacity in the range `[0, 1]`. */
     opacity: number;
@@ -47,8 +58,8 @@ export interface LayerRenderInfo {
     isSkip?: boolean;
     /** Enables picking for this layer when `true`. */
     isPick?: boolean;
-    /** Unified color-map configuration (interpolator, labels, domain, normalization). */
-    colorMap: ColorMapConfig;
+    /** Colormap configuration and computed runtime domain/labels. */
+    colormap: LayerColormap;
     /** Indices of currently picked components, if any. */
     pickedComps?: number[];
 }

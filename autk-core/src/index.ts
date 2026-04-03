@@ -1,5 +1,5 @@
 export { 
-    NormalizationMode,
+    ColorMapDomainMode,
     ColorMapInterpolator
 } from './types';
 
@@ -9,12 +9,15 @@ export type {
     ColorTEX,
     BoundingBox,
     LayerType,
-    NormalizationConfig,
     SequentialDomain,
     DivergingDomain,
     CategoricalDomain,
+    ValidDomain,
+    ColorMapDomain,
     ColorMapConfig,
 } from './types';
+
+export { valueAtPath, isNumericLike } from './utils';
 
 export type { 
     LayerGeometry,
