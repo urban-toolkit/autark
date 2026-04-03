@@ -200,9 +200,8 @@ export class AutkMap {
             case 'LineString':
             case 'MultiLineString':
             case 'polylines': {
-                const offset = TriangulatorPolylines.offset;
                 sType = sType === 'LineString' || sType === 'MultiLineString' ? 'polylines' : sType;
-                this.createPolylinesLayer(id, collection as FeatureCollection, sType, offset, typeof property === 'string' ? property : undefined);
+                this.createPolylinesLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
             }
             case 'Point':
@@ -599,7 +598,7 @@ export class AutkMap {
      * @param offset Polyline extrusion offset used by triangulation.
     * @param property Optional value extractor used to initialize thematic data.
      */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, offset: number, property?: string) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -614,7 +613,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        TriangulatorPolylines.offset = offset;
+        TriangulatorPolylines.offset = typeLayer === 'roads' ? 5 : 8.5;
         const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer.');

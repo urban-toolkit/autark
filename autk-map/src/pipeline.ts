@@ -334,22 +334,27 @@ export abstract class Pipeline {
      * @param {Layer} layer The layer instance
      */
     updateColorUniforms(layer: Layer): void {
-        const colors = {
-            color: MapStyle.getColor(layer.layerInfo.typeLayer),
-            highlightColor: MapStyle.getHighlightColor(),
-            colorMap: ColorMap.getColorMap(layer.layerRenderInfo.colormap.config.interpolator),
-            useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
-            useHighlight: Boolean(layer.layerRenderInfo.isPick),
-            opacity: layer.layerRenderInfo.opacity,
-        };
-
         const computedDomain = layer.layerRenderInfo.colormap.computedDomain;
+
         const isNumericDomain = Array.isArray(computedDomain)
             && computedDomain.length > 0
             && computedDomain.every(v => typeof v === 'number');
         const isCategoricalDomain = Array.isArray(computedDomain)
             && computedDomain.length > 0
             && computedDomain.every(v => typeof v === 'string');
+
+        const colors = {
+            color: MapStyle.getColor(layer.layerInfo.typeLayer),
+            highlightColor: MapStyle.getHighlightColor(),
+            colorMap: ColorMap.getColorMap(
+                layer.layerRenderInfo.colormap.config.interpolator,
+                undefined,
+                isCategoricalDomain ? computedDomain : undefined,
+            ),
+            useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
+            useHighlight: Boolean(layer.layerRenderInfo.isPick),
+            opacity: layer.layerRenderInfo.opacity,
+        };
 
         const min = isNumericDomain ? Number(computedDomain[0]) : 0;
         const max = isNumericDomain ? Number(computedDomain[computedDomain.length - 1]) : 1;

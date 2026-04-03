@@ -264,9 +264,12 @@ export class ColorMap {
                 return d3_scale.scaleDiverging(d3_scheme[ColorMapInterpolator.DIVERGING_RED_BLUE])
                     .domain((domain as DivergingDomain) ?? [0, 0.5, 1]);
             case ColorMapInterpolator.OBSERVABLE10: {
-                const categories = (domain as CategoricalDomain) ?? ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'];
-                const scale = d3_scale.scaleOrdinal(d3_scheme[ColorMapInterpolator.OBSERVABLE10]).domain(categories);
-                return (t: number) => scale(t.toFixed(1));
+                const scheme = d3_scheme[ColorMapInterpolator.OBSERVABLE10] as string[];
+                const n = domain?.length ?? scheme.length;
+                return (t: number) => {
+                    const idx = Math.min(Math.round(t * (n - 1)), scheme.length - 1);
+                    return scheme[idx];
+                };
             }
             default:
                 throw new Error(`Unknown ColorMapInterpolator: ${color}`);

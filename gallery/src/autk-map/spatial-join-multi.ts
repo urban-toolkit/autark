@@ -16,19 +16,12 @@ export class SpatialJoin {
             coordinateFormat: 'EPSG:3395'
         });
 
-        await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise.csv',
-            outputTableName: 'noise',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
+        const CSVs = ['noise', 'parking'];
 
+        for (const csv of CSVs) {
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/parking.csv',
-            outputTableName: 'parking',
+            csvFileUrl: `http://localhost:5173/data/${csv}.csv`,
+            outputTableName: csv,
             geometryColumns: {
                 latColumnName: 'Latitude',
                 longColumnName: 'Longitude',
@@ -38,7 +31,7 @@ export class SpatialJoin {
 
         await this.db.spatialQuery({
             tableRootName: 'neighborhoods',
-            tableJoinName: 'noise',
+            tableJoinName: csv,
             spatialPredicate: 'INTERSECT',
             output: {
                 type: 'MODIFY_ROOT',
@@ -47,7 +40,7 @@ export class SpatialJoin {
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
+                        tableName: csv,
                         column: 'Unique Key',
                         aggregateFn: 'count',
                     },
@@ -55,24 +48,7 @@ export class SpatialJoin {
             },
         });
 
-        await this.db.spatialQuery({
-            tableRootName: 'neighborhoods',
-            tableJoinName: 'parking',
-            spatialPredicate: 'INTERSECT',
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'parking',
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
-                    },
-                ],
-            },
-        });
+        }
 
         this.map = new AutkMap(canvas);
         await this.map.init();
@@ -85,8 +61,8 @@ export class SpatialJoin {
 
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            const collection = await this.db.getLayer(layerData.name);
+            this.map.loadCollection({ id: layerData.name, collection, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }

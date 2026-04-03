@@ -1,5 +1,11 @@
 import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, ColorMapDomainStrategy, ColorMapInterpolator, LayerType, MapStyle } from 'autk-map';
+import { 
+    AutkMap,
+    ColorMapDomainStrategy,
+    ColorMapInterpolator,
+    LayerType,
+    MapStyle 
+} from 'autk-map';
 
 export class ColormapCat {
     protected map!: AutkMap;
@@ -27,8 +33,8 @@ export class ColormapCat {
 
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            const collection = await this.db.getLayer(layerData.name);
+            this.map.loadCollection({ id: layerData.name, collection, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
