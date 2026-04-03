@@ -20,6 +20,16 @@ export type HistogramConfig = {
 };
 
 /**
+ * Datum contract bound to interactive marks.
+ *
+ * `autkIds` must always reference source feature indices from the original
+ * input collection (never DOM position indices).
+ */
+export type AutkDatum = GeoJsonProperties & {
+    autkIds?: number[];
+};
+
+/**
  * Base configuration accepted by D3-based plot implementations.
  */
 export type ChartConfig = {

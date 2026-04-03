@@ -1,6 +1,6 @@
 import { GeoJsonProperties } from "geojson";
 
-import type { ChartConfig, ChartMargins, ChartEvents, ChartEventRecord } from "./api";
+import type { AutkDatum, ChartConfig, ChartMargins, ChartEvents, ChartEventRecord } from "./api";
 import { ColorMapInterpolator } from "./core-types";
 import { ChartEvent } from "./events-types";
 import { EventEmitter } from "./core-types";
@@ -15,7 +15,7 @@ export abstract class BaseChart {
 
     protected _div!: HTMLElement;
 
-    protected _data!: GeoJsonProperties[];
+    protected _data!: AutkDatum[];
 
     protected _axis!: string[];
     protected _attributes!: string[];
@@ -46,7 +46,7 @@ export abstract class BaseChart {
         this._chartEvents = new EventEmitter<ChartEventRecord>();
         this._enabledEvents = config.events ?? [];
 
-        this._data = config.collection.features.map((f) => f.properties);
+        this._data = this.ensureAutkIds(config.collection.features.map((f) => f.properties as AutkDatum));
         this.resetSelectionSourceMap();
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
         this._width = config.width || 800;
@@ -67,7 +67,7 @@ export abstract class BaseChart {
      * Returns internal data rows used by the chart.
      * @returns Normalized feature properties array used for rendering.
      */
-    get data(): GeoJsonProperties[] {
+    get data(): AutkDatum[] {
         return this._data;
     }
 
@@ -76,7 +76,7 @@ export abstract class BaseChart {
      * @param data New rendered rows.
      */
     set data(data: GeoJsonProperties[]) {
-        this._data = data;
+        this._data = this.ensureAutkIds(data as AutkDatum[]);
         this.resetSelectionSourceMap();
     }
 
@@ -133,6 +133,29 @@ export abstract class BaseChart {
     }
 
     /**
+     * Resolves source ids from a mark datum using the `autkIds` contract.
+     *
+     * Falls back to the provided rendered index when `autkIds` is absent.
+     * @param datum Bound mark datum.
+     * @param fallbackId Rendered index fallback for identity mappings.
+     */
+    protected getDatumAutkIds(datum: unknown, fallbackId?: number): number[] {
+        if (datum && typeof datum === 'object') {
+            const candidate = (datum as { autkIds?: unknown }).autkIds;
+            if (Array.isArray(candidate)) {
+                const ids = candidate.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+                if (ids.length > 0) return ids;
+            }
+        }
+
+        if (typeof fallbackId === 'number' && Number.isFinite(fallbackId)) {
+            return [fallbackId];
+        }
+
+        return [];
+    }
+
+    /**
      * Sets custom rendered-index to source-index mapping.
      * @param map Mapping from rendered mark index to one or more source feature indices.
      */
@@ -147,6 +170,17 @@ export abstract class BaseChart {
         this._selectionSourceMap = new Map(
             this._data.map((_d, idx) => [idx, [idx]])
         );
+    }
+
+    /**
+     * Ensures every row carries the source-id contract field.
+     * @param data Render rows.
+     */
+    protected ensureAutkIds(data: AutkDatum[]): AutkDatum[] {
+        return data.map((row, idx) => {
+            const ids = Array.isArray(row?.autkIds) ? row.autkIds : [idx];
+            return { ...(row ?? {}), autkIds: ids };
+        });
     }
 
 
