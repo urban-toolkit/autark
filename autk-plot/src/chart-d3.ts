@@ -55,14 +55,10 @@ export abstract class ChartD3 extends BaseChart {
         const chart = this;
 
         svgs
-            .each(function (_d, id: number) {
+            .each(function (d, id: number) {
                 d3.select(this)
                     .on('click', function () {
-                        if (chart.selection.includes(id)) {
-                            chart.selection = chart.selection.filter(loc => loc !== id);
-                        } else {
-                            chart.selection.push(id);
-                        }
+                        chart.toggleSelectionByDatum(d, id);
 
                         chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
                         chart.updateChartSelection();
@@ -103,12 +99,12 @@ export abstract class ChartD3 extends BaseChart {
                             const nextSel = new Set<number>();
 
                             marksGroup.selectAll('.autkMark')
-                                .each(function (_d, id: number) {
+                                .each(function (d, id: number) {
                                     const node = d3.select(this).node() as SVGGeometryElement | null;
                                     if (!node) return;
 
                                     if (chart.nodeIntersectsRect(node, x0, y0, x1, y1)) {
-                                        nextSel.add(id);
+                                        chart.getDatumAutkIds(d, id).forEach((sourceId) => nextSel.add(sourceId));
                                     }
                                 });
 
@@ -166,12 +162,12 @@ export abstract class ChartD3 extends BaseChart {
                             const nextSel = new Set<number>();
 
                             marksGroup.selectAll('.autkMark')
-                                .each(function (_d, id: number) {
+                                .each(function (d, id: number) {
                                     const node = d3.select(this).node() as SVGGeometryElement | null;
                                     if (!node) return;
 
                                     if (chart.nodeIntersectsRect(node, x0, y0, x1, y1)) {
-                                        nextSel.add(id);
+                                        chart.getDatumAutkIds(d, id).forEach((sourceId) => nextSel.add(sourceId));
                                     }
                                 });
 
@@ -231,12 +227,12 @@ export abstract class ChartD3 extends BaseChart {
                             const nextSel = new Set<number>();
 
                             marksGroup.selectAll('.autkMark')
-                                .each(function (_d, id: number) {
+                                .each(function (d, id: number) {
                                     const node = d3.select(this).node() as SVGGeometryElement | null;
                                     if (!node) return;
 
                                     if (chart.nodeIntersectsRect(node, x0, y0, x1, y1)) {
-                                        nextSel.add(id);
+                                        chart.getDatumAutkIds(d, id).forEach((sourceId) => nextSel.add(sourceId));
                                     }
                                 });
 
@@ -261,14 +257,41 @@ export abstract class ChartD3 extends BaseChart {
     updateChartSelection(): void {
         const svgs = d3.select(this._div).selectAll('.autkMark');
 
-        svgs.style('fill', (_d: unknown, id: number) => {
+        svgs.style('fill', (d: unknown, id: number) => {
 
-            if (this.selection.includes(id)) {
+            if (this.isDatumSelected(d, id)) {
                 return ChartStyle.highlight;
             } else {
                 return ChartStyle.default;
             }
         });
+    }
+
+    /**
+     * Toggles all source ids represented by the given datum.
+     */
+    protected toggleSelectionByDatum(datum: unknown, fallbackId: number): void {
+        const ids = this.getDatumAutkIds(datum, fallbackId);
+        if (ids.length === 0) return;
+
+        const next = new Set(this.selection);
+        const isFullySelected = ids.every((id) => next.has(id));
+
+        if (isFullySelected) {
+            ids.forEach((id) => next.delete(id));
+        } else {
+            ids.forEach((id) => next.add(id));
+        }
+
+        this.selection = Array.from(next);
+    }
+
+    /**
+     * Returns whether any source id represented by the datum is selected.
+     */
+    protected isDatumSelected(datum: unknown, fallbackId: number): boolean {
+        const ids = this.getDatumAutkIds(datum, fallbackId);
+        return ids.some((id) => this.selection.includes(id));
     }
 
     /**
