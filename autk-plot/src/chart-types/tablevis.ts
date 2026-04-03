@@ -147,15 +147,10 @@ export class TableVis extends ChartD3 {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => chart.selection.includes(d.idx) ? ChartStyle.highlight : 'transparent')
-            .style('color', (d) => chart.selection.includes(d.idx) ? '#ffffff' : '#000000')
+            .style('background-color', (d) => chart.isDatumSelected(d.row, d.idx) ? ChartStyle.highlight : 'transparent')
+            .style('color', (d) => chart.isDatumSelected(d.row, d.idx) ? '#ffffff' : '#000000')
             .on('click', function (_event, d) {
-                const id = d.idx;
-                if (chart.selection.includes(id)) {
-                    chart.selection = chart.selection.filter(loc => loc !== id);
-                } else {
-                    chart.selection.push(id);
-                }
+                chart.toggleSelectionByDatum(d.row, d.idx);
                 chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
                 chart.updateChartSelection();
             });

@@ -17,7 +17,6 @@ export class Barchart extends ChartD3 {
     protected mapY!: d3.ScaleLinear<number, number>;
 
     private _histogramConfig?: HistogramConfig;
-    private _binToFeatureIds: Map<number, number[]> = new Map();
     private _rawData!: any[];
 
     /**
@@ -43,9 +42,8 @@ export class Barchart extends ChartD3 {
     }
 
     /**
-     * Transforms raw feature values into histogram bins and updates the
-     * selection source map so selections resolve back to original feature indices.
-     * Falls back to identity mapping when not in histogram mode.
+     * Transforms raw feature values into histogram bins and stores source ids
+     * directly on each rendered bin datum via `autkIds`.
      */
     protected override computeTransform(): void {
         if (!this._histogramConfig) {
@@ -56,102 +54,22 @@ export class Barchart extends ChartD3 {
         const { column, numBins, divisor = 1, labelSuffix = '' } = this._histogramConfig;
 
         const binCounts = new Array(numBins).fill(0);
-        this._binToFeatureIds = new Map();
-        for (let i = 0; i < numBins; i++) this._binToFeatureIds.set(i, []);
+        const binToFeatureIds: number[][] = Array.from({ length: numBins }, () => []);
 
         this._rawData.forEach((d: any, idx: number) => {
             const val = d ? this.getNestedValue(d, column) : null;
             if (val == null) return;
             const bin = Math.max(0, Math.min(Math.floor(+val / divisor), numBins - 1));
             binCounts[bin]++;
-            this._binToFeatureIds.get(bin)!.push(idx);
+            binToFeatureIds[bin].push(idx);
         });
 
         this.data = Array.from({ length: numBins }, (_, i) => ({
             label: `${i}-${i + 1}${labelSuffix}`,
             count: binCounts[i],
+            autkIds: binToFeatureIds[i],
         })) as any;
         this._attributes = ['label', 'count'];
-        this.setSelectionSourceMap(new Map(this._binToFeatureIds));
-    }
-
-    /**
-     * Overrides click handling in histogram mode to preserve bin selection
-     * behavior while emitting source feature indices.
-     * @returns Nothing. Registers click handlers on marks.
-     */
-    override clickEvent(): void {
-        if (!this._histogramConfig) { super.clickEvent(); return; }
-
-        const svgs = d3.select(this._div).selectAll('.autkMark');
-        const cls = d3.select(this._div).selectAll('.autkClear');
-        const chart = this;
-
-        svgs.each(function (_d, binIdx: number) {
-            d3.select(this).on('click', function () {
-                if (chart.selection.includes(binIdx)) {
-                    chart.selection = chart.selection.filter(x => x !== binIdx);
-                } else {
-                    chart.selection.push(binIdx);
-                }
-                chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
-                chart.updateChartSelection();
-            });
-        });
-
-        cls.on('click', function () {
-            chart.selection = [];
-            chart.events.emit(ChartEvent.CLICK, { selection: [] });
-            chart.updateChartSelection();
-        });
-    }
-
-    /**
-     * Overrides horizontal brushing in histogram mode using band intersection.
-     * @returns Nothing. Registers brush handlers on the brush layer.
-     */
-    override brushXEvent(): void {
-        if (!this._histogramConfig) { super.brushXEvent(); return; }
-
-        const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrushable');
-        const chart = this;
-
-        const extent: [[number, number], [number, number]] = [
-            [0, 0],
-            [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom],
-        ];
-
-        brushable.each(function () {
-            const cBrush = d3.select<SVGGElement, unknown>(this);
-
-            const brush = d3.brushX()
-                .extent(extent)
-                .on('start end', function (event: any) {
-                    if (event.selection) {
-                        const [x0, x1] = event.selection as [number, number];
-                        const nextSel = new Set<number>();
-
-                        // Intersect brush x-range with each bar's x-range via the band scale
-                        chart.data.forEach((_d: any, binIdx: number) => {
-                            const label = String(chart.getNestedValue(_d, chart._attributes[0]));
-                            const barX = chart.mapX(label) ?? 0;
-                            if (barX + chart.mapX.bandwidth() > x0 && barX < x1) {
-                                nextSel.add(binIdx);
-                            }
-                        });
-
-                        chart.selection = Array.from(nextSel);
-                        chart.events.emit(ChartEvent.BRUSH_X, { selection: chart.getSelectedSourceIndices() });
-                        chart.updateChartSelection();
-                    } else {
-                        chart.selection = [];
-                        chart.events.emit(ChartEvent.BRUSH_X, { selection: [] });
-                        chart.updateChartSelection();
-                    }
-                });
-
-            cBrush.call(brush);
-        });
     }
 
     /**

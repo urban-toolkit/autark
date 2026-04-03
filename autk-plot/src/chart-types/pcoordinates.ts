@@ -199,7 +199,7 @@ export class ParallelCoordinates extends ChartD3 {
 
         // Read the stable original index from the data-idx attribute, not the DOM position
         // (DOM order changes after .raise(), so the id parameter cannot be trusted here).
-        const idx = (node: SVGPathElement) => +(d3.select(node).attr('data-idx') ?? -1);
+        const isSelected = (d: unknown) => this.getDatumAutkIds(d).some((id) => sel.includes(id));
 
         let strokeFn: (this: SVGPathElement, d: unknown) => string;
 
@@ -214,7 +214,7 @@ export class ParallelCoordinates extends ChartD3 {
                 const lo = chart._domain?.[0] ?? dimValues.reduce((a, b) => Math.min(a, b), Infinity);
                 const hi = chart._domain?.[1] ?? dimValues.reduce((a, b) => Math.max(a, b), -Infinity);
                 strokeFn = function (this: SVGPathElement, d: unknown) {
-                    if (sel.includes(idx(this))) return ChartStyle.highlight;
+                    if (isSelected(d)) return ChartStyle.highlight;
                     const v = +chart.getNestedValue(d, dim) || 0;
                     const { r, g, b } = ColorMap.getColor(v, chart._colorMapInterpolator, [lo, hi]);
                     return `rgb(${r},${g},${b})`;
@@ -223,7 +223,7 @@ export class ParallelCoordinates extends ChartD3 {
                 const catScale = scale as d3.ScalePoint<string>;
                 const categories = catScale.domain();
                 strokeFn = function (this: SVGPathElement, d: unknown) {
-                    if (sel.includes(idx(this))) return ChartStyle.highlight;
+                    if (isSelected(d)) return ChartStyle.highlight;
                     const val = String(chart.getNestedValue(d, dim));
                     const i = categories.indexOf(val);
                     const t = categories.length <= 1 ? 0.5 : i / (categories.length - 1);
@@ -231,22 +231,22 @@ export class ParallelCoordinates extends ChartD3 {
                     return `rgb(${r},${g},${b})`;
                 };
             } else {
-                strokeFn = function (this: SVGPathElement) {
-                    return sel.includes(idx(this)) ? ChartStyle.highlight : ChartStyle.default;
+                strokeFn = function (this: SVGPathElement, d: unknown) {
+                    return isSelected(d) ? ChartStyle.highlight : ChartStyle.default;
                 };
             }
         } else {
-            strokeFn = function (this: SVGPathElement) {
-                return sel.includes(idx(this)) ? ChartStyle.highlight : ChartStyle.default;
+            strokeFn = function (this: SVGPathElement, d: unknown) {
+                return isSelected(d) ? ChartStyle.highlight : ChartStyle.default;
             };
         }
 
         lines
             .style('stroke', strokeFn)
-            .style('opacity', function (this: SVGPathElement) { return sel.includes(idx(this)) ? 1 : 0.7; })
-            .style('stroke-width', function (this: SVGPathElement) { return sel.includes(idx(this)) ? 3 : 2; });
+            .style('opacity', function (this: SVGPathElement, d: unknown) { return isSelected(d) ? 1 : 0.7; })
+            .style('stroke-width', function (this: SVGPathElement, d: unknown) { return isSelected(d) ? 3 : 2; });
 
-        lines.filter(function (this: SVGPathElement) { return sel.includes(idx(this)); }).raise();
+        lines.filter(function (this: SVGPathElement, d: unknown) { return isSelected(d); }).raise();
     }
 
     /**
@@ -319,7 +319,7 @@ export class ParallelCoordinates extends ChartD3 {
                         }
 
                         if (isSelected) {
-                            nextSel.add(id);
+                            chart.getDatumAutkIds(d, id).forEach((sourceId) => nextSel.add(sourceId));
                         }
                     });
 
