@@ -42,7 +42,6 @@
     "vite-plugin-dts": "^4.5.4"
   },
   "dependencies": {
-    "autk-types": "*",
     "@duckdb/duckdb-wasm": "^1.32.0",
     "@turf/turf": "^7.3.4",
     "apache-arrow": "^21.1.0",
