@@ -2,57 +2,63 @@ import type { ColorHEX, ColorRGB } from './core-types';
 import { ColorMap } from './core-types';
 
 /**
- * Static style helpers shared by all charts.
+ * Global style helpers shared by all chart implementations.
  *
- * Centralizes default and highlight colors used by D3-based mark styling.
+ * `ChartStyle` centralizes the base and highlighted colors applied to marks
+ * during selection updates.
+ *
+ * Values are static and process-wide for the package runtime. Updating them
+ * affects all charts that read style values after the update.
  */
 export class ChartStyle {
-    // default color for unknown layers
+    /** Default fill/stroke color used for non-selected marks. */
     protected static _default: ColorHEX = '#bfbfbf';
-    // default highlight color
+    /** Highlight color used for selected marks. */
     protected static _highlight: ColorHEX = '#5dade2';
 
     /**
-     * Default mark color used when there is no selection highlight.
+     * Gets the default mark color.
+     * @returns Hex color used for non-selected marks.
      */
     static get default(): ColorHEX {
         return ChartStyle._default;
     }
 
     /**
-     * Highlight color used for selected marks.
+     * Gets the highlight mark color.
+     * @returns Hex color used for selected marks.
      */
     static get highlight(): ColorHEX {
         return ChartStyle._highlight;
     }
 
     /**
-     * Updates the global highlight color.
-     * @param color Highlight color as hexadecimal string.
+     * Updates the global highlight color used by selection styling.
+     * @param color Hex color string to apply as the highlight color.
      */
     public static setHighlightColor(color: ColorHEX): void {
         ChartStyle._highlight = color;
     }
 
     /**
-     * Returns highlight color in RGB format.
-     * @returns Highlight color converted to RGB channels.
+     * Gets the highlight color in RGB format.
+     * @returns Highlight color converted from hex to RGB channels.
      */
     public static getHighlightColor(): ColorRGB {
         return ColorMap.hexToRgb(ChartStyle._highlight);
     }
 
     /**
-     * Updates the global default mark color.
-     * @param color Default mark color as hexadecimal string.
+     * Updates the global default color used for non-selected marks.
+     * @param color Hex color string to apply as the default mark color.
      */
     public static setDefaultColor(color: ColorHEX): void {
         ChartStyle._default = color;
     }
 
     /**
-     * Returns default mark color in RGB format.
-     * @returns Default color converted to RGB channels.
+     * Gets the default mark color in RGB format.
+     * @returns Default color converted from hex to RGB channels.
      */
     public static getDefaultColor(): ColorRGB {
         return ColorMap.hexToRgb(ChartStyle._default);

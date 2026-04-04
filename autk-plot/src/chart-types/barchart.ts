@@ -4,6 +4,7 @@ import { ChartD3 } from "../chart-d3";
 import type { ChartConfig, HistogramConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
+import { valueAtPath } from "autk-core";
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
@@ -57,7 +58,7 @@ export class Barchart extends ChartD3 {
         const binToFeatureIds: number[][] = Array.from({ length: numBins }, () => []);
 
         this._rawData.forEach((d: any, idx: number) => {
-            const val = d ? this.getNestedValue(d, column) : null;
+            const val = d ? valueAtPath(d, column) : null;
             if (val == null) return;
             const bin = Math.max(0, Math.min(Math.floor(+val / divisor), numBins - 1));
             binCounts[bin]++;
@@ -115,12 +116,12 @@ export class Barchart extends ChartD3 {
 
         // ---- Scales
         const xDomain = this.data.map((d) => {
-            const val = d ? this.getNestedValue(d, this._attributes[0]) : 'unknown';
+            const val = d ? valueAtPath(d, this._attributes[0]) : 'unknown';
             return String(val);
         });
         this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
@@ -168,10 +169,10 @@ export class Barchart extends ChartD3 {
 
         // ---- Bars
         const cGroup = svg
-            .selectAll('.autkBrushable')
+            .selectAll('.autkBrush')
             .data([0])
             .join('g')
-            .attr('class', 'autkBrushable autkMarksGroup')
+            .attr('class', 'autkBrush autkMarksGroup')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
 
         cGroup
@@ -191,11 +192,11 @@ export class Barchart extends ChartD3 {
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', (d) => {
-                const val = d ? this.getNestedValue(d, this._attributes[0]) : 'unknown';
+                const val = d ? valueAtPath(d, this._attributes[0]) : 'unknown';
                 return this.mapX(String(val)) || 0;
             })
-            .attr('y', (d) => this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
-            .attr('height', (d) => height - this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
+            .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
+            .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
             .attr('width', this.mapX.bandwidth())
             .style('fill', ChartStyle.default)
             .style('stroke', '#2f2f2f')

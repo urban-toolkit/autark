@@ -4,6 +4,7 @@ import { ChartD3 } from "../chart-d3";
 import type { ChartConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
+import { valueAtPath } from "autk-core";
 
 /**
  * Table-based visualization with sorting and row selection interactions.
@@ -98,29 +99,26 @@ export class TableVis extends ChartD3 {
     }
 
     /**
-     * Click handling is implemented in row rendering to preserve row indices.
-     * @returns Nothing.
-     */
-    override clickEvent(): void { /* no-op */ }
-
-    /**
      * Returns rows ordered by current selection and optional sort column.
+     *
+     * Each entry carries `autkIds: [idx]` so the base `clickEvent` can resolve
+     * the stable source index without relying on the DOM position.
      * @returns Row descriptors with stable source indices.
      */
-    private getDisplayRows(): { idx: number; row: any }[] {
+    private getDisplayRows(): { idx: number; row: any; autkIds: number[] }[] {
         const highlighted = this.selection
-            .map(idx => ({ idx, row: this.data[idx] }))
+            .map(idx => ({ idx, row: this.data[idx], autkIds: [idx] }))
             .filter(d => d.row != null);
 
         const rest = this.data
-            .map((row, idx) => ({ idx, row }))
+            .map((row, idx) => ({ idx, row, autkIds: [idx] }))
             .filter(d => !this.selection.includes(d.idx));
 
         if (this.sortColumn) {
             const col = this.sortColumn;
             rest.sort((a, b) => {
-                const av = a.row ? this.getNestedValue(a.row, col) : null;
-                const bv = b.row ? this.getNestedValue(b.row, col) : null;
+                const av = a.row ? valueAtPath(a.row, col) : null;
+                const bv = b.row ? valueAtPath(b.row, col) : null;
                 if (av == null) return 1;
                 if (bv == null) return -1;
                 const an = Number(av), bn = Number(bv);
@@ -147,19 +145,14 @@ export class TableVis extends ChartD3 {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => chart.isDatumSelected(d.row, d.idx) ? ChartStyle.highlight : 'transparent')
-            .style('color', (d) => chart.isDatumSelected(d.row, d.idx) ? '#ffffff' : '#000000')
-            .on('click', function (_event, d) {
-                chart.toggleSelectionByDatum(d.row, d.idx);
-                chart.events.emit(ChartEvent.CLICK, { selection: chart.getSelectedSourceIndices() });
-                chart.updateChartSelection();
-            });
+            .style('background-color', (d) => chart.isDatumSelected(d) ? ChartStyle.highlight : 'transparent')
+            .style('color', (d) => chart.isDatumSelected(d) ? '#ffffff' : '#000000');
 
         rows
             .selectAll('td')
             .data((d) => chart._attributes.map((attr, i) => ({
                 column: chart._axis[i] ?? attr,
-                value: d.row ? chart.getNestedValue(d.row, attr) : 'unknown'
+                value: d.row ? valueAtPath(d.row, attr) : 'unknown'
             })))
             .join('td')
             .style('padding', '6px 8px')
@@ -168,13 +161,14 @@ export class TableVis extends ChartD3 {
     }
 
     /**
-     * Re-renders rows to reflect latest selection state.
+     * Re-renders rows and re-attaches click handlers after selection styles are applied.
      * @returns Nothing.
      */
-    override updateChartSelection(): void {
+    protected override onSelectionUpdated(): void {
         const tbody = d3.select(this._div).select<HTMLTableSectionElement>('.autk-table tbody');
         if (tbody.node()) {
             this.renderRows(tbody);
+            this.clickEvent();
         }
     }
 

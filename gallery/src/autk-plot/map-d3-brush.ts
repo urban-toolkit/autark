@@ -3,6 +3,7 @@ import { FeatureCollection } from 'geojson';
 import { AutkChart, ChartEvent } from 'autk-plot';
 
 import { AutkMap, VectorLayer } from 'autk-map';
+import { MapEvent } from 'autk-map';
 
 export class MapD3 {
     protected map!: AutkMap;
@@ -43,8 +44,13 @@ export class MapD3 {
     }
 
     protected async updateMapListeners() {
-        // Map picking events are handled through the map's internal event emitter
-        // Use the map's public API to handle interactions instead
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
+            if (selection.length > 0) {
+                this.plot.setSelection(selection);
+            } else {
+                this.plot.setSelection([]);
+            }
+        });
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {

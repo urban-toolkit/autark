@@ -1,7 +1,9 @@
 import * as d3 from 'd3';
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
-import { EventEmitter } from '../core-types';
-import type { ChartEventRecord, ChartEvents } from '../api';
+import { valueAtPath } from 'autk-core';
+
+import { BaseChart } from '../base-chart';
+import type { ChartConfig } from '../api';
 
 /**
  * Configuration for the linechart implementation.
@@ -38,97 +40,62 @@ export type LinechartConfig = {
  *   chart.setSelection([42]);         // show feature 42
  *   chart.setSelection([]);           // clear to empty state
  */
-export class Linechart {
-    private _div: HTMLElement;
-    private _data: GeoJsonProperties[];
-    private _selection: number[] = [];
-    private _width: number;
-    private _height: number;
-    private _margins: { left: number; right: number; top: number; bottom: number };
-    private _attributes: [string, string?, string?];
-    private _xLabel: string;
-    private _yLabel: string;
-    private _title: string;
-    private _tickFormats: [string, string];
+export class Linechart extends BaseChart {
     private _startYear: number;
-    public events: ChartEvents = new EventEmitter<ChartEventRecord>();
 
     /**
      * Creates a line chart instance and renders the initial state.
      * @param config Linechart configuration.
      */
     constructor(config: LinechartConfig) {
-        this._div = config.div;
-        this._data = config.collection.features.map(f => f.properties);
-        this._width = config.width ?? 600;
-        this._height = config.height ?? 280;
-        this._margins = config.margins ?? { left: 52, right: 20, top: 42, bottom: 44 };
-        this._attributes = config.attributes;
-        this._xLabel = config.labels?.axis?.[0] ?? 'Year';
-        this._yLabel = config.labels?.axis?.[1] ?? 'Value';
-        this._title = config.labels?.title ?? '';
-        this._tickFormats = config.tickFormats ?? ['.0f', '.1f'];
+        const attributes = config.attributes.filter((attr): attr is string => typeof attr === 'string');
+
+        const chartConfig: ChartConfig = {
+            div: config.div,
+            collection: config.collection,
+            attributes,
+            labels: {
+                axis: [config.labels?.axis?.[0] ?? 'Year', config.labels?.axis?.[1] ?? 'Value'],
+                title: config.labels?.title ?? '',
+            },
+            tickFormats: config.tickFormats ? [...config.tickFormats] : ['.0f', '.1f'],
+            width: config.width ?? 600,
+            height: config.height ?? 280,
+            margins: config.margins ?? { left: 52, right: 20, top: 42, bottom: 44 },
+            events: [],
+        };
+
+        super(chartConfig);
+
         this._startYear = config.startYear ?? 0;
 
         this.draw();
     }
 
-    /**
-     * Returns the active selection for the linechart.
-     * @returns Selected source feature indices.
-     */
-    public get selection(): number[] {
-        return this._selection;
+    /** Re-renders line content based on current selected feature id. */
+    public updateChartSelection(): void {
+        this.render();
     }
 
     /**
-     * Updates the selected feature index used to render the timeseries.
-     * @param ids Source feature indices. Only the first index is rendered.
+     * Draws the chart for the selected feature, or empty state when selection is empty.
      */
-    public setSelection(ids: number[]): void {
-        this._selection = [...ids];
-        const id = ids.length > 0 ? ids[0] : null;
-        this._draw(id);
-    }
-
-    /**
-     * Triggers a redraw using the current selection.
-     */
-    public async draw(): Promise<void> {
-        const id = this._selection.length > 0 ? this._selection[0] : null;
-        this._draw(id);
-    }
-
-    /**
-     * Resolves nested values from dot-notation property paths.
-     * @param obj Source object.
-     * @param path Dot-notation path.
-     * @returns Resolved value or undefined.
-     */
-    private _getNestedValue(obj: any, path: string): any {
-        if (!obj || !path) return undefined;
-        return path.split('.').reduce((acc, part) => acc?.[part], obj);
-    }
-
-    /**
-     * Draws the chart for the provided feature id, or empty state when null.
-     * @param featureId Source feature index to visualize, or null for empty state.
-     */
-    private _draw(featureId: number | null): void {
-        const props = featureId !== null ? this._data[featureId] : null;
+    public render(): void {
+        const featureId = this.selection.length > 0 ? this.selection[0] : null;
+        const props = featureId !== null ? this.data[featureId] : null;
 
         const timeseries: number[] | null = props
-            ? (this._getNestedValue(props, this._attributes[0]) as number[] | undefined) ?? null
+            ? (valueAtPath(props, this._attributes[0]) as number[] | undefined) ?? null
             : null;
 
         const angleDeg: number | null =
             this._attributes[1] && props
-                ? (this._getNestedValue(props, this._attributes[1]) as number | undefined) ?? null
+                ? (valueAtPath(props, this._attributes[1]) as number | undefined) ?? null
                 : null;
 
         const intercept: number | null =
             this._attributes[2] && props
-                ? (this._getNestedValue(props, this._attributes[2]) as number | undefined) ?? null
+                ? (valueAtPath(props, this._attributes[2]) as number | undefined) ?? null
                 : null;
 
         const innerW = this._width  - this._margins.left - this._margins.right;
@@ -208,7 +175,7 @@ export class Linechart {
             .style('font-size', '11px')
             .style('font-family', 'system-ui, sans-serif')
             .style('fill', '#555')
-            .text(this._xLabel);
+            .text(this._axis[0]);
 
         // ── Y axis ───────────────────────────────────────────────────────────
         g.append('g')
@@ -225,7 +192,7 @@ export class Linechart {
             .style('font-size', '11px')
             .style('font-family', 'system-ui, sans-serif')
             .style('fill', '#555')
-            .text(this._yLabel);
+            .text(this._axis[1]);
 
         // ── Legend ───────────────────────────────────────────────────────────
         const legendItems = [

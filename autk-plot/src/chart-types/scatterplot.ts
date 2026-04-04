@@ -4,6 +4,7 @@ import { ChartD3 } from "../chart-d3";
 import type { ChartConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
+import { valueAtPath } from "autk-core";
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
@@ -72,10 +73,10 @@ export class Scatterplot extends ChartD3   {
             .text((d) => d);
 
         // ---- Escalas
-        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._attributes[0]) || 0 : 0);
+        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[0])) || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Eixos
@@ -127,10 +128,10 @@ export class Scatterplot extends ChartD3   {
             .text(this._axis[1]);
 
         const cGroup = svg
-            .selectAll('.autkBrushable')
+            .selectAll('.autkBrush')
             .data([0])
             .join('g')
-            .attr('class', 'autkBrushable autkMarksGroup')
+            .attr('class', 'autkBrush autkMarksGroup')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
 
         cGroup
@@ -149,13 +150,12 @@ export class Scatterplot extends ChartD3   {
             .data(this.data)
             .join('circle')
             .attr('class', 'autkMark')
-            .attr('cx', (d) => this.mapX(d ? +this.getNestedValue(d, this._attributes[0]) || 0 : 0))
-            .attr('cy', (d) => this.mapY(d ? +this.getNestedValue(d, this._attributes[1]) || 0 : 0))
+            .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, this._attributes[0])) || 0 : 0))
+            .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
             .attr('r', 3)
             .style('fill', ChartStyle.default)
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
     }
-
 }

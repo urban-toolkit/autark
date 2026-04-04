@@ -5,6 +5,7 @@ import type { ChartConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
 import { ColorMap } from '../core-types';
+import { valueAtPath } from "autk-core";
 
 /**
  * Parallel coordinates chart for multivariate feature exploration.
@@ -77,18 +78,18 @@ export class ParallelCoordinates extends ChartD3 {
         // Build a scale for each dimension based on data type
         dimensions.forEach((dim) => {
             // Check if dimension is categorical or numerical
-            const sampleValues = this.data.map(d => d ? this.getNestedValue(d, dim) : null).filter(v => v !== null && v !== undefined);
+            const sampleValues = this.data.map(d => d ? valueAtPath(d, dim) : null).filter(v => v !== null && v !== undefined);
             const isNumerical = sampleValues.every(v => !isNaN(Number(v)));
 
             if (isNumerical) {
                 // Numerical scale
                 this.dimensionTypes.set(dim, 'numerical');
-                const extent = d3.extent(this.data, (d) => d ? +this.getNestedValue(d, dim) || 0 : 0) as [number, number];
+                const extent = d3.extent(this.data, (d) => d ? Number(valueAtPath(d, dim)) || 0 : 0) as [number, number];
                 this.scales.set(dim, d3.scaleLinear().domain(extent).range([height, 0]));
             } else {
                 // Categorical scale
                 this.dimensionTypes.set(dim, 'categorical');
-                const uniqueValues = Array.from(new Set(this.data.map(d => d ? String(this.getNestedValue(d, dim)) : 'unknown')));
+                const uniqueValues = Array.from(new Set(this.data.map(d => d ? String(valueAtPath(d, dim)) : 'unknown')));
                 this.scales.set(dim, d3.scalePoint<string>().domain(uniqueValues).range([height, 0]).padding(0.5));
             }
         });
@@ -125,15 +126,15 @@ export class ParallelCoordinates extends ChartD3 {
 
         // ---- Draw axes
         const axisGroups = svg
-            .selectAll('.autkBrushable')
+            .selectAll('.autkBrush')
             .data(dimensions)
             .join('g')
-            .attr('class', 'autkBrushable')
+            .attr('class', 'autkBrush')
             .attr('transform', (d) => `translate(${this._margins.left + (this.axisPositions(d) || 0)}, ${this._margins.top})`)
             .style('visibility', 'inherit');
 
         // Store dimension name for selection
-        axisGroups.attr('data-dim', (d) => d);
+        axisGroups.attr('autkBrushId', (d) => d);
 
         // Add axis lines and ticks
         axisGroups.each((dim, i, nodes) => {
@@ -190,15 +191,12 @@ export class ParallelCoordinates extends ChartD3 {
     }
 
     /**
-     * Re-applies line style based on current selection and color dimension.
-     * @returns Nothing. Updates SVG styles in place.
+     * Applies stroke-based selection styles with optional color-by-dimension mapping.
      */
-    public updateChartSelection(): void {
-        const lines = d3.select(this._div).selectAll<SVGPathElement, unknown>('.autkMark');
+    protected override applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
+        const lines = svgs as unknown as d3.Selection<SVGPathElement, unknown, HTMLElement, unknown>;
+        const chart = this;
         const sel = this.selection;
-
-        // Read the stable original index from the data-idx attribute, not the DOM position
-        // (DOM order changes after .raise(), so the id parameter cannot be trusted here).
         const isSelected = (d: unknown) => this.getDatumAutkIds(d).some((id) => sel.includes(id));
 
         let strokeFn: (this: SVGPathElement, d: unknown) => string;
@@ -208,14 +206,13 @@ export class ParallelCoordinates extends ChartD3 {
             const scale = this.scales.get(dim);
             const dimType = this.dimensionTypes.get(dim);
 
-            const chart = this;
             if (dimType === 'numerical' && scale) {
-                const dimValues = chart.data.map(d => d ? +chart.getNestedValue(d, dim) || 0 : 0);
+                const dimValues = chart.data.map(d => d ? Number(valueAtPath(d, dim)) || 0 : 0);
                 const lo = chart._domain?.[0] ?? dimValues.reduce((a, b) => Math.min(a, b), Infinity);
                 const hi = chart._domain?.[1] ?? dimValues.reduce((a, b) => Math.max(a, b), -Infinity);
                 strokeFn = function (this: SVGPathElement, d: unknown) {
                     if (isSelected(d)) return ChartStyle.highlight;
-                    const v = +chart.getNestedValue(d, dim) || 0;
+                    const v = Number(valueAtPath(d, dim)) || 0;
                     const { r, g, b } = ColorMap.getColor(v, chart._colorMapInterpolator, [lo, hi]);
                     return `rgb(${r},${g},${b})`;
                 };
@@ -224,7 +221,7 @@ export class ParallelCoordinates extends ChartD3 {
                 const categories = catScale.domain();
                 strokeFn = function (this: SVGPathElement, d: unknown) {
                     if (isSelected(d)) return ChartStyle.highlight;
-                    const val = String(chart.getNestedValue(d, dim));
+                    const val = String(valueAtPath(d, dim));
                     const i = categories.indexOf(val);
                     const t = categories.length <= 1 ? 0.5 : i / (categories.length - 1);
                     const { r, g, b } = ColorMap.getColor(t, chart._colorMapInterpolator);
@@ -260,79 +257,6 @@ export class ParallelCoordinates extends ChartD3 {
     }
 
     /**
-     * Enables per-axis vertical brushing and emits source feature indices.
-     * @returns Nothing. Registers brush handlers for each axis.
-     */
-    public brushYEvent(): void {
-        const brushable = d3.selectAll<SVGGElement, string>('.autkBrushable');
-        const chart = this;
-
-        // Store active brushes extents (min/max Y values per dimension)
-        const activeBrushes = new Map<string, [number, number]>();
-
-        const brushHeight = chart._height - chart._margins.top - chart._margins.bottom;
-
-        brushable.each(function () {
-            const cBrush = d3.select<SVGGElement, unknown>(this);
-            const dim = cBrush.attr('data-dim') as string;
-
-            const brush = d3.brushY()
-                .extent([[-15, 0], [15, brushHeight]])
-                .on("start brush end", function (event: any) {
-                    if (event.selection) {
-                        activeBrushes.set(dim, event.selection);
-                    } else {
-                        activeBrushes.delete(dim);
-                    }
-
-                    if (activeBrushes.size === 0) {
-                        chart.selection = [];
-                        chart.events.emit(ChartEvent.BRUSH_Y, { selection: [] });
-                        chart.updateChartSelection();
-                        return;
-                    }
-
-                    const nextSel = new Set<number>();
-
-                    // For each data point check if it intersects ALL active brushes
-                    chart.data.forEach((d, id) => {
-                        let isSelected = true;
-
-                        for (const [activeDim, brushExtent] of activeBrushes) {
-                            const scale = chart.scales.get(activeDim);
-                            const dimType = chart.dimensionTypes.get(activeDim);
-
-                            let y = 0;
-                            if (scale && dimType === 'numerical') {
-                                const numScale = scale as d3.ScaleLinear<number, number>;
-                                y = numScale(+chart.getNestedValue(d, activeDim) || 0);
-                            } else if (scale && dimType === 'categorical') {
-                                const catScale = scale as d3.ScalePoint<string>;
-                                y = catScale(String(chart.getNestedValue(d, activeDim))) ?? 0;
-                            }
-
-                            // If y is outside the brush extent for THIS dimension, line is not selected
-                            if (y < brushExtent[0] || y > brushExtent[1]) {
-                                isSelected = false;
-                                break;
-                            }
-                        }
-
-                        if (isSelected) {
-                            chart.getDatumAutkIds(d, id).forEach((sourceId) => nextSel.add(sourceId));
-                        }
-                    });
-
-                    chart.selection = Array.from(nextSel);
-                    chart.events.emit(ChartEvent.BRUSH_Y, { selection: chart.getSelectedSourceIndices() });
-                    chart.updateChartSelection();
-                });
-
-            cBrush.call(brush);
-        });
-    }
-
-    /**
      * Generates the polyline path through all configured dimensions.
      * @param d Render row object.
      * @returns SVG path string for the row.
@@ -348,10 +272,10 @@ export class ParallelCoordinates extends ChartD3 {
             let y = 0;
             if (scale && dimType === 'numerical') {
                 const numScale = scale as d3.ScaleLinear<number, number>;
-                y = numScale(+this.getNestedValue(d, dim) || 0);
+                y = numScale(Number(valueAtPath(d, dim)) || 0);
             } else if (scale && dimType === 'categorical') {
                 const catScale = scale as d3.ScalePoint<string>;
-                y = catScale(String(this.getNestedValue(d, dim))) ?? 0;
+                y = catScale(String(valueAtPath(d, dim))) ?? 0;
             }
 
             return [x, y];

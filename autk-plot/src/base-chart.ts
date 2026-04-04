@@ -8,36 +8,57 @@ import { EventEmitter } from "./core-types";
 /**
  * Shared base class for all chart implementations.
  *
- * Handles data extraction, sizing defaults, selection state,
- * and source-id based selection mapping via `autkIds`.
+ * `BaseChart` normalizes input data, stores common rendering options, tracks
+ * selection state, and exposes the minimal lifecycle used by concrete charts.
+ *
+ * Identity mapping for interactions is based on `autkIds`, which always refer
+ * to source feature ids from the input collection.
  */
 export abstract class BaseChart {
 
+    /** Host element where the chart is rendered. */
     protected _div!: HTMLElement;
 
+    /** Normalized render rows bound to marks. */
     protected _data!: AutkDatum[];
 
+    /** User-facing axis labels. */
     protected _axis!: string[];
+    /** Dot-path attributes used to read values from row objects. */
     protected _attributes!: string[];
+    /** Plot title text. */
     protected _title!: string;
+    /** D3 tick-format specifiers used by axis renderers. */
     protected _tickFormats!: string[];
 
+    /** Outer chart width in pixels. */
     protected _width: number = 800;
+    /** Outer chart height in pixels. */
     protected _height: number = 500;
 
+    /** Plot margins in pixels. */
     protected _margins!: ChartMargins;
 
+    /** Current selected source ids. */
     protected _selection: number[] = [];
 
+    /** Typed event dispatcher used by chart interaction events. */
     protected _chartEvents!: ChartEvents;
+    /** Events explicitly enabled for this chart instance. */
     protected _enabledEvents: ChartEvent[] = [];
 
+    /** Optional fixed numerical domain (for thematic color mapping). */
     protected _domain: [number, number] | undefined = undefined;
+    /** Active colormap interpolator used by charts that support color encoding. */
     protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQUENTIAL_REDS;
 
 
     /**
      * Initializes shared chart state from plot configuration.
+        *
+        * Input feature properties are normalized through `ensureAutkIds` so
+        * interaction identity is consistent across all chart implementations.
+        *
      * @param config Plot configuration containing input collection and render options.
      */
     constructor(config: ChartConfig) {
@@ -63,7 +84,7 @@ export abstract class BaseChart {
 
     /**
      * Returns internal data rows used by the chart.
-     * @returns Normalized feature properties array used for rendering.
+     * @returns Normalized render rows used for mark binding.
      */
     get data(): AutkDatum[] {
         return this._data;
@@ -71,6 +92,9 @@ export abstract class BaseChart {
 
     /**
      * Replaces internal data rows.
+     *
+     * Incoming rows are normalized to ensure each datum carries `autkIds`.
+     *
      * @param data New rendered rows.
      */
     set data(data: GeoJsonProperties[]) {
@@ -79,16 +103,16 @@ export abstract class BaseChart {
 
 
     /**
-     * Returns selected source feature indices.
-     * @returns Current source feature indices selected in the chart.
+     * Returns selected source ids.
+     * @returns Current source ids selected in the chart.
      */
     get selection(): number[] {
         return this._selection;
     }
 
     /**
-     * Updates selected source feature indices.
-     * @param selection Source feature indices to mark as selected.
+     * Updates selected source ids.
+     * @param selection Source ids to mark as selected.
      */
     set selection(selection: number[]) {
         this._selection = selection;
@@ -96,7 +120,7 @@ export abstract class BaseChart {
 
     /**
      * Returns the chart event dispatcher.
-     * @returns Plot event dispatcher for listener registration.
+     * @returns Typed plot event dispatcher for listener registration.
      */
     get events(): ChartEvents {
         return this._chartEvents;
@@ -112,7 +136,7 @@ export abstract class BaseChart {
 
     /**
      * Applies a new selection and refreshes mark styles.
-     * @param selection Source feature indices.
+     * @param selection Source ids.
      */
     public setSelection(selection: number[]) {
         this._selection = selection;
@@ -120,22 +144,12 @@ export abstract class BaseChart {
     }
 
     /**
-     * Resolves selected source ids to a unique normalized array.
-     * @param selection Optional source-id selection. Uses current state when omitted.
-     * @returns Unique source feature indices represented by the selection.
-     */
-    public getSelectedSourceIndices(selection: number[] = this._selection): number[] {
-        return Array.from(new Set(selection.filter((idx) => Number.isFinite(idx))));
-    }
-
-    /**
      * Resolves source ids from a mark datum using the `autkIds` contract.
      *
-     * Falls back to the provided rendered index when `autkIds` is absent.
      * @param datum Bound mark datum.
-     * @param fallbackId Rendered index fallback for identity mappings.
+        * @returns Source ids represented by the datum, or an empty array.
      */
-    protected getDatumAutkIds(datum: unknown, fallbackId?: number): number[] {
+    protected getDatumAutkIds(datum: unknown): number[] {
         if (datum && typeof datum === 'object') {
             const candidate = (datum as { autkIds?: unknown }).autkIds;
             if (Array.isArray(candidate)) {
@@ -144,16 +158,13 @@ export abstract class BaseChart {
             }
         }
 
-        if (typeof fallbackId === 'number' && Number.isFinite(fallbackId)) {
-            return [fallbackId];
-        }
-
         return [];
     }
 
     /**
      * Ensures every row carries the source-id contract field.
      * @param data Render rows.
+        * @returns New rows array with guaranteed `autkIds` values.
      */
     protected ensureAutkIds(data: AutkDatum[]): AutkDatum[] {
         return data.map((row, idx) => {
@@ -179,7 +190,13 @@ export abstract class BaseChart {
         this.render();
     }
 
+    /**
+     * Renders chart DOM/SVG/HTML nodes for the current internal state.
+     */
     abstract render(): void;
 
+    /**
+     * Re-applies visual selection state to rendered marks.
+     */
     abstract updateChartSelection(): void;
 }

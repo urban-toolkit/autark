@@ -13,19 +13,39 @@ type ChartInstance = {
 };
 
 /**
- * Unified public chart entrypoint for autk-plot.
+ * Unified public entrypoint for autk-plot chart creation and interaction.
  *
- * Wraps chart-specific implementations behind a single constructor
- * and a common selection/event API.
+ * `AutkChart` wraps chart-specific implementations (`scatterplot`, `barchart`,
+ * `parallel-coordinates`, `table`, `linechart`) behind a single constructor
+ * and a stable API for selection and event handling.
+ *
+ * The wrapper delegates all behavior to the concrete chart instance selected by
+ * `config.type` while exposing a chart-agnostic interface to consumers.
+ *
+ * @example
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'scatterplot',
+ *   collection,
+ *   labels: { axis: ['x', 'y'], title: 'Example' }
+ * });
+ *
+ * plot.events.on('click', ({ selection }) => {
+ *   console.log(selection);
+ * });
  */
 export class AutkChart {
     private _plot: ChartInstance;
     private _type: ChartType;
 
     /**
-     * Creates a chart instance for the requested chart type.
+     * Creates a chart wrapper for the requested chart type.
+     *
+     * The concrete implementation is selected using the discriminated
+     * `config.type` field and instantiated immediately.
+     *
      * @param div Host HTML element where the chart should render.
      * @param config Discriminated chart configuration with a `type` field.
+     * @throws If `config.type` is not supported.
      */
     constructor(div: HTMLElement, config: UnifiedChartConfig) {
         this._type = config.type;
@@ -33,15 +53,19 @@ export class AutkChart {
     }
 
     /**
-     * Returns the chart type handled by this wrapper.
-     * @returns Active chart type.
+     * Gets the active chart type handled by this wrapper.
+     * @returns Active chart type discriminator.
      */
     get type(): ChartType {
         return this._type;
     }
 
     /**
-     * Returns the underlying concrete chart instance.
+     * Gets the underlying concrete chart instance.
+     *
+     * This is mainly useful for advanced scenarios that require direct access
+     * to implementation-specific behavior.
+     *
      * @returns Internal chart implementation instance.
      */
     get instance(): ChartInstance {
@@ -49,63 +73,81 @@ export class AutkChart {
     }
 
     /**
-     * Gets the active selection as source feature indices.
-     * @returns Selected source feature indices.
+     * Gets the active selection as source feature ids.
+     * @returns Selected source feature ids.
      */
     get selection(): number[] {
         return this._plot.selection;
     }
 
     /**
-     * Gets the event dispatcher for this chart.
-     * @returns Plot event dispatcher.
+     * Gets the chart event dispatcher.
+     * @returns Typed event dispatcher exposed by the concrete chart.
      */
     get events(): ChartEvents {
         return this._plot.events;
     }
 
     /**
-     * Applies a selection to the chart.
-     * @param selection Source feature indices to highlight/select.
+     * Applies a new selection to the chart.
+     *
+     * The selection is interpreted as source feature ids and forwarded to the
+     * concrete chart instance.
+     *
+     * @param selection Source feature ids to highlight/select.
      */
     public setSelection(selection: number[]): void {
         this._plot.setSelection(selection);
     }
 
     /**
-     * Triggers a redraw when supported by the underlying chart implementation.
-     * @returns A promise resolved when redraw completes (if async).
+     * Triggers a redraw of the underlying chart implementation.
+     *
+     * Implementations may perform synchronous or asynchronous rendering, so
+     * this method always returns a promise.
+     *
+     * @returns Promise resolved when redraw completes.
      */
     public async draw(): Promise<void> {
         await this._plot.draw();
     }
 
-    private omitType<T extends { type: ChartType }>(config: T): Omit<T, 'type'> {
-        const { type, ...rest } = config;
-        void type;
-        return rest;
-    }
-
+    /**
+     * Instantiates the concrete chart class from a discriminated config.
+     *
+     * This method is intentionally centralized so chart type dispatch remains
+     * explicit and easy to audit.
+     *
+     * @param div Host HTML element where the chart should render.
+     * @param config Discriminated chart configuration.
+     * @returns Concrete chart instance matching `config.type`.
+     * @throws If `config.type` is not supported.
+     */
     private createPlot(div: HTMLElement, config: UnifiedChartConfig): ChartInstance {
         switch (config.type) {
             case 'scatterplot': {
-                const chartConfig = this.omitType(config);
+                const { type, ...chartConfig } = config;
+                void type;
                 return new Scatterplot({ div, ...chartConfig });
             }
             case 'barchart': {
-                const chartConfig = this.omitType(config);
+                const { type, ...chartConfig } = config;
+                void type;
                 return new Barchart({ div, ...chartConfig });
             }
             case 'parallel-coordinates': {
-                const chartConfig = this.omitType(config);
+                const { type, ...chartConfig } = config;
+                void type;
                 return new ParallelCoordinates({ div, ...chartConfig });
             }
             case 'table': {
-                const chartConfig = this.omitType(config);
+                const { type, ...chartConfig } = config;
+                void type;
                 return new TableVis({ div, ...chartConfig });
             }
             case 'linechart': {
-                const chartConfig = this.omitType(config);
+                const { type, ...chartConfig } = config;
+                void type;
                 return new Linechart({ div, ...chartConfig });
             }
             default: {
