@@ -137,6 +137,7 @@ export class TableVis extends ChartD3 {
     private renderRows(tbody: d3.Selection<HTMLTableSectionElement, unknown, any, unknown>): void {
         const displayRows = this.getDisplayRows();
         const chart = this;
+        const numberFormatter = d3.format('');
 
         const rows = tbody
             .selectAll<HTMLTableRowElement, { idx: number; row: any }>('tr')
@@ -157,7 +158,7 @@ export class TableVis extends ChartD3 {
             .join('td')
             .style('padding', '6px 8px')
             .style('text-align', 'center')
-            .text((d) => typeof d.value === 'number' ? +d.value.toFixed(4) : String(d.value));
+                .text((d) => typeof d.value === 'number' ? numberFormatter(d.value) : String(d.value));
     }
 
     /**

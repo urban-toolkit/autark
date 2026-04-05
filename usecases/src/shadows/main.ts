@@ -402,8 +402,6 @@ export class Shadows {
             histogram: {
                 column: `sjoin.avg.${this.currentMonth}`,
                 numBins: 13,
-                divisor: 60,
-                labelSuffix: 'h',
             },
         });
     }

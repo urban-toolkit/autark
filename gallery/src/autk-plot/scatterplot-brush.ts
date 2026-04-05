@@ -23,7 +23,6 @@ export class MapD3 {
         this.updatePlotListeners();
     }
 
-
     protected async loadAutkMap(canvas: HTMLCanvasElement) {
         this.map = new AutkMap(canvas);
         await this.map.init();
@@ -38,20 +37,9 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'scatterplot',
             collection: this.geojson,
-            attributes: ['shape_area', 'shape_leng'],
-            labels: { axis: ['shape_area', 'shape_leng'], title: 'Plot example' },
+            labels: { axis: ['shape_area', 'shape_leng'], title: 'Scatterplot example' },
             width: 790,
             events: [ChartEvent.BRUSH]
-        });
-    }
-
-    protected async updateMapListeners() {
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            if (selection.length > 0) {
-                this.plot.setSelection(selection);
-            } else {
-                this.plot.setSelection([]);
-            }
         });
     }
 
@@ -59,6 +47,12 @@ export class MapD3 {
         this.plot.events.on(ChartEvent.BRUSH, ({ selection }) => {
             const layer = <VectorLayer> this.map.layerManager.searchByLayerId(layerId);
             layer!.setHighlightedIds(selection);
+        });
+    }
+
+    protected async updateMapListeners() {
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
+            this.plot.setSelection(selection);
         });
     }
 }

@@ -14,8 +14,6 @@ export type NormalizedHistogramTransform = {
     };
     options: {
         bins: number;
-        divisor: number;
-        labelSuffix: string;
     };
 };
 
@@ -70,8 +68,6 @@ function normalizeHistogramTransform(config: HistogramTransformConfig): Normaliz
         },
         options: {
             bins: config.options?.bins ?? 10,
-            divisor: config.options?.divisor ?? 1,
-            labelSuffix: config.options?.labelSuffix ?? '',
         },
     };
 }

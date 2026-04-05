@@ -8,17 +8,17 @@ const URL = (import.meta as any).env.BASE_URL;
 export class MapD3Histogram {
     protected map!: AutkMap;
     protected plot!: AutkChart;
-    protected plotDiv!: HTMLElement;
 
     protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
         this.geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
-        this.plotDiv = plotDiv;
 
         await this.loadAutkMap(canvas);
-        this.initPlot();
+        await this.loadAutkPlot(plotDiv);
+
         this.updateMapListeners();
+        this.updatePlotListeners();
     }
 
     protected async loadAutkMap(canvas: HTMLCanvasElement): Promise<void> {
@@ -27,35 +27,36 @@ export class MapD3Histogram {
 
         this.map.loadCollection({ id: 'neighborhoods', collection: this.geojson });
         this.map.updateRenderInfo('neighborhoods', { isPick: true });
+
         this.map.draw();
     }
 
-    protected initPlot(): void {
-        this.plot = new AutkChart(this.plotDiv, {
+    protected async loadAutkPlot(plotDiv: HTMLElement): Promise<void> {
+        this.plot = new AutkChart(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
-            labels: { axis: ['label', 'count'], title: 'Area histogram (neighborhoods)' },
+            labels: { axis: ['area range', 'neighborhoods count'], title: 'Histogram example' },
             transform: {
                 preset: 'histogram',
                 attributes: { value: 'shape_area' },
-                options: { bins: 8, divisor: 1_000_000, labelSuffix: 'M' },
+                options: { bins: 10 },
             },
-            margins: { left: 60, right: 20, top: 50, bottom: 180 },
+            margins: { left: 60, right: 20, top: 50, bottom: 80 },
             width: 790,
-            events: [ChartEvent.CLICK],
+            events: [ChartEvent.BRUSH_X],
         });
+    }
 
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
+    protected updatePlotListeners(layerId: string = 'neighborhoods') {
+        this.plot.events.on(ChartEvent.BRUSH_X, ({ selection }) => {
+            const layer = this.map.layerManager.searchByLayerId(layerId) as VectorLayer;
             layer?.setHighlightedIds(selection);
         });
+
     }
 
     protected updateMapListeners(): void {
         this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
-            layer?.setHighlightedIds(selection);
-
             this.plot.setSelection(selection);
         });
     }

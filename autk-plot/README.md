@@ -73,8 +73,6 @@ const bins = presetHistogram({
   rows,
   column: 'sjoin.avg.jun',
   numBins: 13,
-  divisor: 60,
-  labelSuffix: 'h',
 });
 ```
 

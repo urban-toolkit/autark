@@ -19,6 +19,10 @@ export class ParallelCoordinates extends ChartD3 {
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
     protected colorDimension: string | null = null;
 
+    private formatNumericAxisValue(value: number): string {
+        return d3.format('')(value);
+    }
+
     /**
      * Creates a parallel coordinates chart and performs the initial draw.
      * @param config Plot configuration for parallel coordinates rendering.
@@ -142,7 +146,11 @@ export class ParallelCoordinates extends ChartD3 {
             const dimType = this.dimensionTypes.get(dim);
 
             if (scale && dimType === 'numerical') {
-                d3.select(nodes[i]).call(d3.axisLeft(scale as d3.ScaleLinear<number, number>).ticks(5) as any);
+                d3.select(nodes[i]).call(
+                    d3.axisLeft(scale as d3.ScaleLinear<number, number>)
+                        .ticks(5)
+                        .tickFormat((value) => this.formatNumericAxisValue(Number(value))) as any
+                );
             } else if (scale && dimType === 'categorical') {
                 d3.select(nodes[i]).call(d3.axisLeft(scale as d3.ScalePoint<string>) as any);
             }

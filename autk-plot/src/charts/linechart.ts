@@ -60,7 +60,7 @@ export class Linechart extends BaseChart {
                 axis: [labels?.axis?.[0] ?? 'Year', labels?.axis?.[1] ?? 'Value'],
                 title: labels?.title ?? '',
             },
-            tickFormats: config.tickFormats ? [...config.tickFormats] : ['.0f', '.1f'],
+            tickFormats: config.tickFormats ? [...config.tickFormats] : ['', ''],
             width: config.width ?? 600,
             height: config.height ?? 280,
             margins: config.margins ?? { left: 52, right: 20, top: 42, bottom: 44 },
@@ -271,7 +271,11 @@ export class Linechart extends BaseChart {
     private formatBucketLabel(bucket: string): string {
         const numericBucket = Number(bucket);
         if (this._startYear > 0 && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-            return String(this._startYear + numericBucket);
+            return d3.format(this._tickFormats[0])(this._startYear + numericBucket);
+        }
+
+        if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+            return d3.format(this._tickFormats[0])(numericBucket);
         }
 
         return bucket;

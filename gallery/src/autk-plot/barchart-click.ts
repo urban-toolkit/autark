@@ -36,7 +36,7 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
-            labels: { axis: ['ntaname', 'shape_area'], title: 'Plot example' },
+            labels: { axis: ['ntaname', 'shape_area'], title: 'Barchart example' },
             margins: { left: 60, right: 20, top: 50, bottom: 200 },
             width: 790,
             events: [ChartEvent.CLICK]
@@ -45,11 +45,7 @@ export class MapD3 {
 
     protected async updateMapListeners() {
         this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            if (selection.length > 0) {
-                this.plot.setSelection(selection);
-            } else {
-                this.plot.setSelection([]);
-            }
+            this.plot.setSelection(selection);
         });
     }
 

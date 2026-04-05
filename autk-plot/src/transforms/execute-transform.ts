@@ -51,8 +51,6 @@ export function executeResolvedTransform(
                 rows,
                 column: transform.attributes.value,
                 numBins: transform.options.bins,
-                divisor: transform.options.divisor,
-                labelSuffix: transform.options.labelSuffix,
             }),
         };
     }

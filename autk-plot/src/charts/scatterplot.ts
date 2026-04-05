@@ -1,3 +1,30 @@
+/**
+ * @fileoverview Scatter plot visualization for two-dimensional numeric data.
+ *
+ * Provides a D3-based scatter plot implementation with the following features:
+ * - **Point-based rendering**: Projects two numeric attributes as x/y marks
+ * - **Two-axis mapping**: Numeric domains mapped to linear x/y scales
+ * - **Selection and linked views**: Uses source feature ids for click/brush interactions across components
+ *
+ * @example
+ * // Basic scatter plot
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'scatterplot',
+ *   collection: geojson,
+ *   attributes: ['population', 'income'],
+ *   labels: { axis: ['population', 'income'], title: 'Population vs Income' }
+ * });
+ *
+ * @example
+ * // Scatter plot with interaction events
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'scatterplot',
+ *   collection: geojson,
+ *   attributes: ['x', 'y'],
+ *   events: [ChartEvent.CLICK, ChartEvent.BRUSH]
+ * });
+ */
+
 import * as d3 from "d3";
 
 import { ChartD3 } from "../chart-d3";
@@ -9,7 +36,10 @@ import { valueAtPath } from "autk-core";
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
  *
- * Expects two numeric attributes: x and y.
+ * Expects exactly two numeric attributes, interpreted as x and y dimensions.
+ *
+ * The chart delegates interaction mechanics (click/brush selection, highlight
+ * styling, and selection event emission) to the shared ChartD3 base class.
  */
 export class Scatterplot extends ChartD3   {
 
@@ -22,10 +52,13 @@ export class Scatterplot extends ChartD3   {
      */
     constructor(config: ChartConfig) {
         if(config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+        if (config.tickFormats === undefined) {
+            config.tickFormats = ['~s', '~s'];
+        }
         super(config);
 
         if (this._attributes.length < 2) {
-            throw new Error('Scatterplot requires two dimensions. Provide `attributes: [x, y]` or `labels.axis: [x, y]`.');
+            throw new Error('Scatterplot requires two dimensions.');
         }
 
         this.draw();
@@ -152,7 +185,7 @@ export class Scatterplot extends ChartD3   {
             .attr('class', 'autkMark')
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, this._attributes[0])) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
-            .attr('r', 3)
+            .attr('r', 5)
             .style('fill', ChartStyle.default)
             .style('visibility', 'inherit');
 

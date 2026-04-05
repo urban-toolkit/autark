@@ -15,8 +15,6 @@ export type ChartMargins = { left: number; right: number; top: number; bottom: n
 export type HistogramConfig = {
     column: string;       // nested property path to the value (e.g. 'sjoin.avg.jun')
     numBins: number;      // number of equal-width bins
-    divisor?: number;     // divide raw value before binning (e.g. 60 to convert min → h)
-    labelSuffix?: string; // appended to each bin label (e.g. 'h')
 };
 
 /** Supported reducer names for built-in transform presets. */
@@ -37,8 +35,6 @@ export type HistogramTransformConfig = {
     };
     options?: {
         bins?: number;
-        divisor?: number;
-        labelSuffix?: string;
     };
 };
 

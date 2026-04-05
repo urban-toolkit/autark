@@ -83,7 +83,7 @@ export abstract class BaseChart {
         this._axis = axisLabels.length > 0 ? axisLabels : attributes;
         this._attributes = attributes;
         this._title = config.labels?.title || 'Autk Plot';
-        this._tickFormats = config.tickFormats ?? ['.2s', '.2s'];
+        this._tickFormats = config.tickFormats ?? ['', ''];
         this._domain = config.domain;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQUENTIAL_REDS;
     }

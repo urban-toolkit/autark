@@ -1,10 +1,46 @@
+/**
+ * @fileoverview Bar chart visualization supporting both categorical and histogram modes.
+ *
+ * Provides a D3-based bar chart implementation with the following features:
+ * - **Dual rendering modes**: Categorical bars and histogram bins from transformed data
+ * - **Two-axis mapping**: Category/bin labels on x and numeric values on y
+ * - **Selection and linked views**: Uses source feature ids for click/brush interactions across components
+ *
+ * The chart maintains a stable mapping between rendered bins and original source features,
+ * allowing selections to remain consistent across transformations.
+ *
+ * @example
+ * // Histogram mode with map-plot linking
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'barchart',
+ *   collection: geojson,
+ *   transform: {
+ *     preset: 'histogram',
+ *     attributes: { value: 'shape_area' },
+ *     options: { bins: 8 }
+ *   },
+ *   labels: { axis: ['area range', 'count'], title: 'Distribution' },
+ *   events: [ChartEvent.CLICK]
+ * });
+ *
+ * @example
+ * // Categorical mode
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'barchart',
+ *   collection: features,
+ *   labels: { axis: ['category', 'value'] }
+ * });
+ */
+
 import * as d3 from "d3";
 
-import { ChartD3 } from "../chart-d3";
+import { valueAtPath } from "autk-core";
+
 import type { ChartConfig, ChartTransformConfig } from "../api";
+
+import { ChartD3 } from "../chart-d3";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
-import { valueAtPath } from "autk-core";
 import { executeTransform } from "../transforms/execute-transform";
 
 /**
@@ -26,12 +62,22 @@ export class Barchart extends ChartD3 {
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+        if (config.tickFormats === undefined) {
+            config.tickFormats = ['~s', '~s'];
+        }
         if (config.transform) {
-            config.labels = Barchart.applyTransformLabelDefaults(config.labels, config.transform);
+            const axis = config.labels?.axis ?? (config.transform.preset === 'histogram' ? ['label', 'count'] : ['bucket', 'value']);
+            const title = config.labels?.title
+                ?? (config.transform.preset === 'histogram'
+                    ? 'Histogram'
+                    : config.transform.preset === 'temporal-events'
+                        ? 'Temporal events'
+                        : 'Timeseries');
+            config.labels = { axis, title };
         }
         super(config);
 
-        this._transformConfig = config.transform ?? this.fromLegacyHistogramConfig(config);
+        this._transformConfig = config.transform;
 
         this.draw();
     }
@@ -46,72 +92,41 @@ export class Barchart extends ChartD3 {
             return;
         }
 
-        const selected = new Set(this._selection);
+        // Always compute histogram from all features
         const allRows = this._sourceFeatures.map((f, idx) => ({
             ...(f.properties ?? {}),
             autkIds: [idx],
         }));
-        const rows = this._selection.length === 0
-            ? allRows
-            : allRows.filter(row => row.autkIds.some(id => selected.has(id)));
 
-        const transformed = executeTransform(rows, this._transformConfig);
+        const transformed = executeTransform(allRows, this._transformConfig);
         this.data = transformed.rows as any;
         this._attributes = transformed.attributes;
     }
 
+    /**
+     * Applies an external selection expressed as source feature ids.
+     *
+     * In transform mode, ensures transformed rows are available before
+     * delegating visual highlight updates to shared D3 selection styling.
+     *
+     * @param selection Source feature ids to highlight.
+     */
     override setSelection(selection: number[]): void {
         this._selection = selection;
         if (this._transformConfig) {
-            this.draw();
-        } else {
-            this.updateChartSelection();
+            // Ensure histogram is computed before updating chart
+            if (!this.data || this.data.length === 0) {
+                this.computeTransform();
+            }
         }
-    }
-
-    private fromLegacyHistogramConfig(config: ChartConfig): ChartTransformConfig | undefined {
-        if (!config.histogram) {
-            return undefined;
-        }
-
-        return {
-            preset: 'histogram',
-            attributes: {
-                value: config.histogram.column,
-            },
-            options: {
-                bins: config.histogram.numBins,
-                divisor: config.histogram.divisor,
-                labelSuffix: config.histogram.labelSuffix,
-            },
-        };
-    }
-
-    private static applyTransformLabelDefaults(
-        labels: ChartConfig['labels'],
-        transform: ChartTransformConfig
-    ): NonNullable<ChartConfig['labels']> {
-        const axis = labels?.axis ?? (transform.preset === 'histogram' ? ['label', 'count'] : ['bucket', 'value']);
-        const title = labels?.title ?? Barchart.getTransformTitle(transform);
-
-        return { axis, title };
-    }
-
-    private static getTransformTitle(transform: ChartTransformConfig): string {
-        if (transform.preset === 'histogram') {
-            return 'Histogram';
-        }
-        if (transform.preset === 'temporal-events') {
-            return 'Temporal events';
-        }
-        return 'Timeseries';
+        this.updateChartSelection();
     }
 
     /**
      * Renders chart scaffolding, axes, and bar marks.
      * @returns Promise resolved when SVG nodes are synchronized.
      */
-    public async render(): Promise<void> {
+    async render(): Promise<void> {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
@@ -159,7 +174,13 @@ export class Barchart extends ChartD3 {
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
-        const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0);
+        const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
+            const value = String(d);
+            const numericValue = Number(value);
+            return Number.isFinite(numericValue) && value.trim() !== ''
+                ? d3.format(this._tickFormats[0] || '~s')(numericValue)
+                : value;
+        });
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisX')
@@ -178,7 +199,17 @@ export class Barchart extends ChartD3 {
             .attr('dy', '-.40em')
             .attr('transform', 'rotate(-90)');
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(',.0f'));
+        // X axis label:
+        xAxisSelection
+            .append('text')
+            .attr('class', 'title')
+            .attr('text-anchor', 'end')
+            .attr('x', width)
+            .attr('y', this._margins.bottom / 2 + 10)
+            .style('visibility', 'visible')
+            .text(this._axis[0]);
+
+        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisY')
