@@ -1,5 +1,5 @@
 import { valueAtPath } from 'autk-core';
-import type { TransformRow } from '../transform-engine';
+import type { TransformRow } from '../kernel';
 
 export type HistogramPresetOptions<T extends TransformRow> = {
     rows: T[];

@@ -4,7 +4,7 @@ import {
     type TransformReducerName,
     type TransformResolution,
     type TransformRow,
-} from '../transform-engine';
+} from '../kernel';
 
 export type TemporalBucketRow = {
     bucket: string;

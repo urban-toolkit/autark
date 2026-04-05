@@ -3,7 +3,7 @@ import {
     type ReducedBucket,
     type TransformReducerName,
     type TransformRow,
-} from '../transform-engine';
+} from '../kernel';
 
 export type TimeseriesBucketRow = {
     bucket: string;
