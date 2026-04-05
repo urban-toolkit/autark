@@ -2,7 +2,7 @@ import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import type { EventEmitter } from './core-types';
 import { ColorMapInterpolator } from './core-types';
 import { ChartEvent } from './events-types';
-import type { LinechartConfig } from './chart-types/linechart';
+import type { LinechartConfig } from './charts/linechart';
 
 /**
  * Margin values in pixels around the plot drawing area.
@@ -18,6 +18,70 @@ export type HistogramConfig = {
     divisor?: number;     // divide raw value before binning (e.g. 60 to convert min → h)
     labelSuffix?: string; // appended to each bin label (e.g. 'h')
 };
+
+/** Supported reducer names for built-in transform presets. */
+export type TransformReducer = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+/** Supported temporal resolutions for event bucketing presets. */
+export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'month' | 'year';
+
+/**
+ * Histogram preset config.
+ *
+ * Defaults are applied internally when `options` are omitted.
+ */
+export type HistogramTransformConfig = {
+    preset: 'histogram';
+    attributes: {
+        value: string;
+    };
+    options?: {
+        bins?: number;
+        divisor?: number;
+        labelSuffix?: string;
+    };
+};
+
+/**
+ * Temporal events preset config.
+ *
+ * Defaults are applied internally when `options` or optional attributes are omitted.
+ */
+export type TemporalEventsTransformConfig = {
+    preset: 'temporal-events';
+    attributes: {
+        events: string;
+        timestamp?: string;
+        value?: string;
+    };
+    options?: {
+        resolution?: TransformResolution;
+        reducer?: TransformReducer;
+    };
+};
+
+/**
+ * Timeseries preset config.
+ *
+ * Defaults are applied internally when `options` or optional attributes are omitted.
+ */
+export type TimeseriesTransformConfig = {
+    preset: 'timeseries';
+    attributes: {
+        series: string;
+        timestamp?: string;
+        value?: string;
+    };
+    options?: {
+        reducer?: TransformReducer;
+    };
+};
+
+/** Transform preset config accepted by `AutkChart`. */
+export type ChartTransformConfig =
+    | HistogramTransformConfig
+    | TemporalEventsTransformConfig
+    | TimeseriesTransformConfig;
 
 /**
  * Datum contract bound to interactive marks.
@@ -41,6 +105,7 @@ export type ChartConfig = {
     height?: number,
     labels?: { axis: string[]; title: string },
     attributes?: string[],
+    transform?: ChartTransformConfig,
     histogram?: HistogramConfig,
     tickFormats?: string[], // d3-format specifier per axis, e.g. ['.1f', '.4f']
     /** Explicit data domain `[min, max]` for numerical color encoding. If omitted, computed from the data. */

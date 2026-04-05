@@ -33,6 +33,12 @@ export type {
 export type {
 	ChartMargins,
 	HistogramConfig,
+	TransformReducer,
+	TransformResolution,
+	HistogramTransformConfig,
+	TemporalEventsTransformConfig,
+	TimeseriesTransformConfig,
+	ChartTransformConfig,
 	AutkDatum,
 	ChartConfig,
 	ChartSelectionPayload,
