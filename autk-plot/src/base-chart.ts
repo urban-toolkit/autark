@@ -1,4 +1,4 @@
-import { GeoJsonProperties } from "geojson";
+import type { Feature, GeoJsonProperties, Geometry } from "geojson";
 
 import type { AutkDatum, ChartConfig, ChartMargins, ChartEvents, ChartEventRecord } from "./api";
 import { ColorMapInterpolator } from "./core-types";
@@ -18,6 +18,9 @@ export abstract class BaseChart {
 
     /** Host element where the chart is rendered. */
     protected _div!: HTMLElement;
+
+    /** Original source features from the input collection, indexed by source feature id. */
+    protected _sourceFeatures!: Feature<Geometry, GeoJsonProperties>[];
 
     /** Normalized render rows bound to marks. */
     protected _data!: AutkDatum[];
@@ -66,7 +69,11 @@ export abstract class BaseChart {
         this._chartEvents = new EventEmitter<ChartEventRecord>();
         this._enabledEvents = config.events ?? [];
 
-        this._data = this.ensureAutkIds(config.collection.features.map((f) => f.properties as AutkDatum));
+        this._sourceFeatures = config.collection.features;
+        this._data = this._sourceFeatures.map((f, idx) => ({
+            ...(f.properties ?? {}),
+            autkIds: [idx],
+        })) as AutkDatum[];
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
         this._width = config.width || 800;
         this._height = config.height || 500;

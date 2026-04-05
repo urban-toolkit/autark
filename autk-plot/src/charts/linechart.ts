@@ -35,7 +35,6 @@ export class Linechart extends BaseChart {
     private _startYear: number;
     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
     private _transformConfig?: ChartTransformConfig;
-    private _rawData!: AutkDatum[];
 
     /**
      * Creates a line chart instance and renders the initial state.
@@ -72,16 +71,19 @@ export class Linechart extends BaseChart {
 
         this._startYear = config.startYear ?? 0;
         this._transformConfig = config.transform;
-        this._rawData = [...this.data];
 
         this.draw();
     }
 
     protected override computeTransform(): void {
         const selected = new Set(this.selection);
+        const allRows = this._sourceFeatures.map((f, idx) => ({
+            ...(f.properties ?? {}),
+            autkIds: [idx],
+        })) as AutkDatum[];
         const sourceRows = this.selection.length === 0
-            ? this._rawData
-            : this._rawData.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
+            ? allRows
+            : allRows.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
 
         if (this._transformConfig) {
             const transformed = executeTransform(sourceRows, this._transformConfig);

@@ -19,7 +19,6 @@ export class Barchart extends ChartD3 {
     protected mapY!: d3.ScaleLinear<number, number>;
 
     private _transformConfig?: ChartTransformConfig;
-    private _rawData!: any[];
 
     /**
      * Creates a bar chart instance and performs the initial draw.
@@ -34,11 +33,6 @@ export class Barchart extends ChartD3 {
 
         this._transformConfig = config.transform ?? this.fromLegacyHistogramConfig(config);
 
-        if (this._transformConfig) {
-            // Save original data before draw() replaces it with aggregated rows.
-            this._rawData = [...this.data];
-        }
-
         this.draw();
     }
 
@@ -52,9 +46,27 @@ export class Barchart extends ChartD3 {
             return;
         }
 
-        const transformed = executeTransform(this._rawData, this._transformConfig);
+        const selected = new Set(this._selection);
+        const allRows = this._sourceFeatures.map((f, idx) => ({
+            ...(f.properties ?? {}),
+            autkIds: [idx],
+        }));
+        const rows = this._selection.length === 0
+            ? allRows
+            : allRows.filter(row => row.autkIds.some(id => selected.has(id)));
+
+        const transformed = executeTransform(rows, this._transformConfig);
         this.data = transformed.rows as any;
         this._attributes = transformed.attributes;
+    }
+
+    override setSelection(selection: number[]): void {
+        this._selection = selection;
+        if (this._transformConfig) {
+            this.draw();
+        } else {
+            this.updateChartSelection();
+        }
     }
 
     private fromLegacyHistogramConfig(config: ChartConfig): ChartTransformConfig | undefined {
