@@ -5,6 +5,7 @@ import type { ChartConfig, HistogramConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
 import { valueAtPath } from "autk-core";
+import { presetHistogram } from "../transforms";
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
@@ -54,22 +55,13 @@ export class Barchart extends ChartD3 {
 
         const { column, numBins, divisor = 1, labelSuffix = '' } = this._histogramConfig;
 
-        const binCounts = new Array(numBins).fill(0);
-        const binToFeatureIds: number[][] = Array.from({ length: numBins }, () => []);
-
-        this._rawData.forEach((d: any, idx: number) => {
-            const val = d ? valueAtPath(d, column) : null;
-            if (val == null) return;
-            const bin = Math.max(0, Math.min(Math.floor(+val / divisor), numBins - 1));
-            binCounts[bin]++;
-            binToFeatureIds[bin].push(idx);
-        });
-
-        this.data = Array.from({ length: numBins }, (_, i) => ({
-            label: `${i}-${i + 1}${labelSuffix}`,
-            count: binCounts[i],
-            autkIds: binToFeatureIds[i],
-        })) as any;
+        this.data = presetHistogram({
+            rows: this._rawData,
+            column,
+            numBins,
+            divisor,
+            labelSuffix,
+        }) as any;
         this._attributes = ['label', 'count'];
     }
 
