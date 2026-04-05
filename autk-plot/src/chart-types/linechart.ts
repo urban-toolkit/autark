@@ -4,24 +4,18 @@ import { valueAtPath } from 'autk-core';
 
 import { BaseChart } from '../base-chart';
 import type { ChartConfig } from '../api';
+import { presetTimeseriesAggregate, type TimeseriesPoint } from '../transforms';
 
 /**
  * Configuration for the linechart implementation.
  *
  * Attributes are interpreted as:
- * 1) timeseries array path
- * 2) optional regression angle path
- * 3) optional regression intercept path
+ * 1) timeseries path
  */
 export type LinechartConfig = {
     div: HTMLElement;
     collection: FeatureCollection<Geometry, GeoJsonProperties>;
-    /**
-     * Attribute paths (nested dot-notation) in order:
-     *   [0] timeseries array  (required)
-     *   [1] regression angle in degrees — atan(slope)*180/π  (optional)
-     *   [2] regression intercept                              (optional)
-     */
+    /** Attribute paths (nested dot-notation), where [0] is the timeseries path. */
     attributes: [string, string?, string?];
     labels?: { axis?: [string, string]; title?: string };
     tickFormats?: [string, string]; // [x-axis format, y-axis format]
@@ -32,16 +26,14 @@ export type LinechartConfig = {
 };
 
 /**
- * Line chart that shows a timeseries stored in a GeoJSON feature property,
- * optionally overlaid with an OLS regression line.
+ * Line chart that aggregates feature-level timeseries into a single series.
  *
- * Usage:
- *   const chart = new Linechart({ div, data: geojson, attributes: ['lst_timeseries', 'compute.angle', 'compute.intercept'], startYear: 2001 });
- *   chart.setSelection([42]);         // show feature 42
- *   chart.setSelection([]);           // clear to empty state
+ * Rendering rows are generated through shared transform presets and each point
+ * preserves provenance via `autkIds`.
  */
 export class Linechart extends BaseChart {
     private _startYear: number;
+     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
 
     /**
      * Creates a line chart instance and renders the initial state.
@@ -72,32 +64,37 @@ export class Linechart extends BaseChart {
         this.draw();
     }
 
-    /** Re-renders line content based on current selected feature id. */
+    protected override computeTransform(): void {
+        const selected = new Set(this.selection);
+        const sourceRows = this.selection.length === 0
+            ? this.data
+            : this.data.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
+
+        const reducedSeries = presetTimeseriesAggregate({
+            rows: sourceRows,
+            reducer: 'avg',
+            pointsOf: (row) => this.getTimeseriesPoints(row),
+        });
+
+        reducedSeries.sort((a, b) => this.compareBuckets(a.bucket, b.bucket));
+
+        this._seriesData = reducedSeries.map((item, idx) => ({
+            x: idx,
+            label: item.bucket,
+            y: item.value,
+            autkIds: item.autkIds,
+        }));
+    }
+
+    /** Recomputes series rows and redraws the chart. */
     public updateChartSelection(): void {
-        this.render();
+        this.draw();
     }
 
     /**
-     * Draws the chart for the selected feature, or empty state when selection is empty.
+     * Draws the aggregated line for all rows or the currently selected subset.
      */
     public render(): void {
-        const featureId = this.selection.length > 0 ? this.selection[0] : null;
-        const props = featureId !== null ? this.data[featureId] : null;
-
-        const timeseries: number[] | null = props
-            ? (valueAtPath(props, this._attributes[0]) as number[] | undefined) ?? null
-            : null;
-
-        const angleDeg: number | null =
-            this._attributes[1] && props
-                ? (valueAtPath(props, this._attributes[1]) as number | undefined) ?? null
-                : null;
-
-        const intercept: number | null =
-            this._attributes[2] && props
-                ? (valueAtPath(props, this._attributes[2]) as number | undefined) ?? null
-                : null;
-
         const innerW = this._width  - this._margins.left - this._margins.right;
         const innerH = this._height - this._margins.top  - this._margins.bottom;
 
@@ -114,9 +111,9 @@ export class Linechart extends BaseChart {
         svg.selectAll('*').remove();
 
         // ── Scales ──────────────────────────────────────────────────────────
-        const n = timeseries?.length ?? 24;
+        const n = Math.max(this._seriesData.length, 1);
 
-        const allY = timeseries ?? [];
+        const allY = this._seriesData.map((item) => item.y);
         const yMin = allY.length > 0 ? Math.min(...allY) : 0;
         const yMax = allY.length > 0 ? Math.max(...allY) : 50;
         const yPad = (yMax - yMin) * 0.1 || 1;
@@ -158,7 +155,7 @@ export class Linechart extends BaseChart {
             .call(
                 d3.axisBottom(xScale)
                     .ticks(Math.min(n, 12))
-                    .tickFormat(d => d3.format(this._tickFormats[0])(this._startYear + +d))
+                    .tickFormat(d => this._seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(this._startYear + +d))
             );
         xAxisG.selectAll<SVGTextElement, unknown>('text')
             .style('font-size', '11px')
@@ -194,30 +191,8 @@ export class Linechart extends BaseChart {
             .style('fill', '#555')
             .text(this._axis[1]);
 
-        // ── Legend ───────────────────────────────────────────────────────────
-        const legendItems = [
-            { color: '#4472c4', dash: '',    label: 'Observed LST' },
-            { color: '#e04444', dash: '5,3', label: 'Regression'   },
-        ];
-        const legendX = innerW - 120;
-        const legendBaseY = -this._margins.top * 0.2 + 6;
-        legendItems.forEach((item, i) => {
-            const ly = legendBaseY + i * 16;
-            g.append('line')
-                .attr('x1', legendX).attr('y1', ly)
-                .attr('x2', legendX + 18).attr('y2', ly)
-                .attr('stroke', item.color)
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', item.dash || null);
-            g.append('text')
-                .attr('x', legendX + 23).attr('y', ly + 4)
-                .style('font-size', '10px')
-                .style('font-family', 'system-ui, sans-serif')
-                .text(item.label);
-        });
-
         // ── Empty state — no data yet ─────────────────────────────────────
-        if (!timeseries || timeseries.length === 0) {
+        if (this._seriesData.length === 0) {
             g.append('text')
                 .attr('x', innerW / 2)
                 .attr('y', innerH / 2)
@@ -225,46 +200,90 @@ export class Linechart extends BaseChart {
                 .style('font-size', '12px')
                 .style('fill', '#aaa')
                 .style('font-family', 'system-ui, sans-serif')
-                .text('Pick a road segment to see its LST timeseries');
+                .text('No timeseries data for the current selection');
             return;
         }
 
-        // ── Observed timeseries ───────────────────────────────────────────
-        const observed = timeseries.map((v, i) => ({ x: i, y: v }));
-        const lineGen = d3.line<{ x: number; y: number }>()
+        // ── Aggregated timeseries ─────────────────────────────────────────
+        const lineGen = d3.line<{ x: number; y: number; autkIds: number[] }>()
             .x(d => xScale(d.x))
             .y(d => yScale(d.y));
 
         g.append('path')
-            .datum(observed)
+            .datum(this._seriesData)
             .attr('fill', 'none')
             .attr('stroke', '#4472c4')
             .attr('stroke-width', 1.5)
             .attr('d', lineGen);
 
-        g.selectAll('.obs-dot')
-            .data(observed)
+        g.selectAll('.agg-dot')
+            .data(this._seriesData)
             .join('circle')
-            .attr('class', 'obs-dot')
+            .attr('class', 'agg-dot')
             .attr('cx', d => xScale(d.x))
             .attr('cy', d => yScale(d.y))
             .attr('r', 3)
             .attr('fill', '#4472c4');
+    }
 
-        // ── Regression line (only when both parameters are present) ────────
-        if (angleDeg !== null && intercept !== null) {
-            const slope = Math.tan(angleDeg * (Math.PI / 180));
-            const regLine = [
-                { x: 0,     y: intercept },
-                { x: n - 1, y: intercept + slope * (n - 1) },
-            ];
-            g.append('path')
-                .datum(regLine)
-                .attr('fill', 'none')
-                .attr('stroke', '#e04444')
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', '5,3')
-                .attr('d', lineGen);
+    private getTimeseriesPoints(row: GeoJsonProperties): TimeseriesPoint[] {
+        const seriesPath = this._attributes[0];
+        const sourceSeries = valueAtPath(row, seriesPath);
+        if (!Array.isArray(sourceSeries)) return [];
+
+        const points: TimeseriesPoint[] = [];
+
+        sourceSeries.forEach((point, idx) => {
+            if (typeof point === 'number' && Number.isFinite(point)) {
+                points.push({
+                    timestamp: this._startYear > 0 ? this._startYear + idx : idx,
+                    value: point,
+                });
+                return;
+            }
+
+            if (!point || typeof point !== 'object') {
+                return;
+            }
+
+            const mapPoint = point as Record<string, unknown>;
+            const rawTimestamp = mapPoint['timestamp'] ?? mapPoint['time'] ?? mapPoint['date'] ?? mapPoint['x'] ?? idx;
+            const timestamp =
+                rawTimestamp instanceof Date || typeof rawTimestamp === 'string' || typeof rawTimestamp === 'number'
+                    ? rawTimestamp
+                    : idx;
+
+            const value = mapPoint['value'] ?? mapPoint['y'] ?? mapPoint['avg'] ?? mapPoint['val'];
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return;
+            }
+
+            points.push({ timestamp, value: numericValue });
+        });
+
+        return points;
+    }
+
+    private compareBuckets(a: string, b: string): number {
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        const validDateA = Number.isFinite(dateA.getTime());
+        const validDateB = Number.isFinite(dateB.getTime());
+
+        if (validDateA && validDateB) {
+            return dateA.getTime() - dateB.getTime();
         }
+
+        const numA = Number(a);
+        const numB = Number(b);
+        const validNumA = Number.isFinite(numA);
+        const validNumB = Number.isFinite(numB);
+
+        if (validNumA && validNumB) {
+            return numA - numB;
+        }
+
+        return a.localeCompare(b);
     }
 }
