@@ -1,9 +1,5 @@
 import type { ChartEvents, ChartType, UnifiedChartConfig } from './api';
-import { Barchart } from './chart-types/barchart';
-import { Linechart } from './chart-types/linechart';
-import { ParallelCoordinates } from './chart-types/pcoordinates';
-import { Scatterplot } from './chart-types/scatterplot';
-import { TableVis } from './chart-types/tablevis';
+import { Barchart, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
 
 type ChartInstance = {
     selection: number[];
