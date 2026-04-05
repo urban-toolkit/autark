@@ -1,11 +1,11 @@
 import * as d3 from "d3";
 
 import { ChartD3 } from "../chart-d3";
-import type { ChartConfig, HistogramConfig } from "../api";
+import type { ChartConfig, ChartTransformConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
 import { valueAtPath } from "autk-core";
-import { presetHistogram } from "../transforms/presets/histogram";
+import { executeTransform } from "../transforms/execute-transform";
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
@@ -18,7 +18,7 @@ export class Barchart extends ChartD3 {
     protected mapX!: d3.ScaleBand<string>;
     protected mapY!: d3.ScaleLinear<number, number>;
 
-    private _histogramConfig?: HistogramConfig;
+    private _transformConfig?: ChartTransformConfig;
     private _rawData!: any[];
 
     /**
@@ -27,16 +27,15 @@ export class Barchart extends ChartD3 {
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+        if (config.transform) {
+            config.labels = Barchart.applyTransformLabelDefaults(config.labels, config.transform);
+        }
         super(config);
 
-        if (config.histogram) {
-            this._histogramConfig = {
-                column: config.histogram.column,
-                numBins: config.histogram.numBins,
-                divisor: config.histogram.divisor ?? 1,
-                labelSuffix: config.histogram.labelSuffix ?? '',
-            };
-            // Save original data before draw() replaces it with bin summaries
+        this._transformConfig = config.transform ?? this.fromLegacyHistogramConfig(config);
+
+        if (this._transformConfig) {
+            // Save original data before draw() replaces it with aggregated rows.
             this._rawData = [...this.data];
         }
 
@@ -48,21 +47,52 @@ export class Barchart extends ChartD3 {
      * directly on each rendered bin datum via `autkIds`.
      */
     protected override computeTransform(): void {
-        if (!this._histogramConfig) {
+        if (!this._transformConfig) {
             super.computeTransform();
             return;
         }
 
-        const { column, numBins, divisor = 1, labelSuffix = '' } = this._histogramConfig;
+        const transformed = executeTransform(this._rawData, this._transformConfig);
+        this.data = transformed.rows as any;
+        this._attributes = transformed.attributes;
+    }
 
-        this.data = presetHistogram({
-            rows: this._rawData,
-            column,
-            numBins,
-            divisor,
-            labelSuffix,
-        }) as any;
-        this._attributes = ['label', 'count'];
+    private fromLegacyHistogramConfig(config: ChartConfig): ChartTransformConfig | undefined {
+        if (!config.histogram) {
+            return undefined;
+        }
+
+        return {
+            preset: 'histogram',
+            attributes: {
+                value: config.histogram.column,
+            },
+            options: {
+                bins: config.histogram.numBins,
+                divisor: config.histogram.divisor,
+                labelSuffix: config.histogram.labelSuffix,
+            },
+        };
+    }
+
+    private static applyTransformLabelDefaults(
+        labels: ChartConfig['labels'],
+        transform: ChartTransformConfig
+    ): NonNullable<ChartConfig['labels']> {
+        const axis = labels?.axis ?? (transform.preset === 'histogram' ? ['label', 'count'] : ['bucket', 'value']);
+        const title = labels?.title ?? Barchart.getTransformTitle(transform);
+
+        return { axis, title };
+    }
+
+    private static getTransformTitle(transform: ChartTransformConfig): string {
+        if (transform.preset === 'histogram') {
+            return 'Histogram';
+        }
+        if (transform.preset === 'temporal-events') {
+            return 'Temporal events';
+        }
+        return 'Timeseries';
     }
 
     /**
