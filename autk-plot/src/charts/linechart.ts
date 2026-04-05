@@ -1,29 +1,10 @@
 import * as d3 from 'd3';
-import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import { ChartD3 } from '../chart-d3';
+import type { AutkDatum, ChartConfig } from '../api';
+import { run } from '../transforms';
+import { ChartEvent } from '../events-types';
 
-import { BaseChart } from '../base-chart';
-import type { AutkDatum, ChartConfig, ChartTransformConfig } from '../api';
-import { executeTransform } from '../transforms/execute-transform';
 
-/**
- * Configuration for the linechart implementation.
- *
- * Attributes are interpreted as:
- * 1) timeseries path
- */
-export type LinechartConfig = {
-    div: HTMLElement;
-    collection: FeatureCollection<Geometry, GeoJsonProperties>;
-    /** Attribute paths (nested dot-notation), where [0] is the timeseries path in legacy mode. */
-    attributes?: [string, string?, string?];
-    transform?: ChartTransformConfig;
-    labels?: { axis?: [string, string]; title?: string };
-    tickFormats?: [string, string]; // [x-axis format, y-axis format]
-    width?: number;
-    height?: number;
-    margins?: { left: number; right: number; top: number; bottom: number };
-    startYear?: number;
-};
 
 /**
  * Line chart that aggregates feature-level timeseries into a single series.
@@ -31,51 +12,79 @@ export type LinechartConfig = {
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
  */
-export class Linechart extends BaseChart {
+export class Linechart extends ChartD3 {
+
     private _startYear: number;
     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
-    private _transformConfig?: ChartTransformConfig;
 
     /**
      * Creates a line chart instance and renders the initial state.
      * @param config Linechart configuration.
      */
-    constructor(config: LinechartConfig) {
-        const attributes = (config.attributes ?? []).reduce<string[]>((acc, attr) => {
-            if (typeof attr === 'string') {
-                acc.push(attr);
-            }
-            return acc;
-        }, []);
-        const labels = config.transform
-            ? Linechart.applyTransformLabelDefaults(config.labels, config.transform)
-            : config.labels;
+    constructor(config: ChartConfig) {
+        if (config.events === undefined) { config.events = [ChartEvent.BRUSH_Y]; }
+        if (config.tickFormats === undefined) { config.tickFormats = ['~s', '~s']; }
+        if (!config.attributes) {
+            config.attributes = [];
+        } else {
+            config.attributes = config.attributes.filter((attr) => typeof attr === 'string');
+        }
+        if (!config.transform) {
+            config.transform = {
+                preset: 'timeseries',
+                attributes: {
+                    series: config.attributes[0] ?? '',
+                    timestamp: 'timestamp',
+                    value: 'value',
+                },
+                options: { reducer: 'avg' },
+            };
+            const axis = config.labels?.axis ?? [config.transform.preset === 'timeseries' ? 'time' : 'bucket', 'value'];
+            const title = config.labels?.title ?? (config.transform.preset === 'timeseries' ? 'Timeseries' : 'Temporal events');
+            config.labels = { axis, title };
+        }
 
-        const chartConfig: ChartConfig = {
-            div: config.div,
-            collection: config.collection,
-            attributes,
-            transform: config.transform,
-            labels: {
-                axis: [labels?.axis?.[0] ?? 'Year', labels?.axis?.[1] ?? 'Value'],
-                title: labels?.title ?? '',
-            },
-            tickFormats: config.tickFormats ? [...config.tickFormats] : ['', ''],
-            width: config.width ?? 600,
-            height: config.height ?? 280,
-            margins: config.margins ?? { left: 52, right: 20, top: 42, bottom: 44 },
-            events: [],
-        };
-
-        super(chartConfig);
+        super(config);
 
         this._startYear = config.startYear ?? 0;
-        this._transformConfig = config.transform;
 
         this.draw();
     }
 
     protected override computeTransform(): void {
+        const formatBucketLabel = (bucket: string): string => {
+            const numericBucket = Number(bucket);
+            if (this._startYear > 0 && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+                return d3.format(this._tickFormats[0])(this._startYear + numericBucket);
+            }
+            if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+                return d3.format(this._tickFormats[0])(numericBucket);
+            }
+            return bucket;
+        };
+
+        const compareBuckets = (a: string, b: string): number => {
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            const validDateA = Number.isFinite(dateA.getTime());
+            const validDateB = Number.isFinite(dateB.getTime());
+
+            if (validDateA && validDateB) {
+                return dateA.getTime() - dateB.getTime();
+            }
+
+            const numA = Number(a);
+            const numB = Number(b);
+            const validNumA = Number.isFinite(numA);
+            const validNumB = Number.isFinite(numB);
+
+            if (validNumA && validNumB) {
+                return numA - numB;
+            }
+
+            return a.localeCompare(b);
+        };
+
         const selected = new Set(this.selection);
         const allRows = this._sourceFeatures.map((f, idx) => ({
             ...(f.properties ?? {}),
@@ -85,34 +94,22 @@ export class Linechart extends BaseChart {
             ? allRows
             : allRows.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
 
-        if (this._transformConfig) {
-            const transformed = executeTransform(sourceRows, this._transformConfig);
-            if (transformed.preset === 'histogram') {
-                throw new Error('Linechart does not support the histogram transform preset.');
-            }
-
-            const reducedSeries = [...transformed.rows].sort((a, b) => this.compareBuckets(a.bucket, b.bucket));
-            this._seriesData = reducedSeries.map((item, idx) => ({
-                x: idx,
-                label: this.formatBucketLabel(item.bucket),
-                y: item.value,
-                autkIds: item.autkIds,
-            }));
-            return;
+        if (!this._transformConfig) {
+            throw new Error('Linechart requires a transform configuration.');
         }
 
-        const reducedSeries = this.getLegacyTimeseriesRows(sourceRows);
+        const transformed = run(sourceRows, this._transformConfig);
+        if (transformed.preset === 'histogram') {
+            throw new Error('Linechart does not support the histogram transform preset.');
+        }
+
+        const reducedSeries = [...transformed.rows].sort((a, b) => compareBuckets(a.bucket, b.bucket));
         this._seriesData = reducedSeries.map((item, idx) => ({
             x: idx,
-            label: this.formatBucketLabel(item.bucket),
+            label: formatBucketLabel(item.bucket),
             y: item.value,
             autkIds: item.autkIds,
         }));
-    }
-
-    /** Recomputes series rows and redraws the chart. */
-    public updateChartSelection(): void {
-        this.draw();
     }
 
     /**
@@ -122,16 +119,17 @@ export class Linechart extends BaseChart {
         const innerW = this._width  - this._margins.left - this._margins.right;
         const innerH = this._height - this._margins.top  - this._margins.bottom;
 
-        // ── SVG shell (create once, clear contents each redraw) ──────────────
-        const container = d3.select(this._div);
-        let svg = container.select<SVGSVGElement>('#linechart');
-        if (svg.empty()) {
-            svg = container
-                .append('svg')
-                .attr('id', 'linechart')
-                .attr('width', this._width)
-                .attr('height', this._height);
-        }
+        // ---- SVG shell
+        const svg = d3
+            .select(this._div)
+            .selectAll<SVGSVGElement, number>('#plot')
+            .data([0])
+            .join('svg')
+            .attr('id', 'plot')
+            .attr('width', this._width)
+            .attr('height', this._height)
+            .style('visibility', 'visible');
+
         svg.selectAll('*').remove();
 
         // ── Scales ──────────────────────────────────────────────────────────
@@ -248,68 +246,5 @@ export class Linechart extends BaseChart {
             .attr('cy', d => yScale(d.y))
             .attr('r', 3)
             .attr('fill', '#4472c4');
-    }
-
-    private getLegacyTimeseriesRows(rows: AutkDatum[]) {
-        const reducedSeries = executeTransform(rows, {
-            preset: 'timeseries',
-            attributes: {
-                series: this._attributes[0],
-            },
-            options: {
-                reducer: 'avg',
-            },
-        });
-
-        if (reducedSeries.preset === 'histogram') {
-            return [];
-        }
-
-        return [...reducedSeries.rows].sort((a, b) => this.compareBuckets(a.bucket, b.bucket));
-    }
-
-    private formatBucketLabel(bucket: string): string {
-        const numericBucket = Number(bucket);
-        if (this._startYear > 0 && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-            return d3.format(this._tickFormats[0])(this._startYear + numericBucket);
-        }
-
-        if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-            return d3.format(this._tickFormats[0])(numericBucket);
-        }
-
-        return bucket;
-    }
-
-    private static applyTransformLabelDefaults(
-        labels: LinechartConfig['labels'],
-        transform: ChartTransformConfig
-    ): NonNullable<LinechartConfig['labels']> {
-        const axis = labels?.axis ?? [transform.preset === 'timeseries' ? 'time' : 'bucket', 'value'];
-        const title = labels?.title ?? (transform.preset === 'timeseries' ? 'Timeseries' : 'Temporal events');
-
-        return { axis, title };
-    }
-
-    private compareBuckets(a: string, b: string): number {
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        const validDateA = Number.isFinite(dateA.getTime());
-        const validDateB = Number.isFinite(dateB.getTime());
-
-        if (validDateA && validDateB) {
-            return dateA.getTime() - dateB.getTime();
-        }
-
-        const numA = Number(a);
-        const numB = Number(b);
-        const validNumA = Number.isFinite(numA);
-        const validNumB = Number.isFinite(numB);
-
-        if (validNumA && validNumB) {
-            return numA - numB;
-        }
-
-        return a.localeCompare(b);
     }
 }

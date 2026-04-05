@@ -17,3 +17,7 @@ export type { ColorMapConfig } from 'autk-core';
 
 export { EventEmitter } from 'autk-core';
 export type { EventListener } from 'autk-core';
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+export { valueAtPath } from 'autk-core';

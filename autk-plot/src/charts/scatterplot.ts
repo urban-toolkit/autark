@@ -25,13 +25,13 @@
  * });
  */
 
-import * as d3 from "d3";
+import * as d3 from 'd3';
 
-import { ChartD3 } from "../chart-d3";
-import type { ChartConfig } from "../api";
-import { ChartStyle } from "../chart-style";
-import { ChartEvent } from "../events-types";
-import { valueAtPath } from "autk-core";
+import { ChartD3 } from '../chart-d3';
+import type { ChartConfig } from '../api';
+import { ChartStyle } from '../chart-style';
+import { ChartEvent } from '../events-types';
+import { valueAtPath } from '../core-types';
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.

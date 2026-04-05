@@ -1,9 +1,9 @@
-import type { Feature, GeoJsonProperties, Geometry } from "geojson";
+import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
 
-import type { AutkDatum, ChartConfig, ChartMargins, ChartEvents, ChartEventRecord } from "./api";
-import { ColorMapInterpolator } from "./core-types";
-import { ChartEvent } from "./events-types";
-import { EventEmitter } from "./core-types";
+import type { AutkDatum, ChartConfig, ChartMargins, ChartEvents, ChartEventRecord, ChartTransformConfig } from './api';
+import { ColorMapInterpolator } from './core-types';
+import { ChartEvent } from './events-types';
+import { EventEmitter } from './core-types';
 
 /**
  * Shared base class for all chart implementations.
@@ -55,6 +55,9 @@ export abstract class BaseChart {
     /** Active colormap interpolator used by charts that support color encoding. */
     protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQUENTIAL_REDS;
 
+    /** Optional transform config shared by chart implementations that support transformed views. */
+    protected _transformConfig?: ChartTransformConfig;
+
 
     /**
      * Initializes shared chart state from plot configuration.
@@ -86,6 +89,7 @@ export abstract class BaseChart {
         this._tickFormats = config.tickFormats ?? ['', ''];
         this._domain = config.domain;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQUENTIAL_REDS;
+        this._transformConfig = config.transform;
     }
 
 

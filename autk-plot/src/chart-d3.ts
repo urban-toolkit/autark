@@ -1,10 +1,10 @@
-import * as d3 from "d3";
+import * as d3 from 'd3';
 
-import { BaseChart } from "./base-chart";
+import { BaseChart } from './base-chart';
 
-import type { ChartConfig } from "./api";
-import { ChartEvent } from "./events-types";
-import { ChartStyle } from "./chart-style";
+import type { ChartConfig } from './api';
+import { ChartEvent } from './events-types';
+import { ChartStyle } from './chart-style';
 
 /**
  * Base class for D3-driven chart implementations.

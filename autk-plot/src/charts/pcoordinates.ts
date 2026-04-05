@@ -1,11 +1,12 @@
-import * as d3 from "d3";
+import * as d3 from 'd3';
 
-import { ChartD3 } from "../chart-d3";
-import type { ChartConfig } from "../api";
-import { ChartStyle } from "../chart-style";
-import { ChartEvent } from "../events-types";
-import { ColorMap } from '../core-types';
-import { valueAtPath } from "autk-core";
+import { valueAtPath, ColorMap } from '../core-types';
+
+import type { ChartConfig } from '../api';
+
+import { ChartD3 } from '../chart-d3';
+import { ChartStyle } from '../chart-style';
+import { ChartEvent } from '../events-types';
 
 /**
  * Parallel coordinates chart for multivariate feature exploration.
@@ -19,19 +20,19 @@ export class ParallelCoordinates extends ChartD3 {
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
     protected colorDimension: string | null = null;
 
-    private formatNumericAxisValue(value: number): string {
-        return d3.format('')(value);
-    }
-
     /**
      * Creates a parallel coordinates chart and performs the initial draw.
      * @param config Plot configuration for parallel coordinates rendering.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+        if (config.tickFormats === undefined) {
+            config.tickFormats = ['~s', '~s'];
+        }
         super(config);
 
         this.axisPositions = d3.scalePoint();
+
         this.draw();
     }
 
@@ -149,7 +150,7 @@ export class ParallelCoordinates extends ChartD3 {
                 d3.select(nodes[i]).call(
                     d3.axisLeft(scale as d3.ScaleLinear<number, number>)
                         .ticks(5)
-                        .tickFormat((value) => this.formatNumericAxisValue(Number(value))) as any
+                        .tickFormat((value) => d3.format(this._tickFormats[0] || '~s')(Number(value))) as any
                 );
             } else if (scale && dimType === 'categorical') {
                 d3.select(nodes[i]).call(d3.axisLeft(scale as d3.ScalePoint<string>) as any);

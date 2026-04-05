@@ -36,7 +36,7 @@ export type {
 	TransformReducer,
 	TransformResolution,
 	HistogramTransformConfig,
-	TemporalEventsTransformConfig,
+	TemporalTransformConfig,
 	TimeseriesTransformConfig,
 	ChartTransformConfig,
 	AutkDatum,

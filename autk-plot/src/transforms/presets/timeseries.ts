@@ -1,9 +1,40 @@
-import {
-    reduceBuckets,
-    type ReducedBucket,
-    type TransformReducerName,
-    type TransformRow,
-} from '../kernel';
+import { valueAtPath } from '../../core-types';
+
+import type { AutkDatum, TimeseriesTransformConfig } from '../../api';
+import type { TransformRow, TransformReducerName } from '../kernel';
+
+import { reduceBuckets } from '../kernel';
+
+// ---- Executed transform -------------------------------------------------
+
+export type ExecutedTimeseriesTransform = {
+    preset: 'timeseries';
+    attributes: ['bucket', 'value'];
+    rows: TimeseriesBucketRow[];
+};
+
+/**
+ * Runs a timeseries transform and returns chart-ready rows.
+ */
+export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConfig): ExecutedTimeseriesTransform {
+    return {
+        preset: 'timeseries',
+        attributes: ['bucket', 'value'],
+        rows: presetTimeseries({
+            rows,
+            reducer: config.options?.reducer ?? 'avg',
+            pointsOf: (row) => getTimeseriesPoints(row, config),
+        }),
+    };
+}
+
+// ---- Preset algorithm ---------------------------------------------------
+
+export type TimeseriesPresetOptions<T extends TransformRow> = {
+    rows: T[];
+    pointsOf: (row: T) => TimeseriesPoint[] | null | undefined;
+    reducer?: TransformReducerName;
+}
 
 export type TimeseriesBucketRow = {
     bucket: string;
@@ -12,28 +43,10 @@ export type TimeseriesBucketRow = {
     autkIds: number[];
 };
 
-export type TimeseriesPoint = {
-    timestamp: Date | string | number;
-    value: number | null | undefined;
-};
-
-export type TimeseriesPresetOptions<T extends TransformRow> = {
-    rows: T[];
-    pointsOf: (row: T) => TimeseriesPoint[] | null | undefined;
-    reducer?: TransformReducerName;
-};
-
-const mapReducedToTemporalRows = (buckets: ReducedBucket[]): TimeseriesBucketRow[] => buckets.map(item => ({
-    bucket: item.key,
-    value: item.value,
-    count: item.count,
-    autkIds: item.autkIds,
-}));
-
 /**
  * Aggregates feature timeseries by timestamp across all rows.
  */
-export function presetTimeseriesAggregate<T extends TransformRow>(
+export function presetTimeseries<T extends TransformRow>(
     options: TimeseriesPresetOptions<T>
 ): TimeseriesBucketRow[] {
     const reducer = options.reducer ?? 'avg';
@@ -64,5 +77,57 @@ export function presetTimeseriesAggregate<T extends TransformRow>(
         reducer,
     });
 
-    return mapReducedToTemporalRows(reduced);
+    return reduced.map(item => ({
+        bucket: item.key,
+        value: item.value,
+        count: item.count,
+        autkIds: item.autkIds,
+    }));
+}
+
+export type TimeseriesPoint = {
+    timestamp: Date | string | number;
+    value: number | null | undefined;
+};
+
+function getTimeseriesPoints(
+    row: TransformRow,
+    config: TimeseriesTransformConfig
+): TimeseriesPoint[] {
+    const sourceSeries = valueAtPath(row, config.attributes.series);
+    if (!Array.isArray(sourceSeries)) {
+        return [];
+    }
+
+    const points: TimeseriesPoint[] = [];
+
+    sourceSeries.forEach((point, index) => {
+        if (typeof point === 'number' && Number.isFinite(point)) {
+            points.push({
+                timestamp: index,
+                value: point,
+            });
+            return;
+        }
+
+        if (!point || typeof point !== 'object') {
+            return;
+        }
+
+        const timestamp = valueAtPath(point as Record<string, unknown>, config.attributes.timestamp) ?? index;
+        const rawValue = valueAtPath(point as Record<string, unknown>, config.attributes.value);
+        const numericValue = Number(rawValue);
+        if (!Number.isFinite(numericValue)) {
+            return;
+        }
+
+        points.push({
+            timestamp: timestamp instanceof Date || typeof timestamp === 'string' || typeof timestamp === 'number'
+                ? timestamp
+                : index,
+            value: numericValue,
+        });
+    });
+
+    return points;
 }

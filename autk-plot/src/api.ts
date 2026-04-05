@@ -2,7 +2,7 @@ import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import type { EventEmitter } from './core-types';
 import { ColorMapInterpolator } from './core-types';
 import { ChartEvent } from './events-types';
-import type { LinechartConfig } from './charts/linechart';
+
 
 /**
  * Margin values in pixels around the plot drawing area.
@@ -39,16 +39,16 @@ export type HistogramTransformConfig = {
 };
 
 /**
- * Temporal events preset config.
+ * Temporal preset config.
  *
- * Defaults are applied internally when `options` or optional attributes are omitted.
+ * Defaults are applied internally when `options` are omitted.
  */
-export type TemporalEventsTransformConfig = {
-    preset: 'temporal-events';
+export type TemporalTransformConfig = {
+    preset: 'temporal';
     attributes: {
         events: string;
-        timestamp?: string;
-        value?: string;
+        timestamp: string;
+        value: string;
     };
     options?: {
         resolution?: TransformResolution;
@@ -57,16 +57,14 @@ export type TemporalEventsTransformConfig = {
 };
 
 /**
- * Timeseries preset config.
- *
- * Defaults are applied internally when `options` or optional attributes are omitted.
+ * Defaults are applied internally when `options` are omitted.
  */
 export type TimeseriesTransformConfig = {
     preset: 'timeseries';
     attributes: {
         series: string;
-        timestamp?: string;
-        value?: string;
+        timestamp: string;
+        value: string;
     };
     options?: {
         reducer?: TransformReducer;
@@ -76,7 +74,7 @@ export type TimeseriesTransformConfig = {
 /** Transform preset config accepted by `AutkChart`. */
 export type ChartTransformConfig =
     | HistogramTransformConfig
-    | TemporalEventsTransformConfig
+    | TemporalTransformConfig
     | TimeseriesTransformConfig;
 
 /**
@@ -107,6 +105,8 @@ export type ChartConfig = {
     /** Explicit data domain `[min, max]` for numerical color encoding. If omitted, computed from the data. */
     domain?: [number, number];
     colorMapInterpolator?: ColorMapInterpolator;
+    /** Optional start year for time-based charts (linechart, etc). */
+    startYear?: number;
 }
 
 /**
@@ -182,7 +182,7 @@ export type TableChartConfig = SharedChartConfig & {
 /**
  * Unified configuration for line charts.
  */
-export type LinechartUnifiedConfig = Omit<LinechartConfig, 'div'> & {
+export type LinechartUnifiedConfig = SharedChartConfig & {
     type: 'linechart';
 };
 

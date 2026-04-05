@@ -1,7 +1,33 @@
 import * as d3 from 'd3';
 
-import { valueAtPath } from 'autk-core';
+import { valueAtPath } from '../../core-types';
+import type { AutkDatum, HistogramTransformConfig } from '../../api';
 import type { TransformRow } from '../kernel';
+
+// ---- Executed transform -------------------------------------------------
+
+export type ExecutedHistogramTransform = {
+    preset: 'histogram';
+    attributes: ['label', 'count'];
+    rows: HistogramBinRow[];
+};
+
+/**
+ * Runs a histogram transform and returns chart-ready rows.
+ */
+export function runHistogram(rows: AutkDatum[], config: HistogramTransformConfig): ExecutedHistogramTransform {
+    return {
+        preset: 'histogram',
+        attributes: ['label', 'count'],
+        rows: presetHistogram({
+            rows,
+            column: config.attributes.value,
+            numBins: config.options?.bins ?? 10,
+        }),
+    };
+}
+
+// ---- Preset algorithm ---------------------------------------------------
 
 export type HistogramPresetOptions<T extends TransformRow> = {
     rows: T[];

@@ -32,16 +32,16 @@
  * });
  */
 
-import * as d3 from "d3";
+import * as d3 from 'd3';
 
-import { valueAtPath } from "autk-core";
+import { valueAtPath } from '../core-types';
 
-import type { ChartConfig, ChartTransformConfig } from "../api";
+import type { ChartConfig } from '../api';
 
-import { ChartD3 } from "../chart-d3";
-import { ChartStyle } from "../chart-style";
-import { ChartEvent } from "../events-types";
-import { executeTransform } from "../transforms/execute-transform";
+import { ChartD3 } from '../chart-d3';
+import { ChartStyle } from '../chart-style';
+import { ChartEvent } from '../events-types';
+import { run } from '../transforms';
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
@@ -54,30 +54,24 @@ export class Barchart extends ChartD3 {
     protected mapX!: d3.ScaleBand<string>;
     protected mapY!: d3.ScaleLinear<number, number>;
 
-    private _transformConfig?: ChartTransformConfig;
-
     /**
      * Creates a bar chart instance and performs the initial draw.
      * @param config Plot configuration with categorical axes or histogram settings.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
-        if (config.tickFormats === undefined) {
-            config.tickFormats = ['~s', '~s'];
-        }
+        if (config.tickFormats === undefined) { config.tickFormats = ['~s', '~s']; }
         if (config.transform) {
             const axis = config.labels?.axis ?? (config.transform.preset === 'histogram' ? ['label', 'count'] : ['bucket', 'value']);
             const title = config.labels?.title
                 ?? (config.transform.preset === 'histogram'
                     ? 'Histogram'
-                    : config.transform.preset === 'temporal-events'
-                        ? 'Temporal events'
+                    : config.transform.preset === 'temporal'
+                        ? 'Temporal'
                         : 'Timeseries');
             config.labels = { axis, title };
         }
         super(config);
-
-        this._transformConfig = config.transform;
 
         this.draw();
     }
@@ -98,28 +92,9 @@ export class Barchart extends ChartD3 {
             autkIds: [idx],
         }));
 
-        const transformed = executeTransform(allRows, this._transformConfig);
+        const transformed = run(allRows, this._transformConfig);
         this.data = transformed.rows as any;
         this._attributes = transformed.attributes;
-    }
-
-    /**
-     * Applies an external selection expressed as source feature ids.
-     *
-     * In transform mode, ensures transformed rows are available before
-     * delegating visual highlight updates to shared D3 selection styling.
-     *
-     * @param selection Source feature ids to highlight.
-     */
-    override setSelection(selection: number[]): void {
-        this._selection = selection;
-        if (this._transformConfig) {
-            // Ensure histogram is computed before updating chart
-            if (!this.data || this.data.length === 0) {
-                this.computeTransform();
-            }
-        }
-        this.updateChartSelection();
     }
 
     /**
