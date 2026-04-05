@@ -1,10 +1,9 @@
 import * as d3 from 'd3';
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
-import { valueAtPath } from 'autk-core';
 
 import { BaseChart } from '../base-chart';
-import type { ChartConfig } from '../api';
-import { presetTimeseriesAggregate, type TimeseriesPoint } from '../transforms/presets/timeseries';
+import type { AutkDatum, ChartConfig, ChartTransformConfig } from '../api';
+import { executeTransform } from '../transforms/execute-transform';
 
 /**
  * Configuration for the linechart implementation.
@@ -15,8 +14,9 @@ import { presetTimeseriesAggregate, type TimeseriesPoint } from '../transforms/p
 export type LinechartConfig = {
     div: HTMLElement;
     collection: FeatureCollection<Geometry, GeoJsonProperties>;
-    /** Attribute paths (nested dot-notation), where [0] is the timeseries path. */
-    attributes: [string, string?, string?];
+    /** Attribute paths (nested dot-notation), where [0] is the timeseries path in legacy mode. */
+    attributes?: [string, string?, string?];
+    transform?: ChartTransformConfig;
     labels?: { axis?: [string, string]; title?: string };
     tickFormats?: [string, string]; // [x-axis format, y-axis format]
     width?: number;
@@ -34,21 +34,32 @@ export type LinechartConfig = {
 export class Linechart extends BaseChart {
     private _startYear: number;
     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
+    private _transformConfig?: ChartTransformConfig;
+    private _rawData!: AutkDatum[];
 
     /**
      * Creates a line chart instance and renders the initial state.
      * @param config Linechart configuration.
      */
     constructor(config: LinechartConfig) {
-        const attributes = config.attributes.filter((attr): attr is string => typeof attr === 'string');
+        const attributes = (config.attributes ?? []).reduce<string[]>((acc, attr) => {
+            if (typeof attr === 'string') {
+                acc.push(attr);
+            }
+            return acc;
+        }, []);
+        const labels = config.transform
+            ? Linechart.applyTransformLabelDefaults(config.labels, config.transform)
+            : config.labels;
 
         const chartConfig: ChartConfig = {
             div: config.div,
             collection: config.collection,
             attributes,
+            transform: config.transform,
             labels: {
-                axis: [config.labels?.axis?.[0] ?? 'Year', config.labels?.axis?.[1] ?? 'Value'],
-                title: config.labels?.title ?? '',
+                axis: [labels?.axis?.[0] ?? 'Year', labels?.axis?.[1] ?? 'Value'],
+                title: labels?.title ?? '',
             },
             tickFormats: config.tickFormats ? [...config.tickFormats] : ['.0f', '.1f'],
             width: config.width ?? 600,
@@ -60,6 +71,8 @@ export class Linechart extends BaseChart {
         super(chartConfig);
 
         this._startYear = config.startYear ?? 0;
+        this._transformConfig = config.transform;
+        this._rawData = [...this.data];
 
         this.draw();
     }
@@ -67,20 +80,29 @@ export class Linechart extends BaseChart {
     protected override computeTransform(): void {
         const selected = new Set(this.selection);
         const sourceRows = this.selection.length === 0
-            ? this.data
-            : this.data.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
+            ? this._rawData
+            : this._rawData.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
 
-        const reducedSeries = presetTimeseriesAggregate({
-            rows: sourceRows,
-            reducer: 'avg',
-            pointsOf: (row) => this.getTimeseriesPoints(row),
-        });
+        if (this._transformConfig) {
+            const transformed = executeTransform(sourceRows, this._transformConfig);
+            if (transformed.preset === 'histogram') {
+                throw new Error('Linechart does not support the histogram transform preset.');
+            }
 
-        reducedSeries.sort((a, b) => this.compareBuckets(a.bucket, b.bucket));
+            const reducedSeries = [...transformed.rows].sort((a, b) => this.compareBuckets(a.bucket, b.bucket));
+            this._seriesData = reducedSeries.map((item, idx) => ({
+                x: idx,
+                label: this.formatBucketLabel(item.bucket),
+                y: item.value,
+                autkIds: item.autkIds,
+            }));
+            return;
+        }
 
+        const reducedSeries = this.getLegacyTimeseriesRows(sourceRows);
         this._seriesData = reducedSeries.map((item, idx) => ({
             x: idx,
-            label: item.bucket,
+            label: this.formatBucketLabel(item.bucket),
             y: item.value,
             autkIds: item.autkIds,
         }));
@@ -226,43 +248,41 @@ export class Linechart extends BaseChart {
             .attr('fill', '#4472c4');
     }
 
-    private getTimeseriesPoints(row: GeoJsonProperties): TimeseriesPoint[] {
-        const seriesPath = this._attributes[0];
-        const sourceSeries = valueAtPath(row, seriesPath);
-        if (!Array.isArray(sourceSeries)) return [];
-
-        const points: TimeseriesPoint[] = [];
-
-        sourceSeries.forEach((point, idx) => {
-            if (typeof point === 'number' && Number.isFinite(point)) {
-                points.push({
-                    timestamp: this._startYear > 0 ? this._startYear + idx : idx,
-                    value: point,
-                });
-                return;
-            }
-
-            if (!point || typeof point !== 'object') {
-                return;
-            }
-
-            const mapPoint = point as Record<string, unknown>;
-            const rawTimestamp = mapPoint['timestamp'] ?? mapPoint['time'] ?? mapPoint['date'] ?? mapPoint['x'] ?? idx;
-            const timestamp =
-                rawTimestamp instanceof Date || typeof rawTimestamp === 'string' || typeof rawTimestamp === 'number'
-                    ? rawTimestamp
-                    : idx;
-
-            const value = mapPoint['value'] ?? mapPoint['y'] ?? mapPoint['avg'] ?? mapPoint['val'];
-            const numericValue = Number(value);
-            if (!Number.isFinite(numericValue)) {
-                return;
-            }
-
-            points.push({ timestamp, value: numericValue });
+    private getLegacyTimeseriesRows(rows: AutkDatum[]) {
+        const reducedSeries = executeTransform(rows, {
+            preset: 'timeseries',
+            attributes: {
+                series: this._attributes[0],
+            },
+            options: {
+                reducer: 'avg',
+            },
         });
 
-        return points;
+        if (reducedSeries.preset === 'histogram') {
+            return [];
+        }
+
+        return [...reducedSeries.rows].sort((a, b) => this.compareBuckets(a.bucket, b.bucket));
+    }
+
+    private formatBucketLabel(bucket: string): string {
+        const numericBucket = Number(bucket);
+        if (this._startYear > 0 && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+            return String(this._startYear + numericBucket);
+        }
+
+        return bucket;
+    }
+
+    private static applyTransformLabelDefaults(
+        labels: LinechartConfig['labels'],
+        transform: ChartTransformConfig
+    ): NonNullable<LinechartConfig['labels']> {
+        const axis = labels?.axis ?? [transform.preset === 'timeseries' ? 'time' : 'bucket', 'value'];
+        const title = labels?.title ?? (transform.preset === 'timeseries' ? 'Timeseries' : 'Temporal events');
+
+        return { axis, title };
     }
 
     private compareBuckets(a: string, b: string): number {
