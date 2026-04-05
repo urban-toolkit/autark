@@ -1,0 +1,129 @@
+body {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #1f2421;
+    background:
+        radial-gradient(circle at top left, rgba(232, 173, 95, 0.28), transparent 28%),
+        linear-gradient(180deg, #f7f1e4 0%, #efe4cf 100%);
+}
+
+#app {
+    max-width: 1260px;
+    margin: 0 auto;
+    padding: 36px 24px 48px;
+}
+
+.hero {
+    margin-bottom: 28px;
+}
+
+.eyebrow {
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 12px;
+    color: #9a4f2f;
+}
+
+h1 {
+    margin: 0;
+    font-size: 40px;
+    font-weight: 600;
+}
+
+.lede {
+    max-width: 760px;
+    margin: 12px 0 0;
+    line-height: 1.5;
+    font-size: 17px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+}
+
+.panel {
+    background: rgba(255, 252, 246, 0.82);
+    border: 1px solid rgba(83, 58, 40, 0.12);
+    box-shadow: 0 18px 50px rgba(75, 49, 29, 0.08);
+    border-radius: 22px;
+    padding: 18px 18px 20px;
+    backdrop-filter: blur(8px);
+}
+
+.panel h2 {
+    margin: 0 0 8px;
+    font-size: 24px;
+}
+
+.panel-note {
+    margin: 0 0 12px;
+    color: #5b534c;
+    line-height: 1.45;
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.meta-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #f1dfbf;
+    color: #55361a;
+    font-size: 13px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.table th,
+.table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(83, 58, 40, 0.12);
+    vertical-align: top;
+    text-align: left;
+}
+
+.table th {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7a614c;
+}
+
+.code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    color: #5c4025;
+    background: rgba(245, 232, 208, 0.7);
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin: 0 0 12px;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 720px) {
+    #app {
+        padding: 28px 16px 36px;
+    }
+
+    h1 {
+        font-size: 32px;
+    }
+}
