@@ -3,6 +3,7 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
+import { MapEvent } from 'autk-map';
 
 export class MapParallelCoordinates {
     protected map!: AutkMap;
@@ -11,7 +12,7 @@ export class MapParallelCoordinates {
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
@@ -44,8 +45,13 @@ export class MapParallelCoordinates {
     }
 
     protected async updateMapListeners() {
-        // Map picking events are handled through the map's internal event emitter
-        // Use the map's public API to handle interactions instead
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
+            if (selection.length > 0) {
+                this.plot.setSelection(selection);
+            } else {
+                this.plot.setSelection([]);
+            }
+        });
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {

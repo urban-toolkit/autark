@@ -12,7 +12,7 @@ export class MapD3 {
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
