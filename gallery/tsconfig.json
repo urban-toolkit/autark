@@ -5,8 +5,7 @@
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
     "paths": {
       "autk-core": ["../autk-core/src/index.ts"],
       "autk-compute": ["../autk-compute/src/main.ts"],

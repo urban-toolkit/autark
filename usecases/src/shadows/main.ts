@@ -6,38 +6,76 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
-import { AutkMap, LayerType, VectorLayer } from 'autk-map';
+import { AutkMap, LayerType, VectorLayer, MapEvent } from 'autk-map';
 import { AutkChart, ChartEvent } from 'autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
 import shadowShader from './shadow-shader.wgsl?raw';
 
+import {
+    MonthCode,
+    MONTH_CONFIG,
+    DEFAULT_MONTH,
+    MONTH_DOY,
+    isMonthCode,
+    resolveBuildingFootprint,
+    resolveBuildingHeight,
+    mergeComputedRoads,
+    clearRoadsCompute,
+} from './shadows-utils';
+
+/**
+ * End-to-end urban shadows case study.
+ *
+ * This class orchestrates data loading, compute execution, map rendering,
+ * picking interactions, and linked chart filtering in one runnable example.
+ *
+ * Data flow overview:
+ * 1) load and derive data in the spatial DB,
+ * 2) keep one mutable roads collection in memory,
+ * 3) patch `properties.compute` in place after analytical runs,
+ * 4) map display modes to different thematic accessors.
+ */
 export class Shadows {
+    /** Main map facade used for rendering, picking and thematic updates. */
     protected map!: AutkMap;
+    /** Spatial DB facade used for OSM loading and SQL/spatial transformations. */
     protected db!: AutkSpatialDb;
+    /** Histogram chart instance linked to roads selection/highlighting. */
     protected histogram!: AutkChart;
 
+    /** Logical identifier of the segmented roads layer used in this workflow. */
     protected readonly ROADS_LAYER = 'table_roads_20m';
 
+    /** Mutable roads collection used as single source of truth for thematic values. */
     protected roads!: FeatureCollection;
+    /** Buildings collection used as the picking/compute source. */
     protected buildings!: FeatureCollection;
-    protected computedRoads?: FeatureCollection;
 
+    /** Currently selected building id from map picking, null when nothing is selected. */
     protected selectedBuildingId: number | null = null;
+    /** Selected building footprint ring used as compute uniform matrix. */
     protected selectedBuildingRing: number[][] | null = null;
+    /** Selected building height in meters used as compute uniform scalar. */
     protected selectedBuildingHeight: number = 0;
 
-    protected currentMonth: string = 'jun';
+    /** Active month that drives baseline aggregation and analytical compute inputs. */
+    protected currentMonth: MonthCode = DEFAULT_MONTH;
+    /** Active roads thematic mode. */
     protected displayMode: 'heatmap' | 'compute' | 'contribution' = 'heatmap';
 
-    // Maps GPU component index (group index) → first feature index for that group.
-    // The GPU pick ID is a group index (features sharing building_id are collapsed into
-    // one group by TriangulatorBuildings), so we cannot use it directly as a feature index.
-    protected buildingGroupToFeatureIndex: Map<number, number> = new Map();
-
+    /** DOM host where the histogram chart is rendered. */
     protected histogramDiv!: HTMLElement;
 
-    public async run(canvas: HTMLCanvasElement, histogramDiv: HTMLElement): Promise<void> {
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /**
+     * Boots the complete shadows example runtime.
+     *
+     * @param canvas Map rendering canvas.
+     * @param histogramDiv Container element where the histogram is mounted.
+     */
+    async run(canvas: HTMLCanvasElement, histogramDiv: HTMLElement): Promise<void> {
         this.histogramDiv = histogramDiv;
 
         await this.loadDb();
@@ -46,10 +84,103 @@ export class Shadows {
         this.updateThematicData();
         this.reloadHistogram();
         this.updateHistogramListeners();
+        this.updateMapListeners();
     }
 
-    // ── Database ──────────────────────────────────────────────────────────────
+    /**
+     * Computes per-road shadow metrics for one building and one month.
+     *
+     * Shader outputs are merged back into the in-memory roads collection under
+     * `properties.compute` while preserving original feature attributes.
+     *
+     * @param footprint Building footprint ring used as uniform matrix input.
+     * @param height Building height in meters.
+     * @param month Active month code for day-of-year and baseline lookup.
+     */
+    async computeShadows(footprint: number[][], height: number, month: MonthCode): Promise<void> {
+        const doy = MONTH_DOY[month];
 
+        // seg, sjoin_avg are per-feature. bld_height, doy, ring are global uniforms.
+        // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
+        //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
+        const geojsonCompute = new GeojsonCompute();
+        const result = await geojsonCompute.analytical({
+            collection: this.roads,
+            variableMapping: {
+                seg:       'geometry.coordinates',
+                sjoin_avg: `sjoin.avg.${month}`,
+            },
+            attributeMatrices: {
+                seg: { rows: 'auto', cols: 2 },
+            },
+            uniforms: {
+                bld_height: height,
+                doy,
+            },
+            uniformMatrices: {
+                ring: { data: footprint, cols: 2 },
+            },
+            outputColumns: ['shadow', 'contribution'],
+            wgslBody: shadowShader,
+        });
+
+        mergeComputedRoads(this.roads, result);
+    }
+
+    /**
+     * Handles month dropdown changes.
+     *
+     * Recomputes analytical values when a building is selected; otherwise
+     * resets compute attributes to zero. Then refreshes chart listeners and map
+     * thematic state.
+     *
+     * @param month Raw month code from UI.
+     */
+    async changeMonth(month: string): Promise<void> {
+        const normalizedMonth = isMonthCode(month)
+            ? month
+            : DEFAULT_MONTH;
+        this.currentMonth = normalizedMonth;
+
+        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
+        roadsLayer?.clearHighlightedIds();
+
+        // Recompute accumulated shadows for the new date if a building is selected.
+        if (this.selectedBuildingRing) {
+            await this.computeShadows(this.selectedBuildingRing, this.selectedBuildingHeight, this.currentMonth);
+        } else {
+            clearRoadsCompute(this.roads);
+        }
+
+        this.reloadHistogram();
+        this.updateHistogramListeners();
+        this.updateThematicData();
+    }
+
+    /**
+     * Handles display mode radio changes and reapplies thematic rendering.
+     *
+     * @param mode Target thematic display mode.
+     */
+    changeDisplayMode(mode: 'heatmap' | 'compute' | 'contribution'): void {
+        this.displayMode = mode;
+
+        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
+        roadsLayer?.clearHighlightedIds();
+
+        this.updateThematicData();
+    }
+
+    // ── Database (protected) ───────────────────────────────────────────────────
+
+    /**
+     * Loads and derives all data required by this example.
+     *
+     * It performs OSM loading, CSV ingestion, road segmentation, and monthly
+     * baseline aggregation (`sjoin.avg.<month>`), then caches roads/buildings.
+     * Finally it initializes compute attributes to zeros to keep compute and
+     * contribution thematic modes always defined.
+     */
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
         this.db = new AutkSpatialDb();
@@ -94,7 +225,7 @@ export class Shadows {
         });
 
         setLoadingState('Computing shadow joins...', 'Linking shadow measurements to road segments for each season.');
-        for (const month of ['jun', 'sep', 'dez']) {
+        for (const { code: month } of MONTH_CONFIG) {
             await this.db.spatialQuery({
                 tableRootName: this.ROADS_LAYER,
                 tableJoinName: 'shadows',
@@ -115,64 +246,24 @@ export class Shadows {
 
         this.roads     = await this.db.getLayer(this.ROADS_LAYER);
         this.buildings = await this.db.getLayer('table_osm_buildings');
-        this.computeBuildingGroupMapping();
+
+        clearRoadsCompute(this.roads);
     }
 
-    protected computeBuildingGroupMapping(): void {
-        let groupIdx = 0;
-        const seenBuildingIds = new Set<string>();
-        for (let i = 0; i < this.buildings.features.length; i++) {
-            const props = this.buildings.features[i].properties;
-            const key = props ? String(props['building_id'] ?? '-1') : '-1';
-            if (!seenBuildingIds.has(key)) {
-                this.buildingGroupToFeatureIndex.set(groupIdx, i);
-                seenBuildingIds.add(key);
-                groupIdx++;
-            }
-        }
+    /** Clears selected-building fields to the no-selection state. */
+    protected clearSelectedBuildingState(): void {
+        this.selectedBuildingId = null;
+        this.selectedBuildingRing = null;
+        this.selectedBuildingHeight = 0;
     }
 
-    protected monthToDoy(month: string): number {
-        const map: Record<string, number> = {
-            jun: 172,  // June 21 — summer solstice
-            sep: 265,  // September 22 — autumnal equinox
-            dez: 355,  // December 21 — winter solstice
-        };
-        return map[month] ?? 172;
-    }
+    // ── Map (protected) ────────────────────────────────────────────────────────
 
-    public async computeShadows(footprint: number[][], height: number, month: string): Promise<void> {
-        const doy = this.monthToDoy(month);
-
-        // seg, sjoin_avg are per-feature. bld_height, doy, ring are global uniforms.
-        // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
-        //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
-        const geojsonCompute = new GeojsonCompute();
-        const result = await geojsonCompute.analytical({
-            collection: this.roads,
-            variableMapping: {
-                seg:       'geometry.coordinates',
-                sjoin_avg: `sjoin.avg.${month}`,
-            },
-            attributeMatrices: {
-                seg: { rows: 'auto', cols: 2 },
-            },
-            uniforms: {
-                bld_height: height,
-                doy,
-            },
-            uniformMatrices: {
-                ring: { data: footprint, cols: 2 },
-            },
-            outputColumns: ['shadow', 'contribution'],
-            wgslBody: shadowShader,
-        });
-
-        this.computedRoads = result;
-    }
-
-    // ── Map ───────────────────────────────────────────────────────────────────
-
+    /**
+     * Initializes map rendering and uploads all DB-derived layers.
+     *
+     * @param canvas Map rendering canvas.
+     */
     protected async loadMap(canvas: HTMLCanvasElement): Promise<void> {
         setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
         this.map = new AutkMap(canvas);
@@ -192,9 +283,7 @@ export class Shadows {
                     type: 'raster',
                     property: 'avg.shadows',
                 });
-                this.map.updateRenderInfo(layerData.name, { opacity: 0.5 });
-                this.map.updateRenderInfo(layerData.name, { isColorMap: true });
-                this.map.updateRenderInfo(layerData.name, { isSkip: true });
+                this.map.updateRenderInfo(layerData.name, { opacity: 0.5, isColorMap: true, isSkip: true });
             }
             else {
                 this.map.loadCollection({ id: layerData.name, collection: layer, type: layerData.type as LayerType });
@@ -207,9 +296,37 @@ export class Shadows {
         this.map.draw();
     }
 
+    /**
+     * Wires map picking events to building selection lifecycle.
+     *
+     * - empty selection resets selected-building state and compute attributes
+     * - picked building triggers per-building compute and thematic refresh
+     */
+    protected updateMapListeners(): void {
+        this.map.events.on(MapEvent.PICKING, async ({ selection, layerId }) => {
+            if (layerId !== 'table_osm_buildings') return;
+            if (selection.length === 0) {
+                this.clearSelectedBuildingState();
+                clearRoadsCompute(this.roads);
+                this.updateThematicData();
+                return;
+            }
+
+            try {
+                await this.onBuildingPick(selection[0]);
+            } catch (error) {
+                console.error('Shadows: failed to process picked building.', error);
+            }
+        });
+    }
+
+    /**
+     * Handles one picked building event end-to-end.
+     *
+     * @param id Feature id emitted by the building picking layer.
+     */
     protected async onBuildingPick(id: number): Promise<void> {
-        const featureIndex = this.buildingGroupToFeatureIndex.get(id) ?? id;
-        const feature = this.buildings.features[featureIndex];
+        const feature = this.buildings.features[id];
         if (!feature) return;
 
         this.selectedBuildingId = id;
@@ -218,30 +335,16 @@ export class Shadows {
         const buildingsLayer = this.map.layerManager.searchByLayerId('table_osm_buildings') as VectorLayer;
         buildingsLayer?.setHighlightedIds([id]);
 
-        // Extract outer ring of the footprint (handles GeometryCollection, Polygon, MultiPolygon).
-        const geom = feature.geometry as any;
-        let ring: number[][];
-        if (geom.type === 'GeometryCollection') {
-            const firstPart = geom.geometries?.[0];
-            ring = firstPart?.type === 'MultiPolygon'
-                ? firstPart.coordinates[0][0]
-                : firstPart?.coordinates?.[0] ?? [];
-        } else {
-            ring = geom.type === 'MultiPolygon'
-                ? geom.coordinates[0][0]
-                : geom.coordinates[0];
+        // Buildings are now single features with GeometryCollection parts.
+        // Use the largest available ring and the max part height.
+        const ring = resolveBuildingFootprint(feature);
+        const height = resolveBuildingHeight(feature);
+        if (!ring) {
+            console.warn(`Shadows: no valid polygon footprint for picked building ${id}.`);
+            return;
         }
 
-        // Building height: use OSM `height` tag, fall back to `building:levels` × 3 m, then 20 m.
-        const props = feature.properties ?? {};
-        const partProps = Array.isArray(props['parts']) ? (props['parts'][0] ?? {}) : props;
-        const rawHeight  = parseFloat(partProps['height'] ?? props['height']);
-        const rawLevels  = parseFloat(partProps['building:levels'] ?? props['building:levels']) * 3;
-        const height = isFinite(rawHeight) && rawHeight > 0 ? rawHeight
-                   : isFinite(rawLevels) && rawLevels > 0 ? rawLevels
-                   : 20;
-
-        this.selectedBuildingRing   = ring;
+        this.selectedBuildingRing = ring;
         this.selectedBuildingHeight = height;
 
         await this.computeShadows(ring, height, this.currentMonth);
@@ -251,6 +354,13 @@ export class Shadows {
         }
     }
 
+    /**
+     * Applies roads thematic mapping according to current display mode.
+     *
+     * - `heatmap` uses monthly baseline values
+     * - `compute` uses analytical shadow minutes
+     * - `contribution` uses analytical percent contribution
+     */
     protected updateThematicData(): void {
         if (this.displayMode === 'heatmap') {
             this.map.updateThematic({
@@ -266,40 +376,17 @@ export class Shadows {
 
         // 'compute' or 'contribution' mode
         const key = this.displayMode === 'compute' ? 'shadow' : 'contribution';
-        const source = this.computedRoads ?? this.roads;
-                const property = this.computedRoads ? `properties.compute.${key}` : 'properties.__missing__';
-                this.map.updateThematic({ id: this.ROADS_LAYER, collection: source, property });
+
+        this.map.updateThematic({ id: this.ROADS_LAYER, collection: this.roads, property: `properties.compute.${key}` });
         this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
         this.map.draw();
     }
 
-    public async changeMonth(month: string): Promise<void> {
-        this.currentMonth = month;
+    // ── Histogram (protected) ──────────────────────────────────────────────────
 
-        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
-        roadsLayer?.clearHighlightedIds();
-
-        // Recompute accumulated shadows for the new date if a building is selected.
-        if (this.selectedBuildingRing) {
-            await this.computeShadows(this.selectedBuildingRing, this.selectedBuildingHeight, month);
-        }
-
-        this.reloadHistogram();
-        this.updateHistogramListeners();
-        this.updateThematicData();
-    }
-
-    public changeDisplayMode(mode: 'heatmap' | 'compute' | 'contribution'): void {
-        this.displayMode = mode;
-
-        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
-        roadsLayer?.clearHighlightedIds();
-
-        this.updateThematicData();
-    }
-
-    // ── Histogram ─────────────────────────────────────────────────────────────
-
+    /**
+     * Recreates the monthly histogram chart from current roads data.
+     */
     protected reloadHistogram(): void {
         this.histogramDiv.innerHTML = '';
 
@@ -319,6 +406,9 @@ export class Shadows {
         });
     }
 
+    /**
+     * Connects histogram brushing to roads-layer highlighting.
+     */
     protected updateHistogramListeners(): void {
         this.histogram.events.on(ChartEvent.BRUSH_X, ({ selection: roadIds }) => {
             const layer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER);
@@ -326,9 +416,16 @@ export class Shadows {
             this.map.draw();
         });
     }
-
 }
 
+// ── Entry Point ────────────────────────────────────────────────────────────
+
+/**
+ * Browser entrypoint for the shadows use case page.
+ *
+ * Creates and runs the example, exposes it to `window` for inline HTML event
+ * handlers, and emits `shadows-ready` when async boot completes.
+ */
 async function main() {
     try {
         const canvas = document.querySelector('canvas');
