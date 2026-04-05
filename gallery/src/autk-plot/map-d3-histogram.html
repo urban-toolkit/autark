@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Examples)</title>
+    <link rel="stylesheet" href="/src/autk-plot/map-d3-histogram.css">
+</head>
+
+<body>
+    <div id="app">
+        <h2>map-d3-histogram.ts</h2>
+        <canvas> </canvas>
+        <div id="plot">
+            <div id="plotBar"></div>
+            <div id="plotBody"></div>
+        </div>
+    </div>
+</body>
+<script type="module" src="/src/autk-plot/map-d3-histogram.ts"></script>
+
+<script>
+    function floatingPlot() {
+        let newX = 0,
+            newY = 0,
+            startX = 0,
+            startY = 0;
+
+        const plot = document.querySelector('#plot');
+        const bar = document.querySelector('#plotBar');
+
+        bar.addEventListener('mousedown', mouseDown);
+        plot.style.visibility = 'visible';
+
+        function mouseDown(e) {
+            startX = e.clientX;
+            startY = e.clientY;
+
+            document.addEventListener('mousemove', mouseMove);
+            document.addEventListener('mouseup', mouseUp);
+        }
+
+        function mouseMove(e) {
+            newX = startX - e.clientX;
+            newY = startY - e.clientY;
+
+            startX = e.clientX;
+            startY = e.clientY;
+
+            plot.style.top = plot.offsetTop - newY + 'px';
+            plot.style.left = plot.offsetLeft - newX + 'px';
+
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function mouseUp() {
+            document.removeEventListener('mousemove', mouseMove);
+        }
+    }
+    floatingPlot();
+</script>
+
+</html>

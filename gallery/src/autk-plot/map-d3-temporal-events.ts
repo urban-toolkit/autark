@@ -1,20 +1,14 @@
-import type { Feature, FeatureCollection, Geometry, GeoJsonProperties, Point } from 'geojson';
+import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkChart, ChartEvent, type AutkDatum } from 'autk-plot';
+import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
-
-type EventItem = { timestamp: string; weight: number };
-type SourceProperties = GeoJsonProperties & AutkDatum & { events?: EventItem[] };
-type SourceCollection = FeatureCollection<Geometry, GeoJsonProperties>;
-type PlotCollection = FeatureCollection<Point, GeoJsonProperties>;
 
 export class MapD3TemporalEvents {
     protected map!: AutkMap;
     protected plot!: AutkChart;
     protected plotDiv!: HTMLElement;
 
-    protected geojson!: SourceCollection;
-    protected selectedIds: number[] = [];
+    protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
         this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
@@ -22,7 +16,7 @@ export class MapD3TemporalEvents {
 
         this.attachSyntheticEvents();
         await this.loadAutkMap(canvas);
-        this.renderPlot();
+        this.initPlot();
         this.updateMapListeners();
     }
 
@@ -55,15 +49,11 @@ export class MapD3TemporalEvents {
         this.map.draw();
     }
 
-    protected renderPlot(): void {
-        const sourceRows = this.getSourceRows();
-        const collection = this.toPlotCollection(sourceRows, 'shape_area');
-
-        this.plotDiv.innerHTML = '';
+    protected initPlot(): void {
         this.plot = new AutkChart(this.plotDiv, {
             type: 'barchart',
-            collection,
-            labels: { axis: ['bucket', 'value'], title: 'Monthly synthetic events (selected neighborhoods)' },
+            collection: this.geojson,
+            labels: { axis: ['bucket', 'value'], title: 'Monthly synthetic events (neighborhoods)' },
             transform: {
                 preset: 'temporal-events',
                 attributes: {
@@ -81,54 +71,19 @@ export class MapD3TemporalEvents {
             events: [ChartEvent.CLICK],
         });
 
-        this.updatePlotListeners();
-        this.plot.setSelection(this.selectedIds);
+        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
+            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
+            layer?.setHighlightedIds(selection);
+        });
     }
 
     protected updateMapListeners(): void {
         this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            this.selectedIds = selection;
-
             const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
             layer?.setHighlightedIds(selection);
 
-            this.renderPlot();
+            this.plot.setSelection(selection);
         });
-    }
-
-    protected updatePlotListeners(layerId: string = 'neighborhoods'): void {
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId(layerId) as VectorLayer;
-            layer?.setHighlightedIds(selection);
-        });
-    }
-
-    protected getSourceRows(): SourceProperties[] {
-        const features = this.selectedIds.length > 0
-            ? this.selectedIds.map(id => this.geojson.features[id]).filter((feature): feature is Feature<Geometry, GeoJsonProperties> => Boolean(feature))
-            : this.geojson.features;
-
-        return features.map((feature) => {
-            const featureIndex = this.geojson.features.indexOf(feature);
-            return {
-                ...(feature.properties ?? {}),
-                autkIds: [featureIndex],
-            } as SourceProperties;
-        });
-    }
-
-    protected toPlotCollection(rows: Array<GeoJsonProperties & AutkDatum>, valueKey: string): PlotCollection {
-        return {
-            type: 'FeatureCollection',
-            features: rows.map((row, index) => ({
-                type: 'Feature',
-                geometry: {
-                    type: 'Point',
-                    coordinates: [index, Number(row[valueKey] ?? 0)],
-                },
-                properties: row,
-            })),
-        };
     }
 }
 
