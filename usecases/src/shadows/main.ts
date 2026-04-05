@@ -10,7 +10,7 @@ import { AutkMap, LayerType, VectorLayer, MapEvent } from 'autk-map';
 import { AutkChart, ChartEvent } from 'autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
-import shadowShader from './shadow-shader.wgsl?raw';
+import shadowShader from './shadow.wgsl?raw';
 
 import {
     MonthCode,
@@ -22,7 +22,7 @@ import {
     resolveBuildingHeight,
     mergeComputedRoads,
     clearRoadsCompute,
-} from './shadows-utils';
+} from './utils';
 
 /**
  * End-to-end urban shadows case study.
