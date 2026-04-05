@@ -4,8 +4,7 @@ import {
     type TransformReducerName,
     type TransformResolution,
     type TransformRow,
-} from './transform-engine';
-import { valueAtPath } from 'autk-core';
+} from '../transform-engine';
 
 export type TemporalBucketRow = {
     bucket: string;
@@ -21,31 +20,6 @@ export type EventTemporalPresetOptions<T extends TransformRow, E> = {
     resolution: TransformResolution;
     reducer?: TransformReducerName;
     valueOf?: (event: E) => number | null | undefined;
-};
-
-export type TimeseriesPoint = {
-    timestamp: Date | string | number;
-    value: number | null | undefined;
-};
-
-export type TimeseriesPresetOptions<T extends TransformRow> = {
-    rows: T[];
-    pointsOf: (row: T) => TimeseriesPoint[] | null | undefined;
-    reducer?: TransformReducerName;
-};
-
-export type HistogramPresetOptions<T extends TransformRow> = {
-    rows: T[];
-    column: string;
-    numBins: number;
-    divisor?: number;
-    labelSuffix?: string;
-};
-
-export type HistogramBinRow = {
-    label: string;
-    count: number;
-    autkIds: number[];
 };
 
 const toDate = (value: Date | string | number | null | undefined): Date | null => {
@@ -133,75 +107,4 @@ export function presetEventsByResolution<T extends TransformRow, E>(
     });
 
     return mapReducedToTemporalRows(reduced);
-}
-
-/**
- * Aggregates feature timeseries by timestamp across all rows.
- */
-export function presetTimeseriesAggregate<T extends TransformRow>(
-    options: TimeseriesPresetOptions<T>
-): TemporalBucketRow[] {
-    const reducer = options.reducer ?? 'avg';
-    const pointRows: TransformRow[] = [];
-
-    options.rows.forEach((row, rowIndex) => {
-        const rowAutkIds = Array.isArray(row.autkIds) && row.autkIds.length > 0
-            ? row.autkIds
-            : [rowIndex];
-        const points = options.pointsOf(row) ?? [];
-
-        points.forEach((point) => {
-            pointRows.push({
-                autkIds: rowAutkIds,
-                __bucket: String(point.timestamp),
-                __value: point.value,
-            });
-        });
-    });
-
-    const reduced = reduceBuckets({
-        rows: pointRows,
-        bucketOf: (row) => String(row.__bucket ?? ''),
-        valueOf: (row) => {
-            const value = row.__value;
-            return typeof value === 'number' && Number.isFinite(value) ? value : null;
-        },
-        reducer,
-    });
-
-    return mapReducedToTemporalRows(reduced);
-}
-
-/**
- * Aggregates numeric values into fixed histogram bins.
- */
-export function presetHistogram<T extends TransformRow>(
-    options: HistogramPresetOptions<T>
-): HistogramBinRow[] {
-    const { rows, column, numBins, divisor = 1, labelSuffix = '' } = options;
-
-    const binCounts = new Array(numBins).fill(0);
-    const binToFeatureIds: number[][] = Array.from({ length: numBins }, () => []);
-
-    rows.forEach((row, rowIndex) => {
-        const val = valueAtPath(row, column);
-        if (val == null) return;
-
-        const numVal = Number(val);
-        if (!Number.isFinite(numVal)) return;
-
-        const bin = Math.max(0, Math.min(Math.floor(numVal / divisor), numBins - 1));
-        const rowAutkIds = Array.isArray(row.autkIds) && row.autkIds.length > 0
-            ? row.autkIds
-            : [rowIndex];
-
-        binCounts[bin] += 1;
-        binToFeatureIds[bin].push(...rowAutkIds);
-    });
-
-    return Array.from({ length: numBins }, (_, i) => ({
-        label: `${i}-${i + 1}${labelSuffix}`,
-        count: binCounts[i],
-        autkIds: Array.from(new Set(binToFeatureIds[i])),
-    }));
 }

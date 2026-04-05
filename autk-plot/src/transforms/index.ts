@@ -1,2 +1,4 @@
 export * from './transform-engine';
-export * from './transform-presets';
+export * from './presets/histogram';
+export * from './presets/temporal-events';
+export * from './presets/timeseries';

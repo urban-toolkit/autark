@@ -4,7 +4,7 @@ import { valueAtPath } from 'autk-core';
 
 import { BaseChart } from '../base-chart';
 import type { ChartConfig } from '../api';
-import { presetTimeseriesAggregate, type TimeseriesPoint } from '../transforms';
+import { presetTimeseriesAggregate, type TimeseriesPoint } from '../transforms/presets/timeseries';
 
 /**
  * Configuration for the linechart implementation.
@@ -33,7 +33,7 @@ export type LinechartConfig = {
  */
 export class Linechart extends BaseChart {
     private _startYear: number;
-     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
+    private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
 
     /**
      * Creates a line chart instance and renders the initial state.

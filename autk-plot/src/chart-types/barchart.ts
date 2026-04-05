@@ -5,7 +5,7 @@ import type { ChartConfig, HistogramConfig } from "../api";
 import { ChartStyle } from "../chart-style";
 import { ChartEvent } from "../events-types";
 import { valueAtPath } from "autk-core";
-import { presetHistogram } from "../transforms";
+import { presetHistogram } from "../transforms/presets/histogram";
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
