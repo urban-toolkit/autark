@@ -10,7 +10,7 @@ export class LoadCsv {
         await this.db.init();
 
         await this.db.loadCsv({
-            csvFileUrl: `${URL}/data/noise.csv`,
+            csvFileUrl: `${URL}data/noise.csv`,
             outputTableName: 'noise',
             geometryColumns: {
                 latColumnName: 'Latitude',

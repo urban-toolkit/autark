@@ -27,7 +27,7 @@ export class LayerOpacity {
         });
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: `${URL}/data/mnt_neighs.geojson`,
+            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395'
         });

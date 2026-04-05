@@ -91,7 +91,7 @@ export class Urbane {
 
         setLoadingState('Loading neighborhood dataset...', 'Importing Manhattan neighborhood boundaries.');
         await this.db.loadCustomLayer({
-            geojsonFileUrl: `${URL}/data/mnt_neighs.geojson`,
+            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395',
         });
@@ -106,7 +106,7 @@ export class Urbane {
         setLoadingState('Loading urban datasets...', 'Importing arrests, schools, restaurants, and other datasets.');
         for (const dataset of this.datasets) {
             await this.db.loadCsv({
-                csvFileUrl: `${URL}/data/${dataset}_manhattan_clean.csv`,
+                csvFileUrl: `${URL}data/${dataset}_manhattan_clean.csv`,
                 outputTableName: dataset,
                 geometryColumns: {
                     latColumnName: 'latitude',

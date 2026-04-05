@@ -13,7 +13,7 @@ export class MapD3TemporalEvents {
     protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
+        this.geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
         this.plotDiv = plotDiv;
 
         this.attachSyntheticEvents();

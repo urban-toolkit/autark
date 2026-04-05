@@ -46,7 +46,7 @@ export class OsmLayersApi {
 
         setLoadingState('Loading temperature dataset...', 'Importing 24-year land surface temperature raster.');
         await this.db.loadGeoTiff({
-            geotiffFileUrl: `${URL}/data/niteroi_lst_verao_2001_2024.tif`,
+            geotiffFileUrl: `${URL}data/niteroi_lst_verao_2001_2024.tif`,
             outputTableName: 'lst',
             sourceCrs: 'EPSG:4326',
             coordinateFormat: 'EPSG:3395',

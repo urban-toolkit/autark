@@ -11,7 +11,7 @@ export class GeojsonPolygonsVis {
         this.db = new AutkSpatialDb();
         await this.db.init();
 
-        const response = await fetch(`${URL}/data/mnt_neighs.geojson`);
+        const response = await fetch(`${URL}data/mnt_neighs.geojson`);
         const data = await response.json();
 
         await this.db.loadCustomLayer({

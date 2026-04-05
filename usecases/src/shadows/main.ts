@@ -206,7 +206,7 @@ export class Shadows {
 
         setLoadingState('Loading shadow measurements...', 'Importing accumulated shadow data.');
         await this.db.loadCsv({
-            csvFileUrl: `${URL}/data/shadows_chicago.csv`,
+            csvFileUrl: `${URL}data/shadows_chicago.csv`,
             outputTableName: 'shadows',
             geometryColumns: {
                 latColumnName: 'latitude',

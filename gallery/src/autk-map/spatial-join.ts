@@ -13,13 +13,13 @@ export class SpatialJoin {
         await this.db.init();
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: `${URL}/data/mnt_neighs.geojson`,
+            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395'
         });
 
         await this.db.loadCsv({
-            csvFileUrl: `${URL}/data/noise.csv`,
+            csvFileUrl: `${URL}data/noise.csv`,
             outputTableName: 'noise',
             geometryColumns: {
                 latColumnName: 'Latitude',

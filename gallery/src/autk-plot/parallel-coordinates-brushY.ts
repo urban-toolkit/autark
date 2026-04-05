@@ -14,7 +14,7 @@ export class MapParallelCoordinates {
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
+        this.geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
