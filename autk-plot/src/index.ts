@@ -56,3 +56,8 @@ export { ChartEvent } from './events-types';
 
 /** Global default/highlight style helpers shared by chart implementations. */
 export { ChartStyle } from './chart-style';
+
+// ─── Transform helpers ─────────────────────────────────────────────────────
+
+/** Shared data transformation engine and ready-to-use transform presets. */
+export * from './transforms';
