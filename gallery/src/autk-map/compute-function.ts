@@ -5,6 +5,8 @@ import { AutkMap, LayerType } from 'autk-map';
 
 import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class ComputeFunction {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
@@ -14,13 +16,13 @@ export class ComputeFunction {
         await this.db.init();
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+            geojsonFileUrl: `${URL}/data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395'
         });
 
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise.csv',
+            csvFileUrl: `${URL}/data/noise.csv`,
             outputTableName: 'noise',
             geometryColumns: {
                 latColumnName: 'Latitude',

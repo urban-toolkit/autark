@@ -1,11 +1,13 @@
 import { AutkSpatialDb } from 'autk-db';
-import { 
+import {
     AutkMap,
     ColorMapDomainStrategy,
     ColorMapInterpolator,
     LayerType,
     MapStyle 
 } from 'autk-map';
+
+const URL = (import.meta as any).env.BASE_URL;
 
 export class ColormapCat {
     protected map!: AutkMap;
@@ -16,7 +18,7 @@ export class ColormapCat {
         await this.db.init();
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
+            geojsonFileUrl: `${URL}/data/mnt_roads.geojson`,
             outputTableName: 'roads',
             coordinateFormat: 'EPSG:3395'
         });

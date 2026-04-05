@@ -1,17 +1,20 @@
+
 import { FeatureCollection } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 import { MapEvent } from 'autk-map';
 
-export class MapD3 {
+const URL = (import.meta as any).env.BASE_URL;
+
+export class MapParallelCoordinates {
     protected map!: AutkMap;
     protected plot!: AutkChart;
 
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
@@ -32,12 +35,14 @@ export class MapD3 {
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
         this.plot = new AutkChart(plotDiv, {
-            type: 'barchart',
+            type: 'parallel-coordinates',
             collection: this.geojson,
-            labels: { axis: ['ntaname', 'shape_area'], title: 'Plot example' },
-            margins: { left: 60, right: 20, top: 50, bottom: 200 },
+            labels: { 
+                axis: ['shape_area', 'shape_leng', 'cdta2020'], 
+                title: 'Neighborhood Characteristics' 
+            },
             width: 790,
-            events: [ChartEvent.CLICK]
+            events: [ChartEvent.BRUSH_Y]
         });
     }
 
@@ -52,18 +57,19 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
+        this.plot.events.on(ChartEvent.BRUSH_Y, ({ selection }) => {
             const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.setHighlightedIds(selection);
             }
         });
     }
+
 }
 
 async function main() {
-    const example = new MapD3();
-    
+    const example = new MapParallelCoordinates();
+
     const canvas = document.querySelector('canvas') as HTMLCanvasElement;
     const plotBdy = document.querySelector('#plotBody') as HTMLElement;
 

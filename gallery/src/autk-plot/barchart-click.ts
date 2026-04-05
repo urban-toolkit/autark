@@ -1,18 +1,19 @@
-
 import { FeatureCollection } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 import { MapEvent } from 'autk-map';
 
-export class MapParallelCoordinates {
+const URL = (import.meta as any).env.BASE_URL;
+
+export class MapD3 {
     protected map!: AutkMap;
     protected plot!: AutkChart;
 
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
@@ -33,14 +34,12 @@ export class MapParallelCoordinates {
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
         this.plot = new AutkChart(plotDiv, {
-            type: 'parallel-coordinates',
+            type: 'barchart',
             collection: this.geojson,
-            labels: { 
-                axis: ['shape_area', 'shape_leng', 'cdta2020'], 
-                title: 'Neighborhood Characteristics' 
-            },
+            labels: { axis: ['ntaname', 'shape_area'], title: 'Plot example' },
+            margins: { left: 60, right: 20, top: 50, bottom: 200 },
             width: 790,
-            events: [ChartEvent.BRUSH_Y]
+            events: [ChartEvent.CLICK]
         });
     }
 
@@ -55,19 +54,18 @@ export class MapParallelCoordinates {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.BRUSH_Y, ({ selection }) => {
+        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
             const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
             if (layer) {
                 layer.setHighlightedIds(selection);
             }
         });
     }
-
 }
 
 async function main() {
-    const example = new MapParallelCoordinates();
-
+    const example = new MapD3();
+    
     const canvas = document.querySelector('canvas') as HTMLCanvasElement;
     const plotBdy = document.querySelector('#plotBody') as HTMLElement;
 

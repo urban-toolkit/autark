@@ -5,6 +5,8 @@ import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 import { MapEvent } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class MapD3 {
     protected map!: AutkMap;
     protected plot!: AutkChart;
@@ -12,7 +14,7 @@ export class MapD3 {
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);

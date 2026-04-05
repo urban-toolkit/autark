@@ -1,5 +1,7 @@
 import { AutkSpatialDb } from 'autk-db';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class LoadCsv {
     protected db!: AutkSpatialDb;
 
@@ -8,7 +10,7 @@ export class LoadCsv {
         await this.db.init();
 
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise.csv',
+            csvFileUrl: `${URL}/data/noise.csv`,
             outputTableName: 'noise',
             geometryColumns: {
                 latColumnName: 'Latitude',

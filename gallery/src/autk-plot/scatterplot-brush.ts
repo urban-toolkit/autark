@@ -5,6 +5,8 @@ import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
 import { MapEvent } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class MapD3 {
     protected map!: AutkMap;
     protected plot!: AutkChart;
@@ -12,8 +14,7 @@ export class MapD3 {
     protected geojson!: FeatureCollection;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        // Updated to use relative path exactly as proposed in the hardcode fix!
-        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
 
         await this.loadAutkMap(canvas);
         await this.loadAutkPlot(plotDiv);
@@ -35,11 +36,12 @@ export class MapD3 {
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
         this.plot = new AutkChart(plotDiv, {
-            type: 'table',
+            type: 'scatterplot',
             collection: this.geojson,
-            labels: { axis: ['ntaname', 'shape_area', 'shape_leng'], title: 'Table Visualization' },
+            attributes: ['shape_area', 'shape_leng'],
+            labels: { axis: ['shape_area', 'shape_leng'], title: 'Plot example' },
             width: 790,
-            events: [ChartEvent.CLICK]
+            events: [ChartEvent.BRUSH]
         });
     }
 
@@ -54,8 +56,8 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
-            const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
+        this.plot.events.on(ChartEvent.BRUSH, ({ selection }) => {
+            const layer = <VectorLayer> this.map.layerManager.searchByLayerId(layerId);
             layer!.setHighlightedIds(selection);
         });
     }

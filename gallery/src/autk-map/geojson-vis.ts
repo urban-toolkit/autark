@@ -1,6 +1,8 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class GeojsonVis {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
@@ -10,7 +12,7 @@ export class GeojsonVis {
         await this.db.init();
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+            geojsonFileUrl: `${URL}/data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395'
         });

@@ -3,6 +3,8 @@ import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class MapD3Histogram {
     protected map!: AutkMap;
     protected plot!: AutkChart;
@@ -11,7 +13,7 @@ export class MapD3Histogram {
     protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch('/data/mnt_neighs_proj.geojson').then(res => res.json());
+        this.geojson = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
         this.plotDiv = plotDiv;
 
         await this.loadAutkMap(canvas);

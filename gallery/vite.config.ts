@@ -24,7 +24,7 @@ export default defineConfig({
       allow: ['..'],
     },
     // @ts-ignore
-    open: process.env.VITE_OPEN || '/src/autk-plot/map-d3-table.html',
+    open: process.env.VITE_OPEN || '/src/autk-plot/table-click.html',
     cors: {
       origin: '*',
       allowedHeaders: 'Range, Content-Type, Authorization',

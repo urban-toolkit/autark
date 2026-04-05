@@ -4,6 +4,8 @@ import { GeojsonCompute } from 'autk-compute';
 import { AutkChart, ChartEvent, ChartStyle } from 'autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 declare function setLoadingState(message: string, note?: string): void;
 declare function hideLoading(): void;
 declare function showError(message: string, note?: string): void;
@@ -44,7 +46,7 @@ export class OsmLayersApi {
 
         setLoadingState('Loading temperature dataset...', 'Importing 24-year land surface temperature raster.');
         await this.db.loadGeoTiff({
-            geotiffFileUrl: '/data/niteroi_lst_verao_2001_2024.tif',
+            geotiffFileUrl: `${URL}/data/niteroi_lst_verao_2001_2024.tif`,
             outputTableName: 'lst',
             sourceCrs: 'EPSG:4326',
             coordinateFormat: 'EPSG:3395',

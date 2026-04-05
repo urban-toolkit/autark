@@ -1,6 +1,8 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class GeojsonPolygonsVis {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
@@ -9,7 +11,7 @@ export class GeojsonPolygonsVis {
         this.db = new AutkSpatialDb();
         await this.db.init();
 
-        const response = await fetch('http://localhost:5173/data/mnt_neighs.geojson');
+        const response = await fetch(`${URL}/data/mnt_neighs.geojson`);
         const data = await response.json();
 
         await this.db.loadCustomLayer({

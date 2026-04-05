@@ -1,5 +1,7 @@
 import { AutkSpatialDb } from 'autk-db';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class RawQueryJoin {
     protected db!: AutkSpatialDb;
     protected geojson!: any;
@@ -9,7 +11,7 @@ export class RawQueryJoin {
         await this.db.init();
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
+            geojsonFileUrl: `${URL}/data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
             coordinateFormat: 'EPSG:3395'
         });

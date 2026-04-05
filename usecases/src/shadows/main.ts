@@ -24,6 +24,8 @@ import {
     clearRoadsCompute,
 } from './utils';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 /**
  * End-to-end urban shadows case study.
  *
@@ -204,7 +206,7 @@ export class Shadows {
 
         setLoadingState('Loading shadow measurements...', 'Importing accumulated shadow data.');
         await this.db.loadCsv({
-            csvFileUrl: `http://localhost:5173/data/shadows_chicago.csv`,
+            csvFileUrl: `${URL}/data/shadows_chicago.csv`,
             outputTableName: 'shadows',
             geometryColumns: {
                 latColumnName: 'latitude',

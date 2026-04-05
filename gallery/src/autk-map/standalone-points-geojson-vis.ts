@@ -1,5 +1,7 @@
 import { AutkMap } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class StandaloneGeojsonVis {
     protected map!: AutkMap;
 
@@ -7,8 +9,8 @@ export class StandaloneGeojsonVis {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        const neighs = await fetch('http://localhost:5173/data/mnt_neighs_proj.geojson').then(res => res.json());
-        const points = await fetch('http://localhost:5173/data/mnt_points_test_proj.geojson').then(res => res.json());
+        const neighs = await fetch(`${URL}/data/mnt_neighs_proj.geojson`).then(res => res.json());
+        const points = await fetch(`${URL}/data/mnt_points_test_proj.geojson`).then(res => res.json());
 
         this.map.loadCollection({ id: 'neighborhoods', collection: neighs });
         this.map.loadCollection({ id: 'points', collection: points });

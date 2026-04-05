@@ -1,6 +1,8 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 
 export class SpatialJoinNear {
     protected map!: AutkMap;
@@ -26,7 +28,7 @@ export class SpatialJoinNear {
         });
 
         await this.db.loadCsv({
-            csvFileUrl: 'http://localhost:5173/data/noise.csv',
+            csvFileUrl: `${URL}/data/noise.csv`,
             outputTableName: 'noise',
             geometryColumns: {
                 latColumnName: 'Latitude',

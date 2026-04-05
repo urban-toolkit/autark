@@ -1,6 +1,8 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType } from 'autk-map';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class GeojsonLinesVis {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
@@ -10,7 +12,7 @@ export class GeojsonLinesVis {
         await this.db.init();
 
         await this.db.loadCustomLayer({
-            geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
+            geojsonFileUrl: `${URL}/data/mnt_roads.geojson`,
             outputTableName: 'roads',
             coordinateFormat: 'EPSG:3395'
         });
