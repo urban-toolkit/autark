@@ -1,3 +1,10 @@
+/**
+ * Histogram transform preset.
+ *
+ * Aggregates a single numeric or categorical column into fixed-width bins,
+ * preserving source feature provenance (`autkIds`) on every output row.
+ */
+
 import * as d3 from 'd3';
 
 import { valueAtPath } from '../../core-types';
@@ -6,6 +13,12 @@ import type { TransformRow } from '../kernel';
 
 // ---- Executed transform -------------------------------------------------
 
+/**
+ * Result produced by `runHistogram`.
+ *
+ * Carries the fixed attribute tuple `['label', 'count']` and the binned rows
+ * ready for bar-chart rendering.
+ */
 export type ExecutedHistogramTransform = {
     preset: 'histogram';
     attributes: ['label', 'count'];
@@ -14,6 +27,12 @@ export type ExecutedHistogramTransform = {
 
 /**
  * Runs a histogram transform and returns chart-ready rows.
+ *
+ * Aggregates values into histogram bins (numeric or categorical) and returns chart-ready rows.
+ *
+ * @param rows Input data rows (AutkDatum[])
+ * @param config Histogram transform configuration
+ * @returns Executed histogram transform result
  */
 export function runHistogram(rows: AutkDatum[], config: HistogramTransformConfig): ExecutedHistogramTransform {
     return {
@@ -29,12 +48,25 @@ export function runHistogram(rows: AutkDatum[], config: HistogramTransformConfig
 
 // ---- Preset algorithm ---------------------------------------------------
 
+/**
+ * Options accepted by `presetHistogram`.
+ *
+ * @template T Row type extending `TransformRow`.
+ */
 export type HistogramPresetOptions<T extends TransformRow> = {
+    /** Input rows to bin. */
     rows: T[];
+    /** Dot-path attribute name whose values are binned. */
     column: string;
+    /** Number of bins for quantitative columns. Ignored for categorical columns. */
     numBins: number;
 };
 
+/**
+ * A single histogram bin ready for chart rendering.
+ *
+ * `label` is either a category string or a formatted numeric range such as `"1k-2k"`.
+ */
 export type HistogramBinRow = {
     label: string;
     count: number;
@@ -42,7 +74,12 @@ export type HistogramBinRow = {
 };
 
 /**
- * Aggregates numeric values into fixed histogram bins.
+ * Aggregates values into histogram bins (numeric or categorical).
+ *
+ * Detects column type and delegates to categorical or quantitative binning.
+ *
+ * @param options Histogram preset options (rows, column, numBins)
+ * @returns Array of histogram bin rows
  */
 export function presetHistogram<T extends TransformRow>(
     options: HistogramPresetOptions<T>
@@ -65,6 +102,13 @@ export function presetHistogram<T extends TransformRow>(
 // ---- Helper functions ----------------------------------------------------
 
 
+/**
+ * Aggregates categorical values into histogram bins.
+ *
+ * @param rows Input data rows
+ * @param column Column name to bin
+ * @returns Array of histogram bin rows for each category
+ */
 function categoricalHistogram<T extends TransformRow>(rows: T[], column: string): HistogramBinRow[] {
     const categoryMap = new Map<string, { count: number, autkIds: number[] }>();
     rows.forEach((row, rowIndex) => {
@@ -85,6 +129,14 @@ function categoricalHistogram<T extends TransformRow>(rows: T[], column: string)
     }));
 }
 
+/**
+ * Aggregates numeric values into fixed-width histogram bins.
+ *
+ * @param rows Input data rows
+ * @param column Column name to bin
+ * @param numBins Number of bins
+ * @returns Array of histogram bin rows for each numeric bin
+ */
 function quantitativeHistogram<T extends TransformRow>(rows: T[], column: string, numBins: number): HistogramBinRow[] {
     if (!Number.isFinite(numBins) || numBins <= 0) {
         return [];

@@ -1,13 +1,13 @@
 import type { ChartEvents, ChartType, UnifiedChartConfig } from './api';
 
 import { ChartBase } from './chart-base';
-import { Barchart, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
+import { Barchart, Heatmatrix, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
 
 /**
  * Unified public entrypoint for autk-plot chart creation and interaction.
  *
  * `AutkChart` wraps chart-specific implementations (`scatterplot`, `barchart`,
- * `parallel-coordinates`, `table`, `linechart`) behind a single constructor
+ * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`) behind a single constructor
  * and a stable API for selection and event handling.
  *
  * The wrapper delegates all behavior to the concrete chart instance selected by
@@ -140,6 +140,11 @@ export class AutkChart {
                 const { type, ...chartConfig } = config;
                 void type;
                 return new Linechart({ div, ...chartConfig });
+            }
+            case 'heatmatrix': {
+                const { type, ...chartConfig } = config;
+                void type;
+                return new Heatmatrix({ div, ...chartConfig });
             }
             default: {
                 const unreachable: never = config;

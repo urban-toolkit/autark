@@ -137,11 +137,50 @@ export type TimeseriesTransformConfig = {
     };
 };
 
+/**
+ * Sort preset config.
+ *
+ * Reorders rows by a single column without aggregating them.
+ * Preserves `autkIds` on every output row.
+ */
+export type SortTransformConfig = {
+    preset: 'sort';
+    attributes: {
+        column: string;
+        direction?: 'asc' | 'desc';
+    };
+};
+
+/**
+ * Heat matrix preset config.
+ *
+ * Groups rows by a pair of categorical dimensions and reduces a numeric value
+ * column within each (x, y) cell. Defaults are applied internally when `options` are omitted.
+ */
+export type HeatmatrixTransformConfig = {
+    preset: 'heatmatrix';
+    attributes: {
+        x: string;
+        y: string;
+        /** Required for non-count reducers. Omit when `reducer` is `'count'` (the default). */
+        value?: string;
+    };
+    options?: {
+        reducer?: TransformReducer;
+        /** Number of bins for x when the x attribute is quantitative. Defaults to 10. */
+        binsX?: number;
+        /** Number of bins for y when the y attribute is quantitative. Defaults to 10. */
+        binsY?: number;
+    };
+};
+
 /** Transform preset config accepted by `AutkChart`. */
 export type ChartTransformConfig =
     | HistogramTransformConfig
     | TemporalTransformConfig
-    | TimeseriesTransformConfig;
+    | TimeseriesTransformConfig
+    | SortTransformConfig
+    | HeatmatrixTransformConfig;
 
 
 // ---------------------------------------------------------------------------
@@ -151,7 +190,7 @@ export type ChartTransformConfig =
 /**
  * Supported chart variants in the unified autk-plot API.
  */
-export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart';
+export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart' | 'heatmatrix';
 
 /**
  * Unified configuration for scatter plots.
@@ -190,6 +229,15 @@ export type LinechartUnifiedConfig = Omit<ChartConfig, 'div'> & {
 };
 
 /**
+ * Unified configuration for heat matrix charts.
+ *
+ * Requires a `heatmatrix` transform preset that defines the x, y, and value attributes.
+ */
+export type HeatmatrixChartConfig = Omit<ChartConfig, 'div'> & {
+    type: 'heatmatrix';
+};
+
+/**
  * Discriminated union describing all supported unified chart configurations.
  */
 export type UnifiedChartConfig =
@@ -197,4 +245,5 @@ export type UnifiedChartConfig =
     | BarchartChartConfig
     | ParallelCoordinatesChartConfig
     | TableChartConfig
-    | LinechartUnifiedConfig;
+    | LinechartUnifiedConfig
+    | HeatmatrixChartConfig;

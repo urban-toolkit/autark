@@ -35,6 +35,7 @@ export type {
 	TransformReducer,
 	TransformResolution,
 	HistogramTransformConfig,
+	HeatmatrixTransformConfig,
 	TemporalTransformConfig,
 	TimeseriesTransformConfig,
 	ChartTransformConfig,
@@ -48,6 +49,7 @@ export type {
 	ParallelCoordinatesChartConfig,
 	TableChartConfig,
 	LinechartUnifiedConfig,
+	HeatmatrixChartConfig,
 	UnifiedChartConfig,
 } from './api';
 
