@@ -38,6 +38,10 @@ export class MapD3 {
             type: 'table',
             collection: this.collection,
             labels: { axis: ['ntaname', 'shape_area', 'shape_leng'], title: 'Table Visualization' },
+            transform: {
+                preset: 'sort',
+                attributes: { column: 'ntaname', direction: 'asc' }
+            },
             width: 790,
             events: [ChartEvent.CLICK]
         });

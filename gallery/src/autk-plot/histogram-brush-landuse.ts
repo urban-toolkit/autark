@@ -38,7 +38,7 @@ export class MapD3HistogramLanduse {
             labels: { axis: ['land use type', 'neighborhoods count'], title: 'Land Use Histogram Example' },
             transform: {
                 preset: 'histogram',
-                attributes: { value: 'landuseyou ca' }
+                attributes: { value: 'landuse' }
             },
             margins: { left: 60, right: 20, top: 50, bottom: 80 },
             width: 790,
