@@ -38,7 +38,7 @@ import { valueAtPath } from '../core-types';
 
 import type { ChartConfig } from '../api';
 
-import { ChartD3 } from '../chart-d3';
+import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
 import { run } from '../transforms';
@@ -49,7 +49,7 @@ import { run } from '../transforms';
  * In histogram mode, rendered bins are mapped back to original source feature
  * indices so interaction payloads remain stable across transformations.
  */
-export class Barchart extends ChartD3 {
+export class Barchart extends ChartBase {
 
     protected mapX!: d3.ScaleBand<string>;
     protected mapY!: d3.ScaleLinear<number, number>;

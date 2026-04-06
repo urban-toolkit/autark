@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 
-import { ChartD3 } from '../chart-d3';
-import type { ChartConfig } from '../api';
+import { ChartBase } from '../chart-base';
+import type { AutkDatum, ChartConfig } from '../api';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
 import { valueAtPath } from '../core-types';
@@ -11,7 +11,7 @@ import { valueAtPath } from '../core-types';
  *
  * Selected rows are pinned to the top and keep stable source index mapping.
  */
-export class TableVis extends ChartD3 {
+export class TableVis extends ChartBase {
 
     protected sortColumn: string | null = null;
 
@@ -83,7 +83,7 @@ export class TableVis extends ChartD3 {
                 const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
                 chart.sortColumn = chart.sortColumn === attr ? null : attr;
                 chart.updateHeaderStyles();
-                chart.updateChartSelection();
+                chart.applyChartSelection();
             });
 
         // ---- Body
@@ -146,8 +146,8 @@ export class TableVis extends ChartD3 {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => chart.isDatumSelected(d) ? ChartStyle.highlight : 'transparent')
-            .style('color', (d) => chart.isDatumSelected(d) ? '#ffffff' : '#000000');
+            .style('background-color', (d) => (d as AutkDatum)?.autkIds?.some((id) => chart.selection.includes(id)) ? ChartStyle.highlight : 'transparent')
+            .style('color', (d) => (d as AutkDatum)?.autkIds?.some((id) => chart.selection.includes(id)) ? '#ffffff' : '#000000');
 
         rows
             .selectAll('td')

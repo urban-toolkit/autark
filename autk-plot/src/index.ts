@@ -32,7 +32,6 @@ export type {
 
 export type {
 	ChartMargins,
-	HistogramConfig,
 	TransformReducer,
 	TransformResolution,
 	HistogramTransformConfig,
@@ -41,7 +40,6 @@ export type {
 	ChartTransformConfig,
 	AutkDatum,
 	ChartConfig,
-	ChartSelectionPayload,
 	ChartEventRecord,
 	ChartEvents,
 	ChartType,

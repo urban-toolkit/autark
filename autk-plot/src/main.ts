@@ -1,12 +1,7 @@
 import type { ChartEvents, ChartType, UnifiedChartConfig } from './api';
-import { Barchart, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
 
-type ChartInstance = {
-    selection: number[];
-    events: ChartEvents;
-    setSelection: (selection: number[]) => void;
-    draw: () => void | Promise<void>;
-};
+import { ChartBase } from './chart-base';
+import { Barchart, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
 
 /**
  * Unified public entrypoint for autk-plot chart creation and interaction.
@@ -30,7 +25,7 @@ type ChartInstance = {
  * });
  */
 export class AutkChart {
-    private _plot: ChartInstance;
+    private _plot: ChartBase;
     private _type: ChartType;
 
     /**
@@ -64,7 +59,7 @@ export class AutkChart {
      *
      * @returns Internal chart implementation instance.
      */
-    get instance(): ChartInstance {
+    get instance(): ChartBase {
         return this._plot;
     }
 
@@ -93,7 +88,7 @@ export class AutkChart {
      * @param selection Source feature ids to highlight/select.
      */
     public setSelection(selection: number[]): void {
-        this._plot.setSelection(selection);
+        this._plot.selection = selection;
     }
 
     /**
@@ -102,10 +97,10 @@ export class AutkChart {
      * Implementations may perform synchronous or asynchronous rendering, so
      * this method always returns a promise.
      *
-     * @returns Promise resolved when redraw completes.
+     * @returns void
      */
-    public async draw(): Promise<void> {
-        await this._plot.draw();
+    public draw(): void {
+        this._plot.draw();
     }
 
     /**
@@ -119,7 +114,7 @@ export class AutkChart {
      * @returns Concrete chart instance matching `config.type`.
      * @throws If `config.type` is not supported.
      */
-    private createPlot(div: HTMLElement, config: UnifiedChartConfig): ChartInstance {
+    private createPlot(div: HTMLElement, config: UnifiedChartConfig): ChartBase {
         switch (config.type) {
             case 'scatterplot': {
                 const { type, ...chartConfig } = config;

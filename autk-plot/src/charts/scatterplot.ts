@@ -27,7 +27,7 @@
 
 import * as d3 from 'd3';
 
-import { ChartD3 } from '../chart-d3';
+import { ChartBase } from '../chart-base';
 import type { ChartConfig } from '../api';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
@@ -41,7 +41,7 @@ import { valueAtPath } from '../core-types';
  * The chart delegates interaction mechanics (click/brush selection, highlight
  * styling, and selection event emission) to the shared ChartD3 base class.
  */
-export class Scatterplot extends ChartD3   {
+export class Scatterplot extends ChartBase {
 
     protected mapX!: d3.ScaleLinear<number, number>;
     protected mapY!: d3.ScaleLinear<number, number>;

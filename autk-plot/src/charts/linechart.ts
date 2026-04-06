@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { ChartD3 } from '../chart-d3';
+import { ChartBase } from '../chart-base';
 import type { AutkDatum, ChartConfig } from '../api';
 import { run } from '../transforms';
 import { ChartEvent } from '../events-types';
@@ -12,7 +12,7 @@ import { ChartEvent } from '../events-types';
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
  */
-export class Linechart extends ChartD3 {
+export class Linechart extends ChartBase {
 
     private _startYear: number;
     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
@@ -92,7 +92,7 @@ export class Linechart extends ChartD3 {
         })) as AutkDatum[];
         const sourceRows = this.selection.length === 0
             ? allRows
-            : allRows.filter((row) => this.getDatumAutkIds(row).some((id) => selected.has(id)));
+            : allRows.filter((row) => (row.autkIds ?? []).some((id) => selected.has(id)));
 
         if (!this._transformConfig) {
             throw new Error('Linechart requires a transform configuration.');

@@ -49,6 +49,43 @@ export function presetHistogram<T extends TransformRow>(
 ): HistogramBinRow[] {
     const { rows, column, numBins } = options;
 
+    // Detect if the column is categorical (non-numeric)
+    const isCategorical = rows.some(row => {
+        const val = valueAtPath(row, column);
+        return typeof val === 'string' || (typeof val === 'number' && !Number.isFinite(val));
+    });
+
+    if (isCategorical) {
+        return categoricalHistogram(rows, column);
+    } else {
+        return quantitativeHistogram(rows, column, numBins);
+    }
+}
+
+// ---- Helper functions ----------------------------------------------------
+
+
+function categoricalHistogram<T extends TransformRow>(rows: T[], column: string): HistogramBinRow[] {
+    const categoryMap = new Map<string, { count: number, autkIds: number[] }>();
+    rows.forEach((row, rowIndex) => {
+        const val = valueAtPath(row, column);
+        if (val == null) return;
+        const key = String(val);
+        if (!categoryMap.has(key)) {
+            categoryMap.set(key, { count: 0, autkIds: [] });
+        }
+        const entry = categoryMap.get(key)!;
+        entry.count += 1;
+        entry.autkIds.push(...(Array.isArray(row.autkIds) && row.autkIds.length > 0 ? row.autkIds : [rowIndex]));
+    });
+    return Array.from(categoryMap.entries()).map(([label, { count, autkIds }]) => ({
+        label,
+        count,
+        autkIds: Array.from(new Set(autkIds)),
+    }));
+}
+
+function quantitativeHistogram<T extends TransformRow>(rows: T[], column: string, numBins: number): HistogramBinRow[] {
     if (!Number.isFinite(numBins) || numBins <= 0) {
         return [];
     }

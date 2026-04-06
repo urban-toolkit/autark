@@ -2,9 +2,9 @@ import * as d3 from 'd3';
 
 import { valueAtPath, ColorMap } from '../core-types';
 
-import type { ChartConfig } from '../api';
+import type { AutkDatum, ChartConfig } from '../api';
 
-import { ChartD3 } from '../chart-d3';
+import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
 
@@ -13,7 +13,7 @@ import { ChartEvent } from '../events-types';
  *
  * Supports mixed numeric/categorical dimensions and multi-axis brushing.
  */
-export class ParallelCoordinates extends ChartD3 {
+export class ParallelCoordinates extends ChartBase {
 
     protected scales: Map<string, d3.ScaleLinear<number, number> | d3.ScalePoint<string>> = new Map();
     protected axisPositions: d3.ScalePoint<string>;
@@ -195,7 +195,7 @@ export class ParallelCoordinates extends ChartD3 {
             .on('click', (_event, dim) => {
                 this.colorDimension = this.colorDimension === dim ? null : dim;
                 this.updateAxisLabelStyles();
-                this.updateChartSelection();
+                this.applyChartSelection();
             });
     }
 
@@ -206,7 +206,7 @@ export class ParallelCoordinates extends ChartD3 {
         const lines = svgs as unknown as d3.Selection<SVGPathElement, unknown, HTMLElement, unknown>;
         const chart = this;
         const sel = this.selection;
-        const isSelected = (d: unknown) => this.getDatumAutkIds(d).some((id) => sel.includes(id));
+        const isSelected = (d: unknown) => ((d as AutkDatum)?.autkIds ?? []).some((id) => sel.includes(id));
 
         let strokeFn: (this: SVGPathElement, d: unknown) => string;
 
