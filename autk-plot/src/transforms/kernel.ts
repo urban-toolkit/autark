@@ -1,12 +1,31 @@
+/**
+ * Supported temporal resolutions used by the temporal transform preset.
+ *
+ * Controls the granularity at which event timestamps are bucketed.
+ */
 export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'month' | 'year';
 
+/**
+ * Supported reducer names used when aggregating values within a bucket.
+ */
 export type TransformReducerName = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
+/**
+ * Minimum row shape expected by transform kernel functions.
+ *
+ * All transform presets operate on rows that optionally carry `autkIds` for
+ * source feature provenance.
+ */
 export type TransformRow = {
     autkIds?: number[];
     [key: string]: unknown;
 };
 
+/**
+ * Output of a single aggregated bucket after reduction.
+ *
+ * `autkIds` contains all source feature ids that contributed to this bucket.
+ */
 export type ReducedBucket = {
     key: string;
     value: number;
@@ -14,14 +33,30 @@ export type ReducedBucket = {
     autkIds: number[];
 };
 
+/**
+ * Options accepted by `reduceBuckets`.
+ *
+ * @template T Row type extending `TransformRow`.
+ */
 export type ReduceBucketsOptions<T extends TransformRow> = {
+    /** Input rows to aggregate. */
     rows: T[];
+    /** Returns the bucket key for a row, or `null` to skip the row. */
     bucketOf: (row: T) => string | null;
+    /** Returns the numeric value used by the reducer. Defaults to `1` when omitted (count). */
     valueOf?: (row: T) => number | null;
+    /** Reducer to apply within each bucket. */
     reducer: TransformReducerName;
+    /**
+     * When `true` (default), a row without `autkIds` falls back to its array index
+     * as the source id. Set to `false` to omit source tracking for synthetic rows.
+     */
     fallbackAutkIdFromRowIndex?: boolean;
 };
 
+/**
+ * Mutable accumulator updated per-row during bucket reduction.
+ */
 type ReducerState = {
     count: number;
     sum: number;
@@ -29,6 +64,11 @@ type ReducerState = {
     max: number;
 };
 
+/**
+ * Creates a new reducer state object with initial values.
+ *
+ * @returns ReducerState with zeroed count/sum and infinite min/max
+ */
 const createReducerState = (): ReducerState => ({
     count: 0,
     sum: 0,
@@ -36,6 +76,13 @@ const createReducerState = (): ReducerState => ({
     max: Number.NEGATIVE_INFINITY,
 });
 
+/**
+ * Normalizes autkIds from a candidate value, falling back to the row index if needed.
+ *
+ * @param candidate Value to check for autkIds (should be an array)
+ * @param fallbackIndex Row index to use if candidate is missing/invalid
+ * @returns Array of source ids
+ */
 const normalizeAutkIds = (candidate: unknown, fallbackIndex: number | null): number[] => {
     const ids = Array.isArray(candidate)
         ? candidate.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
@@ -49,7 +96,13 @@ const normalizeAutkIds = (candidate: unknown, fallbackIndex: number | null): num
 };
 
 /**
- * Merges source feature ids preserving uniqueness.
+ * Merges two arrays of source feature ids, preserving uniqueness.
+ *
+ * Used to track provenance of features through aggregation steps.
+ *
+ * @param base Existing source ids
+ * @param incoming New source ids to merge
+ * @returns Unique array of source ids
  */
 export function mergeAutkIds(base: number[], incoming: number[]): number[] {
     if (incoming.length === 0) return base;
@@ -59,6 +112,12 @@ export function mergeAutkIds(base: number[], incoming: number[]): number[] {
 
 /**
  * Applies one of the built-in reducers to a reducer state.
+ *
+ * Supported reducers: 'count', 'sum', 'avg', 'min', 'max'.
+ *
+ * @param state Current reducer state
+ * @param reducer Reducer name
+ * @returns Final reduced value
  */
 export function finalizeReducerValue(state: ReducerState, reducer: TransformReducerName): number {
     if (reducer === 'count') return state.count;
@@ -70,6 +129,11 @@ export function finalizeReducerValue(state: ReducerState, reducer: TransformRedu
 
 /**
  * Reduces rows into keyed buckets while preserving source feature provenance.
+ *
+ * Groups rows by a bucket key, applies the specified reducer, and merges autkIds for provenance.
+ *
+ * @param options Reduction options (bucketOf, valueOf, reducer, etc)
+ * @returns Array of reduced buckets
  */
 export function reduceBuckets<T extends TransformRow>(options: ReduceBucketsOptions<T>): ReducedBucket[] {
     const {

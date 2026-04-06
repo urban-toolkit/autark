@@ -27,11 +27,13 @@
 
 import * as d3 from 'd3';
 
-import { ChartBase } from '../chart-base';
+import { valueAtPath } from '../core-types';
+
 import type { ChartConfig } from '../api';
+
+import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
-import { valueAtPath } from '../core-types';
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
@@ -43,7 +45,9 @@ import { valueAtPath } from '../core-types';
  */
 export class Scatterplot extends ChartBase {
 
+    /** Linear scale mapping the x-attribute domain to pixel coordinates. */
     protected mapX!: d3.ScaleLinear<number, number>;
+    /** Linear scale mapping the y-attribute domain to pixel coordinates. */
     protected mapY!: d3.ScaleLinear<number, number>;
 
     /**
@@ -87,7 +91,7 @@ export class Scatterplot extends ChartBase {
 
         svg.attr('width', this._width).attr('height', this._height);
 
-        // ---- Tamanho do Gráfico
+        // ---- Chart size
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
 
@@ -105,14 +109,14 @@ export class Scatterplot extends ChartBase {
             .style('visibility', 'visible')
             .text((d) => d);
 
-        // ---- Escalas
+        // ---- Scales
         const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[0])) || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
         const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
-        // ---- Eixos
+        // ---- Axes
         const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(d3.format(this._tickFormats[0]));
 
         const xAxisSelection = svg

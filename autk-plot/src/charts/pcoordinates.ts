@@ -1,3 +1,32 @@
+/**
+ * @fileoverview Parallel coordinates chart for multivariate feature exploration.
+ *
+ * Provides a D3-based parallel coordinates implementation with the following features:
+ * - **Multidimensional rendering**: Visualizes each feature as a polyline across multiple axes
+ * - **Mixed data types**: Supports both numeric and categorical dimensions with automatic scale detection
+ * - **Multi-axis brushing and selection**: Enables brushing on any axis for interactive filtering and linked selection
+ * - **Color-by-dimension**: Clickable axis labels allow coloring lines by any dimension (numeric or categorical)
+ * - **Customizable axes and labels**: Axis/attribute mapping for flexible dimension selection and labeling
+ *
+ * @example
+ * // Basic parallel coordinates chart
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'parallel-coordinates',
+ *   collection: geojson,
+ *   attributes: ['attr1', 'attr2', 'attr3'],
+ *   labels: { axis: ['A', 'B', 'C'], title: 'Parallel Coordinates' }
+ * });
+ *
+ * @example
+ * // Parallel coordinates with color-by-dimension and brushing
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'parallel-coordinates',
+ *   collection: geojson,
+ *   events: [ChartEvent.BRUSH_X, ChartEvent.BRUSH_Y],
+ *   attributes: ['height', 'type', 'value'],
+ *   labels: { axis: ['Height', 'Type', 'Value'], title: 'Multivariate Exploration' }
+ * });
+ */
 import * as d3 from 'd3';
 
 import { valueAtPath, ColorMap } from '../core-types';
@@ -15,9 +44,13 @@ import { ChartEvent } from '../events-types';
  */
 export class ParallelCoordinates extends ChartBase {
 
+    /** Per-dimension scales: linear for numerical dimensions, point for categorical ones. */
     protected scales: Map<string, d3.ScaleLinear<number, number> | d3.ScalePoint<string>> = new Map();
+    /** Point scale that maps each dimension name to its horizontal axis position. */
     protected axisPositions: d3.ScalePoint<string>;
+    /** Detected type for each dimension: `'numerical'` or `'categorical'`. */
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
+    /** Dimension currently used for color encoding, or `null` when coloring is inactive. */
     protected colorDimension: string | null = null;
 
     /**
@@ -114,6 +147,17 @@ export class ParallelCoordinates extends ChartBase {
             .attr('class', 'autkMarksGroup')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
 
+        foreground
+            .selectAll('.autkClear')
+            .data([0])
+            .join('rect')
+            .attr('class', 'autkClear')
+            .attr('x', -this._margins.left)
+            .attr('y', -this._margins.top)
+            .attr('width', this._width)
+            .attr('height', this._height)
+            .style('fill', 'transparent')
+            .style('visibility', 'visible');
 
         // ---- Draw foreground lines (interactive)
         foreground
@@ -156,20 +200,6 @@ export class ParallelCoordinates extends ChartBase {
                 d3.select(nodes[i]).call(d3.axisLeft(scale as d3.ScalePoint<string>) as any);
             }
         });
-
-        // ---- Add clear area for deselection
-        foreground
-            .selectAll('.autkClear')
-            .data([0])
-            .join('rect')
-            .attr('class', 'autkClear')
-            .attr('x', -this._margins.left)
-            .attr('y', -this._margins.top)
-            .attr('width', this._width)
-            .attr('height', this._height)
-            .style('fill', 'transparent')
-            .style('visibility', 'visible')
-            .lower();
 
         this.configureSignalListeners();
 

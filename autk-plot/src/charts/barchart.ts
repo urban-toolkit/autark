@@ -41,7 +41,10 @@ import type { ChartConfig } from '../api';
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
+
 import { run } from '../transforms';
+
+import type { ExecutedHistogramTransform } from '../transforms';
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
@@ -51,7 +54,9 @@ import { run } from '../transforms';
  */
 export class Barchart extends ChartBase {
 
+    /** Band scale mapping category/bin labels to pixel positions. */
     protected mapX!: d3.ScaleBand<string>;
+    /** Linear scale mapping bar heights (numeric values) to pixel coordinates. */
     protected mapY!: d3.ScaleLinear<number, number>;
 
     /**
@@ -60,15 +65,16 @@ export class Barchart extends ChartBase {
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
-        if (config.tickFormats === undefined) { config.tickFormats = ['~s', '~s']; }
+        if (config.tickFormats === undefined) { 
+            config.tickFormats = ['~s', '~s']; 
+        }
         if (config.transform) {
-            const axis = config.labels?.axis ?? (config.transform.preset === 'histogram' ? ['label', 'count'] : ['bucket', 'value']);
-            const title = config.labels?.title
-                ?? (config.transform.preset === 'histogram'
-                    ? 'Histogram'
-                    : config.transform.preset === 'temporal'
-                        ? 'Temporal'
-                        : 'Timeseries');
+            if (config.transform.preset !== 'histogram') {
+                throw new Error('Barchart only supports the histogram transform preset.');
+            }
+
+            const axis = config.labels?.axis ?? ['label', 'count'];
+            const title = config.labels?.title ?? 'Histogram';
             config.labels = { axis, title };
         }
         super(config);
@@ -81,10 +87,7 @@ export class Barchart extends ChartBase {
      * directly on each rendered bin datum via `autkIds`.
      */
     protected override computeTransform(): void {
-        if (!this._transformConfig) {
-            super.computeTransform();
-            return;
-        }
+        if (!this._transformConfig) return;
 
         // Always compute histogram from all features
         const allRows = this._sourceFeatures.map((f, idx) => ({
@@ -92,7 +95,7 @@ export class Barchart extends ChartBase {
             autkIds: [idx],
         }));
 
-        const transformed = run(allRows, this._transformConfig);
+        const transformed = run(allRows, this._transformConfig) as ExecutedHistogramTransform;
         this.data = transformed.rows as any;
         this._attributes = transformed.attributes;
     }

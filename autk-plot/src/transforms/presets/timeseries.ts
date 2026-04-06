@@ -1,3 +1,11 @@
+/**
+ * Timeseries transform preset.
+ *
+ * Flattens feature-level timeseries arrays into individual points, buckets
+ * them by timestamp, and reduces each bucket to a single value. Source feature
+ * provenance (`autkIds`) is merged across all points that fall into a bucket.
+ */
+
 import { valueAtPath } from '../../core-types';
 
 import type { AutkDatum, TimeseriesTransformConfig } from '../../api';
@@ -7,6 +15,12 @@ import { reduceBuckets } from '../kernel';
 
 // ---- Executed transform -------------------------------------------------
 
+/**
+ * Result produced by `runTimeseries`.
+ *
+ * Carries the fixed attribute tuple `['bucket', 'value']` and the bucketed
+ * rows ready for line-chart rendering.
+ */
 export type ExecutedTimeseriesTransform = {
     preset: 'timeseries';
     attributes: ['bucket', 'value'];
@@ -15,6 +29,12 @@ export type ExecutedTimeseriesTransform = {
 
 /**
  * Runs a timeseries transform and returns chart-ready rows.
+ *
+ * Aggregates feature-level timeseries into buckets by timestamp, applying the specified reducer.
+ *
+ * @param rows Input data rows (AutkDatum[])
+ * @param config Timeseries transform configuration
+ * @returns Executed timeseries transform result
  */
 export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConfig): ExecutedTimeseriesTransform {
     return {
@@ -30,12 +50,25 @@ export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConf
 
 // ---- Preset algorithm ---------------------------------------------------
 
+/**
+ * Options accepted by `presetTimeseries`.
+ *
+ * @template T Row type extending `TransformRow`.
+ */
 export type TimeseriesPresetOptions<T extends TransformRow> = {
+    /** Input feature rows. */
     rows: T[];
+    /** Extracts the timeseries point array from a row. */
     pointsOf: (row: T) => TimeseriesPoint[] | null | undefined;
+    /** Reducer applied within each timestamp bucket. Defaults to `'avg'`. */
     reducer?: TransformReducerName;
 }
 
+/**
+ * A single timeseries bucket row ready for chart rendering.
+ *
+ * `bucket` is the string representation of the timestamp for that bucket.
+ */
 export type TimeseriesBucketRow = {
     bucket: string;
     value: number;
@@ -45,6 +78,11 @@ export type TimeseriesBucketRow = {
 
 /**
  * Aggregates feature timeseries by timestamp across all rows.
+ *
+ * Flattens all timeseries points, then reduces by timestamp bucket.
+ *
+ * @param options Timeseries preset options (rows, pointsOf, reducer)
+ * @returns Array of reduced timeseries buckets
  */
 export function presetTimeseries<T extends TransformRow>(
     options: TimeseriesPresetOptions<T>
@@ -85,11 +123,23 @@ export function presetTimeseries<T extends TransformRow>(
     }));
 }
 
+/**
+ * A single point in a feature timeseries before aggregation.
+ */
 export type TimeseriesPoint = {
     timestamp: Date | string | number;
     value: number | null | undefined;
 };
 
+/**
+ * Extracts timeseries points from a row according to the timeseries transform config.
+ *
+ * Handles both array-of-numbers and array-of-objects formats, extracting timestamp and value fields.
+ *
+ * @param row Input row (feature)
+ * @param config Timeseries transform configuration
+ * @returns Array of timeseries points with timestamp and value
+ */
 function getTimeseriesPoints(
     row: TransformRow,
     config: TimeseriesTransformConfig

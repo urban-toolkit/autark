@@ -1,11 +1,45 @@
+/**
+ * @fileoverview Table-based visualization for tabular data with sorting and selection.
+ *
+ * Provides a D3-based table visualization with the following features:
+ * - **Tabular rendering**: Displays feature properties as rows and columns
+ * - **Sortable columns**: Clickable headers cycle through asc → desc → unsorted
+ * - **Selection and linked views**: Uses source feature ids for click selection and highlights, with selected rows pinned to the top
+ * - **Customizable columns**: Axis/attribute mapping for flexible column selection and labeling
+ *
+ * @example
+ * // Basic table visualization
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'table',
+ *   collection: geojson,
+ *   attributes: ['name', 'population', 'area'],
+ *   labels: { axis: ['Name', 'Population', 'Area'], title: 'City Table' }
+ * });
+ *
+ * @example
+ * // Table with selection and sorting
+ * const plot = new AutkChart(plotDiv, {
+ *   type: 'table',
+ *   collection: geojson,
+ *   events: [ChartEvent.CLICK],
+ *   attributes: ['id', 'value'],
+ *   labels: { axis: ['ID', 'Value'], title: 'Data Table' }
+ * });
+ */
 import * as d3 from 'd3';
 
-import { ChartBase } from '../chart-base';
-import type { AutkDatum, ChartConfig } from '../api';
-import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../events-types';
 import { valueAtPath } from '../core-types';
 
+import type { AutkDatum, ChartConfig } from '../api';
+
+import { ChartBase } from '../chart-base';
+import { ChartStyle } from '../chart-style';
+import { ChartEvent } from '../events-types';
+
+import { run } from '../transforms';
+
+import type { SortTransformConfig } from '../api';
+import type { ExecutedSortTransform } from '../transforms/presets/sort';
 /**
  * Table-based visualization with sorting and row selection interactions.
  *
@@ -13,17 +47,37 @@ import { valueAtPath } from '../core-types';
  */
 export class TableVis extends ChartBase {
 
-    protected sortColumn: string | null = null;
-
     /**
      * Creates a table visualization and performs the initial draw.
      * @param config Plot configuration for table rendering.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+
+        if (config.transform && config.transform.preset !== 'sort') {
+            throw new Error('TableVis only supports the sort transform preset.');
+        }
+
         super(config);
 
         this.draw();
+    }
+
+    /**
+     * Sorts feature rows by the configured sort column and direction.
+     *
+     * The default no-op sort (no transform config) preserves insertion order.
+     */
+    protected override computeTransform(): void {
+        if (!this._transformConfig) return;
+
+        const allRows = this._sourceFeatures.map((f, idx) => ({
+            ...(f.properties ?? {}),
+            autkIds: [idx],
+        })) as AutkDatum[];
+
+        const transformed = run(allRows, this._transformConfig) as ExecutedSortTransform;
+        this.data = transformed.rows as any;
     }
 
     /**
@@ -60,7 +114,6 @@ export class TableVis extends ChartBase {
 
         // ---- Headers
         const thead = table.selectAll('thead').data([0]).join('thead');
-        const chart = this;
 
         thead
             .selectAll('tr')
@@ -79,11 +132,20 @@ export class TableVis extends ChartBase {
             .style('user-select', 'none')
             .text((d) => String(d))
             .on('click', (_event, axisLabel) => {
-                const attrIdx = chart._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
-                chart.sortColumn = chart.sortColumn === attr ? null : attr;
-                chart.updateHeaderStyles();
-                chart.applyChartSelection();
+                const attrIdx = this._axis.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? this._attributes[attrIdx] : axisLabel;
+
+                if ((this._transformConfig as SortTransformConfig).attributes.column === attr) {
+                    if ((this._transformConfig as SortTransformConfig).attributes.direction === 'asc') {
+                        this._transformConfig = { preset: 'sort', attributes: { column: attr, direction: 'desc' } };
+                    } else {
+                        this._transformConfig = { preset: 'sort', attributes: { column: attr, direction: 'asc' } };
+                    }
+                } else {
+                    this._transformConfig = { preset: 'sort', attributes: { column: attr, direction: 'asc' } };
+                }
+
+                this.draw();
             });
 
         // ---- Body
@@ -99,71 +161,45 @@ export class TableVis extends ChartBase {
     }
 
     /**
-     * Returns rows ordered by current selection and optional sort column.
+     * Renders data rows, pinning selected rows to the top.
      *
-     * Each entry carries `autkIds: [idx]` so the base `clickEvent` can resolve
-     * the stable source index without relying on the DOM position.
-     * @returns Row descriptors with stable source indices.
-     */
-    private getDisplayRows(): { idx: number; row: any; autkIds: number[] }[] {
-        const highlighted = this.selection
-            .map(idx => ({ idx, row: this.data[idx], autkIds: [idx] }))
-            .filter(d => d.row != null);
-
-        const rest = this.data
-            .map((row, idx) => ({ idx, row, autkIds: [idx] }))
-            .filter(d => !this.selection.includes(d.idx));
-
-        if (this.sortColumn) {
-            const col = this.sortColumn;
-            rest.sort((a, b) => {
-                const av = a.row ? valueAtPath(a.row, col) : null;
-                const bv = b.row ? valueAtPath(b.row, col) : null;
-                if (av == null) return 1;
-                if (bv == null) return -1;
-                const an = Number(av), bn = Number(bv);
-                if (!isNaN(an) && !isNaN(bn)) return bn - an;
-                return String(bv).localeCompare(String(av));
-            });
-        }
-
-        return [...highlighted, ...rest];
-    }
-
-    /**
-     * Renders data rows and row-level interaction handlers.
+     * Row identity is resolved via `autkIds` so ordering remains stable
+     * across sorts and selection changes.
+     *
      * @param tbody Target tbody selection.
      */
     private renderRows(tbody: d3.Selection<HTMLTableSectionElement, unknown, any, unknown>): void {
-        const displayRows = this.getDisplayRows();
-        const chart = this;
+        const sel = new Set(this.selection);
+        const selectedRows = this.data.filter((row) => row?.autkIds?.some((id) => sel.has(id)));
+        const restRows = this.data.filter((row) => !row?.autkIds?.some((id) => sel.has(id)));
+        const displayRows = [...selectedRows, ...restRows];
+
         const numberFormatter = d3.format('');
 
         const rows = tbody
-            .selectAll<HTMLTableRowElement, { idx: number; row: any }>('tr')
-            .data(displayRows, (d) => String(d.idx))
+            .selectAll<HTMLTableRowElement, AutkDatum>('tr')
+            .data(displayRows, (d) => String(d?.autkIds?.[0] ?? ''))
             .join('tr')
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => (d as AutkDatum)?.autkIds?.some((id) => chart.selection.includes(id)) ? ChartStyle.highlight : 'transparent')
-            .style('color', (d) => (d as AutkDatum)?.autkIds?.some((id) => chart.selection.includes(id)) ? '#ffffff' : '#000000');
+            .style('background-color', (d) => d?.autkIds?.some((id) => sel.has(id)) ? ChartStyle.highlight : 'transparent')
+            .style('color', (d) => d?.autkIds?.some((id) => sel.has(id)) ? '#ffffff' : '#000000');
 
         rows
             .selectAll('td')
-            .data((d) => chart._attributes.map((attr, i) => ({
-                column: chart._axis[i] ?? attr,
-                value: d.row ? valueAtPath(d.row, attr) : 'unknown'
+            .data((d) => this._attributes.map((attr, i) => ({
+                column: this._axis[i] ?? attr,
+                value: d ? valueAtPath(d, attr) : 'unknown'
             })))
             .join('td')
             .style('padding', '6px 8px')
             .style('text-align', 'center')
-                .text((d) => typeof d.value === 'number' ? numberFormatter(d.value) : String(d.value));
+            .text((d) => typeof d.value === 'number' ? numberFormatter(d.value) : String(d.value));
     }
 
     /**
      * Re-renders rows and re-attaches click handlers after selection styles are applied.
-     * @returns Nothing.
      */
     protected override onSelectionUpdated(): void {
         const tbody = d3.select(this._div).select<HTMLTableSectionElement>('.autk-table tbody');
@@ -174,22 +210,20 @@ export class TableVis extends ChartBase {
     }
 
     /**
-     * Updates header styling based on active sort column.
-     * @returns Nothing.
+     * Updates header styling to reflect the active sort column and direction.
      */
     protected updateHeaderStyles(): void {
-        const chart = this;
         d3.select(this._div)
             .selectAll<HTMLTableCellElement, string>('th')
             .style('color', (axisLabel) => {
-                const attrIdx = chart._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
-                return chart.sortColumn === attr ? '#cc3300' : '#000';
+                const attrIdx = this._axis.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? this._attributes[attrIdx] : axisLabel;
+                return (this._transformConfig as SortTransformConfig)?.attributes.column === attr ? '#cc3300' : '#000';
             })
             .style('text-decoration', (axisLabel) => {
-                const attrIdx = chart._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? chart._attributes[attrIdx] : axisLabel;
-                return chart.sortColumn === attr ? 'underline' : 'none';
+                const attrIdx = this._axis.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? this._attributes[attrIdx] : axisLabel;
+                return (this._transformConfig as SortTransformConfig)?.attributes.column === attr ? 'underline' : 'none';
             });
     }
 }

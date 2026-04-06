@@ -1,3 +1,12 @@
+/**
+ * Temporal transform preset.
+ *
+ * Flattens nested event arrays from feature properties, buckets them by
+ * timestamp at a configurable resolution, and reduces each bucket to a single
+ * value. Source feature provenance (`autkIds`) is merged across all events
+ * that fall into a bucket.
+ */
+
 import { valueAtPath } from '../../core-types';
 
 import type { AutkDatum, TemporalTransformConfig } from '../../api';
@@ -7,6 +16,12 @@ import { reduceBuckets } from '../kernel';
 
 // ---- Executed transform -------------------------------------------------
 
+/**
+ * Result produced by `runTemporal`.
+ *
+ * Carries the fixed attribute tuple `['bucket', 'value']` and the bucketed
+ * rows ready for line-chart rendering.
+ */
 export type ExecutedTemporalTransform = {
     preset: 'temporal';
     attributes: ['bucket', 'value'];
@@ -15,6 +30,12 @@ export type ExecutedTemporalTransform = {
 
 /**
  * Runs a temporal transform and returns chart-ready rows.
+ *
+ * Aggregates nested event collections into temporal buckets using the specified resolution and reducer.
+ *
+ * @param rows Input data rows (AutkDatum[])
+ * @param config Temporal transform configuration
+ * @returns Executed temporal transform result
  */
 export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig): ExecutedTemporalTransform {
     const resolution = config.options?.resolution ?? 'month';
@@ -49,15 +70,32 @@ export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig):
 
 // ---- Preset algorithm ---------------------------------------------------
 
+/**
+ * Options accepted by `presetTemporal`.
+ *
+ * @template T Row type extending `TransformRow`.
+ * @template E Event object type stored in each row.
+ */
 export type TemporalPresetOptions<T extends TransformRow, E> = {
+    /** Input feature rows. */
     rows: T[];
+    /** Returns the array of events for a row, or `null`/`undefined` for none. */
     eventsOf: (row: T) => E[] | null | undefined;
+    /** Extracts the timestamp from an event object. */
     timestampOf: (event: E) => Date | string | number | null | undefined;
+    /** Temporal resolution controlling bucket granularity. */
     resolution: TransformResolution;
+    /** Reducer applied within each bucket. Defaults to `'count'`. */
     reducer?: TransformReducerName;
+    /** Extracts the numeric value used by the reducer. Required for non-count reducers. */
     valueOf?: (event: E) => number | null | undefined;
 };
 
+/**
+ * A single temporal bucket row ready for chart rendering.
+ *
+ * `bucket` is a formatted string key (e.g. `"2024-03"` for monthly resolution).
+ */
 export type TemporalBucketRow = {
     bucket: string;
     value: number;
@@ -67,6 +105,11 @@ export type TemporalBucketRow = {
 
 /**
  * Aggregates nested event collections into temporal buckets.
+ *
+ * Flattens all events, assigns them to buckets by timestamp and resolution, then reduces by bucket.
+ *
+ * @param options Temporal preset options (rows, eventsOf, timestampOf, resolution, reducer, valueOf)
+ * @returns Array of reduced temporal buckets
  */
 export function presetTemporal<T extends TransformRow, E>(
     options: TemporalPresetOptions<T, E>
@@ -94,7 +137,13 @@ export function presetTemporal<T extends TransformRow, E>(
 }
 
 /**
- * Formats a date into one of the supported temporal bucket keys.
+ * Formats a date into a string bucket key according to the specified temporal resolution.
+ *
+ * Supported resolutions: 'hour', 'day', 'weekday', 'monthday', 'month', 'year'.
+ *
+ * @param date Date object to format
+ * @param resolution Temporal resolution (bucket granularity)
+ * @returns Formatted bucket key string
  */
 export function formatTemporalBucket(date: Date, resolution: TransformResolution): string {
     const pad2 = (value: number): string => String(value).padStart(2, '0');
@@ -117,6 +166,14 @@ export function formatTemporalBucket(date: Date, resolution: TransformResolution
     return String(date.getUTCFullYear());
 }
 
+/**
+ * Flattens all events from all rows into an array of event rows with bucket and value fields.
+ *
+ * Used internally by presetTemporal to prepare data for reduction.
+ *
+ * @param options Temporal preset options (rows, eventsOf, timestampOf, resolution, valueOf)
+ * @returns Array of event rows with __bucket and __value fields
+ */
 const toTemporalRows = <T extends TransformRow, E>(
     options: TemporalPresetOptions<T, E>
 ): TransformRow[] => {
