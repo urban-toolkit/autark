@@ -41,7 +41,8 @@ export class ComputeFunction {
                 y: 'shape_leng',
             },
             resultField: 'result',
-            wgslBody: 'return x / y;',
+            // The Isoperimetric Quotient (Compactness/Circularity) 
+            wgslBody: 'return (4 * 3.1415927 * x) / (y * y);',
         });
 
         this.map = new AutkMap(canvas);

@@ -5,7 +5,7 @@ import { AutkMap, LayerType } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
-export class GeojsonVis {
+export class Heatmap {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
 
@@ -21,7 +21,7 @@ export class GeojsonVis {
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: ['surface', 'parks', 'water'] as Array<
+                layers: ['surface', 'parks', 'water', 'roads'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
                 dropOsmTable: true,
@@ -89,7 +89,7 @@ export class GeojsonVis {
 }
 
 async function main() {
-    const example = new GeojsonVis();
+    const example = new Heatmap();
     await example.run();
 }
 main();
