@@ -62,6 +62,7 @@ export { TriangulatorRaster }    from './triangulator-raster';
 
 export { Camera } from './camera';
 export type { CameraData, ViewProjectionParams } from './camera';
+export { CameraAnimator } from './camera-animator';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
