@@ -255,7 +255,26 @@ export class RasterLayer extends Layer {
         const isRGBA = rasterValues.length === this._rasterResX * this._rasterResY * 4;
         if (!isRGBA) {
             const validValues = rasterValues.filter(v => !isNaN(v));
-            const transferContext = buildTransferContext(validValues, this._transferFunction);
+
+            // Use the resolved colormap domain (e.g. percentile bounds) as the
+            // transfer-function range so that alpha scaling matches color scaling.
+            const colorDomain = this._layerRenderInfo.colormap.computedDomain;
+            const numericDomain = (
+                Array.isArray(colorDomain)
+                && colorDomain.length > 0
+                && colorDomain.every(v => typeof v === 'number')
+            )
+                ? colorDomain as [number, number] | [number, number, number]
+                : null;
+
+            const transferValues = numericDomain
+                ? validValues.filter(v => v >= numericDomain[0] && v <= numericDomain[numericDomain.length - 1])
+                : validValues;
+
+            const transferContext = buildTransferContext(
+                transferValues.length > 0 ? transferValues : validValues,
+                this._transferFunction,
+            );
 
             if (transferContext.validCount === 0) {
                 rasterValues.forEach(() => {
@@ -271,19 +290,12 @@ export class RasterLayer extends Layer {
                     return;
                 }
 
-                const colorDomain = this._layerRenderInfo.colormap.computedDomain;
-                const numericDomain = (
-                    Array.isArray(colorDomain)
-                    && colorDomain.length > 0
-                    && colorDomain.every(v => typeof v === 'number')
-                )
-                    ? colorDomain as [number, number] | [number, number, number]
-                    : [transferContext.min, transferContext.max] as [number, number];
+                const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
 
                 const color = ColorMap.getColor(
                     d,
                     this._layerRenderInfo.colormap.config.interpolator,
-                    numericDomain,
+                    effectiveDomain,
                 );
                 const alpha = computeAlphaByte(d, transferContext);
 
