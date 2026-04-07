@@ -23,16 +23,15 @@ export class LoadCsvUseCase {
       throw new Error('Cannot provide both csvFileUrl and csvObject. Please provide only one.');
     }
 
-    let csvPath = csvFileUrl as string;
-    let tempFileCreated = false;
+    const csvString = csvFileUrl
+      ? await fetch(csvFileUrl).then((r) => {
+          if (!r.ok) throw new Error(`HTTP error! Error to load ${csvFileUrl}! Status: ${r.status}`);
+          return r.text();
+        })
+      : this.buildCsvString(csvObject!, delimiter);
 
-    if (csvObject) {
-      const csvString = this.buildCsvString(csvObject, delimiter);
-
-      csvPath = `temp_csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.csv`;
-      await this.db.registerFileText(csvPath, csvString);
-      tempFileCreated = true;
-    }
+    const csvPath = `temp_csv_${Date.now()}_${Math.random().toString(36).slice(2, 11)}.csv`;
+    await this.db.registerFileText(csvPath, csvString);
 
     const qualifiedTableName = `${workspace}.${outputTableName}`;
     
@@ -59,9 +58,7 @@ export class LoadCsvUseCase {
       await this.conn.query(`CREATE INDEX ${indexName} ON ${qualifiedTableName} USING RTREE (${DEFAULT_GEO_COLUMN_NAME});`);
     }
 
-    if (tempFileCreated) {
-      await this.db.dropFile(csvPath);
-    }
+    await this.db.dropFile(csvPath);
 
     return {
       source: 'csv',
