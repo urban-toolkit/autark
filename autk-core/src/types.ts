@@ -30,7 +30,7 @@ export type ResolvedDomain = number[] | string[];
 export type ColorMapDomainSpec =
   | { type: ColorMapDomainStrategy.USER; params: number[] | string[] }
   | { type: ColorMapDomainStrategy.MIN_MAX }
-  | { type: ColorMapDomainStrategy.PERCENTILE; params?: [number, number] };
+  | { type: ColorMapDomainStrategy.PERCENTILE; params?: [number, number] }; // params: [lowerPercentile, upperPercentile] in 0–100 range, default [2, 98]
 
 /**
  * Color map interpolators for thematic data visualization.

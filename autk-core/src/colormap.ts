@@ -133,11 +133,11 @@ export class ColorMap {
         }
 
         if (mode === ColorMapDomainStrategy.PERCENTILE) {
-            const [lowerPercentile, upperPercentile] = config.domainSpec.params ?? [0.02, 0.98];
-            const low = ColorMap.computePercentile(values, lowerPercentile);
-            const high = ColorMap.computePercentile(values, upperPercentile);
+            const [lowerPercentile, upperPercentile] = config.domainSpec.params ?? [2, 98];
+            const low = ColorMap.computePercentile(values, lowerPercentile / 100);
+            const high = ColorMap.computePercentile(values, upperPercentile / 100);
             if (ColorMap.isDiverging(interpolator)) {
-                const center = ColorMap.computePercentile(values, 0.5);
+                const center = ColorMap.computePercentile(values, 50 / 100);
                 return [low, center, high];
             }
             return [low, high];
