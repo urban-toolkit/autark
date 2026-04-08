@@ -29,7 +29,7 @@
  */
 import * as d3 from 'd3';
 
-import { valueAtPath, ColorMap } from '../core-types';
+import { valueAtPath } from '../core-types';
 
 import type { AutkDatum, ChartConfig } from '../api';
 
@@ -50,9 +50,6 @@ export class ParallelCoordinates extends ChartBase {
     protected axisPositions: d3.ScalePoint<string>;
     /** Detected type for each dimension: `'numerical'` or `'categorical'`. */
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
-    /** Dimension currently used for color encoding, or `null` when coloring is inactive. */
-    protected colorDimension: string | null = null;
-
     /**
      * Creates a parallel coordinates chart and performs the initial draw.
      * @param config Plot configuration for parallel coordinates rendering.
@@ -64,6 +61,7 @@ export class ParallelCoordinates extends ChartBase {
         }
         super(config);
 
+        this._colorProperty = 'stroke';
         this.axisPositions = d3.scalePoint();
 
         this.draw();
@@ -111,7 +109,7 @@ export class ParallelCoordinates extends ChartBase {
         }
 
         // ---- Scales for each dimension
-        const dimensions = this._attributes;
+        const dimensions = this._axisAttributes;
 
         // Build a scale for each dimension based on data type
         dimensions.forEach((dim) => {
@@ -221,64 +219,30 @@ export class ParallelCoordinates extends ChartBase {
             .style('font-weight', '600')
             .style('cursor', 'pointer')
             .style('visibility', 'visible')
-            .text((_d, i) => this._axis[i] ?? _d)
+            .text((_d, i) => this._axisLabels[i] ?? _d)
             .on('click', (_event, dim) => {
-                this.colorDimension = this.colorDimension === dim ? null : dim;
+                this._colorAttribute = this._colorAttribute === dim ? undefined : dim;
+                if (this._colorAttribute) {
+                    this.computeColorDomain();
+                } else {
+                    this._resolvedDomain = undefined;
+                }
                 this.updateAxisLabelStyles();
                 this.applyChartSelection();
             });
     }
 
     /**
-     * Applies stroke-based selection styles with optional color-by-dimension mapping.
+     * Applies stroke color via base class, then adjusts opacity, stroke-width, and z-order.
      */
     protected override applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
+        super.applyMarkStyles(svgs);
+
         const lines = svgs as unknown as d3.Selection<SVGPathElement, unknown, HTMLElement, unknown>;
-        const chart = this;
         const sel = this.selection;
         const isSelected = (d: unknown) => ((d as AutkDatum)?.autkIds ?? []).some((id) => sel.includes(id));
 
-        let strokeFn: (this: SVGPathElement, d: unknown) => string;
-
-        if (this.colorDimension) {
-            const dim = this.colorDimension;
-            const scale = this.scales.get(dim);
-            const dimType = this.dimensionTypes.get(dim);
-
-            if (dimType === 'numerical' && scale) {
-                const dimValues = chart.data.map(d => d ? Number(valueAtPath(d, dim)) || 0 : 0);
-                const lo = chart._domain?.[0] ?? dimValues.reduce((a, b) => Math.min(a, b), Infinity);
-                const hi = chart._domain?.[1] ?? dimValues.reduce((a, b) => Math.max(a, b), -Infinity);
-                strokeFn = function (this: SVGPathElement, d: unknown) {
-                    if (isSelected(d)) return ChartStyle.highlight;
-                    const v = Number(valueAtPath(d, dim)) || 0;
-                    const { r, g, b } = ColorMap.getColor(v, chart._colorMapInterpolator, [lo, hi]);
-                    return `rgb(${r},${g},${b})`;
-                };
-            } else if (dimType === 'categorical' && scale) {
-                const catScale = scale as d3.ScalePoint<string>;
-                const categories = catScale.domain();
-                strokeFn = function (this: SVGPathElement, d: unknown) {
-                    if (isSelected(d)) return ChartStyle.highlight;
-                    const val = String(valueAtPath(d, dim));
-                    const i = categories.indexOf(val);
-                    const t = categories.length <= 1 ? 0.5 : i / (categories.length - 1);
-                    const { r, g, b } = ColorMap.getColor(t, chart._colorMapInterpolator);
-                    return `rgb(${r},${g},${b})`;
-                };
-            } else {
-                strokeFn = function (this: SVGPathElement, d: unknown) {
-                    return isSelected(d) ? ChartStyle.highlight : ChartStyle.default;
-                };
-            }
-        } else {
-            strokeFn = function (this: SVGPathElement, d: unknown) {
-                return isSelected(d) ? ChartStyle.highlight : ChartStyle.default;
-            };
-        }
-
         lines
-            .style('stroke', strokeFn)
             .style('opacity', function (this: SVGPathElement, d: unknown) { return isSelected(d) ? 1 : 0.7; })
             .style('stroke-width', function (this: SVGPathElement, d: unknown) { return isSelected(d) ? 3 : 2; });
 
@@ -291,8 +255,8 @@ export class ParallelCoordinates extends ChartBase {
      */
     protected updateAxisLabelStyles(): void {
         d3.select(this._div).selectAll<SVGTextElement, string>('.axis-label')
-            .style('fill', (dim) => { if (this.colorDimension !== dim) return '#000'; const { r, g, b } = ColorMap.getColor(0.7, this._colorMapInterpolator); return `rgb(${r},${g},${b})`; })
-            .style('text-decoration', (dim) => this.colorDimension === dim ? 'underline' : 'none');
+            .style('fill', (dim) => this._colorAttribute === dim ? '#cc3300' : '#000')
+            .style('text-decoration', (dim) => this._colorAttribute === dim ? 'underline' : 'none');
     }
 
     /**
@@ -301,7 +265,7 @@ export class ParallelCoordinates extends ChartBase {
      * @returns SVG path string for the row.
      */
     protected path(d: any): string {
-        const dimensions = this._attributes;
+        const dimensions = this._axisAttributes;
         const lineGenerator = d3.line<[number, number]>();
         const points: [number, number][] = dimensions.map((dim) => {
             const x = this.axisPositions(dim) || 0;

@@ -213,7 +213,7 @@ export class OsmLayersApi {
         this.plot = new AutkChart(document.getElementById('plotBody') as HTMLElement, {
             type: 'scatterplot',
             collection: this.computedRoadsGeojson,
-            attributes: ['compute.intercept', 'compute.angle'],
+            attributes: { axis: ['compute.intercept', 'compute.angle'] },
             labels: { axis: ['Baseline LST (°C)', 'Warming angle (°)'], title: 'LST regression' },
             tickFormats: ['.1~f', '.3~f'],
             width: 600,
@@ -230,12 +230,11 @@ export class OsmLayersApi {
         this.linechart = new AutkChart(document.getElementById('lineChartBody') as HTMLElement, {
             type: 'linechart',
             collection: this.computedRoadsGeojson,
-            attributes: ['lst_timeseries', 'compute.angle', 'compute.intercept'],
+            attributes: { axis: ['lst_timeseries', 'compute.angle', 'compute.intercept'] },
             labels: { axis: ['Year', 'LST (°C)'], title: 'Selected Road LST timeseries' },
             tickFormats: ['.0f', '.1f'],
             width: 600,
             height: 280,
-            startYear: START_YEAR,
         });
     }
 

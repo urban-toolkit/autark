@@ -17,7 +17,6 @@
  *     attributes: { value: 'population' }
  *   },
  *   labels: { axis: ['year', 'population'], title: 'Population Over Time' },
- *   startYear: 2000
  * });
  *
  * @example
@@ -55,8 +54,6 @@ import type { ExecutedTemporalTransform, ExecutedTimeseriesTransform } from '../
  */
 export class Linechart extends ChartBase {
 
-    /** Optional year offset added to numeric bucket indices when formatting x-axis tick labels. */
-    private _startYear: number;
     /** Computed render data for the current selection: one entry per time bucket. */
     private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
 
@@ -84,8 +81,6 @@ export class Linechart extends ChartBase {
 
         super(config);
 
-        this._startYear = config.startYear ?? 0;
-
         this.draw();
     }
 
@@ -98,9 +93,6 @@ export class Linechart extends ChartBase {
     protected override computeTransform(): void {
         const formatBucketLabel = (bucket: string): string => {
             const numericBucket = Number(bucket);
-            if (this._startYear > 0 && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-                return d3.format(this._tickFormats[0])(this._startYear + numericBucket);
-            }
             if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
                 return d3.format(this._tickFormats[0])(numericBucket);
             }
@@ -193,7 +185,7 @@ export class Linechart extends ChartBase {
         // ---- Axes
         const xAxis = d3.axisBottom(xScale)
             .ticks(Math.min(n, 12))
-            .tickFormat((d) => this._seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(this._startYear + +d));
+            .tickFormat((d) => this._seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisX')
@@ -212,7 +204,7 @@ export class Linechart extends ChartBase {
             .attr('dy', '0.4em');
         xAxisSelection
             .selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axis[0]])
+            .data([this._axisLabels[0]])
             .join('text')
             .attr('class', 'axis-label title')
             .attr('text-anchor', 'end')
@@ -238,7 +230,7 @@ export class Linechart extends ChartBase {
         yAxisSelection.selectAll<SVGLineElement, unknown>('.tick line').style('stroke', '#e0e0e0');
         yAxisSelection
             .selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axis[1]])
+            .data([this._axisLabels[1]])
             .join('text')
             .attr('class', 'axis-label title')
             .attr('text-anchor', 'end')

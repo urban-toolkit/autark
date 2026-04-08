@@ -120,7 +120,7 @@ export class TableVis extends ChartBase {
             .data([0])
             .join('tr')
             .selectAll<HTMLTableCellElement, string>('th')
-            .data(this._axis)
+            .data(this._axisLabels)
             .join('th')
             .style('padding', '8px')
             .style('border-bottom', '2px solid #bbb')
@@ -132,8 +132,8 @@ export class TableVis extends ChartBase {
             .style('user-select', 'none')
             .text((d) => String(d))
             .on('click', (_event, axisLabel) => {
-                const attrIdx = this._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? this._attributes[attrIdx] : axisLabel;
+                const attrIdx = this._axisLabels.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
 
                 if ((this._transformConfig as SortTransformConfig).attributes.column === attr) {
                     if ((this._transformConfig as SortTransformConfig).attributes.direction === 'asc') {
@@ -188,8 +188,8 @@ export class TableVis extends ChartBase {
 
         rows
             .selectAll('td')
-            .data((d) => this._attributes.map((attr, i) => ({
-                column: this._axis[i] ?? attr,
+            .data((d) => this._axisAttributes.map((attr, i) => ({
+                column: this._axisLabels[i] ?? attr,
                 value: d ? valueAtPath(d, attr) : 'unknown'
             })))
             .join('td')
@@ -216,13 +216,13 @@ export class TableVis extends ChartBase {
         d3.select(this._div)
             .selectAll<HTMLTableCellElement, string>('th')
             .style('color', (axisLabel) => {
-                const attrIdx = this._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? this._attributes[attrIdx] : axisLabel;
+                const attrIdx = this._axisLabels.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
                 return (this._transformConfig as SortTransformConfig)?.attributes.column === attr ? '#cc3300' : '#000';
             })
             .style('text-decoration', (axisLabel) => {
-                const attrIdx = this._axis.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? this._attributes[attrIdx] : axisLabel;
+                const attrIdx = this._axisLabels.indexOf(axisLabel);
+                const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
                 return (this._transformConfig as SortTransformConfig)?.attributes.column === attr ? 'underline' : 'none';
             });
     }

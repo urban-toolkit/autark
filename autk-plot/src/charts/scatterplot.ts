@@ -61,7 +61,7 @@ export class Scatterplot extends ChartBase {
         }
         super(config);
 
-        if (this._attributes.length < 2) {
+        if (this._axisAttributes.length < 2) {
             throw new Error('Scatterplot requires two dimensions.');
         }
 
@@ -110,10 +110,10 @@ export class Scatterplot extends ChartBase {
             .text((d) => d);
 
         // ---- Scales
-        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[0])) || 0 : 0);
+        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Axes
@@ -138,7 +138,7 @@ export class Scatterplot extends ChartBase {
             .attr('x', width)
             .attr('y', this._margins.bottom / 2 + 10)
             .style('visibility', 'visible')
-            .text(this._axis[0]);
+            .text(this._axisLabels[0]);
 
         const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
 
@@ -162,7 +162,7 @@ export class Scatterplot extends ChartBase {
             .attr('y', -this._margins.left / 2 - 7)
             .attr('x', -this._margins.top)
             .style('visibility', 'visible')
-            .text(this._axis[1]);
+            .text(this._axisLabels[1]);
 
         const cGroup = svg
             .selectAll('.autkBrush')
@@ -187,8 +187,8 @@ export class Scatterplot extends ChartBase {
             .data(this.data)
             .join('circle')
             .attr('class', 'autkMark')
-            .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, this._attributes[0])) || 0 : 0))
-            .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
+            .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0))
+            .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0))
             .attr('r', 5)
             .style('fill', ChartStyle.default)
             .style('visibility', 'inherit');

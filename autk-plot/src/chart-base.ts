@@ -2,7 +2,8 @@ import * as d3 from 'd3';
 import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
 
 import type { AutkDatum, ChartConfig, ChartMargins, ChartEvents, ChartEventRecord, ChartTransformConfig } from './api';
-import { ColorMapInterpolator, EventEmitter } from './core-types';
+import { ColorMapInterpolator, ColorMapDomainStrategy, ColorMap, EventEmitter, valueAtPath } from './core-types';
+import type { ColorMapDomainSpec, ResolvedDomain } from './core-types';
 import { ChartEvent } from './events-types';
 import { ChartStyle } from './chart-style';
 
@@ -29,10 +30,19 @@ export abstract class ChartBase {
     /** Normalized render rows bound to marks. */
     protected _data!: AutkDatum[];
 
-    /** User-facing axis labels. */
-    protected _axis!: string[];
+    /** Current selected source ids. */
+    protected _selection: number[] = [];
+
     /** Dot-path attributes used to read values from row objects. */
-    protected _attributes!: string[];
+    protected _axisAttributes!: string[];
+    /** User-facing axis labels. */
+    protected _axisLabels!: string[];
+    
+    /** Dot-path attribute used for color encoding, if any. */
+    protected _colorAttribute: string | undefined = undefined;
+    /** User-facing label for the color dimension. */
+    protected _colorLabel: string | undefined = undefined;
+    
     /** Plot title text. */
     protected _title!: string;
     /** D3 tick-format specifiers used by axis renderers. */
@@ -42,20 +52,21 @@ export abstract class ChartBase {
     protected _width: number = 800;
     /** Outer chart height in pixels. */
     protected _height: number = 500;
-
     /** Plot margins in pixels. */
     protected _margins!: ChartMargins;
-
-    /** Current selected source ids. */
-    protected _selection: number[] = [];
 
     /** Typed event dispatcher used by chart interaction events. */
     protected _chartEvents!: ChartEvents;
     /** Events explicitly enabled for this chart instance. */
     protected _enabledEvents: ChartEvent[] = [];
 
-    /** Optional fixed numerical domain (for thematic color mapping). */
-    protected _domain: [number, number] | undefined = undefined;
+    /** Domain specification for color encoding (from config). */
+    protected _domainSpec: ColorMapDomainSpec | undefined = undefined;
+    /** Resolved color domain, computed from data after each transform. */
+    protected _resolvedDomain: ResolvedDomain | undefined = undefined;
+
+    /** CSS property to apply color to: 'fill' for area marks, 'stroke' for line marks. */
+    protected _colorProperty: 'fill' | 'stroke' = 'fill';
     /** Active colormap interpolator used by charts that support color encoding. */
     protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQUENTIAL_REDS;
 
@@ -68,7 +79,7 @@ export abstract class ChartBase {
     /**
      * Brush combine mode for multi-brush interactions.
      * When multiple brushes are active, this controls whether marks must satisfy
-     * all (`and`) or any (`or`) brush predicates to be selected.
+     * all (`and`) or any (`or`) brush pre dicates to be selected.
      */
     protected _MODE: 'and' | 'or' = 'and';
 
@@ -82,8 +93,6 @@ export abstract class ChartBase {
      */
     constructor(config: ChartConfig) {
         this._div = config.div;
-        this._chartEvents = new EventEmitter<ChartEventRecord>();
-        this._enabledEvents = config.events ?? [];
 
         this._sourceFeatures = config.collection.features;
         this._data = this._sourceFeatures.map((f, idx) => ({
@@ -92,9 +101,14 @@ export abstract class ChartBase {
         })) as AutkDatum[];
 
         const axisLabels = config.labels?.axis ?? [];
-        const attributes = config.attributes ?? axisLabels;
-        this._axis = axisLabels.length > 0 ? axisLabels : attributes;
-        this._attributes = attributes;
+        const axisAttributes = config.attributes?.axis ?? axisLabels;
+
+        this._axisLabels = axisLabels.length > 0 ? axisLabels : axisAttributes;
+        this._axisAttributes = axisAttributes;
+
+        this._colorLabel = config.labels?.color;
+        this._colorAttribute = config.attributes?.color ?? config.labels?.color;
+
         this._title = config.labels?.title || 'Autk Plot';
         this._tickFormats = config.tickFormats ?? ['', ''];
 
@@ -102,7 +116,10 @@ export abstract class ChartBase {
         this._height = config.height || 500;
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
 
-        this._domain = config.domain;
+        this._chartEvents = new EventEmitter<ChartEventRecord>();
+        this._enabledEvents = config.events ?? [];
+
+        this._domainSpec = config.domainSpec;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQUENTIAL_REDS;
 
         this._transformConfig = config.transform;
@@ -166,11 +183,12 @@ export abstract class ChartBase {
     // --- Lifecycle ---
 
     /**
-     * Template method. Calls `computeTransform()` then `render()`.
+     * Template method. Calls `computeTransform()`, `computeColorDomain()`, then `render()`.
      * Do not override — implement `render()` instead.
      */
     public draw(): void {
         this.computeTransform();
+        this.computeColorDomain();
         this.render();
     }
 
@@ -181,6 +199,71 @@ export abstract class ChartBase {
      * or reorder data while preserving `autkIds` on each rendered datum.
      */
     protected computeTransform(): void {}
+
+    /**
+     * Resolves and caches the color domain for the active color attribute.
+     *
+     * Extracts all values for `_colorAttribute` from `this.data`, then calls
+     * `ColorMap.resolveDomainFromData()` using the configured interpolator and
+     * domain spec. The result is stored in `_resolvedDomain`.
+     *
+     * No-op when no `_colorAttribute` is set.
+     */
+    protected computeColorDomain(): void {
+        if (!this._colorAttribute) return;
+
+        const values = this.data
+            .filter(d => d != null)
+            .map(d => valueAtPath(d!, this._colorAttribute!))
+            .filter(v => v != null && !(typeof v === 'number' && !Number.isFinite(v)));
+
+        if (values.length === 0) return;
+
+        this._resolvedDomain = ColorMap.resolveDomainFromData(
+            values as number[] | string[],
+            {
+                interpolator: this._colorMapInterpolator,
+                domainSpec: this._domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
+            },
+        );
+    }
+
+    /**
+     * Returns the color for a single mark datum.
+     *
+     * Resolution order:
+     * 1. Selected → `ChartStyle.highlight`
+     * 2. Color attribute active → data-driven color from `_resolvedDomain`
+     * 3. Fallback → `ChartStyle.default`
+     *
+     * @param d Bound datum.
+     * @returns CSS color string.
+     */
+    protected getMarkColor(d: unknown): string {
+        const datum = d as AutkDatum;
+
+        if (datum?.autkIds?.some(id => this.selection.includes(id))) {
+            return ChartStyle.highlight;
+        }
+
+        if (!this._colorAttribute || !this._resolvedDomain) {
+            return ChartStyle.default;
+        }
+
+        if (typeof this._resolvedDomain[0] === 'string') {
+            const categories = this._resolvedDomain as string[];
+            const rawVal = String(valueAtPath(datum, this._colorAttribute));
+            const idx = categories.indexOf(rawVal);
+            const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
+            const { r, g, b } = ColorMap.getColor(t, this._colorMapInterpolator, categories);
+            return `rgb(${r},${g},${b})`;
+        } else {
+            const rawVal = Number(valueAtPath(datum, this._colorAttribute)) || 0;
+            const numDomain = this._resolvedDomain as [number, number] | [number, number, number];
+            const { r, g, b } = ColorMap.getColor(rawVal, this._colorMapInterpolator, numDomain);
+            return `rgb(${r},${g},${b})`;
+        }
+    }
 
     /**
      * Renders chart DOM/SVG/HTML nodes for the current internal state.
@@ -406,20 +489,14 @@ export abstract class ChartBase {
     }
 
     /**
-     * Applies selection styles to mark elements.
+     * Applies color to mark elements using `_colorProperty` (fill or stroke).
      *
-     * Override in subclasses that use a different visual encoding
-     * (e.g. stroke-based marks, opacity, raise).
+     * Color resolution order: selection highlight → data-driven colormap → default.
+     * Override only for non-color effects (opacity, stroke-width, `.raise()`).
      * @param svgs Selection containing mark nodes.
      */
     protected applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
-        svgs.style('fill', (d: unknown) => {
-            if ((d as AutkDatum)?.autkIds?.some((id) => this.selection.includes(id))) {
-                return ChartStyle.highlight;
-            } else {
-                return ChartStyle.default;
-            }
-        });
+        svgs.style(this._colorProperty, (d: unknown) => this.getMarkColor(d));
     }
 
     // --- Brush helpers ---

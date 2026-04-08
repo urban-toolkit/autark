@@ -23,16 +23,15 @@
 
 import * as d3 from 'd3';
 
-import { valueAtPath, ColorMap } from '../core-types';
+import { valueAtPath } from '../core-types';
 
 import type { AutkDatum, ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
-import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
 
 import { run } from '../transforms';
-import type { ExecutedHeatmatrixTransform } from '../transforms';
+import type { ExecutedBinning2dTransform, Binning2dCellRow } from '../transforms';
 
 /**
  * Heat matrix chart mapping two categorical dimensions to a grid of colored rectangles.
@@ -53,8 +52,8 @@ export class Heatmatrix extends ChartBase {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
         if (config.tickFormats === undefined) { config.tickFormats = ['', '']; }
 
-        if (!config.transform || config.transform.preset !== 'heatmatrix') {
-            throw new Error('Heatmatrix requires a heatmatrix transform preset.');
+        if (!config.transform || config.transform.preset !== 'binning-2d') {
+            throw new Error('Heatmatrix requires a binning-2d transform preset.');
         }
 
         super(config);
@@ -73,9 +72,10 @@ export class Heatmatrix extends ChartBase {
             autkIds: [idx],
         })) as AutkDatum[];
 
-        const transformed = run(allRows, this._transformConfig!) as ExecutedHeatmatrixTransform;
+        const transformed = run(allRows, this._transformConfig!) as ExecutedBinning2dTransform;
         this.data = transformed.rows as any;
-        this._attributes = transformed.attributes as unknown as string[];
+        this._axisAttributes = transformed.attributes as unknown as string[];
+        this._colorAttribute = this._axisAttributes[2];
     }
 
     /**
@@ -110,17 +110,16 @@ export class Heatmatrix extends ChartBase {
                 .text(d => d);
         }
 
-        // ---- Scales
-        const xValues = Array.from(new Set(this.data.map(d => d ? String(valueAtPath(d, this._attributes[0])) : '')));
-        const yValues = Array.from(new Set(this.data.map(d => d ? String(valueAtPath(d, this._attributes[1])) : '')));
+        // ---- Scales — derive sorted domains from xOrder/yOrder carried by the transform
+        const xValues = Array.from(
+            new Map((this.data as Binning2dCellRow[]).map(d => [d.x, d.xOrder])).entries()
+        ).sort((a, b) => a[1] - b[1]).map(([label]) => label);
+        const yValues = Array.from(
+            new Map((this.data as Binning2dCellRow[]).map(d => [d.y, d.yOrder])).entries()
+        ).sort((a, b) => a[1] - b[1]).map(([label]) => label);
 
         const mapX = d3.scaleBand().domain(xValues).range([0, width]).padding(0.05);
         const mapY = d3.scaleBand().domain(yValues).range([0, height]).padding(0.05);
-
-        // ---- Color domain (computed from data unless explicitly provided)
-        const colorValues = this.data.map(d => d ? Number(valueAtPath(d, this._attributes[2])) || 0 : 0);
-        const lo = this._domain?.[0] ?? Math.min(...colorValues);
-        const hi = this._domain?.[1] ?? Math.max(...colorValues);
 
         // ---- Axes
         const xAxisSelection = svg.selectAll<SVGGElement, unknown>('#axisX').data([0]).join('g')
@@ -134,7 +133,7 @@ export class Heatmatrix extends ChartBase {
             .attr('dy', '0.1em')
             .attr('transform', 'rotate(-45)');
         xAxisSelection.selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axis[0]]).join('text')
+            .data([this._axisLabels[0]]).join('text')
             .attr('class', 'axis-label title')
             .attr('text-anchor', 'end')
             .attr('x', width)
@@ -148,7 +147,7 @@ export class Heatmatrix extends ChartBase {
             .style('visibility', 'visible');
         yAxisSelection.call(d3.axisLeft(mapY).tickSizeOuter(0));
         yAxisSelection.selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axis[1]]).join('text')
+            .data([this._axisLabels[1]]).join('text')
             .attr('class', 'axis-label title')
             .attr('text-anchor', 'end')
             .attr('transform', 'rotate(-90)')
@@ -172,38 +171,14 @@ export class Heatmatrix extends ChartBase {
             .data(this.data)
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', d => mapX(d ? String(valueAtPath(d, this._attributes[0])) : '') ?? 0)
-            .attr('y', d => mapY(d ? String(valueAtPath(d, this._attributes[1])) : '') ?? 0)
+            .attr('x', d => mapX(d ? String(valueAtPath(d, this._axisAttributes[0])) : '') ?? 0)
+            .attr('y', d => mapY(d ? String(valueAtPath(d, this._axisAttributes[1])) : '') ?? 0)
             .attr('width',  mapX.bandwidth())
             .attr('height', mapY.bandwidth())
-            .style('fill', d => {
-                const v = d ? Number(valueAtPath(d, this._attributes[2])) || 0 : 0;
-                const { r, g, b } = ColorMap.getColor(v, this._colorMapInterpolator, [lo, hi]);
-                return `rgb(${r},${g},${b})`;
-            })
+            .style('fill', d => this.getMarkColor(d))
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
     }
 
-    /**
-     * Applies selection styles while preserving color-mapped fills for unselected cells.
-     *
-     * Selected cells use `ChartStyle.highlight`; unselected cells keep their data color.
-     */
-    protected override applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
-        const colorValues = this.data.map(d => d ? Number(valueAtPath(d, this._attributes[2])) || 0 : 0);
-        const lo = this._domain?.[0] ?? Math.min(...colorValues);
-        const hi = this._domain?.[1] ?? Math.max(...colorValues);
-        const sel = this.selection;
-
-        svgs.style('fill', (d: unknown) => {
-            if ((d as AutkDatum)?.autkIds?.some(id => sel.includes(id))) {
-                return ChartStyle.highlight;
-            }
-            const v = d ? Number(valueAtPath(d as Record<string, unknown>, this._attributes[2])) || 0 : 0;
-            const { r, g, b } = ColorMap.getColor(v, this._colorMapInterpolator, [lo, hi]);
-            return `rgb(${r},${g},${b})`;
-        });
-    }
 }
