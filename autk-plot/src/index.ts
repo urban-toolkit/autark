@@ -34,22 +34,14 @@ export type {
 	ChartMargins,
 	TransformReducer,
 	TransformResolution,
-	HistogramTransformConfig,
-	HeatmatrixTransformConfig,
+	Binning1dTransformConfig,
+	Binning2dTransformConfig,
 	TemporalTransformConfig,
 	TimeseriesTransformConfig,
 	ChartTransformConfig,
 	AutkDatum,
 	ChartConfig,
-	ChartEventRecord,
-	ChartEvents,
 	ChartType,
-	ScatterplotChartConfig,
-	BarchartChartConfig,
-	ParallelCoordinatesChartConfig,
-	TableChartConfig,
-	LinechartUnifiedConfig,
-	HeatmatrixChartConfig,
 	UnifiedChartConfig,
 } from './api';
 
@@ -57,6 +49,7 @@ export type {
 
 /** Supported chart interaction events emitted by plot instances. */
 export { ChartEvent } from './events-types';
+export type { ChartEventData, ChartEventRecord } from './events-types';
 
 // ─── Shared style helpers ───────────────────────────────────────────────────
 

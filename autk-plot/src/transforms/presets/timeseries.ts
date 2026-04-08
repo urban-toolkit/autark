@@ -23,7 +23,6 @@ import { reduceBuckets } from '../kernel';
  */
 export type ExecutedTimeseriesTransform = {
     preset: 'timeseries';
-    attributes: ['bucket', 'value'];
     rows: TimeseriesBucketRow[];
 };
 
@@ -36,14 +35,14 @@ export type ExecutedTimeseriesTransform = {
  * @param config Timeseries transform configuration
  * @returns Executed timeseries transform result
  */
-export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConfig): ExecutedTimeseriesTransform {
+export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConfig, columns: string[]): ExecutedTimeseriesTransform {
+    const seriesAttr = columns[0] ?? '';
     return {
         preset: 'timeseries',
-        attributes: ['bucket', 'value'],
         rows: presetTimeseries({
             rows,
             reducer: config.options?.reducer ?? 'avg',
-            pointsOf: (row) => getTimeseriesPoints(row, config),
+            pointsOf: (row) => getTimeseriesPoints(row, seriesAttr, config),
         }),
     };
 }
@@ -142,34 +141,30 @@ export type TimeseriesPoint = {
  */
 function getTimeseriesPoints(
     row: TransformRow,
+    seriesAttr: string,
     config: TimeseriesTransformConfig
 ): TimeseriesPoint[] {
-    const sourceSeries = valueAtPath(row, config.attributes.series);
+    const sourceSeries = valueAtPath(row, seriesAttr);
     if (!Array.isArray(sourceSeries)) {
         return [];
     }
 
+    const timestampAttr = config.options?.timestamp ?? 'timestamp';
+    const valueAttr = config.options?.value ?? 'value';
     const points: TimeseriesPoint[] = [];
 
     sourceSeries.forEach((point, index) => {
         if (typeof point === 'number' && Number.isFinite(point)) {
-            points.push({
-                timestamp: index,
-                value: point,
-            });
+            points.push({ timestamp: index, value: point });
             return;
         }
 
-        if (!point || typeof point !== 'object') {
-            return;
-        }
+        if (!point || typeof point !== 'object') return;
 
-        const timestamp = valueAtPath(point as Record<string, unknown>, config.attributes.timestamp) ?? index;
-        const rawValue = valueAtPath(point as Record<string, unknown>, config.attributes.value);
+        const timestamp = valueAtPath(point as Record<string, unknown>, timestampAttr) ?? index;
+        const rawValue = valueAtPath(point as Record<string, unknown>, valueAttr);
         const numericValue = Number(rawValue);
-        if (!Number.isFinite(numericValue)) {
-            return;
-        }
+        if (!Number.isFinite(numericValue)) return;
 
         points.push({
             timestamp: timestamp instanceof Date || typeof timestamp === 'string' || typeof timestamp === 'number'

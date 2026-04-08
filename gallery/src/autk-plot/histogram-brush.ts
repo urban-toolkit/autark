@@ -35,10 +35,10 @@ export class MapD3Histogram {
         this.plot = new AutkChart(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
+            attributes: { axis: ['shape_area', '@transform'] },
             labels: { axis: ['area range', 'neighborhoods count'], title: 'Histogram example' },
             transform: {
-                preset: 'histogram',
-                attributes: { value: 'shape_area' },
+                preset: 'binning-1d',
                 options: { bins: 10 },
             },
             margins: { left: 60, right: 20, top: 50, bottom: 80 },

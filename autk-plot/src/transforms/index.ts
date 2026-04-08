@@ -49,10 +49,10 @@ export type ExecutedChartTransform =
  * @param config Chart transform configuration
  * @returns Executed transform result (chart-ready rows and attributes)
  */
-export function run(rows: AutkDatum[], config: ChartTransformConfig): ExecutedChartTransform {
-    if (config.preset === 'binning-1d') return runBinning1d(rows, config);
-    if (config.preset === 'binning-2d') return runBinning2d(rows, config);
-    if (config.preset === 'sort') return runSort(rows, config);
-    if (config.preset === 'temporal') return runTemporal(rows, config);
-    return runTimeseries(rows, config);
+export function run(rows: AutkDatum[], config: ChartTransformConfig, columns: string[]): ExecutedChartTransform {
+    if (config.preset === 'binning-1d') return runBinning1d(rows, config, columns);
+    if (config.preset === 'binning-2d') return runBinning2d(rows, config, columns);
+    if (config.preset === 'sort') return runSort(rows, config, columns);
+    if (config.preset === 'temporal') return runTemporal(rows, config, columns);
+    return runTimeseries(rows, config, columns);
 }

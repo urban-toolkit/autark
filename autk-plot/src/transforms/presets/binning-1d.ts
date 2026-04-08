@@ -5,11 +5,12 @@
  * preserving source feature provenance (`autkIds`) on every output row.
  */
 
+import * as d3 from 'd3';
+
 import { valueAtPath } from '../../core-types';
 import type { AutkDatum, Binning1dTransformConfig } from '../../api';
 import type { TransformRow } from '../kernel';
 import { reduceBuckets } from '../kernel';
-import { buildBinMapper } from './binning-2d';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -21,7 +22,6 @@ import { buildBinMapper } from './binning-2d';
  */
 export type ExecutedBinning1dTransform = {
     preset: 'binning-1d';
-    attributes: ['label', 'value'];
     rows: Binning1dBinRow[];
 };
 
@@ -51,8 +51,8 @@ export type Binning1dBinRow = {
  * @param config Binning-1d transform configuration
  * @returns Executed binning-1d transform result
  */
-export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig): ExecutedBinning1dTransform {
-    const { value: valueAttr } = config.attributes;
+export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig, columns: string[]): ExecutedBinning1dTransform {
+    const valueAttr = columns[0] ?? '';
     const reducer = config.options?.reducer ?? 'count';
     const numBins = config.options?.bins ?? 10;
 
@@ -62,7 +62,8 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
         rows: rows as TransformRow[],
         bucketOf: (row) => mapper.label(valueAtPath(row, valueAttr)),
         valueOf: reducer === 'count' ? undefined : (row) => {
-            const v = Number(valueAtPath(row, valueAttr));
+            const col = config.options?.value ?? valueAttr;
+            const v = Number(valueAtPath(row, col));
             return Number.isFinite(v) ? v : null;
         },
         reducer,
@@ -70,7 +71,6 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
 
     return {
         preset: 'binning-1d',
-        attributes: ['label', 'value'],
         rows: reduced
             .map(bucket => ({
                 label: bucket.key,
@@ -80,5 +80,87 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
                 autkIds: bucket.autkIds,
             }))
             .sort((a, b) => a.order - b.order),
+    };
+}
+
+// ---- Bin mapper ---------------------------------------------------------
+
+/**
+ * Maps raw attribute values to bin labels and sort keys.
+ *
+ * `label` formats a raw value to its display string.
+ * `order` returns the numeric sort key for a given label (bin index for
+ * quantitative axes, insertion rank for categorical axes).
+ */
+export type BinMapper = {
+    label: (value: unknown) => string;
+    order: (label: string) => number;
+};
+
+/**
+ * Builds label and order mappers for a single axis attribute.
+ *
+ * Detects whether the attribute is categorical (any non-finite or string value
+ * present in the sample) or quantitative. Categorical attributes map to their
+ * string representation; quantitative attributes are divided into `numBins`
+ * fixed-width ranges with SI-formatted boundaries.
+ *
+ * @param rows Full row set used to detect type and compute bin boundaries.
+ * @param attr Dot-path attribute name.
+ * @param numBins Number of bins when the attribute is quantitative.
+ * @returns BinMapper with `label` and `order` functions.
+ */
+export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number): BinMapper {
+    const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
+
+    const isCategorical = sampleValues.some(v =>
+        typeof v === 'string' || (typeof v === 'number' && !Number.isFinite(v as number))
+    );
+
+    if (isCategorical) {
+        const insertionOrder = new Map<string, number>();
+        const rank = (label: string): number => {
+            if (!insertionOrder.has(label)) insertionOrder.set(label, insertionOrder.size);
+            return insertionOrder.get(label)!;
+        };
+        return {
+            label: (v) => { const s = String(v ?? ''); rank(s); return s; },
+            order: (label) => rank(label),
+        };
+    }
+
+    const nums = sampleValues.map(Number).filter(Number.isFinite);
+    if (nums.length === 0) {
+        return { label: (v) => String(v ?? ''), order: () => 0 };
+    }
+
+    const minValue = Math.min(...nums);
+    const maxValue = Math.max(...nums);
+    const span = maxValue - minValue;
+    const binWidth = span === 0 ? 1 : span / numBins;
+
+    const roundedMin = Math.round(minValue);
+    const roundedMax = Math.max(roundedMin + 1, Math.round(maxValue));
+    const roundedBinWidth = (roundedMax - roundedMin) / numBins;
+    const fmt = d3.format('.2s');
+
+    const labelToOrder = new Map<string, number>();
+    for (let bin = 0; bin < numBins; bin++) {
+        const label = `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
+        if (!labelToOrder.has(label)) labelToOrder.set(label, bin);
+    }
+    if (span === 0) labelToOrder.set(fmt(roundedMin), 0);
+
+    return {
+        label: (v) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return 'unknown';
+            const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
+            const bin = Math.max(0, Math.min(Math.floor(normalized), numBins - 1));
+            return span === 0
+                ? fmt(roundedMin)
+                : `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
+        },
+        order: (label) => labelToOrder.get(label) ?? 0,
     };
 }

@@ -76,7 +76,7 @@ export class TableVis extends ChartBase {
             autkIds: [idx],
         })) as AutkDatum[];
 
-        const transformed = run(allRows, this._transformConfig) as ExecutedSortTransform;
+        const transformed = run(allRows, this._transformConfig!, this._axisAttributes) as ExecutedSortTransform;
         this.data = transformed.rows as any;
     }
 
@@ -135,14 +135,12 @@ export class TableVis extends ChartBase {
                 const attrIdx = this._axisLabels.indexOf(axisLabel);
                 const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
 
-                if ((this._transformConfig as SortTransformConfig).attributes.column === attr) {
-                    if ((this._transformConfig as SortTransformConfig).attributes.direction === 'asc') {
-                        this._transformConfig = { preset: 'sort', attributes: { column: attr, direction: 'desc' } };
-                    } else {
-                        this._transformConfig = { preset: 'sort', attributes: { column: attr, direction: 'asc' } };
-                    }
+                const sortConfig = this._transformConfig as SortTransformConfig;
+                if ((sortConfig.options?.column ?? this._axisAttributes[0]) === attr) {
+                    const direction = sortConfig.options?.direction === 'asc' ? 'desc' : 'asc';
+                    this._transformConfig = { preset: 'sort', options: { column: attr, direction } };
                 } else {
-                    this._transformConfig = { preset: 'sort', attributes: { column: attr, direction: 'asc' } };
+                    this._transformConfig = { preset: 'sort', options: { column: attr, direction: 'asc' } };
                 }
 
                 this.draw();
@@ -218,12 +216,14 @@ export class TableVis extends ChartBase {
             .style('color', (axisLabel) => {
                 const attrIdx = this._axisLabels.indexOf(axisLabel);
                 const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
-                return (this._transformConfig as SortTransformConfig)?.attributes.column === attr ? '#cc3300' : '#000';
+                const sortCol = (this._transformConfig as SortTransformConfig)?.options?.column ?? this._axisAttributes[0];
+                return sortCol === attr ? '#cc3300' : '#000';
             })
             .style('text-decoration', (axisLabel) => {
                 const attrIdx = this._axisLabels.indexOf(axisLabel);
                 const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
-                return (this._transformConfig as SortTransformConfig)?.attributes.column === attr ? 'underline' : 'none';
+                const sortCol = (this._transformConfig as SortTransformConfig)?.options?.column ?? this._axisAttributes[0];
+                return sortCol === attr ? 'underline' : 'none';
             });
     }
 }

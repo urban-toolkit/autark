@@ -35,11 +35,9 @@ export class MapD3HistogramLanduse {
         this.plot = new AutkChart(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
+            attributes: { axis: ['landuse', '@transform'] },
             labels: { axis: ['land use type', 'neighborhoods count'], title: 'Land Use Histogram Example' },
-            transform: {
-                preset: 'histogram',
-                attributes: { value: 'landuse' }
-            },
+            transform: { preset: 'binning-1d' },
             margins: { left: 60, right: 20, top: 50, bottom: 80 },
             width: 790,
             events: [ChartEvent.BRUSH_X],

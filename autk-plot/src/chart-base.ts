@@ -1,10 +1,11 @@
 import * as d3 from 'd3';
 import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
 
-import type { AutkDatum, ChartConfig, ChartMargins, ChartEvents, ChartEventRecord, ChartTransformConfig } from './api';
+import type { AutkDatum, ChartConfig, ChartMargins, ChartTransformConfig } from './api';
 import { ColorMapInterpolator, ColorMapDomainStrategy, ColorMap, EventEmitter, valueAtPath } from './core-types';
 import type { ColorMapDomainSpec, ResolvedDomain } from './core-types';
 import { ChartEvent } from './events-types';
+import type { ChartEventRecord } from './events-types';
 import { ChartStyle } from './chart-style';
 
 /**
@@ -56,7 +57,7 @@ export abstract class ChartBase {
     protected _margins!: ChartMargins;
 
     /** Typed event dispatcher used by chart interaction events. */
-    protected _chartEvents!: ChartEvents;
+    protected _chartEvents!: EventEmitter<ChartEventRecord>;
     /** Events explicitly enabled for this chart instance. */
     protected _enabledEvents: ChartEvent[] = [];
 
@@ -100,10 +101,23 @@ export abstract class ChartBase {
             autkIds: [idx],
         })) as AutkDatum[];
 
+        const hasTransformPlaceholder = [
+            ...(config.attributes?.axis ?? []),
+            config.attributes?.color,
+        ].includes('@transform');
+
+        if (config.transform?.preset === 'sort' && hasTransformPlaceholder) {
+            throw new Error("'@transform' cannot be used with the 'sort' preset.");
+        }
+
         const axisLabels = config.labels?.axis ?? [];
         const axisAttributes = config.attributes?.axis ?? axisLabels;
+        const transformOptions = config.transform?.options as { reducer?: string } | undefined;
+        const reducer = transformOptions?.reducer ?? 'count';
 
-        this._axisLabels = axisLabels.length > 0 ? axisLabels : axisAttributes;
+        this._axisLabels = axisLabels.length > 0
+            ? axisLabels
+            : axisAttributes.map(attr => attr === '@transform' ? String(reducer) : attr);
         this._axisAttributes = axisAttributes;
 
         this._colorLabel = config.labels?.color;
@@ -116,7 +130,7 @@ export abstract class ChartBase {
         this._height = config.height || 500;
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
 
-        this._chartEvents = new EventEmitter<ChartEventRecord>();
+        this._chartEvents = new EventEmitter();
         this._enabledEvents = config.events ?? [];
 
         this._domainSpec = config.domainSpec;
@@ -168,7 +182,7 @@ export abstract class ChartBase {
      * Returns the chart event dispatcher.
      * @returns Typed plot event dispatcher for listener registration.
      */
-    get events(): ChartEvents {
+    get events(): EventEmitter<ChartEventRecord> {
         return this._chartEvents;
     }
 

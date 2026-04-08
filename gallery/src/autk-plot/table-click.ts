@@ -37,11 +37,9 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'table',
             collection: this.collection,
-            labels: { axis: ['ntaname', 'shape_area', 'shape_leng'], title: 'Table Visualization' },
-            transform: {
-                preset: 'sort',
-                attributes: { column: 'ntaname', direction: 'asc' }
-            },
+            attributes: { axis: ['ntaname', 'shape_area', 'shape_leng'] },
+            labels: { title: 'Table Visualization' },
+            transform: { preset: 'sort', options: { direction: 'asc' } },
             width: 790,
             events: [ChartEvent.CLICK]
         });

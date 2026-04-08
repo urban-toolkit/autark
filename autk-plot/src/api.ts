@@ -1,12 +1,17 @@
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
-import type { EventEmitter, ColorMapDomainSpec } from './core-types';
+import type { ColorMapDomainSpec } from './core-types';
 import { ColorMapInterpolator } from './core-types';
-import { ChartEvent } from './events-types';
+import type { ChartEvent } from './events-types';
 
 
 // ---------------------------------------------------------------------------
 // Core / shared types
 // ---------------------------------------------------------------------------
+
+/**
+ * Supported chart variants in the unified autk-plot API.
+ */
+export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart' | 'heatmatrix';
 
 /**
  * Margin values in pixels around the plot drawing area.
@@ -41,38 +46,13 @@ export type ChartConfig = {
     colorMapInterpolator?: ColorMapInterpolator;
 }
 
-
-// ---------------------------------------------------------------------------
-// Event types
-// ---------------------------------------------------------------------------
-
 /**
- * Type mapping ChartEvent enum values to their payload types.
- *
- * All plot interaction events emit `{ selection: number[] }` containing
- * source feature indices of the current selection.
+ * Configuration passed to `AutkChart`. Identical to `ChartConfig` minus `div`,
+ * which is supplied as a separate constructor argument.
  */
-export type ChartEventRecord = {
-    [ChartEvent.CLICK]: { selection: number[] };
-    [ChartEvent.BRUSH]: { selection: number[] };
-    [ChartEvent.BRUSH_X]: { selection: number[] };
-    [ChartEvent.BRUSH_Y]: { selection: number[] };
+export type UnifiedChartConfig = Omit<ChartConfig, 'div'> & {
+    type: ChartType;
 };
-
-/**
- * Type alias for the EventEmitter used by plot instances.
- *
- * Uses the same event emitter from autk-core as autk-map, ensuring
- * consistent event handling patterns across all visualization libraries.
- *
- * @example
- * const plot = new AutkChart(div, { type: 'scatterplot', ... });
- * plot.events.on(ChartEvent.CLICK, ({ selection }) => {
- *   console.log('Selected features:', selection);
- * });
- */
-export type ChartEvents = EventEmitter<ChartEventRecord>;
-
 
 // ---------------------------------------------------------------------------
 // Transform types
@@ -87,56 +67,52 @@ export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'mon
 /**
  * Binning-1d preset config.
  *
- * Defaults are applied internally when `options` are omitted.
+ * The column to bin is read from `ChartConfig.attributes.axis[0]`.
+ * Use `'@transform'` in `axis[1]` to mark the output slot.
  */
 export type Binning1dTransformConfig = {
     preset: 'binning-1d';
-    attributes: {
-        value: string;
-    };
     options?: {
         reducer?: TransformReducer;
         bins?: number;
+        /** Aggregate column for non-count reducers. Required when reducer is not 'count'. */
+        value?: string;
     };
 };
 
 /**
  * Binning-2d preset config.
  *
- * Groups rows by a pair of categorical dimensions and reduces a numeric value
- * column within each (x, y) cell. Defaults are applied internally when `options` are omitted.
+ * The x and y columns are read from `ChartConfig.attributes.axis[0]` and `axis[1]`.
+ * Use `'@transform'` in `ChartConfig.attributes.color` to mark the output slot.
  */
 export type Binning2dTransformConfig = {
     preset: 'binning-2d';
-    attributes: {
-        x: string;
-        y: string;
-        /** Required for non-count reducers. Omit when `reducer` is `'count'` (the default). */
-        value?: string;
-    };
     options?: {
         reducer?: TransformReducer;
         /** Number of bins for x when the x attribute is quantitative. Defaults to 10. */
         binsX?: number;
         /** Number of bins for y when the y attribute is quantitative. Defaults to 10. */
         binsY?: number;
+        /** Aggregate column for non-count reducers. Required when reducer is not 'count'. */
+        value?: string;
     };
 };
-
 
 /**
  * Temporal preset config.
  *
- * Defaults are applied internally when `options` are omitted.
+ * The events array column is read from `ChartConfig.attributes.axis[0]`.
+ * Use `'@transform'` in `axis[1]` to mark the output slot.
+ * `timestamp` and `value` are sub-fields within each event object.
  */
 export type TemporalTransformConfig = {
     preset: 'temporal';
-    attributes: {
-        events: string;
-        timestamp: string;
-        value: string;
-    };
     options?: {
+        /** Timestamp field within each event object. */
+        timestamp?: string;
+        /** Value field within each event for non-count reducers. */
+        value?: string;
         resolution?: TransformResolution;
         reducer?: TransformReducer;
     };
@@ -145,16 +121,17 @@ export type TemporalTransformConfig = {
 /**
  * Timeseries preset config.
  *
- * Defaults are applied internally when `options` are omitted.
+ * The series array column is read from `ChartConfig.attributes.axis[0]`.
+ * Use `'@transform'` in `axis[1]` to mark the output slot.
+ * `timestamp` and `value` are sub-fields within each series point.
  */
 export type TimeseriesTransformConfig = {
     preset: 'timeseries';
-    attributes: {
-        series: string;
-        timestamp: string;
-        value: string;
-    };
     options?: {
+        /** Timestamp field within each series point. */
+        timestamp?: string;
+        /** Value field within each series point. */
+        value?: string;
         reducer?: TransformReducer;
     };
 };
@@ -164,11 +141,13 @@ export type TimeseriesTransformConfig = {
  *
  * Reorders rows by a single column without aggregating them.
  * Preserves `autkIds` on every output row.
+ * Using `'@transform'` in `ChartConfig.attributes` with sort throws an error.
  */
 export type SortTransformConfig = {
     preset: 'sort';
-    attributes: {
-        column: string;
+    options?: {
+        /** Column to sort by. Defaults to `ChartConfig.attributes.axis[0]`. */
+        column?: string;
         direction?: 'asc' | 'desc';
     };
 };
@@ -181,20 +160,3 @@ export type ChartTransformConfig =
     | TimeseriesTransformConfig
     | SortTransformConfig;
 
-
-// ---------------------------------------------------------------------------
-// Unified chart config types
-// ---------------------------------------------------------------------------
-
-/**
- * Supported chart variants in the unified autk-plot API.
- */
-export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart' | 'heatmatrix';
-
-/**
- * Configuration passed to `AutkChart`. Identical to `ChartConfig` minus `div`,
- * which is supplied as a separate constructor argument.
- */
-export type UnifiedChartConfig = Omit<ChartConfig, 'div'> & {
-    type: ChartType;
-};

@@ -28,7 +28,6 @@ export type SortedRow = {
 export type ExecutedSortTransform = {
     preset: 'sort';
     rows: SortedRow[];
-    attributes: string[];
 };
 
 // ---- Runner -------------------------------------------------------------
@@ -42,8 +41,9 @@ export type ExecutedSortTransform = {
  * @param config Sort transform configuration
  * @returns Executed sort transform result
  */
-export function runSort(rows: AutkDatum[], config: SortTransformConfig): ExecutedSortTransform {
-    const { column, direction = 'asc' } = config.attributes;
+export function runSort(rows: AutkDatum[], config: SortTransformConfig, columns: string[]): ExecutedSortTransform {
+    const column = config.options?.column ?? columns[0] ?? '';
+    const direction = config.options?.direction ?? 'asc';
 
     const sorted = [...rows].sort((a, b) => {
         const av = a ? valueAtPath(a, column) : null;
@@ -63,6 +63,5 @@ export function runSort(rows: AutkDatum[], config: SortTransformConfig): Execute
     return {
         preset: 'sort',
         rows: sorted as SortedRow[],
-        attributes: [column],
     };
 }

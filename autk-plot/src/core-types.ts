@@ -11,12 +11,12 @@ export { ColorMapDomainStrategy, ColorMapInterpolator } from 'autk-core';
 export { ColorMap } from 'autk-core';
 
 export type { ColorHEX, ColorRGB, ColorTEX } from 'autk-core';
-export type { ColorMapConfig } from 'autk-core';
+export type { ColorMapConfig, ColorMapDomainSpec, ResolvedDomain } from 'autk-core';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 export { EventEmitter } from 'autk-core';
-export type { EventListener } from 'autk-core';
+export type { EventListener, SelectionData } from 'autk-core';
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 

@@ -5,6 +5,17 @@
 export type EventListener<T> = (event: T) => void;
 
 /**
+ * Base payload shared by all selection-based interaction events.
+ *
+ * Both map (autk-map) and chart (autk-plot) events extend or alias this type,
+ * ensuring a consistent selection contract across all visualization libraries.
+ */
+export interface SelectionData {
+    /** Source feature indices of the current selection. */
+    selection: number[];
+}
+
+/**
  * A lightweight, type-safe event emitter.
  *
  * @template Events - A record mapping event names to their payload types.

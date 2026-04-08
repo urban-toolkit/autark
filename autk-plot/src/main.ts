@@ -1,4 +1,6 @@
-import type { ChartEvents, ChartType, UnifiedChartConfig } from './api';
+import type { ChartType, UnifiedChartConfig } from './api';
+import type { ChartEventRecord } from './events-types';
+import type { EventEmitter } from './core-types';
 
 import { ChartBase } from './chart-base';
 import { Barchart, Heatmatrix, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
@@ -75,7 +77,7 @@ export class AutkChart {
      * Gets the chart event dispatcher.
      * @returns Typed event dispatcher exposed by the concrete chart.
      */
-    get events(): ChartEvents {
+    get events(): EventEmitter<ChartEventRecord> {
         return this._plot.events;
     }
 
@@ -147,8 +149,7 @@ export class AutkChart {
                 return new Heatmatrix({ div, ...chartConfig });
             }
             default: {
-                const unreachable: never = config;
-                throw new Error(`Unsupported chart type: ${String(unreachable)}`);
+                throw new Error(`Unsupported chart type: ${config.type}`);
             }
         }
     }

@@ -49,15 +49,11 @@ export class MapD3Timeseries {
         this.plot = new AutkChart(this.plotDiv, {
             type: 'barchart',
             collection: this.geojson,
-            labels: { axis: ['bucket', 'value'], title: 'Average synthetic timeseries (neighborhoods)' },
+            attributes: { axis: ['series', '@transform'] },
+            labels: { axis: ['bucket', 'avg'], title: 'Average synthetic timeseries (neighborhoods)' },
             transform: {
                 preset: 'timeseries',
-                attributes: {
-                    series: 'series',
-                    timestamp: 'timestamp',
-                    value: 'value',
-                },
-                options: { reducer: 'avg' },
+                options: { timestamp: 'timestamp', value: 'value', reducer: 'avg' },
             },
             margins: { left: 60, right: 20, top: 50, bottom: 140 },
             width: 790,

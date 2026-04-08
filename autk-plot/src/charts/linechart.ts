@@ -120,7 +120,8 @@ export class Linechart extends ChartBase {
             ? allRows
             : allRows.filter((row) => (row.autkIds ?? []).some((id) => selected.has(id)));
 
-        const transformed = run(sourceRows, this._transformConfig!) as ExecutedTemporalTransform | ExecutedTimeseriesTransform;
+        const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
+        const transformed = run(sourceRows, this._transformConfig!, inputColumns) as ExecutedTemporalTransform | ExecutedTimeseriesTransform;
         const reducedSeries = [...transformed.rows].sort((a, b) => compareBuckets(a.bucket, b.bucket));
         this._seriesData = reducedSeries.map((item, idx) => ({
             x: idx,

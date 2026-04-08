@@ -55,15 +55,13 @@ export class MapD3TemporalEvents {
         this.plot = new AutkChart(this.plotDiv, {
             type: 'barchart',
             collection: this.geojson,
-            labels: { axis: ['bucket', 'value'], title: 'Monthly synthetic events (neighborhoods)' },
+            attributes: { axis: ['events', '@transform'] },
+            labels: { axis: ['bucket', 'sum'], title: 'Monthly synthetic events (neighborhoods)' },
             transform: {
-                preset: 'temporal-events',
-                attributes: {
-                    events: 'events',
+                preset: 'temporal',
+                options: {
                     timestamp: 'timestamp',
                     value: 'weight',
-                },
-                options: {
                     resolution: 'month',
                     reducer: 'sum',
                 },

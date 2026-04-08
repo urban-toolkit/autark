@@ -67,7 +67,7 @@ export { CameraAnimator } from './camera-animator';
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 export { EventEmitter } from './event-emitter';
-export type { EventListener } from './event-emitter';
+export type { EventListener, SelectionData } from './event-emitter';
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 

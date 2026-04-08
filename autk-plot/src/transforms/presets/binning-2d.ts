@@ -10,14 +10,13 @@
  * the same cell.
  */
 
-import * as d3 from 'd3';
-
 import { valueAtPath } from '../../core-types';
 
 import type { AutkDatum, Binning2dTransformConfig } from '../../api';
 import type { TransformRow } from '../kernel';
 
 import { reduceBuckets } from '../kernel';
+import { buildBinMapper } from './binning-1d';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -29,7 +28,6 @@ import { reduceBuckets } from '../kernel';
  */
 export type ExecutedBinning2dTransform = {
     preset: 'binning-2d';
-    attributes: ['x', 'y', 'value'];
     rows: Binning2dCellRow[];
 };
 
@@ -64,8 +62,10 @@ export type Binning2dCellRow = {
  * @param config Heat matrix transform configuration
  * @returns Executed heat matrix transform result
  */
-export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig): ExecutedBinning2dTransform {
-    const { x: xAttr, y: yAttr, value: valueAttr } = config.attributes;
+export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig, columns: string[]): ExecutedBinning2dTransform {
+    const xAttr = columns[0] ?? '';
+    const yAttr = columns[1] ?? '';
+    const valueAttr = config.options?.value;
     const reducer = config.options?.reducer ?? 'count';
     const binsX = config.options?.binsX ?? 10;
     const binsY = config.options?.binsY ?? 10;
@@ -92,7 +92,6 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
 
     return {
         preset: 'binning-2d',
-        attributes: ['x', 'y', 'value'],
         rows: reduced.map(bucket => {
             const sepIdx = bucket.key.indexOf(SEP);
             const xLabel = bucket.key.slice(0, sepIdx);
@@ -107,90 +106,5 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
                 autkIds: bucket.autkIds,
             };
         }),
-    };
-}
-
-// ---- Per-axis bin mapper -------------------------------------------------
-
-/**
- * Return type for `buildBinMapper`.
- *
- * `label` formats a raw value to its display string via d3.format.
- * `order` returns the numeric sort key for a given label (bin index for
- * quantitative axes, insertion rank for categorical axes).
- */
-export type BinMapper = {
-    label: (value: unknown) => string;
-    order: (label: string) => number;
-};
-
-/**
- * Builds label and order mappers for a single axis attribute.
- *
- * Detects whether the attribute is categorical (any non-finite or string value
- * present in the sample) or quantitative. Categorical attributes map to their
- * string representation; quantitative attributes are divided into `numBins`
- * fixed-width ranges with SI-formatted boundaries matching `binning-1d`.
- *
- * @param rows Full row set used to detect type and compute bin boundaries.
- * @param attr Dot-path attribute name.
- * @param numBins Number of bins when the attribute is quantitative.
- * @returns BinMapper with `label` and `order` functions.
- */
-export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number): BinMapper {
-    const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
-
-    const isCategorical = sampleValues.some(v =>
-        typeof v === 'string' || (typeof v === 'number' && !Number.isFinite(v as number))
-    );
-
-    if (isCategorical) {
-        // Track insertion order so the renderer can sort categoricals consistently.
-        const insertionOrder = new Map<string, number>();
-        const rank = (label: string): number => {
-            if (!insertionOrder.has(label)) insertionOrder.set(label, insertionOrder.size);
-            return insertionOrder.get(label)!;
-        };
-        return {
-            label: (v) => { const s = String(v ?? ''); rank(s); return s; },
-            order: (label) => rank(label),
-        };
-    }
-
-    const nums = sampleValues.map(Number).filter(Number.isFinite);
-    if (nums.length === 0) {
-        return { label: (v) => String(v ?? ''), order: () => 0 };
-    }
-
-    const minValue = Math.min(...nums);
-    const maxValue = Math.max(...nums);
-    const span = maxValue - minValue;
-    const binWidth = span === 0 ? 1 : span / numBins;
-
-    // Integer-rounded boundaries for cleaner SI formatting (mirrors binning-1d)
-    const roundedMin = Math.round(minValue);
-    const roundedMax = Math.max(roundedMin + 1, Math.round(maxValue));
-    const roundedBinWidth = (roundedMax - roundedMin) / numBins;
-    const fmt = d3.format('.2s');
-
-    // Pre-build label → bin-index map so order() is O(1) without re-parsing.
-    const labelToOrder = new Map<string, number>();
-    for (let bin = 0; bin < numBins; bin++) {
-        const label = `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
-        if (!labelToOrder.has(label)) labelToOrder.set(label, bin);
-    }
-    if (span === 0) labelToOrder.set(fmt(roundedMin), 0);
-
-    return {
-        label: (v) => {
-            const n = Number(v);
-            if (!Number.isFinite(n)) return 'unknown';
-            const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
-            const bin = Math.max(0, Math.min(Math.floor(normalized), numBins - 1));
-            return span === 0
-                ? fmt(roundedMin)
-                : `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
-        },
-        order: (label) => labelToOrder.get(label) ?? 0,
     };
 }

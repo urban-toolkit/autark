@@ -36,12 +36,12 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'heatmatrix',
             collection: this.geojson,
+            attributes: { axis: ['shape_area', 'landuse'], color: '@transform' },
+            labels: { axis: ['Shape Area', 'Land Use'], title: 'Neighborhoods by Area and Land Use' },
             transform: {
-                preset: 'heatmatrix',
-                attributes: { x: 'shape_area', y: 'landuse' },
+                preset: 'binning-2d',
                 options: { binsX: 5 }
             },
-            labels: { axis: ['Shape Area', 'Land Use'], title: 'Neighborhoods by Area and Land Use' },
             margins: { left: 100, right: 20, top: 50, bottom: 80 },
             width: 790,
             events: [ChartEvent.CLICK]

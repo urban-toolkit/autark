@@ -2,6 +2,7 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, VectorLayer } from 'autk-map';
+
 import { MapEvent } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
@@ -36,7 +37,10 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
-            labels: { axis: ['ntaname', 'shape_area'], title: 'Barchart example' },
+            labels: { 
+                axis: ['ntaname', 'shape_area'], 
+                title: 'Barchart example' 
+            },
             margins: { left: 60, right: 20, top: 50, bottom: 200 },
             width: 790,
             events: [ChartEvent.CLICK]

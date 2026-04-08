@@ -72,10 +72,11 @@ export class Heatmatrix extends ChartBase {
             autkIds: [idx],
         })) as AutkDatum[];
 
-        const transformed = run(allRows, this._transformConfig!) as ExecutedBinning2dTransform;
+        const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
+        const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning2dTransform;
         this.data = transformed.rows as any;
-        this._axisAttributes = transformed.attributes as unknown as string[];
-        this._colorAttribute = this._axisAttributes[2];
+        this._axisAttributes = ['x', 'y'];
+        this._colorAttribute = 'value';
     }
 
     /**

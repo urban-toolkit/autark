@@ -293,7 +293,7 @@ export class Urbane {
         this.parallel = new AutkChart(this.plotDivParallel, {
             type: 'parallel-coordinates',
             collection: plotData,
-            attributes,
+            attributes: { axis: attributes },
             labels: { axis: axisLabels, title },
             width: 790,
             events: [ChartEvent.BRUSH_Y],
@@ -302,7 +302,7 @@ export class Urbane {
         this.table = new AutkChart(this.plotDivTable, {
             type: 'table',
             collection: plotData,
-            attributes: [titleCol, ...attributes],
+            attributes: { axis: [titleCol, ...attributes] },
             labels: { axis: ['Id', ...axisLabels], title },
             width: 790,
             events: [ChartEvent.CLICK],

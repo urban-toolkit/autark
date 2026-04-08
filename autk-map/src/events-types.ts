@@ -16,12 +16,12 @@ export enum MouseStatus {
   DRAG = 'mouseDrag',
 }
 
+import type { SelectionData } from 'autk-core';
+
 /**
  * Payload emitted for feature-picking map events.
  */
-export interface MapEventData {
-    /** Currently selected feature identifiers for the emitted layer. */
-    selection: number[];
+export interface MapEventData extends SelectionData {
     /** Identifier of the layer that emitted the event. */
     layerId: string;
 }

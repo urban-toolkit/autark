@@ -24,7 +24,6 @@ import { reduceBuckets } from '../kernel';
  */
 export type ExecutedTemporalTransform = {
     preset: 'temporal';
-    attributes: ['bucket', 'value'];
     rows: TemporalBucketRow[];
 };
 
@@ -37,30 +36,32 @@ export type ExecutedTemporalTransform = {
  * @param config Temporal transform configuration
  * @returns Executed temporal transform result
  */
-export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig): ExecutedTemporalTransform {
+export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, columns: string[]): ExecutedTemporalTransform {
+    const eventsAttr = columns[0] ?? '';
+    const timestampAttr = config.options?.timestamp ?? 'timestamp';
+    const valueAttr = config.options?.value ?? 'value';
     const resolution = config.options?.resolution ?? 'month';
     const reducer = config.options?.reducer ?? 'count';
     return {
         preset: 'temporal',
-        attributes: ['bucket', 'value'],
         rows: presetTemporal({
             rows,
             resolution,
             reducer,
             eventsOf: (row) => {
-                const value = valueAtPath(row, config.attributes.events);
+                const value = valueAtPath(row, eventsAttr);
                 return Array.isArray(value) ? value : [];
             },
             timestampOf: (event) => {
                 if (!event || typeof event !== 'object') return undefined;
-                const value = valueAtPath(event as Record<string, unknown>, config.attributes.timestamp);
+                const value = valueAtPath(event as Record<string, unknown>, timestampAttr);
                 return value instanceof Date || typeof value === 'string' || typeof value === 'number' ? value : undefined;
             },
             valueOf: reducer === 'count'
                 ? undefined
                 : (event) => {
                     if (!event || typeof event !== 'object') return null;
-                    const value = valueAtPath(event as Record<string, unknown>, config.attributes.value);
+                    const value = valueAtPath(event as Record<string, unknown>, valueAttr);
                     const numericValue = Number(value);
                     return Number.isFinite(numericValue) ? numericValue : null;
                 },

@@ -1,10 +1,10 @@
+import type { SelectionData } from './core-types';
+
 /**
  * Interaction events emitted by chart instances.
  *
  * Each event carries a payload with `selection`, where values are source
  * feature ids represented by currently selected marks.
- *
- * Event payload typing is defined in `ChartEventRecord`.
  */
 export enum ChartEvent {
     /**
@@ -24,3 +24,9 @@ export enum ChartEvent {
      */
     BRUSH_X = 'brushX'
 }
+
+/** Payload emitted by all chart interaction events. */
+export type ChartEventData = SelectionData;
+
+/** Event map consumed by the typed chart event emitter. */
+export type ChartEventRecord = Record<ChartEvent, ChartEventData>;

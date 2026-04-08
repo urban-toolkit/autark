@@ -95,9 +95,10 @@ export class Barchart extends ChartBase {
             autkIds: [idx],
         }));
 
-        const transformed = run(allRows, this._transformConfig) as ExecutedBinning1dTransform;
+        const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
+        const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning1dTransform;
         this.data = transformed.rows as any;
-        this._axisAttributes = transformed.attributes;
+        this._axisAttributes = ['label', 'value'];
     }
 
     /**
