@@ -321,6 +321,8 @@ export class Renderer {
         // Configure the frame buffer
         this._frameBuffer.loadOp = 'clear';
         this._frameBuffer.resolveTarget = this._context.getCurrentTexture().createView();
+        const sky = MapStyle.getColor('background');
+        this._frameBuffer.clearValue = { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 };
 
         const renderPassDesc: GPURenderPassDescriptor = {
             colorAttachments: [this._frameBuffer],
