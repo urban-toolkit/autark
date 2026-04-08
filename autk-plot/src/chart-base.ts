@@ -1,11 +1,30 @@
 import * as d3 from 'd3';
-import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
 
-import type { AutkDatum, ChartConfig, ChartMargins, ChartTransformConfig } from './api';
-import { ColorMapInterpolator, ColorMapDomainStrategy, ColorMap, EventEmitter, valueAtPath } from './core-types';
+import type {
+    Feature,
+    GeoJsonProperties,
+    Geometry,
+} from 'geojson';
+
+import type {
+    AutkDatum,
+    ChartConfig,
+    ChartMargins,
+    ChartTransformConfig,
+} from './api';
+
+import {
+    ColorMapInterpolator,
+    ColorMapDomainStrategy,
+    ColorMap,
+    EventEmitter,
+    valueAtPath,
+} from './core-types';
 import type { ColorMapDomainSpec, ResolvedDomain } from './core-types';
+
 import { ChartEvent } from './events-types';
 import type { ChartEventRecord } from './events-types';
+
 import { ChartStyle } from './chart-style';
 
 /**

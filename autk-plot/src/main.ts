@@ -1,9 +1,19 @@
 import type { ChartType, UnifiedChartConfig } from './api';
-import type { ChartEventRecord } from './events-types';
+
 import type { EventEmitter } from './core-types';
 
+import type { ChartEventRecord } from './events-types';
+
 import { ChartBase } from './chart-base';
-import { Barchart, Heatmatrix, Linechart, ParallelCoordinates, Scatterplot, TableVis } from './charts';
+
+import {
+    Barchart,
+    Heatmatrix,
+    Linechart,
+    ParallelCoordinates,
+    Scatterplot,
+    TableVis,
+} from './charts';
 
 /**
  * Unified public entrypoint for autk-plot chart creation and interaction.

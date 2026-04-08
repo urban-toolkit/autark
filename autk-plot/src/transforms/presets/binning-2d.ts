@@ -13,7 +13,6 @@
 import { valueAtPath } from '../../core-types';
 
 import type { AutkDatum, Binning2dTransformConfig } from '../../api';
-import type { TransformRow } from '../kernel';
 
 import { reduceBuckets } from '../kernel';
 import { buildBinMapper } from './binning-1d';
@@ -57,10 +56,6 @@ export type Binning2dCellRow = {
  * Detects whether each axis attribute is categorical or quantitative, builds a
  * bin-label mapper for each axis, then groups rows by the resulting (x, y) label
  * pair and reduces the value column using the specified reducer.
- *
- * @param rows Input data rows (AutkDatum[])
- * @param config Heat matrix transform configuration
- * @returns Executed heat matrix transform result
  */
 export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig, columns: string[]): ExecutedBinning2dTransform {
     const xAttr = columns[0] ?? '';
@@ -77,7 +72,7 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
     const SEP = '\0';
 
     const reduced = reduceBuckets({
-        rows: rows as TransformRow[],
+        rows,
         bucketOf: (row) => {
             const xLabel = xMapper.label(valueAtPath(row, xAttr));
             const yLabel = yMapper.label(valueAtPath(row, yAttr));

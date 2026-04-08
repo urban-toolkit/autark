@@ -1,181 +1,81 @@
-/**
- * Supported temporal resolutions used by the temporal transform preset.
- *
- * Controls the granularity at which event timestamps are bucketed.
- */
-export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'month' | 'year';
+import type { TransformReducer } from '../api';
 
-/**
- * Supported reducer names used when aggregating values within a bucket.
- */
-export type TransformReducerName = 'count' | 'sum' | 'avg' | 'min' | 'max';
-
-/**
- * Minimum row shape expected by transform kernel functions.
- *
- * All transform presets operate on rows that optionally carry `autkIds` for
- * source feature provenance.
- */
-export type TransformRow = {
-    autkIds?: number[];
-    [key: string]: unknown;
-};
+/** Minimum row shape expected by `reduceBuckets`. Covers both `AutkDatum` rows and synthetic intermediate rows created by temporal and timeseries presets. */
+type Row = { autkIds?: number[]; [key: string]: unknown };
 
 /**
  * Output of a single aggregated bucket after reduction.
- *
- * `autkIds` contains all source feature ids that contributed to this bucket.
  */
 export type ReducedBucket = {
+    /** The bucket identifier (e.g. `"2024-03"`, `"1k-2k"`). */
     key: string;
+    /** The reduced numeric result (count, sum, avg, min, or max). */
     value: number;
+    /** How many rows fell into this bucket. */
     count: number;
+    /** Merged source feature ids from all rows in this bucket, used for selection linking. */
     autkIds: number[];
 };
 
 /**
- * Options accepted by `reduceBuckets`.
+ * Groups rows into keyed buckets and reduces each bucket to a single value.
  *
- * @template T Row type extending `TransformRow`.
+ * @param rows - Input data to aggregate.
+ * @param bucketOf - Assigns a group key to each row. Return `null` to skip the row.
+ * @param valueOf - Extracts the numeric value to reduce per row. Omit for count mode (defaults to `1`).
+ * @param reducer - How to collapse all values in a bucket: `count`, `sum`, `avg`, `min`, or `max`.
  */
-export type ReduceBucketsOptions<T extends TransformRow> = {
-    /** Input rows to aggregate. */
-    rows: T[];
-    /** Returns the bucket key for a row, or `null` to skip the row. */
-    bucketOf: (row: T) => string | null;
-    /** Returns the numeric value used by the reducer. Defaults to `1` when omitted (count). */
-    valueOf?: (row: T) => number | null;
-    /** Reducer to apply within each bucket. */
-    reducer: TransformReducerName;
-    /**
-     * When `true` (default), a row without `autkIds` falls back to its array index
-     * as the source id. Set to `false` to omit source tracking for synthetic rows.
-     */
-    fallbackAutkIdFromRowIndex?: boolean;
-};
-
-/**
- * Mutable accumulator updated per-row during bucket reduction.
- */
-type ReducerState = {
-    count: number;
-    sum: number;
-    min: number;
-    max: number;
-};
-
-/**
- * Creates a new reducer state object with initial values.
- *
- * @returns ReducerState with zeroed count/sum and infinite min/max
- */
-const createReducerState = (): ReducerState => ({
-    count: 0,
-    sum: 0,
-    min: Number.POSITIVE_INFINITY,
-    max: Number.NEGATIVE_INFINITY,
-});
-
-/**
- * Normalizes autkIds from a candidate value, falling back to the row index if needed.
- *
- * @param candidate Value to check for autkIds (should be an array)
- * @param fallbackIndex Row index to use if candidate is missing/invalid
- * @returns Array of source ids
- */
-const normalizeAutkIds = (candidate: unknown, fallbackIndex: number | null): number[] => {
-    const ids = Array.isArray(candidate)
-        ? candidate.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
-        : [];
-
-    if (ids.length > 0) {
-        return ids;
-    }
-
-    return fallbackIndex === null ? [] : [fallbackIndex];
-};
-
-/**
- * Merges two arrays of source feature ids, preserving uniqueness.
- *
- * Used to track provenance of features through aggregation steps.
- *
- * @param base Existing source ids
- * @param incoming New source ids to merge
- * @returns Unique array of source ids
- */
-export function mergeAutkIds(base: number[], incoming: number[]): number[] {
-    if (incoming.length === 0) return base;
-    if (base.length === 0) return Array.from(new Set(incoming));
-    return Array.from(new Set([...base, ...incoming]));
-}
-
-/**
- * Applies one of the built-in reducers to a reducer state.
- *
- * Supported reducers: 'count', 'sum', 'avg', 'min', 'max'.
- *
- * @param state Current reducer state
- * @param reducer Reducer name
- * @returns Final reduced value
- */
-export function finalizeReducerValue(state: ReducerState, reducer: TransformReducerName): number {
-    if (reducer === 'count') return state.count;
-    if (reducer === 'sum') return state.sum;
-    if (reducer === 'avg') return state.count > 0 ? state.sum / state.count : 0;
-    if (reducer === 'min') return state.count > 0 ? state.min : 0;
-    return state.count > 0 ? state.max : 0;
-}
-
-/**
- * Reduces rows into keyed buckets while preserving source feature provenance.
- *
- * Groups rows by a bucket key, applies the specified reducer, and merges autkIds for provenance.
- *
- * @param options Reduction options (bucketOf, valueOf, reducer, etc)
- * @returns Array of reduced buckets
- */
-export function reduceBuckets<T extends TransformRow>(options: ReduceBucketsOptions<T>): ReducedBucket[] {
-    const {
-        rows,
-        bucketOf,
-        valueOf,
-        reducer,
-        fallbackAutkIdFromRowIndex = true,
-    } = options;
-
-    const buckets = new Map<string, { state: ReducerState; autkIds: number[] }>();
+export function reduceBuckets(options: {
+    rows: Row[];
+    bucketOf: (row: Row) => string | null;
+    valueOf?: (row: Row) => number | null;
+    reducer: TransformReducer;
+}): ReducedBucket[] {
+    const { rows, bucketOf, valueOf, reducer } = options;
+    const buckets = new Map<string, { count: number; sum: number; min: number; max: number; autkIds: number[] }>();
 
     rows.forEach((row, rowIndex) => {
         const key = bucketOf(row);
         if (!key) return;
 
-        const fallbackIndex = fallbackAutkIdFromRowIndex ? rowIndex : null;
-        const rowAutkIds = normalizeAutkIds(row.autkIds, fallbackIndex);
+        const ids = Array.isArray(row.autkIds)
+            ? (row.autkIds as number[]).filter(n => typeof n === 'number' && Number.isFinite(n))
+            : [];
+        const rowAutkIds = ids.length > 0 ? ids : [rowIndex];
 
         if (!buckets.has(key)) {
-            buckets.set(key, { state: createReducerState(), autkIds: [] });
+            buckets.set(key, { 
+                count: 0, 
+                sum: 0, 
+                min: Number.POSITIVE_INFINITY, 
+                max: Number.NEGATIVE_INFINITY, 
+                autkIds: [] 
+            });
         }
 
-        const bucket = buckets.get(key);
-        if (!bucket) return;
-
+        const bucket = buckets.get(key)!;
         const numericValue = valueOf ? valueOf(row) : 1;
         if (numericValue === null || !Number.isFinite(numericValue)) return;
 
-        bucket.state.count += 1;
-        bucket.state.sum += numericValue;
-        bucket.state.min = Math.min(bucket.state.min, numericValue);
-        bucket.state.max = Math.max(bucket.state.max, numericValue);
-        bucket.autkIds = mergeAutkIds(bucket.autkIds, rowAutkIds);
+        bucket.count += 1;
+        bucket.sum += numericValue;
+        bucket.min = Math.min(bucket.min, numericValue);
+        bucket.max = Math.max(bucket.max, numericValue);
+
+        const merged = [...bucket.autkIds, ...rowAutkIds];
+        bucket.autkIds = merged.length > 0 ? Array.from(new Set(merged)) : bucket.autkIds;
     });
 
     return Array.from(buckets.entries())
-        .map(([key, bucket]) => ({
-            key,
-            value: finalizeReducerValue(bucket.state, reducer),
-            count: bucket.state.count,
-            autkIds: bucket.autkIds,
-        }))
+        .map(([key, b]) => {
+            let value: number;
+            if (reducer === 'count') value = b.count;
+            else if (reducer === 'sum') value = b.sum;
+            else if (reducer === 'avg') value = b.count > 0 ? b.sum / b.count : 0;
+            else if (reducer === 'min') value = b.count > 0 ? b.min : 0;
+            else value = b.count > 0 ? b.max : 0;
+
+            return { key, value, count: b.count, autkIds: b.autkIds };
+        })
         .filter(item => item.count > 0);
 }

@@ -12,9 +12,6 @@ export { ColorMapInterpolator } from './core-types';
 /** Colormap utility: conversions and data-to-color sampling helpers. */
 export { ColorMap } from './core-types';
 
-/** Typed event emitter used by plot event APIs. */
-export { EventEmitter } from './core-types';
-
 export type {
 	/** Hex color string (for example `#5dade2`). */
 	ColorHEX,
@@ -24,8 +21,8 @@ export type {
 	ColorTEX,
 	/** Colormap configuration payload. */
 	ColorMapConfig,
-	/** Listener function type used by the event emitter. */
-	EventListener,
+	/** Domain specification for colormap scaling. */
+	ColorMapDomainSpec,
 } from './core-types';
 
 // ─── API and config types ───────────────────────────────────────────────────
@@ -39,6 +36,7 @@ export type {
 	TemporalTransformConfig,
 	TimeseriesTransformConfig,
 	ChartTransformConfig,
+	SortTransformConfig,
 	AutkDatum,
 	ChartConfig,
 	ChartType,
@@ -46,6 +44,16 @@ export type {
 } from './api';
 
 // ─── Events ─────────────────────────────────────────────────────────────────
+
+/** Typed event emitter used by plot event APIs. */
+export { EventEmitter } from './core-types';
+
+export type { 
+	/** Listener function type used by the event emitter. */
+	EventListener,
+	/** Data structure for representing selected elements in the plot. */
+    SelectionData
+} from './core-types';
 
 /** Supported chart interaction events emitted by plot instances. */
 export { ChartEvent } from './events-types';

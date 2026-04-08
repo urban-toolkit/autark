@@ -1,6 +1,12 @@
-import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import type {
+    Geometry,
+    FeatureCollection,
+    GeoJsonProperties,
+} from 'geojson';
+
 import type { ColorMapDomainSpec } from './core-types';
 import { ColorMapInterpolator } from './core-types';
+
 import type { ChartEvent } from './events-types';
 
 
@@ -16,7 +22,16 @@ export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 't
 /**
  * Margin values in pixels around the plot drawing area.
  */
-export type ChartMargins = { left: number; right: number; top: number; bottom: number };
+export type ChartMargins = {
+    /** Left margin in pixels. */
+    left: number;
+    /** Right margin in pixels. */
+    right: number;
+    /** Top margin in pixels. */
+    top: number;
+    /** Bottom margin in pixels. */
+    bottom: number;
+};
 
 /**
  * Datum contract bound to interactive marks.
@@ -25,32 +40,59 @@ export type ChartMargins = { left: number; right: number; top: number; bottom: n
  * input collection (never DOM position indices).
  */
 export type AutkDatum = GeoJsonProperties & {
+    /** Source feature indices from the original GeoJSON input collection. */
     autkIds?: number[];
 };
 
 /**
- * Base configuration accepted by D3-based plot implementations.
+ * Base configuration accepted by all chart implementations.
  */
 export type ChartConfig = {
-    div: HTMLElement,
-    collection: FeatureCollection<Geometry, GeoJsonProperties>,
-    events?: ChartEvent[],
-    margins?: ChartMargins,
-    width?: number,
-    height?: number,
-    labels?: { axis?: string[]; title?: string; color?: string },
-    attributes?: { axis?: string[]; color?: string },
-    transform?: ChartTransformConfig,
-    tickFormats?: string[],
+    /** Host HTML element where the chart renders. */
+    div: HTMLElement;
+    /** GeoJSON feature collection used as the chart data source. */
+    collection: FeatureCollection<Geometry, GeoJsonProperties>;
+    /** Interaction events the chart should emit (click, brush, etc). */
+    events?: ChartEvent[];
+    /** Pixel margins around the plot drawing area. */
+    margins?: ChartMargins;
+    /** Chart width in pixels. Defaults to the container width. */
+    width?: number;
+    /** Chart height in pixels. Defaults to the container height. */
+    height?: number;
+    /** Display labels for axes, title, and color legend. */
+    labels?: {
+        /** Chart title. */
+        title?: string;
+        /** Labels for each axis. */
+        axis?: string[];
+        /** Color legend label. */
+        color?: string;
+    };
+    /** Feature property names to map to visual channels. */
+    attributes?: {
+        /** Property names mapped to axes. */
+        axis?: string[];
+        /** Property name mapped to the color channel. */
+        color?: string;
+    };
+    /** Optional data transform applied before rendering. */
+    transform?: ChartTransformConfig;
+    /** D3 format strings for each axis tick. */
+    tickFormats?: string[];
+    /** Domain specification controlling how the colormap range is derived. */
     domainSpec?: ColorMapDomainSpec;
+    /** Color interpolator used for the colormap. */
     colorMapInterpolator?: ColorMapInterpolator;
-}
+};
 
 /**
  * Configuration passed to `AutkChart`. Identical to `ChartConfig` minus `div`,
- * which is supplied as a separate constructor argument.
+ * which is supplied as a separate constructor argument, plus a `type` discriminant
+ * that selects the chart implementation.
  */
 export type UnifiedChartConfig = Omit<ChartConfig, 'div'> & {
+    /** Selects which chart implementation to instantiate. */
     type: ChartType;
 };
 
@@ -73,9 +115,11 @@ export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'mon
 export type Binning1dTransformConfig = {
     preset: 'binning-1d';
     options?: {
+        /** Reducer applied within each bin. Defaults to `'count'`. */
         reducer?: TransformReducer;
+        /** Number of bins for quantitative attributes. Defaults to `10`. */
         bins?: number;
-        /** Aggregate column for non-count reducers. Required when reducer is not 'count'. */
+        /** Feature property to aggregate for non-count reducers. Required when `reducer` is not `'count'`. */
         value?: string;
     };
 };
@@ -89,12 +133,13 @@ export type Binning1dTransformConfig = {
 export type Binning2dTransformConfig = {
     preset: 'binning-2d';
     options?: {
+        /** Reducer applied within each cell. Defaults to `'count'`. */
         reducer?: TransformReducer;
-        /** Number of bins for x when the x attribute is quantitative. Defaults to 10. */
+        /** Number of bins for the x axis when quantitative. Defaults to `10`. */
         binsX?: number;
-        /** Number of bins for y when the y attribute is quantitative. Defaults to 10. */
+        /** Number of bins for the y axis when quantitative. Defaults to `10`. */
         binsY?: number;
-        /** Aggregate column for non-count reducers. Required when reducer is not 'count'. */
+        /** Feature property to aggregate for non-count reducers. Required when `reducer` is not `'count'`. */
         value?: string;
     };
 };
@@ -109,11 +154,13 @@ export type Binning2dTransformConfig = {
 export type TemporalTransformConfig = {
     preset: 'temporal';
     options?: {
-        /** Timestamp field within each event object. */
+        /** Field within each event object that holds the timestamp. Defaults to `'timestamp'`. */
         timestamp?: string;
-        /** Value field within each event for non-count reducers. */
+        /** Field within each event object used for non-count reducers. Defaults to `'value'`. */
         value?: string;
+        /** Granularity of the time buckets. Defaults to `'month'`. */
         resolution?: TransformResolution;
+        /** Reducer applied within each bucket. Defaults to `'count'`. */
         reducer?: TransformReducer;
     };
 };
@@ -128,10 +175,11 @@ export type TemporalTransformConfig = {
 export type TimeseriesTransformConfig = {
     preset: 'timeseries';
     options?: {
-        /** Timestamp field within each series point. */
+        /** Field within each series point that holds the timestamp. Defaults to `'timestamp'`. */
         timestamp?: string;
-        /** Value field within each series point. */
+        /** Field within each series point that holds the numeric value. Defaults to `'value'`. */
         value?: string;
+        /** Reducer applied within each timestamp bucket. Defaults to `'avg'`. */
         reducer?: TransformReducer;
     };
 };
@@ -148,6 +196,7 @@ export type SortTransformConfig = {
     options?: {
         /** Column to sort by. Defaults to `ChartConfig.attributes.axis[0]`. */
         column?: string;
+        /** Sort direction. Defaults to `'asc'`. */
         direction?: 'asc' | 'desc';
     };
 };
@@ -159,4 +208,3 @@ export type ChartTransformConfig =
     | TemporalTransformConfig
     | TimeseriesTransformConfig
     | SortTransformConfig;
-

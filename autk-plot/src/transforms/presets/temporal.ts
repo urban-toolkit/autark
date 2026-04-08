@@ -9,8 +9,7 @@
 
 import { valueAtPath } from '../../core-types';
 
-import type { AutkDatum, TemporalTransformConfig } from '../../api';
-import type { TransformRow, TransformReducerName, TransformResolution } from '../kernel';
+import type { AutkDatum, TemporalTransformConfig, TransformResolution } from '../../api';
 
 import { reduceBuckets } from '../kernel';
 
@@ -18,78 +17,10 @@ import { reduceBuckets } from '../kernel';
 
 /**
  * Result produced by `runTemporal`.
- *
- * Carries the fixed attribute tuple `['bucket', 'value']` and the bucketed
- * rows ready for line-chart rendering.
  */
 export type ExecutedTemporalTransform = {
     preset: 'temporal';
     rows: TemporalBucketRow[];
-};
-
-/**
- * Runs a temporal transform and returns chart-ready rows.
- *
- * Aggregates nested event collections into temporal buckets using the specified resolution and reducer.
- *
- * @param rows Input data rows (AutkDatum[])
- * @param config Temporal transform configuration
- * @returns Executed temporal transform result
- */
-export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, columns: string[]): ExecutedTemporalTransform {
-    const eventsAttr = columns[0] ?? '';
-    const timestampAttr = config.options?.timestamp ?? 'timestamp';
-    const valueAttr = config.options?.value ?? 'value';
-    const resolution = config.options?.resolution ?? 'month';
-    const reducer = config.options?.reducer ?? 'count';
-    return {
-        preset: 'temporal',
-        rows: presetTemporal({
-            rows,
-            resolution,
-            reducer,
-            eventsOf: (row) => {
-                const value = valueAtPath(row, eventsAttr);
-                return Array.isArray(value) ? value : [];
-            },
-            timestampOf: (event) => {
-                if (!event || typeof event !== 'object') return undefined;
-                const value = valueAtPath(event as Record<string, unknown>, timestampAttr);
-                return value instanceof Date || typeof value === 'string' || typeof value === 'number' ? value : undefined;
-            },
-            valueOf: reducer === 'count'
-                ? undefined
-                : (event) => {
-                    if (!event || typeof event !== 'object') return null;
-                    const value = valueAtPath(event as Record<string, unknown>, valueAttr);
-                    const numericValue = Number(value);
-                    return Number.isFinite(numericValue) ? numericValue : null;
-                },
-        }),
-    };
-}
-
-// ---- Preset algorithm ---------------------------------------------------
-
-/**
- * Options accepted by `presetTemporal`.
- *
- * @template T Row type extending `TransformRow`.
- * @template E Event object type stored in each row.
- */
-export type TemporalPresetOptions<T extends TransformRow, E> = {
-    /** Input feature rows. */
-    rows: T[];
-    /** Returns the array of events for a row, or `null`/`undefined` for none. */
-    eventsOf: (row: T) => E[] | null | undefined;
-    /** Extracts the timestamp from an event object. */
-    timestampOf: (event: E) => Date | string | number | null | undefined;
-    /** Temporal resolution controlling bucket granularity. */
-    resolution: TransformResolution;
-    /** Reducer applied within each bucket. Defaults to `'count'`. */
-    reducer?: TransformReducerName;
-    /** Extracts the numeric value used by the reducer. Required for non-count reducers. */
-    valueOf?: (event: E) => number | null | undefined;
 };
 
 /**
@@ -104,49 +35,75 @@ export type TemporalBucketRow = {
     autkIds: number[];
 };
 
+// ---- Runner -------------------------------------------------------------
+
 /**
- * Aggregates nested event collections into temporal buckets.
- *
- * Flattens all events, assigns them to buckets by timestamp and resolution, then reduces by bucket.
- *
- * @param options Temporal preset options (rows, eventsOf, timestampOf, resolution, reducer, valueOf)
- * @returns Array of reduced temporal buckets
+ * Runs a temporal transform and returns chart-ready rows.
  */
-export function presetTemporal<T extends TransformRow, E>(
-    options: TemporalPresetOptions<T, E>
-): TemporalBucketRow[] {
-    const reducer = options.reducer ?? 'count';
-    const eventRows = toTemporalRows(options);
+export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, columns: string[]): ExecutedTemporalTransform {
+    const eventsAttr = columns[0] ?? '';
+    const timestampAttr = config.options?.timestamp ?? 'timestamp';
+    const valueAttr = config.options?.value ?? 'value';
+    const resolution = config.options?.resolution ?? 'month';
+    const reducer = config.options?.reducer ?? 'count';
+
+    type EventRow = { autkIds: number[]; __bucket: string; __value: number | null };
+    const eventRows: EventRow[] = [];
+
+    rows.forEach((row, rowIndex) => {
+        const ids = Array.isArray(row?.autkIds) ? row.autkIds as number[] : [];
+        const rowAutkIds = ids.length > 0 ? ids : [rowIndex];
+        const events = valueAtPath(row, eventsAttr);
+        if (!Array.isArray(events)) return;
+
+        events.forEach((event: unknown) => {
+            if (!event || typeof event !== 'object') return;
+            const raw = valueAtPath(event as Record<string, unknown>, timestampAttr);
+            if (raw === null || raw === undefined) return;
+            const date = raw instanceof Date ? raw : new Date(raw as string | number);
+            if (!Number.isFinite(date.getTime())) return;
+
+            let value: number | null = null;
+            if (reducer !== 'count') {
+                const v = Number(valueAtPath(event as Record<string, unknown>, valueAttr));
+                value = Number.isFinite(v) ? v : null;
+            }
+
+            eventRows.push({
+                autkIds: rowAutkIds,
+                __bucket: formatTemporalBucket(date, resolution),
+                __value: value,
+            });
+        });
+    });
 
     const reduced = reduceBuckets({
         rows: eventRows,
         bucketOf: (row) => String(row.__bucket ?? ''),
-        valueOf: (row) => {
-            if (reducer === 'count') return 1;
-            const value = row.__value;
-            return typeof value === 'number' && Number.isFinite(value) ? value : null;
+        valueOf: reducer === 'count' ? undefined : (row) => {
+            const v = (row as EventRow).__value;
+            return typeof v === 'number' && Number.isFinite(v) ? v : null;
         },
         reducer,
     });
 
-    return reduced.map(item => ({
-        bucket: item.key,
-        value: item.value,
-        count: item.count,
-        autkIds: item.autkIds,
-    }));
+    return {
+        preset: 'temporal',
+        rows: reduced.map(item => ({
+            bucket: item.key,
+            value: item.value,
+            count: item.count,
+            autkIds: item.autkIds,
+        })),
+    };
 }
+
+// ---- Bucket key formatter -----------------------------------------------
 
 /**
  * Formats a date into a string bucket key according to the specified temporal resolution.
- *
- * Supported resolutions: 'hour', 'day', 'weekday', 'monthday', 'month', 'year'.
- *
- * @param date Date object to format
- * @param resolution Temporal resolution (bucket granularity)
- * @returns Formatted bucket key string
  */
-export function formatTemporalBucket(date: Date, resolution: TransformResolution): string {
+function formatTemporalBucket(date: Date, resolution: TransformResolution): string {
     const pad2 = (value: number): string => String(value).padStart(2, '0');
 
     if (resolution === 'hour') {
@@ -166,42 +123,3 @@ export function formatTemporalBucket(date: Date, resolution: TransformResolution
     }
     return String(date.getUTCFullYear());
 }
-
-/**
- * Flattens all events from all rows into an array of event rows with bucket and value fields.
- *
- * Used internally by presetTemporal to prepare data for reduction.
- *
- * @param options Temporal preset options (rows, eventsOf, timestampOf, resolution, valueOf)
- * @returns Array of event rows with __bucket and __value fields
- */
-const toTemporalRows = <T extends TransformRow, E>(
-    options: TemporalPresetOptions<T, E>
-): TransformRow[] => {
-    const { rows, eventsOf, timestampOf, resolution, valueOf } = options;
-    const eventRows: TransformRow[] = [];
-
-    rows.forEach((row, rowIndex) => {
-        const rowAutkIds = Array.isArray(row.autkIds) && row.autkIds.length > 0
-            ? row.autkIds
-            : [rowIndex];
-        const events = eventsOf(row) ?? [];
-
-        events.forEach((event) => {
-            const timestamp = timestampOf(event);
-            if (timestamp === null || timestamp === undefined) return;
-
-            const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
-            if (!date) return;
-            if (!Number.isFinite(date.getTime())) return;
-
-            eventRows.push({
-                autkIds: rowAutkIds,
-                __bucket: formatTemporalBucket(date, resolution),
-                __value: valueOf ? (valueOf(event) ?? null) : 1,
-            });
-        });
-    });
-
-    return eventRows;
-};

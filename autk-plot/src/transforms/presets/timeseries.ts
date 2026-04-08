@@ -9,7 +9,6 @@
 import { valueAtPath } from '../../core-types';
 
 import type { AutkDatum, TimeseriesTransformConfig } from '../../api';
-import type { TransformRow, TransformReducerName } from '../kernel';
 
 import { reduceBuckets } from '../kernel';
 
@@ -17,51 +16,11 @@ import { reduceBuckets } from '../kernel';
 
 /**
  * Result produced by `runTimeseries`.
- *
- * Carries the fixed attribute tuple `['bucket', 'value']` and the bucketed
- * rows ready for line-chart rendering.
  */
 export type ExecutedTimeseriesTransform = {
     preset: 'timeseries';
     rows: TimeseriesBucketRow[];
 };
-
-/**
- * Runs a timeseries transform and returns chart-ready rows.
- *
- * Aggregates feature-level timeseries into buckets by timestamp, applying the specified reducer.
- *
- * @param rows Input data rows (AutkDatum[])
- * @param config Timeseries transform configuration
- * @returns Executed timeseries transform result
- */
-export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConfig, columns: string[]): ExecutedTimeseriesTransform {
-    const seriesAttr = columns[0] ?? '';
-    return {
-        preset: 'timeseries',
-        rows: presetTimeseries({
-            rows,
-            reducer: config.options?.reducer ?? 'avg',
-            pointsOf: (row) => getTimeseriesPoints(row, seriesAttr, config),
-        }),
-    };
-}
-
-// ---- Preset algorithm ---------------------------------------------------
-
-/**
- * Options accepted by `presetTimeseries`.
- *
- * @template T Row type extending `TransformRow`.
- */
-export type TimeseriesPresetOptions<T extends TransformRow> = {
-    /** Input feature rows. */
-    rows: T[];
-    /** Extracts the timeseries point array from a row. */
-    pointsOf: (row: T) => TimeseriesPoint[] | null | undefined;
-    /** Reducer applied within each timestamp bucket. Defaults to `'avg'`. */
-    reducer?: TransformReducerName;
-}
 
 /**
  * A single timeseries bucket row ready for chart rendering.
@@ -75,32 +34,42 @@ export type TimeseriesBucketRow = {
     autkIds: number[];
 };
 
+// ---- Runner -------------------------------------------------------------
+
 /**
- * Aggregates feature timeseries by timestamp across all rows.
- *
- * Flattens all timeseries points, then reduces by timestamp bucket.
- *
- * @param options Timeseries preset options (rows, pointsOf, reducer)
- * @returns Array of reduced timeseries buckets
+ * Runs a timeseries transform and returns chart-ready rows.
  */
-export function presetTimeseries<T extends TransformRow>(
-    options: TimeseriesPresetOptions<T>
-): TimeseriesBucketRow[] {
-    const reducer = options.reducer ?? 'avg';
-    const pointRows: TransformRow[] = [];
+export function runTimeseries(rows: AutkDatum[], config: TimeseriesTransformConfig, columns: string[]): ExecutedTimeseriesTransform {
+    const seriesAttr = columns[0] ?? '';
+    const timestampAttr = config.options?.timestamp ?? 'timestamp';
+    const valueAttr = config.options?.value ?? 'value';
+    const reducer = config.options?.reducer ?? 'avg';
 
-    options.rows.forEach((row, rowIndex) => {
-        const rowAutkIds = Array.isArray(row.autkIds) && row.autkIds.length > 0
-            ? row.autkIds
-            : [rowIndex];
-        const points = options.pointsOf(row) ?? [];
+    type PointRow = { autkIds: number[]; __bucket: string; __value: number | null };
+    const pointRows: PointRow[] = [];
 
-        points.forEach((point) => {
-            pointRows.push({
-                autkIds: rowAutkIds,
-                __bucket: String(point.timestamp),
-                __value: point.value,
-            });
+    rows.forEach((row, rowIndex) => {
+        const ids = Array.isArray(row?.autkIds) ? row.autkIds as number[] : [];
+        const rowAutkIds = ids.length > 0 ? ids : [rowIndex];
+        const series = valueAtPath(row, seriesAttr);
+        if (!Array.isArray(series)) return;
+
+        series.forEach((point: unknown, index: number) => {
+            if (typeof point === 'number' && Number.isFinite(point)) {
+                pointRows.push({ autkIds: rowAutkIds, __bucket: String(index), __value: point });
+                return;
+            }
+            if (!point || typeof point !== 'object') return;
+
+            const raw = valueAtPath(point as Record<string, unknown>, timestampAttr) ?? index;
+            const bucket = raw instanceof Date || typeof raw === 'string' || typeof raw === 'number'
+                ? String(raw)
+                : String(index);
+
+            const v = Number(valueAtPath(point as Record<string, unknown>, valueAttr));
+            if (!Number.isFinite(v)) return;
+
+            pointRows.push({ autkIds: rowAutkIds, __bucket: bucket, __value: v });
         });
     });
 
@@ -108,71 +77,19 @@ export function presetTimeseries<T extends TransformRow>(
         rows: pointRows,
         bucketOf: (row) => String(row.__bucket ?? ''),
         valueOf: (row) => {
-            const value = row.__value;
-            return typeof value === 'number' && Number.isFinite(value) ? value : null;
+            const v = (row as PointRow).__value;
+            return typeof v === 'number' && Number.isFinite(v) ? v : null;
         },
         reducer,
     });
 
-    return reduced.map(item => ({
-        bucket: item.key,
-        value: item.value,
-        count: item.count,
-        autkIds: item.autkIds,
-    }));
-}
-
-/**
- * A single point in a feature timeseries before aggregation.
- */
-export type TimeseriesPoint = {
-    timestamp: Date | string | number;
-    value: number | null | undefined;
-};
-
-/**
- * Extracts timeseries points from a row according to the timeseries transform config.
- *
- * Handles both array-of-numbers and array-of-objects formats, extracting timestamp and value fields.
- *
- * @param row Input row (feature)
- * @param config Timeseries transform configuration
- * @returns Array of timeseries points with timestamp and value
- */
-function getTimeseriesPoints(
-    row: TransformRow,
-    seriesAttr: string,
-    config: TimeseriesTransformConfig
-): TimeseriesPoint[] {
-    const sourceSeries = valueAtPath(row, seriesAttr);
-    if (!Array.isArray(sourceSeries)) {
-        return [];
-    }
-
-    const timestampAttr = config.options?.timestamp ?? 'timestamp';
-    const valueAttr = config.options?.value ?? 'value';
-    const points: TimeseriesPoint[] = [];
-
-    sourceSeries.forEach((point, index) => {
-        if (typeof point === 'number' && Number.isFinite(point)) {
-            points.push({ timestamp: index, value: point });
-            return;
-        }
-
-        if (!point || typeof point !== 'object') return;
-
-        const timestamp = valueAtPath(point as Record<string, unknown>, timestampAttr) ?? index;
-        const rawValue = valueAtPath(point as Record<string, unknown>, valueAttr);
-        const numericValue = Number(rawValue);
-        if (!Number.isFinite(numericValue)) return;
-
-        points.push({
-            timestamp: timestamp instanceof Date || typeof timestamp === 'string' || typeof timestamp === 'number'
-                ? timestamp
-                : index,
-            value: numericValue,
-        });
-    });
-
-    return points;
+    return {
+        preset: 'timeseries',
+        rows: reduced.map(item => ({
+            bucket: item.key,
+            value: item.value,
+            count: item.count,
+            autkIds: item.autkIds,
+        })),
+    };
 }

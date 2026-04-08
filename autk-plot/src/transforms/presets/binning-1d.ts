@@ -9,7 +9,6 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../../core-types';
 import type { AutkDatum, Binning1dTransformConfig } from '../../api';
-import type { TransformRow } from '../kernel';
 import { reduceBuckets } from '../kernel';
 
 // ---- Executed transform -------------------------------------------------
@@ -46,10 +45,6 @@ export type Binning1dBinRow = {
  *
  * Detects whether the value attribute is categorical or quantitative, builds a
  * bin-label mapper, then groups rows by bin label and reduces using the specified reducer.
- *
- * @param rows Input data rows (AutkDatum[])
- * @param config Binning-1d transform configuration
- * @returns Executed binning-1d transform result
  */
 export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig, columns: string[]): ExecutedBinning1dTransform {
     const valueAttr = columns[0] ?? '';
@@ -59,7 +54,7 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
     const mapper = buildBinMapper(rows, valueAttr, numBins);
 
     const reduced = reduceBuckets({
-        rows: rows as TransformRow[],
+        rows,
         bucketOf: (row) => mapper.label(valueAtPath(row, valueAttr)),
         valueOf: reducer === 'count' ? undefined : (row) => {
             const col = config.options?.value ?? valueAttr;
@@ -85,14 +80,7 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
 
 // ---- Bin mapper ---------------------------------------------------------
 
-/**
- * Maps raw attribute values to bin labels and sort keys.
- *
- * `label` formats a raw value to its display string.
- * `order` returns the numeric sort key for a given label (bin index for
- * quantitative axes, insertion rank for categorical axes).
- */
-export type BinMapper = {
+type BinMapper = {
     label: (value: unknown) => string;
     order: (label: string) => number;
 };
@@ -100,15 +88,9 @@ export type BinMapper = {
 /**
  * Builds label and order mappers for a single axis attribute.
  *
- * Detects whether the attribute is categorical (any non-finite or string value
- * present in the sample) or quantitative. Categorical attributes map to their
- * string representation; quantitative attributes are divided into `numBins`
- * fixed-width ranges with SI-formatted boundaries.
- *
- * @param rows Full row set used to detect type and compute bin boundaries.
- * @param attr Dot-path attribute name.
- * @param numBins Number of bins when the attribute is quantitative.
- * @returns BinMapper with `label` and `order` functions.
+ * Detects whether the attribute is categorical or quantitative. Categorical
+ * attributes map to their string representation; quantitative attributes are
+ * divided into `numBins` fixed-width ranges with SI-formatted boundaries.
  */
 export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number): BinMapper {
     const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
