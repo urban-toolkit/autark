@@ -30,6 +30,7 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../core-types';
 
+import type { SortTransformConfig } from '../api';
 import type { AutkDatum, ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
@@ -37,8 +38,6 @@ import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../events-types';
 
 import { run } from '../transforms';
-
-import type { SortTransformConfig } from '../api';
 import type { ExecutedSortTransform } from '../transforms/presets/sort';
 /**
  * Table-based visualization with sorting and row selection interactions.
@@ -56,6 +55,10 @@ export class TableVis extends ChartBase {
 
         if (config.transform && config.transform.preset !== 'sort') {
             throw new Error('TableVis only supports the sort transform preset.');
+        }
+
+        if (!config.transform) {
+            config.transform = { preset: 'sort', options: { column: config.attributes?.axis?.[0] ?? '', direction: 'asc' } };
         }
 
         super(config);
