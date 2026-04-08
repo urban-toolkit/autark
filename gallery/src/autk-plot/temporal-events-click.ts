@@ -1,89 +1,125 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
+import { AutkSpatialDb, LayerType } from 'autk-db';
+import { AutkMap, MapEvent, MapStyle, VectorLayer } from 'autk-map';
 import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3TemporalEvents {
     protected map!: AutkMap;
+    protected db!: AutkSpatialDb;
     protected plot!: AutkChart;
+
+    protected canvas!: HTMLCanvasElement;
     protected plotDiv!: HTMLElement;
 
-    protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
+    protected roads!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
+        this.canvas = canvas;
         this.plotDiv = plotDiv;
 
-        this.attachSyntheticEvents();
-        await this.loadAutkMap(canvas);
-        this.initPlot();
-        this.updateMapListeners();
+        await this.loadData();
+        await this.loadMap();
+        await this.loadPlot();
     }
 
-    protected attachSyntheticEvents(): void {
-        const months = [
-            '2025-01-12T12:00:00Z',
-            '2025-02-14T12:00:00Z',
-            '2025-03-18T12:00:00Z',
-            '2025-04-09T12:00:00Z',
-        ];
+    protected async loadData(): Promise<void> {
+        this.db = new AutkSpatialDb();
+        await this.db.init();
 
-        this.geojson.features.forEach((feature, index) => {
-            const props = (feature.properties ?? {}) as Record<string, unknown>;
-            const base = (index % months.length);
-            props.events = [
-                { timestamp: months[base], weight: 1 + (index % 3) },
-                { timestamp: months[(base + 1) % months.length], weight: 2 + (index % 2) },
-                { timestamp: months[(base + 2) % months.length], weight: 1 },
-            ];
-            feature.properties = props as GeoJsonProperties;
+        await this.db.loadCustomLayer({
+            geojsonFileUrl: `${URL}data/mnt_roads.geojson`,
+            outputTableName: 'roads',
+            coordinateFormat: 'EPSG:3395'
+        });
+
+        await this.db.loadCsv({
+            csvFileUrl: `${URL}data/noise_manhattan_clean.csv`,
+            outputTableName: 'noise',
+            geometryColumns: {
+                latColumnName: 'latitude',
+                longColumnName: 'longitude',
+                coordinateFormat: 'EPSG:3395',
+            },
+        });
+
+        await this.db.spatialQuery({
+            tableRootName: 'roads',
+            tableJoinName: 'noise',
+            spatialPredicate: 'NEAR',
+            nearDistance: 200,
+            output: {
+                type: 'MODIFY_ROOT',
+            },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [
+                    {
+                        tableName: 'noise',
+                        column: 'key',
+                        aggregateFn: 'count',
+                    },
+                    {
+                        tableName: 'noise',
+                        column: 'date',
+                        aggregateFn: 'collect',
+                    }
+                ],
+            },
+        });
+
+        this.roads = await this.db.getLayer('roads');
+    }
+
+    protected async loadMap(): Promise<void> {
+        this.map = new AutkMap(this.canvas);
+
+        await this.map.init();
+        await this.loadLayers();
+
+        MapStyle.setPredefinedStyle('light');
+        this.map.draw();
+
+        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
+            this.plot.setSelection(selection);
         });
     }
 
-    protected async loadAutkMap(canvas: HTMLCanvasElement): Promise<void> {
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-
-        this.map.loadCollection({ id: 'neighborhoods', collection: this.geojson });
-        this.map.updateRenderInfo('neighborhoods', { isPick: true });
-        this.map.draw();
-    }
-
-    protected initPlot(): void {
+    protected loadPlot() {
         this.plot = new AutkChart(this.plotDiv, {
-            type: 'barchart',
-            collection: this.geojson,
-            attributes: { axis: ['events', '@transform'] },
-            labels: { axis: ['bucket', 'sum'], title: 'Monthly synthetic events (neighborhoods)' },
+            type: 'linechart',
+            collection: this.roads,
+            attributes: { axis: ['sjoin.collect.noise', '@transform'] },
+            labels: { axis: ['buckets', 'count'], title: 'Monthly noise events per road' },
             transform: {
                 preset: 'temporal',
                 options: {
-                    timestamp: 'timestamp',
-                    value: 'weight',
-                    resolution: 'month',
-                    reducer: 'sum',
+                    timestamp: 'date',
+                    resolution: 'day',
+                    reducer: 'count',
                 },
             },
             margins: { left: 60, right: 20, top: 50, bottom: 140 },
             width: 790,
-            events: [ChartEvent.CLICK],
+            events: [ChartEvent.BRUSH_X],
         });
 
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
+        this.plot.events.on(ChartEvent.BRUSH_X, ({ selection }) => {
+            const layer = this.map.layerManager.searchByLayerId('roads') as VectorLayer;
             layer?.setHighlightedIds(selection);
         });
     }
 
-    protected updateMapListeners(): void {
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
-            layer?.setHighlightedIds(selection);
+    protected async loadLayers(): Promise<void> {
+        for (const layerData of this.db.getLayerTables()) {
+            const geojson = await this.db.getLayer(layerData.name);
+            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
+        }
 
-            this.plot.setSelection(selection);
-        });
+        this.map.updateThematic({ id: 'roads', collection: this.roads, property: 'properties.sjoin.count.noise' });
     }
 }
 
