@@ -1,4 +1,4 @@
-type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted';
+type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted' | 'collect';
 
 export interface SpatialQueryParams {
   tableRootName: string;

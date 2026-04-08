@@ -192,6 +192,8 @@ function buildSjoinObject(
       sjoinParts.push(buildCountExpression(columns[0]));
     } else if (funcName === 'weighted') {
       sjoinParts.push(buildWeightedExpression(columns[0], geomContext));
+    } else if (funcName === 'collect') {
+      sjoinParts.push(buildCollectExpression(columns[0]));
     } else {
       sjoinParts.push(buildNestedFunctionExpression(funcName, columns));
     }
@@ -218,6 +220,18 @@ function buildWeightedExpression(
     : `${tableJoin.name}."${geometricColumnJoin}"`;
   const columnName = column.aggregateFnResultColumnName ?? column.table.name;
   return `'weighted', json_object('${columnName}', SUM(1.0 / (ST_Distance(${rootGeom}, ${joinGeom}) + 1.0)))`;
+}
+
+function buildCollectExpression(column: { table: Table; column: string; aggregateFnResultColumnName?: string }): string {
+  const columnName = column.aggregateFnResultColumnName ?? column.table.name;
+  const valueExpression = generateValueExpression(column.table, column.column, 'COLLECT');
+  return `'collect', json_object('${columnName}', ${valueExpression})`;
+}
+
+function buildCollectColumnExpression(table: Table, columnName: string): string {
+  if (table.source === 'geotiff') return `${table.name}.properties.${columnName}`;
+  if (isLayerType(table.type)) return buildJsonExtract(table.name, columnName);
+  return `${table.name}."${columnName}"`;
 }
 
 function buildCountExpression(column: { table: Table; column: string; aggregateFnResultColumnName?: string }): string {
@@ -258,6 +272,22 @@ function buildNonAggregateColumns(
 }
 
 function generateValueExpression(table: Table, columnName: string, aggregateFunction: string): string {
+  if (aggregateFunction === 'COLLECT') {
+    // '*' collects the entire properties object of the join row; otherwise collects a specific column.
+    if (columnName === '*') {
+      if (table.source === 'geotiff') return `json_group_array(${table.name}.properties)`;
+      if (isLayerType(table.type)) return `json_group_array(CAST(${table.name}.properties AS JSON))`;
+      // CSV/JSON tables: build a json_object from all non-geometry columns
+      const cols = table.columns
+        .filter(c => c.name !== 'geometry')
+        .map(c => `'${c.name}', ${table.name}."${c.name}"`)
+        .join(', ');
+      return `json_group_array(json_object(${cols}))`;
+    }
+    // Single-column collect: wrap in json_object so consumers always get an array of objects.
+    const colExpr = buildCollectColumnExpression(table, columnName);
+    return `json_group_array(json_object('${columnName}', ${colExpr}))`;
+  }
   if (table.source === 'geotiff') {
     return `${aggregateFunction}(${table.name}.properties.${columnName})`;
   }
