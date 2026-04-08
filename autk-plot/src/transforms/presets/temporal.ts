@@ -60,7 +60,8 @@ export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, 
             if (!event || typeof event !== 'object') return;
             const raw = valueAtPath(event as Record<string, unknown>, timestampAttr);
             if (raw === null || raw === undefined) return;
-            const date = raw instanceof Date ? raw : new Date(raw as string | number);
+            const normalized = typeof raw === 'string' ? raw.replace(' ', 'T') : raw;
+            const date = normalized instanceof Date ? normalized : new Date(normalized as string | number);
             if (!Number.isFinite(date.getTime())) return;
 
             let value: number | null = null;
