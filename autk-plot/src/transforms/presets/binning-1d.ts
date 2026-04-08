@@ -8,7 +8,9 @@
 import * as d3 from 'd3';
 
 import { valueAtPath } from '../../core-types';
+
 import type { AutkDatum, Binning1dTransformConfig } from '../../api';
+
 import { reduceBuckets } from '../kernel';
 
 // ---- Executed transform -------------------------------------------------
@@ -31,10 +33,15 @@ export type ExecutedBinning1dTransform = {
  * `order` is the numeric sort key for the bin (bin index for quantitative, insertion order for categorical).
  */
 export type Binning1dBinRow = {
+    /** Bin label — category string or formatted numeric range such as `"1k-2k"`. */
     label: string;
+    /** Numeric sort key for this bin (bin index for quantitative, insertion order for categorical). */
     order: number;
+    /** The reduced numeric result (count, sum, avg, min, or max) for this bin. */
     value: number;
+    /** How many rows fell into this bin. */
     count: number;
+    /** Merged source feature ids from all rows in this bin, used for selection linking. */
     autkIds: number[];
 };
 
@@ -45,6 +52,10 @@ export type Binning1dBinRow = {
  *
  * Detects whether the value attribute is categorical or quantitative, builds a
  * bin-label mapper, then groups rows by bin label and reduces using the specified reducer.
+ *
+ * @param rows - Input feature data to bin.
+ * @param config - Transform configuration, including reducer, bin count, and optional value column.
+ * @param columns - Ordered attribute names; `columns[0]` is the value axis attribute.
  */
 export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig, columns: string[]): ExecutedBinning1dTransform {
     const valueAttr = columns[0] ?? '';
@@ -80,19 +91,18 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
 
 // ---- Bin mapper ---------------------------------------------------------
 
-type BinMapper = {
-    label: (value: unknown) => string;
-    order: (label: string) => number;
-};
-
 /**
  * Builds label and order mappers for a single axis attribute.
  *
  * Detects whether the attribute is categorical or quantitative. Categorical
  * attributes map to their string representation; quantitative attributes are
  * divided into `numBins` fixed-width ranges with SI-formatted boundaries.
+ *
+ * @param rows - Input data used to infer the attribute's type and numeric range.
+ * @param attr - Dot-path attribute name to map.
+ * @param numBins - Number of equal-width bins for quantitative attributes.
  */
-export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number): BinMapper {
+export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number) {
     const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
 
     const isCategorical = sampleValues.some(v =>
@@ -105,15 +115,16 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
             if (!insertionOrder.has(label)) insertionOrder.set(label, insertionOrder.size);
             return insertionOrder.get(label)!;
         };
+
         return {
-            label: (v) => { const s = String(v ?? ''); rank(s); return s; },
-            order: (label) => rank(label),
+            label: (v: unknown) => { const s = String(v ?? ''); rank(s); return s; },
+            order: (label: string) => rank(label),
         };
     }
 
     const nums = sampleValues.map(Number).filter(Number.isFinite);
     if (nums.length === 0) {
-        return { label: (v) => String(v ?? ''), order: () => 0 };
+        return { label: (v: unknown) => String(v ?? ''), order: () => 0 };
     }
 
     const minValue = Math.min(...nums);
@@ -134,7 +145,7 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     if (span === 0) labelToOrder.set(fmt(roundedMin), 0);
 
     return {
-        label: (v) => {
+        label: (v: unknown) => {
             const n = Number(v);
             if (!Number.isFinite(n)) return 'unknown';
             const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
@@ -143,6 +154,6 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
                 ? fmt(roundedMin)
                 : `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
         },
-        order: (label) => labelToOrder.get(label) ?? 0,
+        order: (label: string) => labelToOrder.get(label) ?? 0,
     };
 }

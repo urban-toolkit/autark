@@ -7,17 +7,10 @@
  */
 
 import { valueAtPath } from '../../core-types';
+
 import type { AutkDatum, SortTransformConfig } from '../../api';
 
 // ---- Executed transform -------------------------------------------------
-
-/**
- * A single sorted row preserving source feature provenance.
- */
-export type SortedRow = {
-    [key: string]: unknown;
-    autkIds: number[];
-};
 
 /**
  * Result produced by `runSort`.
@@ -27,7 +20,7 @@ export type SortedRow = {
  */
 export type ExecutedSortTransform = {
     preset: 'sort';
-    rows: SortedRow[];
+    rows: AutkDatum[];
 };
 
 // ---- Runner -------------------------------------------------------------
@@ -62,6 +55,6 @@ export function runSort(rows: AutkDatum[], config: SortTransformConfig, columns:
 
     return {
         preset: 'sort',
-        rows: sorted as SortedRow[],
+        rows: sorted,
     };
 }

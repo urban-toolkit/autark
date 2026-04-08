@@ -37,14 +37,19 @@ export type ExecutedBinning2dTransform = {
  * formatted numeric range such as `"1k-2k"`.
  */
 export type Binning2dCellRow = {
+    /** Bin label for the x axis — category string or formatted numeric range such as `"1k-2k"`. */
     x: string;
+    /** Bin label for the y axis — category string or formatted numeric range such as `"1k-2k"`. */
     y: string;
     /** Numeric sort key for the x bin (bin index for quantitative, insertion order for categorical). */
     xOrder: number;
     /** Numeric sort key for the y bin (bin index for quantitative, insertion order for categorical). */
     yOrder: number;
+    /** The reduced numeric result (count, sum, avg, min, or max) for this cell. */
     value: number;
+    /** How many rows fell into this cell. */
     count: number;
+    /** Merged source feature ids from all rows in this cell, used for selection linking. */
     autkIds: number[];
 };
 
@@ -56,6 +61,10 @@ export type Binning2dCellRow = {
  * Detects whether each axis attribute is categorical or quantitative, builds a
  * bin-label mapper for each axis, then groups rows by the resulting (x, y) label
  * pair and reduces the value column using the specified reducer.
+ *
+ * @param rows - Input feature data to aggregate.
+ * @param config - Transform configuration, including reducer, per-axis bin counts, and optional value column.
+ * @param columns - Ordered attribute names; `columns[0]` is the x axis, `columns[1]` is the y axis.
  */
 export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig, columns: string[]): ExecutedBinning2dTransform {
     const xAttr = columns[0] ?? '';
