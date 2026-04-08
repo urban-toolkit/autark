@@ -1,5 +1,5 @@
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
-import type { EventEmitter } from './core-types';
+import type { EventEmitter, ColorMapDomainSpec } from './core-types';
 import { ColorMapInterpolator } from './core-types';
 import { ChartEvent } from './events-types';
 
@@ -33,15 +33,12 @@ export type ChartConfig = {
     margins?: ChartMargins,
     width?: number,
     height?: number,
-    labels?: { axis: string[]; title: string },
-    attributes?: string[],
+    labels?: { axis?: string[]; title?: string; color?: string },
+    attributes?: { axis?: string[]; color?: string },
     transform?: ChartTransformConfig,
-    tickFormats?: string[], // d3-format specifier per axis, e.g. ['.1f', '.4f']
-    /** Explicit data domain `[min, max]` for numerical color encoding. If omitted, computed from the data. */
-    domain?: [number, number];
+    tickFormats?: string[],
+    domainSpec?: ColorMapDomainSpec;
     colorMapInterpolator?: ColorMapInterpolator;
-    /** Optional start year for time-based charts (linechart, etc). */
-    startYear?: number;
 }
 
 
@@ -88,19 +85,44 @@ export type TransformReducer = 'count' | 'sum' | 'avg' | 'min' | 'max';
 export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'month' | 'year';
 
 /**
- * Histogram preset config.
+ * Binning-1d preset config.
  *
  * Defaults are applied internally when `options` are omitted.
  */
-export type HistogramTransformConfig = {
-    preset: 'histogram';
+export type Binning1dTransformConfig = {
+    preset: 'binning-1d';
     attributes: {
         value: string;
     };
     options?: {
+        reducer?: TransformReducer;
         bins?: number;
     };
 };
+
+/**
+ * Binning-2d preset config.
+ *
+ * Groups rows by a pair of categorical dimensions and reduces a numeric value
+ * column within each (x, y) cell. Defaults are applied internally when `options` are omitted.
+ */
+export type Binning2dTransformConfig = {
+    preset: 'binning-2d';
+    attributes: {
+        x: string;
+        y: string;
+        /** Required for non-count reducers. Omit when `reducer` is `'count'` (the default). */
+        value?: string;
+    };
+    options?: {
+        reducer?: TransformReducer;
+        /** Number of bins for x when the x attribute is quantitative. Defaults to 10. */
+        binsX?: number;
+        /** Number of bins for y when the y attribute is quantitative. Defaults to 10. */
+        binsY?: number;
+    };
+};
+
 
 /**
  * Temporal preset config.
@@ -151,36 +173,13 @@ export type SortTransformConfig = {
     };
 };
 
-/**
- * Heat matrix preset config.
- *
- * Groups rows by a pair of categorical dimensions and reduces a numeric value
- * column within each (x, y) cell. Defaults are applied internally when `options` are omitted.
- */
-export type HeatmatrixTransformConfig = {
-    preset: 'heatmatrix';
-    attributes: {
-        x: string;
-        y: string;
-        /** Required for non-count reducers. Omit when `reducer` is `'count'` (the default). */
-        value?: string;
-    };
-    options?: {
-        reducer?: TransformReducer;
-        /** Number of bins for x when the x attribute is quantitative. Defaults to 10. */
-        binsX?: number;
-        /** Number of bins for y when the y attribute is quantitative. Defaults to 10. */
-        binsY?: number;
-    };
-};
-
 /** Transform preset config accepted by `AutkChart`. */
 export type ChartTransformConfig =
-    | HistogramTransformConfig
+    | Binning1dTransformConfig
+    | Binning2dTransformConfig
     | TemporalTransformConfig
     | TimeseriesTransformConfig
-    | SortTransformConfig
-    | HeatmatrixTransformConfig;
+    | SortTransformConfig;
 
 
 // ---------------------------------------------------------------------------
@@ -193,57 +192,9 @@ export type ChartTransformConfig =
 export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart' | 'heatmatrix';
 
 /**
- * Unified configuration for scatter plots.
+ * Configuration passed to `AutkChart`. Identical to `ChartConfig` minus `div`,
+ * which is supplied as a separate constructor argument.
  */
-export type ScatterplotChartConfig = Omit<ChartConfig, 'div'> & {
-    type: 'scatterplot';
-    attributes?: [string, string];
+export type UnifiedChartConfig = Omit<ChartConfig, 'div'> & {
+    type: ChartType;
 };
-
-/**
- * Unified configuration for bar charts.
- */
-export type BarchartChartConfig = Omit<ChartConfig, 'div'> & {
-    type: 'barchart';
-};
-
-/**
- * Unified configuration for parallel coordinates charts.
- */
-export type ParallelCoordinatesChartConfig = Omit<ChartConfig, 'div'> & {
-    type: 'parallel-coordinates';
-};
-
-/**
- * Unified configuration for table visualizations.
- */
-export type TableChartConfig = Omit<ChartConfig, 'div'> & {
-    type: 'table';
-};
-
-/**
- * Unified configuration for line charts.
- */
-export type LinechartUnifiedConfig = Omit<ChartConfig, 'div'> & {
-    type: 'linechart';
-};
-
-/**
- * Unified configuration for heat matrix charts.
- *
- * Requires a `heatmatrix` transform preset that defines the x, y, and value attributes.
- */
-export type HeatmatrixChartConfig = Omit<ChartConfig, 'div'> & {
-    type: 'heatmatrix';
-};
-
-/**
- * Discriminated union describing all supported unified chart configurations.
- */
-export type UnifiedChartConfig =
-    | ScatterplotChartConfig
-    | BarchartChartConfig
-    | ParallelCoordinatesChartConfig
-    | TableChartConfig
-    | LinechartUnifiedConfig
-    | HeatmatrixChartConfig;

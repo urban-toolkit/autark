@@ -39,12 +39,12 @@ import { valueAtPath } from '../core-types';
 import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
-import { ChartStyle } from '../chart-style';
+
 import { ChartEvent } from '../events-types';
 
 import { run } from '../transforms';
 
-import type { ExecutedHistogramTransform } from '../transforms';
+import type { ExecutedBinning1dTransform } from '../transforms';
 
 /**
  * Bar chart implementation supporting categorical values and histogram mode.
@@ -69,12 +69,12 @@ export class Barchart extends ChartBase {
             config.tickFormats = ['~s', '~s']; 
         }
         if (config.transform) {
-            if (config.transform.preset !== 'histogram') {
-                throw new Error('Barchart only supports the histogram transform preset.');
+            if (config.transform.preset !== 'binning-1d') {
+                throw new Error('Barchart only supports the binning-1d transform preset.');
             }
 
-            const axis = config.labels?.axis ?? ['label', 'count'];
-            const title = config.labels?.title ?? 'Histogram';
+            const axis = config.labels?.axis ?? ['label', 'value'];
+            const title = config.labels?.title ?? 'Distribution';
             config.labels = { axis, title };
         }
         super(config);
@@ -95,9 +95,9 @@ export class Barchart extends ChartBase {
             autkIds: [idx],
         }));
 
-        const transformed = run(allRows, this._transformConfig) as ExecutedHistogramTransform;
+        const transformed = run(allRows, this._transformConfig) as ExecutedBinning1dTransform;
         this.data = transformed.rows as any;
-        this._attributes = transformed.attributes;
+        this._axisAttributes = transformed.attributes;
     }
 
     /**
@@ -143,12 +143,12 @@ export class Barchart extends ChartBase {
 
         // ---- Scales
         const xDomain = this.data.map((d) => {
-            const val = d ? valueAtPath(d, this._attributes[0]) : 'unknown';
+            const val = d ? valueAtPath(d, this._axisAttributes[0]) : 'unknown';
             return String(val);
         });
         this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
@@ -185,7 +185,7 @@ export class Barchart extends ChartBase {
             .attr('x', width)
             .attr('y', this._margins.bottom / 2 + 10)
             .style('visibility', 'visible')
-            .text(this._axis[0]);
+            .text(this._axisLabels[0]);
 
         const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
 
@@ -208,7 +208,7 @@ export class Barchart extends ChartBase {
             .attr('y', -this._margins.left / 2 - 7)
             .attr('x', -this._margins.top)
             .style('visibility', 'visible')
-            .text(this._axis[1]);
+            .text(this._axisLabels[1]);
 
         // ---- Bars
         const cGroup = svg
@@ -235,13 +235,13 @@ export class Barchart extends ChartBase {
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', (d) => {
-                const val = d ? valueAtPath(d, this._attributes[0]) : 'unknown';
+                const val = d ? valueAtPath(d, this._axisAttributes[0]) : 'unknown';
                 return this.mapX(String(val)) || 0;
             })
-            .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
-            .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this._attributes[1])) || 0 : 0))
+            .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0))
+            .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0))
             .attr('width', this.mapX.bandwidth())
-            .style('fill', ChartStyle.default)
+            .style('fill', d => this.getMarkColor(d))
             .style('stroke', '#2f2f2f')
             .style('visibility', 'inherit');
 
