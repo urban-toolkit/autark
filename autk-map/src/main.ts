@@ -354,7 +354,7 @@ export class AutkMap {
         const currentConfig = layer.layerRenderInfo.colormap.config;
 
         const mergedColorMap: ColorMapConfig = {
-            interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQUENTIAL_BLUES,
+            interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQ_BLUES,
             domainSpec: colorMap.domainSpec ?? currentConfig.domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
         };
 
@@ -776,7 +776,7 @@ export class AutkMap {
 
     private defaultColorMap(): ColorMapConfig {
         return {
-            interpolator: ColorMapInterpolator.SEQUENTIAL_REDS,
+            interpolator: ColorMapInterpolator.SEQ_REDS,
             domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
         };
     }

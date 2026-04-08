@@ -71,7 +71,7 @@ export class SpatialJoin {
             id: 'neighborhoods',
             colorMap: {
                 domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
-                interpolator: ColorMapInterpolator.SEQUENTIAL_BLUES,
+                interpolator: ColorMapInterpolator.SEQ_BLUES,
             },
         });
 

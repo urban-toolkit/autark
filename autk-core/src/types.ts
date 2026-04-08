@@ -34,16 +34,20 @@ export type ColorMapDomainSpec =
 
 /**
  * Color map interpolators for thematic data visualization.
- * @property SEQUENTIAL_REDS - Red color interpolation.
- * @property SEQUENTIAL_BLUES - Blue color interpolation.
- * @property DIVERGING_RED_BLUE - Diverging red-blue color interpolation.
- * @property OBSERVABLE10 - Observable10 categorical color scheme.
+ * @property SEQ_REDS - Sequential red color interpolation.
+ * @property SEQ_BLUES - Sequential blue color interpolation.
+ * @property DIV_RED_BLUE - Diverging red-blue color interpolation.
+ * @property DIV_SPECTRAL - Diverging spectral color interpolation.
+ * @property CAT_OBSERVABLE10 - Observable10 categorical color scheme.
+ * @property CAT_PAIRED - Paired categorical color scheme.
  */
 export enum ColorMapInterpolator {
-  SEQUENTIAL_REDS = 'interpolateReds',
-  SEQUENTIAL_BLUES = 'interpolateBlues',
-  DIVERGING_RED_BLUE = 'interpolateRdBu',
-  OBSERVABLE10 = 'schemeObservable10',
+  SEQ_REDS = 'interpolateReds',
+  SEQ_BLUES = 'interpolateBlues',
+  DIV_RED_BLUE = 'interpolateRdBu',
+  DIV_SPECTRAL = 'interpolateSpectral',
+  CAT_OBSERVABLE10 = 'schemeObservable10',
+  CAT_PAIRED = 'schemePaired',
 }
 
 /**

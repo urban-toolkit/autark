@@ -232,8 +232,8 @@ export class AutkMapUi {
 
         const interpolator = this._activeLayer.layerRenderInfo.colormap.config.interpolator;
         const labels       = this._activeLayer.layerRenderInfo.colormap.computedLabels ?? [];
-        const res          = interpolator === ColorMapInterpolator.OBSERVABLE10 ? 10 : 100;
-        const slc          = interpolator === ColorMapInterpolator.OBSERVABLE10 ? Math.min(labels.length, 10) : 100;
+        const res          = interpolator === ColorMapInterpolator.CAT_OBSERVABLE10 ? 10 : 100;
+        const slc          = interpolator === ColorMapInterpolator.CAT_OBSERVABLE10 ? Math.min(labels.length, 10) : 100;
         const colorMap     = ColorMap.getColorArray(interpolator, res).slice(0, slc);
 
         const svg       = d3.select(this._legend).append('svg').attr('width', width).attr('height', innerHeight);
@@ -250,7 +250,7 @@ export class AutkMapUi {
 
         const textData = labels.map((d, i) => ({
             label: d,
-            pos: interpolator === ColorMapInterpolator.OBSERVABLE10
+            pos: interpolator === ColorMapInterpolator.CAT_OBSERVABLE10
                 ? i * rectWidth + rectWidth / 2
                 : i * (innerWidth / (labels.length - 1)),
         }));

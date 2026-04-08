@@ -39,7 +39,7 @@ export class ColormapDiv {
         this.map.updateColorMap({
             id: layer,
             colorMap: {
-                interpolator: ColorMapInterpolator.DIVERGING_RED_BLUE,
+                interpolator: ColorMapInterpolator.DIV_RED_BLUE,
                 domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
             },
         });

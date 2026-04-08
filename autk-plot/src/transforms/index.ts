@@ -21,9 +21,9 @@ import { runTimeseries } from './presets/timeseries';
 
 // ---- Public row types ---------------------------------------------------
 
+export type {  ExecutedSortTransform } from './presets/sort';
 export type { Binning1dBinRow, ExecutedBinning1dTransform } from './presets/binning-1d';
 export type { Binning2dCellRow, ExecutedBinning2dTransform } from './presets/binning-2d';
-export type { SortedRow, ExecutedSortTransform } from './presets/sort';
 export type { TemporalBucketRow, ExecutedTemporalTransform } from './presets/temporal';
 export type { TimeseriesBucketRow, ExecutedTimeseriesTransform } from './presets/timeseries';
 

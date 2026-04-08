@@ -17,7 +17,7 @@
  *     options: { reducer: 'sum' }
  *   },
  *   labels: { axis: ['Day', 'Hour'], title: 'Activity Heatmap' },
- *   colorMapInterpolator: ColorMapInterpolator.SEQUENTIAL_BLUES
+ *   colorMapInterpolator: ColorMapInterpolator.SEQ_BLUES
  * });
  */
 

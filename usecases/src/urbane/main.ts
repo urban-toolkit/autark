@@ -228,7 +228,7 @@ export class Urbane {
             this.map.updateColorMap({
                 id: 'table_osm_roads',
                 colorMap: {
-                    domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [0.15, 0.85] },
+                    domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [15, 85] },
                 },
             });
 
@@ -263,7 +263,7 @@ export class Urbane {
             id: layerId,
             colorMap: {
                 domainSpec: column.includes('skyExposure')
-                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [0.15, 0.85] }
+                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [15, 85] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
             },
         });

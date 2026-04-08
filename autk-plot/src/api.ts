@@ -82,8 +82,10 @@ export type ChartConfig = {
     tickFormats?: string[];
     /** Domain specification controlling how the colormap range is derived. */
     domainSpec?: ColorMapDomainSpec;
-    /** Color interpolator used for the colormap. */
+    /** Color interpolator used for continuous (numeric) color encoding. */
     colorMapInterpolator?: ColorMapInterpolator;
+    /** Color interpolator used when the color attribute contains categorical (string) values. Defaults to `OBSERVABLE10`. */
+    categoricalColorMapInterpolator?: ColorMapInterpolator;
 };
 
 /**

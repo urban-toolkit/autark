@@ -134,8 +134,8 @@ export class OsmLayersApi {
 
     protected updateRoadsThematic(mode: 'slope' | 'year', year?: number): void {
         const interpolator = mode === 'slope'
-            ? ColorMapInterpolator.DIVERGING_RED_BLUE
-            : ColorMapInterpolator.SEQUENTIAL_REDS;
+            ? ColorMapInterpolator.DIV_RED_BLUE
+            : ColorMapInterpolator.SEQ_REDS;
 
         this.map.updateColorMap({
             id: 'table_osm_roads',

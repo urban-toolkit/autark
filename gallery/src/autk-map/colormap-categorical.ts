@@ -54,7 +54,7 @@ export class ColormapCat {
         this.map.updateColorMap({
             id: layer,
             colorMap: {
-                interpolator: ColorMapInterpolator.OBSERVABLE10,
+                interpolator: ColorMapInterpolator.CAT_OBSERVABLE10,
                 domainSpec: { type: ColorMapDomainStrategy.USER, params: ['primary', 'secondary', 'other'] },
             },
         });

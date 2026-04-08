@@ -262,7 +262,7 @@ class Heatmap {
 
         this.map.updateRenderInfo('heatmap', { opacity: 0.5 });
         this.map.updateColorMap({ id: 'heatmap', colorMap: { 
-            interpolator: ColorMapInterpolator.SEQUENTIAL_BLUES, 
+            interpolator: ColorMapInterpolator.SEQ_BLUES, 
             domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [0, 99] } 
         } });
     }
