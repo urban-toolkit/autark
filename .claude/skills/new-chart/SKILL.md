@@ -86,13 +86,14 @@ public render(): void {
         .attr('width', width).attr('height', height)
         .style('fill', 'white').style('opacity', 0);
 
-    // 6. Marks — bind this.data, use ChartStyle.default as initial fill
+    // 6. Marks — bind this.data; use getMarkColor for color-mapped fills,
+    //    or ChartStyle.default if this chart never uses color encoding.
     cGroup.selectAll('.autkMark')
         .data(this.data)
         .join('circle')           // replace with rect/path/etc as needed
         .attr('class', 'autkMark')
         // ... position and size attributes ...
-        .style('fill', ChartStyle.default);
+        .style('fill', d => this.getMarkColor(d));
 
     // 7. Wire interactions — always the last line
     this.configureSignalListeners();
@@ -163,11 +164,13 @@ protected override computeTransform(): void {
     }));
     const transformed = run(allRows, this._transformConfig) as ExecutedXxxTransform;
     this.data = transformed.rows as any;
-    this._attributes = transformed.attributes as unknown as string[];
+    this._axisAttributes = transformed.attributes as unknown as string[];
+    // If the transform produces a color column, set it here so computeColorDomain() picks it up:
+    // this._colorAttribute = this._axisAttributes[2];
 }
 ```
 
-When a transform is required (not optional), validate it in the constructor and skip the `if (!this._transformConfig) return` guard. Also: when a transform replaces `this._attributes`, do **not** add an `attributes` tuple to the chart's config type — the transform output is the authoritative attribute list.
+When a transform is required (not optional), validate it in the constructor and skip the `if (!this._transformConfig) return` guard. Also: when a transform replaces `this._axisAttributes`, do **not** add an `attributes.axis` entry to the chart's config type — the transform output is the authoritative attribute list.
 
 #### Creating a new transform preset
 
@@ -178,29 +181,41 @@ If no existing preset covers the aggregation the chart needs, create one. Regist
 3. **`transforms/index.ts`** — `import` the runner; `export * from './presets/<name>'`; add `ExecutedXxxTransform` to `ExecutedChartTransform` union; add `if (config.preset === 'xxx') return runXxx(rows, config);` to `run()`
 4. The chart file imports from `'../transforms'` (the index) — no direct preset import needed
 
-### `applyMarkStyles()` — override when the default fill encoding loses information
+### `applyMarkStyles()` — override only for non-color selection effects
 
-The default sets every mark to either `ChartStyle.highlight` (selected) or `ChartStyle.default` (unselected). This is correct for most charts.
+**Do not override for color purposes.** The base class `applyMarkStyles` already handles everything:
+- Selection → `ChartStyle.highlight`
+- `_colorAttribute` active → data-driven color via `getMarkColor(d)`
+- Fallback → `ChartStyle.default`
 
-Override when marks carry a **data-driven fill** that should be preserved for unselected marks — for example a color-mapped heatmap cell that should stay colored while only selected cells switch to highlight. In that case, recompute the color domain from `this.data` and apply it per-mark:
+Color is applied to the CSS property named by `_colorProperty` (`'fill'` by default). For **stroke-based marks** (paths, polylines), set this in the constructor — no override needed:
 
 ```typescript
-protected override applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
-    const colorValues = this.data.map(d => d ? Number(valueAtPath(d, this._attributes[2])) || 0 : 0);
-    const lo = this._domain?.[0] ?? Math.min(...colorValues);
-    const hi = this._domain?.[1] ?? Math.max(...colorValues);
-    const sel = this.selection;
-
-    svgs.style('fill', (d: unknown) => {
-        if ((d as AutkDatum)?.autkIds?.some(id => sel.includes(id))) return ChartStyle.highlight;
-        const v = d ? Number(valueAtPath(d as Record<string, unknown>, this._attributes[2])) || 0 : 0;
-        const { r, g, b } = ColorMap.getColor(v, this._colorMapInterpolator, [lo, hi]);
-        return `rgb(${r},${g},${b})`;
-    });
+constructor(config: ChartConfig) {
+    // ...
+    super(config);
+    this._colorProperty = 'stroke'; // color goes to stroke, not fill
+    this.draw();
 }
 ```
 
-For stroke-based marks (paths, polylines) override for the same reason. See `pcoordinates.ts`.
+Override `applyMarkStyles` only when you also need **non-color selection effects** — opacity, stroke-width changes, or `.raise()` to bring selected marks forward. Always call `super` first so color is still applied:
+
+```typescript
+protected override applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
+    super.applyMarkStyles(svgs); // handles all color
+
+    const lines = svgs as unknown as d3.Selection<SVGPathElement, unknown, HTMLElement, unknown>;
+    const sel = this.selection;
+    const isSelected = (d: unknown) => ((d as AutkDatum)?.autkIds ?? []).some(id => sel.includes(id));
+
+    lines
+        .style('opacity', function (d: unknown) { return isSelected(d) ? 1 : 0.7; })
+        .style('stroke-width', function (d: unknown) { return isSelected(d) ? 3 : 2; });
+
+    lines.filter(function (d: unknown) { return isSelected(d); }).raise();
+}
+```
 
 ### `onSelectionUpdated()` — only when marks must reorder on selection
 
