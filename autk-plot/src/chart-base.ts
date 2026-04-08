@@ -87,14 +87,23 @@ export abstract class ChartBase {
 
     /** CSS property to apply color to: 'fill' for area marks, 'stroke' for line marks. */
     protected _colorProperty: 'fill' | 'stroke' = 'fill';
-    /** Active colormap interpolator used by charts that support color encoding. */
-    protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQUENTIAL_REDS;
+    /** Color interpolator used for continuous (numeric) color encoding. */
+    protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQ_REDS;
+    /** Color interpolator used when the color attribute contains categorical (string) values. */
+    protected _categoricalColorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.CAT_OBSERVABLE10;
 
     /** Optional transform config shared by chart implementations that support transformed views. */
     protected _transformConfig?: ChartTransformConfig;
 
     /** Active brush rectangles keyed by brush id. Only one brush type is active at a time. */
     protected _activeBrushes: Map<string, [number, number, number, number]> = new Map();
+
+    /**
+     * Datums of marks directly hit by the last interaction (brush or click).
+     * When non-empty, `getMarkColor` uses direct mark identity instead of autkId membership.
+     * Cleared by `setSelection` so that external feature-id-based selection uses the normal path.
+     */
+    private _hitMarks: Set<unknown> = new Set();
 
     /**
      * Brush combine mode for multi-brush interactions.
@@ -153,7 +162,8 @@ export abstract class ChartBase {
         this._enabledEvents = config.events ?? [];
 
         this._domainSpec = config.domainSpec;
-        this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQUENTIAL_REDS;
+        this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
+        this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
 
         this._transformConfig = config.transform;
     }
@@ -189,12 +199,21 @@ export abstract class ChartBase {
     }
 
     /**
-     * Updates selected source ids.
-     * @param selection Source ids to mark as selected.
+     * Internal setter used by interaction handlers and subclasses.
+     * External callers should use `setSelection` instead.
      */
-    set selection(selection: number[]) {
+    protected set selection(selection: number[]) {
         this._selection = selection;
         this.applyChartSelection();
+    }
+
+    /**
+     * Sets selection from an external source (e.g. linked view).
+     * Clears `_hitMarks` so highlight uses autkId membership instead of direct mark identity.
+     */
+    setSelection(selection: number[]): void {
+        this._hitMarks = new Set();
+        this.selection = selection;
     }
 
     /**
@@ -252,10 +271,13 @@ export abstract class ChartBase {
 
         if (values.length === 0) return;
 
+        const isCategorical = values.some(v => typeof v === 'string' && isNaN(Number(v as string)));
+        const interpolator = isCategorical ? this._categoricalColorMapInterpolator : this._colorMapInterpolator;
+
         this._resolvedDomain = ColorMap.resolveDomainFromData(
             values as number[] | string[],
             {
-                interpolator: this._colorMapInterpolator,
+                interpolator,
                 domainSpec: this._domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
             },
         );
@@ -275,7 +297,7 @@ export abstract class ChartBase {
     protected getMarkColor(d: unknown): string {
         const datum = d as AutkDatum;
 
-        if (datum?.autkIds?.some(id => this.selection.includes(id))) {
+        if (this._hitMarks.size > 0 ? this._hitMarks.has(d) : datum?.autkIds?.some(id => this.selection.includes(id))) {
             return ChartStyle.highlight;
         }
 
@@ -288,12 +310,14 @@ export abstract class ChartBase {
             const rawVal = String(valueAtPath(datum, this._colorAttribute));
             const idx = categories.indexOf(rawVal);
             const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
-            const { r, g, b } = ColorMap.getColor(t, this._colorMapInterpolator, categories);
+            const interpolator = this._categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
+            const { r, g, b } = ColorMap.getColor(t, interpolator, categories);
             return `rgb(${r},${g},${b})`;
         } else {
             const rawVal = Number(valueAtPath(datum, this._colorAttribute)) || 0;
             const numDomain = this._resolvedDomain as [number, number] | [number, number, number];
-            const { r, g, b } = ColorMap.getColor(rawVal, this._colorMapInterpolator, numDomain);
+            const interpolator = this._colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
+            const { r, g, b } = ColorMap.getColor(rawVal, interpolator, numDomain);
             return `rgb(${r},${g},${b})`;
         }
     }
@@ -373,7 +397,7 @@ export abstract class ChartBase {
      * Brush rectangles are translated to marks-group coordinates before
      * geometric intersection is evaluated.
      */
-    brushEvent(): void {
+    protected brushEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrush');
         // const marksGroup = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
         const chart = this;
@@ -409,7 +433,7 @@ export abstract class ChartBase {
      * For multiple brush hosts, brush extents are narrow in X to support
      * per-axis style interactions.
      */
-    brushXEvent(): void {
+    protected brushXEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrush');
         // const marksGroup = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
         const chart = this;
@@ -453,7 +477,7 @@ export abstract class ChartBase {
      * For multiple brush hosts, brush extents are narrow in X to support
      * per-axis style interactions.
      */
-    brushYEvent(): void {
+    protected brushYEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrush');
         const marksGroup = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
         const chart = this;
@@ -543,13 +567,14 @@ export abstract class ChartBase {
      * @param activeBrushes Active brush rectangles keyed by brush id.
      * @returns Source ids represented by marks that satisfy brush predicates.
      */
-    private resolveSelectionFromRects(activeBrushes: Map<string, [number, number, number, number]>): number[] {
+    protected resolveSelectionFromRects(activeBrushes: Map<string, [number, number, number, number]>): number[] {
         const rects = Array.from(activeBrushes.values());
         if (rects.length === 0) return [];
 
         const marksGroup = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
         const nextSel = new Set<number>();
 
+        this._hitMarks = new Set();
         marksGroup.selectAll('.autkMark')
             .each((d, id: number, nodes) => {
                 const node = nodes[id] as SVGGeometryElement | null;
@@ -559,6 +584,7 @@ export abstract class ChartBase {
                 const selected = (this._MODE === 'and') ? hits.every(Boolean) : hits.some(Boolean);
 
                 if (selected) {
+                    this._hitMarks.add(d);
                     ((d as AutkDatum)?.autkIds ?? []).forEach((sourceId) => nextSel.add(sourceId));
                 }
             });
@@ -572,6 +598,7 @@ export abstract class ChartBase {
      * @param activeBrushes Active brush rectangles for that event type.
      */
     private applyBrushSelection(event: ChartEvent, activeBrushes: Map<string, [number, number, number, number]>): void {
+        if (activeBrushes.size === 0) this._hitMarks = new Set();
         const selection = activeBrushes.size === 0 ? [] : this.resolveSelectionFromRects(activeBrushes);
         this.selection = selection;
         this.events.emit(event, { selection: this.selection });

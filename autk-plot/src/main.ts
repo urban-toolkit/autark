@@ -100,7 +100,7 @@ export class AutkChart {
      * @param selection Source feature ids to highlight/select.
      */
     public setSelection(selection: number[]): void {
-        this._plot.selection = selection;
+        this._plot.setSelection(selection);
     }
 
     /**

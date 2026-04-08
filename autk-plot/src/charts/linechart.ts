@@ -283,7 +283,7 @@ export class Linechart extends ChartBase {
             .attr('class', 'autkMark')
             .attr('cx', (d) => xScale(d.x))
             .attr('cy', (d) => yScale(d.y))
-            .attr('r', 3)
+            .attr('r', 5)
             .style('fill', ChartStyle.default)
             .style('visibility', 'inherit');
 
