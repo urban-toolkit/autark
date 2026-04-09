@@ -111,14 +111,10 @@ export class Linechart extends ChartBase {
             return a.localeCompare(b);
         };
 
-        const selected = new Set(this.selection);
-        const allRows = this._sourceFeatures.map((f, idx) => ({
+        const sourceRows = this._sourceFeatures.map((f, idx) => ({
             ...(f.properties ?? {}),
             autkIds: [idx],
         })) as AutkDatum[];
-        const sourceRows = this.selection.length === 0
-            ? allRows
-            : allRows.filter((row) => (row.autkIds ?? []).some((id) => selected.has(id)));
 
         const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
         const transformed = run(sourceRows, this._transformConfig!, inputColumns) as ExecutedTemporalTransform | ExecutedTimeseriesTransform;
@@ -290,7 +286,7 @@ export class Linechart extends ChartBase {
         // ---- Empty state
         cGroup
             .selectAll('.autk-empty')
-            .data(this._seriesData.length === 0 ? ['No timeseries data for the current selection'] : [])
+            .data(this._seriesData.length === 0 ? ['No timeseries data available'] : [])
             .join('text')
             .attr('class', 'autk-empty')
             .attr('x', innerW / 2)

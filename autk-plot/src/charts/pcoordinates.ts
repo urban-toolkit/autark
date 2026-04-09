@@ -31,7 +31,7 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../core-types';
 
-import type { AutkDatum, ChartConfig } from '../api';
+import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
@@ -239,14 +239,12 @@ export class ParallelCoordinates extends ChartBase {
         super.applyMarkStyles(svgs);
 
         const lines = svgs as unknown as d3.Selection<SVGPathElement, unknown, HTMLElement, unknown>;
-        const sel = this.selection;
-        const isSelected = (d: unknown) => ((d as AutkDatum)?.autkIds ?? []).some((id) => sel.includes(id));
 
         lines
-            .style('opacity', function (this: SVGPathElement, d: unknown) { return isSelected(d) ? 1 : 0.7; })
-            .style('stroke-width', function (this: SVGPathElement, d: unknown) { return isSelected(d) ? 3 : 2; });
+            .style('opacity', (d: unknown) => this.isMarkHighlighted(d) ? 1 : 0.7)
+            .style('stroke-width', (d: unknown) => this.isMarkHighlighted(d) ? 3 : 2);
 
-        lines.filter(function (this: SVGPathElement, d: unknown) { return isSelected(d); }).raise();
+        lines.filter((d: unknown) => this.isMarkHighlighted(d)).raise();
     }
 
     /**

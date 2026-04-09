@@ -50,8 +50,18 @@ export abstract class ChartBase {
     /** Normalized render rows bound to marks. */
     protected _data!: AutkDatum[];
 
-    /** Current selected source ids. */
-    protected _selection: number[] = [];
+    /**
+     * Datums of marks directly selected by local interaction (brush/click).
+     * Owned exclusively by interaction handlers. Neither `setSelection` nor external
+     * callers may touch this field.
+     */
+    private _selectedMarkDatums: Set<object> = new Set();
+
+    /**
+     * Feature IDs set by an external linked view via `setSelection`.
+     * Owned exclusively by `setSelection`. Neither brush nor click handlers may touch this field.
+     */
+    private _selectedFeatureIds: Set<number> = new Set();
 
     /** Dot-path attributes used to read values from row objects. */
     protected _axisAttributes!: string[];
@@ -95,15 +105,14 @@ export abstract class ChartBase {
     /** Optional transform config shared by chart implementations that support transformed views. */
     protected _transformConfig?: ChartTransformConfig;
 
+    
     /** Active brush rectangles keyed by brush id. Only one brush type is active at a time. */
     protected _activeBrushes: Map<string, [number, number, number, number]> = new Map();
+    /** Stored brush behavior instances keyed by brush id, used for programmatic visual clearing. */
+    private _brushBehaviors: Map<string, d3.BrushBehavior<unknown>> = new Map();
+    /** When true, brush event handlers skip event emission (used during programmatic brush clearing). */
+    private _suppressBrushEvents: boolean = false;
 
-    /**
-     * Datums of marks directly hit by the last interaction (brush or click).
-     * When non-empty, `getMarkColor` uses direct mark identity instead of autkId membership.
-     * Cleared by `setSelection` so that external feature-id-based selection uses the normal path.
-     */
-    private _hitMarks: Set<unknown> = new Set();
 
     /**
      * Brush combine mode for multi-brush interactions.
@@ -191,29 +200,52 @@ export abstract class ChartBase {
     }
 
     /**
-     * Returns selected source ids.
-     * @returns Current source ids selected in the chart.
+     * Returns the feature IDs derived from the current interaction selection.
+     * Used by brush/click event emission. Does not include externally-set feature IDs.
      */
     get selection(): number[] {
-        return this._selection;
+        const fids = new Set<number>();
+        for (const datum of this._selectedMarkDatums) {
+            const ids = (datum as AutkDatum).autkIds ?? [];
+            for (const fid of ids) fids.add(fid);
+        }
+        return Array.from(fids);
     }
 
     /**
-     * Internal setter used by interaction handlers and subclasses.
-     * External callers should use `setSelection` instead.
+     * Sets an external highlight from a linked view.
+     * Owns `_selectedFeatureIds` exclusively — does not touch `_selectedMarkDatums`.
      */
-    protected set selection(selection: number[]) {
-        this._selection = selection;
+    setSelection(selection: number[]): void {
+        this._selectedFeatureIds = new Set(selection);
+        if (selection.length === 0) {
+            this._selectedMarkDatums = new Set();
+            this._activeBrushes.clear();
+            this.clearBrushVisuals();
+        }
         this.applyChartSelection();
     }
 
     /**
-     * Sets selection from an external source (e.g. linked view).
-     * Clears `_hitMarks` so highlight uses autkId membership instead of direct mark identity.
+     * Removes all D3 brush rectangle visuals from the chart without firing brush events.
+     * Called when selection is cleared externally. Uses stored brush behavior instances
+     * to call `.move(selection, null)` on each brush element.
      */
-    setSelection(selection: number[]): void {
-        this._hitMarks = new Set();
-        this.selection = selection;
+    private clearBrushVisuals(): void {
+        this._suppressBrushEvents = true;
+        const chart = this;
+        d3.select(this._div)
+            .selectAll<SVGGElement, unknown>('.autkBrush')
+            .each(function (_d, i) {
+                const el = d3.select<SVGGElement, unknown>(this);
+                const dim = el.attr('autkBrushId');
+                const brushKey = dim && dim.length > 0 ? dim : String(i);
+                const brush = chart._brushBehaviors.get(brushKey);
+                if (brush) {
+                    brush.move(el, null);
+                }
+            });
+        this._suppressBrushEvents = false;
     }
 
     /**
@@ -297,7 +329,7 @@ export abstract class ChartBase {
     protected getMarkColor(d: unknown): string {
         const datum = d as AutkDatum;
 
-        if (this._hitMarks.size > 0 ? this._hitMarks.has(d) : datum?.autkIds?.some(id => this.selection.includes(id))) {
+        if (this.isMarkHighlighted(d)) {
             return ChartStyle.highlight;
         }
 
@@ -320,6 +352,27 @@ export abstract class ChartBase {
             const { r, g, b } = ColorMap.getColor(rawVal, interpolator, numDomain);
             return `rgb(${r},${g},${b})`;
         }
+    }
+
+    /**
+     * Returns `true` when a mark should be highlighted.
+     *
+     * Union of two independent layers:
+     * 1. Mark was directly selected by local interaction (`_selectedMarkDatums`).
+     * 2. Any of the mark's feature IDs are in the external selection (`_selectedFeatureIds`).
+     *
+     * @param d Bound mark datum.
+     */
+    protected isMarkHighlighted(d: unknown): boolean {
+        if (d == null || typeof d !== 'object') return false;
+
+        if (this._selectedMarkDatums.has(d as object)) return true;
+
+        if (this._selectedFeatureIds.size > 0) {
+            return ((d as AutkDatum).autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
+        }
+
+        return false;
     }
 
     /**
@@ -360,35 +413,30 @@ export abstract class ChartBase {
     clickEvent(): void {
         const svgs = d3.select(this._div).selectAll('.autkMark');
         const cls = d3.select(this._div).selectAll('.autkClear');
-
         const chart = this;
 
-        svgs
-            .each(function (d) {
-                d3.select(this)
-                    .on('click', function () {
-                        const ids = (d as AutkDatum)?.autkIds ?? [];
-                        if (ids.length === 0) return;
-
-                        const next = new Set(chart.selection);
-                        const isFullySelected = ids.every((id) => next.has(id));
-
-                        if (isFullySelected) {
-                            ids.forEach((id) => next.delete(id));
-                        } else {
-                            ids.forEach((id) => next.add(id));
-                        }
-
-                        chart.selection = Array.from(next);
-                        chart.events.emit(ChartEvent.CLICK, { selection: chart.selection });
-                    });
+        svgs.each(function (d) {
+            d3.select(this).on('click', function () {
+                if (d == null || typeof d !== 'object') return;
+                if (chart._selectedMarkDatums.has(d as object)) {
+                    chart._selectedMarkDatums.delete(d as object);
+                } else {
+                    chart._selectedMarkDatums.add(d as object);
+                }
+                if (chart._selectedMarkDatums.size === 0) {
+                    chart._selectedFeatureIds = new Set();
+                }
+                chart.applyChartSelection();
+                chart.events.emit(ChartEvent.CLICK, { selection: chart.selection });
             });
+        });
 
-        cls
-            .on('click', function () {
-                chart.selection = [];
-                chart.events.emit(ChartEvent.CLICK, { selection: [] });
-            });
+        cls.on('click', function () {
+            chart._selectedMarkDatums = new Set();
+            chart._selectedFeatureIds = new Set();
+            chart.applyChartSelection();
+            chart.events.emit(ChartEvent.CLICK, { selection: [] });
+        });
     }
 
     /**
@@ -411,18 +459,21 @@ export abstract class ChartBase {
                 const brush = d3.brush()
                     .extent([[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]])
                     .on("start brush end", function (event: any) {
+                        if (chart._suppressBrushEvents) return;
                         if (event.selection) {
                             const [x0, y0] = event.selection[0];
                             const [x1, y1] = event.selection[1];
                             // No transform shift needed
                             chart._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
-                            chart.selection = chart.resolveSelectionFromRects(chart._activeBrushes);
+                            chart.resolveSelectionFromRects(chart._activeBrushes);
+                            chart.applyChartSelection();
                             chart.events.emit(ChartEvent.BRUSH, { selection: chart.selection });
                         } else {
                             chart._activeBrushes.delete(brushKey);
                             chart.applyBrushSelection(ChartEvent.BRUSH, chart._activeBrushes);
                         }
                     });
+                chart._brushBehaviors.set(brushKey, brush);
                 cBrush.call(brush);
             });
     }
@@ -452,6 +503,7 @@ export abstract class ChartBase {
                 const brush = d3.brushX()
                     .extent(extent)
                     .on("start brush end", function (event: any) {
+                        if (chart._suppressBrushEvents) return;
                         if (event.selection) {
                             // No transform shift needed
                             const x0 = event.selection[0];
@@ -460,13 +512,15 @@ export abstract class ChartBase {
                             const y1 = chart._height;
 
                             chart._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
-                            chart.selection = chart.resolveSelectionFromRects(chart._activeBrushes);
+                            chart.resolveSelectionFromRects(chart._activeBrushes);
+                            chart.applyChartSelection();
                             chart.events.emit(ChartEvent.BRUSH_X, { selection: chart.selection });
                         } else {
                             chart._activeBrushes.delete(brushKey);
                             chart.applyBrushSelection(ChartEvent.BRUSH_X, chart._activeBrushes);
                         }
                     });
+                chart._brushBehaviors.set(brushKey, brush);
                 cBrush.call(brush);
             });
     }
@@ -496,6 +550,7 @@ export abstract class ChartBase {
                 const brush = d3.brushY()
                     .extent(extent)
                     .on("start brush end", function (event: any) {
+                        if (chart._suppressBrushEvents) return;
                         if (event.selection) {
                             // Inline transform/offset computation for axis-aligned brushing
                             const cTransform = cBrush.attr('transform');
@@ -517,13 +572,15 @@ export abstract class ChartBase {
                             const y1 = event.selection[1] + shiftY;
 
                             chart._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
-                            chart.selection = chart.resolveSelectionFromRects(chart._activeBrushes);
+                            chart.resolveSelectionFromRects(chart._activeBrushes);
+                            chart.applyChartSelection();
                             chart.events.emit(ChartEvent.BRUSH_Y, { selection: chart.selection });
                         } else {
                             chart._activeBrushes.delete(brushKey);
                             chart.applyBrushSelection(ChartEvent.BRUSH_Y, chart._activeBrushes);
                         }
                     });
+                chart._brushBehaviors.set(brushKey, brush);
                 cBrush.call(brush);
             });
     }
@@ -572,24 +629,22 @@ export abstract class ChartBase {
         if (rects.length === 0) return [];
 
         const marksGroup = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
-        const nextSel = new Set<number>();
 
-        this._hitMarks = new Set();
+        this._selectedMarkDatums = new Set();
         marksGroup.selectAll('.autkMark')
-            .each((d, id: number, nodes) => {
-                const node = nodes[id] as SVGGeometryElement | null;
+            .each((d, i: number, nodes) => {
+                const node = nodes[i] as SVGGeometryElement | null;
                 if (!node) return;
 
                 const hits = rects.map(([x0, y0, x1, y1]) => this.nodeIntersectsRect(node, x0, y0, x1, y1));
                 const selected = (this._MODE === 'and') ? hits.every(Boolean) : hits.some(Boolean);
 
-                if (selected) {
-                    this._hitMarks.add(d);
-                    ((d as AutkDatum)?.autkIds ?? []).forEach((sourceId) => nextSel.add(sourceId));
+                if (selected && d != null && typeof d === 'object') {
+                    this._selectedMarkDatums.add(d as object);
                 }
             });
 
-        return Array.from(nextSel);
+        return this.selection;
     }
 
     /**
@@ -598,9 +653,13 @@ export abstract class ChartBase {
      * @param activeBrushes Active brush rectangles for that event type.
      */
     private applyBrushSelection(event: ChartEvent, activeBrushes: Map<string, [number, number, number, number]>): void {
-        if (activeBrushes.size === 0) this._hitMarks = new Set();
-        const selection = activeBrushes.size === 0 ? [] : this.resolveSelectionFromRects(activeBrushes);
-        this.selection = selection;
+        if (activeBrushes.size === 0) {
+            this._selectedMarkDatums = new Set();
+            this._selectedFeatureIds = new Set();
+        } else {
+            this.resolveSelectionFromRects(activeBrushes);
+        }
+        this.applyChartSelection();
         this.events.emit(event, { selection: this.selection });
     }
 

@@ -170,9 +170,8 @@ export class TableVis extends ChartBase {
      * @param tbody Target tbody selection.
      */
     private renderRows(tbody: d3.Selection<HTMLTableSectionElement, unknown, any, unknown>): void {
-        const sel = new Set(this.selection);
-        const selectedRows = this.data.filter((row) => row?.autkIds?.some((id) => sel.has(id)));
-        const restRows = this.data.filter((row) => !row?.autkIds?.some((id) => sel.has(id)));
+        const selectedRows = this.data.filter((row) => this.isMarkHighlighted(row));
+        const restRows = this.data.filter((row) => !this.isMarkHighlighted(row));
         const displayRows = [...selectedRows, ...restRows];
 
         const numberFormatter = d3.format('');
@@ -184,8 +183,8 @@ export class TableVis extends ChartBase {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => d?.autkIds?.some((id) => sel.has(id)) ? ChartStyle.highlight : 'transparent')
-            .style('color', (d) => d?.autkIds?.some((id) => sel.has(id)) ? '#ffffff' : '#000000');
+            .style('background-color', (d) => this.isMarkHighlighted(d) ? ChartStyle.highlight : 'transparent')
+            .style('color', (d) => this.isMarkHighlighted(d) ? '#ffffff' : '#000000');
 
         rows
             .selectAll('td')
