@@ -395,13 +395,14 @@ export class Shadows {
         this.histogram = new AutkChart(this.histogramDiv, {
             type: 'barchart',
             collection: this.roads,
+            attributes: { axis: [`sjoin.avg.${this.currentMonth}`, '@transform'] },
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,
             height: 380,
             events: [ChartEvent.BRUSH_X],
-            histogram: {
-                column: `sjoin.avg.${this.currentMonth}`,
-                numBins: 13,
+            transform: {
+                preset: 'binning-1d',
+                options: { bins: 13 },
             },
         });
     }

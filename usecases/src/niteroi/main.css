@@ -216,3 +216,8 @@ canvas {
     color: #999;
     margin: 0;
 }
+
+
+#plotBody circle {
+    opacity: 0.25;
+}   

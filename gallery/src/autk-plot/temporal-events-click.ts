@@ -75,11 +75,11 @@ export class MapD3TemporalEvents {
 
     protected async loadMap(): Promise<void> {
         this.map = new AutkMap(this.canvas);
+        MapStyle.setPredefinedStyle('light');
 
         await this.map.init();
         await this.loadLayers();
 
-        MapStyle.setPredefinedStyle('light');
         this.map.draw();
 
         this.map.events.on(MapEvent.PICKING, ({ selection }) => {
@@ -94,7 +94,7 @@ export class MapD3TemporalEvents {
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
             labels: { axis: ['buckets', 'count'], title: 'Monthly noise events per road' },
             transform: {
-                preset: 'temporal',
+                preset: 'binning-events',
                 options: {
                     timestamp: 'date',
                     resolution: 'day',
@@ -120,6 +120,7 @@ export class MapD3TemporalEvents {
         }
 
         this.map.updateThematic({ id: 'roads', collection: this.roads, property: 'properties.sjoin.count.noise' });
+        this.map.updateRenderInfo('roads', { isPick: true });
     }
 }
 

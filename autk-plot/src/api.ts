@@ -147,14 +147,14 @@ export type Binning2dTransformConfig = {
 };
 
 /**
- * Temporal preset config.
+ * Binning-events preset config.
  *
  * The events array column is read from `ChartConfig.attributes.axis[0]`.
  * Use `'@transform'` in `axis[1]` to mark the output slot.
  * `timestamp` and `value` are sub-fields within each event object.
  */
-export type TemporalTransformConfig = {
-    preset: 'temporal';
+export type BinningEventsTransformConfig = {
+    preset: 'binning-events';
     options?: {
         /** Field within each event object that holds the timestamp. Defaults to `'timestamp'`. */
         timestamp?: string;
@@ -168,20 +168,21 @@ export type TemporalTransformConfig = {
 };
 
 /**
- * Timeseries preset config.
+ * Reduce-series preset config.
  *
  * The series array column is read from `ChartConfig.attributes.axis[0]`.
  * Use `'@transform'` in `axis[1]` to mark the output slot.
  * `timestamp` and `value` are sub-fields within each series point.
+ * Unlike `binning-events`, timestamps are used as-is with no resolution bucketing.
  */
-export type TimeseriesTransformConfig = {
-    preset: 'timeseries';
+export type ReduceSeriesTransformConfig = {
+    preset: 'reduce-series';
     options?: {
         /** Field within each series point that holds the timestamp. Defaults to `'timestamp'`. */
         timestamp?: string;
         /** Field within each series point that holds the numeric value. Defaults to `'value'`. */
         value?: string;
-        /** Reducer applied within each timestamp bucket. Defaults to `'avg'`. */
+        /** Reducer applied across features sharing the same timestamp. Defaults to `'avg'`. */
         reducer?: TransformReducer;
     };
 };
@@ -207,6 +208,6 @@ export type SortTransformConfig = {
 export type ChartTransformConfig =
     | Binning1dTransformConfig
     | Binning2dTransformConfig
-    | TemporalTransformConfig
-    | TimeseriesTransformConfig
+    | BinningEventsTransformConfig
+    | ReduceSeriesTransformConfig
     | SortTransformConfig;

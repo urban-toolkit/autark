@@ -1,4 +1,5 @@
-import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle } from 'autk-map';
+import type { FeatureCollection, Feature, Geometry, GeoJsonProperties } from 'geojson';
+import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle, MapEvent } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { AutkChart, ChartEvent, ChartStyle } from 'autk-plot';
@@ -21,7 +22,8 @@ export class OsmLayersApi {
     protected linechart!: AutkChart;
     protected geotiffData: any;
     protected roadsGeojson: any;
-    protected computedRoadsGeojson: any;
+    protected computedRoadsGeojson!: FeatureCollection<Geometry, GeoJsonProperties>;
+    private _linechartDebounce: ReturnType<typeof setTimeout> | null = null;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
@@ -130,6 +132,22 @@ export class OsmLayersApi {
             outputColumns: ['angle', 'intercept'],
             wgslBody: lstRegressionShader,
         });
+
+        // Convert plain number arrays to {timestamp, value} objects so the
+        // timeseries transform can use year strings as bucket keys.
+        this.computedRoadsGeojson = {
+            ...this.computedRoadsGeojson,
+            features: this.computedRoadsGeojson.features.map((f: Feature<Geometry, GeoJsonProperties>) => ({
+                ...f,
+                properties: {
+                    ...f.properties,
+                    lst_timeseries: ((f.properties?.lst_timeseries ?? []) as number[]).map((v, i) => ({
+                        timestamp: String(START_YEAR + i),
+                        value: v,
+                    })),
+                },
+            })),
+        };
     }
 
     protected updateRoadsThematic(mode: 'slope' | 'year', year?: number): void {
@@ -142,7 +160,7 @@ export class OsmLayersApi {
             colorMap: {
                 interpolator,
                 domainSpec: mode === 'slope'
-                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [0.02, 0.98] }
+                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [2, 98] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
             },
         });
@@ -153,7 +171,7 @@ export class OsmLayersApi {
             collection: this.roadsGeojson,
             property: mode === 'slope'
                 ? 'properties.compute.angle'
-                : `properties.lst_timeseries.${year! - START_YEAR}`,
+                : `properties.lst_timeseries.${year! - START_YEAR}.value`,
         });
 
         // Labels are computed internally from data + current colormap domain mode.
@@ -161,6 +179,7 @@ export class OsmLayersApi {
 
     protected async applyRoadslstThematic(): Promise<void> {
         this.roadsGeojson = this.computedRoadsGeojson;
+        this.map.updateRenderInfo('table_osm_roads', { isPick: true });
         this.updateRoadsThematic('slope');
     }
 
@@ -221,26 +240,47 @@ export class OsmLayersApi {
             events: [ChartEvent.BRUSH],
         });
 
-        this.plot.events.on(ChartEvent.BRUSH, ({ selection: ids }) => {
-            const layer = this.map.layerManager.searchByLayerId('table_osm_roads') as VectorLayer;
-            if (layer) layer.setHighlightedIds(ids);
-            this.map.draw();
-        });
-
         this.linechart = new AutkChart(document.getElementById('lineChartBody') as HTMLElement, {
             type: 'linechart',
-            collection: this.computedRoadsGeojson,
-            attributes: { axis: ['lst_timeseries', 'compute.angle', 'compute.intercept'] },
+            collection: { type: 'FeatureCollection', features: [] },
+            attributes: { axis: ['lst_timeseries', '@transform'] },
+            transform: {
+                preset: 'reduce-series',
+                options: { timestamp: 'timestamp', value: 'value' },
+            },
             labels: { axis: ['Year', 'LST (°C)'], title: 'Selected Road LST timeseries' },
             tickFormats: ['.0f', '.1f'],
             width: 600,
             height: 280,
         });
+
+        this.plot.events.on(ChartEvent.BRUSH, ({ selection: ids }) => {
+            const layer = this.map.layerManager.searchByLayerId('table_osm_roads') as VectorLayer;
+            if (layer) layer.setHighlightedIds(ids);
+            this.map.draw();
+
+            if (this._linechartDebounce) clearTimeout(this._linechartDebounce);
+            this._linechartDebounce = setTimeout(() => this.reloadLinechart(ids), 200);
+        });
+    }
+
+    protected reloadLinechart(ids?: number[]): void {
+        const collection: FeatureCollection<Geometry, GeoJsonProperties> =
+            ids && ids.length > 0
+                ? { ...this.computedRoadsGeojson, features: ids.map(i => this.computedRoadsGeojson.features[i]).filter(Boolean) as Feature<Geometry, GeoJsonProperties>[] }
+                : { type: 'FeatureCollection', features: [] };
+
+        this.linechart.updateCollection(collection);
     }
 
     protected setupPickListener(): void {
-        // Map picking events are handled through the map's internal event emitter
-        // Use the map's public API to handle interactions instead
+        this.map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+            if (layerId !== 'table_osm_roads') return;
+
+            this.plot.setSelection(selection);
+            this.reloadLinechart(selection);
+            this.map.draw();
+        });
     }
 }
 

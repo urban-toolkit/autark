@@ -104,6 +104,17 @@ export class AutkChart {
     }
 
     /**
+     * Replaces the chart's data collection and redraws in place.
+     *
+     * Resets all selection state without recreating the chart instance.
+     *
+     * @param collection New GeoJSON feature collection to render.
+     */
+    public updateCollection(collection: import('geojson').FeatureCollection): void {
+        this._plot.updateCollection(collection);
+    }
+
+    /**
      * Triggers a redraw of the underlying chart implementation.
      *
      * Implementations may perform synchronous or asynchronous rendering, so

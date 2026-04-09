@@ -1,5 +1,5 @@
 /**
- * Temporal transform preset.
+ * Binning-events transform preset.
  *
  * Flattens nested event arrays from feature properties, buckets them by
  * timestamp at a configurable resolution, and reduces each bucket to a single
@@ -9,26 +9,26 @@
 
 import { valueAtPath } from '../../core-types';
 
-import type { AutkDatum, TemporalTransformConfig, TransformResolution } from '../../api';
+import type { AutkDatum, BinningEventsTransformConfig, TransformResolution } from '../../api';
 
 import { reduceBuckets } from '../kernel';
 
 // ---- Executed transform -------------------------------------------------
 
 /**
- * Result produced by `runTemporal`.
+ * Result produced by `runBinningEvents`.
  */
-export type ExecutedTemporalTransform = {
-    preset: 'temporal';
-    rows: TemporalBucketRow[];
+export type ExecutedBinningEventsTransform = {
+    preset: 'binning-events';
+    rows: BinningEventsBucketRow[];
 };
 
 /**
- * A single temporal bucket row ready for chart rendering.
+ * A single event bucket row ready for chart rendering.
  *
  * `bucket` is a formatted string key (e.g. `"2024-03"` for monthly resolution).
  */
-export type TemporalBucketRow = {
+export type BinningEventsBucketRow = {
     bucket: string;
     value: number;
     count: number;
@@ -38,9 +38,9 @@ export type TemporalBucketRow = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a temporal transform and returns chart-ready rows.
+ * Runs a binning-events transform and returns chart-ready rows.
  */
-export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, columns: string[]): ExecutedTemporalTransform {
+export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransformConfig, columns: string[]): ExecutedBinningEventsTransform {
     const eventsAttr = columns[0] ?? '';
     const timestampAttr = config.options?.timestamp ?? 'timestamp';
     const valueAttr = config.options?.value ?? 'value';
@@ -72,7 +72,7 @@ export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, 
 
             eventRows.push({
                 autkIds: rowAutkIds,
-                __bucket: formatTemporalBucket(date, resolution),
+                __bucket: formatEventBucket(date, resolution),
                 __value: value,
             });
         });
@@ -89,7 +89,7 @@ export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, 
     });
 
     return {
-        preset: 'temporal',
+        preset: 'binning-events',
         rows: reduced.map(item => ({
             bucket: item.key,
             value: item.value,
@@ -102,9 +102,9 @@ export function runTemporal(rows: AutkDatum[], config: TemporalTransformConfig, 
 // ---- Bucket key formatter -----------------------------------------------
 
 /**
- * Formats a date into a string bucket key according to the specified temporal resolution.
+ * Formats a date into a string bucket key according to the specified resolution.
  */
-function formatTemporalBucket(date: Date, resolution: TransformResolution): string {
+function formatEventBucket(date: Date, resolution: TransformResolution): string {
     const pad2 = (value: number): string => String(value).padStart(2, '0');
 
     if (resolution === 'hour') {

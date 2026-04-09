@@ -213,6 +213,26 @@ export abstract class ChartBase {
     }
 
     /**
+     * Replaces the chart's data collection and redraws in place.
+     *
+     * Resets all selection state. Does not recreate the chart instance or
+     * touch the DOM outside of the normal `draw()` render path.
+     *
+     * @param collection New GeoJSON feature collection to render.
+     */
+    updateCollection(collection: import('geojson').FeatureCollection<Geometry, GeoJsonProperties>): void {
+        this._sourceFeatures = collection.features;
+        this._data = this._sourceFeatures.map((f, idx) => ({
+            ...(f.properties ?? {}),
+            autkIds: [idx],
+        })) as AutkDatum[];
+        this._selectedMarkDatums = new Set();
+        this._selectedFeatureIds = new Set();
+        this._activeBrushes.clear();
+        this.draw();
+    }
+
+    /**
      * Sets an external highlight from a linked view.
      * Owns `_selectedFeatureIds` exclusively — does not touch `_selectedMarkDatums`.
      */

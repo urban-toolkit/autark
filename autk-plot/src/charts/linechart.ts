@@ -1,11 +1,11 @@
 /**
- * @fileoverview Line chart visualization for temporal and timeseries data.
+ * @fileoverview Line chart visualization for event-based and timeseries data.
  *
  * Provides a D3-based line chart implementation with the following features:
- * - **Single-series rendering**: Aggregates feature-level timeseries or temporal buckets into a unified line
- * - **Flexible bucket labeling**: Supports numeric, date, and custom bucket labels, with optional start year offset
+ * - **Single-series rendering**: Aggregates feature-level timeseries or event buckets into a unified line
+ * - **Flexible bucket labeling**: Supports numeric, date, and custom bucket labels
  * - **Selection and linked views**: Uses source feature ids for brush interactions and linked selection across components
- * - **Transform support**: Accepts temporal or timeseries transform presets for flexible aggregation
+ * - **Transform support**: Accepts binning-events or timeseries transform presets for flexible aggregation
  *
  * @example
  * // Basic line chart with timeseries transform
@@ -20,15 +20,13 @@
  * });
  *
  * @example
- * // Line chart with temporal aggregation and brush interaction
+ * // Line chart with event binning and brush interaction
  * const plot = new AutkChart(plotDiv, {
  *   type: 'linechart',
  *   collection: geojson,
  *   transform: {
- *     preset: 'temporal',
- *     attributes: { value: 'cases', time: 'date' },
- *     resolution: 'month',
- *     reducer: 'sum'
+ *     preset: 'binning-events',
+ *     options: { value: 'cases', timestamp: 'date', resolution: 'month', reducer: 'sum' }
  *   },
  *   events: [ChartEvent.BRUSH_Y],
  *   labels: { axis: ['month', 'cases'], title: 'Monthly Cases' }
@@ -40,11 +38,10 @@ import type { AutkDatum, ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../events-types';
 
 import { run } from '../transforms';
 
-import type { ExecutedTemporalTransform, ExecutedTimeseriesTransform } from '../transforms';
+import type { ExecutedReduceSeriesTransform } from '../transforms';
 
 /**
  * Line chart that aggregates feature-level timeseries into a single series.
@@ -62,7 +59,7 @@ export class Linechart extends ChartBase {
      * @param config Linechart configuration.
      */
     constructor(config: ChartConfig) {
-        if (config.events === undefined) { config.events = [ChartEvent.BRUSH_Y]; }
+        if (config.events === undefined) { config.events = []; }
         if (config.tickFormats === undefined) { 
             config.tickFormats = ['~s', '~s']; 
         }
@@ -70,12 +67,12 @@ export class Linechart extends ChartBase {
         if (!config.transform) {
             throw new Error('Linechart requires a transform configuration.');
         }
-        if (config.transform.preset !== 'timeseries' && config.transform.preset !== 'temporal') {
-            throw new Error('Linechart only supports timeseries and temporal transform presets.');
+        if (config.transform.preset !== 'reduce-series' && config.transform.preset !== 'binning-events') {
+            throw new Error('Linechart only supports reduce-series and binning-events transform presets.');
         }
         else {
-            const axis = config.labels?.axis ?? (config.transform.preset === 'timeseries' ? ['time', 'value'] : ['bucket', 'value']);
-            const title = config.labels?.title ?? (config.transform.preset === 'timeseries' ? 'Timeseries' : 'Temporal events');
+            const axis = config.labels?.axis ?? (config.transform.preset === 'reduce-series' ? ['time', 'value'] : ['bucket', 'value']);
+            const title = config.labels?.title ?? (config.transform.preset === 'reduce-series' ? 'Series' : 'Events over time');
             config.labels = { axis, title };
         }
 
@@ -87,7 +84,7 @@ export class Linechart extends ChartBase {
     /**
      * Computes the transformed series data for the line chart based on the current selection and transform config.
      *
-     * Handles bucket label formatting, sorting, and aggregation for both temporal and timeseries presets.
+     * Handles bucket label formatting, sorting, and aggregation for both binning-events and timeseries presets.
      * Updates the internal _seriesData array used for rendering.
      */
     protected override computeTransform(): void {
@@ -117,7 +114,7 @@ export class Linechart extends ChartBase {
         })) as AutkDatum[];
 
         const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
-        const transformed = run(sourceRows, this._transformConfig!, inputColumns) as ExecutedTemporalTransform | ExecutedTimeseriesTransform;
+        const transformed = run(sourceRows, this._transformConfig!, inputColumns) as ExecutedReduceSeriesTransform;
         const reducedSeries = [...transformed.rows].sort((a, b) => compareBuckets(a.bucket, b.bucket));
         this._seriesData = reducedSeries.map((item, idx) => ({
             x: idx,

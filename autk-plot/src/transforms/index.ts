@@ -10,22 +10,22 @@ import type { AutkDatum, ChartTransformConfig } from '../api';
 import type { ExecutedBinning1dTransform } from './presets/binning-1d';
 import type { ExecutedBinning2dTransform } from './presets/binning-2d';
 import type { ExecutedSortTransform } from './presets/sort';
-import type { ExecutedTemporalTransform } from './presets/temporal';
-import type { ExecutedTimeseriesTransform } from './presets/timeseries';
+import type { ExecutedBinningEventsTransform } from './presets/binning-events';
+import type { ExecutedReduceSeriesTransform } from './presets/reduce-series';
 
 import { runBinning1d } from './presets/binning-1d';
 import { runBinning2d } from './presets/binning-2d';
 import { runSort } from './presets/sort';
-import { runTemporal } from './presets/temporal';
-import { runTimeseries } from './presets/timeseries';
+import { runBinningEvents } from './presets/binning-events';
+import { runReduceSeries } from './presets/reduce-series';
 
 // ---- Public row types ---------------------------------------------------
 
 export type {  ExecutedSortTransform } from './presets/sort';
 export type { Binning1dBinRow, ExecutedBinning1dTransform } from './presets/binning-1d';
 export type { Binning2dCellRow, ExecutedBinning2dTransform } from './presets/binning-2d';
-export type { TemporalBucketRow, ExecutedTemporalTransform } from './presets/temporal';
-export type { TimeseriesBucketRow, ExecutedTimeseriesTransform } from './presets/timeseries';
+export type { BinningEventsBucketRow, ExecutedBinningEventsTransform } from './presets/binning-events';
+export type { ReduceSeriesBucketRow, ExecutedReduceSeriesTransform } from './presets/reduce-series';
 
 // ---- Kernel public surface ----------------------------------------------
 
@@ -41,8 +41,8 @@ export type ExecutedChartTransform =
     | ExecutedBinning1dTransform
     | ExecutedBinning2dTransform
     | ExecutedSortTransform
-    | ExecutedTemporalTransform
-    | ExecutedTimeseriesTransform;
+    | ExecutedBinningEventsTransform
+    | ExecutedReduceSeriesTransform;
 
 // ---- Top-level dispatcher -----------------------------------------------
 
@@ -55,6 +55,6 @@ export function run(rows: AutkDatum[], config: ChartTransformConfig, columns: st
     if (config.preset === 'binning-1d') return runBinning1d(rows, config, columns);
     if (config.preset === 'binning-2d') return runBinning2d(rows, config, columns);
     if (config.preset === 'sort') return runSort(rows, config, columns);
-    if (config.preset === 'temporal') return runTemporal(rows, config, columns);
-    return runTimeseries(rows, config, columns);
+    if (config.preset === 'binning-events') return runBinningEvents(rows, config, columns);
+    return runReduceSeries(rows, config, columns);
 }
