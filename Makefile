@@ -1,4 +1,4 @@
-.PHONY: install lint typecheck build build-all docs verify dev map db plot compute clean publish
+.PHONY: install lint typecheck build build-all docs verify test test-ui test-codegen dev map db plot compute clean publish
 
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
@@ -51,7 +51,16 @@ docs:
 		"cd autk-plot && npm run doc" \
 		"cd autk-compute && npm run doc"
 
-verify: lint typecheck build-all docs
+verify: lint typecheck build-all docs test
+
+test:
+	npx playwright test $(APP)
+
+test-ui:
+	npx playwright test --ui $(APP)
+
+test-codegen:
+	node playwright.codegen.mjs http://localhost:5173$(OPEN)
 
 
 dev:

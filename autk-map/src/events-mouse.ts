@@ -6,101 +6,95 @@ import { AutkMap } from './main';
  *
  * This controller wires DOM mouse events to camera operations
  * (pan, rotate, zoom) and feature picking.
+ *
+ * All drag-related listeners (`pointerdown`, `pointermove`, `pointerup`) are
+ * registered on the document in capture phase during `bindEvents()`, before
+ * any third-party script (e.g. Playwright's recorder) can be injected. This
+ * guarantees our handlers fire first regardless of overlay elements or
+ * injected capture listeners added later.
  */
 export class MouseEvents {
-    /**
-     * Parent map instance used to access camera, renderer, and layers.
-     */
     private _map!: AutkMap;
-
-    /**
-     * Last pointer position in canvas pixel coordinates.
-     */
     private _lastPoint: number[];
-
-    /**
-     * Current interaction state.
-     */
     private _status: MouseStatus;
 
-    /** Bound wheel handler used for add/remove listener symmetry. */
     private _onWheel: (e: WheelEvent) => void;
-    /** Bound mouse down handler used for add/remove listener symmetry. */
-    private _onMouseDown: (e: MouseEvent) => void;
-    /** Bound mouse up handler used for add/remove listener symmetry. */
-    private _onMouseUp: (e: MouseEvent) => void;
-    /** Bound context menu handler used for add/remove listener symmetry. */
-    private _onContextMenu: (e: MouseEvent) => void;
-    /** Bound mouse move handler used for add/remove listener symmetry. */
-    private _onMouseMove: (e: MouseEvent) => void;
-    /** Bound double click handler used for add/remove listener symmetry. */
+    private _onPointerDown: (e: PointerEvent) => void;
+    private _onPointerUp: (e: PointerEvent) => void;
+    private _onContextMenu: (e: PointerEvent) => void;
+    private _onPointerMove: (e: PointerEvent) => void;
     private _onDblClick: (e: MouseEvent) => void;
 
-    /**
-     * Creates a mouse interaction controller for a map instance.
-     *
-     * @param map Target map instance.
-     */
     constructor(map: AutkMap) {
         this._map = map;
         this._lastPoint = [0, 0];
         this._status = MouseStatus.IDLE;
 
         this._onWheel = this.mouseWheel.bind(this);
-        this._onMouseDown = this.mouseDown.bind(this);
-        this._onMouseUp = this.mouseUp.bind(this);
+        this._onPointerDown = this.pointerDown.bind(this);
+        this._onPointerUp = this.pointerUp.bind(this);
         this._onContextMenu = this.contextMenu.bind(this);
-        this._onMouseMove = this.mouseMove.bind(this);
+        this._onPointerMove = this.pointerMove.bind(this);
         this._onDblClick = this.mouseDoubleClick.bind(this);
     }
 
     /**
-     * Attaches all mouse listeners to the renderer canvas.
+     * Attaches all pointer listeners.
+     *
+     * Drag listeners are registered on the document in capture phase so they
+     * are added before Playwright's recorder (or any other injected script)
+     * and therefore fire first in the event propagation chain.
      */
     bindEvents(): void {
         const canvas = this._map.renderer.canvas;
         canvas.addEventListener('wheel', this._onWheel, { passive: false });
-        canvas.addEventListener('mousedown', this._onMouseDown, false);
-        canvas.addEventListener('mouseup', this._onMouseUp, false);
-        canvas.addEventListener('contextmenu', this._onContextMenu, false);
-        canvas.addEventListener('mousemove', this._onMouseMove, false);
+        canvas.addEventListener('contextmenu', this._onContextMenu as any, false);
         canvas.addEventListener('dblclick', this._onDblClick, false);
+        document.addEventListener('pointerdown', this._onPointerDown, { capture: true });
+        document.addEventListener('pointermove', this._onPointerMove, { capture: true });
+        document.addEventListener('pointerup',   this._onPointerUp,   { capture: true });
     }
 
     /**
-     * Removes all mouse listeners from the map canvas.
+     * Removes all pointer listeners.
      */
     destroyEvents(): void {
         const canvas = this._map.renderer.canvas;
         canvas.removeEventListener('wheel', this._onWheel);
-        canvas.removeEventListener('mousedown', this._onMouseDown);
-        canvas.removeEventListener('mouseup', this._onMouseUp);
-        canvas.removeEventListener('contextmenu', this._onContextMenu);
-        canvas.removeEventListener('mousemove', this._onMouseMove);
+        canvas.removeEventListener('contextmenu', this._onContextMenu as any);
         canvas.removeEventListener('dblclick', this._onDblClick);
+        document.removeEventListener('pointerdown', this._onPointerDown, { capture: true });
+        document.removeEventListener('pointermove', this._onPointerMove, { capture: true });
+        document.removeEventListener('pointerup',   this._onPointerUp,   { capture: true });
     }
 
-    /**
-     * Prevents the browser context menu on the map canvas.
-     *
-     * @param event Native mouse event.
-     */
-    contextMenu(event: MouseEvent): void {
+    contextMenu(event: PointerEvent): void {
         event.preventDefault();
         event.stopPropagation();
     }
 
-    /**
-     * Starts a drag interaction for left or middle mouse button.
-     *
-     * @param event Native mouse event.
-     */
-    mouseDown(event: MouseEvent): void {
-        event.preventDefault();
-        event.stopPropagation();
+    private _getPoint(event: PointerEvent | MouseEvent): number[] {
+        const canvas = this._map.renderer.canvas;
+        const rect = canvas.getBoundingClientRect();
+        return [
+            event.clientX - rect.left,
+            event.clientY - rect.top,
+        ];
+    }
 
-        if (event.button == 0 || event.button == 1) {
-            this._lastPoint = [event.offsetX, event.offsetY];
+    /**
+     * Starts a drag when the pointer goes down over the canvas.
+     *
+     * The canvas bounds check is necessary because this listener fires for
+     * all document pointerdown events.
+     */
+    pointerDown(event: PointerEvent): void {
+        if (event.target !== this._map.renderer.canvas) return;
+
+        if (event.button === 0 || event.button === 1) {
+            event.preventDefault();
+            event.stopPropagation();
+            this._lastPoint = this._getPoint(event);
             this._status = MouseStatus.DRAG;
         }
     }
@@ -108,53 +102,53 @@ export class MouseEvents {
     /**
      * Applies camera pan or orbit while dragging.
      *
-     * Hold Shift + left drag to orbit; otherwise drag pans.
-     *
-     * @param event Native mouse event.
+     * If pointerdown was deferred (e.g. by Playwright's recorder), we detect
+     * drag start here by checking event.buttons while in IDLE state.
      */
-    mouseMove(event: MouseEvent): void {
-        const canvas = this._map.renderer.canvas;
-
-        if (this._status === MouseStatus.DRAG) {
-            event.preventDefault();
-            event.stopPropagation();
-            const dx = -event.offsetX + this._lastPoint[0];
-            const dy = event.offsetY - this._lastPoint[1];
-
-            if (event.buttons === 1 && event.shiftKey) {
-                this._map.camera.yaw(dx / canvas.offsetWidth);
-                this._map.camera.pitch(dy / canvas.offsetHeight);
-            } else {
-                this._map.camera.translate(dx / canvas.offsetWidth, dy / canvas.offsetHeight);
-            }
-
-            this._lastPoint = [event.offsetX, event.offsetY];
+    pointerMove(event: PointerEvent): void {
+        if (this._status === MouseStatus.IDLE && (event.buttons === 1 || event.buttons === 4)
+                && event.target === this._map.renderer.canvas) {
+            this._lastPoint = this._getPoint(event);
+            this._status = MouseStatus.DRAG;
         }
+
+        if (this._status !== MouseStatus.DRAG) return;
+
+        const canvas = this._map.renderer.canvas;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const point = this._getPoint(event);
+        const dx = -point[0] + this._lastPoint[0];
+        const dy =  point[1] - this._lastPoint[1];
+
+        if ((event.buttons & 1) === 1 && event.shiftKey) {
+            this._map.camera.yaw(dx / canvas.offsetWidth);
+            this._map.camera.pitch(dy / canvas.offsetHeight);
+        } else {
+            this._map.camera.translate(dx / canvas.offsetWidth, dy / canvas.offsetHeight);
+        }
+
+        this._lastPoint = point;
     }
 
     /**
      * Ends the current drag interaction.
-     *
-     * @param event Native mouse event.
+     * No-op when not in DRAG state.
      */
-    mouseUp(event: MouseEvent): void {
+    pointerUp(event: PointerEvent): void {
+        if (this._status !== MouseStatus.DRAG) return;
+
         event.preventDefault();
         event.stopPropagation();
-
         this._status = MouseStatus.IDLE;
     }
 
-    /**
-     * Zooms the camera around the cursor position.
-     *
-     * @param event Native wheel event.
-     */
     mouseWheel(event: WheelEvent) {
         event.preventDefault();
         event.stopPropagation();
 
         const canvas = this._map.renderer.canvas;
-
         const rect = canvas.getBoundingClientRect();
         const x = (event.clientX - rect.left) / canvas.offsetWidth;
         const y = 1.0 - (event.clientY - rect.top) / canvas.offsetHeight;
@@ -162,14 +156,6 @@ export class MouseEvents {
         this._map.camera.zoom(event.deltaY * 0.01, x, y);
     }
 
-    /**
-     * Queues a picking request at the double-clicked canvas position.
-     *
-     * The position is converted from CSS pixels to the actual backing
-     * canvas resolution before being stored.
-     *
-     * @param event Native mouse event.
-     */
     mouseDoubleClick(event: MouseEvent) {
         event.preventDefault();
         event.stopPropagation();
