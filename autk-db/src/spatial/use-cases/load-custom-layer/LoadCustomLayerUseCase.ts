@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { CustomLayerTable } from '../../../shared/interfaces';
-import { Params } from './interfaces';
+import { LoadCustomLayerParams } from './interfaces';
 import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
@@ -24,7 +24,7 @@ export class LoadCustomLayerUseCase {
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
     boundingBox,
     workspace = 'main',
-  }: Params): Promise<CustomLayerTable> {
+  }: LoadCustomLayerParams): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
     }

@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Params } from './interfaces';
+import { LoadLayerParams } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
 import { LayerTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
@@ -19,7 +19,7 @@ export class LoadLayerUseCase {
     this.aggregateBuildingLayerUseCase = new AggregateBuildingLayerUseCase(conn);
   }
 
-  async exec(params: Params): Promise<LayerTable> {
+  async exec(params: LoadLayerParams): Promise<LayerTable> {
     if (!params.coordinateFormat) params.coordinateFormat = DEFALT_COORDINATE_FORMAT;
     const workspace = params.workspace || 'main';
 

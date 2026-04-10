@@ -1,7 +1,7 @@
 import { FeatureCollection } from 'geojson';
 import { BoundingBox } from '../../../shared/interfaces';
 
-export interface Params {
+export interface LoadCustomLayerParams {
   geojsonFileUrl?: string;
   geojsonObject?: FeatureCollection;
   outputTableName: string;

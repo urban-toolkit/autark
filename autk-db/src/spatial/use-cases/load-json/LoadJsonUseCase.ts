@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Params } from './interfaces';
+import { LoadJsonParams } from './interfaces';
 import { JsonTable } from '../../../shared/interfaces';
 import { LOAD_JSON_ON_TABLE_QUERY, LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
@@ -15,7 +15,7 @@ export class LoadJsonUseCase {
     this.conn = conn;
   }
 
-  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = 'main' }: Params): Promise<JsonTable> {
+  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = 'main' }: LoadJsonParams): Promise<JsonTable> {
     if (!jsonFileUrl && !jsonObject) {
       throw new Error('Either jsonFileUrl or jsonObject must be provided');
     }

@@ -46,7 +46,7 @@ export interface OsmLoadTimings {
   layers: LayerLoadTimings[];
 }
 
-export type Params = {
+export type LoadOsmParams = {
   outputTableName: string;
   autoLoadLayers?: {
     coordinateFormat: string;

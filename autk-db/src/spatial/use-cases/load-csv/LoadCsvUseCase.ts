@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Params } from './interfaces';
+import { LoadCsvParams } from './interfaces';
 import { CsvTable } from '../../../shared/interfaces';
 import { LOAD_CSV_ON_TABLE_QUERY, LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
@@ -15,7 +15,7 @@ export class LoadCsvUseCase {
     this.conn = conn;
   }
 
-  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = 'main' }: Params): Promise<CsvTable> {
+  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = 'main' }: LoadCsvParams): Promise<CsvTable> {
     if (!csvFileUrl && !csvObject) {
       throw new Error('Either csvFileUrl or csvObject must be provided');
     }

@@ -1,6 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Params, OsmElement, OnLoadingProgress } from './interfaces';
+import { LoadOsmParams, OsmElement, OnLoadingProgress } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
 
 interface OsmExecResult {
@@ -38,7 +38,7 @@ export class LoadOsmFromOverpassApiUseCase {
     return `overpass-${type}-${queryArea.geocodeArea}-${areas}`;
   }
 
-  async exec(params: Params): Promise<OsmExecResult> {
+  async exec(params: LoadOsmParams): Promise<OsmExecResult> {
     if (!params.queryArea) throw new Error('queryArea must be provided');
     const workspace = params.workspace || 'main';
     const onProgress = params.onProgress;

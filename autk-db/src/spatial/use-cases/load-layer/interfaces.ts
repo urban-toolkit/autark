@@ -33,7 +33,7 @@ export function mapGeojsonGeometryTypeToLayerType(geojsonType: string): LayerTyp
   }
 }
 
-export interface Params {
+export interface LoadLayerParams {
   osmInputTableName: string;
   outputTableName?: string;
   layer: LayerType;

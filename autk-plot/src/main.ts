@@ -6,6 +6,7 @@ import type { ChartEventRecord } from './events-types';
 
 import { ChartBase } from './chart-base';
 
+
 import {
     Barchart,
     Heatmatrix,

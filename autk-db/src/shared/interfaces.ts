@@ -14,7 +14,7 @@ export type CsvTable = CommonTable & { source: 'csv'; type: 'pointset' }; // TOD
 export type JsonTable = CommonTable & { source: 'json'; type: 'pointset' };
 export type AnyTable = CommonTable & { source: 'user'; type: 'pointset' };
 
-interface CommonTable {
+export interface CommonTable {
   name: string;
   columns: Column[];
 }

@@ -30,7 +30,7 @@ export type { ReduceSeriesBucketRow, ExecutedReduceSeriesTransform } from './pre
 // ---- Kernel public surface ----------------------------------------------
 
 export { reduceBuckets } from './kernel';
-export type { ReducedBucket } from './kernel';
+export type { ReducedBucket, Row } from './kernel';
 
 // ---- Discriminated union ------------------------------------------------
 

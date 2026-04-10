@@ -1,7 +1,7 @@
 import type { TransformReducer } from '../api';
 
 /** Minimum row shape expected by `reduceBuckets`. Covers both `AutkDatum` rows and synthetic intermediate rows created by temporal and timeseries presets. */
-type Row = { autkIds?: number[]; [key: string]: unknown };
+export type Row = { autkIds?: number[]; [key: string]: unknown };
 
 /**
  * Output of a single aggregated bucket after reduction.
@@ -20,10 +20,10 @@ export type ReducedBucket = {
 /**
  * Groups rows into keyed buckets and reduces each bucket to a single value.
  *
- * @param rows - Input data to aggregate.
- * @param bucketOf - Assigns a group key to each row. Return `null` to skip the row.
- * @param valueOf - Extracts the numeric value to reduce per row. Omit for count mode (defaults to `1`).
- * @param reducer - How to collapse all values in a bucket: `count`, `sum`, `avg`, `min`, or `max`.
+ * @param options.rows - Input data to aggregate.
+ * @param options.bucketOf - Assigns a group key to each row. Return `null` to skip the row.
+ * @param options.valueOf - Extracts the numeric value to reduce per row. Omit for count mode (defaults to `1`).
+ * @param options.reducer - How to collapse all values in a bucket: `count`, `sum`, `avg`, `min`, or `max`.
  */
 export function reduceBuckets(options: {
     rows: Row[];

@@ -3,7 +3,7 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { CsvTable, CustomLayerTable, LayerTable, JsonTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
-import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
+import { LoadLayerUseCase, LoadLayerParams } from './use-cases/load-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
 import { LoadJsonUseCase, LoadJsonParams } from './use-cases/load-json';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
@@ -16,7 +16,7 @@ import { BoundingBox } from '../shared/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
 import { isLayerType } from './use-cases/load-layer/interfaces';
-import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
+import { LoadOsmParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 import type { OsmLoadTimings } from './use-cases/load-osm-from-overpass-api/interfaces';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
 import { GridLayerTable, GeoTiffTable } from '../shared/interfaces';
@@ -190,7 +190,7 @@ export class AutkSpatialDb {
    * @returns A promise that resolves when the OSM data and layers are fully loaded.
    * @throws Error if the database or connection is not initialized.
    */
-  async loadOsm(params: LoadOsmFromOverpassApiParams): Promise<OsmLoadTimings> {
+  async loadOsm(params: LoadOsmParams): Promise<OsmLoadTimings> {
     if (
       !this.db ||
       !this.conn ||
@@ -232,7 +232,7 @@ export class AutkSpatialDb {
       for (const layer of params.autoLoadLayers.layers) {
         const shouldCrop = layer !== 'buildings'; // avoid crop buildings layer
 
-        const layerParams: GetLayerParams = {
+        const layerParams: LoadLayerParams = {
           osmInputTableName: params.outputTableName,
           coordinateFormat: params.autoLoadLayers.coordinateFormat,
           layer,
@@ -314,7 +314,7 @@ export class AutkSpatialDb {
    * @throws Error if the database or connection is not initialized.
    * @throws Error if the OSM input table is not found or is not of the correct type.
    */
-  async loadLayer(params: GetLayerParams): Promise<LayerTable> {
+  async loadLayer(params: LoadLayerParams): Promise<LayerTable> {
     if (!this.db || !this.conn || !this.loadLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
