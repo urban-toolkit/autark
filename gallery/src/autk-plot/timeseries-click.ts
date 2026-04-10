@@ -52,7 +52,7 @@ export class MapD3Timeseries {
             attributes: { axis: ['series', '@transform'] },
             labels: { axis: ['bucket', 'avg'], title: 'Average synthetic timeseries (neighborhoods)' },
             transform: {
-                preset: 'timeseries',
+                preset: 'reduce-series',
                 options: { timestamp: 'timestamp', value: 'value', reducer: 'avg' },
             },
             margins: { left: 60, right: 20, top: 50, bottom: 140 },

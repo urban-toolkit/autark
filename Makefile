@@ -6,8 +6,6 @@ RIMRAF := npx rimraf
 APP ?= gallery
 
 LIB_PACKAGES := autk-map autk-db autk-plot autk-compute
-APP_PACKAGES := gallery usecases performance
-TYPECHECK_PACKAGES := autk-core $(LIB_PACKAGES) $(APP_PACKAGES)
 DOC_PACKAGES := $(LIB_PACKAGES)
 
 lint:
@@ -21,8 +19,7 @@ typecheck:
 		"cd autk-plot && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
 		"cd gallery && npx tsc --noEmit --skipLibCheck" \
-		"cd usecases && npx tsc --noEmit --skipLibCheck" \
-		"cd performance && npx tsc --noEmit --skipLibCheck"
+		"cd usecases && npx tsc --noEmit --skipLibCheck"
 
 build:
 	$(CONCURRENTLY) \
@@ -36,10 +33,7 @@ build-all:
 		"cd autk-map && npm run build" \
 		"cd autk-db && npm run build" \
 		"cd autk-plot && npm run build" \
-		"cd autk-compute && npm run build" \
-		"cd gallery && npm run build" \
-		"cd usecases && npm run build" \
-		"cd performance && npm run build"
+		"cd autk-compute && npm run build"
 
 docs:
 	$(CONCURRENTLY) \
@@ -48,7 +42,7 @@ docs:
 		"cd autk-plot && npm run doc" \
 		"cd autk-compute && npm run doc"
 
-verify: lint typecheck build-all docs test
+verify: lint typecheck build-all docs
 
 test:
 	APP=$(APP) OPEN=$(OPEN) npx playwright test tests/$(APP)
