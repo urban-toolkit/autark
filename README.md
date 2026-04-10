@@ -56,28 +56,50 @@ sudo apt-get install build-essential
 
 ### Building and Running
 
-After istalling Node,js and GNU Make, in the root folder of the project, run the following command to install required packages:
+After installing Node.js and GNU Make, in the root folder of the project, run the following command to install required packages:
 
 ```bash
 make install
 ```
 
-After installing the required packages, run the following command to start the development server for the default `examples` application:
+To start the development server for the default `gallery` application:
 
 ```bash
 make dev
 ```
 
-There are several examples inside the `examples/` directory that can be loaded to test Autark. To open a specific file or app different from the default, you can append the `OPEN` parameter to `make dev`. The `APP` and `OPEN` variables can be used together. For instance, to open a specific example:
+You can specify a different application workspace using the `APP` variable and a specific file using `OPEN`:
 
 ```bash
-make dev OPEN=/src/autk-plot/map-d3-table.html
+# Run the gallery with a specific example
+make dev APP=gallery OPEN=/src/autk-plot/map-d3-table.html
+
+# Run the usecases workspace (case studies)
+make dev APP=usecases OPEN=/src/urbane/main.html
 ```
 
-If you wish to run a different application, such as one of the `case-studies`, you can specify the target environment using the `APP` variable. The `case-studies` folder contains multiple applications:
+### Development Workflow
 
+The `Makefile` provides several commands to help with the development process:
+
+| Command | Description |
+| :--- | :--- |
+| `make install` | Installs all dependencies for the workspace. |
+| `make build` | Builds the core libraries (`autk-map`, `autk-db`, etc.). |
+| `make verify` | Runs the full CI suite: lint, typecheck, build-all, docs, and tests. |
+| `make test` | Runs Playwright end-to-end tests. |
+| `make test-ui` | Opens the Playwright UI for interactive test debugging. |
+| `make test-codegen` | Starts the Playwright recorder to generate tests. |
+| `make docs` | Generates TypeDoc documentation for the core libraries. |
+| `make clean` | Removes `node_modules` and all build artifacts. |
+
+#### Component-Specific Builds
+If you are working on a specific module, you can rebuild it individually:
 ```bash
-make dev APP=case-studies OPEN=/src/urbane/main.html
+make map      # Build autk-map
+make db       # Build autk-db
+make plot     # Build autk-plot
+make compute  # Build autk-compute
 ```
 
 ## Notes
