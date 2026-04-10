@@ -41,6 +41,10 @@ npm-debug.log*
 ._*
 .DS_Store
 
+# Playwright output
+tests/report/
+tests/results/
+
 # Test data
 **/public/data-ignore/*
 performance/public/data/noise.csv

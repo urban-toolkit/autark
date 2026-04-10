@@ -78,6 +78,28 @@ make dev APP=gallery OPEN=/src/autk-plot/map-d3-table.html
 make dev APP=usecases OPEN=/src/urbane/main.html
 ```
 
+### Testing
+
+Autark uses [Playwright](https://playwright.dev/) for end-to-end visual regression testing. Tests are organized under `tests/<app>/` and capture screenshots of the canvas output, which are compared against saved reference images.
+
+All test commands accept two parameters: `APP` (the application workspace, e.g. `gallery` or `usecases`) and `OPEN` (the path to the example within the app).
+
+```bash
+# Run tests and compare against saved reference screenshots
+make test APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+
+# Save new reference screenshots (run this when visual output changes intentionally)
+make test-update APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+
+# Open the Playwright UI for interactive test debugging
+make test-ui APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+
+# Record a new test by interacting with an example in the browser
+# Interactions are saved as a test file under tests/<app>/
+make test-codegen APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+```
+
+
 ### Development Workflow
 
 The `Makefile` provides several commands to help with the development process:
@@ -87,9 +109,6 @@ The `Makefile` provides several commands to help with the development process:
 | `make install` | Installs all dependencies for the workspace. |
 | `make build` | Builds the core libraries (`autk-map`, `autk-db`, etc.). |
 | `make verify` | Runs the full CI suite: lint, typecheck, build-all, docs, and tests. |
-| `make test` | Runs Playwright end-to-end tests. |
-| `make test-ui` | Opens the Playwright UI for interactive test debugging. |
-| `make test-codegen` | Starts the Playwright recorder to generate tests. |
 | `make docs` | Generates TypeDoc documentation for the core libraries. |
 | `make clean` | Removes `node_modules` and all build artifacts. |
 

@@ -12,8 +12,11 @@
  */
 
 import { chromium } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
-const url = process.argv[2] ?? 'http://localhost:5173';
+const url = process.argv[2] ?? 'http://localhost:5177';
+const outputFile = process.argv[3];
 
 const browser = await chromium.launch({
     headless: false,
@@ -28,10 +31,21 @@ const context = await browser.newContext({
     viewport: { width: 1280, height: 1280 },
 });
 
+if (outputFile) {
+    mkdirSync(dirname(outputFile), { recursive: true });
+    // Use internal recorder API (same as `playwright codegen --output`) to auto-save generated code.
+    await context._enableRecorder({ language: 'playwright-test', outputFile, startRecording: true });
+} else {
+    // Fallback: open Inspector UI without saving.
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.pause();
+    await browser.close();
+    process.exit(0);
+}
+
 const page = await context.newPage();
 await page.goto(url);
 
-// Opens the Playwright Inspector with the code recorder UI.
-await page.pause();
-
-await browser.close();
+// Wait for the browser to close (user finishes recording).
+await new Promise(resolve => browser.on('disconnected', resolve));

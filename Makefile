@@ -1,4 +1,4 @@
-.PHONY: install lint typecheck build build-all docs verify test test-ui test-codegen dev map db plot compute clean publish
+.PHONY: install lint typecheck build build-all docs verify test test-update test-ui test-codegen dev map db plot compute clean publish
 
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
@@ -9,9 +9,6 @@ LIB_PACKAGES := autk-map autk-db autk-plot autk-compute
 APP_PACKAGES := gallery usecases performance
 TYPECHECK_PACKAGES := autk-core $(LIB_PACKAGES) $(APP_PACKAGES)
 DOC_PACKAGES := $(LIB_PACKAGES)
-
-install:
-	npm install
 
 lint:
 	npm run lint
@@ -54,17 +51,20 @@ docs:
 verify: lint typecheck build-all docs test
 
 test:
-	npx playwright test $(APP)
+	APP=$(APP) OPEN=$(OPEN) npx playwright test tests/$(APP)
+
+test-update:
+	APP=$(APP) OPEN=$(OPEN) npx playwright test tests/$(APP) --update-snapshots
 
 test-ui:
-	npx playwright test --ui $(APP)
+	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui tests/$(APP)
 
 test-codegen:
-	node playwright.codegen.mjs http://localhost:5173$(OPEN)
+	node playwright.codegen.mjs http://localhost:5173$(OPEN)$(if $(OPEN), tests/$(APP)/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||').test.ts)
 
 
 dev:
-	make install
+	npm install
 	make build
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \

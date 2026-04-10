@@ -6,13 +6,16 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
+  testIgnore: /\/\._/,
+  snapshotPathTemplate: '{testFileDir}/{arg}{ext}',
+  outputDir: './tests/results',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: [['html', { outputFolder: './tests/report' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5177',
     viewport: { width: 1280, height: 1280 },
     trace: 'on-first-retry',
     ignoreHTTPSErrors: true,
@@ -35,8 +38,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
+    command: `cd ${process.env.APP ?? 'gallery'} && npm run dev -- --port 5177`,
+    url: `http://localhost:5177${process.env.OPEN ?? '/'}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
