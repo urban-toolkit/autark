@@ -30,6 +30,7 @@ export class OsmLayersApi {
         await this.loadLayers();
 
         this.map.draw();
+        this.addOpacitySlider(canvas);
     }
 
     protected async loadLayers(): Promise<void> {
@@ -38,6 +39,54 @@ export class OsmLayersApi {
             this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
+    }
+
+    private addOpacitySlider(canvas: HTMLCanvasElement): void {
+        const container = document.createElement('div');
+        const rect = canvas.getBoundingClientRect();
+        container.style.cssText = `
+            position: fixed;
+            top: ${rect.top + 16}px;
+            right: ${window.innerWidth - rect.right + 16}px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 14px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-family: system-ui, sans-serif;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 20;
+        `;
+
+        const label = document.createElement('label');
+        label.textContent = 'Buildings';
+        label.style.color = '#333';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '1';
+        slider.step = '0.01';
+        slider.value = '1';
+        slider.style.width = '100px';
+
+        const valueDisplay = document.createElement('span');
+        valueDisplay.textContent = '1.00';
+        valueDisplay.style.cssText = 'min-width: 2.5em; text-align: right; color: #555;';
+
+        slider.addEventListener('input', () => {
+            const opacity = parseFloat(slider.value);
+            valueDisplay.textContent = opacity.toFixed(2);
+            this.map.updateRenderInfo('table_osm_buildings', { opacity });
+        });
+
+        container.appendChild(label);
+        container.appendChild(slider);
+        container.appendChild(valueDisplay);
+
+        document.body.appendChild(container);
     }
 }
 
