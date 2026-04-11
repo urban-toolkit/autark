@@ -1,11 +1,11 @@
 {
     "background": "#bed2d7",
-    "surface": "#EFEFEF",
-    "parks": "#C3D0B2",
-    "water": "#bed2d7",
+    "surface": "#dce4e8",
+    "parks": "#b8ccb0",
+    "water": "#9ec0cb",
     "roads": "#d9b504",
-    "buildings": "#DFDFDF",
-    "points": "#7f7f7fff",
-    "polylines": "#DFDFDF",
-    "polygons": "#DFDFDF"
+    "buildings": "#f0f4f6",
+    "points": "#4a6570",
+    "polylines": "#d9b504",
+    "polygons": "#dce2e5"
 }

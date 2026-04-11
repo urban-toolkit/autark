@@ -4,8 +4,8 @@
     "parks": "#d5eacb",
     "water": "#b8def5",
     "roads": "#ffffff",
-    "buildings": "#d9d5cf",
+    "buildings": "#f2f5f6",
     "points": "#3f4348",
     "polylines": "#f2a65a",
-    "polygons": "#d9d5cf"
+    "polygons": "#e4e7ea"
 }
