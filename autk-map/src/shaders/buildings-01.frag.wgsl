@@ -12,22 +12,23 @@ struct BufferOut {
     @location(1) normal : vec4f,
 }
 
-@fragment 
-fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inSkipped: f32) -> BufferOut {
+@fragment
+fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inSkipped: f32) -> BufferOut {
 
     if (inSkipped > 0.0) {
         discard;
     }
 
-    var light1: vec3f = normalize(vec3f(1.0, 0.0, 1.0));
-    var light2: vec3f = normalize(vec3f(0.0, 1.0, 0.0));
+    // 3-tone architectural lighting: top faces bright, lit walls mid, shadow walls dark.
+    // Light from upper-front-right (Z up). Ambient sets the shadow-face floor (~60%).
+    // Diffuse adds up to 40% on top/lit faces, giving a clear 60-100% range.
+    var light: vec3f = normalize(vec3f(0.8, 0.5, 1.5));
 
     var normal: vec3f = normalize(inNormal);
 
-    var diffuse: f32 = 0.7 * max(dot(normal, light1) * 0.7, 0.0) + 0.3 * max(dot(normal, light2) * 0.7, 0.0);
-    var ambient: f32 = 0.5;
+    var diffuse: f32 = 0.28 * max(dot(normal, light), 0.0);
+    var ambient: f32 = 0.62;
 
-    // var finalcolor: vec4f = vec4f(0.0, 0.0, 0.0, 1.0);
     var color = vec4f(color.r / 255, color.g / 255, color.b / 255, color.a);
 
     var thematicValue = inThematic;
@@ -54,8 +55,10 @@ fn main(@location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2)
     var shade: vec4f = color * (diffuse + ambient);
 
     var output : BufferOut;
-    output.color  = vec4f(0.5 * shade.rgb + 0.5 * color.rgb, 1.0);
-    output.normal = vec4f(normal * 0.5 + 0.5, 1.0);
+    output.color  = vec4f(shade.rgb, 1.0);
+    // Store depth in normal.a (mapped to [0.001, 0.999] so geometry is always > 0,
+    // distinguishable from background which is cleared to 0.0).
+    output.normal = vec4f(normal * 0.5 + 0.5, fragPos.z * 0.998 + 0.001);
 
     return output;
 }
