@@ -13,6 +13,75 @@ const globalRoofShapeCounts: Record<string, number> = {};
 let globalLogTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export class TriangulatorBuildings {
+    static computeOrigin(geojson: FeatureCollection): [number, number] {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+        const expand = (coord: number[]) => {
+            if (coord[0] < minX) minX = coord[0];
+            if (coord[0] > maxX) maxX = coord[0];
+            if (coord[1] < minY) minY = coord[1];
+            if (coord[1] > maxY) maxY = coord[1];
+        };
+
+        for (const feature of geojson.features) {
+            const geom = feature.geometry;
+            if (!geom) continue;
+            this.expandGeometry(geom, expand);
+        }
+
+        if (!Number.isFinite(minX)) return [0, 0];
+        return [(minX + maxX) * 0.5, (minY + maxY) * 0.5];
+    }
+
+    private static expandGeometry(geom: any, expand: (c: number[]) => void): void {
+        if (geom.type === 'Point') {
+            expand(geom.coordinates);
+        } else if (geom.type === 'LineString') {
+            for (const c of geom.coordinates) expand(c);
+        } else if (geom.type === 'MultiLineString') {
+            for (const line of geom.coordinates) for (const c of line) expand(c);
+        } else if (geom.type === 'Polygon') {
+            for (const ring of geom.coordinates) for (const c of ring) expand(c);
+        } else if (geom.type === 'MultiPolygon') {
+            for (const poly of geom.coordinates)
+                for (const ring of poly) for (const c of ring) expand(c);
+        } else if (geom.type === 'GeometryCollection') {
+            for (const sub of geom.geometries) this.expandGeometry(sub, expand);
+        }
+    }
+
+    static triangulate(geojson: FeatureCollection, options: { origin: number[] }): { positions: Float32Array; indices: Uint32Array } {
+        const [geometries] = this.buildMesh(geojson, options.origin);
+        
+        let totalVerts = 0;
+        let totalIndices = 0;
+        for (const g of geometries) {
+            totalVerts += g.position.length;
+            totalIndices += (g.indices?.length ?? 0);
+        }
+
+        const positions = new Float32Array(totalVerts);
+        const indices = new Uint32Array(totalIndices);
+
+        let vOffset = 0;
+        let iOffset = 0;
+        let vertexCount = 0;
+
+        for (const g of geometries) {
+            positions.set(g.position, vOffset);
+            if (g.indices) {
+                for (let i = 0; i < g.indices.length; i++) {
+                    indices[iOffset + i] = g.indices[i] + vertexCount;
+                }
+                iOffset += g.indices.length;
+            }
+            vOffset += g.position.length;
+            vertexCount += g.position.length / 3;
+        }
+
+        return { positions, indices };
+    }
+
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];

@@ -172,8 +172,8 @@ export class AutkMap {
      * Supported layer types: 'surface', 'water', 'parks', 'roads', 'buildings',
      * 'points', 'polylines', 'polygons', 'raster'.
      *
+     * @param id Unique layer identifier.
      * @param params Load parameters.
-     * @param params.id Unique layer identifier.
      * @param params.collection Source GeoJSON feature collection.
      * @param params.type Optional layer type override.
      * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
@@ -237,8 +237,8 @@ export class AutkMap {
      *
      * For raster layers the raster texture is rebuilt from `property`.
      *
+     * @param id Layer identifier.
      * @param params Update parameters.
-     * @param params.id Layer identifier.
      * @param params.collection Source feature collection.
      * @param params.property Dot-path accessor resolved from each feature.
      */
@@ -306,8 +306,8 @@ export class AutkMap {
     /**
      * Updates raster layer values and color domain.
      *
+     * @param id Layer identifier.
      * @param params Update parameters.
-     * @param params.id Layer identifier.
      * @param params.collection GeoTIFF-derived feature collection.
      * @param params.property Dot-path accessor for each raster cell.
      * @param params.transferFunction Optional opacity transfer-function configuration.
@@ -345,6 +345,7 @@ export class AutkMap {
     /**
      * Updates color-map configuration for a layer.
      *
+     * @param id Layer identifier.
      * @param params Color-map update parameters.
      */
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {

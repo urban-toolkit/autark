@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import { FeatureCollection, LineString, MultiLineString } from 'geojson';
+import { FeatureCollection } from 'geojson';
 import { ColorRGB, Camera, TriangulatorBuildings } from 'autk-core';
 import { GpuPipeline } from './compute-pipeline';
 
