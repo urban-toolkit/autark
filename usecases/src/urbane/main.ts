@@ -2,7 +2,7 @@
 import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
-import { GeojsonCompute, RenderCompute } from 'autk-compute';
+import { ComputeGpgpu, ComputeRender } from 'autk-compute';
 import { AutkChart, ChartEvent } from 'autk-plot';
 import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
@@ -135,7 +135,7 @@ export class Urbane {
         setLoadingState('Computing sky view factor...', 'Running render-based GPU analysis for road segments.');
         const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
         const roadsGeoJson = await this.db.getLayer('table_osm_roads');
-        const rc = new RenderCompute();
+        const rc = new ComputeRender();
 
         this.roadsWithSky = await rc.renderIntoMetrics({
             layers: [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 } }],
@@ -188,7 +188,7 @@ export class Urbane {
             p.scoreInputs = vals;
         }
 
-        return new GeojsonCompute().analytical({
+        return new ComputeGpgpu().exec({
             collection: geojson,
             variableMapping: { vals: 'scoreInputs' },
             attributeArrays: { vals: N },
@@ -218,25 +218,19 @@ export class Urbane {
             const geojson = layerData.name === 'neighborhoods'
                 ? this.neighs
                 : await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
         }
 
         this.map.updateRenderInfo('table_osm_buildings', { isSkip: true });
         this.map.updateRenderInfo('neighborhoods', { opacity: 0.75, isPick: true });
 
         if (this.roadsWithSky) {
-            this.map.updateColorMap({
-                id: 'table_osm_roads',
-                colorMap: {
+            this.map.updateColorMap('table_osm_roads', { colorMap: {
                     domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [15, 85] },
-                },
-            });
+                }, });
 
-            this.map.updateThematic({
-                id: 'table_osm_roads',
-                collection: this.roadsWithSky,
-                property: 'properties.compute.skyViewFactor',
-            });
+            this.map.updateThematic('table_osm_roads', { collection: this.roadsWithSky,
+                property: 'properties.compute.skyViewFactor', });
             this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
         }
 
@@ -259,16 +253,13 @@ export class Urbane {
             return;
         }
 
-        this.map.updateColorMap({
-            id: layerId,
-            colorMap: {
+        this.map.updateColorMap(layerId, { colorMap: {
                 domainSpec: column.includes('skyExposure')
                     ? { type: ColorMapDomainStrategy.PERCENTILE, params: [15, 85] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
-            },
-        });
+            }, });
 
-        this.map.updateThematic({ id: layerId, collection: geojson, property: `properties.${column}` });
+        this.map.updateThematic(layerId, { collection: geojson, property: `properties.${column}` });
         this.map.updateRenderInfo(layerId, { isColorMap: true });
         this.map.draw();
     }
@@ -449,7 +440,7 @@ export class Urbane {
             this._currentLevel = 'active_buildings';
             await this.updateBuildingsSelection();
 
-            this.map.loadCollection({ id: 'active_buildings', collection: this.activeBuildings, type: 'buildings' });
+            this.map.loadCollection('active_buildings', { collection: this.activeBuildings, type: 'buildings' });
             this.map.updateRenderInfo('neighborhoods', { isSkip: true, isPick: false });
             this.map.updateRenderInfo('active_buildings', { isSkip: false, isPick: true });
         } else {

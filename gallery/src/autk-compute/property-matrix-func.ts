@@ -1,4 +1,4 @@
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 import { FeatureCollection } from 'geojson';
 
 export class PropertyMatrixFunc {
@@ -42,11 +42,11 @@ export class PropertyMatrixFunc {
     console.log('Target color value:', targetColor);
     console.log('Total pixels per image:', imageWidth * imageHeight);
 
-    const geojsonCompute = new GeojsonCompute();
+    const geojsonCompute = new ComputeGpgpu();
 
     // Calculate percentage of pixels matching the target color
     console.log('\n=== Calculating Color Percentage in Images ===');
-    const result = await geojsonCompute.analytical({
+    const result = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         img: 'image',

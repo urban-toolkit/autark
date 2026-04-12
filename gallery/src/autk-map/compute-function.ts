@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 
 import { AutkMap, LayerType } from 'autk-map';
 
@@ -33,8 +33,8 @@ export class ComputeFunction {
 
         let geojson = await this.db.getLayer('neighborhoods');
 
-        const geojsonCompute = new GeojsonCompute();
-        geojson = await geojsonCompute.analytical({
+        const geojsonCompute = new ComputeGpgpu();
+        geojson = await geojsonCompute.exec({
             collection: geojson,
             variableMapping: {
                 x: 'shape_area',
@@ -57,14 +57,14 @@ export class ComputeFunction {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
 
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
 
     protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
-        this.map.updateThematic({ id: 'neighborhoods', collection: geojson, property: 'properties.compute.result' });
+        this.map.updateThematic('neighborhoods', { collection: geojson, property: 'properties.compute.result' });
     }
 }
 

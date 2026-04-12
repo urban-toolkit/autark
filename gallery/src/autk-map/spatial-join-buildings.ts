@@ -71,7 +71,7 @@ export class SpatialJoinNear {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -79,7 +79,7 @@ export class SpatialJoinNear {
     protected async updateThematicData(layer: string = 'table_osm_buildings') {
         const geojson = await this.db.getLayer(layer);
 
-        this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.sjoin.count.noise' });
+        this.map.updateThematic(layer, { collection: geojson, property: 'properties.sjoin.count.noise' });
     }
 }
 

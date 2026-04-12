@@ -1,4 +1,4 @@
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 import { FeatureCollection } from 'geojson';
 
 export class PropertyArrayFunc {
@@ -42,11 +42,11 @@ export class PropertyArrayFunc {
 
     console.log('Initial GeoJSON:', geojson);
 
-    const geojsonCompute = new GeojsonCompute();
+    const geojsonCompute = new ComputeGpgpu();
 
     // Example 1: Calculate average of measurements array
     console.log('\n=== Example 1: Array Average ===');
-    let result1 = await geojsonCompute.analytical({
+    let result1 = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         values: 'measurements',
@@ -70,7 +70,7 @@ export class PropertyArrayFunc {
 
     // Example 2: Weighted sum using scalar and array
     console.log('\n=== Example 2: Scalar * Array Sum ===');
-    let result2 = await geojsonCompute.analytical({
+    let result2 = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         temp: 'temperature',
@@ -95,7 +95,7 @@ export class PropertyArrayFunc {
 
     // Example 3: Dot product of two arrays
     console.log('\n=== Example 3: Dot Product of Two Arrays ===');
-    let result3 = await geojsonCompute.analytical({
+    let result3 = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         a: 'measurements',
@@ -122,7 +122,7 @@ export class PropertyArrayFunc {
 
     // Example 4: Find maximum value in array
     console.log('\n=== Example 4: Maximum Value in Array ===');
-    let result4 = await geojsonCompute.analytical({
+    let result4 = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         values: 'measurements',

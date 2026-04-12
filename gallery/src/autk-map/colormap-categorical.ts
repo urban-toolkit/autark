@@ -36,7 +36,7 @@ export class ColormapCat {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const collection = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -51,14 +51,11 @@ export class ColormapCat {
             feature.properties.compute.highwayGroup = ['primary', 'secondary'].includes(highway) ? highway : 'other';
         });
 
-        this.map.updateColorMap({
-            id: layer,
-            colorMap: {
+        this.map.updateColorMap(layer, { colorMap: {
                 interpolator: ColorMapInterpolator.CAT_OBSERVABLE10,
                 domainSpec: { type: ColorMapDomainStrategy.USER, params: ['primary', 'secondary', 'other'] },
-            },
-        });
-        this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.compute.highwayGroup' });
+            }, });
+        this.map.updateThematic(layer, { collection: geojson, property: 'properties.compute.highwayGroup' });
     }
 
 }

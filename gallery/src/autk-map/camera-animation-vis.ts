@@ -2,7 +2,7 @@
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType, MapStyle } from 'autk-map';
 import { CameraAnimator, ColorMapDomainStrategy, ColorMapInterpolator } from 'autk-core';
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 import { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 const URL = (import.meta as any).env.BASE_URL;
@@ -38,7 +38,7 @@ class CameraAnimationVis {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -84,7 +84,7 @@ class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -163,7 +163,7 @@ class SpatialJoinNear {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -171,7 +171,7 @@ class SpatialJoinNear {
     protected async updateThematicData(layer: string = 'table_osm_buildings') {
         const geojson = await this.db.getLayer(layer);
 
-        this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.sjoin.count.noise' });
+        this.map.updateThematic(layer, { collection: geojson, property: 'properties.sjoin.count.noise' });
         this.map.updateRenderInfo(layer, { isColorMap: true });
     }
 }
@@ -252,16 +252,16 @@ class Heatmap {
             const geojson = await this.db.getLayer(layerData.name);
 
             if (layerData.type === 'raster') {
-                this.map.loadCollection({ id: layerData.name, collection: geojson, type: 'raster', property: propertyPath });
+                this.map.loadCollection(layerData.name, { collection: geojson, type: 'raster', property: propertyPath });
             }
             else {
-                this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+                this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             }
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
         this.map.updateRenderInfo('heatmap', { opacity: 0.5 });
-        this.map.updateColorMap({ id: 'heatmap', colorMap: { 
+        this.map.updateColorMap('heatmap', { colorMap: { 
             interpolator: ColorMapInterpolator.SEQ_BLUES, 
             domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [0, 99] } 
         } });
@@ -294,8 +294,8 @@ class ComputeFunction {
 
         let geojson = await this.db.getLayer('neighborhoods');
 
-        const geojsonCompute = new GeojsonCompute();
-        geojson = await geojsonCompute.analytical({
+        const geojsonCompute = new ComputeGpgpu();
+        geojson = await geojsonCompute.exec({
             collection: geojson,
             variableMapping: {
                 x: 'shape_area',
@@ -325,14 +325,14 @@ class ComputeFunction {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
 
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
 
     protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
-        this.map.updateThematic({ id: 'neighborhoods', collection: geojson, property: 'properties.compute.result' });
+        this.map.updateThematic('neighborhoods', { collection: geojson, property: 'properties.compute.result' });
         this.map.updateRenderInfo('neighborhoods', { isColorMap: true });
     }
 }

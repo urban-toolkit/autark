@@ -1,7 +1,7 @@
 import type { FeatureCollection, Feature, Geometry, GeoJsonProperties } from 'geojson';
 import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle, MapEvent } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 import { AutkChart, ChartEvent, ChartStyle } from 'autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
 
@@ -98,7 +98,7 @@ export class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
         }
     }
 
@@ -122,10 +122,10 @@ export class OsmLayersApi {
         });
 
         setLoadingState('Running GPU regression...', 'Computing OLS slope and intercept on the GPU.');
-        const compute = new GeojsonCompute();
+        const compute = new ComputeGpgpu();
         const geojson = await this.db.getLayer('table_osm_roads');
 
-        this.computedRoadsGeojson = await compute.analytical({
+        this.computedRoadsGeojson = await compute.exec({
             collection: geojson,
             variableMapping: { bands: 'lst_timeseries' },
             attributeArrays: { bands: BAND_COUNT },
@@ -155,24 +155,18 @@ export class OsmLayersApi {
             ? ColorMapInterpolator.DIV_RED_BLUE
             : ColorMapInterpolator.SEQ_REDS;
 
-        this.map.updateColorMap({
-            id: 'table_osm_roads',
-            colorMap: {
+        this.map.updateColorMap('table_osm_roads', { colorMap: {
                 interpolator,
                 domainSpec: mode === 'slope'
                     ? { type: ColorMapDomainStrategy.PERCENTILE, params: [2, 98] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
-            },
-        });
+            }, });
         this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
 
-        this.map.updateThematic({
-            id: 'table_osm_roads',
-            collection: this.roadsGeojson,
+        this.map.updateThematic('table_osm_roads', { collection: this.roadsGeojson,
             property: mode === 'slope'
                 ? 'properties.compute.angle'
-                : `properties.lst_timeseries.${year! - START_YEAR}.value`,
-        });
+                : `properties.lst_timeseries.${year! - START_YEAR}.value`, });
 
         // Labels are computed internally from data + current colormap domain mode.
     }
@@ -189,12 +183,9 @@ export class OsmLayersApi {
 
         const yearSelect = document.getElementById('yearSelect') as HTMLSelectElement;
         const defaultBand = `band_${parseInt(yearSelect.value, 10) - START_YEAR + 1}`;
-        this.map.loadCollection({
-            id: tableName,
-            collection: geotiff,
+        this.map.loadCollection(tableName, { collection: geotiff,
             type: 'raster',
-            property: defaultBand,
-        });
+            property: defaultBand, });
 
         this.map.updateRenderInfo(tableName, { isSkip: true });
         this.map.updateRenderInfo(tableName, { opacity: 0.65 });
@@ -216,11 +207,8 @@ export class OsmLayersApi {
             const bandName = `band_${year - START_YEAR + 1}`;
 
             if (this.geotiffData) {
-                this.map.updateThematic({
-                    id: 'lst',
-                    collection: this.geotiffData,
-                    property: `properties.${bandName}`,
-                });
+                this.map.updateThematic('lst', { collection: this.geotiffData,
+                    property: `properties.${bandName}`, });
             }
 
             this.updateRoadsThematic(colorMode, year);

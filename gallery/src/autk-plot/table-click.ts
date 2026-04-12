@@ -27,7 +27,7 @@ export class MapD3 {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        this.map.loadCollection({ id: 'neighborhoods', collection: this.collection });
+        this.map.loadCollection('neighborhoods', { collection: this.collection });
         this.map.updateRenderInfo('neighborhoods', { isPick: true });
 
         this.map.draw();

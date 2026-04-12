@@ -40,7 +40,7 @@ export class MapD3Timeseries {
         this.map = new AutkMap(canvas);
         await this.map.init();
 
-        this.map.loadCollection({ id: 'neighborhoods', collection: this.geojson });
+        this.map.loadCollection('neighborhoods', { collection: this.geojson });
         this.map.updateRenderInfo('neighborhoods', { isPick: true });
         this.map.draw();
     }

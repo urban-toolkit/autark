@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 
 import { AutkMap, LayerType } from 'autk-map';
 
@@ -8,6 +8,8 @@ import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 export class ComputeOsm {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
+
+    protected result!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
         this.db = new AutkSpatialDb();
@@ -21,16 +23,14 @@ export class ComputeOsm {
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads'>,
                 dropOsmTable: true,
             },
         });
 
-        let geojson = await this.db.getLayer('table_osm_roads');
-
-        const geojsonCompute = new GeojsonCompute();
-        geojson = await geojsonCompute.analytical({
-            collection: geojson,
+        const geojsonCompute = new ComputeGpgpu();
+        this.result = await geojsonCompute.exec({
+            collection:  await this.db.getLayer('table_osm_roads'),
             variableMapping: {
                 x: 'lanes',
             },
@@ -44,24 +44,19 @@ export class ComputeOsm {
         });
 
         this.map = new AutkMap(canvas);
-
         await this.map.init();
         await this.loadLayers();
-        await this.updateThematicData(geojson);
-
         this.map.draw();
     }
 
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
-    }
 
-    protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
-        this.map.updateThematic({ id: 'table_osm_roads', collection: geojson, property: 'properties.compute.result' });
+        this.map.updateThematic('table_osm_roads', { collection: this.result, property: 'properties.compute.result' });
     }
 }
 

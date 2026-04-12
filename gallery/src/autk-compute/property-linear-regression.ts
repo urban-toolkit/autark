@@ -1,4 +1,4 @@
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 import { FeatureCollection } from 'geojson';
 
 export class PropertyLinearRegression {
@@ -59,11 +59,11 @@ export class PropertyLinearRegression {
     console.log('  - y_train: array of dependent variable values');
     console.log('  - x_predict: value to predict for');
 
-    const geojsonCompute = new GeojsonCompute();
+    const geojsonCompute = new ComputeGpgpu();
 
     // Linear Regression - Predict Value
     console.log('\n=== Running Linear Regression Prediction on GPU ===');
-    const result = await geojsonCompute.analytical({
+    const result = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         x_values: 'x_train',

@@ -61,7 +61,7 @@ export class OsmLayersApi {
     protected async loadLayers(db: AutkSpatialDb, map: AutkMap): Promise<void> {
         for (const layerData of db.getLayerTables()) {
             const geojson = await db.getLayer(layerData.name);
-            map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }

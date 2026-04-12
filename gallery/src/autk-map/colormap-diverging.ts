@@ -29,21 +29,18 @@ export class ColormapDiv {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
 
     protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
-        this.map.updateColorMap({
-            id: layer,
-            colorMap: {
+        this.map.updateColorMap(layer, { colorMap: {
                 interpolator: ColorMapInterpolator.DIV_RED_BLUE,
                 domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
-            },
-        });
-        this.map.updateThematic({ id: layer, collection: geojson, property: 'properties.shape_area' });
+            }, });
+        this.map.updateThematic(layer, { collection: geojson, property: 'properties.shape_area' });
     }
 
 }

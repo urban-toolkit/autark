@@ -10,7 +10,7 @@ export class StandaloneGeojsonVis {
         await this.map.init();
 
         const geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
-        this.map.loadCollection({ id: 'neighborhoods', collection: geojson });
+        this.map.loadCollection('neighborhoods', { collection: geojson });
 
         this.map.draw();
     }

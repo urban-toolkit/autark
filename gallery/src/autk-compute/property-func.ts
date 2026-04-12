@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 
 export class LoadGeojson {
   protected db!: AutkSpatialDb;
@@ -24,8 +24,8 @@ export class LoadGeojson {
     let geojson = await this.db.getLayer('table_osm_buildings');
     console.log({ initialGeojson: geojson });
 
-    const geojsonCompute = new GeojsonCompute();
-    geojson = await geojsonCompute.analytical({
+    const geojsonCompute = new ComputeGpgpu();
+    geojson = await geojsonCompute.exec({
       collection: geojson,
       variableMapping: {
         x: 'height',

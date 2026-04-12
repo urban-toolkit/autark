@@ -23,8 +23,6 @@ export type ThematicValueAccessor = string;
  * raster layer. For all other layer types `property` is unused.
  */
 export interface LoadCollectionParams {
-    /** Destination layer identifier. */
-    id: string;
     /** Source feature collection. Raster collections may contain null geometries. */
     collection: FeatureCollection<Geometry | null>;
     /** Optional explicit geometry type override. */
@@ -46,8 +44,6 @@ export interface LoadCollectionParams {
  * `collection.features[0].properties.raster`.
  */
 export interface UpdateRasterParams {
-    /** Target layer identifier. */
-    id: string;
     /** GeoTIFF-derived feature collection. */
     collection: FeatureCollection<Geometry | null>;
     /** Dot-path accessor for numeric value in each raster cell. */
@@ -60,8 +56,6 @@ export interface UpdateRasterParams {
  * Parameters for updating a layer's thematic (color-mapped) values.
  */
 export interface UpdateThematicParams {
-    /** Target layer identifier. */
-    id: string;
     /** Source feature collection used to derive thematic values. */
     collection: FeatureCollection;
     /** Dot-path accessor resolved from each item in the collection. */
@@ -72,8 +66,6 @@ export interface UpdateThematicParams {
  * Parameters for patching a layer's color-map configuration.
  */
 export interface UpdateColorMapParams {
-    /** Target layer identifier. */
-    id: string;
     /** Partial color-map patch merged with existing layer color-map state. */
     colorMap: Partial<ColorMapConfig>;
 }

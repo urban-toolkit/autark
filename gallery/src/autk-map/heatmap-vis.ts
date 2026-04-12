@@ -76,10 +76,10 @@ export class Heatmap {
             const geojson = await this.db.getLayer(layerData.name);
 
             if (layerData.type === 'raster') {
-                this.map.loadCollection({ id: layerData.name, collection: geojson, type: 'raster', property: propertyPath });
+                this.map.loadCollection(layerData.name, { collection: geojson, type: 'raster', property: propertyPath });
             }
             else {
-                this.map.loadCollection({ id: layerData.name, collection: geojson, type: layerData.type as LayerType });
+                this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
             }
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }

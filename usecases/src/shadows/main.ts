@@ -5,7 +5,7 @@ declare function showError(message: string, note?: string): void;
 import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
-import { GeojsonCompute } from 'autk-compute';
+import { ComputeGpgpu } from 'autk-compute';
 import { AutkMap, LayerType, VectorLayer, MapEvent } from 'autk-map';
 import { AutkChart, ChartEvent } from 'autk-plot';
 
@@ -105,8 +105,8 @@ export class Shadows {
         // seg, sjoin_avg are per-feature. bld_height, doy, ring are global uniforms.
         // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
         //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
-        const geojsonCompute = new GeojsonCompute();
-        const result = await geojsonCompute.analytical({
+        const geojsonCompute = new ComputeGpgpu();
+        const result = await geojsonCompute.exec({
             collection: this.roads,
             variableMapping: {
                 seg:       'geometry.coordinates',
@@ -279,16 +279,13 @@ export class Shadows {
             const layer = await this.db.getLayer(layerData.name);
 
             if (layerData.name === 'heatmap') {
-                await this.map.loadCollection({
-                    id: layerData.name,
-                    collection: layer,
+                await this.map.loadCollection(layerData.name, { collection: layer,
                     type: 'raster',
-                    property: 'avg.shadows',
-                });
+                    property: 'avg.shadows', });
                 this.map.updateRenderInfo(layerData.name, { opacity: 0.5, isColorMap: true, isSkip: true });
             }
             else {
-                this.map.loadCollection({ id: layerData.name, collection: layer, type: layerData.type as LayerType });
+                this.map.loadCollection(layerData.name, { collection: layer, type: layerData.type as LayerType });
             }
 
         }
@@ -365,11 +362,8 @@ export class Shadows {
      */
     protected updateThematicData(): void {
         if (this.displayMode === 'heatmap') {
-            this.map.updateThematic({
-                id: this.ROADS_LAYER,
-                collection: this.roads,
-                property: `properties.sjoin.avg.${this.currentMonth}`,
-            });
+            this.map.updateThematic(this.ROADS_LAYER, { collection: this.roads,
+                property: `properties.sjoin.avg.${this.currentMonth}`, });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isPick: true });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
             this.map.draw();
@@ -379,7 +373,7 @@ export class Shadows {
         // 'compute' or 'contribution' mode
         const key = this.displayMode === 'compute' ? 'shadow' : 'contribution';
 
-        this.map.updateThematic({ id: this.ROADS_LAYER, collection: this.roads, property: `properties.compute.${key}` });
+        this.map.updateThematic(this.ROADS_LAYER, { collection: this.roads, property: `properties.compute.${key}` });
         this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
         this.map.draw();
     }

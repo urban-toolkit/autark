@@ -64,7 +64,7 @@ import { AutkMapUi } from './map-ui';
  * await map.init();
  * 
  * const geojsonData = { \/* GeoJSON data *\/ };
- * map.loadCollection({ id: 'my_data', collection: geojsonData });
+ * map.loadCollection('my_data', { collection: geojsonData });
  */
 export class AutkMap {
     /** View and projection camera. */
@@ -178,7 +178,7 @@ export class AutkMap {
      * @param params.type Optional layer type override.
      * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
      */
-    loadCollection({ id, collection, type = null, property }: LoadCollectionParams): void {
+    loadCollection(id: string, { collection, type = null, property }: LoadCollectionParams): void {
         if (!this.layerManager.bbox) {
             this.layerManager.computeBboxAndOrigin(collection);
         }
@@ -242,7 +242,7 @@ export class AutkMap {
      * @param params.collection Source feature collection.
      * @param params.property Dot-path accessor resolved from each feature.
      */
-    updateThematic({ id, collection, property }: UpdateThematicParams): void {
+    updateThematic(id: string, { collection, property }: UpdateThematicParams): void {
         const layer = this._layerManager.searchByLayerId(id) as VectorLayer | null;
 
         if (!layer) { return; }
@@ -312,7 +312,7 @@ export class AutkMap {
      * @param params.property Dot-path accessor for each raster cell.
      * @param params.transferFunction Optional opacity transfer-function configuration.
      */
-    updateRaster({ id, collection, property, transferFunction }: UpdateRasterParams): void {
+    updateRaster(id: string, { collection, property, transferFunction }: UpdateRasterParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || layer.layerInfo.typeLayer !== 'raster') { return; }
 
@@ -347,7 +347,7 @@ export class AutkMap {
      *
      * @param params Color-map update parameters.
      */
-    updateColorMap({ id, colorMap }: UpdateColorMapParams): void {
+    updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
 
@@ -585,7 +585,7 @@ export class AutkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
         if (property) {
-            this.updateThematic({ id: layerName, collection: geojson, property });
+            this.updateThematic(layerName, { collection: geojson, property  });
         }
     }
 
@@ -633,7 +633,7 @@ export class AutkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
         if (property) {
-            this.updateThematic({ id: layerName, collection: geojson, property });
+            this.updateThematic(layerName, { collection: geojson, property  });
         }
     }
 
@@ -679,7 +679,7 @@ export class AutkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
         if (property) {
-            this.updateThematic({ id: layerName, collection: geojson, property });
+            this.updateThematic(layerName, { collection: geojson, property  });
         }
     }
 
@@ -725,7 +725,7 @@ export class AutkMap {
         this.createLayer(layerInfo, layerRenderInfo, layerData);
 
         if (property) {
-            this.updateThematic({ id: layerName, collection: geojson, property });
+            this.updateThematic(layerName, { collection: geojson, property  });
         }
     }
 
@@ -771,7 +771,7 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
-        this.updateRaster({ id: layerName, collection: geotiff, property });
+        this.updateRaster(layerName, { collection: geotiff, property  });
     }
 
     private defaultColorMap(): ColorMapConfig {

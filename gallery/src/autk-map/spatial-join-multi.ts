@@ -64,7 +64,7 @@ export class SpatialJoin {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const collection = await this.db.getLayer(layerData.name);
-            this.map.loadCollection({ id: layerData.name, collection, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection, type: layerData.type as LayerType });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
@@ -72,11 +72,8 @@ export class SpatialJoin {
     protected async updateThematicData(property: string) {
         const geojson = await this.db.getLayer('neighborhoods');
 
-        this.map.updateThematic({
-            id: 'neighborhoods',
-            collection: geojson,
-            property: `properties.sjoin.count.${property}`,
-        });
+        this.map.updateThematic('neighborhoods', { collection: geojson,
+            property: `properties.sjoin.count.${property}`, });
     }
 
     uiUpdate() {
