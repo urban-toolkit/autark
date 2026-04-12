@@ -9,6 +9,13 @@ type GlobalVarMeta =
   | { kind: 'matrix'; name: string; rows: number; cols: number };
 
 export class ComputeGpgpu extends GpuPipeline {
+  /**
+   * Executes a WGSL compute shader on feature properties in a GPGPU pipeline.
+   * Features are processed in a single columnar pass for optimal GPU performance.
+   *
+   * @param params - Computation parameters including feature collection and WGSL shader body.
+   * @returns A new FeatureCollection with computed values written to properties.compute.
+   */
   async exec(params: ComputeFunctionIntoPropertiesParams): Promise<FeatureCollection> {
     const {
       collection,

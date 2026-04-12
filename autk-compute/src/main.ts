@@ -3,11 +3,13 @@ import { ComputeGpgpu } from './compute-gpgpu';
 import { ComputeRender, RenderComputeParams }  from './compute-render';
 import { ComputeFunctionIntoPropertiesParams } from './interfaces';
 
-export { ComputeGpgpu };
-export { ComputeRender };
+export { ComputeGpgpu, ComputeRender };
+export { GpuPipeline } from './compute-pipeline';
+
 export type { RenderLayer, RenderComputeParams } from './compute-render';
 export type { ViewProjectionParams } from 'autk-core';
-export type { ComputeFunctionIntoPropertiesParams } from './interfaces';
+export type { ComputeFunctionIntoPropertiesParams, ComputeResult } from './interfaces';
+export type { ComputeConfig, TypedArray, TypedArrayConstructor } from './compute-pipeline';
 
 /**
  * Unified compute engine that exposes both GPU-analytical (WGSL over feature properties)
