@@ -1,0 +1,33 @@
+body {
+    margin: 20px;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+#app {
+    margin: 10px;
+
+    width: 1600px;
+    min-height: 185px;
+    border: 1px solid #bfbfbf;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+canvas {
+    margin: 10px;
+    width: 780px;
+    height: 780px;
+}
+
+.map-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+

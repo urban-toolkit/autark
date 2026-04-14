@@ -1,0 +1,43 @@
+{
+  "name": "urban-grammar",
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/urban-grammar.umd.cjs",
+  "module": "./dist/urban-grammar.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/urban-grammar.js",
+      "require": "./dist/urban-grammar.umd.cjs"
+    }
+  },
+  "scripts": {
+    "doc": "typedoc --options typedoc.json --watch",
+    "dev": "vite",
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "@webgpu/types": "^0.1.66",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "ts-loader": "^9.5.4",
+    "typedoc": "^0.28.14",
+    "typedoc-theme-oxide": "^0.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vite-plugin-dts": "^4.5.4",
+    "vite-plugin-glsl": "^1.5.4"
+  }
+}
