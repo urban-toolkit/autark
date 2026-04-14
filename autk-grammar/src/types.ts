@@ -1,4 +1,6 @@
 import type { UrbanSpec } from 'urban-grammar';
+import type { AutkMap } from 'autk-map';
+import type { FeatureCollection } from 'geojson';
 
 export type Targets = {
     compute?: string,
@@ -7,7 +9,10 @@ export type Targets = {
     plot?: string
 }
 
+export type MapRegistry = Map<string, AutkMap>;
+export type GeoJsonCache = Map<string, FeatureCollection>;
+
 export type AutkGrammarSpec = UrbanSpec;
 
-export { ColorMapInterpolator } from 'urban-grammar';
+export { ColorMapInterpolator, NormalizationMode } from 'urban-grammar';
 

@@ -30,7 +30,11 @@ export function createEngine(options: EngineOptions): IEngine{
         }
 
         if(spec.plot){
-            await adapters.plot.resolvePlot(undefined, spec.plot);
+            if(Array.isArray(spec.plot))
+                for(const plot of spec.plot)
+                    await adapters.plot.resolvePlot(context, plot);
+            else
+                await adapters.plot.resolvePlot(context, spec.plot);
         }
     }
 

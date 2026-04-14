@@ -1,10 +1,10 @@
 import { MapAdapter, MapSpec } from 'urban-grammar';
-import { Targets } from '../types';
+import { Targets, MapRegistry, GeoJsonCache } from '../types';
 import { AutkMap, MapStyle, LayerType } from 'autk-map';
 import { SpatialDb } from 'autk-db';
 import { Feature, GeoJsonProperties } from 'geojson';
 
-export function createMapAdapter(targets?: Targets): MapAdapter {
+export function createMapAdapter(targets?: Targets, registry?: MapRegistry, cache?: GeoJsonCache): MapAdapter {
 
     async function loadLayers(map: AutkMap, context: SpatialDb, spec: MapSpec): Promise<void> {
         // TODO: this information should be more easily available here. Maybe that is solved with a more solid shared context for the grammar.
@@ -24,7 +24,7 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
             const getFnv = layerRef.getFnv;
             const defaultFnv = layerRef.defaultFnv;
 
-            const data = await context.getLayer(name);
+            const data = cache?.get(name) ?? await context.getLayer(name);
 
             if(type == LayerType.AUTK_RASTER)
                 map.loadGeoTiffLayer(
@@ -97,12 +97,16 @@ export function createMapAdapter(targets?: Targets): MapAdapter {
                     throw new Error("Target for map is not a canvas: "+targets.map);
 
                 const map = new AutkMap(canvas);
-                
+
                 if(spec.style)
                     MapStyle.setPredefinedStyle(spec.style)
 
                 await map.init();
                 await loadLayers(map, context, spec);
+
+                if(registry)
+                    for(const layerRef of spec.layerRefs)
+                        registry.set(layerRef.dataRef, map);
 
                 map.draw();
             }

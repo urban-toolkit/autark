@@ -3,19 +3,21 @@ import { createDataAdapter } from "./adapters/data";
 import { createMapAdapter } from "./adapters/map";
 import { createPlotAdapter } from "./adapters/plot";
 import { createComputeAdapter } from "./adapters/compute";
-import { Targets } from "./types";
+import { Targets, MapRegistry, GeoJsonCache } from "./types";
 
 export class AutkGrammar {
     private dataAdapter?: DataAdapter;
     private mapAdapter?: MapAdapter;
     private plotAdapter?: PlotAdapter;
     private computeAdapter?: ComputeAdapter;
-    private grammarEngine?: IEngine; 
+    private grammarEngine?: IEngine;
 
     constructor(targets?: Targets) {
-        this.dataAdapter = createDataAdapter(targets);
-        this.mapAdapter = createMapAdapter(targets);
-        this.plotAdapter = createPlotAdapter(targets);
+        const registry: MapRegistry = new Map();
+        const cache: GeoJsonCache = new Map();
+        this.dataAdapter = createDataAdapter(targets, cache);
+        this.mapAdapter = createMapAdapter(targets, registry, cache);
+        this.plotAdapter = createPlotAdapter(targets, registry, cache);
         this.computeAdapter = createComputeAdapter();
     }
 

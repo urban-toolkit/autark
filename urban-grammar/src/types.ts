@@ -137,10 +137,14 @@ export type MapSpec = {
 
 export type PlotSpec = {
     dataRef: string,
-    x: string,
-    y: string,
     mark: PlotMark,
-    event: PlotEvent
+    axis: string[],
+    title?: string,
+    events?: PlotEvent[],
+    width?: number,
+    height?: number,
+    margins?: { left: number; right: number; top: number; bottom: number },
+    mapRef?: string,
 }
 
 export type ComputeSpec = {
@@ -160,7 +164,7 @@ export type UrbanSpec = {
     data?: DataSourceSpec[],
     compute?: ComputeSpec[],
     map?: MapSpec[] | MapSpec,
-    plot?: PlotSpec
+    plot?: PlotSpec[] | PlotSpec
 }
 
 export type EngineOptions = {

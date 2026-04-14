@@ -1,6 +1,6 @@
 import { AutkGrammar, AutkGrammarSpec } from 'autk-grammar';
 
-export class MapD3Brush {
+export class MapD3PC {
     protected autkGrammar!: AutkGrammar;
 
     public async run(): Promise<void> {
@@ -23,11 +23,11 @@ export class MapD3Brush {
             },
             plot: {
                 dataRef: 'neighborhoods',
-                mark: 'scatter',
-                axis: ['shape_area', 'shape_leng'],
-                title: 'Plot example',
+                mark: 'parallel-coordinates',
+                axis: ['shape_area', 'shape_leng', 'cdta2020'],
+                title: 'Neighborhood Characteristics',
                 width: 790,
-                events: ['brush'],
+                events: ['brushY'],
                 mapRef: 'neighborhoods'
             }
         }
@@ -37,7 +37,7 @@ export class MapD3Brush {
 }
 
 async function main() {
-    const example = new MapD3Brush();
+    const example = new MapD3PC();
 
     await example.run();
 }

@@ -1,8 +1,8 @@
 import { CsvDataSourceSpec, CustomDataSourceSpec, DataAdapter, DataSourceSpec, HeatmapSourceSpec, JoinSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar';
 import { SpatialDb } from 'autk-db';
-import { Targets } from '../types';
+import { Targets, GeoJsonCache } from '../types';
 
-export function createDataAdapter(targets?: Targets): DataAdapter {
+export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): DataAdapter {
 
     function print(db: SpatialDb, targets?: Targets): void {
         if(!targets || !targets.db)
@@ -47,10 +47,22 @@ export function createDataAdapter(targets?: Targets): DataAdapter {
                     await db.loadJson(rest_spec as JsonDataSourceSpec);
                     print(db, targets);
                     return db;
-                case 'geojson':
-                    await db.loadCustomLayer(rest_spec as CustomDataSourceSpec);
+                case 'geojson': {
+                    const geojsonSpec = rest_spec as CustomDataSourceSpec;
+                    if(cache) {
+                        let geojson;
+                        if(geojsonSpec.geojsonFileUrl) {
+                            const response = await fetch(geojsonSpec.geojsonFileUrl);
+                            geojson = await response.json();
+                        } else {
+                            geojson = geojsonSpec.geojsonObject;
+                        }
+                        if(geojson) cache.set(geojsonSpec.outputTableName, geojson);
+                    }
+                    await db.loadCustomLayer(geojsonSpec);
                     print(db, targets);
                     return db;
+                }
                 case 'heatmap': 
                     await db.buildHeatmap(rest_spec as HeatmapSourceSpec);
                     print(db, targets);

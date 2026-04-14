@@ -9,7 +9,7 @@ export enum ColorMapInterpolator {
   OBSERVABLE10 = 'schemeObservable10',
 }
 
-export type PlotMark = 'bar' | 'line' | 'point';
+export type PlotMark = 'scatter' | 'bar' | 'line' | 'parallel-coordinates' | 'table';
 
 export type PlotEvent = 'click' | 'brush' | 'brushY' | 'brushX';
 
