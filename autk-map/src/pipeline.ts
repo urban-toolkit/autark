@@ -2,7 +2,7 @@
 
 import { Layer } from './layer';
 
-import { Camera, ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './core-types';
+import { Camera, ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './types-core';
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
 

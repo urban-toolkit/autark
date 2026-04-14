@@ -1,6 +1,6 @@
 import { FeatureCollection, Feature, Point, MultiPoint  } from 'geojson';
 
-import { LayerGeometry, LayerComponent } from './mesh-types';
+import { LayerGeometry, LayerComponent } from './types-mesh';
 
 export class TriangulatorPoints {
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
@@ -26,7 +26,10 @@ export class TriangulatorPoints {
             let nTriangles = 0;
 
             for (const triangulation of meshes) {
-                mesh.push({ position: triangulation.flatCoords, indices: triangulation.flatIds });
+                mesh.push({ 
+                    position: new Float32Array(triangulation.flatCoords), 
+                    indices: new Uint32Array(triangulation.flatIds) 
+                });
                 nPoints += triangulation.flatCoords.length / 2;
                 nTriangles += triangulation.flatIds.length / 3;
             }

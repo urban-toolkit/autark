@@ -7,7 +7,7 @@ import type {
     ColorMapConfig,
     TransferFunction,
     LayerType,
-} from './core-types';
+} from './types-core';
 
 /**
  * Dot-path accessor used by thematic mapping.

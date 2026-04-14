@@ -1,16 +1,16 @@
 // ─── Plot entry point ───────────────────────────────────────────────────────
 
 /** Unified chart wrapper used to instantiate and interact with plot types. */
-export { AutkChart } from './main';
+export { AutkChart } from './chart';
 
-// ─── Core re-exports (from autk-core via core-types) ───────────────────────
+// ─── Core re-exports (from autk-core via types-core) ───────────────────────
 
 /** Strategy enum controlling how a colormap domain is derived from data. */
-export { ColorMapDomainStrategy } from './core-types';
+export { ColorMapDomainStrategy } from './types-core';
 /** Interpolator identifiers for d3-scale-chromatic color schemes. */
-export { ColorMapInterpolator } from './core-types';
+export { ColorMapInterpolator } from './types-core';
 /** Colormap utility: conversions and data-to-color sampling helpers. */
-export { ColorMap } from './core-types';
+export { ColorMap } from './types-core';
 
 export type {
 	/** Hex color string (for example `#5dade2`). */
@@ -23,9 +23,11 @@ export type {
 	ColorMapConfig,
 	/** Domain specification for colormap scaling. */
 	ColorMapDomainSpec,
-} from './core-types';
+} from './types-core';
 
 // ─── API and config types ───────────────────────────────────────────────────
+
+export type { AutkDatum } from './types-chart';
 
 export type {
 	ChartMargins,
@@ -37,7 +39,6 @@ export type {
 	ReduceSeriesTransformConfig,
 	ChartTransformConfig,
 	SortTransformConfig,
-	AutkDatum,
 	ChartConfig,
 	ChartType,
 	UnifiedChartConfig,
@@ -46,18 +47,18 @@ export type {
 // ─── Events ─────────────────────────────────────────────────────────────────
 
 /** Typed event emitter used by plot event APIs. */
-export { EventEmitter } from './core-types';
+export { EventEmitter } from './types-core';
 
 export type { 
 	/** Listener function type used by the event emitter. */
 	EventListener,
 	/** Data structure for representing selected elements in the plot. */
     SelectionData
-} from './core-types';
+} from './types-core';
 
 /** Supported chart interaction events emitted by plot instances. */
-export { ChartEvent } from './events-types';
-export type { ChartEventData, ChartEventRecord } from './events-types';
+export { ChartEvent } from './types-events';
+export type { ChartEventData, ChartEventRecord } from './types-events';
 
 /** Base class for all concrete chart implementations. */
 export { ChartBase } from './chart-base';

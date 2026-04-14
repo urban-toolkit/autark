@@ -1,143 +1,144 @@
-import { LayerData, LayerInfo, LayerRenderInfo } from './layer-types';
+import { Camera, LayerBorder, LayerBorderComponent } from './types-core';
 
-import { Camera, LayerBorder, LayerBorderComponent } from './core-types';
-import { Renderer } from './renderer';
+import {
+    LayerInfo,
+    LayerRenderInfo,
+    LayerData
+} from './types-layers';
 
 import { VectorLayer } from './layer-vector';
+
+import { Renderer } from './renderer';
+
 import { PipelineTriangleBorder } from './pipeline-triangle-border';
 
 /**
- * Triangles2DLayer extends VectorLayer to handle rendering of 2D triangles with optional borders.
- * It manages triangle positions, indices, and border geometry with separate rendering pipelines.
+ * 2D Triangles layer class.
+ * Inherits from VectorLayer and provides additional methods for handling border geometry.
  */
 export class Triangles2DLayer extends VectorLayer {
     /**
-     * Positions of the borders.
-     * @type {number[]}
+     * Border positions of the triangles.
+     * @type {Float32Array}
      */
-    protected _borderPos!: number[];
+    protected _borderPosition: Float32Array = new Float32Array(0);
 
     /**
-     * IDs of the borders.
-     * @type {number[]}
+     * Border indices of the triangles.
+     * @type {Uint32Array}
      */
-    protected _borderIds!: number[];
+    protected _borderIndices: Uint32Array = new Uint32Array(0);
 
     /**
-     * Components of the layer.
-     * @type {LayerComponent[]}
+     * Border components of the layer.
+     * @type {LayerBorderComponent[]}
      */
     protected _borderComponents: LayerBorderComponent[] = [];
 
     /**
-     * Pipeline for rendering borders.
+     * Rendering pipeline for the border.
      * @type {PipelineTriangleBorder}
      */
     protected _pipelineBorder!: PipelineTriangleBorder;
 
     /**
-     * Tracks whether border geometry data is out of sync with GPU buffers.
-     * @type {boolean}
-     */
-    protected _borderDataIsDirty: boolean = false;
-
-    /**
-     * Constructor for Triangles2DLayer.
+     * Creates a 2D triangles layer.
      * @param {LayerInfo} layerInfo - The layer information.
      * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
      * @param {LayerData} layerData - The layer data.
      */
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
-        super(layerInfo, layerRenderInfo, layerData);
-        this.loadLayerData(layerData);
+        super(layerInfo, layerRenderInfo, layerData, 2);
+        // Field initializers run after super() and overwrite data set during the
+        // polymorphic loadLayerData call inside VectorLayer.constructor.
+        // Re-load border data explicitly so it is available for createPipeline.
+        this.loadBorderGeometry(layerData.border ?? []);
+        this.loadBorderComponent(layerData.borderComponents ?? []);
     }
 
     /**
-     * Get the readonly border positions.
-     * @returns {readonly number[]} - The positions of the borders.
+     * Gets the border positions of the triangles.
+     * @returns {Float32Array} The border positions.
      */
-    get borderPos(): readonly number[] {
-        return this._borderPos;
+    get borderPosition(): Float32Array {
+        return this._borderPosition;
     }
 
     /**
-     * Get the readonly border indices.
-     * @returns {readonly number[]} - The indices of the borders.
+     * Gets the border indices of the triangles.
+     * @returns {Uint32Array} The border indices.
      */
-    get borderIds(): readonly number[] {
-        return this._borderIds;
+    get borderIndices(): Uint32Array {
+        return this._borderIndices;
     }
 
     /**
-     * Create the rendering pipeline for the layer.
-     * @param {Renderer} renderer - The renderer instance.
+     * Gets the border components of the layer.
+     * @returns {LayerBorderComponent[]} The border components.
      */
-    createPipeline(renderer: Renderer): void {
-        super.createPipeline(renderer);
-
-        this._pipelineBorder = new PipelineTriangleBorder(renderer);
-        this._pipelineBorder.build(this);
+    get borderComponents(): LayerBorderComponent[] {
+        return this._borderComponents;
     }
 
     /**
-     * Load the layer data, specifically the border information.
-     * @param {LayerData} layerData - The data associated with the layer.
+     * Loads the layer data, including border geometry and components.
+     * @param {LayerData} layerData - The layer data to load.
      */
-    loadLayerData(layerData: LayerData): void {
+    override loadLayerData(layerData: LayerData): void {
         super.loadLayerData(layerData);
 
-        this.loadBorderGeometry(layerData.border || []);
-        this.loadBorderComponent(layerData.borderComponents || []);
+        this.loadBorderGeometry(layerData.border ?? []);
+        this.loadBorderComponent(layerData.borderComponents ?? []);
     }
 
     /**
      * Load the border geometry data for the layer.
-     * Validates that border data is consistent and marks GPU buffers as dirty.
      * @param {LayerBorder[]} border - The border geometry data to load.
      */
     loadBorderGeometry(border: LayerBorder[]): void {
-        const position: number[] = [];
-        const indices: number[] = [];
-
-        for (let id = 0; id < border.length; id++) {
-            const borderData = border[id];
-
-            // Validate positions and indices dimensions
-            if (borderData.position.length % 2 !== 0) {
-                console.warn(`Border ${id}: position array length is not even (got ${borderData.position.length})`);
-            }
-            if (!borderData.indices || borderData.indices.length === 0) {
-                console.warn(`Border ${id}: no indices provided`);
-            }
-
-            // Calculate index offset based on current position count
-            const offsetVertices = position.length / 2;
-            borderData.indices.forEach((idx) => {
-                if (idx < 0 || idx >= borderData.position.length / 2) {
-                    console.warn(`Border ${id}: index ${idx} out of bounds [0, ${borderData.position.length / 2})`);
-                }
-                indices.push(idx + offsetVertices);
-            });
-
-            // Merge position data
-            position.push(...borderData.position);
+        let totalVerts = 0;
+        let totalIndices = 0;
+        for (const b of border) {
+            totalVerts += b.position.length;
+            totalIndices += b.indices.length;
         }
 
-        this._borderPos = position;
-        this._borderIds = indices;
-        this._borderDataIsDirty = true;
+        const position = new Float32Array(totalVerts);
+        const indices = new Uint32Array(totalIndices);
+
+        let vOffset = 0;
+        let iOffset = 0;
+        let vertexCount = 0;
+
+        for (let id = 0; id < border.length; id++) {
+            const b = border[id];
+            
+            position.set(b.position, vOffset);
+
+            for (let i = 0; i < b.indices.length; i++) {
+                indices[iOffset + i] = b.indices[i] + vertexCount;
+            }
+
+            const vertsAdded = b.position.length / 2; // Always 2D for 2D borders
+            vOffset += b.position.length;
+            iOffset += b.indices.length;
+            vertexCount += vertsAdded;
+        }
+
+        this._borderPosition = position;
+        this._borderIndices = indices;
     }
 
     /**
-     * Load the border components for the layer.
-     * @param {LayerBorderComponent[]} borderComponent - The border components to load.
+     * Loads the border components of the layer.
+     * @param {LayerBorderComponent[]} borderComponents - The border components to load.
      */
-    loadBorderComponent(borderComponent: LayerBorderComponent[]): void {
+    loadBorderComponent(borderComponents: LayerBorderComponent[]): void {
         this._borderComponents = [];
 
         const accum = { nPoints: 0, nLines: 0 };
-        for (let cId = 0; cId < borderComponent.length; cId++) {
-            const comp = borderComponent[cId];
+        for (let cId = 0; cId < borderComponents.length; cId++) {
+            const comp = borderComponents[cId];
 
             accum.nPoints += comp.nPoints;
             accum.nLines += comp.nLines;
@@ -150,29 +151,40 @@ export class Triangles2DLayer extends VectorLayer {
     }
 
     /**
-     * Render the layer for the current pass.
-     * Syncs border GPU buffers if data has changed, then renders borders.
+     * Creates the rendering pipeline for the layer, including the border pipeline.
+     * @param {Renderer} renderer - The renderer instance.
+     */
+    override createPipeline(renderer: Renderer): void {
+        super.createPipeline(renderer);
+
+        if (this._borderPosition.length > 0) {
+            this._pipelineBorder = new PipelineTriangleBorder(renderer);
+            this._pipelineBorder.build(this);
+        }
+    }
+
+    /**
+     * Renders the layer for the current pass, including the border.
      * @param {Camera} camera - The camera instance.
      */
-    renderPass(camera: Camera): void {
+    override renderPass(camera: Camera): void {
         super.renderPass(camera);
 
-        // Skip if no border data
-        if (this._borderPos.length === 0 || this._borderIds.length === 0) {
-            return;
+        if (!this._pipelineBorder) { return; }
+
+        if (this._renderInfoIsDirty) {
+            this._pipelineBorder.updateColorUniforms(this);
         }
 
-        // Update GPU buffers if border geometry changed
-        if (this._borderDataIsDirty) {
+        if (this._dataIsDirty) {
             this._pipelineBorder.updateVertexBuffers(this);
-            this._borderDataIsDirty = false;
         }
 
         this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);
         this._pipelineBorder.renderPass(camera);
     }
 
-    /** Releases GPU resources for base and border pipelines. */
+    /** Releases GPU resources owned by 2D pipelines. */
     override destroy(): void {
         super.destroy();
         this._pipelineBorder?.destroy();

@@ -7,9 +7,10 @@
 
 import * as d3 from 'd3';
 
-import { valueAtPath } from '../../core-types';
+import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum, Binning1dTransformConfig } from '../../api';
+import type { AutkDatum } from '../../types-chart';
+import type { Binning1dTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
 

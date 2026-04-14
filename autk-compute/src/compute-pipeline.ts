@@ -1,30 +1,5 @@
 import { getSharedGpuDevice } from './device-manager';
-
-export type TypedArray =
-  | Float32Array
-  | Float64Array
-  | Int8Array
-  | Int16Array
-  | Int32Array
-  | Uint8Array
-  | Uint8ClampedArray
-  | Uint16Array
-  | Uint32Array
-  | BigInt64Array
-  | BigUint64Array;
-
-export type TypedArrayConstructor =
-  | Float32ArrayConstructor
-  | Float64ArrayConstructor
-  | Int8ArrayConstructor
-  | Int16ArrayConstructor
-  | Int32ArrayConstructor
-  | Uint8ArrayConstructor
-  | Uint8ClampedArrayConstructor
-  | Uint16ArrayConstructor
-  | Uint32ArrayConstructor
-  | BigInt64ArrayConstructor
-  | BigUint64ArrayConstructor;
+import { TypedArray, TypedArrayConstructor } from 'autk-core';
 
 export interface ComputeConfig {
   shader: string;

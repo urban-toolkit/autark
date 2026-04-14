@@ -34,7 +34,8 @@
  */
 import * as d3 from 'd3';
 
-import type { AutkDatum, ChartConfig } from '../api';
+import type { AutkDatum } from '../types-chart';
+import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';

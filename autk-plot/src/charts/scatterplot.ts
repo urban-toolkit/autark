@@ -27,13 +27,13 @@
 
 import * as d3 from 'd3';
 
-import { valueAtPath } from '../core-types';
+import { valueAtPath } from '../types-core';
 
 import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../events-types';
+import { ChartEvent } from '../types-events';
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.

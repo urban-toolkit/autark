@@ -1,6 +1,6 @@
 import { FeatureCollection, Feature, LineString, MultiLineString, MultiPolygon, Polygon } from "geojson";
 
-import { LayerBorder, LayerBorderComponent, LayerComponent, LayerGeometry } from "./mesh-types";
+import { LayerBorder, LayerBorderComponent, LayerComponent, LayerGeometry } from "./types-mesh";
 
 import earcut from "earcut";
 
@@ -32,7 +32,10 @@ export class TriangulatorPolygons {
             let nTriangles = 0;
 
             for (const triangulation of meshes) {
-                mesh.push({ position: triangulation.flatCoords, indices: triangulation.flatIds });
+                mesh.push({ 
+                    position: new Float32Array(triangulation.flatCoords), 
+                    indices: new Uint32Array(triangulation.flatIds) 
+                });
                 nPoints += triangulation.flatCoords.length / 2;
                 nTriangles += triangulation.flatIds.length / 3;
             }
@@ -71,7 +74,10 @@ export class TriangulatorPolygons {
             let nLines = 0;
 
             for (const polyline of borders) {
-                border.push({ position: polyline.flatCoords, indices: polyline.flatIds });
+                border.push({ 
+                    position: new Float32Array(polyline.flatCoords), 
+                    indices: new Uint32Array(polyline.flatIds) 
+                });
                 nPoints += polyline.flatCoords.length / 2;
                 nLines += polyline.flatIds.length / 2;
             }

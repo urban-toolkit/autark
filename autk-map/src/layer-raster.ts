@@ -2,7 +2,7 @@ import {
     LayerInfo,
     LayerRenderInfo,
     LayerData,
-} from "./layer-types";
+} from "./types-layers";
 
 import { Layer } from "./layer";
 
@@ -14,12 +14,12 @@ import {
     DEFAULT_TRANSFER_FUNCTION,
     buildTransferContext,
     computeAlphaByte,
-} from './core-types';
+} from './types-core';
 
 import type { 
     TransferFunction,
     RequiredTransferFunction
-} from './core-types';
+} from './types-core';
 
 import { Renderer } from "./renderer";
 
@@ -29,21 +29,21 @@ import { PipelineTriangleRaster } from "./pipeline-triangle-raster";
 export class RasterLayer extends Layer {
     /**
      * Positions of the triangles.
-     * @type {number[]}
+     * @type {Float32Array}
      */
-    protected _position!: number[];
+    protected _position!: Float32Array;
 
     /**
      * Indices of the triangles.
-     * @type {number[]}
+     * @type {Uint32Array}
      */
-    protected _indices!: number[];
+    protected _indices!: Uint32Array;
 
     /**
      * The texture coordinates for the layer.
-     * @type {number[]}
+     * @type {Float32Array}
      */
-    protected _texCoord!: number[];
+    protected _texCoord!: Float32Array;
 
     /**
      * Components of the layer.
@@ -65,12 +65,12 @@ export class RasterLayer extends Layer {
 
     /**
      * The raster data for the layer.
-     * @type {RasterData}
+     * @type {Float32Array}
      */
-    protected _rasterData!: number[];
+    protected _rasterData!: Float32Array;
 
     /** Canonical scalar raster payload used for domain recomputation. */
-    protected _rasterValues: number[] = [];
+    protected _rasterValues: Float32Array = new Float32Array(0);
 
     /** Opacity transfer-function configuration used while rebuilding raster RGBA data. */
     protected _transferFunction: RequiredTransferFunction = { ...DEFAULT_TRANSFER_FUNCTION };
@@ -94,25 +94,25 @@ export class RasterLayer extends Layer {
 
     /**
      * Get the positions of the triangles.
-     * @returns {number[]} - The positions of the triangles.
+     * @returns {Float32Array} - The positions of the triangles.
      */
-    get position(): number[] {
+    get position(): Float32Array {
         return this._position;
     }
 
     /**
      * Get the indices of the triangles.
-     * @returns {number[]} - The indices of the triangles.
+     * @returns {Uint32Array} - The indices of the triangles.
      */
-    get indices(): number[] {
+    get indices(): Uint32Array {
         return this._indices;
     }
 
     /**
      * Get the texture coordinates.
-     * @returns {number[]} - The texture coordinates.
+     * @returns {Float32Array} - The texture coordinates.
      */
-    get texCoord(): number[] {
+    get texCoord(): Float32Array {
         return this._texCoord;
     }
 
@@ -142,14 +142,14 @@ export class RasterLayer extends Layer {
 
     /**
      * Get the raster data.
-     * @returns {RasterData} - The raster data.
+     * @returns {Float32Array} - The raster data.
      */
-    get rasterData(): number[] {
+    get rasterData(): Float32Array {
         return this._rasterData;
     }
 
     /** Original scalar raster values (not normalized). */
-    get rasterValues(): number[] {
+    get rasterValues(): Float32Array {
         return this._rasterValues;
     }
 
@@ -186,26 +186,44 @@ export class RasterLayer extends Layer {
      * @param {LayerGeometry[]} layerGeometry - The layer data.
      */
     loadGeometry(layerGeometry: LayerGeometry[]): void {
-        const position: number[] = [];
-        const indices: number[] = [];
-        const texCoord: number[] = [];
+        let totalVerts = 0;
+        let totalIndices = 0;
+        let totalTexCoords = 0;
+
+        for (const g of layerGeometry) {
+            totalVerts += g.position.length;
+            totalIndices += (g.indices?.length ?? 0);
+            totalTexCoords += (g.texCoord?.length ?? 0);
+        }
+
+        const position = new Float32Array(totalVerts);
+        const indices = new Uint32Array(totalIndices);
+        const texCoord = new Float32Array(totalTexCoords);
+
+        let vOffset = 0;
+        let iOffset = 0;
+        let tOffset = 0;
+        let vertexCount = 0;
 
         for (let id = 0; id < layerGeometry.length; id++) {
-            // fix the index count
-            layerGeometry[id].indices?.forEach((a) => {
-                const b = a + position.length / 2;
-                indices.push(b);
-            });
+            const g = layerGeometry[id];
+            
+            position.set(g.position, vOffset);
 
-            // merges the position data
-            layerGeometry[id].position.forEach((d) => {
-                position.push(d);
-            });
+            if (g.indices) {
+                for (let i = 0; i < g.indices.length; i++) {
+                    indices[iOffset + i] = g.indices[i] + vertexCount;
+                }
+                iOffset += g.indices.length;
+            }
 
-            // merges the texture coordinate data
-            layerGeometry[id].texCoord?.forEach((d) => {
-                texCoord.push(d);
-            });
+            if (g.texCoord) {
+                texCoord.set(g.texCoord, tOffset);
+                tOffset += g.texCoord.length;
+            }
+
+            vOffset += g.position.length;
+            vertexCount += g.position.length / 2; // Raster is always 2D
         }
 
         // Raster triangles are expected to be 2D vertices and 2D UV pairs.
@@ -243,21 +261,22 @@ export class RasterLayer extends Layer {
      * Load raster values and rebuild the texture.
      * @param rasterValues Flattened raster values to colorize.
      */
-    loadRaster(rasterValues: number[]): void {
-        const rasterData: number[] = [];
-
+    loadRaster(rasterValues: Float32Array): void {
         if (!rasterValues || rasterValues.length === 0) {
             return;
         }
 
-        this._rasterValues = [...rasterValues];
+        this._rasterValues = rasterValues;
 
         const isRGBA = rasterValues.length === this._rasterResX * this._rasterResY * 4;
-        if (!isRGBA) {
-            const validValues = rasterValues.filter(v => !isNaN(v));
+        const rasterData = new Float32Array(isRGBA ? rasterValues.length : this._rasterResX * this._rasterResY * 4);
 
-            // Use the resolved colormap domain (e.g. percentile bounds) as the
-            // transfer-function range so that alpha scaling matches color scaling.
+        if (!isRGBA) {
+            const validValues: number[] = [];
+            for (let i = 0; i < rasterValues.length; i++) {
+                if (!isNaN(rasterValues[i])) validValues.push(rasterValues[i]);
+            }
+
             const colorDomain = this._layerRenderInfo.colormap.computedDomain;
             const numericDomain = (
                 Array.isArray(colorDomain)
@@ -277,17 +296,20 @@ export class RasterLayer extends Layer {
             );
 
             if (transferContext.validCount === 0) {
-                rasterValues.forEach(() => {
-                    rasterData.push(0, 0, 0, 0);
-                });
+                rasterData.fill(0);
                 this._rasterData = rasterData;
                 return;
             }
 
-            rasterValues.forEach((d) => {
+            for (let i = 0; i < rasterValues.length; i++) {
+                const d = rasterValues[i];
+                const offset = i * 4;
                 if (isNaN(d)) {
-                    rasterData.push(0, 0, 0, 0);
-                    return;
+                    rasterData[offset] = 0;
+                    rasterData[offset + 1] = 0;
+                    rasterData[offset + 2] = 0;
+                    rasterData[offset + 3] = 0;
+                    continue;
                 }
 
                 const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
@@ -299,16 +321,14 @@ export class RasterLayer extends Layer {
                 );
                 const alpha = computeAlphaByte(d, transferContext);
 
-                rasterData.push(color.r);
-                rasterData.push(color.g);
-                rasterData.push(color.b);
-                rasterData.push(alpha);
-            });
+                rasterData[offset] = color.r;
+                rasterData[offset + 1] = color.g;
+                rasterData[offset + 2] = color.b;
+                rasterData[offset + 3] = alpha;
+            }
         }
         else {
-            rasterValues.forEach((d) => {
-                rasterData.push(d);
-            });
+            rasterData.set(rasterValues);
         }
 
         this._rasterData = rasterData;
@@ -349,4 +369,3 @@ export class RasterLayer extends Layer {
         this._pipeline?.destroy();
     }
 }
- 

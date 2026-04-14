@@ -6,7 +6,7 @@ import buildingsFS01 from './shaders/buildings-01.frag.wgsl';
 import buildingsVS02 from './shaders/buildings-02.vert.wgsl';
 import buildingsFS02 from './shaders/buildings-02.frag.wgsl';
 
-import { Camera } from './core-types';
+import { Camera } from './types-core';
 import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
@@ -277,7 +277,7 @@ export class PipelineBuildingSSAO extends Pipeline {
      * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
      */
     updateVertexBuffers(mesh: Triangles3DLayer): void {
-        this._normalData = this._syncFloatData(this._normalData, mesh.normal as number[]);
+        this._normalData = this._syncFloatData(this._normalData, mesh.normal);
         this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
         this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
         this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);

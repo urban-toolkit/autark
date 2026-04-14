@@ -28,14 +28,14 @@
  */
 import * as d3 from 'd3';
 
-import { valueAtPath } from '../core-types';
+import { valueAtPath } from '../types-core';
 
-import type { SortTransformConfig } from '../api';
-import type { AutkDatum, ChartConfig } from '../api';
+import type { AutkDatum } from '../types-chart';
+import type { SortTransformConfig, ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../events-types';
+import { ChartEvent } from '../types-events';
 
 import { run } from '../transforms';
 import type { ExecutedSortTransform } from '../transforms/presets/sort';

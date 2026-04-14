@@ -1,5 +1,5 @@
-import type { ColorHEX, ColorRGB } from './core-types';
-import { ColorMap } from './core-types';
+import type { ColorHEX, ColorRGB } from './types-core';
+import { ColorMap } from './types-core';
 
 /**
  * Global style helpers shared by all chart implementations.

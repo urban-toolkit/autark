@@ -11,7 +11,9 @@ import {
     ResolvedDomain,
     ColorRGB,
     ColorTEX,
-} from './types';
+} from './types-colormap';
+
+import type { TypedArray } from './types-utils';
 
 // Internal shape aliases kept private to this module
 type SequentialDomain = [number, number];
@@ -66,11 +68,16 @@ export class ColorMap {
         return { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 1.0 };
     }
 
-    public static computeMinMaxRange(values: number[]): [number, number] {
-        return [
-            values.reduce((a, b) => Math.min(a, b), Infinity),
-            values.reduce((a, b) => Math.max(a, b), -Infinity),
-        ];
+    public static computeMinMaxRange(values: number[] | TypedArray): [number, number] {
+        if (values.length === 0) return [0, 0];
+        let min = Infinity;
+        let max = -Infinity;
+        for (let i = 0; i < values.length; i++) {
+            const v = values[i];
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+        return [min, max];
     }
 
     /**
@@ -85,13 +92,22 @@ export class ColorMap {
      * @returns Values remapped to `[0, 1]`.
      */
     public static normalizeValues(
-        values: number[],
+        values: number[] | TypedArray,
         domain: SequentialDomain | DivergingDomain,
-    ): number[] {
+    ): number[] | Float32Array {
         const min = domain[0];
         const max = domain[domain.length - 1] as number;
         const range = max - min;
-        return values.map(v => range > 0 ? Math.max(0, Math.min(1, (v - min) / range)) : 0);
+        
+        if (Array.isArray(values)) {
+            return values.map(v => range > 0 ? Math.max(0, Math.min(1, (v - min) / range)) : 0);
+        } else {
+            const result = new Float32Array(values.length);
+            for (let i = 0; i < values.length; i++) {
+                result[i] = range > 0 ? Math.max(0, Math.min(1, (values[i] - min) / range)) : 0;
+            }
+            return result;
+        }
     }
 
     private static isDiverging(interpolator: ColorMapInterpolator): boolean {
@@ -102,7 +118,7 @@ export class ColorMap {
      * Resolves a numeric domain from data and color-map configuration.
      */
     public static resolveNumericDomainFromConfig(
-        values: number[],
+        values: number[] | TypedArray,
         config: ColorMapConfig,
         interpolator: ColorMapInterpolator,
     ): SequentialDomain | DivergingDomain {
@@ -203,7 +219,7 @@ export class ColorMap {
     }
 
     public static resolveDomainFromData(
-        values: number[] | string[],
+        values: number[] | string[] | TypedArray,
         config: ColorMapConfig,
     ): ResolvedDomain {
         const cacheKey = `${config.interpolator}|${JSON.stringify(config.domainSpec)}|${ColorMap.computeDataFingerprint(values)}`;
@@ -212,33 +228,35 @@ export class ColorMap {
             return cached;
         }
 
-        const isCategorical = values.some(v => typeof v === 'string' && isNaN(Number(v)));
+        const isCategorical = config.interpolator.startsWith('scheme')
+            || (config.domainSpec.type === ColorMapDomainStrategy.USER && config.domainSpec.params.some(v => typeof v === 'string'))
+            || (!ArrayBuffer.isView(values) && (values as Array<number|string>).some(v => typeof v === 'string' && isNaN(Number(v))));
 
         let computed: ResolvedDomain;
         if (isCategorical) {
-            computed = ColorMap.resolveCategoricalDomainFromConfig(values.map(v => String(v)), config);
+            computed = ColorMap.resolveCategoricalDomainFromConfig(values as string[], config);
         } else {
-            computed = ColorMap.resolveNumericDomainFromConfig(values.map(v => Number(v)), config, config.interpolator);
+            computed = ColorMap.resolveNumericDomainFromConfig(values as number[] | TypedArray, config, config.interpolator);
         }
 
         ColorMap._domainCache.set(cacheKey, computed);
         return computed;
     }
 
-    private static computeDataFingerprint(values: Array<number | string>): string {
+    private static computeDataFingerprint(values: Array<number | string> | TypedArray): string {
         if (values.length === 0) {
             return 'empty';
         }
 
-        if (typeof values[0] === 'number') {
-            const nums = values as number[];
-            const min = nums.reduce((a, b) => Math.min(a, b), Infinity);
-            const max = nums.reduce((a, b) => Math.max(a, b), -Infinity);
-            const sum = nums.reduce((a, b) => a + b, 0);
+        if (ArrayBuffer.isView(values) || typeof values[0] === 'number') {
+            const nums = values as number[] | TypedArray;
+            const [min, max] = ColorMap.computeMinMaxRange(nums);
+            let sum = 0;
+            for (let i = 0; i < nums.length; i++) sum += nums[i];
             return `n:${nums.length}:${min}:${max}:${sum}`;
         }
 
-        const strs = values.map(v => String(v));
+        const strs = values as string[];
         return `s:${strs.length}:${strs.join('|')}`;
     }
 
@@ -285,9 +303,9 @@ export class ColorMap {
         }
     }
 
-    private static computePercentile(values: number[], p: number): number {
+    private static computePercentile(values: number[] | TypedArray, p: number): number {
         if (values.length === 0) return 0;
-        const sorted = [...values].sort((a, b) => a - b);
+        const sorted = (ArrayBuffer.isView(values) ? new Float32Array(values) : [...values]).sort((a, b) => a - b);
         const idx = p * (sorted.length - 1);
         const lo = Math.floor(idx);
         const hi = Math.ceil(idx);

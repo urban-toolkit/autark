@@ -6,8 +6,9 @@ import type {
     Geometry,
 } from 'geojson';
 
+import type { AutkDatum } from './types-chart';
+
 import type {
-    AutkDatum,
     ChartConfig,
     ChartMargins,
     ChartTransformConfig,
@@ -19,11 +20,11 @@ import {
     ColorMap,
     EventEmitter,
     valueAtPath,
-} from './core-types';
-import type { ColorMapDomainSpec, ResolvedDomain } from './core-types';
+} from './types-core';
+import type { ColorMapDomainSpec, ResolvedDomain } from './types-core';
 
-import { ChartEvent } from './events-types';
-import type { ChartEventRecord } from './events-types';
+import { ChartEvent } from './types-events';
+import type { ChartEventRecord } from './types-events';
 
 import { ChartStyle } from './chart-style';
 

@@ -13,9 +13,10 @@
  *     is used as the bucket key so sort order is preserved.
  */
 
-import { valueAtPath } from '../../core-types';
+import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum, ReduceSeriesTransformConfig } from '../../api';
+import type { AutkDatum } from '../../types-chart';
+import type { ReduceSeriesTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
 

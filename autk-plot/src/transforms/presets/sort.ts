@@ -6,9 +6,10 @@
  * every output row.
  */
 
-import { valueAtPath } from '../../core-types';
+import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum, SortTransformConfig } from '../../api';
+import type { AutkDatum } from '../../types-chart';
+import type { SortTransformConfig } from '../../api';
 
 // ---- Executed transform -------------------------------------------------
 

@@ -10,9 +10,10 @@
  * the same cell.
  */
 
-import { valueAtPath } from '../../core-types';
+import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum, Binning2dTransformConfig } from '../../api';
+import type { AutkDatum } from '../../types-chart';
+import type { Binning2dTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
 import { buildBinMapper } from './binning-1d';

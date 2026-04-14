@@ -1,5 +1,5 @@
-import { MouseStatus } from './events-types';
-import { AutkMap } from './main';
+import { MouseStatus } from './types-events';
+import { AutkMap } from './map';
 
 /**
  * Handles pointer interactions for the map canvas.

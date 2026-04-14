@@ -12,10 +12,10 @@
   ],
   "main": "./dist/autk-compute.umd.cjs",
   "module": "./dist/autk-compute.js",
-  "types": "./dist/main.d.ts",
+  "types": "./dist/src/compute.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/main.d.ts",
+      "types": "./dist/src/compute.d.ts",
       "import": "./dist/autk-compute.js",
       "require": "./dist/autk-compute.umd.cjs"
     }

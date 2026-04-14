@@ -1,4 +1,4 @@
-import { AutkMap } from './main';
+import { AutkMap } from './map';
 
 /**
  * ResizeEvents handles window resize interactions with the map.

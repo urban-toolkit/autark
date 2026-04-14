@@ -6,7 +6,8 @@
  * instead of from individual preset files.
  */
 
-import type { AutkDatum, ChartTransformConfig } from '../api';
+import type { AutkDatum } from '../types-chart';
+import type { ChartTransformConfig } from '../api';
 import type { ExecutedBinning1dTransform } from './presets/binning-1d';
 import type { ExecutedBinning2dTransform } from './presets/binning-2d';
 import type { ExecutedSortTransform } from './presets/sort';

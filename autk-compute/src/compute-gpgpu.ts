@@ -1,7 +1,7 @@
 import { FeatureCollection } from 'geojson';
 import { valueAtPath } from 'autk-core';
 import { GpuPipeline } from './compute-pipeline';
-import { ComputeFunctionIntoPropertiesParams } from './interfaces';
+import { ComputeFunctionIntoPropertiesParams } from './types-compute';
 
 type GlobalVarMeta =
   | { kind: 'scalar'; name: string }

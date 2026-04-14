@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import { FeatureCollection, LineString, MultiLineString } from 'geojson';
+import { FeatureCollection } from 'geojson';
 import { 
     ColorRGB, 
     Camera, 
@@ -8,7 +8,9 @@ import {
     TriangulatorPolygons, 
     TriangulatorPolylines, 
     TriangulatorPoints,
-    LayerType 
+    LayerType,
+    computeOrigin,
+    flattenMesh
 } from 'autk-core';
 import { GpuPipeline } from './compute-pipeline';
 
@@ -16,7 +18,7 @@ import VERT_SHADER from './shaders/render-vert.wgsl?raw';
 import FRAG_SHADER from './shaders/render-frag.wgsl?raw';
 import COUNT_SHADER from './shaders/render-count.wgsl?raw';
 
-// ── Public interfaces ─────────────────────────────────────────────────────────
+// ── Public types-compute ─────────────────────────────────────────────────────────
 
 export interface RenderLayer {
     /** GeoJSON source features. */
@@ -64,32 +66,32 @@ export class ComputeRender extends GpuPipeline {
         if (N === 0) return viewpoints;
 
         // Use autk-core triangulation strategy based on LayerType
-        const origin = TriangulatorBuildings.computeOrigin(layers[0].geojson);
+        const origin = computeOrigin(layers[0].geojson);
         
         const meshes = layers.map(l => {
-            let mesh;
+            let geometries;
             switch (l.type) {
                 case 'buildings':
-                    mesh = TriangulatorBuildings.triangulate(l.geojson, { origin });
+                    [geometries] = TriangulatorBuildings.buildMesh(l.geojson, origin);
                     break;
                 case 'polygons':
                 case 'surface':
                 case 'water':
                 case 'parks':
-                    mesh = TriangulatorPolygons.triangulate(l.geojson, { origin });
+                    [geometries] = TriangulatorPolygons.buildMesh(l.geojson, origin);
                     break;
                 case 'roads':
                 case 'polylines':
-                    mesh = TriangulatorPolylines.triangulate(l.geojson, { origin });
+                    [geometries] = TriangulatorPolylines.buildMesh(l.geojson, origin);
                     break;
                 case 'points':
-                    mesh = TriangulatorPoints.triangulate(l.geojson, { origin });
+                    [geometries] = TriangulatorPoints.buildMesh(l.geojson, origin);
                     break;
                 default:
                     console.warn(`RenderCompute: unsupported layer type "${l.type}", skipping.`);
                     return null;
             }
-            return { mesh, color: l.color };
+            return { mesh: flattenMesh(geometries), color: l.color };
         }).filter(m => m !== null) as { mesh: { positions: Float32Array; indices: Uint32Array }; color: ColorRGB }[];
 
         const cameras = buildRoadCameras(viewpoints, origin, eyeHeight, fov, near, far);

@@ -34,13 +34,13 @@
 
 import * as d3 from 'd3';
 
-import { valueAtPath } from '../core-types';
+import { valueAtPath } from '../types-core';
 
 import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 
-import { ChartEvent } from '../events-types';
+import { ChartEvent } from '../types-events';
 
 import { run } from '../transforms';
 

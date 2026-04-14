@@ -4,7 +4,7 @@ import pickingVertexSource from './shaders/picking.vert.wgsl';
 import pickingFragmentSource from './shaders/picking.frag.wgsl';
 import picking3dVertexSource from './shaders/picking-3d.vert.wgsl';
 
-import { Camera } from './core-types';
+import { Camera } from './types-core';
 import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
 import { VectorLayer } from './layer-vector';

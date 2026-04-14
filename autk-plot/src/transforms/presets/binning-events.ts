@@ -7,9 +7,10 @@
  * that fall into a bucket.
  */
 
-import { valueAtPath } from '../../core-types';
+import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum, BinningEventsTransformConfig, TransformResolution } from '../../api';
+import type { AutkDatum } from '../../types-chart';
+import type { BinningEventsTransformConfig, TransformResolution } from '../../api';
 
 import { reduceBuckets } from '../kernel';
 

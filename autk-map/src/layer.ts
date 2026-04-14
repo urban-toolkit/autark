@@ -1,5 +1,5 @@
-import { Camera } from './core-types';
-import { LayerInfo, LayerRenderInfo } from './layer-types';
+import { Camera } from './types-core';
+import { LayerInfo, LayerRenderInfo } from './types-layers';
 import { Renderer } from './renderer';
 
 /**

@@ -1,6 +1,6 @@
 import { FeatureCollection, Feature, Geometry, LineString, MultiLineString } from 'geojson';
 
-import { LayerGeometry, LayerComponent } from './mesh-types';
+import { LayerGeometry, LayerComponent } from './types-mesh';
 
 import { lineOffset, lineString } from '@turf/turf';
 import earcut from 'earcut';
@@ -26,7 +26,11 @@ export class TriangulatorRaster {
         const texCoords = [0, 0, 1, 0, 1, 1, 0, 1];
         const flatIds = [0, 1, 2, 0, 2, 3];
 
-        mesh.push({ position: flatCoords, texCoord: texCoords, indices: flatIds });
+        mesh.push({ 
+            position: new Float32Array(flatCoords), 
+            texCoord: new Float32Array(texCoords), 
+            indices: new Uint32Array(flatIds) 
+        });
 
         comps.push({ nPoints: flatCoords.length / 2, nTriangles: flatIds.length / 3 });
 

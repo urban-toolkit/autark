@@ -1,11 +1,11 @@
-import { Camera, LayerComponent, LayerGeometry } from './core-types';
+import { Camera, LayerComponent, LayerGeometry } from './types-core';
 
 import {
     LayerData, 
     LayerInfo, 
     LayerRenderInfo, 
     LayerThematic 
-} from './layer-types';
+} from './types-layers';
 
 import { Layer } from './layer';
 
@@ -28,21 +28,21 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Positions of the triangles.
-     * @type {number[]}
+     * @type {Float32Array}
      */
-    protected _position!: number[];
+    protected _position!: Float32Array;
 
     /**
      * Thematic data for the layer.
-     * @type {number[]}
+     * @type {Float32Array}
      */
-    protected _thematic!: number[];
+    protected _thematic!: Float32Array;
 
     /**
      * Indices of the triangles.
-     * @type {number[]}
+     * @type {Uint32Array}
      */
-    protected _indices!: number[];
+    protected _indices!: Uint32Array;
 
     /**
      * Components of the layer.
@@ -59,9 +59,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Highlighted vertices of the layer.
-     * @type {number[]}
+     * @type {Float32Array}
      */
-    protected _highlightedVertices!: number[];
+    protected _highlightedVertices!: Float32Array;
 
     /**
      * Skipped IDs of the layer.
@@ -72,9 +72,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Skipped vertices of the layer.
-     * @type {number[]}
+     * @type {Float32Array}
      */
-    protected _skippedVertices!: number[];
+    protected _skippedVertices!: Float32Array;
 
     /**
      * Rendering pipeline for the layer.
@@ -115,25 +115,25 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Get the positions of the triangles.
-     * @returns {number[]} - The positions of the triangles.
+     * @returns {Float32Array} - The positions of the triangles.
      */
-    get position(): number[] {
+    get position(): Float32Array {
         return this._position;
     }
 
     /**
      * Get the thematic data of the layer.
-     * @returns {number[]} - The thematic data.
+     * @returns {Float32Array} - The thematic data.
      */
-    get thematic(): number[] {
+    get thematic(): Float32Array {
         return this._thematic;
     }
 
     /**
      * Get the indices of the triangles.
-     * @returns {number[]} - The indices of the triangles.
+     * @returns {Uint32Array} - The indices of the triangles.
      */
-    get indices(): number[] {
+    get indices(): Uint32Array {
         return this._indices;
     }
 
@@ -155,9 +155,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Gets the highlighted vertices of the layer.
-     * @returns {number[]} The highlighted vertices.
+     * @returns {Float32Array} The highlighted vertices.
      */
-    get highlightedVertices(): number[] {
+    get highlightedVertices(): Float32Array {
         return this._highlightedVertices;
     }
 
@@ -171,9 +171,9 @@ export abstract class VectorLayer extends Layer {
 
     /**
      * Gets the skipped vertices of the layer.
-     * @returns {number[]} The skipped vertices.
+     * @returns {Float32Array} The skipped vertices.
      */
-    get skippedVertices(): number[] {
+    get skippedVertices(): Float32Array {
         return this._skippedVertices;
     }
 
@@ -196,20 +196,35 @@ export abstract class VectorLayer extends Layer {
      * @param {LayerGeometry[]} layerGeometry - The geometry data to load.
      */
     loadGeometry(layerGeometry: LayerGeometry[]): void {
-        const position: number[] = [];
-        const indices: number[] = [];
+        let totalVerts = 0;
+        let totalIndices = 0;
+        for (const g of layerGeometry) {
+            totalVerts += g.position.length;
+            totalIndices += (g.indices?.length ?? 0);
+        }
+
+        const position = new Float32Array(totalVerts);
+        const indices = new Uint32Array(totalIndices);
+
+        let vOffset = 0;
+        let iOffset = 0;
+        let vertexCount = 0;
 
         for (let id = 0; id < layerGeometry.length; id++) {
-            // fix the index count
-            layerGeometry[id].indices?.forEach((a) => {
-                const b = a + position.length / this._dimension;
-                indices.push(b);
-            });
+            const g = layerGeometry[id];
+            
+            position.set(g.position, vOffset);
 
-            // merges the position data
-            layerGeometry[id].position.forEach((d) => {
-                position.push(d);
-            });
+            if (g.indices) {
+                for (let i = 0; i < g.indices.length; i++) {
+                    indices[iOffset + i] = g.indices[i] + vertexCount;
+                }
+                iOffset += g.indices.length;
+            }
+
+            const vertsAdded = g.position.length / this._dimension;
+            vOffset += g.position.length;
+            vertexCount += vertsAdded;
         }
 
         this._position = position;
@@ -242,13 +257,13 @@ export abstract class VectorLayer extends Layer {
      * @param {LayerThematic[]} layerThematic - The thematic data to load.
      */
     loadThematic(layerThematic: LayerThematic[]): void {
-        const thematic: number[] = [];
+        const thematic = new Float32Array(this._vertexCount);
 
+        let offset = 0;
         for (let compId = 0; compId < layerThematic.length; compId++) {
             const aggr = this.aggregateThematicComponent(compId, layerThematic[compId]);
-            for (let aId = 0; aId < aggr.length; aId++) {
-                thematic.push(aggr[aId]);
-            }
+            thematic.set(aggr, offset);
+            offset += aggr.length;
         }
 
         console.assert(thematic.length === this._vertexCount);
@@ -399,19 +414,16 @@ export abstract class VectorLayer extends Layer {
      * Expands scalar thematic value to all vertices of a component.
      * @param {number} component - The component index.
      * @param {LayerThematic} layerThematic - The thematic data to aggregate.
-     * @returns {number[]} - The aggregated thematic data.
+     * @returns {Float32Array} - The aggregated thematic data.
      */
-    private aggregateThematicComponent(component: number, layerThematic: LayerThematic): number[] {
+    private aggregateThematicComponent(component: number, layerThematic: LayerThematic): Float32Array {
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;
         const nPoint = ePoint - sPoint;
 
-        const thematic = new Array(nPoint);
+        const thematic = new Float32Array(nPoint);
         const value = layerThematic.values[0] ?? 0;
-
-        for (let vId = 0; vId < nPoint; vId++) {
-            thematic[vId] = value;
-        }
+        thematic.fill(value);
 
         return thematic;
     }
@@ -420,9 +432,9 @@ export abstract class VectorLayer extends Layer {
      * Resets highlight/skip state after full layer-data reload (geometry/components changed).
      */
     private _resetInteractionState(): void {
-        this._highlightedVertices = new Array(this._vertexCount).fill(0);
+        this._highlightedVertices = new Float32Array(this._vertexCount).fill(0);
         this._highlightedIds = new Set<number>();
-        this._skippedVertices = new Array(this._vertexCount).fill(0);
+        this._skippedVertices = new Float32Array(this._vertexCount).fill(0);
         this._skippedIds = new Set<number>();
     }
 

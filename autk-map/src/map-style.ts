@@ -1,4 +1,4 @@
-import { ColorHEX, ColorRGB, ColorMap } from './core-types';
+import { ColorHEX, ColorRGB, ColorMap } from './types-core';
 
 import defaultStyle from './styles/default.json';
 import light from './styles/light.json';

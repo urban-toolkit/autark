@@ -1,4 +1,4 @@
-import { AutkMap } from './main';
+import { AutkMap } from './map';
 import { MapStyle } from './map-style';
 
 /**

@@ -1,9 +1,9 @@
 // ─── Color mapping ───────────────────────────────────────────────────────────
 
 /** Strategy enum controlling how a colormap domain is derived from data. */
-export { ColorMapDomainStrategy } from './types';
+export { ColorMapDomainStrategy } from './types-colormap';
 /** Interpolator identifiers for d3-scale-chromatic color schemes. */
-export { ColorMapInterpolator } from './types';
+export { ColorMapInterpolator } from './types-colormap';
 /** Colormap engine: domain resolution, label generation, color sampling. */
 export { ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './colormap';
 
@@ -14,7 +14,7 @@ export type {
     ColorMapDomainSpec,
     /** Full colormap configuration: interpolator + domain spec. */
     ColorMapConfig,
-} from './types';
+} from './types-colormap';
 
 // ─── Color primitives ────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ export type {
     ColorRGB,
     /** Flat RGBA texture array: `[r, g, b, a, r, g, b, a, …]`. */
     ColorTEX,
-} from './types';
+} from './types-colormap';
 
 // ─── Raster / transfer function ──────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ export type {
     LayerComponent,
     LayerBorder,
     LayerBorderComponent,
-} from './mesh-types';
+} from './types-mesh';
 
 // ─── Triangulators ───────────────────────────────────────────────────────────
 
@@ -76,7 +76,14 @@ export type {
     BoundingBox,
     /** Layer geometry kind identifier. */
     LayerType,
-} from './types';
+} from './types-layer';
+
+export type {
+    /** Supported TypedArray views for binary data buffers. */
+    TypedArray,
+    /** Constructors for supported TypedArray views. */
+    TypedArrayConstructor,
+} from './types-utils';
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
@@ -84,3 +91,7 @@ export type {
 export { valueAtPath } from './utils';
 /** Returns `true` if the value can be coerced to a finite number. */
 export { isNumericLike } from './utils';
+/** Computes the central origin of a GeoJSON FeatureCollection. */
+export { computeOrigin } from './utils';
+/** Flattens an array of LayerGeometry pieces into continuous typed arrays. */
+export { flattenMesh } from './utils';

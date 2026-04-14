@@ -1,7 +1,7 @@
 import { BBox, FeatureCollection, Geometry } from 'geojson';
 
-import type { LayerType } from './core-types';
-import { LayerData, LayerInfo, LayerRenderInfo } from './layer-types';
+import type { LayerType } from './types-core';
+import { LayerData, LayerInfo, LayerRenderInfo } from './types-layers';
 
 import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';

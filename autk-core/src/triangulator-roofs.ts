@@ -843,9 +843,6 @@ export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
     };
 }
 
-const roofShapeCounts: Record<string, number> = {};
-let logTimeout: ReturnType<typeof setTimeout> | null = null;
-
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -864,14 +861,6 @@ export function buildBuildingPartMesh(
     props: GeoJsonProperties,
 ): MeshData[] {
     const info = extractRoofInfo(props);
-    
-    roofShapeCounts[info.shape] = (roofShapeCounts[info.shape] || 0) + 1;
-    if (!logTimeout) {
-        logTimeout = setTimeout(() => {
-            console.log('Processed roof shapes:', { ...roofShapeCounts });
-            logTimeout = null;
-        }, 1000);
-    }
 
     let roofH = info.height;
     if (roofH <= 0 && info.shape !== 'flat') {

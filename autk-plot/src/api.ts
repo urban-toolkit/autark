@@ -4,10 +4,10 @@ import type {
     GeoJsonProperties,
 } from 'geojson';
 
-import type { ColorMapDomainSpec } from './core-types';
-import { ColorMapInterpolator } from './core-types';
+import type { ColorMapDomainSpec } from './types-core';
+import type { ColorMapInterpolator } from './types-core';
 
-import type { ChartEvent } from './events-types';
+import type { ChartEvent } from './types-events';
 
 
 // ---------------------------------------------------------------------------
@@ -31,17 +31,6 @@ export type ChartMargins = {
     top: number;
     /** Bottom margin in pixels. */
     bottom: number;
-};
-
-/**
- * Datum contract bound to interactive marks.
- *
- * `autkIds` must always reference source feature indices from the original
- * input collection (never DOM position indices).
- */
-export type AutkDatum = GeoJsonProperties & {
-    /** Source feature indices from the original GeoJSON input collection. */
-    autkIds?: number[];
 };
 
 /**

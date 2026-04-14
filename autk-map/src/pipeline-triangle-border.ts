@@ -6,7 +6,7 @@ import linesFragmentSource from './shaders/triangle-02.frag.wgsl';
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
-import { Camera } from './core-types';
+import { Camera } from './types-core';
 
 import { Triangles2DLayer } from './layer-triangles2D';
 
@@ -86,6 +86,7 @@ export class PipelineTriangleBorder extends Pipeline {
         this.createCameraUniformBindGroup();
 
         this.updateVertexBuffers(borders);
+        this.updateColorUniforms(borders);
 
         this.createPipeline();
     }
@@ -115,14 +116,14 @@ export class PipelineTriangleBorder extends Pipeline {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
-            size: borders.borderPos.length * 4,
+            size: borders.borderPosition.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         // vertex data
         this._borderIndicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
-            size: borders.borderIds.length * 4,
+            size: borders.borderIndices.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
 
@@ -139,8 +140,8 @@ export class PipelineTriangleBorder extends Pipeline {
      * @param {Triangles2DLayer} borders The border data containing positions and indices
      */
     updateVertexBuffers(borders: Triangles2DLayer): void {
-        this._positionData = this._syncFloatData(this._positionData, borders.borderPos as number[]);
-        this._indicesData = this._syncUintData(this._indicesData, borders.borderIds as number[]);
+        this._positionData = this._syncFloatData(this._positionData, borders.borderPosition);
+        this._indicesData = this._syncUintData(this._indicesData, borders.borderIndices);
         this._skippedData = this._syncFloatData(this._skippedData, borders.skippedVertices);
 
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);

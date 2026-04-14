@@ -1,15 +1,15 @@
 // ─── Map entry point ─────────────────────────────────────────────────────────
 
-export { AutkMap } from './main';
+export { AutkMap } from './map';
 
 // ─── Color mapping (re-exported from autk-core) ──────────────────────────────
 
 /** Strategy enum controlling how a colormap domain is derived from data. */
-export { ColorMapDomainStrategy } from './core-types';
+export { ColorMapDomainStrategy } from './types-core';
 /** Interpolator identifiers for d3-scale-chromatic color schemes. */
-export { ColorMapInterpolator } from './core-types';
+export { ColorMapInterpolator } from './types-core';
 /** Colormap engine: domain resolution, label generation, color sampling. */
-export { ColorMap } from './core-types';
+export { ColorMap } from './types-core';
 
 export type {
     /** Resolved (computed) domain: `number[]` for numeric scales, `string[]` for categorical. */
@@ -18,16 +18,16 @@ export type {
     ColorMapDomainSpec,
     /** Full colormap configuration: interpolator + domain spec. */
     ColorMapConfig,
-} from './core-types';
+} from './types-core';
 
 // ─── Color primitives (re-exported from autk-core) ───────────────────────────
 
-export type { ColorHEX, ColorRGB, ColorTEX } from './core-types';
+export type { ColorHEX, ColorRGB, ColorTEX } from './types-core';
 
 // ─── Camera (re-exported from autk-core) ─────────────────────────────────────
 
-export { Camera } from './core-types';
-export type { CameraData } from './core-types';
+export { Camera } from './types-core';
+export type { CameraData } from './types-core';
 
 // ─── Geometry / mesh (re-exported from autk-core) ────────────────────────────
 
@@ -36,7 +36,7 @@ export type {
     LayerComponent,
     LayerBorder,
     LayerBorderComponent,
-} from './core-types';
+} from './types-core';
 
 // ─── Triangulators (re-exported from autk-core) ──────────────────────────────
 
@@ -46,7 +46,7 @@ export {
     TriangulatorPolygons,
     TriangulatorPolylines,
     TriangulatorRaster,
-} from './core-types';
+} from './types-core';
 
 // ─── Shared types (re-exported from autk-core) ───────────────────────────────
 
@@ -55,7 +55,7 @@ export type {
     BoundingBox,
     /** Layer geometry kind identifier. */
     LayerType,
-} from './core-types';
+} from './types-core';
 
 // ─── API / params ─────────────────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ export type {
     LayerRenderInfo,
     LayerData,
     LayerThematic,
-} from './layer-types';
+} from './types-layers';
 
 // ─── Map style ───────────────────────────────────────────────────────────────
 
@@ -88,8 +88,8 @@ export { AutkMapUi } from './map-ui';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
-export { MapEvent, MouseStatus } from './events-types';
-export type { MapEventData, MapEventRecord } from './events-types';
+export { MapEvent, MouseStatus } from './types-events';
+export type { MapEventData, MapEventRecord } from './types-events';
 
 export { KeyEvents } from './events-key';
 export { MouseEvents } from './events-mouse';

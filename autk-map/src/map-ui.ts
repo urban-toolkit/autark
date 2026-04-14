@@ -1,6 +1,6 @@
-import { ColorMap, ColorMapInterpolator } from './core-types';
-import { Layer } from './layer.js';
-import { AutkMap } from './main.js';
+import { ColorMap, ColorMapInterpolator } from './types-core';
+import { Layer } from './layer';
+import { AutkMap } from './map';
 
 import * as d3 from 'd3';
 
@@ -66,7 +66,7 @@ export class AutkMapUi {
         this._activeLayer = layer;
 
         // Exclusive isPick: disable on all other vector layers
-        this.map.layerManager.layers.forEach(l => {
+        this._map.layerManager.layers.forEach((l: Layer) => {
             if (l.layerInfo.id !== layer.layerInfo.id) {
                 this.map.updateRenderInfo(l.layerInfo.id, { isPick: false });
             }
