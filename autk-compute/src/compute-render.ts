@@ -1,20 +1,34 @@
 /// <reference types="@webgpu/types" />
 
-import { FeatureCollection } from 'geojson';
-import { ColorRGB, Camera, TriangulatorBuildings } from 'autk-core';
+import { FeatureCollection, LineString, MultiLineString } from 'geojson';
+import { 
+    ColorRGB, 
+    Camera, 
+    TriangulatorBuildings, 
+    TriangulatorPolygons, 
+    TriangulatorPolylines, 
+    TriangulatorPoints,
+    LayerType 
+} from 'autk-core';
 import { GpuPipeline } from './compute-pipeline';
+
+import VERT_SHADER from './shaders/render-vert.wgsl?raw';
+import FRAG_SHADER from './shaders/render-frag.wgsl?raw';
+import COUNT_SHADER from './shaders/render-count.wgsl?raw';
 
 // ── Public interfaces ─────────────────────────────────────────────────────────
 
 export interface RenderLayer {
-    /** GeoJSON buildings (Polygon / MultiPolygon / LineString footprints). */
+    /** GeoJSON source features. */
     geojson: FeatureCollection;
     /** RGBA color used to paint this layer's geometry. r/g/b in [0-1], alpha in [0-1]. */
     color: ColorRGB;
+    /** Layer type determining the triangulation strategy. */
+    type: LayerType;
 }
 
 export interface RenderComputeParams {
-    /** Geometry layers to render (e.g. buildings). */
+    /** Geometry layers to render. */
     layers: RenderLayer[];
     /**
      * Viewpoint features (LineString or Point).
@@ -35,67 +49,10 @@ export interface RenderComputeParams {
     clearColor?: [number, number, number, number];
 }
 
-// ── WGSL shaders ─────────────────────────────────────────────────────────────
-
-const VERT_SHADER = /* wgsl */`
-@group(0) @binding(0) var<uniform> viewProj: mat4x4f;
-@vertex
-fn main(@location(0) pos: vec3f) -> @builtin(position) vec4f {
-    return viewProj * vec4f(pos, 1.0);
-}
-`;
-
-const FRAG_SHADER = /* wgsl */`
-@group(1) @binding(0) var<uniform> flatColor: vec4f;
-@fragment
-fn main() -> @location(0) vec4f {
-    return flatColor;
-}
-`;
-
-const COUNT_SHADER = /* wgsl */`
-struct Params {
-    gridSize  : u32,
-    tileSize  : u32,
-    totalTiles: u32,
-    _pad      : u32,
-    clearR    : f32,
-    clearG    : f32,
-    clearB    : f32,
-    clearA    : f32,
-}
-@group(0) @binding(0) var tiledTex : texture_2d<f32>;
-@group(0) @binding(1) var<storage, read_write> results: array<atomic<u32>>;
-@group(0) @binding(2) var<uniform> params: Params;
-
-@compute @workgroup_size(8, 8, 1)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-    let ti = gid.z;
-    if ti >= params.totalTiles { return; }
-    if gid.x >= params.tileSize || gid.y >= params.tileSize { return; }
-
-    let col = ti % params.gridSize;
-    let row = ti / params.gridSize;
-    let px  = col * params.tileSize + gid.x;
-    let py  = row * params.tileSize + gid.y;
-
-    let pixel = textureLoad(tiledTex, vec2u(px, py), 0);
-    let isSky =
-        abs(pixel.r - params.clearR) < 0.01 &&
-        abs(pixel.g - params.clearG) < 0.01 &&
-        abs(pixel.b - params.clearB) < 0.01 &&
-        abs(pixel.a - params.clearA) < 0.01;
-
-    if !isSky {
-        atomicAdd(&results[ti], 1u);
-    }
-}
-`;
-
 export class ComputeRender extends GpuPipeline {
     /**
      * Renders each viewpoint feature into an offscreen tile and counts
-     * non-sky (building) pixels.
+     * non-sky (building/geometry) pixels.
      */
     public async renderIntoMetrics(params: RenderComputeParams): Promise<FeatureCollection> {
         const { layers, viewpoints, eyeHeight = 1.7, fov = 90, near = 1, far = 5000, tileSize = 64, clearColor = [0, 0, 0, 1] } = params;
@@ -106,12 +63,34 @@ export class ComputeRender extends GpuPipeline {
         const N = viewpoints.features.length;
         if (N === 0) return viewpoints;
 
-        // Use autk-core triangulation
+        // Use autk-core triangulation strategy based on LayerType
         const origin = TriangulatorBuildings.computeOrigin(layers[0].geojson);
-        const meshes = layers.map(l => ({
-            mesh:  TriangulatorBuildings.triangulate(l.geojson, { origin }),
-            color: l.color,
-        }));
+        
+        const meshes = layers.map(l => {
+            let mesh;
+            switch (l.type) {
+                case 'buildings':
+                    mesh = TriangulatorBuildings.triangulate(l.geojson, { origin });
+                    break;
+                case 'polygons':
+                case 'surface':
+                case 'water':
+                case 'parks':
+                    mesh = TriangulatorPolygons.triangulate(l.geojson, { origin });
+                    break;
+                case 'roads':
+                case 'polylines':
+                    mesh = TriangulatorPolylines.triangulate(l.geojson, { origin });
+                    break;
+                case 'points':
+                    mesh = TriangulatorPoints.triangulate(l.geojson, { origin });
+                    break;
+                default:
+                    console.warn(`RenderCompute: unsupported layer type "${l.type}", skipping.`);
+                    return null;
+            }
+            return { mesh, color: l.color };
+        }).filter(m => m !== null) as { mesh: { positions: Float32Array; indices: Uint32Array }; color: ColorRGB }[];
 
         const cameras = buildRoadCameras(viewpoints, origin, eyeHeight, fov, near, far);
         const gridSize = Math.ceil(Math.sqrt(N));

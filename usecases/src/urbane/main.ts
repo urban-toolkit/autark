@@ -138,7 +138,7 @@ export class Urbane {
         const rc = new ComputeRender();
 
         this.roadsWithSky = await rc.renderIntoMetrics({
-            layers: [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 } }],
+            layers: [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 }, type: 'buildings' }],
             viewpoints: roadsGeoJson,
             tileSize: 64,
         });
