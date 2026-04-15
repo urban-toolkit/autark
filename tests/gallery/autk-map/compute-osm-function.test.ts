@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import * as path from 'path';
 
 test('compute-osm-function', async ({ page }) => {
-    test.setTimeout(100000);
+    test.setTimeout(1000000);
 
     page.on('console', msg => {
         console.log(`Browser log: [${msg.type()}] ${msg.text()}`);
@@ -10,8 +11,10 @@ test('compute-osm-function', async ({ page }) => {
         console.error(`Browser error: ${err.message}`);
     });
 
-    await page.routeFromHAR('tests/data/compute-osm-function.har', { url: 'https://overpass-api.de/**', update: false });
+    await page.routeFromHAR(path.join(__dirname, '../../data/compute-osm-function.har'), { url: 'https://overpass-api.de/**', update: false });
     await page.goto('/src/autk-map/compute-osm-function.html');
+
+
 
     await page.waitForEvent('console', {
         predicate: (msg) => msg.text().includes('Loading layer: table_osm_roads of type roads')

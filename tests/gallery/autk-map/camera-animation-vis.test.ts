@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('test camera animation', async ({ page }) => {
+test('camera-animation-vis', async ({ page }) => {
     await page.goto('/src/autk-map/camera-animation-vis.html');
 
     await page.waitForTimeout(10000);

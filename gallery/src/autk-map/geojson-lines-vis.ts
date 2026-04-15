@@ -1,5 +1,5 @@
 import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, LayerType } from 'autk-map';
+import { AutkMap, LayerType, MapStyle } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
@@ -18,6 +18,7 @@ export class GeojsonLinesVis {
         });
 
         this.map = new AutkMap(canvas);
+        MapStyle.setPredefinedStyle('apple');
 
         await this.map.init();
         await this.loadLayers();

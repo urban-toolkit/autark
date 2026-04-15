@@ -14,9 +14,43 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { spawn } from 'node:child_process';
 
 const url = process.argv[2] ?? 'http://localhost:5177';
 const outputFile = process.argv[3];
+const app = process.env.APP ?? 'gallery';
+
+// Start the Vite dev server if not already running.
+async function waitForServer(serverUrl, timeoutMs = 30000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        try {
+            await fetch(serverUrl);
+            return true;
+        } catch {
+            await new Promise(r => setTimeout(r, 500));
+        }
+    }
+    return false;
+}
+
+let viteProcess = null;
+const healthUrl = new URL(url).origin + '/vite.svg';
+const alreadyRunning = await waitForServer(healthUrl, 500);
+
+if (!alreadyRunning) {
+    viteProcess = spawn('npm', ['run', 'dev', '--', '--port', '5173'], {
+        cwd: app,
+        env: { ...process.env, PLAYWRIGHT: '1' },
+        stdio: 'inherit',
+    });
+    const ready = await waitForServer(healthUrl);
+    if (!ready) {
+        console.error('Vite dev server failed to start.');
+        viteProcess.kill();
+        process.exit(1);
+    }
+}
 
 const browser = await chromium.launch({
     headless: false,
@@ -41,6 +75,7 @@ if (outputFile) {
     await page.goto(url);
     await page.pause();
     await browser.close();
+    if (viteProcess) viteProcess.kill();
     process.exit(0);
 }
 
@@ -49,3 +84,5 @@ await page.goto(url);
 
 // Wait for the browser to close (user finishes recording).
 await new Promise(resolve => browser.on('disconnected', resolve));
+
+if (viteProcess) viteProcess.kill();

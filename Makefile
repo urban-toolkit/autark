@@ -45,22 +45,24 @@ docs:
 verify: lint typecheck build-all docs
 
 ifdef OPEN
-TEST_TARGET = tests/$(APP)/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||').test.ts
+TEST_TARGET = tests/$(APP)/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||')
 else
 TEST_TARGET = tests/$(APP)
 endif
 
+CODEGEN_TARGET = src/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||')
+
 test:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test $(TEST_TARGET)
+	APP=$(APP) OPEN=$(OPEN) npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET))
 
 test-update:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test $(TEST_TARGET) --update-snapshots
+	APP=$(APP) OPEN=$(OPEN) npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET)) --update-snapshots
 
 test-ui:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui $(TEST_TARGET)
+	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET))
 
 test-codegen:
-	node playwright.codegen.mjs http://localhost:5173$(OPEN) $(TEST_TARGET)
+	node playwright.codegen.mjs http://localhost:5173$(OPEN) $(if $(OPEN),$(TEST_TARGET).test.ts)
 
 
 dev:

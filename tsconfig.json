@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["playwright.config.ts", "gallery/**/*.test.ts", "usecases/**/*.test.ts", "performance/**/*.test.ts"]
+  "include": ["playwright.config.ts", "tests/**/*.test.ts"]
 }
