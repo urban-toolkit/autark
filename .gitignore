@@ -44,6 +44,7 @@ npm-debug.log*
 # Playwright output
 tests/report/
 tests/results/
+tests/data
 
 # Test data
 **/public/data-ignore/*
