@@ -13,7 +13,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: [['html', { outputFolder: './tests/report' }]],
+  reporter: [['list'], ['html', { outputFolder: './tests/report' }]],
   use: {
     baseURL: 'http://localhost:5177',
     viewport: { width: 1280, height: 1280 },
@@ -30,6 +30,13 @@ export default defineConfig({
   },
 
   // WebGPU is only supported in Chromium
+  webServer: {
+    command: `cd ${process.env.APP ?? 'gallery'} && PLAYWRIGHT=1 npm run dev -- --port 5177`,
+    url: 'http://localhost:5177/vite.svg',
+    reuseExistingServer: true,
+    timeout: 120 * 1000,
+  },
+
   projects: [
     {
       name: 'chromium',
@@ -37,12 +44,6 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: `cd ${process.env.APP ?? 'gallery'} && npm run dev -- --port 5177`,
-    url: `http://localhost:5177${process.env.OPEN ?? '/'}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
 });
 
 

@@ -44,17 +44,23 @@ docs:
 
 verify: lint typecheck build-all docs
 
+ifdef OPEN
+TEST_TARGET = tests/$(APP)/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||').test.ts
+else
+TEST_TARGET = tests/$(APP)
+endif
+
 test:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test tests/$(APP)
+	APP=$(APP) OPEN=$(OPEN) npx playwright test $(TEST_TARGET)
 
 test-update:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test tests/$(APP) --update-snapshots
+	APP=$(APP) OPEN=$(OPEN) npx playwright test $(TEST_TARGET) --update-snapshots
 
 test-ui:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui tests/$(APP)
+	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui $(TEST_TARGET)
 
 test-codegen:
-	node playwright.codegen.mjs http://localhost:5173$(OPEN)$(if $(OPEN), tests/$(APP)/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||').test.ts)
+	node playwright.codegen.mjs http://localhost:5173$(OPEN) $(TEST_TARGET)
 
 
 dev:
