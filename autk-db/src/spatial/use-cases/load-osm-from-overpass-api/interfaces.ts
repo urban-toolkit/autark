@@ -12,13 +12,13 @@ export interface OsmElement {
     role?: string;
   }[];
   nodes?: number[];
+  /** Inline geometry from Overpass `out geom;` — present alongside `nodes` for ways. */
+  geometry?: Array<{ lat: number; lon: number }>;
 }
 
 export type LoadingPhase =
   | 'querying-osm-server'
   | 'downloading-osm-data'
-  | 'querying-osm-boundaries'
-  | 'downloading-boundaries'
   | 'processing-osm-data'
   | 'processing-boundaries';
 

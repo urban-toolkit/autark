@@ -31,12 +31,16 @@ export class HttpCache<T = any> {
     /**
      * Get data from cache if available and not expired
      */
+    private toRequest(key: string): Request {
+        return new Request(`https://cache.local/${encodeURIComponent(key)}`);
+    }
+
     async get(key: string): Promise<T | null> {
         await this.init();
         if (!this.cache) return null;
 
         try {
-            const response = await this.cache.match(key);
+            const response = await this.cache.match(this.toRequest(key));
             if (!response) return null;
 
             const cached = await response.json();
@@ -44,7 +48,7 @@ export class HttpCache<T = any> {
 
             // Check if expired
             if (now - cached.timestamp > this.ttl) {
-                await this.cache.delete(key);
+                await this.cache.delete(this.toRequest(key));
                 return null;
             }
 
@@ -71,7 +75,7 @@ export class HttpCache<T = any> {
                 headers: { 'Content-Type': 'application/json' },
             });
 
-            await this.cache.put(key, response);
+            await this.cache.put(this.toRequest(key), response);
         } catch {
             // Ignore cache errors
         }
@@ -85,7 +89,7 @@ export class HttpCache<T = any> {
         if (!this.cache) return;
 
         try {
-            await this.cache.delete(key);
+            await this.cache.delete(this.toRequest(key));
         } catch {
             // Ignore errors
         }

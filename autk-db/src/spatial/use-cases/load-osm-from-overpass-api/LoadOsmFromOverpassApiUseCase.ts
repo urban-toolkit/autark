@@ -29,13 +29,9 @@ export class LoadOsmFromOverpassApiUseCase {
     this.cache = new HttpCache('overpass-api-cache', 24 * 60 * 60 * 1000); // 24h TTL
   }
 
-  /**
-   * Generate a cache key from query parameters
-   */
-  private getCacheKey(queryArea: { geocodeArea: string; areas: string[] }, isBoundary: boolean): string {
-    const type = isBoundary ? 'boundaries' : 'data';
+  private getCacheKey(queryArea: { geocodeArea: string; areas: string[] }): string {
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-${type}-${queryArea.geocodeArea}-${areas}`;
+    return `overpass-combined-v2-${queryArea.geocodeArea}-${areas}`;
   }
 
   async exec(params: LoadOsmParams): Promise<OsmExecResult> {
@@ -43,16 +39,17 @@ export class LoadOsmFromOverpassApiUseCase {
     const workspace = params.workspace || 'main';
     const onProgress = params.onProgress;
 
-    // 1. Fetch OSM data from query area (HTTP may be cached)
-    const osmData = await this.fetchOsmWithinArea(params.queryArea, onProgress);
+    // Single API call for both datasets
+    const combined = await this.fetchCombinedOsmData(params.queryArea, onProgress);
+    const { osmData, boundariesData } = this.splitCombinedResponse(combined);
+    console.log(`[autk-db] Split: ${osmData.elements.length} OSM elements, ${boundariesData.elements.length} boundary elements`);
+
     onProgress?.('processing-osm-data');
     const t0 = performance.now();
     await this.insertOsmDataUsingJson(params.outputTableName, osmData, workspace);
     const osmDataProcessingMs = performance.now() - t0;
     console.log(`Successfully inserted ${osmData.elements.length} OSM elements into ${params.outputTableName}`);
 
-    // 2. Fetch OSM data just for boundaries (HTTP may be cached)
-    const boundariesData = await this.fetchBoundariesOsmWithinArea(params.queryArea, onProgress);
     onProgress?.('processing-boundaries');
     const t1 = performance.now();
     await this.insertOsmDataUsingJson(`${params.outputTableName}_boundaries`, boundariesData, workspace, true);
@@ -75,6 +72,53 @@ export class LoadOsmFromOverpassApiUseCase {
       osmDataProcessingMs,
       boundariesProcessingMs,
     };
+  }
+
+  /**
+   * Split a combined Overpass response into main OSM data and boundary data.
+   *
+   * The combined response includes the boundary relations so we can read their
+   * member way IDs. Relations are excluded from both output tables — they were
+   * only fetched to identify which ways form the area boundaries.
+   */
+  private splitCombinedResponse(combined: OverpassApiResponse): {
+    osmData: OverpassApiResponse;
+    boundariesData: OverpassApiResponse;
+  } {
+    const elements = combined.elements ?? [];
+
+    // 1. Collect boundary way IDs from relation members
+    const boundaryWayIds = new Set<number>();
+    for (const element of elements) {
+      if (element.type === 'relation' && element.members) {
+        for (const member of element.members) {
+          if (member.type === 'way') boundaryWayIds.add(member.ref);
+        }
+      }
+    }
+
+    // 2. Main OSM data: all nodes and ways (relations excluded — not used downstream)
+    const osmData: OverpassApiResponse = {
+      elements: elements.filter(e => e.type !== 'relation'),
+    };
+
+    // 3. Boundary data: ways that form the boundary relations + their nodes
+    const boundaryNodeIds = new Set<number>();
+    for (const element of elements) {
+      if (element.type === 'way' && boundaryWayIds.has(element.id) && element.nodes) {
+        element.nodes.forEach(nodeId => boundaryNodeIds.add(nodeId));
+      }
+    }
+
+    const boundariesData: OverpassApiResponse = {
+      elements: elements.filter(
+        e =>
+          (e.type === 'way' && boundaryWayIds.has(e.id)) ||
+          (e.type === 'node' && boundaryNodeIds.has(e.id)),
+      ),
+    };
+
+    return { osmData, boundariesData };
   }
 
   /**
@@ -104,7 +148,14 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Format OSM data into the exact structure expected by our table schema
+   * Format OSM data into the exact structure expected by our table schema.
+   *
+   * With `out geom;`, way elements carry both `nodes` (real OSM IDs, needed so
+   * the closed-way check `refs[0] === refs[last]` still works) and `geometry`
+   * (inline lat/lon coordinates, so we never need a separate node-recursion
+   * step on the server side).  We synthesise node records from the geometry
+   * and deduplicate them by ID, matching the assumption of the SQL layer
+   * queries that each node ID appears exactly once in the table.
    */
   private formatOsmDataForJson(osmData: OverpassApiResponse): Array<{
     kind: 'node' | 'way' | 'relation';
@@ -116,7 +167,7 @@ export class LoadOsmFromOverpassApiUseCase {
     ref_roles: string[];
     ref_types: string[];
   }> {
-    const formattedElements: Array<{
+    type FormattedElement = {
       kind: 'node' | 'way' | 'relation';
       id: number;
       tags: Array<{ k: string; v: string }>;
@@ -125,37 +176,52 @@ export class LoadOsmFromOverpassApiUseCase {
       lon: number | null;
       ref_roles: string[];
       ref_types: string[];
-    }> = [];
+    };
+
+    const formattedElements: FormattedElement[] = [];
+    // Track which node IDs we have already emitted to avoid duplicate records.
+    const emittedNodeIds = new Set<number>();
+
+    const emitNode = (id: number, lat: number, lon: number) => {
+      if (!emittedNodeIds.has(id)) {
+        emittedNodeIds.add(id);
+        formattedElements.push({ kind: 'node', id, tags: [], refs: [], lat, lon, ref_roles: [], ref_types: [] });
+      }
+    };
 
     osmData.elements.forEach((element) => {
       switch (element.type) {
         case 'node':
+          // Standalone nodes (present when using `out body` instead of `out geom`).
           if (element.lat !== undefined && element.lon !== undefined) {
-            formattedElements.push({
-              kind: 'node',
-              id: element.id,
-              tags: element.tags ? Object.entries(element.tags).map(([k, v]) => ({ k, v })) : [],
-              refs: [],
-              lat: element.lat,
-              lon: element.lon,
-              ref_roles: [],
-              ref_types: [],
-            });
+            emitNode(element.id, element.lat, element.lon);
           }
           break;
 
-        case 'way':
+        case 'way': {
+          const refs: number[] = element.nodes ?? [];
+
+          if (element.geometry && element.geometry.length > 0 && element.nodes) {
+            // `out geom` path: geometry is inlined; synthesise node records so
+            // the SQL join in LOAD_LAYER_QUERY can find coordinates by node ID.
+            for (let i = 0; i < element.nodes.length; i++) {
+              const geo = element.geometry[i];
+              if (geo) emitNode(element.nodes[i], geo.lat, geo.lon);
+            }
+          }
+
           formattedElements.push({
             kind: 'way',
             id: element.id,
             tags: element.tags ? Object.entries(element.tags).map(([k, v]) => ({ k, v })) : [],
-            refs: element.nodes || [],
+            refs,
             lat: null,
             lon: null,
             ref_roles: [],
             ref_types: [],
           });
           break;
+        }
 
         case 'relation': {
           const refs: number[] = [];
@@ -217,7 +283,6 @@ export class LoadOsmFromOverpassApiUseCase {
       try {
         response = await fetch(url);
       } catch (networkErr) {
-        // fetch() itself threw – likely a connection reset or browser timeout.
         if (attempt < MAX_RETRIES) {
           const ms = jitter(BACKOFF_429_MS[attempt] ?? 120_000);
           console.warn(
@@ -250,51 +315,70 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Fetch OSM data within a geocode area from the Overpass API (with caching)
+   * Build a single Overpass QL query that fetches both the area data and the
+   * boundary relation geometry in one round-trip.
+   *
+   * Spatial filtering uses the pre-indexed `area` type directly — this is
+   * significantly faster than `relation + map_to_area` because areas are
+   * already stored as indexed objects in the Overpass database.  The
+   * `relation` is still fetched alongside so the caller can read member way
+   * IDs and identify which ways form each area boundary.
    */
-  private async fetchOsmWithinArea(
-    queryArea: { geocodeArea: string; areas: string[] },
-    onProgress?: OnLoadingProgress,
-  ): Promise<OverpassApiResponse> {
-    // Try cache first
-    const cacheKey = this.getCacheKey(queryArea, false);
-    const cachedData = await this.cache.get(cacheKey);
-    if (cachedData) return cachedData;
-
-    // Fetch from API
-    const geocodeAlias = 'areaMain'; // alias without leading dot
-
-    // 1. Main geocode area
+  private buildCombinedQuery(queryArea: { geocodeArea: string; areas: string[] }): string {
+    const geocodeAlias = 'areaMain';
     const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.${geocodeAlias};`;
 
-    // 2. Build a set of lines for each requested sub-area
-    const subAreaLines: string[] = [];
-    const allWaysSelectors: string[] = [];
+    const areaLines: string[] = [];
+    const allSelectors: string[] = [];
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
-      subAreaLines.push(`relation["name"="${areaName}"](area.${geocodeAlias})->.rel${i};`);
-      subAreaLines.push(`.rel${i} map_to_area->.area${i};`);
-      subAreaLines.push(`way(area.area${i})->.ways${i};`);
+      // Use the pre-indexed area object for spatial filtering (fast).
+      areaLines.push(`area["name"="${areaName}"](area.${geocodeAlias})->.area${i};`);
+      // Keep the relation to identify boundary member ways downstream.
+      areaLines.push(`relation["name"="${areaName}"](area.${geocodeAlias})->.rel${i};`);
+      areaLines.push(`(
+        way["highway"](area.area${i});
+        way["building"](area.area${i});
+        way["building:part"](area.area${i});
+        way["landuse"](area.area${i});
+        way["leisure"](area.area${i});
+        way["natural"](area.area${i});
+        way["water"](area.area${i});
+        way["waterway"](area.area${i});
+        way["amenity"](area.area${i});
+      )->.dataWays${i};`);
+      areaLines.push(`way(r.rel${i})->.boundaryWays${i};`);
 
-      allWaysSelectors.push(`.ways${i};`);
+      allSelectors.push(`.rel${i};`);
+      allSelectors.push(`.dataWays${i};`);
+      allSelectors.push(`.boundaryWays${i};`);
     });
 
-    // 3. Combine everything into a full query with readable indentation
-    const query = `
-      [
-        out:json
-      ];
+    return `
+      [out:json][timeout:180][maxsize:536870912];
 
       ${geocodeLine}
-      ${subAreaLines.map((l) => `  ${l}`).join('\n')}
+      ${areaLines.join('\n      ')}
 
-      ( ${allWaysSelectors.join('')} )->.allWays;
-      ( .allWays; >; );
-
-      out body;
+      ( ${allSelectors.join(' ')} );
+      out geom;
     `;
+  }
 
+  /**
+   * Fetch OSM data for both the main dataset and boundary geometry in a single
+   * Overpass API request. Result is cached for 24 h using the Browser Cache API.
+   */
+  private async fetchCombinedOsmData(
+    queryArea: { geocodeArea: string; areas: string[] },
+    onProgress?: OnLoadingProgress,
+  ): Promise<OverpassApiResponse> {
+    const cacheKey = this.getCacheKey(queryArea);
+    const cachedData = await this.cache.get(cacheKey);
+    if (cachedData) return cachedData;
+
+    const query = this.buildCombinedQuery(queryArea);
     const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
 
     console.log('Fetching OSM data from Overpass API...');
@@ -305,86 +389,15 @@ export class LoadOsmFromOverpassApiUseCase {
     onProgress?.('downloading-osm-data');
     const data = await response.json();
 
-    // Store in cache for future use
+    const elementCount = Array.isArray(data.elements) ? data.elements.length : 0;
+    console.log(`[autk-db] Overpass API returned ${elementCount} elements`);
+
+    if (!Array.isArray(data.elements) || elementCount === 0) {
+      console.warn('[autk-db] Overpass API returned no elements — skipping cache. Full response:', JSON.stringify(data).slice(0, 500));
+      return { elements: [] };
+    }
+
     await this.cache.set(cacheKey, data);
-
-    return data;
-  }
-
-  private async fetchBoundariesOsmWithinArea(
-    queryArea: { geocodeArea: string; areas: string[] },
-    onProgress?: OnLoadingProgress,
-  ): Promise<OverpassApiResponse> {
-    // Try cache first
-    const cacheKey = this.getCacheKey(queryArea, true);
-    const cachedData = await this.cache.get(cacheKey);
-    if (cachedData) return cachedData;
-
-    // Fetch from API
-    // ------------------------------------------------------------------------
-    // Example of the query:
-    //
-    // [out:json][timeout:25];
-    // area["name"="<geocodeArea>"]->.<mainAreaAlias>;
-    //
-    // relation["name"="<area1>"](area.<mainAreaAlias>)->.rel1;
-    // way(r.rel1)->.ways1;
-    // ...
-    //
-    // (.ways1; .ways2; ...;)->.allWays;
-    //
-    // (.allWays; >;);
-    //
-    // out skel;
-    // ------------------------------------------------------------------------
-
-    const mainAreaAlias = 'areaMain';
-
-    // 1. Line to select the main area by name
-    const mainAreaLine = `area["name"="${queryArea.geocodeArea}"]->.${mainAreaAlias};`;
-
-    // 2. For each requested sub-area, select the relation inside the main area and
-    //    then select all ways belonging to that relation.
-    const relationLines: string[] = [];
-    const waysLines: string[] = [];
-    const waysSelectors: string[] = [];
-
-    queryArea.areas.forEach((areaName, idx) => {
-      const i = idx + 1;
-      relationLines.push(`relation["name"="${areaName}"](area.${mainAreaAlias})->.rel${i};`);
-      waysLines.push(`way(r.rel${i})->.ways${i};`);
-      waysSelectors.push(`.ways${i};`);
-    });
-
-    // 3. Assemble the final Overpass QL query string.
-    const query = `
-      [out:json][timeout:50];
-
-      ${mainAreaLine}
-
-      ${relationLines.join('\n')}
-      ${waysLines.join('\n')}
-
-      ( ${waysSelectors.join(' ')} )->.allWays;
-
-      (.allWays; >;);
-
-      out skel;
-    `;
-
-    const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
-
-    console.log('Fetching OSM boundaries from Overpass API...');
-    onProgress?.('querying-osm-boundaries');
-
-    const response = await this.fetchWithRetry(url);
-
-    onProgress?.('downloading-boundaries');
-    const data = await response.json();
-
-    // Store in cache for future use
-    await this.cache.set(cacheKey, data);
-
     return data;
   }
 }
