@@ -10,13 +10,6 @@ import type {
 } from './types-core';
 
 /**
- * Dot-path accessor used by thematic mapping.
- *
- * Example: `properties.compute.skyViewFactor`.
- */
-export type ThematicValueAccessor = string;
-
-/**
  * Parameters for loading a feature collection as a map layer.
  *
  * Pass `type: 'raster'` together with `property` to load a GeoTIFF-derived
@@ -59,7 +52,7 @@ export interface UpdateThematicParams {
     /** Source feature collection used to derive thematic values. */
     collection: FeatureCollection;
     /** Dot-path accessor resolved from each item in the collection. */
-    property: ThematicValueAccessor;
+    property: string;
 }
 
 /**

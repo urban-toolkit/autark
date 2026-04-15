@@ -60,7 +60,6 @@ export type {
 // ─── API / params ─────────────────────────────────────────────────────────────
 
 export type {
-    ThematicValueAccessor,
     LoadCollectionParams,
     UpdateRasterParams,
     UpdateThematicParams,
