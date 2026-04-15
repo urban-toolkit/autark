@@ -52,7 +52,9 @@ export class ComputeOSMFunction {
                     },
                     {
                         dataRef: 'table_osm_roads',
-                        getFnv: 'result'
+                        getFnv: 'compute.result',
+                        getFnvType: 'quantitative',
+                        defaultFnv: 0
                     },
                 ]
             },

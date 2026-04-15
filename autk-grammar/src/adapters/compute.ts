@@ -2,8 +2,9 @@ import { ComputeAdapter, ComputeSpec } from 'urban-grammar';
 import { SpatialDb } from 'autk-db';
 import { GeojsonCompute } from 'autk-compute';
 import { FeatureCollection } from 'geojson';
+import { ComputeCache } from '../types';
 
-export function createComputeAdapter(): ComputeAdapter {
+export function createComputeAdapter(cache?: ComputeCache): ComputeAdapter {
 
     return {
         async resolveCompute(context: SpatialDb | undefined, spec: ComputeSpec): Promise<SpatialDb | undefined> {
@@ -22,14 +23,12 @@ export function createComputeAdapter(): ComputeAdapter {
 
                 console.log("Computed GeoJSON: ", new_geojson);
 
-                // Update context with new geojson TODO: pass layers current type
-                await context.loadCustomLayer({
-                    geojsonObject: new_geojson,
-                    outputTableName: spec.dataRef
-                });
+                // Store in cache so the map adapter can access the computed data
+                // without reloading into DuckDB (which would lose the original layer type)
+                if (cache) cache.set(spec.dataRef, new_geojson);
 
                 return context;
             }
-        }   
+        }
     }
 }

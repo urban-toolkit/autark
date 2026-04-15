@@ -1,10 +1,20 @@
 import { MapAdapter, MapSpec } from 'urban-grammar';
-import { Targets, MapRegistry, GeoJsonCache } from '../types';
+import { Targets, MapRegistry, ComputeCache } from '../types';
 import { AutkMap, MapStyle, LayerType } from 'autk-map';
 import { SpatialDb } from 'autk-db';
 import { Feature, GeoJsonProperties } from 'geojson';
 
-export function createMapAdapter(targets?: Targets, registry?: MapRegistry, cache?: GeoJsonCache): MapAdapter {
+function resolveFieldPath(properties: GeoJsonProperties, path: string): unknown {
+    const parts = path.split('.');
+    let current: unknown = properties;
+    for (const part of parts) {
+        if (current == null || typeof current !== 'object') return undefined;
+        current = (current as Record<string, unknown>)[part];
+    }
+    return current;
+}
+
+export function createMapAdapter(targets?: Targets, registry?: MapRegistry, computeCache?: ComputeCache): MapAdapter {
 
     async function loadLayers(map: AutkMap, context: SpatialDb, spec: MapSpec): Promise<void> {
         // TODO: this information should be more easily available here. Maybe that is solved with a more solid shared context for the grammar.
@@ -22,46 +32,41 @@ export function createMapAdapter(targets?: Targets, registry?: MapRegistry, cach
             const name = layerRef.dataRef;
             const type = tableToTypeMap[name];
             const getFnv = layerRef.getFnv;
+            const getFnvType = layerRef.getFnvType;
+            const colorMapDomain = layerRef.colorMapDomain;
             const defaultFnv = layerRef.defaultFnv;
 
-            const data = cache?.get(name) ?? await context.getLayer(name);
+            const data = computeCache?.get(name) ?? await context.getLayer(name);
 
-            if(type == LayerType.AUTK_RASTER)
-                map.loadGeoTiffLayer(
-                    'heatmap',
-                    data,
-                    LayerType.AUTK_RASTER,
-                    (cell: unknown) => Number(cell),
-                );
-            else
+            if(type == LayerType.AUTK_RASTER) {
+                const cellFn = getFnv
+                    ? (cell: unknown) => {
+                        const resolved = resolveFieldPath(cell as Record<string, unknown>, getFnv);
+                        return resolved != null ? Number(resolved) : Number(defaultFnv ?? 0);
+                    }
+                    : (cell: unknown) => Number(cell);
+                map.loadGeoTiffLayer(name, data, LayerType.AUTK_RASTER, cellFn);
+            } else {
                 map.loadGeoJsonLayer(name, data, type as LayerType);
+            }
 
             console.log(`Loading layer: ${name} of type ${type}`);
 
             function _getFnv(feature: Feature): string | number {
                 const properties = feature.properties as GeoJsonProperties;
-                
-                if(getFnv){
 
-                    if(properties && properties.compute && properties.compute[getFnv]) // For properties created by the compute module
-                        return properties.compute[getFnv];
-
-                    if(properties && properties.sjoin){ // For properties created by spatial join
-                        let propertyPath = getFnv.split('_');
-                        if(propertyPath.length == 2 && properties.sjoin[propertyPath[0]] && properties.sjoin[propertyPath[0]][propertyPath[1]]){
-                            return properties.sjoin[propertyPath[0]][propertyPath[1]];    
+                if (getFnv) {
+                    const resolved = resolveFieldPath(properties, getFnv);
+                    if (resolved != null) {
+                        if (getFnvType === 'categorical') {
+                            const str = String(resolved);
+                            return colorMapDomain ? (colorMapDomain.includes(str) ? str : 'other') : str;
                         }
+                        if (getFnvType === 'quantitative') return Number(resolved);
+                        return resolved as string | number;
                     }
-
-                    if(!properties || !properties[getFnv]){
-                        console.log("defaultFnv", defaultFnv);
-                        if(defaultFnv != undefined)
-                            return defaultFnv
-                        else
-                            throw new Error(`Cannot access value ${getFnv} in table ${name}. Value should exist in all rows or default should be set.`);
-                    }
-                        
-                    return properties[getFnv];
+                    if (defaultFnv != undefined) return defaultFnv;
+                    throw new Error(`Cannot access value "${getFnv}" in table "${name}". Value should exist in all rows or a defaultFnv should be set.`);
                 }
 
                 return '';
@@ -72,8 +77,8 @@ export function createMapAdapter(targets?: Targets, registry?: MapRegistry, cach
 
             if(layerRef.colorMapInterpolator)
                 map.updateRenderInfoProperty(name, 'colorMapInterpolator', layerRef.colorMapInterpolator);
-            
-            if(getFnv)
+
+            if(getFnv && type !== LayerType.AUTK_RASTER)
                 map.updateGeoJsonLayerThematic(name, data, _getFnv, layerRef.normalization);
         }
     }

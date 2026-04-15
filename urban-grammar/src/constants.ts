@@ -13,7 +13,7 @@ export type PlotMark = 'scatter' | 'bar' | 'line' | 'parallel-coordinates' | 'ta
 
 export type PlotEvent = 'click' | 'brush' | 'brushY' | 'brushX';
 
-export type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max';
+export type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted';
 
 export enum NormalizationMode {
     MIN_MAX = 'minMax',

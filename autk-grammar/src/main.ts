@@ -3,7 +3,7 @@ import { createDataAdapter } from "./adapters/data";
 import { createMapAdapter } from "./adapters/map";
 import { createPlotAdapter } from "./adapters/plot";
 import { createComputeAdapter } from "./adapters/compute";
-import { Targets, MapRegistry, GeoJsonCache } from "./types";
+import { Targets, MapRegistry, GeoJsonCache, ComputeCache } from "./types";
 
 export class AutkGrammar {
     private dataAdapter?: DataAdapter;
@@ -15,10 +15,11 @@ export class AutkGrammar {
     constructor(targets?: Targets) {
         const registry: MapRegistry = new Map();
         const cache: GeoJsonCache = new Map();
+        const computeCache: ComputeCache = new Map();
         this.dataAdapter = createDataAdapter(targets, cache);
-        this.mapAdapter = createMapAdapter(targets, registry, cache);
+        this.mapAdapter = createMapAdapter(targets, registry, computeCache);
         this.plotAdapter = createPlotAdapter(targets, registry, cache);
-        this.computeAdapter = createComputeAdapter();
+        this.computeAdapter = createComputeAdapter(computeCache);
     }
 
     async run(spec: UrbanSpec) {

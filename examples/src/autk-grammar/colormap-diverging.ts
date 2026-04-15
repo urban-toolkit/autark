@@ -23,7 +23,8 @@ export class ColormapDiverging {
                     {
                         dataRef: 'neighborhoods',
                         colorMapInterpolator: ColorMapInterpolator.DIVERGING_RED_BLUE,
-                        getFnv: 'shape_area'
+                        getFnv: 'shape_area',
+                        getFnvType: 'quantitative'
                     }
                 ]
             }

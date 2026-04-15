@@ -116,7 +116,9 @@ export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSou
     * @property {number[]} [pickedComps] Components that are picked, if any.
     * @property {boolean} [isSkip] Indicates if the layer should be skipped in rendering.
     * @property {boolean} [isPick] Indicates if the layer is for picking
-    * @property {string} getFnv Column to extract thematic numeric values from
+    * @property {string} getFnv Field path to extract thematic values from. Supports dot notation for nested properties (e.g. "tags.highway" resolves to feature.properties.tags.highway).
+    * @property {'categorical' | 'quantitative'} getFnvType How to interpret the extracted value. 'categorical' coerces to string (for discrete color palettes); 'quantitative' coerces to number (for continuous/diverging scales). When omitted the raw value is used as-is.
+    * @property {string[]} colorMapDomain Explicit set of allowed category values. Values not in this list are collapsed to 'other'. Only meaningful when getFnvType is 'categorical'.
  */
 export type MapSpec = {
     style?: 'light' | 'dark',
@@ -131,6 +133,8 @@ export type MapSpec = {
         isSkip?: boolean,
         isPick?: boolean,
         getFnv?: string,
+        getFnvType?: 'categorical' | 'quantitative',
+        colorMapDomain?: string[],
         defaultFnv?: string | number
     }[]
 }

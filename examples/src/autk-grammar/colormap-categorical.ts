@@ -12,7 +12,7 @@ export class ColormapCat {
             data: [
                 {
                     type: 'geojson',
-                    geojsonFileUrl: 'http://localhost:5173/data/mnt_roads_flattened.geojson',
+                    geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
                     outputTableName: 'roads',
                     coordinateFormat: 'EPSG:3395'
                 }
@@ -23,7 +23,9 @@ export class ColormapCat {
                     {
                         dataRef: 'roads',
                         colorMapInterpolator: ColorMapInterpolator.OBSERVABLE10,
-                        getFnv: 'highway'
+                        getFnv: 'highway',
+                        getFnvType: 'categorical',
+                        colorMapDomain: ['primary', 'secondary']
                     }
                 ]
             }

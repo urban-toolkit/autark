@@ -11,6 +11,7 @@ export type Targets = {
 
 export type MapRegistry = Map<string, AutkMap>;
 export type GeoJsonCache = Map<string, FeatureCollection>;
+export type ComputeCache = Map<string, FeatureCollection>;
 
 export type AutkGrammarSpec = UrbanSpec;
 

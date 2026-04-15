@@ -43,7 +43,9 @@ export class ComputeFunction {
                 layerRefs: [
                     {
                         dataRef: 'neighborhoods',
-                        getFnv: 'result'
+                        getFnv: 'compute.result',
+                        getFnvType: 'quantitative',
+                        defaultFnv: 0
                     }
                 ]
             },
@@ -51,11 +53,11 @@ export class ComputeFunction {
 
         await this.autkGrammar.run(spec);
 
-        let p = document.getElementById('app')?.appendChild(document.createElement("p"));
+        // let p = document.getElementById('app')?.appendChild(document.createElement("p"));
         
-        if(p){
-            p.textContent = "Computation ready. Check result on the console.";
-        }
+        // if(p){
+        //     p.textContent = "Computation ready. Check result on the console.";
+        // }
     }
 }
 

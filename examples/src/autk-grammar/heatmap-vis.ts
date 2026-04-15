@@ -39,15 +39,15 @@ export class HeatmapVis {
                     nearDistance: 1000,
                     outputTableName: 'heatmap',
                     grid: {
-                        rows: 256,
-                        columns: 256,
+                        rows: 20,
+                        columns: 20,
                     },
                     groupBy: {
                         selectColumns: [
                             {
                                 tableName: 'noise',
                                 column: 'Unique Key',
-                                aggregateFn: 'count',
+                                aggregateFn: 'weighted',
                             },
                         ],
                     },
@@ -66,7 +66,9 @@ export class HeatmapVis {
                     },
                     {
                         dataRef: 'heatmap',
-                        opacity: 0.5
+                        opacity: 0.5,
+                        getFnv: 'weighted.noise',
+                        defaultFnv: 0
                     }
                 ]
             }
