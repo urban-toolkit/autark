@@ -110,9 +110,9 @@ export class ComputeRender extends GpuPipeline {
 
         const gpuLayers = meshes.map(({ mesh, color }) => {
             const vBuf = device.createBuffer({ size: mesh.positions.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-            device.queue.writeBuffer(vBuf, 0, mesh.positions);
+            device.queue.writeBuffer(vBuf, 0, mesh.positions.buffer as ArrayBuffer, mesh.positions.byteOffset, mesh.positions.byteLength);
             const iBuf = device.createBuffer({ size: mesh.indices.byteLength, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-            device.queue.writeBuffer(iBuf, 0, mesh.indices);
+            device.queue.writeBuffer(iBuf, 0, mesh.indices.buffer as ArrayBuffer, mesh.indices.byteOffset, mesh.indices.byteLength);
             const colorBuf = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
             device.queue.writeBuffer(colorBuf, 0, new Float32Array([color.r, color.g, color.b, color.alpha]));
             return { vBuf, iBuf, indexCount: mesh.indices.length, colorBuf };
