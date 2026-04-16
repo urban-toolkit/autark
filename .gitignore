@@ -47,6 +47,9 @@ tests/results/
 
 # Test data
 **/public/data-ignore/*
+# Large HAR fixtures — regenerate locally with: make test-update cache APP=gallery OPEN=<path>
+tests/data/layer-opacity.har
+tests/data/osm-layers-api-manhattan.har
 performance/public/data/noise.csv
 
 # Misc
