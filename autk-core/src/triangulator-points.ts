@@ -1,4 +1,4 @@
-import { FeatureCollection, Feature, Point, MultiPoint  } from 'geojson';
+import { FeatureCollection, Feature, Point, MultiPoint, GeometryCollection } from 'geojson';
 
 import { LayerGeometry, LayerComponent } from './types-mesh';
 
@@ -17,6 +17,8 @@ export class TriangulatorPoints {
                 meshes = TriangulatorPoints.pointToMesh(feature, origin);
             } else if (feature.geometry.type === 'MultiPoint') {
                 meshes = TriangulatorPoints.multiPointToMesh(feature, origin);
+            } else if (feature.geometry.type === 'GeometryCollection') {
+                meshes = TriangulatorPoints.geometryCollectionToMesh(feature, origin);
             } else {
                 console.warn('Unsupported geometry type:', feature.geometry.type);
                 continue;
@@ -61,6 +63,17 @@ export class TriangulatorPoints {
             const flatIds = [];
             for (let i = 1; i <= res; i++) flatIds.push(0, i, i % res + 1);
             meshes.push({ flatCoords, flatIds });
+        }
+        return meshes;
+    }
+
+    static geometryCollectionToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+        const { geometries } = <GeometryCollection>feature.geometry;
+        const meshes = [];
+        for (const geom of geometries) {
+            const syntheticFeature = { ...feature, geometry: geom } as Feature;
+            if (geom.type === 'Point') meshes.push(...TriangulatorPoints.pointToMesh(syntheticFeature, origin));
+            else if (geom.type === 'MultiPoint') meshes.push(...TriangulatorPoints.multiPointToMesh(syntheticFeature, origin));
         }
         return meshes;
     }

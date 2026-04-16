@@ -1,4 +1,4 @@
-import { FeatureCollection, Feature, LineString, MultiLineString } from 'geojson';
+import { FeatureCollection, Feature, LineString, MultiLineString, GeometryCollection } from 'geojson';
 
 import { LayerGeometry, LayerComponent } from './types-mesh';
 
@@ -22,6 +22,8 @@ export class TriangulatorPolylines {
                 meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
             } else if (feature.geometry.type === 'MultiLineString') {
                 meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
+            } else if (feature.geometry.type === 'GeometryCollection') {
+                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, TriangulatorPolylines.offset);
             } else {
                 console.warn('Unsupported geometry type:', feature.geometry.type);
                 continue;
@@ -57,6 +59,20 @@ export class TriangulatorPolylines {
         const flatCoords = top.map((cord: number[]) => [cord[0], cord[1]]).flat();
 
         return [{ flatCoords, flatIds }];
+    }
+
+    static geometryCollectionToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
+        const { geometries } = <GeometryCollection>feature.geometry;
+        const meshes = [];
+        for (const geom of geometries) {
+            const syntheticFeature = { ...feature, geometry: geom } as Feature;
+            if (geom.type === 'LineString') {
+                meshes.push(...TriangulatorPolylines.lineStringToPolyline(syntheticFeature, origin, offset));
+            } else if (geom.type === 'MultiLineString') {
+                meshes.push(...TriangulatorPolylines.multiLineStringToPolyline(syntheticFeature, origin, offset));
+            }
+        }
+        return meshes;
     }
 
     static multiLineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
