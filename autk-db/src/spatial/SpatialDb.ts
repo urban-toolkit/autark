@@ -181,6 +181,25 @@ export class AutkSpatialDb {
 
   // ---- LOAD's methods
 
+  private async clipLayerToSurface(layerTableName: string, surfaceTableName: string, workspace: string): Promise<void> {
+    const qualifiedLayer = `${workspace}.${layerTableName}`;
+    const qualifiedSurface = `${workspace}.${surfaceTableName}`;
+    await this.conn!.query(`
+      CREATE OR REPLACE TABLE ${qualifiedLayer} AS
+      WITH surf AS (
+        SELECT ST_Union_Agg(geometry) AS geom FROM ${qualifiedSurface}
+      ),
+      clipped AS (
+        SELECT l.id, l.properties, l.refs,
+          ST_Intersection(l.geometry, surf.geom) AS geometry
+        FROM ${qualifiedLayer} l, surf
+        WHERE ST_Intersects(l.geometry, surf.geom)
+      )
+      SELECT id, properties, refs, geometry FROM clipped
+      WHERE NOT ST_IsEmpty(geometry);
+    `);
+  }
+
   /**
    * Loads OSM data from the Overpass API and optionally loads layers based on the provided parameters.
    * When autoLoadLayers is enabled, this method will automatically extract and process specific layers
@@ -229,6 +248,9 @@ export class AutkSpatialDb {
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
 
+      let surfaceLayerName: string | null = null;
+      const clippableLayerNames: string[] = [];
+
       for (const layer of params.autoLoadLayers.layers) {
         const shouldCrop = layer !== 'buildings'; // avoid crop buildings layer
 
@@ -259,6 +281,16 @@ export class AutkSpatialDb {
           );
           const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
           if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
+          surfaceLayerName = layerTable.name;
+        } else if (['roads', 'parks', 'water'].includes(layer)) {
+          clippableLayerNames.push(layerTable.name);
+        }
+      }
+
+      // Clip roads, parks, and water to the surface polygon
+      if (surfaceLayerName && clippableLayerNames.length > 0) {
+        for (const layerName of clippableLayerNames) {
+          await this.clipLayerToSurface(layerName, surfaceLayerName, this.currentWorkspace);
         }
       }
 

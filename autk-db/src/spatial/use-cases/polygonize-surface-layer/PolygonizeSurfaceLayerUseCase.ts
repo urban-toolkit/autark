@@ -24,7 +24,7 @@ export class PolygonizeSurfaceLayerUseCase {
         const { surfaceTableName, workspace = 'main' } = params;
         const qualifiedSurfaceTableName = `${workspace}.${surfaceTableName}`;
         const qualifiedFeatureCollectionTableName = `${workspace}.${surfaceTableName}_feature_collection`;
-        
+
         const geojson = await this.getLayerGeojsonUseCase.exec(surfaceTable, workspace) as FeatureCollection<LineString>;
         const polygonizedGeojson = polygonize(geojson) as FeatureCollection<Polygon>;
 
@@ -47,7 +47,7 @@ export class PolygonizeSurfaceLayerUseCase {
         const describeTableResponse = await this.conn.query(queryLayer);
         await this.db.dropFile(fileName);
 
-        console.log('Loaded polygonized layer!')
+        console.log('Loaded polygonized layer!');
 
         return {
             source: 'osm',
@@ -57,4 +57,3 @@ export class PolygonizeSurfaceLayerUseCase {
         };
     }
 }
-
