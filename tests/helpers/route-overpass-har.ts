@@ -4,6 +4,7 @@ import { Page } from '@playwright/test';
 
 const OVERPASS_INTERPRETER_PATTERN = 'https://overpass-api.de/api/interpreter';
 const OVERPASS_STATUS_PATTERN = 'https://overpass-api.de/api/status';
+// Satisfies autk-db's slot-availability check without hitting the network during playback.
 const OVERPASS_STATUS_MOCK = 'Connected as anonymous\nCurrent time: 2026-01-01T00:00:00Z\nRate limit: 2\n2 slots available now.';
 interface HarHeader { name: string; value: string; }
 

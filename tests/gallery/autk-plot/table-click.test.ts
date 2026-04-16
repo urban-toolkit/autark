@@ -1,4 +1,7 @@
+/**
+ * Visual regression test stub for the table-click gallery example.
+ */
 import { test, expect } from '@playwright/test';
 
-test('test', async ({ page }) => {
+test('table-click', async ({ page }) => {
 });

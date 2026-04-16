@@ -1,3 +1,7 @@
+/**
+ * Visual regression test for the geojson-vis gallery example (standalone-geojson-vis.html).
+ * Selects a layer via the legend, enables an overlay button, then double-clicks to zoom in before capturing.
+ */
 import { test, expect } from '@playwright/test';
 
 test('geojson-vis', async ({ page }) => {

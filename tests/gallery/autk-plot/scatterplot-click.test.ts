@@ -1,4 +1,7 @@
+/**
+ * Visual regression test stub for the scatterplot-click gallery example.
+ */
 import { test, expect } from '@playwright/test';
 
-test('test', async ({ page }) => {
+test('scatterplot-click', async ({ page }) => {
 });

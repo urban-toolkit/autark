@@ -1,3 +1,8 @@
+/**
+ * Visual regression test for the heatmap-vis gallery example.
+ * Overpass API responses are replayed from a local HAR file; run
+ * `make test-update cache APP=gallery OPEN=/src/autk-map/heatmap-vis.html` to re-record.
+ */
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
 import { routeOverpassHar } from '../../helpers/route-overpass-har';

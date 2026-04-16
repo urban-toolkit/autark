@@ -1,3 +1,7 @@
+/**
+ * Visual regression test for the spatial-join gallery example.
+ * Uses a fixed timeout because the canvas emits no console event on render completion.
+ */
 import { test, expect } from '@playwright/test';
 
 test('spatial-join', async ({ page }) => {
@@ -11,7 +15,7 @@ test('spatial-join', async ({ page }) => {
     });
 
     await page.goto('/src/autk-map/spatial-join.html');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(5000); // canvas emits no sentinel; wait for GPU rendering to settle
 
     await expect(page.locator('canvas')).toHaveScreenshot('spatial-join.png');
 });

@@ -1,3 +1,7 @@
+/**
+ * Visual regression test for the colormap-diverging gallery example.
+ * Opens the colormap picker and advances to the second palette before capturing.
+ */
 import { test, expect } from '@playwright/test';
 
 test('colormap-diverging', async ({ page }) => {

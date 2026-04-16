@@ -1,3 +1,7 @@
+/**
+ * Visual regression test for the compute-function gallery example.
+ * Opens the compute panel and applies the second function before capturing.
+ */
 import { test, expect } from '@playwright/test';
 
 test('compute-function', async ({ page }) => {
