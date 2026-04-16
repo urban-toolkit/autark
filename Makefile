@@ -55,8 +55,22 @@ CODEGEN_TARGET = src/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | s
 test:
 	APP=$(APP) OPEN=$(OPEN) npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET))
 
+# make test-update          → update both cache (HAR) and images (snapshots)
+# make test-update cache    → update HAR files only
+# make test-update images   → update snapshots only
+# make test-update cache images → update both explicitly
+_CACHE  := $(filter cache,$(MAKECMDGOALS))
+_IMAGES := $(filter images,$(MAKECMDGOALS))
+_BOTH   := $(if $(or $(_CACHE),$(_IMAGES)),,1)
+
 test-update:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET)) --update-snapshots
+	APP=$(APP) OPEN=$(OPEN) \
+	$(if $(or $(_CACHE),$(_BOTH)),HAR_UPDATE=1) \
+	npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET)) \
+	$(if $(or $(_IMAGES),$(_BOTH)),--update-snapshots)
+
+cache images:
+	@true
 
 test-ui:
 	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET))

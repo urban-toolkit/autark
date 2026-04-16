@@ -88,8 +88,14 @@ All test commands accept two parameters: `APP` (the application workspace, e.g. 
 # Run tests and compare against saved reference screenshots
 make test APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
 
-# Save new reference screenshots (run this when visual output changes intentionally)
+# Update both HAR cache and reference screenshots
 make test-update APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+
+# Update cached Overpass API responses (HAR files) only
+make test-update cache APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+
+# Update reference screenshots only
+make test-update images APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
 
 # Open the Playwright UI for interactive test debugging
 make test-ui APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
@@ -98,6 +104,8 @@ make test-ui APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
 # Interactions are saved as a test file under tests/<app>/
 make test-codegen APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
 ```
+
+Tests that load OpenStreetMap data use HAR files under `tests/data/` to replay Overpass API responses without hitting the network. Run `make test-update cache` to re-record them when the query or area changes.
 
 
 ### Development Workflow
