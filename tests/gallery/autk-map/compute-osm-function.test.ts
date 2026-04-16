@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
+import { routeOverpassHar } from '../../helpers/route-overpass-har';
 
 test('compute-osm-function', async ({ page }) => {
     test.setTimeout(1000000);
@@ -11,7 +12,7 @@ test('compute-osm-function', async ({ page }) => {
         console.error(`Browser error: ${err.message}`);
     });
 
-    await page.routeFromHAR(path.join(__dirname, '../../data/compute-osm-function.har'), { url: 'https://overpass-api.de/**', update: false });
+    await routeOverpassHar(page, path.join(__dirname, '../../data/compute-osm-function.har'), false);
     await page.goto('/src/autk-map/compute-osm-function.html');
 
 

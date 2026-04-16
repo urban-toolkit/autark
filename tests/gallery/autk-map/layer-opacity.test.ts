@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
+import { routeOverpassHar } from '../../helpers/route-overpass-har';
 
 test('layer-opacity', async ({ page }) => {
     test.setTimeout(1000000);
@@ -11,11 +12,7 @@ test('layer-opacity', async ({ page }) => {
         console.error(`Browser error: ${err.message}`);
     });
 
-   
-    console.log('Setting up HAR route for Overpass API requests...');
-    console.log(`HAR file path: ${path.join(__dirname, '../../data/layer-opacity.har')}`); 
-
-    await page.routeFromHAR(path.join(__dirname, '../../data/layer-opacity.har'), { url: 'https://overpass-api.de/**', update: true });
+    await routeOverpassHar(page, path.join(__dirname, '../../data/layer-opacity.har'), false);
     await page.goto('/src/autk-map/layer-opacity.html');
 
     await page.waitForEvent('console', {
