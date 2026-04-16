@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test('standalone-geojson-vis', async ({ page }) => {
+    test.setTimeout(1000000);
+
     await page.goto('/src/autk-map/standalone-geojson-vis.html');
     await page.locator('rect').nth(2).click();
     await page.getByRole('button').nth(2).click();

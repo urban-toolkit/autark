@@ -15,8 +15,6 @@ test('compute-osm-function', async ({ page }) => {
     await routeOverpassHar(page, path.join(__dirname, '../../data/compute-osm-function.har'), false);
     await page.goto('/src/autk-map/compute-osm-function.html');
 
-
-
     await page.waitForEvent('console', {
         predicate: (msg) => msg.text().includes('Loading layer: table_osm_roads of type roads')
     });

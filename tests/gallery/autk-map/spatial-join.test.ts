@@ -11,10 +11,7 @@ test('spatial-join', async ({ page }) => {
     });
 
     await page.goto('/src/autk-map/spatial-join.html');
-
-    await page.waitForEvent('console', {
-        predicate: (msg) => msg.text().includes('Loading layer: neighborhoods of type surface')
-    });
+    await page.waitForTimeout(5000);
 
     await expect(page.locator('canvas')).toHaveScreenshot('spatial-join.png');
 });

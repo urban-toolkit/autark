@@ -11,7 +11,6 @@ test('standalone-points-geojson-vis', async ({ page }) => {
     });
 
     await page.goto('/src/autk-map/standalone-points-geojson-vis.html');
-
     await page.waitForTimeout(5000);
 
     await expect(page.locator('canvas')).toHaveScreenshot('standalone-points-geojson-vis.png');

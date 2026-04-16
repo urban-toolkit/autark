@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import * as path from 'path';
+import { routeOverpassHar } from '../../helpers/route-overpass-har';
 
 test('osm-layers-api-multi', async ({ page }) => {
     test.setTimeout(1000000);
@@ -10,6 +12,7 @@ test('osm-layers-api-multi', async ({ page }) => {
         console.error(`Browser error: ${err.message}`);
     });
 
+    await routeOverpassHar(page, path.join(__dirname, '../../data/osm-layers-api-multi.har'), false);
     await page.goto('/src/autk-map/osm-layers-api-multi.html');
 
     await page.waitForEvent('console', {

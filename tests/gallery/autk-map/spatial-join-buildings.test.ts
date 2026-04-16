@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import * as path from 'path';
+import { routeOverpassHar } from '../../helpers/route-overpass-har';
 
 test('spatial-join-buildings', async ({ page }) => {
     test.setTimeout(1000000);
@@ -10,7 +12,7 @@ test('spatial-join-buildings', async ({ page }) => {
         console.error(`Browser error: ${err.message}`);
     });
 
-    // TODO: record HAR with `update: true` once Overpass query is finalized
+    await routeOverpassHar(page, path.join(__dirname, '../../data/spatial-join-buildings.har'), false);
     await page.goto('/src/autk-map/spatial-join-buildings.html');
 
     await page.waitForEvent('console', {
