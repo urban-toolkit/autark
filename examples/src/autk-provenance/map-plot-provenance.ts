@@ -124,7 +124,11 @@ function renderAnnotateCard(el: HTMLElement, provenance: ReturnType<typeof creat
   el.appendChild(saveBtn);
 }
 
-function renderFreqCard(el: HTMLElement, provenance: ReturnType<typeof createAutarkProvenance>): void {
+function renderFreqCard(
+  el: HTMLElement,
+  provenance: ReturnType<typeof createAutarkProvenance>,
+  featureName: (id: number) => string,
+): void {
   const graph = provenance.getGraph();
   const freq = computeSelectionFrequency(graph);
 
@@ -155,10 +159,11 @@ function renderFreqCard(el: HTMLElement, provenance: ReturnType<typeof createAut
       const row = document.createElement('div');
       row.className = 'freq-row';
 
-      const idSpan = document.createElement('span');
-      idSpan.className = 'freq-id';
-      idSpan.textContent = `#${id}`;
-      row.appendChild(idSpan);
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'freq-id';
+      nameSpan.textContent = featureName(id);
+      nameSpan.title = `Feature index #${id}`;
+      row.appendChild(nameSpan);
 
       const barWrap = document.createElement('div');
       barWrap.className = 'freq-bar-wrap';
@@ -308,10 +313,17 @@ async function main() {
   const cardFreq     = document.querySelector('#insightsFreq .insights-card-body')     as HTMLElement;
   const cardSummary  = document.querySelector('#insightsSummary .insights-card-body')  as HTMLElement;
 
+  // Build a lookup from feature index → neighborhood name (ntaname property)
+  const featureName = (id: number): string => {
+    const feat = geojson.features[id];
+    const name = feat?.properties?.['ntaname'] as string | undefined;
+    return name ?? `#${id}`;
+  };
+
   function refreshInsights(): void {
     if (cardMetrics)  renderMetricsCard(cardMetrics, provenance);
     if (cardAnnotate) renderAnnotateCard(cardAnnotate, provenance);
-    if (cardFreq)     renderFreqCard(cardFreq, provenance);
+    if (cardFreq)     renderFreqCard(cardFreq, provenance, featureName);
     if (cardSummary)  renderSummaryCard(cardSummary, provenance);
   }
 

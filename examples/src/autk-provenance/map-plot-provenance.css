@@ -362,9 +362,11 @@ svg {
 .freq-id {
   font-size: 11px;
   color: var(--text-muted);
-  width: 52px;
+  width: 140px;
   flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .freq-bar-wrap {
