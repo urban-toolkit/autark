@@ -88,10 +88,10 @@ export type {
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
 /** Resolves a dot-path accessor against an object (e.g. `"properties.area"`). */
-export { valueAtPath } from './utils';
+export { valueAtPath } from './utils-data';
 /** Returns `true` if the value can be coerced to a finite number. */
-export { isNumericLike } from './utils';
+export { isNumericLike } from './utils-data';
 /** Computes the central origin of a GeoJSON FeatureCollection. */
-export { computeOrigin } from './utils';
+export { computeOrigin } from './utils-geo';
 /** Flattens an array of LayerGeometry pieces into continuous typed arrays. */
-export { flattenMesh } from './utils';
+export { flattenMesh } from './utils-mesh';
