@@ -29,7 +29,7 @@ export class ComputeOsm {
         });
 
         const geojsonCompute = new ComputeGpgpu();
-        this.result = await geojsonCompute.exec({
+        this.result = await geojsonCompute.run({
             collection:  await this.db.getLayer('table_osm_roads'),
             variableMapping: {
                 x: 'lanes',

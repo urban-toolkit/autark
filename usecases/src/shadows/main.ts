@@ -106,7 +106,7 @@ export class Shadows {
         // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
         //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
         const geojsonCompute = new ComputeGpgpu();
-        const result = await geojsonCompute.exec({
+        const result = await geojsonCompute.run({
             collection: this.roads,
             variableMapping: {
                 seg:       'geometry.coordinates',

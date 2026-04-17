@@ -137,9 +137,9 @@ export class Urbane {
         const roadsGeoJson = await this.db.getLayer('table_osm_roads');
         const rc = new ComputeRender();
 
-        this.roadsWithSky = await rc.renderIntoMetrics({
-            layers: [{ geojson: buildingsGeoJson, color: { r: 0.8, g: 0.3, b: 0.1, alpha: 1.0 }, type: 'buildings' }],
-            viewpoints: roadsGeoJson,
+        this.roadsWithSky = await rc.run({
+            layers: [{ geojson: buildingsGeoJson, color: { r: 204, g: 77, b: 26, alpha: 1.0 }, type: 'buildings' }],
+            source: roadsGeoJson,
             tileSize: 64,
         });
         await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });
@@ -188,7 +188,7 @@ export class Urbane {
             p.scoreInputs = vals;
         }
 
-        return new ComputeGpgpu().exec({
+        return new ComputeGpgpu().run({
             collection: geojson,
             variableMapping: { vals: 'scoreInputs' },
             attributeArrays: { vals: N },

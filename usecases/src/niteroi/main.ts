@@ -125,7 +125,7 @@ export class OsmLayersApi {
         const compute = new ComputeGpgpu();
         const geojson = await this.db.getLayer('table_osm_roads');
 
-        this.computedRoadsGeojson = await compute.exec({
+        this.computedRoadsGeojson = await compute.run({
             collection: geojson,
             variableMapping: { bands: 'lst_timeseries' },
             attributeArrays: { bands: BAND_COUNT },

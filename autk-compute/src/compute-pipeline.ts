@@ -1,120 +1,63 @@
+/// <reference types="@webgpu/types" />
+
 import { getSharedGpuDevice } from './device-manager';
-import { TypedArray, TypedArrayConstructor } from 'autk-core';
 
-export interface ComputeConfig {
-  shader: string;
-  entryPoint?: string; // default 'main'
-  dispatchSize: [number, number?, number?];
-  inputs: {
-    [name: string]: {
-      type: "storage" | "uniform";
-      data: TypedArray;
-      binding: number;
-      group?: number;
-    };
-  };
-  outputs: {
-    [name: string]: {
-      size: number; // in bytes
-      binding: number;
-      group?: number;
-      arrayType?: TypedArrayConstructor;
-    };
-  };
-}
-
-function alignTo(value: number, multiple: number): number {
-  const remainder = value % multiple;
-  return remainder === 0 ? value : value + (multiple - remainder);
-}
-
+/**
+ * Abstract base class providing shared WebGPU utilities for all compute pipelines.
+ *
+ * Subclasses gain access to a lazily-initialised shared GPU device and a small set of
+ * helpers that eliminate repetitive buffer-creation and readback boilerplate.
+ */
 export abstract class GpuPipeline {
+    /** Returns the shared GPU device, initialising it on first call. */
     protected async getDevice(): Promise<GPUDevice> {
         return getSharedGpuDevice();
     }
 
-    protected async runCompute(config: ComputeConfig): Promise<{ [outputName: string]: TypedArray }> {
-        const device = await this.getDevice();
-        const { shader, entryPoint = "main", dispatchSize, inputs, outputs } = config;
-        
-        const shaderModule = device.createShaderModule({ code: shader });
-        const pipeline = device.createComputePipeline({
-            layout: "auto",
-            compute: { module: shaderModule, entryPoint },
-        });
+    /**
+     * Creates a GPU buffer with the given usage flags.
+     * If `data` is supplied the buffer is written in the same call.
+     */
+    protected createBuffer(
+        device: GPUDevice,
+        size: number,
+        usage: GPUFlagsConstant,
+        data?: ArrayBufferView,
+    ): GPUBuffer {
+        const buffer = device.createBuffer({ size, usage });
+        if (data) device.queue.writeBuffer(buffer, 0, data.buffer as ArrayBuffer, data.byteOffset, data.byteLength);
+        return buffer;
+    }
 
-        const createdInputBuffers = new Map<string, GPUBuffer>();
-        const createdOutputBuffersByOutputKey = new Map<string, GPUBuffer>();
-        const outputSizesByOutputKey = new Map<string, number>();
-        const groupEntries = new Map<number, GPUBindGroupEntry[]>();
+    /**
+     * Shorthand for creating a staging buffer used to read GPU data back to the CPU.
+     * Equivalent to `createBuffer(device, size, COPY_DST | MAP_READ)`.
+     */
+    protected createStagingBuffer(device: GPUDevice, size: number): GPUBuffer {
+        return device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    }
 
-        for (const [name, input] of Object.entries(inputs)) {
-            const group = input.group ?? 0;
-            const usage = input.type === "uniform" ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
-            const srcArray = input.data;
-            const buffer = device.createBuffer({ size: alignTo(srcArray.byteLength, 4), usage });
-            device.queue.writeBuffer(buffer, 0, srcArray.buffer, srcArray.byteOffset, srcArray.byteLength);
-            createdInputBuffers.set(name, buffer);
-            const entries = groupEntries.get(group) ?? [];
-            entries.push({ binding: input.binding, resource: { buffer } });
-            groupEntries.set(group, entries);
-        }
-
-        for (const [name, output] of Object.entries(outputs)) {
-            const group = output.group ?? 0;
-            const aligned = alignTo(output.size, 4);
-            const buffer = device.createBuffer({ size: aligned, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
-            createdOutputBuffersByOutputKey.set(name, buffer);
-            outputSizesByOutputKey.set(name, aligned);
-            const entries = groupEntries.get(group) ?? [];
-            entries.push({ binding: output.binding, resource: { buffer } });
-            groupEntries.set(group, entries);
-        }
-
-        const groups = Array.from(groupEntries.keys()).sort((a, b) => a - b);
-        const bindGroups = new Map<number, GPUBindGroup>();
-        for (const g of groups) {
-            bindGroups.set(g, device.createBindGroup({ layout: pipeline.getBindGroupLayout(g), entries: groupEntries.get(g)! }));
-        }
-
-        const commandEncoder = device.createCommandEncoder();
-        const pass = commandEncoder.beginComputePass();
-        pass.setPipeline(pipeline);
-        for (const g of groups) pass.setBindGroup(g, bindGroups.get(g)!);
-        pass.dispatchWorkgroups(dispatchSize[0] ?? 1, dispatchSize[1] ?? 1, dispatchSize[2] ?? 1);
-        pass.end();
-
-        const stagingByOutputKey = new Map<string, GPUBuffer>();
-        for (const [key, buffer] of createdOutputBuffersByOutputKey.entries()) {
-            const size = outputSizesByOutputKey.get(key)!;
-            const staging = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-            stagingByOutputKey.set(key, staging);
-            commandEncoder.copyBufferToBuffer(buffer, 0, staging, 0, size);
-        }
-
-        device.queue.submit([commandEncoder.finish()]);
-
-        const result: { [outputName: string]: TypedArray } = {};
-        const mapPromises: Promise<void>[] = [];
-
-        for (const [key, staging] of stagingByOutputKey.entries()) {
-            mapPromises.push((async () => {
-                await staging.mapAsync(GPUMapMode.READ);
-                const mapped = staging.getMappedRange();
-                const cfg = outputs[key];
-                const ctor = cfg.arrayType || Uint8Array;
-                const copied = new Uint8Array(mapped.slice(0));
-                staging.unmap();
-                result[key] = new ctor(copied.buffer, 0, copied.byteLength / ctor.BYTES_PER_ELEMENT);
-            })());
-        }
-
-        await Promise.all(mapPromises);
-
-        for (const buf of createdInputBuffers.values()) buf.destroy();
-        for (const buf of createdOutputBuffersByOutputKey.values()) buf.destroy();
-        for (const buf of stagingByOutputKey.values()) buf.destroy();
-
+    /**
+     * Maps a staging buffer, copies its contents into a new typed array, then unmaps
+     * and destroys the buffer.
+     *
+     * @param staging - A buffer created with MAP_READ usage, already populated via a submitted command.
+     * @param Ctor - The TypedArray constructor to wrap the result (e.g. `Float32Array`, `Uint32Array`).
+     */
+    protected async mapReadBuffer<T extends ArrayBufferView>(
+        staging: GPUBuffer,
+        Ctor: new (ab: ArrayBuffer) => T,
+    ): Promise<T> {
+        await staging.mapAsync(GPUMapMode.READ);
+        const result = new Ctor(staging.getMappedRange().slice(0));
+        staging.unmap();
+        staging.destroy();
         return result;
+    }
+
+    /** Rounds `value` up to the nearest multiple of `alignment`. */
+    protected alignTo(value: number, alignment: number): number {
+        const r = value % alignment;
+        return r === 0 ? value : value + (alignment - r);
     }
 }

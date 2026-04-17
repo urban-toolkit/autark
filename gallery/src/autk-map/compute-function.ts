@@ -34,7 +34,7 @@ export class ComputeFunction {
         let geojson = await this.db.getLayer('neighborhoods');
 
         const geojsonCompute = new ComputeGpgpu();
-        geojson = await geojsonCompute.exec({
+        geojson = await geojsonCompute.run({
             collection: geojson,
             variableMapping: {
                 x: 'shape_area',

@@ -1,38 +1,39 @@
 import { FeatureCollection } from 'geojson';
 import { ComputeGpgpu } from './compute-gpgpu';
-import { ComputeRender, RenderComputeParams }  from './compute-render';
-import { ComputeFunctionIntoPropertiesParams } from './types-compute';
+import { ComputeRender } from './compute-render';
+import type { GpgpuPipelineParams, RenderPipelineParams } from './api';
 
 export { ComputeGpgpu, ComputeRender };
+export { generateViewpoints, buildCameraMatrices } from './viewpoint';
 export { GpuPipeline } from './compute-pipeline';
 
-export type { RenderLayer, RenderComputeParams } from './compute-render';
+export type { RenderLayer, RenderPipelineParams, GpgpuPipelineParams } from './api';
+export type { ComputeConfig, GlobalVarMeta } from './types-gpgpu';
 export type { ViewProjectionParams, TypedArray, TypedArrayConstructor } from 'autk-core';
-export type { ComputeFunctionIntoPropertiesParams, ComputeResult } from './types-compute';
-export type { ComputeConfig } from './compute-pipeline';
 
 /**
- * Unified compute engine that exposes both GPU-analytical (WGSL over feature properties)
- * and GPU-render (off-screen rendering metrics) capabilities.
+ * Unified compute engine exposing the GPGPU analytical pipeline and the
+ * GPU render pipeline as a single, cohesive API.
  */
 export class AutkComputeEngine {
-    private _gpgpu = new ComputeGpgpu();
-    private _render  = new ComputeRender();
+    private _gpgpu  = new ComputeGpgpu();
+    private _render = new ComputeRender();
 
     /**
      * Executes a WGSL function over feature properties and writes results
-     * into `feature.properties.compute[resultField]` for every feature.
+     * into `feature.properties.compute` for every feature in the collection.
      */
-    async analytical(params: ComputeFunctionIntoPropertiesParams): Promise<FeatureCollection> {
-        return this._gpgpu.exec(params);
+    async gpgpuPipeline(params: GpgpuPipelineParams): Promise<FeatureCollection> {
+        return this._gpgpu.run(params);
     }
 
     /**
-     * Renders each viewpoint into an offscreen tile and counts non-sky pixels,
-     * returning the viewpoints collection enriched with `buildingCoverage` and
-     * `skyViewFactor` in `feature.properties.compute`.
+     * Generates street-level viewpoints from `params.source`, renders the scene
+     * from each viewpoint into an offscreen tile, and counts non-sky pixels.
+     * Returns the viewpoints annotated with `buildingCoverage` and `skyViewFactor`
+     * in `feature.properties.compute`.
      */
-    async renderIntoMetrics(params: RenderComputeParams): Promise<FeatureCollection> {
-        return this._render.renderIntoMetrics(params);
+    async renderPipeline(params: RenderPipelineParams): Promise<FeatureCollection> {
+        return this._render.run(params);
     }
 }
