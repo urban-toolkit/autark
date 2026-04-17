@@ -1,20 +1,37 @@
-import { FeatureCollection, Feature, LineString } from 'geojson';
+import {
+    FeatureCollection,
+    Feature,
+    LineString,
+} from 'geojson';
+
 import { Camera } from 'autk-core';
 
 /**
- * Samples street-level viewpoints from a road-network FeatureCollection.
+ * Generates one centroid viewpoint per feature from a FeatureCollection.
  *
- * `LineString` and `MultiLineString` features are walked coordinate-by-coordinate;
- * a 2-point `LineString` viewpoint is emitted every `intervalMeters` metres, where
- * the two points encode the eye position and the look-ahead direction.
+ * Each feature contributes exactly one 2-point `LineString` viewpoint:
+ * - Point 0: centroid of the feature geometry (eye position)
+ * - Point 1: centroid offset slightly in the feature's principal direction
+ *   (first→last coordinate), used as the camera look-at target
  *
- * `Point` features are passed through unchanged (looking north).
+ * Supported geometry types:
+ * - `Point`: coordinate as-is, looks north
+ * - `LineString`: mean of all coordinates, direction from first to last
+ * - `MultiLineString`: mean of all coordinates across all lines, first→last
+ * - `Polygon`: mean of outer ring coordinates, looks north
+ * - `MultiPolygon`: mean of first outer ring coordinates, looks north
+ * - All other types are skipped
  *
- * @param source - Road network or any FeatureCollection with linear geometry.
- * @param intervalMeters - Sampling distance in metres along linear features (default: 10).
- * @returns FeatureCollection of 2-point LineString and Point features, one per viewpoint.
+ * @param source - Any FeatureCollection.
+ * @returns FeatureCollection of 2-point LineString features, one per input feature.
+ *
+ * @example
+ * const viewpoints = generateViewpoints(osmRoads);
+ *
+ * @see {@link buildCameraMatrices} for converting viewpoints to view-projection matrices.
+ * @see {@link ComputeRender.run} for the render pipeline that uses these viewpoints.
  */
-export function generateViewpoints(source: FeatureCollection, intervalMeters = 10): FeatureCollection {
+export function generateViewpoints(source: FeatureCollection): FeatureCollection {
     const viewpoints: Feature[] = [];
 
     for (const feature of source.features) {
@@ -22,22 +39,47 @@ export function generateViewpoints(source: FeatureCollection, intervalMeters = 1
         if (!geom) continue;
 
         const props = feature.properties ? { ...feature.properties } : {};
+        let coords: number[][] = [];
+        let dir: [number, number] = [0, 1];
 
-        if (geom.type === 'LineString') {
-            sampleAlongLine(geom.coordinates, intervalMeters, viewpoints, props);
-        } else if (geom.type === 'MultiLineString') {
-            for (const line of geom.coordinates) {
-                sampleAlongLine(line, intervalMeters, viewpoints, props);
-            }
-        } else if (geom.type === 'Point') {
+        if (geom.type === 'Point') {
             const [lon, lat] = geom.coordinates;
             viewpoints.push({
                 type: 'Feature',
                 geometry: { type: 'LineString', coordinates: [[lon, lat], [lon, lat + 1e-5]] } as LineString,
                 properties: props,
             });
+            continue;
+        } else if (geom.type === 'LineString') {
+            coords = geom.coordinates;
+            if (coords.length >= 2)
+                dir = [coords[coords.length - 1][0] - coords[0][0], coords[coords.length - 1][1] - coords[0][1]];
+        } else if (geom.type === 'MultiLineString') {
+            coords = geom.coordinates.flat();
+            if (coords.length >= 2)
+                dir = [coords[coords.length - 1][0] - coords[0][0], coords[coords.length - 1][1] - coords[0][1]];
+        } else if (geom.type === 'Polygon') {
+            coords = geom.coordinates[0];
+        } else if (geom.type === 'MultiPolygon') {
+            coords = geom.coordinates[0][0];
+        } else {
+            continue;
         }
-        // Polygon and other types are intentionally skipped.
+
+        if (coords.length === 0) continue;
+
+        const [lon, lat] = coordsCentroid(coords);
+        const len = Math.sqrt(dir[0] * dir[0] + dir[1] * dir[1]);
+        const scale = len > 1e-9 ? 1e-5 / len : 1e-5;
+
+        viewpoints.push({
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: [[lon, lat], [lon + dir[0] * scale, lat + dir[1] * scale]],
+            } as LineString,
+            properties: props,
+        });
     }
 
     return { type: 'FeatureCollection', features: viewpoints };
@@ -45,7 +87,26 @@ export function generateViewpoints(source: FeatureCollection, intervalMeters = 1
 
 /**
  * Builds a flat array of view-projection matrices (16 floats each) for every viewpoint.
- * Viewpoint geometry must be a LineString (2-point) or Point feature.
+ *
+ * Each viewpoint feature is converted to a camera using the following convention:
+ * - The first coordinate of the LineString is the eye position
+ * - The second coordinate determines the look direction
+ * - The camera is positioned at `eyeHeight` above ground
+ *
+ * @param viewpoints - FeatureCollection of viewpoints (LineString or Point geometry).
+ * @param origin - Scene origin [lon, lat] for coordinate normalization.
+ * @param eyeHeight - Camera eye height above ground in scene units (default: 1.7).
+ * @param fovDeg - Horizontal field of view in degrees (default: 90).
+ * @param near - Near clipping plane distance (default: 1).
+ * @param far - Far clipping plane distance (default: 5000).
+ * @returns Flat Float32Array of 4×4 view-projection matrices (16 floats per viewpoint).
+ *
+ * @example
+ * const origin = computeOrigin(source);
+ * const cameras = buildCameraMatrices(viewpoints, origin, 1.7, 90, 1, 5000);
+ *
+ * @see {@link Camera.buildViewProjection} from autk-core for the underlying camera API.
+ * @see {@link generateViewpoints} for generating viewpoint features.
  */
 export function buildCameraMatrices(
     viewpoints: FeatureCollection,
@@ -60,7 +121,8 @@ export function buildCameraMatrices(
 
     for (let i = 0; i < N; i++) {
         const geom = viewpoints.features[i].geometry as any;
-        let p0: number[], p1: number[];
+        let p0: number[];
+        let p1: number[];
 
         if (geom.type === 'LineString') {
             p0 = geom.coordinates[0];
@@ -78,10 +140,10 @@ export function buildCameraMatrices(
             p1 = [geom.coordinates[0], geom.coordinates[1] + 1];
         }
 
-        const mx  = (p0[0] + p1[0]) * 0.5 - origin[0];
-        const my  = (p0[1] + p1[1]) * 0.5 - origin[1];
-        const dx  = p1[0] - p0[0];
-        const dy  = p1[1] - p0[1];
+        const mx = (p0[0] + p1[0]) * 0.5 - origin[0];
+        const my = (p0[1] + p1[1]) * 0.5 - origin[1];
+        const dx = p1[0] - p0[0];
+        const dy = p1[1] - p0[1];
         const len = Math.sqrt(dx * dx + dy * dy);
         const ndx = len > 0 ? dx / len : 1;
         const ndy = len > 0 ? dy / len : 0;
@@ -96,7 +158,7 @@ export function buildCameraMatrices(
                 near,
                 far,
             }),
-            i * 16,
+            i * 16
         );
     }
 
@@ -105,52 +167,8 @@ export function buildCameraMatrices(
 
 // ── Module-private helpers ────────────────────────────────────────────────────
 
-/**
- * Samples viewpoint features along a coordinate sequence at a fixed interval.
- * Each output is a 2-point LineString encoding position + road direction.
- */
-function sampleAlongLine(
-    coords: number[][],
-    intervalMeters: number,
-    out: Feature[],
-    properties: Record<string, unknown>,
-): void {
-    if (coords.length < 2) return;
-    let distSinceLastSample = 0;
-
-    for (let i = 0; i < coords.length - 1; i++) {
-        const p0 = coords[i];
-        const p1 = coords[i + 1];
-        const segLen = geoDistanceMeters(p0, p1);
-        if (segLen < 1e-9) continue;
-
-        // Normalised direction in degrees-per-metre, used to encode look-ahead.
-        const nx = (p1[0] - p0[0]) / segLen;
-        const ny = (p1[1] - p0[1]) / segLen;
-
-        let offset = intervalMeters - distSinceLastSample;
-
-        while (offset <= segLen) {
-            const t = offset / segLen;
-            const lon = p0[0] + t * (p1[0] - p0[0]);
-            const lat = p0[1] + t * (p1[1] - p0[1]);
-            out.push({
-                type: 'Feature',
-                // Second coordinate is 1 m forward in road direction; encodes look-ahead for the camera.
-                geometry: { type: 'LineString', coordinates: [[lon, lat], [lon + nx, lat + ny]] } as LineString,
-                properties: { ...properties },
-            });
-            offset += intervalMeters;
-        }
-
-        distSinceLastSample = intervalMeters - (offset - segLen);
-    }
-}
-
-/** Equirectangular approximation of ground distance between two lon/lat points, in metres. */
-function geoDistanceMeters(p0: number[], p1: number[]): number {
-    const latMid = (p0[1] + p1[1]) * 0.5 * (Math.PI / 180);
-    const dx = (p1[0] - p0[0]) * Math.cos(latMid) * 111320;
-    const dy = (p1[1] - p0[1]) * 110540;
-    return Math.sqrt(dx * dx + dy * dy);
+function coordsCentroid(coords: number[][]): [number, number] {
+    let lon = 0, lat = 0;
+    for (const c of coords) { lon += c[0]; lat += c[1]; }
+    return [lon / coords.length, lat / coords.length];
 }

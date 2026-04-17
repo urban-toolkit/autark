@@ -99,7 +99,7 @@ export class TriangulatorBuildings {
         else if ('min_level' in props && num(props['min_level']) >= 0) min_height = FLOOR_HEIGHT * num(props['min_level']);
         else if ('building:min_level' in props) min_height = FLOOR_HEIGHT * num(props['building:min_level']);
 
-        if (height <= min_height) return [];   // skip degenerate parts
+        if (height <= min_height) return [];
         return [min_height, height];
     }
 

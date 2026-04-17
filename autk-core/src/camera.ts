@@ -89,7 +89,7 @@ export class Camera {
         this.mProjectionMatrix = mat4.create();
         this.mViewMatrix = mat4.create();
         this.wNear = 1;
-        this.wFar = 1e10;
+        this.wFar = 5e5;
         this.wLookAt = vec3.fromValues(wLookAt[0], wLookAt[1], wLookAt[2]);
         this.wEye = vec3.fromValues(wEye[0], wEye[1], wEye[2]);
         this.updateEyeDirAndLen();
@@ -193,7 +193,11 @@ export class Camera {
     public update(): void {
         const aspect = this.viewportWidth / this.viewportHeight;
         mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
-        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wNear, this.wFar);
+        // Reversed-Z: swap near/far so near→1 and far→0 in NDC.
+        // Combined with depthClearValue=0 and depthCompare='greater-equal' this
+        // distributes float32 precision logarithmically, eliminating z-fighting
+        // at distance without requiring an absurdly large far plane.
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wFar, this.wNear);
     }
 
     /**

@@ -142,30 +142,62 @@ export class LoadOsmFromOverpassApiUseCase {
     let combined: OverpassApiResponse = await boundariesResponse.json();
     console.log(`[autk-db] Boundaries: ${combined.elements?.length ?? 0} elements`);
 
-    // Requests 2–4: one per layer group, skipped when not requested
+    // Requests 2–4: one per layer group, skipped when not requested.
+    // Buildings are fetched as a 2×2 tiled grid to stay within Overpass maxsize limits.
     const layerGroups: [string, string[]][] = [
       ['parks+water', ['parks', 'water']],
       ['roads',       ['roads']],
       ['buildings',   ['buildings']],
     ];
 
+    let anyGroupEmpty = false;
+
     for (const [label, group] of layerGroups) {
       const activeGroup = group.filter(l => requestedLayers.includes(l));
-      const query = activeGroup.length > 0 ? this.buildLayerGroupQuery(queryArea, activeGroup) : null;
+      if (activeGroup.length === 0) continue;
+
+      if (activeGroup.includes('buildings')) {
+        const bbox = this.computeBboxFromElements(combined.elements ?? []);
+        const tileQueries = bbox
+          ? this.buildBuildingsTileQueries(queryArea, bbox)
+          : [this.buildLayerGroupQuery(queryArea, activeGroup)!];
+
+        let buildingsTotal = 0;
+        for (let t = 0; t < tileQueries.length; t++) {
+          await pause(BETWEEN_REQUESTS_MS);
+          console.log(`[autk-db] Fetching buildings tile ${t + 1}/${tileQueries.length}…`);
+          const response = await this.fetchWithRetry(tileQueries[t]);
+          const data: OverpassApiResponse = await response.json();
+          const count = data.elements?.length ?? 0;
+          console.log(`[autk-db] buildings tile ${t + 1}: ${count} elements`);
+          buildingsTotal += count;
+          combined = this.mergeResponses(combined, data);
+        }
+        if (buildingsTotal === 0) {
+          console.warn('[autk-db] buildings: 0 elements across all tiles — skipping cache.');
+          anyGroupEmpty = true;
+        }
+        continue;
+      }
+
+      const query = this.buildLayerGroupQuery(queryArea, activeGroup);
       if (!query) continue;
 
       await pause(BETWEEN_REQUESTS_MS);
       console.log(`[autk-db] Fetching ${label} data from Overpass API…`);
       const response = await this.fetchWithRetry(query);
       const data: OverpassApiResponse = await response.json();
-      console.log(`[autk-db] ${label}: ${data.elements?.length ?? 0} elements`);
+      const count = data.elements?.length ?? 0;
+      console.log(`[autk-db] ${label}: ${count} elements`);
+      if (count === 0) {
+        console.warn(`[autk-db] ${label}: 0 elements — skipping cache.`);
+        anyGroupEmpty = true;
+      }
       combined = this.mergeResponses(combined, data);
     }
 
-    const elementCount = combined.elements?.length ?? 0;
-    if (elementCount === 0) {
-      console.warn('[autk-db] Overpass API returned no elements — skipping cache.');
-      return { elements: [] };
+    if (anyGroupEmpty) {
+      return combined;
     }
 
     await this.cache.set(cacheKey, combined);
@@ -378,7 +410,7 @@ export class LoadOsmFromOverpassApiUseCase {
     });
 
     return `
-      [out:json][timeout:60][maxsize:134217728];
+      [out:json][timeout:60][maxsize:268435456];
 
       ${geocodeLine}
       ${areaLines.join('\n      ')}
@@ -431,6 +463,91 @@ export class LoadOsmFromOverpassApiUseCase {
     }
 
     return [...filters];
+  }
+
+  /**
+   * Derives the bounding box from boundary elements already in memory.
+   * Uses node lat/lon and way inline geometry produced by `out geom qt`.
+   */
+  private computeBboxFromElements(
+    elements: OsmElement[],
+  ): { south: number; north: number; west: number; east: number } | null {
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    let found = false;
+
+    for (const el of elements) {
+      if (el.type === 'node' && el.lat !== undefined && el.lon !== undefined) {
+        if (el.lat < minLat) minLat = el.lat;
+        if (el.lat > maxLat) maxLat = el.lat;
+        if (el.lon < minLon) minLon = el.lon;
+        if (el.lon > maxLon) maxLon = el.lon;
+        found = true;
+      }
+      if (el.type === 'way' && el.geometry) {
+        for (const pt of el.geometry) {
+          if (pt.lat < minLat) minLat = pt.lat;
+          if (pt.lat > maxLat) maxLat = pt.lat;
+          if (pt.lon < minLon) minLon = pt.lon;
+          if (pt.lon > maxLon) maxLon = pt.lon;
+          found = true;
+        }
+      }
+    }
+
+    return found ? { south: minLat, north: maxLat, west: minLon, east: maxLon } : null;
+  }
+
+  /**
+   * Returns `cols × rows` Overpass queries that together cover `bbox`, each
+   * using a combined area + tile-bbox filter so only features inside both the
+   * named OSM area and the tile are returned.  256 MB maxsize per tile keeps
+   * each response well within Overpass limits.
+   */
+  private buildBuildingsTileQueries(
+    queryArea: { geocodeArea: string; areas: string[] },
+    bbox: { south: number; north: number; west: number; east: number },
+    cols = 2,
+    rows = 2,
+  ): string[] {
+    const latStep = (bbox.north - bbox.south) / rows;
+    const lonStep = (bbox.east - bbox.west) / cols;
+    const queries: string[] = [];
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const south = bbox.south + row * latStep;
+        const north = south + latStep;
+        const west  = bbox.west  + col * lonStep;
+        const east  = west  + lonStep;
+        const tileBbox = `${south},${west},${north},${east}`;
+
+        const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
+        const areaLines: string[] = [];
+        const dataWaySelectors: string[] = [];
+
+        queryArea.areas.forEach((areaName, idx) => {
+          const i = idx + 1;
+          areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
+          areaLines.push(`(
+        way["building"](area.area${i})(${tileBbox});
+        way["building:part"](area.area${i})(${tileBbox});
+      )->.dataWays${i};`);
+          dataWaySelectors.push(`.dataWays${i};`);
+        });
+
+        queries.push(`
+      [out:json][timeout:60][maxsize:268435456];
+
+      ${geocodeLine}
+      ${areaLines.join('\n      ')}
+
+      ( ${dataWaySelectors.join(' ')} );
+      out geom qt;
+    `);
+      }
+    }
+
+    return queries;
   }
 
   // ---------------------------------------------------------------------------

@@ -137,11 +137,22 @@ export class Urbane {
         const roadsGeoJson = await this.db.getLayer('table_osm_roads');
         const rc = new ComputeRender();
 
-        this.roadsWithSky = await rc.run({
+        const skyViewpoints = await rc.run({
             layers: [{ geojson: buildingsGeoJson, color: { r: 204, g: 77, b: 26, alpha: 1.0 }, type: 'buildings' }],
             source: roadsGeoJson,
             tileSize: 64,
         });
+
+        // Map sky metrics back onto original road features (1-to-1, same order as generateViewpoints).
+        // This preserves original road geometry in the DB while making compute.skyViewFactor
+        // available for the spatial join.
+        this.roadsWithSky = {
+            ...roadsGeoJson,
+            features: roadsGeoJson.features.map((road, i) => ({
+                ...road,
+                properties: { ...road.properties, compute: skyViewpoints.features[i]?.properties?.compute },
+            })),
+        };
         await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });
 
         setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
@@ -221,12 +232,12 @@ export class Urbane {
             this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
         }
 
-        this.map.updateRenderInfo('table_osm_buildings', { isSkip: true });
+        this.map.updateRenderInfo('table_osm_buildings', { isPick: false });
         this.map.updateRenderInfo('neighborhoods', { opacity: 0.75, isPick: true });
 
         if (this.roadsWithSky) {
             this.map.updateColorMap('table_osm_roads', { colorMap: {
-                    domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [15, 85] },
+                    domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95] },
                 }, });
 
             this.map.updateThematic('table_osm_roads', { collection: this.roadsWithSky,
@@ -255,7 +266,7 @@ export class Urbane {
 
         this.map.updateColorMap(layerId, { colorMap: {
                 domainSpec: column.includes('skyExposure')
-                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [15, 85] }
+                    ? { type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
             }, });
 
@@ -441,6 +452,7 @@ export class Urbane {
             await this.updateBuildingsSelection();
 
             this.map.loadCollection('active_buildings', { collection: this.activeBuildings, type: 'buildings' });
+            this.map.updateRenderInfo('table_osm_buildings', { isSkip: true });
             this.map.updateRenderInfo('neighborhoods', { isSkip: true, isPick: false });
             this.map.updateRenderInfo('active_buildings', { isSkip: false, isPick: true });
         } else {
@@ -449,6 +461,7 @@ export class Urbane {
 
             await this.db.removeLayer('active_buildings');
             this.map.layerManager.removeLayerById('active_buildings');
+            this.map.updateRenderInfo('table_osm_buildings', { isSkip: false, isPick: false });
             this.map.updateRenderInfo('neighborhoods', { isSkip: false, isPick: true });
         }
 

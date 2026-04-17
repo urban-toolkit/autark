@@ -349,7 +349,7 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         this._depthBufferPass01 = {
             view: depthTextureView,
-            depthClearValue: 1.0,
+            depthClearValue: 0.0,
             depthLoadOp: 'clear',
             depthStoreOp: 'store',
         };
@@ -484,7 +484,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: true,
-            depthCompare: 'less-equal',
+            depthCompare: 'greater-equal',
             format: 'depth32float',
         };
 
@@ -551,7 +551,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: true,
-            depthCompare: 'less-equal',
+            depthCompare: 'greater-equal',
             format: 'depth32float',
         };
 

@@ -232,7 +232,7 @@ export class Renderer {
 
         this._pickingDepthBuffer = {
             view: pickingDepthTextureView,
-            depthClearValue: 1.0,
+            depthClearValue: 0.0,
             depthLoadOp: 'clear',
             depthStoreOp: 'store',
         };
@@ -299,7 +299,7 @@ export class Renderer {
 
         this._depthBuffer = {
             view: depthTextureView,
-            depthClearValue: 1.0,
+            depthClearValue: 0.0,
             depthLoadOp: 'clear',
             depthStoreOp: 'store',
         };
