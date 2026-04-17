@@ -20,6 +20,12 @@ export interface CameraSample {
     lookAt: [number, number, number];
 }
 
+/**
+ * Derives view origins from each feature's geometry barycenter.
+ *
+ * @param source - GeoJSON FeatureCollection to extract origins from.
+ * @returns Array of view origins, one per feature with a valid geometry.
+ */
 export function generateViewOrigins(source: FeatureCollection): ViewOrigin[] {
     const origins: ViewOrigin[] = [];
 
@@ -35,6 +41,13 @@ export function generateViewOrigins(source: FeatureCollection): ViewOrigin[] {
     return origins;
 }
 
+/**
+ * Expands view origins into camera samples by generating azimuthal directions.
+ *
+ * @param origins - View origins from {@link generateViewOrigins}.
+ * @param viewSampling - Sampling controls for direction count, offset, and pitch.
+ * @returns Array of camera samples, one per direction per origin.
+ */
 export function expandCameraSamples(
     origins: ViewOrigin[],
     viewSampling: RenderViewSampling = {},
@@ -69,6 +82,16 @@ export function expandCameraSamples(
     return samples;
 }
 
+/**
+ * Builds row-major view-projection matrices for each camera sample.
+ *
+ * @param samples - Camera samples from {@link expandCameraSamples}.
+ * @param origin - Reference origin for relative camera positioning.
+ * @param fovDeg - Horizontal field of view in degrees.
+ * @param near - Near clipping plane distance.
+ * @param far - Far clipping plane distance.
+ * @returns Float32Array of 16-element view-projection matrices.
+ */
 export function buildCameraMatrices(
     samples: CameraSample[],
     origin: [number, number],
