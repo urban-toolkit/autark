@@ -4,6 +4,7 @@ export interface LayerGeometry {
     normal?: Float32Array;
     indices?: Uint32Array;
     texCoord?: Float32Array;
+    featureIndex?: number;
 }
 
 /** Per-feature triangle/point counts used for GPU picking. */

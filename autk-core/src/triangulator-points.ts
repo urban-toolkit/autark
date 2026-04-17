@@ -30,7 +30,8 @@ export class TriangulatorPoints {
             for (const triangulation of meshes) {
                 mesh.push({ 
                     position: new Float32Array(triangulation.flatCoords), 
-                    indices: new Uint32Array(triangulation.flatIds) 
+                    indices: new Uint32Array(triangulation.flatIds),
+                    featureIndex: fId,
                 });
                 nPoints += triangulation.flatCoords.length / 2;
                 nTriangles += triangulation.flatIds.length / 3;

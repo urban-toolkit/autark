@@ -137,20 +137,27 @@ export class Urbane {
         const roadsGeoJson = await this.db.getLayer('table_osm_roads');
         const rc = new ComputeRender();
 
-        const skyViewpoints = await rc.run({
-            layers: [{ geojson: buildingsGeoJson, color: { r: 204, g: 77, b: 26, alpha: 1.0 }, type: 'buildings' }],
+        const roadsWithCoverage = await rc.run({
+            layers: [{ geojson: buildingsGeoJson, classId: 'buildings', type: 'buildings' }],
             source: roadsGeoJson,
+            aggregation: { type: 'coverage' },
+            viewSampling: { directions: 1 },
             tileSize: 64,
         });
 
-        // Map sky metrics back onto original road features (1-to-1, same order as generateViewpoints).
-        // This preserves original road geometry in the DB while making compute.skyViewFactor
-        // available for the spatial join.
+        // Preserve the original road geometry while promoting the sampled render coverage
+        // into the sky-view field consumed by the downstream spatial join.
         this.roadsWithSky = {
-            ...roadsGeoJson,
-            features: roadsGeoJson.features.map((road, i) => ({
+            ...roadsWithCoverage,
+            features: roadsWithCoverage.features.map((road) => ({
                 ...road,
-                properties: { ...road.properties, compute: skyViewpoints.features[i]?.properties?.compute },
+                properties: {
+                    ...road.properties,
+                    compute: {
+                        ...(road.properties?.compute ?? {}),
+                        skyViewFactor: 1 - ((road.properties as any)?.compute?.render?.coverage ?? 0),
+                    },
+                },
             })),
         };
         await this.db.updateTable({ tableName: 'table_osm_roads', data: this.roadsWithSky, strategy: 'replace' });

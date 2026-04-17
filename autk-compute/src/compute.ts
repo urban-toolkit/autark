@@ -9,7 +9,7 @@ import type {
 } from './api';
 
 export { ComputeGpgpu, ComputeRender };
-export { generateViewpoints, buildCameraMatrices } from './viewpoint';
+export { generateViewOrigins, expandCameraSamples, buildCameraMatrices } from './viewpoint';
 export { GpuPipeline } from './compute-pipeline';
 
 export type {
@@ -32,7 +32,7 @@ export type {
  *
  * `AutkComputeEngine` provides a simplified interface for urban analytics:
  * - {@link gpgpuPipeline}: Execute WGSL compute shaders over GeoJSON features
- * - {@link renderPipeline}: Generate street-level imagery and compute visibility metrics
+ * - {@link renderPipeline}: Sample rendered views from source feature origins
  *
  * Both pipelines share a common GPU device and operate on GeoJSON FeatureCollections,
  * writing results to `feature.properties.compute`.
@@ -51,22 +51,23 @@ export type {
  * });
  *
  * @example
- * // Run render pipeline: compute sky view factors
+ * // Run render pipeline: compute coverage from source origins
  * const result = await compute.renderPipeline({
  *   layers: [{
  *     geojson: buildings,
- *     color: { r: 128, g: 128, b: 128, alpha: 1 },
- *     type: 'buildings'
+ *     type: 'buildings',
+ *     classId: 'buildings'
  *   }],
  *   source: streetNetwork,
- *   eyeHeight: 1.7,
+ *   aggregation: { type: 'coverage' },
+ *   viewSampling: { directions: 1 },
  *   fov: 90,
  *   tileSize: 64
  * });
  *
  * @see {@link ComputeGpgpu} for the GPGPU pipeline implementation.
  * @see {@link ComputeRender} for the render pipeline implementation.
- * @see {@link generateViewpoints} for viewpoint generation.
+ * @see {@link generateViewOrigins} for source-origin generation.
  */
 export class AutkComputeEngine {
     private _gpgpu = new ComputeGpgpu();
@@ -122,42 +123,44 @@ export class AutkComputeEngine {
     }
 
     /**
-     * Generates street-level viewpoints from `params.source`, renders the scene
-     * from each viewpoint into an offscreen tile, and counts non-sky pixels.
+     * Derives view origins from `params.source`, expands them into sampled
+     * camera directions, renders the scene from each camera, and reduces the
+     * results back onto the source features.
      *
-     * Returns the viewpoints annotated with `buildingCoverage` and `skyViewFactor`
-     * in `feature.properties.compute`.
+     * Coverage metrics are written into `feature.properties.compute.render`.
      *
      * This is a convenience wrapper around {@link ComputeRender.run}.
      *
      * @param params - Render pipeline parameters.
      * @param params.layers - Geometry layers to render.
-     * @param params.source - Source for viewpoint generation; one viewpoint per feature centroid.
-     * @param params.eyeHeight - Camera eye height (default: 1.7).
+     * @param params.source - Source features used to derive view origins.
+     * @param params.aggregation - Reduction strategy applied to sampled renders.
+     * @param params.viewSampling - Direction sampling applied to each origin.
      * @param params.fov - Horizontal FOV in degrees (default: 90).
      * @param params.near - Near clip plane (default: 1).
      * @param params.far - Far clip plane (default: 5000).
      * @param params.tileSize - Tile resolution in pixels, must be multiple of 8 (default: 64).
      * @param params.clearColor - Background color [R, G, B, A] in [0–1] (default: [0, 0, 0, 1]).
-     * @returns Promise resolving to FeatureCollection of viewpoints with visibility metrics.
+     * @returns Promise resolving to the source FeatureCollection with aggregated metrics.
      *
      * @example
      * // Compute sky view factors for a street network
      * const result = await compute.renderPipeline({
      *   layers: [{
      *     geojson: buildings,
-     *     color: { r: 100, g: 100, b: 100, alpha: 1 },
-     *     type: 'buildings'
+     *     type: 'buildings',
+     *     classId: 'buildings'
      *   }],
      *   source: streets,
-     *   eyeHeight: 1.7,
+     *   aggregation: { type: 'coverage' },
+     *   viewSampling: { directions: 1 },
      *   fov: 90
      * });
      *
      * // Access results
      * result.features.forEach(f => {
-     *   const { buildingCoverage, skyViewFactor } = f.properties.compute;
-     *   console.log(`Sky visibility: ${(skyViewFactor * 100).toFixed(1)}%`);
+     *   const coverage = f.properties.compute.render.coverage;
+     *   console.log(`Coverage: ${(coverage * 100).toFixed(1)}%`);
      * });
      */
     async renderPipeline(params: RenderPipelineParams): Promise<FeatureCollection> {

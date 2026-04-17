@@ -69,7 +69,8 @@ export class TriangulatorBuildings {
                 for (const chunk of chunks) {
                     mesh.push({ 
                         position: new Float32Array(chunk.flatCoords), 
-                        indices: new Uint32Array(chunk.flatIds) 
+                        indices: new Uint32Array(chunk.flatIds),
+                        featureIndex: comps.length,
                     });
                     nPoints += chunk.flatCoords.length / 3;
                     nTriangles += chunk.flatIds.length / 3;
