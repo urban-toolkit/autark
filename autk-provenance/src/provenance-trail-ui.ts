@@ -1,5 +1,12 @@
 import type { AutarkProvenanceState, PathNode, ProvenanceNode } from './types';
 import type { AutarkProvenanceApi } from './create-autark-provenance';
+import {
+  computeGraphMetrics,
+  computeSelectionFrequency,
+  generateSessionNarrative,
+  getInsightAnnotations,
+  type StrategyLabel,
+} from './insight-engine';
 
 export interface ProvenanceTrailUIOptions {
   provenance: AutarkProvenanceApi;
@@ -163,6 +170,10 @@ function createGraphScene(
   for (const item of layout.nodes) {
     const g = createSvgElement('g');
     const isCurrent = item.node.id === currentId;
+    const hasAnnotation =
+      typeof item.node.metadata?.insight === 'string' &&
+      (item.node.metadata.insight as string).trim().length > 0;
+
     g.setAttribute('class', `autk-provenance-node${isCurrent ? ' autk-provenance-node-current' : ''}`);
     g.setAttribute('transform', `translate(${item.x}, ${item.y})`);
 
@@ -171,8 +182,19 @@ function createGraphScene(
     circle.setAttribute('r', isCurrent ? '9' : '7');
     g.appendChild(circle);
 
+    // Insight annotation indicator dot (Feature 1)
+    if (hasAnnotation) {
+      const dot = createSvgElement('circle');
+      dot.setAttribute('class', 'autk-provenance-node-insight-dot');
+      dot.setAttribute('cx', isCurrent ? '7' : '5');
+      dot.setAttribute('cy', isCurrent ? '-7' : '-5');
+      dot.setAttribute('r', '4');
+      g.appendChild(dot);
+    }
+
+    const annotationText = hasAnnotation ? `\n"${(item.node.metadata!.insight as string).trim()}"` : '';
     const title = createSvgElement('title');
-    title.textContent = `${item.node.actionLabel} (${item.node.id})`;
+    title.textContent = `${item.node.actionLabel} (${item.node.id})${annotationText}`;
     g.appendChild(title);
 
     const label = createSvgElement('text');
@@ -206,6 +228,227 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+// ---------------------------------------------------------------------------
+// Insights panel helpers
+// ---------------------------------------------------------------------------
+
+const STRATEGY_COLORS: Record<StrategyLabel, string> = {
+  Confirmatory: '#2e7d32',
+  Exploratory: '#1565c0',
+  'Iterative Refinement': '#6a1b9a',
+};
+
+function formatDurationShort(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function renderInsightsPanel(
+  container: HTMLElement,
+  provenance: AutarkProvenanceApi
+): void {
+  container.innerHTML = '';
+
+  const graph = provenance.getGraph();
+  const currentNode = provenance.getCurrentNode();
+  const metrics = computeGraphMetrics(graph);
+  const freq = computeSelectionFrequency(graph);
+  const annotations = getInsightAnnotations(graph);
+
+  // ── Strategy + metrics row ────────────────────────────────────────────────
+  const metricsRow = document.createElement('div');
+  metricsRow.className = 'autk-prov-insights-metrics';
+
+  const badge = document.createElement('span');
+  badge.className = 'autk-prov-strategy-badge';
+  badge.textContent = metrics.strategyLabel;
+  badge.style.background = STRATEGY_COLORS[metrics.strategyLabel];
+  metricsRow.appendChild(badge);
+
+  const metaItems: string[] = [];
+  if (metrics.sessionDurationMs > 0) {
+    metaItems.push(formatDurationShort(metrics.sessionDurationMs));
+  }
+  metaItems.push(`${metrics.totalNodes} state${metrics.totalNodes !== 1 ? 's' : ''}`);
+  if (metrics.branchPoints > 0) {
+    metaItems.push(`${metrics.branchPoints} branch${metrics.branchPoints !== 1 ? 'es' : ''}`);
+  }
+  if (metrics.backtracks > 0) {
+    metaItems.push(`${metrics.backtracks} backtrack${metrics.backtracks !== 1 ? 's' : ''}`);
+  }
+
+  const metaSpan = document.createElement('span');
+  metaSpan.className = 'autk-prov-metrics-meta';
+  metaSpan.textContent = metaItems.join('  •  ');
+  metricsRow.appendChild(metaSpan);
+
+  container.appendChild(metricsRow);
+
+  // ── Annotate current node (Feature 1: insight provenance) ─────────────────
+  const annotateSection = document.createElement('div');
+  annotateSection.className = 'autk-prov-insights-section';
+
+  const annotateLabel = document.createElement('div');
+  annotateLabel.className = 'autk-prov-insights-section-title';
+  annotateLabel.textContent = 'Insight at this step';
+  annotateSection.appendChild(annotateLabel);
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'autk-prov-annotation-textarea';
+  textarea.placeholder = 'What did you notice or conclude here?';
+  textarea.rows = 3;
+  if (currentNode) {
+    const existing = currentNode.metadata?.insight;
+    textarea.value = typeof existing === 'string' ? existing : '';
+  } else {
+    textarea.disabled = true;
+  }
+  annotateSection.appendChild(textarea);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'autk-prov-annotation-save';
+  saveBtn.textContent = 'Save Insight';
+  saveBtn.disabled = !currentNode;
+  saveBtn.addEventListener('click', () => {
+    if (!currentNode) return;
+    provenance.annotateNode(currentNode.id, textarea.value);
+    renderInsightsPanel(container, provenance);
+  });
+  annotateSection.appendChild(saveBtn);
+
+  container.appendChild(annotateSection);
+
+  // ── Selection focus (Feature 2: aggregate selection frequency) ────────────
+  const topMap = [...freq.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topPlot = [...freq.plot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const hasFreqData = topMap.length > 0 || topPlot.length > 0;
+
+  if (hasFreqData) {
+    const freqSection = document.createElement('div');
+    freqSection.className = 'autk-prov-insights-section';
+
+    const freqTitle = document.createElement('div');
+    freqTitle.className = 'autk-prov-insights-section-title';
+    freqTitle.textContent = 'Selection focus (all branches)';
+    freqSection.appendChild(freqTitle);
+
+    const maxCount = Math.max(
+      ...[...topMap, ...topPlot].map(([, c]) => c),
+      1
+    );
+
+    const renderFreqGroup = (label: string, items: [number, number][]): void => {
+      if (items.length === 0) return;
+      const groupLabel = document.createElement('div');
+      groupLabel.className = 'autk-prov-freq-group-label';
+      groupLabel.textContent = label;
+      freqSection.appendChild(groupLabel);
+
+      for (const [id, count] of items) {
+        const row = document.createElement('div');
+        row.className = 'autk-prov-freq-row';
+
+        const idSpan = document.createElement('span');
+        idSpan.className = 'autk-prov-freq-id';
+        idSpan.textContent = `#${id}`;
+        row.appendChild(idSpan);
+
+        const bar = document.createElement('div');
+        bar.className = 'autk-prov-freq-bar-wrap';
+        const fill = document.createElement('div');
+        fill.className = 'autk-prov-freq-bar-fill';
+        fill.style.width = `${Math.round((count / maxCount) * 100)}%`;
+        bar.appendChild(fill);
+        row.appendChild(bar);
+
+        const countSpan = document.createElement('span');
+        countSpan.className = 'autk-prov-freq-count';
+        countSpan.textContent = `${count}×`;
+        row.appendChild(countSpan);
+
+        freqSection.appendChild(row);
+      }
+    };
+
+    renderFreqGroup('Map', topMap);
+    renderFreqGroup('Plot', topPlot);
+
+    container.appendChild(freqSection);
+  }
+
+  // ── Recorded insight annotations list ─────────────────────────────────────
+  if (annotations.length > 0) {
+    const annoSection = document.createElement('div');
+    annoSection.className = 'autk-prov-insights-section';
+
+    const annoTitle = document.createElement('div');
+    annoTitle.className = 'autk-prov-insights-section-title';
+    annoTitle.textContent = `Recorded insights (${annotations.length})`;
+    annoSection.appendChild(annoTitle);
+
+    for (const a of annotations) {
+      const item = document.createElement('div');
+      item.className = 'autk-prov-anno-item';
+
+      const step = document.createElement('div');
+      step.className = 'autk-prov-anno-step';
+      step.textContent = truncate(a.actionLabel, 24);
+      item.appendChild(step);
+
+      const text = document.createElement('div');
+      text.className = 'autk-prov-anno-text';
+      text.textContent = a.text;
+      item.appendChild(text);
+
+      // Click to navigate to that node
+      item.addEventListener('click', () => {
+        provenance.goToNode(a.nodeId);
+      });
+
+      annoSection.appendChild(item);
+    }
+
+    container.appendChild(annoSection);
+  }
+
+  // ── Auto-generated session narrative (Feature 4: presentation) ─────────────
+  const summarySection = document.createElement('div');
+  summarySection.className = 'autk-prov-insights-section';
+
+  const summaryTitle = document.createElement('div');
+  summaryTitle.className = 'autk-prov-insights-section-title';
+  summaryTitle.textContent = 'Analysis summary';
+  summarySection.appendChild(summaryTitle);
+
+  const narrative = generateSessionNarrative(graph, metrics, annotations);
+
+  const summaryPre = document.createElement('pre');
+  summaryPre.className = 'autk-prov-summary-text';
+  summaryPre.textContent = narrative;
+  summarySection.appendChild(summaryPre);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'autk-prov-copy-btn';
+  copyBtn.textContent = 'Copy to clipboard';
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(narrative).then(() => {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy to clipboard';
+      }, 1800);
+    });
+  });
+  summarySection.appendChild(copyBtn);
+
+  container.appendChild(summarySection);
+}
+
+// ---------------------------------------------------------------------------
+// Main UI renderer
+// ---------------------------------------------------------------------------
+
 export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () => void {
   const {
     provenance,
@@ -222,13 +465,15 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
       const el = document.createElement('style');
       el.id = styleId;
       el.textContent = [
-        '.autk-provenance-root{display:flex;flex-direction:column;height:100%;font-family:system-ui,sans-serif;font-size:13px;gap:10px}',
+        // Core layout
+        '.autk-provenance-root{display:flex;flex-direction:column;height:100%;font-family:system-ui,sans-serif;font-size:13px;gap:10px;min-height:0}',
         '.autk-provenance-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}',
         '.autk-provenance-toolbar-main{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
         '.autk-provenance-toolbar-hint{font-size:11px;color:#5c7389}',
         '.autk-provenance-toggle{padding:6px 10px;border:1px solid #c3cfdb;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;color:#1f344b}',
         '.autk-provenance-toggle:hover{background:#f2f7fd}',
         '.autk-provenance-toggle:disabled{opacity:.55;cursor:not-allowed}',
+        // Graph
         '.autk-provenance-graph-wrap{position:relative;border:1px solid #dbe5f0;border-radius:8px;background:#fff;overflow:auto;min-height:280px;height:280px;max-height:360px;cursor:zoom-in}',
         '.autk-provenance-graph-svg{display:block;min-width:100%;max-width:none}',
         '.autk-provenance-edge{stroke:#b9c8d8;stroke-width:1.4;fill:none}',
@@ -237,6 +482,9 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
         '.autk-provenance-node-current .autk-provenance-node-circle{fill:#dcecff;stroke:#2f5f96;stroke-width:2}',
         '.autk-provenance-node-label{font-size:11px;fill:#1f344b}',
         '.autk-provenance-node-time{font-size:10px;fill:#5c7389}',
+        // Insight annotation dot on graph nodes
+        '.autk-provenance-node-insight-dot{fill:#f59e0b;stroke:#fff;stroke-width:1.5}',
+        // Modal
         '.autk-provenance-modal-backdrop{position:fixed;inset:0;background:rgba(15,27,44,.48);z-index:11000;display:flex;align-items:center;justify-content:center;padding:24px}',
         '.autk-provenance-modal{width:min(1200px,95vw);height:min(860px,90vh);display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:#f8fbff;box-shadow:0 28px 80px rgba(17,31,47,.45)}',
         '.autk-provenance-modal-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;background:#fff;border-bottom:1px solid #dbe5f0}',
@@ -248,17 +496,54 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
         '.autk-provenance-modal-canvas{position:relative;flex:1;min-height:0;border:1px solid #dbe5f0;border-radius:8px;background:#fff;overflow:hidden;cursor:grab;touch-action:none}',
         '.autk-provenance-modal-canvas.autk-provenance-panning{cursor:grabbing}',
         '.autk-provenance-modal-svg{display:block;width:100%;height:100%;min-width:0}',
-        '.autk-provenance-path{display:flex;flex-direction:column;gap:2px;border:1px solid #dbe5f0;border-radius:8px;background:#fbfdff;max-height:220px;overflow-y:auto}',
+        // Path list
+        '.autk-provenance-path{display:flex;flex-direction:column;gap:2px;border:1px solid #dbe5f0;border-radius:8px;background:#fbfdff;max-height:200px;overflow-y:auto}',
         '.autk-provenance-path-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #e7eef6;cursor:pointer}',
         '.autk-provenance-path-item:last-child{border-bottom:0}',
         '.autk-provenance-path-item:hover{background:#f1f7ff}',
         '.autk-provenance-path-item-current{background:#e8f2ff;font-weight:600}',
         '.autk-provenance-path-label{flex:1;min-width:0}',
         '.autk-provenance-path-time{color:#5c7389;font-size:11px;white-space:nowrap}',
+        // Back/forward
         '.autk-provenance-buttons{display:flex;gap:6px}',
         '.autk-provenance-buttons button{padding:6px 12px;border:1px solid #c3cfdb;border-radius:6px;background:#fff;cursor:pointer}',
         '.autk-provenance-buttons button:hover:not(:disabled){background:#f2f7fd}',
         '.autk-provenance-buttons button:disabled{opacity:.55;cursor:not-allowed}',
+        // ── Insights panel ──────────────────────────────────────────────────
+        '.autk-prov-insights-wrap{border:1px solid #dbe5f0;border-radius:8px;background:#fbfdff;overflow-y:auto;max-height:420px;min-height:0}',
+        '.autk-prov-insights-header{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #e7eef6;cursor:pointer;user-select:none}',
+        '.autk-prov-insights-header-label{font-size:12px;font-weight:700;color:#1f344b;letter-spacing:.02em}',
+        '.autk-prov-insights-chevron{font-size:11px;color:#5c7389}',
+        '.autk-prov-insights-body{padding:8px 10px;display:flex;flex-direction:column;gap:10px}',
+        // Metrics row
+        '.autk-prov-insights-metrics{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+        '.autk-prov-strategy-badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap}',
+        '.autk-prov-metrics-meta{font-size:11px;color:#5c7389}',
+        // Section
+        '.autk-prov-insights-section{display:flex;flex-direction:column;gap:5px}',
+        '.autk-prov-insights-section-title{font-size:11px;font-weight:700;color:#5c7389;text-transform:uppercase;letter-spacing:.05em}',
+        // Annotation textarea
+        '.autk-prov-annotation-textarea{width:100%;padding:6px 8px;border:1px solid #c3cfdb;border-radius:6px;font-family:inherit;font-size:12px;resize:vertical;color:#1f344b;background:#fff;box-sizing:border-box}',
+        '.autk-prov-annotation-textarea:focus{outline:none;border-color:#2f5f96}',
+        '.autk-prov-annotation-save{align-self:flex-start;padding:5px 10px;border:1px solid #c3cfdb;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;color:#1f344b}',
+        '.autk-prov-annotation-save:hover:not(:disabled){background:#edf5ff;border-color:#2f5f96;color:#2f5f96}',
+        '.autk-prov-annotation-save:disabled{opacity:.5;cursor:not-allowed}',
+        // Selection frequency bars
+        '.autk-prov-freq-group-label{font-size:11px;color:#1f344b;font-weight:600;margin-top:2px}',
+        '.autk-prov-freq-row{display:flex;align-items:center;gap:6px;min-height:18px}',
+        '.autk-prov-freq-id{font-size:11px;color:#5c7389;width:48px;flex-shrink:0;font-variant-numeric:tabular-nums}',
+        '.autk-prov-freq-bar-wrap{flex:1;height:8px;background:#e7eef6;border-radius:4px;overflow:hidden}',
+        '.autk-prov-freq-bar-fill{height:100%;background:#2f5f96;border-radius:4px;transition:width .3s}',
+        '.autk-prov-freq-count{font-size:11px;color:#1f344b;width:26px;text-align:right;flex-shrink:0}',
+        // Annotation list
+        '.autk-prov-anno-item{padding:6px 8px;border-radius:6px;border:1px solid #e7eef6;background:#fff;cursor:pointer}',
+        '.autk-prov-anno-item:hover{background:#f1f7ff}',
+        '.autk-prov-anno-step{font-size:10px;color:#5c7389;margin-bottom:2px}',
+        '.autk-prov-anno-text{font-size:12px;color:#1f344b;line-height:1.4}',
+        // Summary narrative
+        '.autk-prov-summary-text{margin:0;padding:8px;background:#f0f5fb;border:1px solid #dbe5f0;border-radius:6px;font-size:11px;color:#1f344b;white-space:pre-wrap;word-break:break-word;line-height:1.55;max-height:180px;overflow-y:auto}',
+        '.autk-prov-copy-btn{align-self:flex-start;padding:5px 10px;border:1px solid #c3cfdb;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;color:#1f344b}',
+        '.autk-prov-copy-btn:hover{background:#edf5ff}',
       ].join('');
       document.head.appendChild(el);
     }
@@ -276,6 +561,8 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
   let pathContainer: HTMLDivElement | null = null;
   let backBtn: HTMLButtonElement | null = null;
   let fwdBtn: HTMLButtonElement | null = null;
+  let insightsBodyEl: HTMLDivElement | null = null;
+  let insightsOpen = true;
 
   let graphModalBackdrop: HTMLDivElement | null = null;
   let graphModalCanvas: HTMLDivElement | null = null;
@@ -363,7 +650,7 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
 
     const zoomOutBtn = document.createElement('button');
     zoomOutBtn.type = 'button';
-    zoomOutBtn.textContent = '−';
+    zoomOutBtn.textContent = '\u2212';
     zoomOutBtn.setAttribute('aria-label', 'Zoom out');
 
     const zoomInBtn = document.createElement('button');
@@ -551,10 +838,10 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
     const btnRow = document.createElement('div');
     btnRow.className = 'autk-provenance-buttons';
     backBtn = document.createElement('button');
-    backBtn.textContent = '← Back';
+    backBtn.textContent = '\u2190 Back';
     backBtn.setAttribute('aria-label', 'Go back one step');
     fwdBtn = document.createElement('button');
-    fwdBtn.textContent = 'Forward →';
+    fwdBtn.textContent = 'Forward \u2192';
     fwdBtn.setAttribute('aria-label', 'Go forward one step');
     btnRow.appendChild(backBtn);
     btnRow.appendChild(fwdBtn);
@@ -567,6 +854,37 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
       provenance.goForwardOneStep();
     });
   }
+
+  // ── Insights panel (collapsible) ──────────────────────────────────────────
+  const insightsWrap = document.createElement('div');
+  insightsWrap.className = 'autk-prov-insights-wrap';
+
+  const insightsHeader = document.createElement('div');
+  insightsHeader.className = 'autk-prov-insights-header';
+  const insightsHeaderLabel = document.createElement('span');
+  insightsHeaderLabel.className = 'autk-prov-insights-header-label';
+  insightsHeaderLabel.textContent = 'Session Insights';
+  const insightsChevron = document.createElement('span');
+  insightsChevron.className = 'autk-prov-insights-chevron';
+  insightsChevron.textContent = '\u25b4';
+  insightsHeader.appendChild(insightsHeaderLabel);
+  insightsHeader.appendChild(insightsChevron);
+  insightsWrap.appendChild(insightsHeader);
+
+  const insightsBody = document.createElement('div');
+  insightsBody.className = 'autk-prov-insights-body';
+  insightsWrap.appendChild(insightsBody);
+  insightsBodyEl = insightsBody;
+
+  insightsHeader.addEventListener('click', () => {
+    insightsOpen = !insightsOpen;
+    insightsBody.style.display = insightsOpen ? 'flex' : 'none';
+    insightsChevron.textContent = insightsOpen ? '\u25b4' : '\u25be';
+  });
+
+  container.appendChild(insightsWrap);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   function updateButtons(): void {
     if (backBtn) backBtn.disabled = !provenance.canGoBack();
@@ -620,6 +938,19 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
       labelSpan.textContent = node.actionLabel;
       item.appendChild(labelSpan);
 
+      // Insight indicator in path list
+      const graphNode = provenance.getGraph().nodes.get(node.id);
+      const hasAnnotation =
+        typeof graphNode?.metadata?.insight === 'string' &&
+        (graphNode.metadata.insight as string).trim().length > 0;
+      if (hasAnnotation) {
+        const dot = document.createElement('span');
+        dot.title = graphNode!.metadata!.insight as string;
+        dot.style.cssText =
+          'display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0';
+        item.appendChild(dot);
+      }
+
       if (showTimestamps) {
         const timeSpan = document.createElement('span');
         timeSpan.className = 'autk-provenance-path-time';
@@ -656,6 +987,9 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
       renderPath(path);
     }
     updateButtons();
+    if (insightsBodyEl && insightsOpen) {
+      renderInsightsPanel(insightsBodyEl, provenance);
+    }
   }
 
   const unsub = provenance.addObserver(() => {

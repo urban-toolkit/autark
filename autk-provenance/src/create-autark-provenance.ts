@@ -38,6 +38,8 @@ export interface AutarkProvenanceApi {
   exportGraph(): string;
   importGraph(json: string): void;
   addObserver(callback: (node: import('./types').ProvenanceNode<AutarkProvenanceState>) => void): () => void;
+  /** Attach an insight annotation to any node without creating a new provenance step. */
+  annotateNode(nodeId: string, text: string): boolean;
   stopRecording(): void;
   startRecording(): void;
   db?: import('./adapters/db-adapter').DbAdapterApi;
@@ -114,6 +116,7 @@ export function createAutarkProvenance(options: CreateAutarkProvenanceOptions): 
     exportGraph: core.exportGraph.bind(core),
     importGraph: core.importGraph.bind(core),
     addObserver: core.addObserver.bind(core),
+    annotateNode: core.annotateNode.bind(core),
     stopRecording,
     startRecording,
     db: dbAdapter ?? undefined,

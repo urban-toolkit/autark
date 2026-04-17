@@ -8,3 +8,15 @@ export type { ProvenanceApi, CreateProvenanceOptions } from './create-provenance
 export { renderProvenanceTrailUI } from './provenance-trail-ui';
 export type { ProvenanceTrailUIOptions } from './provenance-trail-ui';
 export * from './adapters';
+export {
+  computeSelectionFrequency,
+  computeGraphMetrics,
+  getInsightAnnotations,
+  generateSessionNarrative,
+} from './insight-engine';
+export type {
+  SelectionFrequency,
+  GraphMetrics,
+  StrategyLabel,
+  InsightAnnotation,
+} from './insight-engine';

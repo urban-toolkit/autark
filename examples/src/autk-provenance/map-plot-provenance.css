@@ -163,16 +163,21 @@ svg {
 }
 
 #sidebar .panel-body {
-  height: calc(100% - 46px);
+  flex: 1;
+  min-height: 0;
   padding: 10px;
+  overflow: hidden;
 }
 
 #provenanceTrail {
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 #provenanceTrail.autk-provenance-root {
   min-height: 0;
+  gap: 8px;
 }
 
 #provenanceTrail .autk-provenance-graph-wrap {
@@ -181,8 +186,267 @@ svg {
 }
 
 #provenanceTrail .autk-provenance-path {
+  flex: 0 0 auto;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+#provenanceTrail .autk-prov-insights-wrap {
   flex: 1;
+  min-height: 0;
   max-height: none;
+  overflow-y: auto;
+}
+
+/* ── Session Insights Section ─────────────────────────────────────────────── */
+
+.insights-panel {
+  margin-top: 0;
+}
+
+.insights-panel h2 {
+  font-size: 16px;
+  padding: 12px 16px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface), var(--surface-muted));
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+
+.insights-card {
+  padding: 16px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 220px;
+}
+
+.insights-card:last-child {
+  border-right: none;
+}
+
+.insights-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+
+.insights-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insights-loading {
+  font-size: 12px;
+  color: var(--text-muted);
+  justify-content: center;
+  align-items: center;
+}
+
+/* Card 1 – Strategy */
+.strategy-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  align-self: flex-start;
+}
+
+.strategy-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.metrics-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.metric-chip {
+  padding: 4px 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.metric-chip strong {
+  color: var(--text);
+}
+
+/* Card 2 – Annotate */
+.annotation-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.annotation-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  resize: vertical;
+  box-sizing: border-box;
+  flex: 1;
+  min-height: 80px;
+}
+
+.annotation-textarea:focus {
+  outline: none;
+  border-color: #2f5f96;
+}
+
+.annotation-save-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.annotation-save-btn:hover:not(:disabled) {
+  background: #edf5ff;
+  border-color: #2f5f96;
+  color: #2f5f96;
+}
+
+.annotation-save-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* Card 3 – Selection frequency */
+.freq-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.freq-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.freq-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.freq-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 52px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.freq-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: #e7eef6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.freq-bar-fill {
+  height: 100%;
+  background: #2f5f96;
+  border-radius: 4px;
+}
+
+.freq-count {
+  font-size: 11px;
+  color: var(--text);
+  width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Card 4 – Summary */
+.summary-pre {
+  flex: 1;
+  margin: 0;
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  overflow-y: auto;
+  max-height: 160px;
+}
+
+.copy-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.copy-btn:hover {
+  background: #edf5ff;
+}
+
+@media (max-width: 1260px) {
+  .insights-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .insights-card:nth-child(2) {
+    border-right: none;
+  }
+  .insights-card:nth-child(1),
+  .insights-card:nth-child(2) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 700px) {
+  .insights-grid {
+    grid-template-columns: 1fr;
+  }
+  .insights-card {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .insights-card:last-child {
+    border-bottom: none;
+  }
 }
 
 .tick line {

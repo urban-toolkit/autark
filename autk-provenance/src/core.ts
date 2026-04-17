@@ -53,6 +53,12 @@ export interface ProvenanceCoreApi<T = AutarkProvenanceState> {
   exportGraph(): string;
   importGraph(json: string): void;
   addObserver(callback: (node: ProvenanceNode<T>) => void): () => void;
+  /**
+   * Attaches an insight annotation to any node's metadata without creating a
+   * new provenance step. Implements Ragan §4.1.4 (insight provenance): insights
+   * cannot be captured automatically — the analyst must record them explicitly.
+   */
+  annotateNode(nodeId: string, text: string): boolean;
 }
 
 export function createProvenanceCore(
@@ -213,6 +219,13 @@ export function createProvenanceCore(
     };
   }
 
+  function annotateNode(nodeId: string, text: string): boolean {
+    const node = nodes.get(nodeId);
+    if (!node) return false;
+    node.metadata = { ...(node.metadata ?? {}), insight: text };
+    return true;
+  }
+
   return {
     applyAction,
     goToNode,
@@ -227,6 +240,7 @@ export function createProvenanceCore(
     exportGraph,
     importGraph,
     addObserver,
+    annotateNode,
   };
 }
 
@@ -388,6 +402,13 @@ export function createProvenanceCoreGeneric<T extends Record<string, unknown>>(
     };
   }
 
+  function annotateNode(nodeId: string, text: string): boolean {
+    const node = nodes.get(nodeId);
+    if (!node) return false;
+    node.metadata = { ...(node.metadata ?? {}), insight: text };
+    return true;
+  }
+
   return {
     applyAction,
     goToNode,
@@ -402,5 +423,6 @@ export function createProvenanceCoreGeneric<T extends Record<string, unknown>>(
     exportGraph,
     importGraph,
     addObserver,
+    annotateNode,
   };
 }
