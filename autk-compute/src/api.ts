@@ -30,10 +30,14 @@ export interface RenderViewSampling {
 }
 
 export type RenderAggregation =
-    | { type: 'coverage' }
-    | { type: 'classes' }
-    | { type: 'objects' }
-    | { type: 'combined' };
+    | {
+        type: 'classes';
+        /** When true, count the transparent render background as an extra class bucket. */
+        includeBackground?: boolean;
+        /** Class id used for the transparent render background. @default 'background' */
+        backgroundClassId?: string;
+    }
+    | { type: 'objects' };
 
 export interface RenderPipelineParams {
     /** Geometry layers rendered from each sampled camera. */
@@ -60,8 +64,6 @@ export interface RenderPipelineParams {
     /** Tile resolution in pixels; must be a multiple of 8. @default 64 */
     tileSize?: number;
 
-    /** Background colour as [R, G, B, A] in [0–1]. @default [0, 0, 0, 1] */
-    clearColor?: [number, number, number, number];
 }
 
 // ── GPGPU pipeline ────────────────────────────────────────────────────────────
@@ -98,13 +100,13 @@ export interface GpgpuPipelineParams {
      */
     attributeMatrices?: Record<string, { rows: number | 'auto'; cols: number }>;
 
-    /** Global scalar constants shared across all features. */
+    /** Global scalar constants shared across all features for one dispatch. */
     uniforms?: Record<string, number>;
 
-    /** Global fixed-length arrays shared across all features. */
+    /** Global fixed-length arrays shared across all features for one dispatch. */
     uniformArrays?: Record<string, number[]>;
 
-    /** Global matrices shared across all features. */
+    /** Global matrices shared across all features for one dispatch. */
     uniformMatrices?: Record<string, { data: number[][]; cols: number }>;
 
     /** WGSL function body executed once per feature. */

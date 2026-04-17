@@ -51,7 +51,7 @@ export type {
  * });
  *
  * @example
- * // Run render pipeline: compute coverage from source origins
+ * // Run render pipeline: compute class shares from source origins
  * const result = await compute.renderPipeline({
  *   layers: [{
  *     geojson: buildings,
@@ -59,7 +59,7 @@ export type {
  *     classId: 'buildings'
  *   }],
  *   source: streetNetwork,
- *   aggregation: { type: 'coverage' },
+ *   aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
  *   viewSampling: { directions: 1 },
  *   fov: 90,
  *   tileSize: 64
@@ -84,9 +84,9 @@ export class AutkComputeEngine {
      * @param params.variableMapping - Maps WGSL variable names to property paths.
      * @param params.attributeArrays - Per-feature fixed-length arrays.
      * @param params.attributeMatrices - Per-feature matrices.
-     * @param params.uniforms - Global scalar constants.
-     * @param params.uniformArrays - Global array constants.
-     * @param params.uniformMatrices - Global matrix constants.
+     * @param params.uniforms - Global scalar constants uploaded once for the dispatch.
+     * @param params.uniformArrays - Global array constants uploaded once for the dispatch.
+     * @param params.uniformMatrices - Global matrix constants uploaded once for the dispatch.
      * @param params.wgslBody - WGSL function body.
      * @param params.resultField - Single output field (optional).
      * @param params.outputColumns - Multiple output fields (optional).
@@ -127,7 +127,7 @@ export class AutkComputeEngine {
      * camera directions, renders the scene from each camera, and reduces the
      * results back onto the source features.
      *
-     * Coverage metrics are written into `feature.properties.compute.render`.
+     * Class and object visibility metrics are written into `feature.properties.compute.render`.
      *
      * This is a convenience wrapper around {@link ComputeRender.run}.
      *
@@ -140,11 +140,10 @@ export class AutkComputeEngine {
      * @param params.near - Near clip plane (default: 1).
      * @param params.far - Far clip plane (default: 5000).
      * @param params.tileSize - Tile resolution in pixels, must be multiple of 8 (default: 64).
-     * @param params.clearColor - Background color [R, G, B, A] in [0–1] (default: [0, 0, 0, 1]).
      * @returns Promise resolving to the source FeatureCollection with aggregated metrics.
      *
      * @example
-     * // Compute sky view factors for a street network
+     * // Compute sky share for a street network
      * const result = await compute.renderPipeline({
      *   layers: [{
      *     geojson: buildings,
@@ -152,15 +151,15 @@ export class AutkComputeEngine {
      *     classId: 'buildings'
      *   }],
      *   source: streets,
-     *   aggregation: { type: 'coverage' },
+     *   aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
      *   viewSampling: { directions: 1 },
      *   fov: 90
      * });
      *
      * // Access results
      * result.features.forEach(f => {
-     *   const coverage = f.properties.compute.render.coverage;
-     *   console.log(`Coverage: ${(coverage * 100).toFixed(1)}%`);
+     *   const sky = f.properties.compute.render.classes.sky;
+     *   console.log(`Sky: ${(sky * 100).toFixed(1)}%`);
      * });
      */
     async renderPipeline(params: RenderPipelineParams): Promise<FeatureCollection> {

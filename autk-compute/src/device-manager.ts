@@ -34,36 +34,52 @@ let sharedDevicePromise: Promise<GPUDevice> | null = null;
  */
 export async function getSharedGpuDevice(): Promise<GPUDevice> {
     if (!sharedDevicePromise) {
-        sharedDevicePromise = (async () => {
-            if (!('gpu' in navigator)) {
-                throw new Error('WebGPU not supported.');
+        let devicePromise!: Promise<GPUDevice>;
+        devicePromise = (async () => {
+            try {
+                if (!('gpu' in navigator)) {
+                    throw new Error('WebGPU not supported.');
+                }
+
+                let adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) {
+                    // Chrome sometimes returns null briefly after a device loss.
+                    await new Promise<void>((resolve) => window.setTimeout(resolve, 150));
+                    adapter = await navigator.gpu.requestAdapter();
+                }
+                if (!adapter) {
+                    throw new Error('Failed to get GPU adapter.');
+                }
+
+                const device = await adapter.requestDevice({
+                    // Request timestamp-query feature if available (for profiling)
+                    requiredFeatures: adapter.features.has('timestamp-query')
+                        ? ['timestamp-query']
+                        : [],
+                    // Request maximum buffer sizes for large compute workloads
+                    requiredLimits: {
+                        maxBufferSize: adapter.limits.maxBufferSize,
+                        maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+                    },
+                });
+
+                // Handle device loss by clearing the cache
+                device.lost.then((info) => {
+                    console.error(`WebGPU device lost: ${info.message}`);
+                    if (sharedDevicePromise === devicePromise) {
+                        sharedDevicePromise = null;
+                    }
+                });
+
+                return device;
+            } catch (error) {
+                if (sharedDevicePromise === devicePromise) {
+                    sharedDevicePromise = null;
+                }
+                throw error;
             }
-
-            const adapter = await navigator.gpu.requestAdapter();
-            if (!adapter) {
-                throw new Error('Failed to get GPU adapter.');
-            }
-
-            const device = await adapter.requestDevice({
-                // Request timestamp-query feature if available (for profiling)
-                requiredFeatures: adapter.features.has('timestamp-query')
-                    ? ['timestamp-query']
-                    : [],
-                // Request maximum buffer sizes for large compute workloads
-                requiredLimits: {
-                    maxBufferSize: adapter.limits.maxBufferSize,
-                    maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-                },
-            });
-
-            // Handle device loss by clearing the cache
-            device.lost.then((info) => {
-                console.error(`WebGPU device lost: ${info.message}`);
-                sharedDevicePromise = null;
-            });
-
-            return device;
         })();
+        sharedDevicePromise = devicePromise;
     }
     return sharedDevicePromise;
 }

@@ -102,7 +102,7 @@ export class Shadows {
     async computeShadows(footprint: number[][], height: number, month: MonthCode): Promise<void> {
         const doy = MONTH_DOY[month];
 
-        // seg, sjoin_avg are per-feature. bld_height, doy, ring are global uniforms.
+        // seg, sjoin_avg are per-feature. bld_height, doy, ring are global constants for the dispatch.
         // Buffer count: seg auto matrix (1) + varrows (1) + sjoin_avg scalar (1)
         //             + uniforms: bld_height, doy (2) + ring (1) + 2 outputs = 8.
         const geojsonCompute = new ComputeGpgpu();

@@ -1,4 +1,4 @@
-import { FeatureCollection } from 'geojson';
+import { Feature, FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import {
     valueAtPath,
@@ -10,6 +10,9 @@ import { GpuPipeline } from './compute-pipeline';
 import type { GpgpuPipelineParams } from './api';
 import type { GlobalVarMeta, ComputeConfig } from './types-gpgpu';
 
+type ComputeFeature = Feature<Geometry, GeoJsonProperties>;
+type GlobalInputArrays = Record<string, Float32Array>;
+
 /**
  * GPGPU compute engine for executing WGSL functions over GeoJSON feature properties.
  *
@@ -19,7 +22,7 @@ import type { GlobalVarMeta, ComputeConfig } from './types-gpgpu';
  *
  * The pipeline supports:
  * - Scalar, array, and matrix inputs per feature
- * - Global uniforms (scalars, arrays, matrices) shared across all features
+ * - Global constants (scalars, arrays, matrices) shared across all features
  * - Auto-sized matrices that adapt to per-feature row counts
  * - Multiple output columns via the `OutputArray` return type
  *
@@ -65,9 +68,9 @@ export class ComputeGpgpu extends GpuPipeline {
      * @param params.variableMapping - Maps WGSL variable names to feature property dot-paths.
      * @param params.attributeArrays - Per-feature fixed-length arrays.
      * @param params.attributeMatrices - Per-feature matrices with fixed or auto rows.
-     * @param params.uniforms - Global scalar constants.
-     * @param params.uniformArrays - Global array constants.
-     * @param params.uniformMatrices - Global matrix constants.
+     * @param params.uniforms - Global scalar constants uploaded once for the dispatch.
+     * @param params.uniformArrays - Global array constants uploaded once for the dispatch.
+     * @param params.uniformMatrices - Global matrix constants uploaded once for the dispatch.
      * @param params.wgslBody - WGSL function body returning f32 or OutputArray.
      * @param params.resultField - Single output field name (optional).
      * @param params.outputColumns - Multiple output field names (optional, takes priority).
@@ -102,10 +105,16 @@ export class ComputeGpgpu extends GpuPipeline {
         const { globalVarNames, globalInputArrays, globalMeta } = this.extractGlobalData(params);
 
         const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wgslBody, outputColumns.length);
-        const allVarNames = [...orderedVarNames, ...globalVarNames];
         const allInputArrays = { ...inputArrays, ...globalInputArrays };
 
-        const result = await this.dispatch(allVarNames, allInputArrays, shader, featureCount, outputColumns.length);
+        const result = await this.dispatch(
+            orderedVarNames,
+            globalVarNames,
+            allInputArrays,
+            shader,
+            featureCount,
+            outputColumns.length
+        );
         return this.applyResultsToFeatures(collection, features, result, outputColumns);
     }
 
@@ -144,7 +153,7 @@ export class ComputeGpgpu extends GpuPipeline {
             const usage = input.type === 'uniform'
                 ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
                 : GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
-            const aligned = this.alignTo(input.data.byteLength, 4);
+            const aligned = this.alignTo(input.data.byteLength, input.type === 'uniform' ? 16 : 4);
             const buf = this.createBuffer(device, aligned, usage, input.data);
             inputBuffers.set(name, buf);
             const entries = groupEntries.get(group) ?? [];
@@ -194,7 +203,7 @@ export class ComputeGpgpu extends GpuPipeline {
         device.queue.submit([encoder.finish()]);
 
         // Read back all outputs (sequentially — GPU serialises anyway).
-        const result: { [outputName: string]: TypedArray } = {};
+        const result: Record<string, TypedArray> = {};
         for (const [key, staging] of stagingBuffers) {
             const cfg = outputs[key];
             const Ctor = cfg.arrayType ?? Uint8Array;
@@ -225,22 +234,28 @@ export class ComputeGpgpu extends GpuPipeline {
      * @private
      */
     private async dispatch(
-        orderedVarNames: string[],
+        featureVarNames: string[],
+        globalVarNames: string[],
         inputArrays: { [varName: string]: Float32Array },
         shader: string,
         featureCount: number,
         numOutputs: number,
     ) {
         const inputs: ComputeConfig['inputs'] = {};
-        orderedVarNames.forEach((varName, idx) => {
-            inputs[varName] = { type: 'storage', data: inputArrays[varName], binding: idx };
+        let binding = 0;
+
+        featureVarNames.forEach((varName) => {
+            inputs[varName] = { type: 'storage', data: inputArrays[varName], binding: binding++ };
+        });
+        globalVarNames.forEach((varName) => {
+            inputs[varName] = { type: 'uniform', data: inputArrays[varName], binding: binding++ };
         });
 
         const outputs: ComputeConfig['outputs'] = {};
         for (let o = 0; o < numOutputs; o++) {
             outputs[`out${o}`] = {
                 size: featureCount * 4,
-                binding: orderedVarNames.length + o,
+                binding: binding + o,
                 arrayType: Float32Array,
             };
         }
@@ -270,14 +285,13 @@ export class ComputeGpgpu extends GpuPipeline {
      * @private
      */
     private extractInputData(
-        features: any[],
+        features: ComputeFeature[],
         variableMapping: Record<string, string>,
         arrayVariables: Record<string, number>,
         matrixVariables: Record<string, { rows: number | 'auto'; cols: number }>,
         featureCount: number,
     ) {
         const orderedVarNames = Object.keys(variableMapping);
-        const extraVarNames: string[] = [];
         const inputArrays: { [varName: string]: Float32Array } = {};
         const scalarVars: string[] = [];
         const arrayVars: Array<{ name: string; length: number }> = [];
@@ -291,7 +305,6 @@ export class ComputeGpgpu extends GpuPipeline {
 
         const accessors = orderedVarNames.map((varName) => {
             const path = this.normalizePropertyPath(variableMapping[varName]);
-            const parts = path.split('.');
             const isArray = varName in arrayVariables;
             const isMatrix = varName in matrixVariables;
             let kind: 'scalar' | 'array' | 'matrix_fixed' | 'matrix_auto' = 'scalar';
@@ -316,7 +329,6 @@ export class ComputeGpgpu extends GpuPipeline {
             return {
                 varName,
                 path,
-                parts,
                 kind,
                 cols,
                 rows,
@@ -356,7 +368,6 @@ export class ComputeGpgpu extends GpuPipeline {
                 inputArrays[acc.varName] = new Float32Array(featureCount * acc.maxRows * acc.cols);
                 const rowsVarName = `${acc.varName}__varrows`;
                 inputArrays[rowsVarName] = acc.actualRows;
-                extraVarNames.push(rowsVarName);
                 matrixVars.push({
                     name: acc.varName,
                     rows: acc.maxRows,
@@ -414,26 +425,26 @@ export class ComputeGpgpu extends GpuPipeline {
     }
 
     /**
-     * Extracts global uniform data (scalars, arrays, matrices) from pipeline parameters.
+     * Extracts global constant data (scalars, arrays, matrices) from pipeline parameters.
      *
      * @param params - GPGPU pipeline parameters containing uniform definitions.
-     * @returns Object containing variable names, input arrays, and metadata for global uniforms.
+     * @returns Object containing variable names, input arrays, and metadata for global constants.
      * @private
      */
     private extractGlobalData(params: GpgpuPipelineParams) {
         const { uniforms = {}, uniformArrays = {}, uniformMatrices = {} } = params;
         const globalVarNames: string[] = [];
-        const globalInputArrays: { [varName: string]: Float32Array } = {};
+        const globalInputArrays: GlobalInputArrays = {};
         const globalMeta: GlobalVarMeta[] = [];
 
         for (const [name, value] of Object.entries(uniforms)) {
-            globalInputArrays[name] = new Float32Array([Number.isFinite(value) ? value : 0]);
+            globalInputArrays[name] = this.packUniformFloats([Number.isFinite(value) ? value : 0]);
             globalMeta.push({ kind: 'scalar', name });
             globalVarNames.push(name);
         }
 
         for (const [name, data] of Object.entries(uniformArrays)) {
-            globalInputArrays[name] = new Float32Array(
+            globalInputArrays[name] = this.packUniformFloats(
                 data.map((v) => Number.isFinite(Number(v)) ? Number(v) : 0)
             );
             globalMeta.push({ kind: 'array', name, length: data.length });
@@ -442,14 +453,14 @@ export class ComputeGpgpu extends GpuPipeline {
 
         for (const [name, { data, cols }] of Object.entries(uniformMatrices)) {
             const rows = data.length;
-            const buf = new Float32Array(rows * cols);
+            const flattened = new Float32Array(rows * cols);
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     const v = Number(data[r]?.[c] ?? 0);
-                    buf[r * cols + c] = Number.isFinite(v) ? v : 0;
+                    flattened[r * cols + c] = Number.isFinite(v) ? v : 0;
                 }
             }
-            globalInputArrays[name] = buf;
+            globalInputArrays[name] = this.packUniformFloats(flattened);
             globalMeta.push({ kind: 'matrix', name, rows, cols });
             globalVarNames.push(name);
         }
@@ -469,18 +480,18 @@ export class ComputeGpgpu extends GpuPipeline {
      */
     private applyResultsToFeatures(
         geojson: FeatureCollection,
-        features: any[],
-        result: { [outputName: string]: any },
+        features: ComputeFeature[],
+        result: Record<string, TypedArray>,
         outputColumns: string[],
     ): FeatureCollection {
-        const newFeatures = features.map((f: any, i: number) => {
-            const properties = f.properties ? { ...f.properties } : {};
+        const newFeatures = features.map((feature, i) => {
+            const properties = feature.properties ? { ...feature.properties } : {};
             const computeProps = properties.compute ? { ...properties.compute } : {};
             outputColumns.forEach((col, o) => {
                 computeProps[col] = (result[`out${o}`] as Float32Array)[i];
             });
             properties.compute = computeProps;
-            return { ...f, properties };
+            return { ...feature, properties };
         });
         return { ...geojson, features: newFeatures } as FeatureCollection;
     }
@@ -525,6 +536,7 @@ export class ComputeGpgpu extends GpuPipeline {
         const computeFunctionParams: string[] = [];
         const computeFunctionArgs: string[] = [];
         const arrayTypeDecls: string[] = [];
+        const uniformHelpers: string[] = [];
 
         const structDef = 'struct ArrayF32 { data: array<f32> }';
 
@@ -577,18 +589,38 @@ export class ComputeGpgpu extends GpuPipeline {
         }
 
         for (const meta of globalMeta) {
+            const packedLength = meta.kind === 'scalar'
+                ? 1
+                : meta.kind === 'array'
+                    ? meta.length
+                    : meta.rows * meta.cols;
+            const packedVec4Count = Math.max(1, Math.ceil(packedLength / 4));
+            const uniformStruct = `${meta.name}_Uniform`;
             bufferDecls.push(
-                `@group(0) @binding(${bindingIdx++}) var<storage, read> ${meta.name}Buf: ArrayF32;`
+                `struct ${uniformStruct} { data: array<vec4f, ${packedVec4Count}>; }`
+            );
+            bufferDecls.push(
+                `@group(0) @binding(${bindingIdx++}) var<uniform> ${meta.name}Buf: ${uniformStruct};`
+            );
+            uniformHelpers.push(
+                `fn ${meta.name}_uniform_at(index: u32) -> f32 {
+                    let chunk = ${meta.name}Buf.data[index / 4u];
+                    let lane = index % 4u;
+                    if (lane == 0u) { return chunk.x; }
+                    if (lane == 1u) { return chunk.y; }
+                    if (lane == 2u) { return chunk.z; }
+                    return chunk.w;
+                }`
             );
             if (meta.kind === 'scalar') {
-                locals.push(`  let ${meta.name}: f32 = ${meta.name}Buf.data[0u];`);
+                locals.push(`  let ${meta.name}: f32 = ${meta.name}_uniform_at(0u);`);
                 computeFunctionParams.push(`${meta.name}: f32`);
                 computeFunctionArgs.push(meta.name);
             } else if (meta.kind === 'array') {
                 arrayTypeDecls.push(`alias ${meta.name}_Array = array<f32, ${meta.length}>;`);
                 arrayCopyCode.push(`  var ${meta.name}: ${meta.name}_Array;`);
                 arrayCopyCode.push(
-                    `  for (var i = 0u; i < ${meta.length}u; i++) { ${meta.name}[i] = ${meta.name}Buf.data[i]; }`
+                    `  for (var i = 0u; i < ${meta.length}u; i++) { ${meta.name}[i] = ${meta.name}_uniform_at(i); }`
                 );
                 computeFunctionParams.push(`${meta.name}: ${meta.name}_Array`, `${meta.name}_length: u32`);
                 computeFunctionArgs.push(meta.name, `${meta.length}u`);
@@ -597,7 +629,7 @@ export class ComputeGpgpu extends GpuPipeline {
                 arrayTypeDecls.push(`alias ${meta.name}_Matrix = array<f32, ${size}>;`);
                 arrayCopyCode.push(`  var ${meta.name}: ${meta.name}_Matrix;`);
                 arrayCopyCode.push(
-                    `  for (var i = 0u; i < ${size}u; i++) { ${meta.name}[i] = ${meta.name}Buf.data[i]; }`
+                    `  for (var i = 0u; i < ${size}u; i++) { ${meta.name}[i] = ${meta.name}_uniform_at(i); }`
                 );
                 computeFunctionParams.push(
                     `${meta.name}: ${meta.name}_Matrix`,
@@ -626,6 +658,7 @@ export class ComputeGpgpu extends GpuPipeline {
         ${outputTypeDecl}
         ${arrayTypeDecls.join('\n        ')}
         ${bufferDecls.join('\n        ')}
+        ${uniformHelpers.join('\n        ')}
         ${outBufDecls.join('\n        ')}
 
         fn compute_value(${computeFunctionParams.join(', ')}) -> ${returnType} { ${wgslBody} }
@@ -639,6 +672,14 @@ export class ComputeGpgpu extends GpuPipeline {
             let result = compute_value(${computeFunctionArgs.join(', ')});
             ${resultLines}
         }`;
+    }
+
+    private packUniformFloats(values: ArrayLike<number>): Float32Array {
+        const packed = new Float32Array(Math.max(4, Math.ceil(values.length / 4) * 4));
+        for (let i = 0; i < values.length; i++) {
+            packed[i] = Number(values[i]) || 0;
+        }
+        return packed;
     }
 
     /**

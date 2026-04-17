@@ -137,25 +137,25 @@ export class Urbane {
         const roadsGeoJson = await this.db.getLayer('table_osm_roads');
         const rc = new ComputeRender();
 
-        const roadsWithCoverage = await rc.run({
+        const roadsWithSkyClasses = await rc.run({
             layers: [{ geojson: buildingsGeoJson, classId: 'buildings', type: 'buildings' }],
             source: roadsGeoJson,
-            aggregation: { type: 'coverage' },
+            aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
             viewSampling: { directions: 1 },
             tileSize: 64,
         });
 
-        // Preserve the original road geometry while promoting the sampled render coverage
+        // Preserve the original road geometry while promoting the sampled render sky share
         // into the sky-view field consumed by the downstream spatial join.
         this.roadsWithSky = {
-            ...roadsWithCoverage,
-            features: roadsWithCoverage.features.map((road) => ({
+            ...roadsWithSkyClasses,
+            features: roadsWithSkyClasses.features.map((road) => ({
                 ...road,
                 properties: {
                     ...road.properties,
                     compute: {
                         ...(road.properties?.compute ?? {}),
-                        skyViewFactor: 1 - ((road.properties as any)?.compute?.render?.coverage ?? 0),
+                        skyViewFactor: Number(((road.properties as any)?.compute?.render?.classes ?? {}).sky ?? 0),
                     },
                 },
             })),

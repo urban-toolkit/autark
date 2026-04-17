@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Examples)</title>
+    <link rel="stylesheet" href="/src/autk-map/compute-render-osm-view-score.css">
+</head>
+
+<body>
+    <div id="app">
+        <h2>compute-render-osm-view-score.ts</h2>
+        <button id="plotToggle" title="Toggle info panel">Info</button>
+        <canvas> </canvas>
+        <div id="plot">
+            <div id="plotBar"></div>
+            <div id="plotBody">
+                <h3 id="info-title">Dataset Average</h3>
+                <div class="info-row"><span>Building id</span><strong id="info-building-id">—</strong></div>
+                <div class="info-row"><span>Estimated height</span><strong id="info-building-height">—</strong></div>
+                <div class="info-row"><span>Parks visibility</span><strong id="info-parks">0.0%</strong></div>
+                <div class="info-row"><span>Water visibility</span><strong id="info-water">0.0%</strong></div>
+                <div class="info-row"><span>Sky visibility</span><strong id="info-sky">0.0%</strong></div>
+                <div class="info-row"><span>View score</span><strong id="info-score">0.000</strong></div>
+                <p id="info-note">View score weights water at 0.25, parks at 0.25, and sky/open view at 0.5.</p>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="module" src="/src/autk-map/compute-render-osm-view-score.ts"></script>
+<script>
+    function floatingPlot() {
+        let startX = 0,
+            startY = 0,
+            dragging = false;
+
+        const plot = document.querySelector('#plot');
+        const bar = document.querySelector('#plotBar');
+        const toggle = document.querySelector('#plotToggle');
+
+        if (!plot || !bar || !toggle) return;
+
+        plot.style.visibility = 'visible';
+
+        toggle.addEventListener('click', () => {
+            plot.classList.toggle('hidden-plot');
+        });
+
+        bar.addEventListener('pointerdown', pointerDown);
+        bar.addEventListener('pointermove', pointerMove);
+        bar.addEventListener('pointerup', pointerUp);
+        bar.addEventListener('pointercancel', pointerUp);
+
+        function pointerDown(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            bar.setPointerCapture(e.pointerId);
+        }
+
+        function pointerMove(e) {
+            if (!dragging) return;
+
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            plot.style.top = `${plot.offsetTop + dy}px`;
+            plot.style.left = `${plot.offsetLeft + dx}px`;
+
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        }
+
+        function pointerUp(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+            dragging = false;
+            if (bar.hasPointerCapture(e.pointerId)) {
+                bar.releasePointerCapture(e.pointerId);
+            }
+        }
+    }
+    floatingPlot();
+</script>
+
+</html>

@@ -35,27 +35,27 @@ export class ComputeRenderOsmSkyExposure {
         const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
 
         const render = new ComputeRender();
-        const roadsWithCoverage = await render.run({
+        const roadsWithSkyClasses = await render.run({
             layers: [{
                 geojson: buildingsGeoJson,
                 type: 'buildings',
                 classId: 'buildings',
             }],
             source: roadsGeoJson,
-            aggregation: { type: 'coverage' },
+            aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
             viewSampling: { directions: 1 },
             tileSize: 64,
         });
 
         this.roadsWithSky = {
-            ...roadsWithCoverage,
-            features: roadsWithCoverage.features.map((road) => ({
+            ...roadsWithSkyClasses,
+            features: roadsWithSkyClasses.features.map((road) => ({
                 ...road,
                 properties: {
                     ...road.properties,
                     compute: {
                         ...(road.properties?.compute ?? {}),
-                        skyViewFactor: 1 - ((road.properties as any)?.compute?.render?.coverage ?? 0),
+                        skyViewFactor: Number(((road.properties as any)?.compute?.render?.classes ?? {}).sky ?? 0),
                     },
                 },
             })),

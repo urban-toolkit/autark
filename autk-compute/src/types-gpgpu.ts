@@ -6,9 +6,9 @@ import {
 } from 'autk-core';
 
 /**
- * Metadata describing a single global (uniform) variable in the generated WGSL shader.
+ * Metadata describing a single global uniform in the generated WGSL shader.
  *
- * Global variables are constants shared across all features during a GPGPU computation,
+ * Global uniforms are constants shared across all features during a GPGPU computation,
  * such as sun angles, thresholds, or day-of-year values.
  *
  * @example
@@ -63,7 +63,7 @@ export interface ComputeConfig {
      * WGSL source code for the compute shader.
      *
      * The shader must declare storage/uniform bindings matching the `inputs` and `outputs`
-     * configuration. Buffer bindings use the `ArrayF32` struct pattern.
+     * configuration. Storage buffers typically use the `ArrayF32` struct pattern.
      */
     shader: string;
 

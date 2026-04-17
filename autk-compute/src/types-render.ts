@@ -12,13 +12,4 @@ export interface GpuFeatureDraw {
 
     /** Uniform buffer carrying encoded render ids for this feature draw. */
     idBuf: GPUBuffer;
-
-    /** Stable object key used when formatting object visibility results. */
-    objectKey: string;
-
-    /** Class bucket index written into the offscreen render target. */
-    classIndex: number;
-
-    /** Global object index written into the offscreen render target. */
-    objectIndex: number;
 }

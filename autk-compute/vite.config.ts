@@ -12,7 +12,7 @@ export default defineConfig({
       name: 'autk-compute',
     },
     copyPublicDir: false,
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true
   },
 });
