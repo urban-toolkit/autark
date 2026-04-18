@@ -597,7 +597,7 @@ export class ComputeGpgpu extends GpuPipeline {
             const packedVec4Count = Math.max(1, Math.ceil(packedLength / 4));
             const uniformStruct = `${meta.name}_Uniform`;
             bufferDecls.push(
-                `struct ${uniformStruct} { data: array<vec4f, ${packedVec4Count}>; }`
+                `struct ${uniformStruct} { data: array<vec4f, ${packedVec4Count}>, }`
             );
             bufferDecls.push(
                 `@group(0) @binding(${bindingIdx++}) var<uniform> ${meta.name}Buf: ${uniformStruct};`

@@ -132,27 +132,29 @@ export class TriangulatorPolygons {
     static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
         const coords = coordinates[0].map((cord: number[]) => cord);
-        const holes = [];
+        const holes: number[] = [];
         for (let i = 1; i < coordinates.length; i++) {
             holes.push(coords.length);
             coordinates[i].forEach((cord: number[]) => coords.push(cord));
         }
+        if (holes.length > 0) {
+            console.log('[autk-core] Triangulating polygon with holes', {
+                featureId: feature.id ?? null,
+                holeCount: holes.length,
+            });
+        }
         const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-        const flatIds = earcut(flatCoords);
+        const flatIds = earcut(flatCoords, holes.length > 0 ? holes : undefined);
         return [{ flatCoords, flatIds }];
     }
 
     static polygonToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
-        const coords = coordinates[0].map((cord: number[]) => cord);
-        const holes = [];
-        for (let i = 1; i < coordinates.length; i++) {
-            holes.push(coords.length);
-            coordinates[i].forEach((cord: number[]) => coords.push(cord));
-        }
-        const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-        const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
-        return [{ flatCoords, flatIds }];
+        return coordinates.map((ring: number[][]) => {
+            const flatCoords = ring.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
+            return { flatCoords, flatIds };
+        });
     }
 
     static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
@@ -160,13 +162,19 @@ export class TriangulatorPolygons {
         const { coordinates } = <MultiPolygon>feature.geometry;
         for (const polygon of coordinates) {
             const coords = polygon[0].map((cord: number[]) => cord);
-            const holes = [];
+            const holes: number[] = [];
             for (let i = 1; i < polygon.length; i++) {
                 holes.push(coords.length);
                 polygon[i].forEach((cord: number[]) => coords.push(cord));
             }
+            if (holes.length > 0) {
+                console.log('[autk-core] Triangulating multipolygon part with holes', {
+                    featureId: feature.id ?? null,
+                    holeCount: holes.length,
+                });
+            }
             const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-            const flatIds = earcut(flatCoords);
+            const flatIds = earcut(flatCoords, holes.length > 0 ? holes : undefined);
             meshes.push({ flatCoords, flatIds });
         }
         return meshes;
@@ -176,15 +184,11 @@ export class TriangulatorPolygons {
         const borders = [];
         const { coordinates } = <MultiPolygon>feature.geometry;
         for (const polygon of coordinates) {
-            const coords = polygon[0].map((cord: number[]) => cord);
-            const holes = [];
-            for (let i = 1; i < polygon.length; i++) {
-                holes.push(coords.length);
-                polygon[i].forEach((cord: number[]) => coords.push(cord));
+            for (const ring of polygon) {
+                const flatCoords = ring.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+                const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
+                borders.push({ flatCoords, flatIds });
             }
-            const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-            const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
-            borders.push({ flatCoords, flatIds });
         }
         return borders;
     }
