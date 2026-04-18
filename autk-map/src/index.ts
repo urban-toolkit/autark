@@ -101,7 +101,6 @@ export { VectorLayer } from './layer-vector';
 export { Triangles2DLayer } from './layer-triangles2D';
 export { Triangles3DLayer } from './layer-triangles3D';
 export { RasterLayer } from './layer-raster';
-export { LayerBbox } from './layer-bbox';
 export { LayerManager } from './layer-manager';
 
 // ─── Render pipelines ────────────────────────────────────────────────────────

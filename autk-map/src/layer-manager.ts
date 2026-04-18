@@ -1,5 +1,6 @@
 import { BBox, FeatureCollection, Geometry } from 'geojson';
 
+import { computeBoundingBox, computeOrigin } from './types-core';
 import type { LayerType } from './types-core';
 import { LayerData, LayerInfo, LayerRenderInfo } from './types-layers';
 
@@ -7,7 +8,6 @@ import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
-import { LayerBbox } from './layer-bbox';
 
 
 /**
@@ -47,12 +47,13 @@ export class LayerManager {
      * @param collection Source feature collection.
      */
     computeBboxAndOrigin(collection: FeatureCollection<Geometry | null>): void {
-        const bbox = collection.bbox ?? LayerBbox.build(collection as FeatureCollection);
+        const computed = computeBoundingBox(collection as FeatureCollection);
+        if (!collection.bbox && !computed) {
+            throw new Error('No valid coordinates found');
+        }
+        const bbox = collection.bbox ?? [computed!.minLon, computed!.minLat, computed!.maxLon, computed!.maxLat];
         this._bbox = bbox;
-        this._origin = [
-            (bbox[2] + bbox[0]) * 0.5,
-            (bbox[3] + bbox[1]) * 0.5,
-        ];
+        this._origin = computeOrigin(collection as FeatureCollection);
     }
 
     /**

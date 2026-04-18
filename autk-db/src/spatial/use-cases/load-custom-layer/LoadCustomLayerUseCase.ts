@@ -6,7 +6,7 @@ import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { FeatureCollection } from 'geojson';
 import { BoundingBox } from '../../../shared/interfaces';
-import { mapGeojsonGeometryTypeToLayerType } from '../load-layer/interfaces';
+import { mapGeometryTypeToLayerType } from 'autk-core';
 
 export class LoadCustomLayerUseCase {
   private db: AsyncDuckDB;
@@ -58,7 +58,7 @@ export class LoadCustomLayerUseCase {
       throw new Error('First feature has no geometry or geometry type');
     }
 
-    const geometryType = mapGeojsonGeometryTypeToLayerType(firstFeature.geometry.type);
+    const geometryType = mapGeometryTypeToLayerType(firstFeature.geometry.type);
 
     const describeTableResponse = await this.createTableFromFeatureCollection(
       geojson,

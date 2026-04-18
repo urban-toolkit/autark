@@ -93,5 +93,13 @@ export { valueAtPath } from './utils-data';
 export { isNumericLike } from './utils-data';
 /** Computes the central origin of a GeoJSON FeatureCollection. */
 export { computeOrigin } from './utils-geo';
+/** Computes the bounding box of a GeoJSON collection or geometry. */
+export { computeBoundingBox } from './utils-geo';
+/** Returns true when a string matches a shared layer type. */
+export { isLayerType } from './utils-geo';
+/** Maps a GeoJSON geometry type to the shared layer taxonomy. */
+export { mapGeometryTypeToLayerType } from './utils-geo';
+/** Builds a closed planar offset polygon from a local-space polyline. */
+export { offsetPolyline } from './utils-geo';
 /** Flattens an array of LayerGeometry pieces into continuous typed arrays. */
 export { flattenMesh } from './utils-mesh';

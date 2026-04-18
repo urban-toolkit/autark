@@ -37,8 +37,8 @@ export class ColormapDiv {
     protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
         const geojson = await this.db.getLayer(layer);
         this.map.updateColorMap(layer, { colorMap: {
-                interpolator: ColorMapInterpolator.DIV_RED_BLUE,
-                domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
+                interpolator: ColorMapInterpolator.DIV_SPECTRAL,
+                domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },
             }, });
         this.map.updateThematic(layer, { collection: geojson, property: 'properties.shape_area' });
     }

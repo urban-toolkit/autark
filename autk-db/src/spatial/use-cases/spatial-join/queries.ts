@@ -1,5 +1,5 @@
 import { Table } from '../../../shared/interfaces';
-import { isLayerType } from '../load-layer/interfaces';
+import { isLayerType } from 'autk-core';
 
 type InternalColumn = { table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string; normalize?: boolean };
 

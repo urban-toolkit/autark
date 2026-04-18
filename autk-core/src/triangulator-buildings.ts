@@ -5,8 +5,6 @@ import { buildBuildingPartMesh, MeshData } from "./triangulator-roofs";
 
 type Vec2 = [number, number];
 
-const globalRoofShapeCounts: Record<string, number> = {};
-
 export class TriangulatorBuildings {
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
@@ -27,9 +25,6 @@ export class TriangulatorBuildings {
             for (let i = 0; i < geometries.length; i++) {
                 const partGeom = geometries[i];
                 const partProps = parts[i] ?? {};
-                
-                const shape = String(partProps['roof:shape'] || 'flat');
-                globalRoofShapeCounts[shape] = (globalRoofShapeCounts[shape] || 0) + 1;
 
                 const heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
                 if (!heightInfo.length) { continue; }

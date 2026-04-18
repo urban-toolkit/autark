@@ -2,7 +2,7 @@ import { FeatureCollection, Feature, LineString, MultiLineString, GeometryCollec
 
 import { LayerGeometry, LayerComponent } from './types-mesh';
 
-import { lineOffset, lineString } from '@turf/turf';
+import { offsetPolyline } from './utils-geo';
 import earcut from 'earcut';
 
 export class TriangulatorPolylines {
@@ -48,18 +48,36 @@ export class TriangulatorPolylines {
 
     static lineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
         const base = <LineString>feature.geometry;
-        base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
+        const localCoords = base.coordinates.map((coord: number[]) => [coord[0] - origin[0], coord[1] - origin[1]]);
+        const polygon = offsetPolyline(localCoords, offset);
+        if (polygon.length < 4) {
+            return [];
+        }
 
-        const top = lineOffset(base, offset, { units: 'degrees' }).geometry.coordinates;
-        const bot = lineOffset(base, -offset, { units: 'degrees' }).geometry.coordinates;
-
-        bot.forEach((cord: number[]) => top.unshift(cord));
-        top.push(top[0]);
-
-        const flatIds = earcut(top.flat());
-        const flatCoords = top.map((cord: number[]) => [cord[0], cord[1]]).flat();
+        const flatIds = earcut(polygon.flat());
+        const flatCoords = polygon.map((coord: number[]) => [coord[0], coord[1]]).flat();
 
         return [{ flatCoords, flatIds }];
+    }
+
+    static multiLineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
+        const { coordinates } = <MultiLineString>feature.geometry;
+
+        const meshes = [];
+        for (const ls of coordinates) {
+            const localCoords = ls.map((coord: number[]) => [coord[0] - origin[0], coord[1] - origin[1]]);
+            const polygon = offsetPolyline(localCoords, offset);
+            if (polygon.length < 4) {
+                continue;
+            }
+
+            const flatIds = earcut(polygon.flat());
+            const flatCoords = polygon.map((coord: number[]) => [coord[0], coord[1]]).flat();
+
+            meshes.push({ flatCoords, flatIds });
+        }
+
+        return meshes;
     }
 
     static geometryCollectionToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
@@ -73,29 +91,6 @@ export class TriangulatorPolylines {
                 meshes.push(...TriangulatorPolylines.multiLineStringToPolyline(syntheticFeature, origin, offset));
             }
         }
-        return meshes;
-    }
-
-    static multiLineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
-        const { coordinates } = <MultiLineString>feature.geometry;
-
-        const meshes = [];
-        for (const ls of coordinates) {
-            const base = lineString(ls).geometry;
-            base.coordinates = base.coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]);
-
-            const top = lineOffset(base, offset, { units: 'degrees' }).geometry.coordinates;
-            const bot = lineOffset(base, -offset, { units: 'degrees' }).geometry.coordinates;
-
-            bot.forEach((cord: number[]) => top.unshift(cord));
-            top.push(top[0]);
-
-            const flatIds = earcut(top.flat());
-            const flatCoords = top.map((cord: number[]) => [cord[0], cord[1]]).flat();
-
-            meshes.push({ flatCoords, flatIds });
-        }
-
         return meshes;
     }
 }

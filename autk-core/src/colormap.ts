@@ -24,11 +24,10 @@ type CategoricalDomain = string[];
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
 
 export class ColorMap {
-    private static _domainCache = new Map<string, ResolvedDomain>();
-
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
-        return ColorMap.interpolatorToRgb(interpolator, value);
+        const { r, g, b } = d3_color.rgb(interpolator(value));
+        return { r, g, b, alpha: 1 };
     }
 
     public static getColorMap(
@@ -39,8 +38,8 @@ export class ColorMap {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const tex: number[] = [];
         for (let id = 0; id < res; id++) {
-            const col = ColorMap.interpolatorToRgb(interpolator, id / (res - 1));
-            tex.push(col.r, col.g, col.b, 1);
+            const { r, g, b } = d3_color.rgb(interpolator(id / (res - 1)));
+            tex.push(r, g, b, 1);
         }
         return tex;
     }
@@ -53,7 +52,8 @@ export class ColorMap {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const result: ColorRGB[] = [];
         for (let id = 0; id < res; id++) {
-            result.push(ColorMap.interpolatorToRgb(interpolator, id / (res - 1)));
+            const { r, g, b } = d3_color.rgb(interpolator(id / (res - 1)));
+            result.push({ r, g, b, alpha: 1 });
         }
         return result;
     }
@@ -80,44 +80,15 @@ export class ColorMap {
         return [min, max];
     }
 
-    /**
-     * Normalizes raw numeric values to `[0, 1]` using the provided domain.
-     *
-     * For a `SequentialDomain` `[min, max]` the output is clamped linearly.
-     * For a `DivergingDomain` `[min, center, max]` the output is linearly
-     * mapped across the full `[min, max]` span (center is used for labels only).
-     *
-     * @param values Raw data values.
-     * @param domain Sequential or diverging domain.
-     * @returns Values remapped to `[0, 1]`.
-     */
-    public static normalizeValues(
-        values: number[] | TypedArray,
-        domain: SequentialDomain | DivergingDomain,
-    ): number[] | Float32Array {
-        const min = domain[0];
-        const max = domain[domain.length - 1] as number;
-        const range = max - min;
-        
-        if (Array.isArray(values)) {
-            return values.map(v => range > 0 ? Math.max(0, Math.min(1, (v - min) / range)) : 0);
-        } else {
-            const result = new Float32Array(values.length);
-            for (let i = 0; i < values.length; i++) {
-                result[i] = range > 0 ? Math.max(0, Math.min(1, (values[i] - min) / range)) : 0;
-            }
-            return result;
-        }
-    }
-
     private static isDiverging(interpolator: ColorMapInterpolator): boolean {
-        return interpolator === ColorMapInterpolator.DIV_RED_BLUE;
+        return interpolator === ColorMapInterpolator.DIV_RED_BLUE
+            || interpolator === ColorMapInterpolator.DIV_SPECTRAL;
     }
 
-/**
+    /**
      * Resolves a numeric domain from data and color-map configuration.
      */
-    public static resolveNumericDomainFromConfig(
+    private static resolveNumericDomainFromConfig(
         values: number[] | TypedArray,
         config: ColorMapConfig,
         interpolator: ColorMapInterpolator,
@@ -163,33 +134,15 @@ export class ColorMap {
         return [min, max];
     }
 
-    /**
-     * Resolves a categorical domain, using the provided one when valid or computing
-     * unique categories from values otherwise.
-     */
-    public static resolveCategoricalDomain(
-        values: string[],
-        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
-    ): CategoricalDomain {
-        if (
-            Array.isArray(domain)
-            && domain.length > 0
-            && domain.every(v => typeof v === 'string')
-        ) {
-            return domain as CategoricalDomain;
-        }
-        return Array.from(new Set(values));
-    }
-
     /** Resolves a categorical domain from a color-map configuration. */
-    public static resolveCategoricalDomainFromConfig(
+    private static resolveCategoricalDomainFromConfig(
         values: string[],
         config: ColorMapConfig,
     ): CategoricalDomain {
         if (config.domainSpec.type === ColorMapDomainStrategy.USER) {
             return config.domainSpec.params.map(v => String(v));
         }
-        return ColorMap.resolveCategoricalDomain(values.map(v => String(v)));
+        return Array.from(new Set(values.map(v => String(v))));
     }
 
     /**
@@ -222,47 +175,15 @@ export class ColorMap {
         values: number[] | string[] | TypedArray,
         config: ColorMapConfig,
     ): ResolvedDomain {
-        const cacheKey = `${config.interpolator}|${JSON.stringify(config.domainSpec)}|${ColorMap.computeDataFingerprint(values)}`;
-        const cached = ColorMap._domainCache.get(cacheKey);
-        if (cached) {
-            return cached;
-        }
-
         const isCategorical = config.interpolator.startsWith('scheme')
             || (config.domainSpec.type === ColorMapDomainStrategy.USER && config.domainSpec.params.some(v => typeof v === 'string'))
             || (!ArrayBuffer.isView(values) && (values as Array<number|string>).some(v => typeof v === 'string' && isNaN(Number(v))));
 
-        let computed: ResolvedDomain;
         if (isCategorical) {
-            computed = ColorMap.resolveCategoricalDomainFromConfig(values as string[], config);
+            return ColorMap.resolveCategoricalDomainFromConfig(values as string[], config);
         } else {
-            computed = ColorMap.resolveNumericDomainFromConfig(values as number[] | TypedArray, config, config.interpolator);
+            return ColorMap.resolveNumericDomainFromConfig(values as number[] | TypedArray, config, config.interpolator);
         }
-
-        ColorMap._domainCache.set(cacheKey, computed);
-        return computed;
-    }
-
-    private static computeDataFingerprint(values: Array<number | string> | TypedArray): string {
-        if (values.length === 0) {
-            return 'empty';
-        }
-
-        if (ArrayBuffer.isView(values) || typeof values[0] === 'number') {
-            const nums = values as number[] | TypedArray;
-            const [min, max] = ColorMap.computeMinMaxRange(nums);
-            let sum = 0;
-            for (let i = 0; i < nums.length; i++) sum += nums[i];
-            return `n:${nums.length}:${min}:${max}:${sum}`;
-        }
-
-        const strs = values as string[];
-        return `s:${strs.length}:${strs.join('|')}`;
-    }
-
-    private static interpolatorToRgb(interpolator: (t: number) => string, value: number): ColorRGB {
-        const { r, g, b } = d3_color.rgb(interpolator(value));
-        return { r, g, b, alpha: 1 };
     }
 
     private static buildInterpolator(

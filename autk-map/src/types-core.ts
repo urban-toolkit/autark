@@ -38,7 +38,14 @@ export type { BoundingBox, LayerType, TypedArray, TypedArrayConstructor } from '
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
-export { valueAtPath, isNumericLike } from 'autk-core';
+export {
+    valueAtPath,
+    isNumericLike,
+    computeOrigin,
+    computeBoundingBox,
+    isLayerType,
+    mapGeometryTypeToLayerType,
+} from 'autk-core';
 
 // ─── Triangulators ───────────────────────────────────────────────────────────
 

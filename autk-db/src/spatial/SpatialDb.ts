@@ -8,6 +8,7 @@ import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
 import { LoadJsonUseCase, LoadJsonParams } from './use-cases/load-json';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
+import { isLayerType } from 'autk-core';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
 import { SpatialQueryParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
@@ -15,7 +16,6 @@ import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase
 import { BoundingBox } from '../shared/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
-import { isLayerType } from './use-cases/load-layer/interfaces';
 import { LoadOsmParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
 import type { OsmLoadTimings } from './use-cases/load-osm-from-overpass-api/interfaces';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';

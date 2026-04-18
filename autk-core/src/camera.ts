@@ -97,17 +97,17 @@ export class Camera {
     }
 
     /**
-     * Returns the current projection matrix as a flat 16-element array.
+     * Returns the current projection matrix.
      */
-    public getProjectionMatrix(): number[] {
-        return Array.from(this.mProjectionMatrix);
+    public getProjectionMatrix(): mat4 {
+        return this.mProjectionMatrix;
     }
 
     /**
-     * Returns the current view matrix as a flat 16-element array.
+     * Returns the current view matrix.
      */
-    public getModelViewMatrix(): number[] {
-        return Array.from(this.mViewMatrix);
+    public getModelViewMatrix(): mat4 {
+        return this.mViewMatrix;
     }
 
     /**
