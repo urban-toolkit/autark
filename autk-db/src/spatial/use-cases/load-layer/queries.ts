@@ -194,69 +194,25 @@ function getLayerQuery(layer: string): (t: string) => string {
 const GET_PARKS = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE parks AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way', 'relation') AND
-      (
-        map_extract(tags, 'leisure')[1] IN ('dog_park', 'park', 'playground', 'recreation_ground') OR
-        map_extract(tags, 'landuse')[1] IN ('wood', 'grass', 'forest', 'orchad', 'village_green', 'vineyard', 'cemetery', 'meadow', 'village_green') OR
-        map_extract(tags, 'natural')[1] IN ('wood', 'grass')
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'parks';
 `;
 
 const GET_WATER = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE water AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way', 'relation') AND
-      (
-        map_extract(tags, 'natural')[1] IN ('water', 'wetland', 'bay', 'strait', 'spring') OR
-        map_extract(tags, 'water')[1] IN ('pond', 'reservoir', 'lagoon', 'stream_pool', 'lake', 'pool', 'canal', 'river')
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'water';
 `;
 
 const GET_BUILDINGS = (tableName: string) => `
    CREATE OR REPLACE TEMP TABLE buildings AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way') AND
-      (
-        map_extract(tags, 'building')[1] IS NOT NULL OR
-        map_extract(tags, 'building:part')[1] IS NOT NULL OR
-        map_extract(tags, 'type')[1] IN ('building')
-      ) AND
-      -- Filter out roof parts (from removeInvalidBuildingParts logic)
-      map_extract(tags, 'building')[1] IS DISTINCT FROM 'roof' AND
-      map_extract(tags, 'building:part')[1] IS DISTINCT FROM 'roof' AND
-      -- Filter out buildings without height information
-      (
-        map_extract(tags, 'height')[1] IS NOT NULL OR
-        map_extract(tags, 'levels')[1] IS NOT NULL OR
-        map_extract(tags, 'building:levels')[1] IS NOT NULL
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
 `;
-
-/*
-const GET_COASTLINE = (tableName: string) => `
-  CREATE TEMP TABLE coastline AS
-    SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way') AND
-      (
-        map_extract(tags, 'natural')[1] IN ('coastline')
-      );
-`;
-*/
 
 const GET_ROADS = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE roads AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind = 'way' AND
-      -- ensure the way has at least two distinct nodes so ST_MakeLine can build a geometry
-      array_length(refs) > 1 AND
-      (
-        map_extract(tags, 'highway')[1] IS NOT NULL AND
-        map_extract(tags, 'area')[1] IS DISTINCT FROM 'yes' AND
-        map_extract(tags, 'highway')[1] NOT IN (
-          'cycleway', 'elevator', 'footway', 'steps', 'pedestrian',
-          'proposed', 'construction', 'abandoned', 'platform', 'raceway'
-        )
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'roads' AND array_length(refs) > 1;
 `;
 
 // Get all ways

@@ -1,4 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
+import { polygonize } from '@turf/turf';
+import { Feature, FeatureCollection, LineString, Polygon, Position } from 'geojson';
 
 import { LoadOsmParams, OsmElement, OnLoadingProgress } from './interfaces';
 import { OsmTable } from '../../../shared/interfaces';
@@ -18,10 +20,32 @@ interface OsmExecResult {
   boundariesProcessingMs: number;
 }
 
+type OverpassTagSelectors = {
+  way: string[];
+  relation: string[];
+};
+
+type WayRing = {
+  nodes: number[];
+  geometry: Array<{ lat: number; lon: number }>;
+};
+
+const PARKS_LEISURE_VALUES = ['dog_park', 'park', 'playground', 'recreation_ground'] as const;
+const PARKS_LANDUSE_VALUES = ['wood', 'grass', 'forest', 'orchard', 'village_green', 'vineyard', 'cemetery', 'meadow'] as const;
+const PARKS_NATURAL_VALUES = ['wood', 'grass', 'grassland', 'forest', 'scrub', 'heath', 'meadow'] as const;
+
+const WATER_NATURAL_VALUES = ['water', 'wetland', 'strait', 'spring'] as const;
+const WATER_WATER_VALUES = ['pond', 'reservoir', 'lagoon', 'stream_pool', 'lake', 'pool', 'canal', 'river'] as const;
+
+const EXCLUDED_ROAD_HIGHWAY_VALUES = ['cycleway', 'elevator', 'footway', 'steps', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'] as const;
+const BUILDING_HEIGHT_KEYS = ['height', 'levels', 'building:levels'] as const;
+
 export class LoadOsmFromOverpassApiUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;
   private cache: HttpCache<OverpassApiResponse>;
+  private nextDerivedWayId = -1;
+  private nextDerivedNodeId = -1;
 
   constructor(db: AsyncDuckDB, conn: AsyncDuckDBConnection) {
     this.db = db;
@@ -386,7 +410,7 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Builds a query for a specific group of layers (tagged ways only).
+   * Builds a query for a specific group of layers.
    * Returns null when no tag selectors apply to the given group (e.g. surface-only).
    */
   private buildLayerGroupQuery(
@@ -394,29 +418,52 @@ export class LoadOsmFromOverpassApiUseCase {
     layerGroup: string[],
   ): string | null {
     const tagSelectors = this.getTagSelectorsForLayers(layerGroup);
-    if (tagSelectors.length === 0) return null;
+    if (tagSelectors.way.length === 0 && tagSelectors.relation.length === 0) return null;
 
     const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
     const areaLines: string[] = [];
     const dataWaySelectors: string[] = [];
+    const dataRelationSelectors: string[] = [];
+    const relationWaySelectors: string[] = [];
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
       areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
-      areaLines.push(`(
-        ${tagSelectors.map(filter => `way[${filter}](area.area${i});`).join('\n        ')}
+      if (tagSelectors.way.length > 0) {
+        areaLines.push(`(
+        ${tagSelectors.way.map(filter => `way[${filter}](area.area${i});`).join('\n        ')}
       )->.dataWays${i};`);
-      dataWaySelectors.push(`.dataWays${i};`);
+        dataWaySelectors.push(`.dataWays${i};`);
+      }
+      if (tagSelectors.relation.length > 0) {
+        areaLines.push(`(
+        ${tagSelectors.relation.map(filter => `relation[${filter}](area.area${i});`).join('\n        ')}
+      )->.dataRelations${i};`);
+        areaLines.push(`way(r.dataRelations${i})->.dataRelationWays${i};`);
+        dataRelationSelectors.push(`.dataRelations${i};`);
+        relationWaySelectors.push(`.dataRelationWays${i};`);
+      }
     });
+
+    const allWaySelectors = [...dataWaySelectors, ...relationWaySelectors];
+    const relationOutput = dataRelationSelectors.length > 0
+      ? `
+      ( ${dataRelationSelectors.join(' ')} );
+      out body;`
+      : '';
+    const wayOutput = allWaySelectors.length > 0
+      ? `
+      ( ${allWaySelectors.join(' ')} );
+      out geom qt;`
+      : '';
 
     return `
       [out:json][timeout:60][maxsize:268435456];
 
       ${geocodeLine}
       ${areaLines.join('\n      ')}
-
-      ( ${dataWaySelectors.join(' ')} );
-      out geom qt;
+      ${relationOutput}
+      ${wayOutput}
     `;
   }
 
@@ -426,43 +473,49 @@ export class LoadOsmFromOverpassApiUseCase {
    * (coastline, beach, cliff, etc.). `surface` needs no selectors — its ways
    * come from `way(r.rel)` in the boundaries query.
    */
-  private getTagSelectorsForLayers(layers: string[]): string[] {
-    const filters = new Set<string>();
-    const naturalValues = new Set<string>();
+  private getTagSelectorsForLayers(layers: string[]): OverpassTagSelectors {
+    const wayFilters = new Set<string>();
+    const relationFilters = new Set<string>();
 
     for (const layer of layers) {
       switch (layer) {
         case 'roads':
-          filters.add('"highway"');
+          wayFilters.add(`"highway"]["area"!="yes"]["highway"!~"^(${EXCLUDED_ROAD_HIGHWAY_VALUES.join('|')})$"`);
           break;
         case 'buildings':
-          filters.add('"building"');
-          filters.add('"building:part"');
+          BUILDING_HEIGHT_KEYS.forEach((heightKey) => {
+            wayFilters.add(`"building"]["building"!="roof"]["${heightKey}"`);
+            wayFilters.add(`"building:part"]["building:part"!="roof"]["${heightKey}"`);
+            wayFilters.add(`"type"="building"]["${heightKey}"`);
+          });
           break;
         case 'parks':
-          filters.add('"leisure"');
-          filters.add('"landuse"');
-          naturalValues.add('wood');
-          naturalValues.add('grass');
+          wayFilters.add(this.buildExactValueSelector('leisure', PARKS_LEISURE_VALUES));
+          wayFilters.add(this.buildExactValueSelector('landuse', PARKS_LANDUSE_VALUES));
+          wayFilters.add(this.buildExactValueSelector('natural', PARKS_NATURAL_VALUES));
+          relationFilters.add(this.buildExactValueSelector('leisure', PARKS_LEISURE_VALUES));
+          relationFilters.add(this.buildExactValueSelector('landuse', PARKS_LANDUSE_VALUES));
+          relationFilters.add(this.buildExactValueSelector('natural', PARKS_NATURAL_VALUES));
           break;
         case 'water':
-          filters.add('"water"');
-          naturalValues.add('water');
-          naturalValues.add('wetland');
-          naturalValues.add('bay');
-          naturalValues.add('strait');
-          naturalValues.add('spring');
+          wayFilters.add(this.buildExactValueSelector('natural', WATER_NATURAL_VALUES));
+          wayFilters.add(this.buildExactValueSelector('water', WATER_WATER_VALUES));
+          relationFilters.add(this.buildExactValueSelector('natural', WATER_NATURAL_VALUES));
+          relationFilters.add(this.buildExactValueSelector('water', WATER_WATER_VALUES));
           break;
         case 'surface':
           break;
       }
     }
 
-    if (naturalValues.size > 0) {
-      filters.add(`"natural"~"^(${[...naturalValues].join('|')})$"`);
-    }
+    return {
+      way: [...wayFilters],
+      relation: [...relationFilters],
+    };
+  }
 
-    return [...filters];
+  private buildExactValueSelector(key: string, values: readonly string[]): string {
+    return `"${key}"~"^(${values.join('|')})$"`;
   }
 
   /**
@@ -559,15 +612,19 @@ export class LoadOsmFromOverpassApiUseCase {
    * - `osmData`: all nodes and ways (relations excluded — used only for boundary identification)
    * - `boundariesData`: only the ways that form admin boundary rings + their nodes
    */
-  private splitCombinedResponse(combined: OverpassApiResponse): {
+  private splitCombinedResponse(
+    combined: OverpassApiResponse,
+  ): {
     osmData: OverpassApiResponse;
     boundariesData: OverpassApiResponse;
   } {
     const elements = combined.elements ?? [];
+    const boundaryRelationIds = this.getBoundaryRelationIds(elements);
+    const processedRelationWays = this.normalizeSimpleAreaRelations(elements, boundaryRelationIds);
 
     const boundaryWayIds = new Set<number>();
     for (const element of elements) {
-      if (element.type === 'relation' && element.members) {
+      if (element.type === 'relation' && boundaryRelationIds.has(element.id) && element.members) {
         for (const member of element.members) {
           if (member.type === 'way') boundaryWayIds.add(member.ref);
         }
@@ -575,7 +632,10 @@ export class LoadOsmFromOverpassApiUseCase {
     }
 
     const osmData: OverpassApiResponse = {
-      elements: elements.filter(e => e.type !== 'relation'),
+      elements: [
+        ...elements.filter(e => e.type !== 'relation'),
+        ...processedRelationWays,
+      ],
     };
 
     const boundaryNodeIds = new Set<number>();
@@ -596,6 +656,269 @@ export class LoadOsmFromOverpassApiUseCase {
     return { osmData, boundariesData };
   }
 
+  private getBoundaryRelationIds(elements: OsmElement[]): Set<number> {
+    const boundaryRelationIds = new Set<number>();
+
+    for (const element of elements) {
+      if (element.type !== 'relation') continue;
+      if (element.tags?.boundary === 'administrative' || element.tags?.type === 'boundary') {
+        boundaryRelationIds.add(element.id);
+      }
+    }
+
+    if (boundaryRelationIds.size > 0) {
+      return boundaryRelationIds;
+    }
+
+    for (const element of elements) {
+      if (element.type !== 'relation') continue;
+      boundaryRelationIds.add(element.id);
+    }
+
+    return boundaryRelationIds;
+  }
+
+  private normalizeSimpleAreaRelations(elements: OsmElement[], boundaryRelationIds: Set<number>): OsmElement[] {
+    const wayById = new Map<number, OsmElement>();
+    for (const element of elements) {
+      if (element.type === 'way') {
+        wayById.set(element.id, element);
+      }
+    }
+
+    const derivedWays: OsmElement[] = [];
+    let processedRelationCount = 0;
+
+    for (const element of elements) {
+      if (element.type !== 'relation' || boundaryRelationIds.has(element.id)) continue;
+      if (!element.members || element.members.length === 0) continue;
+
+      const outerWays = element.members
+        .filter(member => member.type === 'way' && (member.role === 'outer' || member.role === ''))
+        .map(member => wayById.get(member.ref))
+        .filter((way): way is OsmElement => {
+          return !!way &&
+            way.type === 'way' &&
+            !!way.nodes &&
+            !!way.geometry &&
+            way.geometry.length === way.nodes.length;
+        });
+
+      const stitchedOuterRings = this.buildClosedOuterRings(outerWays);
+      if (stitchedOuterRings.length === 0) continue;
+
+      processedRelationCount++;
+      stitchedOuterRings.forEach((ring) => {
+        derivedWays.push({
+          type: 'way',
+          id: this.allocateDerivedWayId(),
+          tags: element.tags,
+          nodes: [...ring.nodes],
+          geometry: [...ring.geometry],
+        });
+      });
+    }
+
+    console.log(`[autk-db] Processed ${processedRelationCount} simple parks/water relations`);
+
+    return derivedWays;
+  }
+
+  private buildClosedOuterRings(ways: OsmElement[]): WayRing[] {
+    const standaloneClosedRings: WayRing[] = [];
+    const openSegments: WayRing[] = [];
+
+    for (const way of ways) {
+      const nodes = [...(way.nodes ?? [])];
+      const geometry = way.geometry ? [...way.geometry] : [];
+      if (nodes.length < 2 || geometry.length !== nodes.length) continue;
+
+      if (nodes.length > 3 && nodes[0] === nodes[nodes.length - 1]) {
+        standaloneClosedRings.push({ nodes, geometry });
+        continue;
+      }
+
+      openSegments.push({ nodes, geometry });
+    }
+
+    const stitchedRings = this.stitchOpenWaySegmentsIntoRings(openSegments);
+    const polygonizedRings = stitchedRings.length === 0 ? this.polygonizeOpenWaySegments(openSegments) : [];
+    return [...standaloneClosedRings, ...stitchedRings, ...polygonizedRings];
+  }
+
+  private stitchOpenWaySegmentsIntoRings(segments: WayRing[]): WayRing[] {
+    const unusedSegments = [...segments];
+    const rings: WayRing[] = [];
+
+    while (unusedSegments.length > 0) {
+      let current = unusedSegments.shift()!;
+      let extended = true;
+
+      while (extended) {
+        extended = false;
+        for (let i = 0; i < unusedSegments.length; i++) {
+          const candidate = unusedSegments[i];
+          const merged = this.tryMergeRings(current, candidate);
+          if (!merged) continue;
+
+          current = merged;
+          unusedSegments.splice(i, 1);
+          extended = true;
+          break;
+        }
+      }
+
+      if (current.nodes.length > 3 && current.nodes[0] === current.nodes[current.nodes.length - 1]) {
+        rings.push(current);
+      }
+    }
+
+    return rings;
+  }
+
+  private tryMergeRings(a: WayRing, b: WayRing): WayRing | null {
+    const aStart = a.nodes[0];
+    const aEnd = a.nodes[a.nodes.length - 1];
+    const bStart = b.nodes[0];
+    const bEnd = b.nodes[b.nodes.length - 1];
+
+    if (aEnd === bStart) return this.concatRings(a, b);
+    if (aEnd === bEnd) return this.concatRings(a, this.reverseRing(b));
+    if (aStart === bEnd) return this.concatRings(b, a);
+    if (aStart === bStart) return this.concatRings(this.reverseRing(b), a);
+
+    return null;
+  }
+
+  private concatRings(left: WayRing, right: WayRing): WayRing {
+    return {
+      nodes: [...left.nodes, ...right.nodes.slice(1)],
+      geometry: [...left.geometry, ...right.geometry.slice(1)],
+    };
+  }
+
+  private reverseRing(ring: WayRing): WayRing {
+    return {
+      nodes: [...ring.nodes].reverse(),
+      geometry: [...ring.geometry].reverse(),
+    };
+  }
+
+  private polygonizeOpenWaySegments(segments: WayRing[]): WayRing[] {
+    if (segments.length === 0) return [];
+
+    const features: Feature<LineString>[] = segments
+      .filter(segment => segment.geometry.length >= 2)
+      .map(segment => ({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: segment.geometry.map(point => [point.lon, point.lat]),
+        },
+      }));
+
+    if (features.length === 0) return [];
+
+    const polygonized = polygonize({
+      type: 'FeatureCollection',
+      features,
+    } satisfies FeatureCollection<LineString>) as FeatureCollection<Polygon>;
+
+    return polygonized.features
+      .flatMap(feature => this.polygonFeatureToWayRings(feature))
+      .filter(ring => ring.nodes.length > 3 && ring.nodes[0] === ring.nodes[ring.nodes.length - 1]);
+  }
+
+  private polygonFeatureToWayRings(feature: Feature<Polygon>): WayRing[] {
+    if (feature.geometry.type !== 'Polygon') return [];
+    const outerRing = feature.geometry.coordinates[0];
+    if (!outerRing || outerRing.length < 4) return [];
+
+    return [this.positionsToWayRing(outerRing)];
+  }
+
+  private positionsToWayRing(positions: Position[]): WayRing {
+    const nodes = positions.map(() => this.allocateDerivedNodeId());
+    nodes[nodes.length - 1] = nodes[0];
+
+    return {
+      nodes,
+      geometry: positions.map(([lon, lat]) => ({ lon, lat })),
+    };
+  }
+
+  private allocateDerivedWayId(): number {
+    return this.nextDerivedWayId--;
+  }
+
+  private allocateDerivedNodeId(): number {
+    return this.nextDerivedNodeId--;
+  }
+
+  private getDerivedLayerTag(tags?: Record<string, string>): 'parks' | 'water' | 'roads' | 'buildings' | null {
+    if (!tags) return null;
+
+    if (this.isBuildingTagSet(tags)) {
+      return 'buildings';
+    }
+
+    if (this.isRoadTagSet(tags)) {
+      return 'roads';
+    }
+
+    if (
+      this.hasTagValue(tags, 'leisure', PARKS_LEISURE_VALUES) ||
+      this.hasTagValue(tags, 'landuse', PARKS_LANDUSE_VALUES) ||
+      this.hasTagValue(tags, 'natural', PARKS_NATURAL_VALUES)
+    ) {
+      return 'parks';
+    }
+
+    if (
+      this.hasTagValue(tags, 'natural', WATER_NATURAL_VALUES) ||
+      this.hasTagValue(tags, 'water', WATER_WATER_VALUES)
+    ) {
+      return 'water';
+    }
+
+    return null;
+  }
+
+  private isRoadTagSet(tags: Record<string, string>): boolean {
+    return (
+      tags.highway !== undefined &&
+      tags.area !== 'yes' &&
+      !this.hasTagValue(tags, 'highway', EXCLUDED_ROAD_HIGHWAY_VALUES)
+    );
+  }
+
+  private isBuildingTagSet(tags: Record<string, string>): boolean {
+    const hasBuildingKind =
+      (tags.building !== undefined && tags.building !== 'roof') ||
+      (tags['building:part'] !== undefined && tags['building:part'] !== 'roof') ||
+      tags.type === 'building';
+
+    return hasBuildingKind && BUILDING_HEIGHT_KEYS.some((key) => tags[key] !== undefined);
+  }
+
+  private hasTagValue(tags: Record<string, string>, key: string, values: readonly string[]): boolean {
+    const value = tags[key];
+    return value !== undefined && values.includes(value);
+  }
+
+  private withDerivedLayerTag(tags?: Record<string, string>): Record<string, string> | undefined {
+    if (!tags) return tags;
+
+    const derivedLayer = this.getDerivedLayerTag(tags);
+    if (!derivedLayer) return tags;
+
+    return {
+      ...tags,
+      __autk_layer: derivedLayer,
+    };
+  }
+
   /** Merges two Overpass responses, deduplicating nodes by ID. */
   private mergeResponses(a: OverpassApiResponse, b: OverpassApiResponse): OverpassApiResponse {
     const nodeIds = new Set(a.elements.filter(e => e.type === 'node').map(e => e.id));
@@ -613,6 +936,11 @@ export class LoadOsmFromOverpassApiUseCase {
     workspace: string,
     ignoreTags: boolean = false,
   ): Promise<void> {
+    if ((osmData.elements?.length ?? 0) === 0) {
+      await this.conn.query(CREATE_OSM_TABLE_QUERY(tableName, workspace));
+      return;
+    }
+
     const formattedElements = this.formatOsmDataForJson(osmData);
     const fileName = 'osm_data.json';
 
@@ -678,6 +1006,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
         case 'way': {
           const refs: number[] = element.nodes ?? [];
+          const tags = this.withDerivedLayerTag(element.tags);
           if (element.geometry && element.geometry.length > 0 && element.nodes) {
             for (let i = 0; i < element.nodes.length; i++) {
               const geo = element.geometry[i];
@@ -687,7 +1016,7 @@ export class LoadOsmFromOverpassApiUseCase {
           formattedElements.push({
             kind: 'way',
             id: element.id,
-            tags: element.tags ? Object.entries(element.tags).map(([k, v]) => ({ k, v })) : [],
+            tags: tags ? Object.entries(tags).map(([k, v]) => ({ k, v })) : [],
             refs,
             lat: null,
             lon: null,
