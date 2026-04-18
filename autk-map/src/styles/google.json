@@ -1,11 +1,11 @@
 {
-    "background": "#e8f0f4",
-    "surface": "#f3f1ed",
-    "parks": "#cfe8c8",
-    "water": "#b9d9f7",
-    "roads": "#ffffff",
-    "buildings": "#f5f3ee",
-    "points": "#5f6368",
-    "polylines": "#f4c54a",
-    "polygons": "#e8e5df"
+    "background": "#f2f0ed",
+    "surface": "#ece9e4",
+    "parks": "#a9e3ad",
+    "water": "#86c9e8",
+    "roads": "#bac5d3",
+    "buildings": "#fbf8f3",
+    "points": "#53606d",
+    "polylines": "#8ea2b5",
+    "polygons": "#efe7bf"
 }
