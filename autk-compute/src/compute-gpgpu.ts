@@ -13,6 +13,22 @@ import type { GlobalVarMeta, ComputeConfig } from './types-gpgpu';
 type ComputeFeature = Feature<Geometry, GeoJsonProperties>;
 type GlobalInputArrays = Record<string, Float32Array>;
 
+const WGSL_IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const WGSL_RESERVED_WORDS = new Set([
+    'array', 'atomic', 'bitcast', 'bool', 'break', 'case', 'const', 'continue', 'continuing',
+    'default', 'discard', 'else', 'enable', 'f16', 'f32', 'false', 'fn', 'for', 'if', 'i32',
+    'let', 'loop', 'mat2x2', 'mat2x3', 'mat2x4', 'mat3x2', 'mat3x3', 'mat3x4', 'mat4x2',
+    'mat4x3', 'mat4x4', 'override', 'private', 'ptr', 'return', 'sampler', 'sampler_comparison',
+    'storage', 'struct', 'switch', 'texture_1d', 'texture_2d', 'texture_2d_array', 'texture_3d',
+    'texture_cube', 'texture_cube_array', 'texture_depth_2d', 'texture_depth_2d_array',
+    'texture_depth_cube', 'texture_depth_cube_array', 'texture_depth_multisampled_2d',
+    'texture_external', 'texture_multisampled_2d', 'texture_storage_1d', 'texture_storage_2d',
+    'texture_storage_2d_array', 'texture_storage_3d', 'true', 'type', 'u32', 'uniform', 'var',
+    'vec2', 'vec2f', 'vec2h', 'vec2i', 'vec2u', 'vec3', 'vec3f', 'vec3h', 'vec3i', 'vec3u',
+    'vec4', 'vec4f', 'vec4h', 'vec4i', 'vec4u', 'while', '_',
+]);
+const INTERNAL_WGSL_SYMBOLS = new Set(['ArrayF32', 'OutputArray', 'compute_value', 'main', 'idx', 'id', 'i']);
+
 /**
  * GPGPU compute engine for executing WGSL functions over GeoJSON feature properties.
  *
@@ -98,6 +114,8 @@ export class ComputeGpgpu extends GpuPipeline {
         if (featureCount === 0) {
             return collection;
         }
+
+        this.validateShaderIdentifiers(params);
 
         const { orderedVarNames, inputArrays, scalarVars, arrayVars, matrixVars } = this.extractInputData(
             features, variableMapping, attributeArrays, attributeMatrices, featureCount,
@@ -269,6 +287,109 @@ export class ComputeGpgpu extends GpuPipeline {
             inputs,
             outputs,
         });
+    }
+
+    private validateShaderIdentifiers(params: GpgpuPipelineParams): void {
+        const {
+            variableMapping,
+            attributeArrays = {},
+            attributeMatrices = {},
+            uniforms = {},
+            uniformArrays = {},
+            uniformMatrices = {},
+        } = params;
+
+        const featureNames = Object.keys(variableMapping);
+        const globalNames = [
+            ...Object.keys(uniforms),
+            ...Object.keys(uniformArrays),
+            ...Object.keys(uniformMatrices),
+        ];
+
+        for (const name of featureNames) {
+            this.validateWgslIdentifier(name, 'variableMapping');
+        }
+        for (const name of globalNames) {
+            const context = name in uniforms
+                ? 'uniforms'
+                : name in uniformArrays
+                    ? 'uniformArrays'
+                    : 'uniformMatrices';
+            this.validateWgslIdentifier(name, context);
+        }
+
+        const claimedSymbols = new Map<string, string>();
+        for (const symbol of INTERNAL_WGSL_SYMBOLS) {
+            claimedSymbols.set(symbol, 'internal WGSL symbol');
+        }
+
+        for (const name of featureNames) {
+            const kind = name in attributeMatrices
+                ? 'matrix'
+                : name in attributeArrays
+                    ? 'array'
+                    : 'scalar';
+            this.claimGeneratedSymbols(claimedSymbols, this.getFeatureGeneratedSymbols(name, kind), `feature "${name}"`);
+        }
+
+        for (const name of Object.keys(uniforms)) {
+            this.claimGeneratedSymbols(claimedSymbols, this.getGlobalGeneratedSymbols(name, 'scalar'), `uniform "${name}"`);
+        }
+        for (const name of Object.keys(uniformArrays)) {
+            this.claimGeneratedSymbols(claimedSymbols, this.getGlobalGeneratedSymbols(name, 'array'), `uniform array "${name}"`);
+        }
+        for (const name of Object.keys(uniformMatrices)) {
+            this.claimGeneratedSymbols(claimedSymbols, this.getGlobalGeneratedSymbols(name, 'matrix'), `uniform matrix "${name}"`);
+        }
+    }
+
+    private validateWgslIdentifier(name: string, context: string): void {
+        if (!WGSL_IDENTIFIER_PATTERN.test(name)) {
+            throw new Error(`ComputeGpgpu: invalid WGSL identifier "${name}" in ${context}.`);
+        }
+        if (WGSL_RESERVED_WORDS.has(name)) {
+            throw new Error(`ComputeGpgpu: WGSL identifier "${name}" is reserved and cannot be used in ${context}.`);
+        }
+    }
+
+    private claimGeneratedSymbols(
+        claimedSymbols: Map<string, string>,
+        symbols: string[],
+        owner: string,
+    ): void {
+        for (const symbol of symbols) {
+            const existingOwner = claimedSymbols.get(symbol);
+            if (existingOwner) {
+                throw new Error(
+                    `ComputeGpgpu: generated WGSL symbol collision for "${symbol}" between ${existingOwner} and ${owner}.`
+                );
+            }
+            claimedSymbols.set(symbol, owner);
+        }
+    }
+
+    private getFeatureGeneratedSymbols(name: string, kind: 'scalar' | 'array' | 'matrix'): string[] {
+        const symbols = [name, `${name}Buf`];
+        if (kind !== 'scalar') {
+            symbols.push(`${name}_offset`);
+        }
+        if (kind === 'array') {
+            symbols.push(`${name}_Array`, `${name}_length`);
+        } else if (kind === 'matrix') {
+            const rowsVarName = `${name}__varrows`;
+            symbols.push(`${name}_Matrix`, `${name}_rows`, `${name}_cols`, rowsVarName, `${rowsVarName}Buf`);
+        }
+        return symbols;
+    }
+
+    private getGlobalGeneratedSymbols(name: string, kind: 'scalar' | 'array' | 'matrix'): string[] {
+        const symbols = [name, `${name}Buf`, `${name}_Uniform`, `${name}_uniform_at`];
+        if (kind === 'array') {
+            symbols.push(`${name}_Array`, `${name}_length`);
+        } else if (kind === 'matrix') {
+            symbols.push(`${name}_Matrix`, `${name}_rows`, `${name}_cols`);
+        }
+        return symbols;
     }
 
     /**
