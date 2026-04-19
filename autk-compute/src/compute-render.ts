@@ -57,6 +57,12 @@ type RenderObjectMetric = {
     sampleRatio: number;
 };
 
+const ENCODED_LAYER_TYPE_BYTE_COUNT = 1;
+const ENCODED_OBJECT_ID_BYTE_COUNT = 2;
+const MAX_ENCODED_LAYER_TYPE_COUNT = (1 << (ENCODED_LAYER_TYPE_BYTE_COUNT * 8)) - 1;
+const MAX_ENCODED_OBJECT_ID_COUNT = (1 << (ENCODED_OBJECT_ID_BYTE_COUNT * 8)) - 1;
+const ENCODED_BYTE_MASK = 0xff;
+
 /**
  * Samples rendered views from source feature origins and aggregates class
  * shares and object visibility back onto the source features.
@@ -330,8 +336,10 @@ export class ComputeRender extends GpuPipeline {
             layerTypes.push(aggregation.backgroundLayerType ?? 'background');
         }
 
-        if (includeClasses && layerTypes.length > 255) {
-            throw new Error('ComputeRender: class aggregation currently supports at most 255 layer types.');
+        if (includeClasses && layerTypes.length > MAX_ENCODED_LAYER_TYPE_COUNT) {
+            throw new Error(
+                `ComputeRender: class aggregation currently supports at most ${MAX_ENCODED_LAYER_TYPE_COUNT} layer types.`
+            );
         }
 
         let flags = 0;
@@ -339,8 +347,10 @@ export class ComputeRender extends GpuPipeline {
         if (includeObjects) flags |= 2;
         if (includeBackgroundLayerType) flags |= 4;
 
-        if (includeObjects && objectKeys.length > 65535) {
-            throw new Error('ComputeRender: object visibility currently supports at most 65535 objects.');
+        if (includeObjects && objectKeys.length > MAX_ENCODED_OBJECT_ID_COUNT) {
+            throw new Error(
+                `ComputeRender: object visibility currently supports at most ${MAX_ENCODED_OBJECT_ID_COUNT} objects.`
+            );
         }
 
         return {
@@ -505,12 +515,12 @@ export class ComputeRender extends GpuPipeline {
 
     private encodeIds(layerTypeIndex: number, objectIndex: number): Float32Array {
         const encodedObject = objectIndex + 1;
-        const low = encodedObject & 255;
-        const high = (encodedObject >> 8) & 255;
+        const low = encodedObject & ENCODED_BYTE_MASK;
+        const high = (encodedObject >> 8) & ENCODED_BYTE_MASK;
         return new Float32Array([
-            (layerTypeIndex + 1) / 255,
-            low / 255,
-            high / 255,
+            (layerTypeIndex + 1) / MAX_ENCODED_LAYER_TYPE_COUNT,
+            low / ENCODED_BYTE_MASK,
+            high / ENCODED_BYTE_MASK,
             1,
         ]);
     }
