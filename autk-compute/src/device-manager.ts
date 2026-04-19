@@ -14,9 +14,7 @@ let sharedDevicePromise: Promise<GPUDevice> | null = null;
  * The device is cached at the module level to prevent redundant adapter
  * requests and ensure consistent device limits across all compute pipelines.
  *
- * The device is configured with:
- * - `timestamp-query` feature (if available) for performance profiling
- * - Maximum buffer size limits from the adapter
+ * The device is configured with the maximum buffer size limits exposed by the adapter.
  *
  * @returns Promise resolving to the shared GPUDevice instance.
  * @throws If WebGPU is not supported in the current browser.
@@ -52,10 +50,6 @@ export async function getSharedGpuDevice(): Promise<GPUDevice> {
                 }
 
                 const device = await adapter.requestDevice({
-                    // Request timestamp-query feature if available (for profiling)
-                    requiredFeatures: adapter.features.has('timestamp-query')
-                        ? ['timestamp-query']
-                        : [],
                     // Request maximum buffer sizes for large compute workloads
                     requiredLimits: {
                         maxBufferSize: adapter.limits.maxBufferSize,
