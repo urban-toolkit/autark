@@ -62,6 +62,8 @@ const ENCODED_OBJECT_ID_BYTE_COUNT = 2;
 const MAX_ENCODED_LAYER_TYPE_COUNT = (1 << (ENCODED_LAYER_TYPE_BYTE_COUNT * 8)) - 1;
 const MAX_ENCODED_OBJECT_ID_COUNT = (1 << (ENCODED_OBJECT_ID_BYTE_COUNT * 8)) - 1;
 const ENCODED_BYTE_MASK = 0xff;
+const OBJECT_VISIBILITY_COUNT_BYTES_PER_ENTRY = Uint32Array.BYTES_PER_ELEMENT;
+const MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES = 256 * 1024 * 1024;
 
 /**
  * Samples rendered views from source feature origins and aggregates class
@@ -126,6 +128,7 @@ export class ComputeRender extends GpuPipeline {
         const alignment = device.limits.minUniformBufferOffsetAlignment;
         const cameraStride = Math.max(64, alignment);
         this.validateAggregationBufferSizes(device, source.features.length, metadata);
+        this.validateObjectAggregationCpuBufferSize(source.features.length, metadata);
         const batchSize = this.computeMaxBatchSize(device, tileSize, cameraStride, metadata);
 
         const createdBuffers: GPUBuffer[] = [];
@@ -289,6 +292,20 @@ export class ComputeRender extends GpuPipeline {
         if (layerTypeBufferSize > device.limits.maxStorageBufferBindingSize) {
             throw new Error(
                 `RenderPipeline: class aggregation requires ${layerTypeBufferSize} bytes, exceeding maxStorageBufferBindingSize ${device.limits.maxStorageBufferBindingSize}.`
+            );
+        }
+    }
+
+    private validateObjectAggregationCpuBufferSize(sourceCount: number, metadata: RenderMetadata): void {
+        if (!metadata.includeObjects) {
+            return;
+        }
+
+        const requiredBytes =
+            sourceCount * metadata.objectKeys.length * OBJECT_VISIBILITY_COUNT_BYTES_PER_ENTRY;
+        if (requiredBytes > MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES) {
+            throw new Error(
+                `ComputeRender: object aggregation requires ${requiredBytes} bytes on the CPU, exceeding the supported accumulation limit of ${MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES} bytes.`
             );
         }
     }
