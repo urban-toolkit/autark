@@ -42,3 +42,6 @@
 - **Tech Stack**: TypeScript, WebGPU, D3.js, Playwright.
 - **Environment**: Requires WebGPU enabled in the browser (Chrome/Edge default; Firefox Nightly requires configuration).
 - **Data Formats**: OpenStreetMap, GeoJSON, GeoTIFF.
+
+## GIT
+- Always commit the code using git best practices (https://www.conventionalcommits.org/en/v1.0.0/)

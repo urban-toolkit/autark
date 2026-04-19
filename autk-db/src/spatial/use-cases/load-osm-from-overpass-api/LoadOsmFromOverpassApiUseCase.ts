@@ -78,7 +78,7 @@ export class LoadOsmFromOverpassApiUseCase {
       );
     }
 
-    const { osmData, boundariesData } = this.splitCombinedResponse(combined);
+    const { osmData, boundariesData } = this.splitCombinedResponse(combined, params.queryArea);
     console.log(`[autk-db] Split: ${osmData.elements.length} OSM elements, ${boundariesData.elements.length} boundary elements`);
 
     onProgress?.('processing-osm-data');
@@ -614,12 +614,13 @@ export class LoadOsmFromOverpassApiUseCase {
    */
   private splitCombinedResponse(
     combined: OverpassApiResponse,
+    queryArea: { geocodeArea: string; areas: string[] },
   ): {
     osmData: OverpassApiResponse;
     boundariesData: OverpassApiResponse;
   } {
     const elements = combined.elements ?? [];
-    const boundaryRelationIds = this.getBoundaryRelationIds(elements);
+    const boundaryRelationIds = this.getBoundaryRelationIds(elements, queryArea.areas);
     const processedRelationWays = this.normalizeSimpleAreaRelations(elements, boundaryRelationIds);
 
     const boundaryWayIds = new Set<number>();
@@ -656,23 +657,21 @@ export class LoadOsmFromOverpassApiUseCase {
     return { osmData, boundariesData };
   }
 
-  private getBoundaryRelationIds(elements: OsmElement[]): Set<number> {
+  private getBoundaryRelationIds(elements: OsmElement[], areaNames: string[]): Set<number> {
     const boundaryRelationIds = new Set<number>();
+    const requestedAreaNames = new Set(areaNames);
 
     for (const element of elements) {
       if (element.type !== 'relation') continue;
-      if (element.tags?.boundary === 'administrative' || element.tags?.type === 'boundary') {
+      if (element.tags?.name && requestedAreaNames.has(element.tags.name)) {
         boundaryRelationIds.add(element.id);
       }
     }
 
-    if (boundaryRelationIds.size > 0) {
-      return boundaryRelationIds;
-    }
-
-    for (const element of elements) {
-      if (element.type !== 'relation') continue;
-      boundaryRelationIds.add(element.id);
+    if (boundaryRelationIds.size === 0) {
+      console.warn(
+        `[autk-db] Requested area boundary relations were not found by exact name match: ${areaNames.join(', ')}`,
+      );
     }
 
     return boundaryRelationIds;
@@ -719,7 +718,7 @@ export class LoadOsmFromOverpassApiUseCase {
       });
     }
 
-    console.log(`[autk-db] Processed ${processedRelationCount} simple parks/water relations`);
+    console.log(`[autk-db] Processed ${processedRelationCount} non-boundary parks/water relations`);
 
     return derivedWays;
   }
