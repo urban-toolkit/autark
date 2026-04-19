@@ -13,7 +13,6 @@ export interface ViewOrigin {
 
 export interface CameraSample {
     sourceIndex: number;
-    azimuthDeg: number;
     eye: [number, number, number];
     lookAt: [number, number, number];
 }
@@ -66,7 +65,6 @@ export function expandCameraSamples(
 
             samples.push({
                 sourceIndex: viewOrigin.sourceIndex,
-                azimuthDeg,
                 eye: [...viewOrigin.origin],
                 lookAt: [
                     viewOrigin.origin[0] + dirX,

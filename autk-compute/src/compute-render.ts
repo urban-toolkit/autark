@@ -29,7 +29,6 @@ type LayerMeshData = {
 type LayerFeatureMeta = {
     layerTypeIndex: number;
     objectIndex: number;
-    objectKey: string;
 };
 
 type RenderMetadata = {
@@ -37,7 +36,6 @@ type RenderMetadata = {
     objectKeys: string[];
     layerTypeIndexByLayer: number[];
     featureMetaByLayer: LayerFeatureMeta[][];
-    includeBackgroundLayerType: boolean;
     includeClasses: boolean;
     includeObjects: boolean;
     flags: number;
@@ -347,7 +345,7 @@ export class ComputeRender extends GpuPipeline {
                     const objectKey = this.buildObjectKey(layer.layerId, rawId ?? featureIndex);
                     const objectIndex = objectKeys.length;
                     objectKeys.push(objectKey);
-                    return { layerTypeIndex, objectIndex, objectKey };
+                    return { layerTypeIndex, objectIndex };
                 });
                 featureMetaByLayer.push(featureMeta);
             } else {
@@ -381,7 +379,6 @@ export class ComputeRender extends GpuPipeline {
             objectKeys,
             layerTypeIndexByLayer,
             featureMetaByLayer,
-            includeBackgroundLayerType,
             includeClasses,
             includeObjects,
             flags,
