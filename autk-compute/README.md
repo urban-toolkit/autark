@@ -17,7 +17,7 @@
 The render pipeline now supports only two aggregation modes:
 
 1. `classes`
-   Computes visible share per semantic class.
+   Computes visible share per semantic layer type.
 2. `objects`
    Computes visibility per individual rendered object.
 
@@ -45,7 +45,21 @@ result.features.forEach((feature) => {
 });
 ```
 
+Render-layer inputs:
+
+- `layerId`: unique per rendered layer in the request; used to scope object keys
+- `layerType`: semantic aggregation bucket for class-share results
+- `objectIdProperty`: optional stable feature property used for object aggregation keys; when omitted, the feature index is used
+
+View sampling inputs:
+
+- `directions`: number of azimuth samples per source feature
+- `azimuthOffsetDeg`: rotates the first sampled view direction
+- `pitchDeg`: applies a shared vertical pitch to every sampled direction
+
 Use `objects` only when you really need per-feature visibility. It is materially heavier than `classes`.
+
+Object aggregation returns keys scoped by `layerId`, not `layerType`, so two layers can share the same semantic `layerType` without colliding in `render.objects`.
 
 ## GPGPU pipeline
 
@@ -60,13 +74,23 @@ const result = await compute.gpgpuPipeline({
 });
 ```
 
-The high-level API also supports global constants for a dispatch through `uniforms`, `uniformArrays`, and `uniformMatrices`.
+Besides `variableMapping`, the high-level API also supports:
+
+- `attributeArrays`: fixed-length per-feature arrays
+- `attributeMatrices`: per-feature matrices with fixed dimensions or `rows: 'auto'`
+- `uniforms`: global scalar constants for one dispatch
+- `uniformArrays`: global fixed-length arrays for one dispatch
+- `uniformMatrices`: global matrices for one dispatch
+
+With `attributeMatrices`, using `rows: 'auto'` tells the pipeline to infer the row count per feature at runtime while still packing each matrix into a fixed GPU stride based on the maximum observed row count.
 
 ## Limits
 
-1. `renderPipeline` class aggregation is limited by `maxStorageBufferBindingSize` for `sourceCount * classCount`.
-2. `objects` aggregation is limited to at most `65535` rendered objects.
-3. Large render workloads should still prefer modest `tileSize` and direction counts.
+1. `renderPipeline` class aggregation is limited by `maxStorageBufferBindingSize` for `sourceCount * layerTypeCount`.
+2. `classes` aggregation supports at most `255` encoded `layerType` buckets, including the optional background bucket.
+3. `objects` aggregation supports at most `65535` rendered objects.
+4. `objects` aggregation also has a CPU-side accumulation limit for the final `sourceCount * objectCount` visibility buffer.
+5. Large render workloads should still prefer modest `tileSize` and direction counts.
 
 ## Resources
 
