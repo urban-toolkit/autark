@@ -204,10 +204,10 @@ export class ComputeRender extends GpuPipeline {
                     this.encodeCountPass(encoder, countPipeline, countBG, tileSize, batchCount);
 
                     const classStage = countBuffers.layerTypeSize > 0
-                        ? this.createStagingBuffer(device, countBuffers.layerTypeSize)
+                        ? this.getReusableStagingBuffer(device, 'render:classes', countBuffers.layerTypeSize)
                         : null;
                     const objectStage = countBuffers.objectSize > 0
-                        ? this.createStagingBuffer(device, countBuffers.objectSize)
+                        ? this.getReusableStagingBuffer(device, 'render:objects', countBuffers.objectSize)
                         : null;
 
                     if (classStage) {

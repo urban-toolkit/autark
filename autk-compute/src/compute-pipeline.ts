@@ -27,6 +27,7 @@ import { getSharedGpuDevice } from './device-manager';
  * @see {@link ComputeRender} for the render pipeline implementation.
  */
 export abstract class GpuPipeline {
+    private reusableStagingBuffers = new Map<string, { buffer: GPUBuffer; size: number }>();
     /**
      * Returns the shared GPU device, initialising it on first call.
      *
@@ -101,12 +102,29 @@ export abstract class GpuPipeline {
     }
 
     /**
-     * Maps a staging buffer, copies its contents into a new typed array, then unmaps
-     * and destroys the buffer.
+     * Returns a reusable staging buffer that is at least `size` bytes large.
+     *
+     * Buffers are cached by `cacheKey` and resized only when a larger capacity
+     * is needed. The caller must ensure the buffer is not currently mapped.
+     */
+    protected getReusableStagingBuffer(device: GPUDevice, cacheKey: string, size: number): GPUBuffer {
+        const existing = this.reusableStagingBuffers.get(cacheKey);
+        if (existing && existing.size >= size) {
+            return existing.buffer;
+        }
+
+        existing?.buffer.destroy();
+        const buffer = this.createStagingBuffer(device, size);
+        this.reusableStagingBuffers.set(cacheKey, { buffer, size });
+        return buffer;
+    }
+
+    /**
+     * Maps a staging buffer, copies its contents into a new typed array, then unmaps it.
      *
      * This is the standard pattern for reading compute results back from the GPU:
      * 1. Submit a command that copies GPU data to a MAP_READ staging buffer
-     * 2. Call this method to read and destroy the staging buffer
+     * 2. Call this method to read and unmap the staging buffer
      *
      * @param staging - A buffer created with MAP_READ usage, already populated via a submitted command.
      * @param Ctor - The TypedArray constructor to wrap the result (e.g., `Float32Array`, `Uint32Array`).
@@ -124,7 +142,6 @@ export abstract class GpuPipeline {
         await staging.mapAsync(GPUMapMode.READ);
         const result = new Ctor(staging.getMappedRange().slice(0));
         staging.unmap();
-        staging.destroy();
         return result;
     }
 
