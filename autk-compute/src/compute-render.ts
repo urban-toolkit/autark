@@ -330,6 +330,10 @@ export class ComputeRender extends GpuPipeline {
             layerTypes.push(aggregation.backgroundLayerType ?? 'background');
         }
 
+        if (includeClasses && layerTypes.length > 255) {
+            throw new Error('ComputeRender: class aggregation currently supports at most 255 layer types.');
+        }
+
         let flags = 0;
         if (includeClasses) flags |= 1;
         if (includeObjects) flags |= 2;
