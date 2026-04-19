@@ -153,8 +153,8 @@ export class ComputeRender extends GpuPipeline {
             const rawClasses = metadata.includeClasses
                 ? new Uint32Array(source.features.length * metadata.layerTypes.length)
                 : new Uint32Array(0);
-            const rawObjects = metadata.includeObjects
-                ? new Uint32Array(sampleCount * metadata.objectKeys.length)
+            const objectVisibleCounts = metadata.includeObjects
+                ? new Uint32Array(source.features.length * metadata.objectKeys.length)
                 : new Uint32Array(0);
 
             for (let batchStart = 0; batchStart < sampleCount; batchStart += batchSize) {
@@ -227,7 +227,12 @@ export class ComputeRender extends GpuPipeline {
                         }
                     }
                     if (batchObjects) {
-                        rawObjects.set(batchObjects, batchStart * metadata.objectKeys.length);
+                        this.accumulateObjectVisibilityCounts(
+                            objectVisibleCounts,
+                            batchObjects,
+                            batchSamples,
+                            metadata.objectKeys.length
+                        );
                     }
                 } finally {
                     tileTexture.destroy();
@@ -239,7 +244,7 @@ export class ComputeRender extends GpuPipeline {
                 }
             }
 
-            return this.applyAggregation(source, samples, metadata, rawClasses, rawObjects, tileSize);
+            return this.applyAggregation(source, samples, metadata, rawClasses, objectVisibleCounts, tileSize);
         } finally {
             for (const buffer of createdBuffers) {
                 buffer.destroy();
@@ -750,7 +755,7 @@ export class ComputeRender extends GpuPipeline {
         samples: CameraSample[],
         metadata: RenderMetadata,
         rawClasses: Uint32Array,
-        rawObjects: Uint32Array,
+        objectVisibleCounts: Uint32Array,
         tileSize: number,
     ): FeatureCollection {
         const totalPixels = tileSize * tileSize;
@@ -779,13 +784,8 @@ export class ComputeRender extends GpuPipeline {
                 if (metadata.includeObjects) {
                     const objects: Record<string, RenderObjectMetric> = {};
                     for (let objectIndex = 0; objectIndex < metadata.objectKeys.length; objectIndex++) {
-                        let visibleSamples = 0;
-                        for (let sampleIndex = 0; sampleIndex < samples.length; sampleIndex++) {
-                            if (samples[sampleIndex].sourceIndex !== sourceIndex) continue;
-                            if ((rawObjects[sampleIndex * metadata.objectKeys.length + objectIndex] ?? 0) > 0) {
-                                visibleSamples += 1;
-                            }
-                        }
+                        const visibleSamples =
+                            objectVisibleCounts[sourceIndex * metadata.objectKeys.length + objectIndex] ?? 0;
 
                         if (visibleSamples > 0) {
                             objects[metadata.objectKeys[objectIndex]] = {
@@ -812,5 +812,25 @@ export class ComputeRender extends GpuPipeline {
                 };
             }),
         } as FeatureCollection;
+    }
+
+    private accumulateObjectVisibilityCounts(
+        objectVisibleCounts: Uint32Array,
+        batchObjects: Uint32Array,
+        batchSamples: CameraSample[],
+        objectCount: number,
+    ): void {
+        for (let sampleIndex = 0; sampleIndex < batchSamples.length; sampleIndex++) {
+            const sourceIndex = batchSamples[sampleIndex]?.sourceIndex;
+            if (sourceIndex === undefined) continue;
+
+            const batchOffset = sampleIndex * objectCount;
+            const sourceOffset = sourceIndex * objectCount;
+            for (let objectIndex = 0; objectIndex < objectCount; objectIndex++) {
+                if ((batchObjects[batchOffset + objectIndex] ?? 0) > 0) {
+                    objectVisibleCounts[sourceOffset + objectIndex] += 1;
+                }
+            }
+        }
     }
 }
