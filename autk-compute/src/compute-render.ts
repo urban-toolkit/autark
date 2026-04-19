@@ -143,6 +143,7 @@ export class ComputeRender extends GpuPipeline {
             }
 
             const { renderPipeline, camBGL, idBGL } = this.buildRenderPipeline(device);
+            const { countPipeline, countBGL } = this.buildCountPipeline(device);
             const idBGs = draws.map((draw) =>
                 device.createBindGroup({
                     layout: idBGL,
@@ -178,7 +179,7 @@ export class ComputeRender extends GpuPipeline {
 
                 try {
                     const tileView = tileTexture.createView();
-                    const { countPipeline, countBG } = this.buildCountPipeline(device, tileView, countBuffers);
+                    const countBG = this.buildCountBindGroup(device, countBGL, tileView, countBuffers);
                     const camBG = device.createBindGroup({
                         layout: camBGL,
                         entries: [{ binding: 0, resource: { buffer: cameraBuf, offset: 0, size: 64 } }],
@@ -656,11 +657,10 @@ export class ComputeRender extends GpuPipeline {
         return { renderPipeline, camBGL, idBGL };
     }
 
-    private buildCountPipeline(
-        device: GPUDevice,
-        tileView: GPUTextureView,
-        countBuffers: CountBuffers,
-    ): { countPipeline: GPUComputePipeline; countBG: GPUBindGroup } {
+    private buildCountPipeline(device: GPUDevice): {
+        countPipeline: GPUComputePipeline;
+        countBGL: GPUBindGroupLayout;
+    } {
         const countBGL = device.createBindGroupLayout({
             entries: [
                 { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float', viewDimension: '2d' } },
@@ -679,7 +679,16 @@ export class ComputeRender extends GpuPipeline {
             },
         });
 
-        const countBG = device.createBindGroup({
+        return { countPipeline, countBGL };
+    }
+
+    private buildCountBindGroup(
+        device: GPUDevice,
+        countBGL: GPUBindGroupLayout,
+        tileView: GPUTextureView,
+        countBuffers: CountBuffers,
+    ): GPUBindGroup {
+        return device.createBindGroup({
             layout: countBGL,
             entries: [
                 { binding: 0, resource: tileView },
@@ -689,8 +698,6 @@ export class ComputeRender extends GpuPipeline {
                 { binding: 4, resource: { buffer: countBuffers.paramsBuf } },
             ],
         });
-
-        return { countPipeline, countBG };
     }
 
     private encodeRenderPasses(
