@@ -138,9 +138,14 @@ export class Urbane {
         const rc = new ComputeRender();
 
         const roadsWithSkyClasses = await rc.run({
-            layers: [{ geojson: buildingsGeoJson, classId: 'buildings', type: 'buildings' }],
+            layers: [{
+                layerId: 'table_osm_buildings',
+                geojson: buildingsGeoJson,
+                layerType: 'buildings',
+                type: 'buildings',
+            }],
             source: roadsGeoJson,
-            aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
+            aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
             viewSampling: { directions: 1 },
             tileSize: 64,
         });

@@ -109,9 +109,10 @@ export class ComputeRenderOsmVisibility {
 
         const pointResults = await render.run({
             layers: [{
+                layerId: 'table_osm_buildings',
                 geojson: this.buildingsForCompute,
                 type: 'buildings',
-                classId: 'buildings',
+                layerType: 'buildings',
                 objectIdProperty: '_renderObjectId',
             }],
             source: viewpoints,
@@ -288,8 +289,9 @@ function resolveBuildingHeight(feature: Feature): number {
 }
 
 function parseObjectKey(key: string): number | null {
-    const parts = key.split(':');
-    const raw = parts[parts.length - 1];
+    const separator = key.indexOf(':');
+    if (separator < 0) return null;
+    const raw = decodeURIComponent(key.slice(separator + 1));
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) ? parsed : null;
 }

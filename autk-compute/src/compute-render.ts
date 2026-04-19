@@ -27,28 +27,28 @@ type LayerMeshData = {
 };
 
 type LayerFeatureMeta = {
-    classIndex: number;
+    layerTypeIndex: number;
     objectIndex: number;
     objectKey: string;
 };
 
 type RenderMetadata = {
-    classIds: string[];
+    layerTypes: string[];
     objectKeys: string[];
-    classIndexByLayer: number[];
+    layerTypeIndexByLayer: number[];
     featureMetaByLayer: LayerFeatureMeta[][];
-    includeBackgroundClass: boolean;
+    includeBackgroundLayerType: boolean;
     includeClasses: boolean;
     includeObjects: boolean;
     flags: number;
 };
 
 type CountBuffers = {
-    classBuf: GPUBuffer;
+    layerTypeBuf: GPUBuffer;
     objectBuf: GPUBuffer;
     sampleSourcesBuf: GPUBuffer;
     paramsBuf: GPUBuffer;
-    classSize: number;
+    layerTypeSize: number;
     objectSize: number;
 };
 
@@ -130,7 +130,7 @@ export class ComputeRender extends GpuPipeline {
                     this.uploadLayerToGpu(device, entry, metadata.featureMetaByLayer[entry.layerIndex])
                 )
                 : layerMeshes.flatMap((entry) =>
-                    this.uploadMergedLayerToGpu(device, entry, metadata.classIndexByLayer[entry.layerIndex] ?? 0)
+                    this.uploadMergedLayerToGpu(device, entry, metadata.layerTypeIndexByLayer[entry.layerIndex] ?? 0)
                 );
             for (const draw of draws) {
                 createdBuffers.push(draw.vBuf, draw.iBuf, draw.idBuf);
@@ -145,7 +145,7 @@ export class ComputeRender extends GpuPipeline {
             );
 
             const rawClasses = metadata.includeClasses
-                ? new Uint32Array(source.features.length * metadata.classIds.length)
+                ? new Uint32Array(source.features.length * metadata.layerTypes.length)
                 : new Uint32Array(0);
             const rawObjects = metadata.includeObjects
                 ? new Uint32Array(sampleCount * metadata.objectKeys.length)
@@ -193,15 +193,15 @@ export class ComputeRender extends GpuPipeline {
                     );
                     this.encodeCountPass(encoder, countPipeline, countBG, tileSize, batchCount);
 
-                    const classStage = countBuffers.classSize > 0
-                        ? this.createStagingBuffer(device, countBuffers.classSize)
+                    const classStage = countBuffers.layerTypeSize > 0
+                        ? this.createStagingBuffer(device, countBuffers.layerTypeSize)
                         : null;
                     const objectStage = countBuffers.objectSize > 0
                         ? this.createStagingBuffer(device, countBuffers.objectSize)
                         : null;
 
                     if (classStage) {
-                        encoder.copyBufferToBuffer(countBuffers.classBuf, 0, classStage, 0, countBuffers.classSize);
+                        encoder.copyBufferToBuffer(countBuffers.layerTypeBuf, 0, classStage, 0, countBuffers.layerTypeSize);
                     }
                     if (objectStage) {
                         encoder.copyBufferToBuffer(countBuffers.objectBuf, 0, objectStage, 0, countBuffers.objectSize);
@@ -226,7 +226,7 @@ export class ComputeRender extends GpuPipeline {
                 } finally {
                     tileTexture.destroy();
                     cameraBuf.destroy();
-                    countBuffers.classBuf.destroy();
+                    countBuffers.layerTypeBuf.destroy();
                     countBuffers.objectBuf.destroy();
                     countBuffers.sampleSourcesBuf.destroy();
                     countBuffers.paramsBuf.destroy();
@@ -273,45 +273,52 @@ export class ComputeRender extends GpuPipeline {
             return;
         }
 
-        const classBufferSize = sourceCount * metadata.classIds.length * 4;
-        if (classBufferSize > device.limits.maxStorageBufferBindingSize) {
+        const layerTypeBufferSize = sourceCount * metadata.layerTypes.length * 4;
+        if (layerTypeBufferSize > device.limits.maxStorageBufferBindingSize) {
             throw new Error(
-                `RenderPipeline: class aggregation requires ${classBufferSize} bytes, exceeding maxStorageBufferBindingSize ${device.limits.maxStorageBufferBindingSize}.`
+                `RenderPipeline: class aggregation requires ${layerTypeBufferSize} bytes, exceeding maxStorageBufferBindingSize ${device.limits.maxStorageBufferBindingSize}.`
             );
         }
     }
 
     private buildRenderMetadata(layers: RenderLayer[], aggregation: RenderAggregation): RenderMetadata {
-        const classIds: string[] = [];
-        const classIndexById = new Map<string, number>();
-        const classIndexByLayer: number[] = [];
+        const layerTypes: string[] = [];
+        const layerTypeIndexById = new Map<string, number>();
+        const layerTypeIndexByLayer: number[] = [];
         const objectKeys: string[] = [];
         const featureMetaByLayer: LayerFeatureMeta[][] = [];
 
         const includeClasses = aggregation.type === 'classes';
         const includeObjects = aggregation.type === 'objects';
-        const includeBackgroundClass = aggregation.type === 'classes' && Boolean(aggregation.includeBackground);
+        const includeBackgroundLayerType = aggregation.type === 'classes' && Boolean(aggregation.includeBackground);
+        const seenLayerIds = includeObjects ? new Set<string>() : null;
 
         layers.forEach((layer) => {
-            let classIndex = classIndexById.get(layer.classId);
-            if (classIndex === undefined) {
-                classIndex = classIds.length;
-                classIds.push(layer.classId);
-                classIndexById.set(layer.classId, classIndex);
+            let layerTypeIndex = layerTypeIndexById.get(layer.layerType);
+            if (layerTypeIndex === undefined) {
+                layerTypeIndex = layerTypes.length;
+                layerTypes.push(layer.layerType);
+                layerTypeIndexById.set(layer.layerType, layerTypeIndex);
             }
 
-            classIndexByLayer.push(classIndex);
+            layerTypeIndexByLayer.push(layerTypeIndex);
             if (includeObjects) {
+                if (layer.layerId.length === 0) {
+                    throw new Error('ComputeRender: layerId must be non-empty when object aggregation is enabled.');
+                }
+                if (seenLayerIds?.has(layer.layerId)) {
+                    throw new Error(`ComputeRender: duplicate layerId "${layer.layerId}" is not allowed for object aggregation.`);
+                }
+                seenLayerIds?.add(layer.layerId);
+
                 const featureMeta = layer.geojson.features.map((feature, featureIndex) => {
                     const rawId = layer.objectIdProperty
                         ? feature.properties?.[layer.objectIdProperty]
                         : undefined;
-                    const objectKey = rawId !== undefined && rawId !== null
-                        ? `${layer.classId}:${String(rawId)}`
-                        : `${layer.classId}:${featureIndex}`;
+                    const objectKey = this.buildObjectKey(layer.layerId, rawId ?? featureIndex);
                     const objectIndex = objectKeys.length;
                     objectKeys.push(objectKey);
-                    return { classIndex, objectIndex, objectKey };
+                    return { layerTypeIndex, objectIndex, objectKey };
                 });
                 featureMetaByLayer.push(featureMeta);
             } else {
@@ -319,25 +326,25 @@ export class ComputeRender extends GpuPipeline {
             }
         });
 
-        if (includeBackgroundClass) {
-            classIds.push(aggregation.backgroundClassId ?? 'background');
+        if (includeBackgroundLayerType) {
+            layerTypes.push(aggregation.backgroundLayerType ?? 'background');
         }
 
         let flags = 0;
         if (includeClasses) flags |= 1;
         if (includeObjects) flags |= 2;
-        if (includeBackgroundClass) flags |= 4;
+        if (includeBackgroundLayerType) flags |= 4;
 
         if (includeObjects && objectKeys.length > 65535) {
             throw new Error('ComputeRender: object visibility currently supports at most 65535 objects.');
         }
 
         return {
-            classIds,
+            layerTypes,
             objectKeys,
-            classIndexByLayer,
+            layerTypeIndexByLayer,
             featureMetaByLayer,
-            includeBackgroundClass,
+            includeBackgroundLayerType,
             includeClasses,
             includeObjects,
             flags,
@@ -441,7 +448,7 @@ export class ComputeRender extends GpuPipeline {
                 device,
                 16,
                 GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-                this.encodeIds(meta.classIndex, meta.objectIndex)
+                this.encodeIds(meta.layerTypeIndex, meta.objectIndex)
             );
 
             draws.push({
@@ -458,7 +465,7 @@ export class ComputeRender extends GpuPipeline {
     private uploadMergedLayerToGpu(
         device: GPUDevice,
         layerMesh: LayerMeshData,
-        classIndex: number,
+        layerTypeIndex: number,
     ): GpuFeatureDraw[] {
         const mesh = flattenMesh(layerMesh.geometries);
         if (mesh.indices.length === 0) {
@@ -481,7 +488,7 @@ export class ComputeRender extends GpuPipeline {
             device,
             16,
             GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            this.encodeIds(classIndex, 0)
+            this.encodeIds(layerTypeIndex, 0)
         );
 
         return [{
@@ -492,16 +499,20 @@ export class ComputeRender extends GpuPipeline {
         }];
     }
 
-    private encodeIds(classIndex: number, objectIndex: number): Float32Array {
+    private encodeIds(layerTypeIndex: number, objectIndex: number): Float32Array {
         const encodedObject = objectIndex + 1;
         const low = encodedObject & 255;
         const high = (encodedObject >> 8) & 255;
         return new Float32Array([
-            (classIndex + 1) / 255,
+            (layerTypeIndex + 1) / 255,
             low / 255,
             high / 255,
             1,
         ]);
+    }
+
+    private buildObjectKey(layerId: string, rawObjectId: unknown): string {
+        return `${encodeURIComponent(layerId)}:${encodeURIComponent(String(rawObjectId))}`;
     }
 
     private createTileTexture(device: GPUDevice, texSize: number): GPUTexture {
@@ -541,12 +552,12 @@ export class ComputeRender extends GpuPipeline {
         samples: CameraSample[],
         metadata: RenderMetadata,
     ): CountBuffers {
-        const classSize = metadata.includeClasses ? sourceCount * metadata.classIds.length * 4 : 0;
+        const layerTypeSize = metadata.includeClasses ? sourceCount * metadata.layerTypes.length * 4 : 0;
         const objectSize = metadata.includeObjects ? sampleCount * metadata.objectKeys.length * 4 : 0;
         const sampleSourcesSize = Math.max(4, sampleCount * 4);
 
-        const classBuf = device.createBuffer({
-            size: Math.max(4, classSize),
+        const layerTypeBuf = device.createBuffer({
+            size: Math.max(4, layerTypeSize),
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
         });
         const objectBuf = device.createBuffer({
@@ -565,7 +576,7 @@ export class ComputeRender extends GpuPipeline {
         pv.setUint32(0, gridSize, true);
         pv.setUint32(4, tileSize, true);
         pv.setUint32(8, sampleCount, true);
-        pv.setUint32(12, metadata.classIds.length, true);
+        pv.setUint32(12, metadata.layerTypes.length, true);
         pv.setUint32(16, metadata.objectKeys.length, true);
         pv.setUint32(20, metadata.flags, true);
         const paramsBuf = this.createBuffer(
@@ -576,11 +587,11 @@ export class ComputeRender extends GpuPipeline {
         );
 
         return {
-            classBuf,
+            layerTypeBuf,
             objectBuf,
             sampleSourcesBuf,
             paramsBuf,
-            classSize,
+            layerTypeSize,
             objectSize,
         };
     }
@@ -653,7 +664,7 @@ export class ComputeRender extends GpuPipeline {
             layout: countBGL,
             entries: [
                 { binding: 0, resource: tileView },
-                { binding: 1, resource: { buffer: countBuffers.classBuf } },
+                { binding: 1, resource: { buffer: countBuffers.layerTypeBuf } },
                 { binding: 2, resource: { buffer: countBuffers.objectBuf } },
                 { binding: 3, resource: { buffer: countBuffers.sampleSourcesBuf } },
                 { binding: 4, resource: { buffer: countBuffers.paramsBuf } },
@@ -744,9 +755,9 @@ export class ComputeRender extends GpuPipeline {
 
                 if (metadata.includeClasses) {
                     const classes: Record<string, number> = {};
-                    for (let classIndex = 0; classIndex < metadata.classIds.length; classIndex++) {
-                        const raw = rawClasses[sourceIndex * metadata.classIds.length + classIndex] ?? 0;
-                        classes[metadata.classIds[classIndex]] = sampleCount > 0 ? raw / (totalPixels * sampleCount) : 0;
+                    for (let layerTypeIndex = 0; layerTypeIndex < metadata.layerTypes.length; layerTypeIndex++) {
+                        const raw = rawClasses[sourceIndex * metadata.layerTypes.length + layerTypeIndex] ?? 0;
+                        classes[metadata.layerTypes[layerTypeIndex]] = sampleCount > 0 ? raw / (totalPixels * sampleCount) : 0;
                     }
                     render.classes = classes;
                 }

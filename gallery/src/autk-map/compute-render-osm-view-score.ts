@@ -36,19 +36,22 @@ export class ComputeRenderOsmViewScore {
         const waterGeoJson = await this.db.getLayer('table_osm_water');
         const renderLayers = [
             {
+                layerId: 'table_osm_buildings',
                 geojson: buildingsGeoJson,
                 type: 'buildings' as const,
-                classId: 'buildings',
+                layerType: 'buildings',
             },
             {
+                layerId: 'table_osm_parks',
                 geojson: parksGeoJson,
                 type: 'parks' as const,
-                classId: 'parks',
+                layerType: 'parks',
             },
             {
+                layerId: 'table_osm_water',
                 geojson: waterGeoJson,
                 type: 'water' as const,
-                classId: 'water',
+                layerType: 'water',
             },
         ];
 
@@ -56,7 +59,7 @@ export class ComputeRenderOsmViewScore {
         const buildingsWithClasses = await render.run({
             layers: renderLayers,
             source: buildingsGeoJson,
-            aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
+            aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
             viewSampling: { directions: 36 },
             tileSize: 32,
         });

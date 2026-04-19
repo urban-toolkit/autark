@@ -5,14 +5,17 @@ import { LayerType } from 'autk-core';
 // ── Render pipeline ───────────────────────────────────────────────────────────
 
 export interface RenderLayer {
+    /** Unique layer identifier used to scope object aggregation results. */
+    layerId: string;
+
     /** GeoJSON source features rendered for this layer. */
     geojson: FeatureCollection;
 
     /** Triangulation strategy used to mesh the GeoJSON geometries. */
     type: LayerType;
 
-    /** Semantic class bucket used by higher-level render aggregations. */
-    classId: string;
+    /** Semantic layer bucket used by higher-level render aggregations. */
+    layerType: string;
 
     /** Optional source property to be used as a stable object identifier. */
     objectIdProperty?: string;
@@ -34,8 +37,8 @@ export type RenderAggregation =
         type: 'classes';
         /** When true, count the transparent render background as an extra class bucket. */
         includeBackground?: boolean;
-        /** Class id used for the transparent render background. @default 'background' */
-        backgroundClassId?: string;
+        /** Layer type used for the transparent render background. @default 'background' */
+        backgroundLayerType?: string;
     }
     | { type: 'objects' };
 

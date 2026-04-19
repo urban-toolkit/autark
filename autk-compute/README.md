@@ -26,12 +26,12 @@ Background can be counted as an extra class bucket when using `classes`:
 ```ts
 const result = await compute.renderPipeline({
   layers: [
-    { geojson: buildings, type: 'buildings', classId: 'buildings' },
-    { geojson: parks, type: 'surface', classId: 'parks' },
-    { geojson: water, type: 'surface', classId: 'water' },
+    { layerId: 'buildings', geojson: buildings, type: 'buildings', layerType: 'buildings' },
+    { layerId: 'parks', geojson: parks, type: 'surface', layerType: 'parks' },
+    { layerId: 'water', geojson: water, type: 'surface', layerType: 'water' },
   ],
   source: roads,
-  aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
+  aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
   viewSampling: { directions: 1 },
   tileSize: 64,
 });

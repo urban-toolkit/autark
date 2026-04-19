@@ -37,12 +37,13 @@ export class ComputeRenderOsmSkyExposure {
         const render = new ComputeRender();
         const roadsWithSkyClasses = await render.run({
             layers: [{
+                layerId: 'table_osm_buildings',
                 geojson: buildingsGeoJson,
                 type: 'buildings',
-                classId: 'buildings',
+                layerType: 'buildings',
             }],
             source: roadsGeoJson,
-            aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
+            aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
             viewSampling: { directions: 1 },
             tileSize: 64,
         });

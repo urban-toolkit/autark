@@ -54,12 +54,13 @@ export type {
  * // Run render pipeline: compute class shares from source origins
  * const result = await compute.renderPipeline({
  *   layers: [{
+ *     layerId: 'buildings',
  *     geojson: buildings,
  *     type: 'buildings',
- *     classId: 'buildings'
+ *     layerType: 'buildings'
  *   }],
  *   source: streetNetwork,
- *   aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
+ *   aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
  *   viewSampling: { directions: 1 },
  *   fov: 90,
  *   tileSize: 64
@@ -146,12 +147,13 @@ export class AutkComputeEngine {
      * // Compute sky share for a street network
      * const result = await compute.renderPipeline({
      *   layers: [{
+     *     layerId: 'buildings',
      *     geojson: buildings,
      *     type: 'buildings',
-     *     classId: 'buildings'
+     *     layerType: 'buildings'
      *   }],
      *   source: streets,
-     *   aggregation: { type: 'classes', includeBackground: true, backgroundClassId: 'sky' },
+     *   aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
      *   viewSampling: { directions: 1 },
      *   fov: 90
      * });
