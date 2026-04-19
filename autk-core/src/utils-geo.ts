@@ -1,4 +1,4 @@
-import { FeatureCollection, Geometry } from 'geojson';
+import { FeatureCollection, Geometry, Position } from 'geojson';
 
 import type { BoundingBox, LayerType } from './types-layer';
 
@@ -49,6 +49,20 @@ export function computeBoundingBox(source: FeatureCollection | Geometry | null):
     }
 
     return { minLon, minLat, maxLon, maxLat };
+}
+
+/**
+ * Computes a geometry centroid using geometry-aware weighting.
+ *
+ * Polygonal geometries use area-weighted centroids, linear geometries use
+ * length-weighted segment midpoints, and point geometries use coordinate
+ * averages. Geometry collections combine child centroids using those same
+ * geometric weights.
+ */
+export function computeGeometryCentroid(geometry: Geometry | null): [number, number, number] | null {
+    if (!geometry) return null;
+    const weighted = computeWeightedCentroid(geometry);
+    return weighted ? weighted.centroid : null;
 }
 
 /**
@@ -116,6 +130,167 @@ function expandGeometry(geom: Geometry, expand: (c: number[]) => void): void {
             for (const sub of geom.geometries) expandGeometry(sub, expand);
             break;
     }
+}
+
+type WeightedCentroid = {
+    centroid: [number, number, number];
+    weight: number;
+};
+
+function computeWeightedCentroid(geometry: Geometry): WeightedCentroid | null {
+    switch (geometry.type) {
+        case 'Point':
+            return {
+                centroid: [geometry.coordinates[0], geometry.coordinates[1], geometry.coordinates[2] ?? 0],
+                weight: 1,
+            };
+        case 'MultiPoint':
+            return averagePositions(geometry.coordinates);
+        case 'LineString':
+            return computeLineCentroid(geometry.coordinates);
+        case 'MultiLineString':
+            return combineWeightedCentroids(geometry.coordinates.map((line) => computeLineCentroid(line)));
+        case 'Polygon':
+            return computePolygonCentroid(geometry.coordinates);
+        case 'MultiPolygon':
+            return combineWeightedCentroids(geometry.coordinates.map((polygon) => computePolygonCentroid(polygon)));
+        case 'GeometryCollection':
+            return combineWeightedCentroids(geometry.geometries.map((child) => computeWeightedCentroid(child)));
+    }
+}
+
+function averagePositions(positions: Position[]): WeightedCentroid | null {
+    if (positions.length === 0) return null;
+
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    for (const position of positions) {
+        x += position[0];
+        y += position[1];
+        z += position[2] ?? 0;
+    }
+
+    return {
+        centroid: [x / positions.length, y / positions.length, z / positions.length],
+        weight: positions.length,
+    };
+}
+
+function computeLineCentroid(positions: Position[]): WeightedCentroid | null {
+    if (positions.length === 0) return null;
+    if (positions.length === 1) return averagePositions(positions);
+
+    let totalLength = 0;
+    let weightedX = 0;
+    let weightedY = 0;
+    let weightedZ = 0;
+
+    for (let i = 0; i < positions.length - 1; i++) {
+        const start = positions[i];
+        const end = positions[i + 1];
+        const length = Math.hypot(end[0] - start[0], end[1] - start[1], (end[2] ?? 0) - (start[2] ?? 0));
+        if (length === 0) continue;
+
+        totalLength += length;
+        weightedX += ((start[0] + end[0]) * 0.5) * length;
+        weightedY += ((start[1] + end[1]) * 0.5) * length;
+        weightedZ += (((start[2] ?? 0) + (end[2] ?? 0)) * 0.5) * length;
+    }
+
+    if (totalLength === 0) {
+        return averagePositions(positions);
+    }
+
+    return {
+        centroid: [weightedX / totalLength, weightedY / totalLength, weightedZ / totalLength],
+        weight: totalLength,
+    };
+}
+
+function computePolygonCentroid(rings: Position[][]): WeightedCentroid | null {
+    const shell = rings[0];
+    if (!shell || shell.length === 0) return null;
+
+    let weightedX = 0;
+    let weightedY = 0;
+    let weightedZ = 0;
+    let totalSignedArea = 0;
+
+    for (const ring of rings) {
+        const ringCentroid = computeRingCentroid(ring);
+        if (!ringCentroid) continue;
+        weightedX += ringCentroid.centroid[0] * ringCentroid.signedArea;
+        weightedY += ringCentroid.centroid[1] * ringCentroid.signedArea;
+        weightedZ += ringCentroid.centroid[2] * ringCentroid.signedArea;
+        totalSignedArea += ringCentroid.signedArea;
+    }
+
+    const totalArea = Math.abs(totalSignedArea);
+    if (totalArea === 0) {
+        const flattened = rings.flat();
+        return averagePositions(flattened);
+    }
+
+    return {
+        centroid: [weightedX / totalSignedArea, weightedY / totalSignedArea, weightedZ / totalSignedArea],
+        weight: totalArea,
+    };
+}
+
+function computeRingCentroid(ring: Position[]): { centroid: [number, number, number]; signedArea: number } | null {
+    if (ring.length < 3) return null;
+
+    let crossSum = 0;
+    let centroidX = 0;
+    let centroidY = 0;
+    let weightedZ = 0;
+
+    for (let i = 0; i < ring.length - 1; i++) {
+        const current = ring[i];
+        const next = ring[i + 1];
+        const cross = current[0] * next[1] - next[0] * current[1];
+        crossSum += cross;
+        centroidX += (current[0] + next[0]) * cross;
+        centroidY += (current[1] + next[1]) * cross;
+        weightedZ += (((current[2] ?? 0) + (next[2] ?? 0)) * 0.5) * cross;
+    }
+
+    const signedArea = crossSum * 0.5;
+    if (signedArea === 0) return null;
+
+    return {
+        centroid: [
+            centroidX / (6 * signedArea),
+            centroidY / (6 * signedArea),
+            weightedZ / crossSum,
+        ],
+        signedArea,
+    };
+}
+
+function combineWeightedCentroids(
+    centroids: Array<WeightedCentroid | null>,
+): WeightedCentroid | null {
+    let totalWeight = 0;
+    let weightedX = 0;
+    let weightedY = 0;
+    let weightedZ = 0;
+
+    for (const centroid of centroids) {
+        if (!centroid || centroid.weight === 0) continue;
+        totalWeight += centroid.weight;
+        weightedX += centroid.centroid[0] * centroid.weight;
+        weightedY += centroid.centroid[1] * centroid.weight;
+        weightedZ += centroid.centroid[2] * centroid.weight;
+    }
+
+    if (totalWeight === 0) return null;
+
+    return {
+        centroid: [weightedX / totalWeight, weightedY / totalWeight, weightedZ / totalWeight],
+        weight: totalWeight,
+    };
 }
 
 

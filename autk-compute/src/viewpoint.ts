@@ -1,10 +1,8 @@
 import {
     FeatureCollection,
-    Geometry,
-    Position,
 } from 'geojson';
 
-import { Camera } from 'autk-core';
+import { Camera, computeGeometryCentroid } from 'autk-core';
 
 import type { RenderViewSampling } from './api';
 
@@ -21,7 +19,7 @@ export interface CameraSample {
 }
 
 /**
- * Derives view origins from each feature's geometry barycenter.
+ * Derives view origins from each feature's geometry centroid.
  *
  * @param source - GeoJSON FeatureCollection to extract origins from.
  * @returns Array of view origins, one per feature with a valid geometry.
@@ -32,7 +30,7 @@ export function generateViewOrigins(source: FeatureCollection): ViewOrigin[] {
     source.features.forEach((feature, sourceIndex) => {
         if (!feature.geometry) return;
 
-        const origin = geometryBarycenter(feature.geometry);
+        const origin = computeGeometryCentroid(feature.geometry);
         if (!origin) return;
 
         origins.push({ sourceIndex, origin });
@@ -129,42 +127,6 @@ export function buildCameraMatrices(
     }
 
     return cameras;
-}
-
-function geometryBarycenter(geometry: Geometry): [number, number, number] | null {
-    const positions = flattenPositions(geometry);
-    if (positions.length === 0) return null;
-
-    let x = 0;
-    let y = 0;
-    let z = 0;
-
-    for (const pos of positions) {
-        x += pos[0];
-        y += pos[1];
-        z += pos[2] ?? 0;
-    }
-
-    return [x / positions.length, y / positions.length, z / positions.length];
-}
-
-function flattenPositions(geometry: Geometry): Position[] {
-    switch (geometry.type) {
-        case 'Point':
-            return [geometry.coordinates];
-        case 'MultiPoint':
-        case 'LineString':
-            return geometry.coordinates;
-        case 'MultiLineString':
-        case 'Polygon':
-            return geometry.coordinates.flat();
-        case 'MultiPolygon':
-            return geometry.coordinates.flat(2);
-        case 'GeometryCollection':
-            return geometry.geometries.flatMap(flattenPositions);
-        default:
-            return [];
-    }
 }
 
 function degToRad(value: number): number {

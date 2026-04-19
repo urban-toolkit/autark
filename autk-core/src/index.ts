@@ -93,6 +93,8 @@ export { valueAtPath } from './utils-data';
 export { isNumericLike } from './utils-data';
 /** Computes the central origin of a GeoJSON FeatureCollection. */
 export { computeOrigin } from './utils-geo';
+/** Computes a geometry-aware centroid for a GeoJSON geometry. */
+export { computeGeometryCentroid } from './utils-geo';
 /** Computes the bounding box of a GeoJSON collection or geometry. */
 export { computeBoundingBox } from './utils-geo';
 /** Returns true when a string matches a shared layer type. */
