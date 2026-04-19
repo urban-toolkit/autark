@@ -137,87 +137,90 @@ export class ComputeGpgpu extends GpuPipeline {
         const device = await this.getDevice();
         const { shader, entryPoint = 'main', dispatchSize, inputs, outputs } = config;
 
-        const shaderModule = device.createShaderModule({ code: shader });
-        const pipeline = device.createComputePipeline({
-            layout: 'auto',
-            compute: { module: shaderModule, entryPoint },
-        });
-
         const inputBuffers = new Map<string, GPUBuffer>();
         const outputBuffers = new Map<string, GPUBuffer>();
-        const outputSizes = new Map<string, number>();
-        const groupEntries = new Map<number, GPUBindGroupEntry[]>();
-
-        for (const [name, input] of Object.entries(inputs)) {
-            const group = input.group ?? 0;
-            const usage = input.type === 'uniform'
-                ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-                : GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
-            const aligned = this.alignTo(input.data.byteLength, input.type === 'uniform' ? 16 : 4);
-            const buf = this.createBuffer(device, aligned, usage, input.data);
-            inputBuffers.set(name, buf);
-            const entries = groupEntries.get(group) ?? [];
-            entries.push({ binding: input.binding, resource: { buffer: buf } });
-            groupEntries.set(group, entries);
-        }
-
-        for (const [name, output] of Object.entries(outputs)) {
-            const group = output.group ?? 0;
-            const aligned = this.alignTo(output.size, 4);
-            const buf = this.createBuffer(device, aligned, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-            outputBuffers.set(name, buf);
-            outputSizes.set(name, aligned);
-            const entries = groupEntries.get(group) ?? [];
-            entries.push({ binding: output.binding, resource: { buffer: buf } });
-            groupEntries.set(group, entries);
-        }
-
-        const groups = [...groupEntries.keys()].sort((a, b) => a - b);
-        const bindGroups = new Map<number, GPUBindGroup>();
-        for (const g of groups) {
-            bindGroups.set(g, device.createBindGroup({
-                layout: pipeline.getBindGroupLayout(g),
-                entries: groupEntries.get(g)!,
-            }));
-        }
-
-        // Build staging buffers and encode the full command buffer in one pass.
         const stagingBuffers = new Map<string, GPUBuffer>();
-        const encoder = device.createCommandEncoder();
+        try {
+            const shaderModule = device.createShaderModule({ code: shader });
+            const pipeline = device.createComputePipeline({
+                layout: 'auto',
+                compute: { module: shaderModule, entryPoint },
+            });
 
-        const pass = encoder.beginComputePass();
-        pass.setPipeline(pipeline);
-        for (const g of groups) {
-            pass.setBindGroup(g, bindGroups.get(g)!);
+            const outputSizes = new Map<string, number>();
+            const groupEntries = new Map<number, GPUBindGroupEntry[]>();
+
+            for (const [name, input] of Object.entries(inputs)) {
+                const group = input.group ?? 0;
+                const usage = input.type === 'uniform'
+                    ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+                    : GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
+                const aligned = this.alignTo(input.data.byteLength, input.type === 'uniform' ? 16 : 4);
+                const buf = this.createBuffer(device, aligned, usage, input.data);
+                inputBuffers.set(name, buf);
+                const entries = groupEntries.get(group) ?? [];
+                entries.push({ binding: input.binding, resource: { buffer: buf } });
+                groupEntries.set(group, entries);
+            }
+
+            for (const [name, output] of Object.entries(outputs)) {
+                const group = output.group ?? 0;
+                const aligned = this.alignTo(output.size, 4);
+                const buf = this.createBuffer(device, aligned, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+                outputBuffers.set(name, buf);
+                outputSizes.set(name, aligned);
+                const entries = groupEntries.get(group) ?? [];
+                entries.push({ binding: output.binding, resource: { buffer: buf } });
+                groupEntries.set(group, entries);
+            }
+
+            const groups = [...groupEntries.keys()].sort((a, b) => a - b);
+            const bindGroups = new Map<number, GPUBindGroup>();
+            for (const g of groups) {
+                bindGroups.set(g, device.createBindGroup({
+                    layout: pipeline.getBindGroupLayout(g),
+                    entries: groupEntries.get(g)!,
+                }));
+            }
+
+            const encoder = device.createCommandEncoder();
+
+            const pass = encoder.beginComputePass();
+            pass.setPipeline(pipeline);
+            for (const g of groups) {
+                pass.setBindGroup(g, bindGroups.get(g)!);
+            }
+            pass.dispatchWorkgroups(dispatchSize[0] ?? 1, dispatchSize[1] ?? 1, dispatchSize[2] ?? 1);
+            pass.end();
+
+            for (const [key, buf] of outputBuffers) {
+                const size = outputSizes.get(key)!;
+                const staging = this.createStagingBuffer(device, size);
+                stagingBuffers.set(key, staging);
+                encoder.copyBufferToBuffer(buf, 0, staging, 0, size);
+            }
+
+            device.queue.submit([encoder.finish()]);
+
+            const result: Record<string, TypedArray> = {};
+            for (const [key, staging] of stagingBuffers) {
+                const cfg = outputs[key];
+                const Ctor = cfg.arrayType ?? Uint8Array;
+                result[key] = await this.mapReadBuffer(staging, Ctor as new (ab: ArrayBuffer) => TypedArray);
+            }
+
+            return result;
+        } finally {
+            for (const buf of inputBuffers.values()) {
+                buf.destroy();
+            }
+            for (const buf of outputBuffers.values()) {
+                buf.destroy();
+            }
+            for (const buf of stagingBuffers.values()) {
+                buf.destroy();
+            }
         }
-        pass.dispatchWorkgroups(dispatchSize[0] ?? 1, dispatchSize[1] ?? 1, dispatchSize[2] ?? 1);
-        pass.end();
-
-        for (const [key, buf] of outputBuffers) {
-            const size = outputSizes.get(key)!;
-            const staging = this.createStagingBuffer(device, size);
-            stagingBuffers.set(key, staging);
-            encoder.copyBufferToBuffer(buf, 0, staging, 0, size);
-        }
-
-        device.queue.submit([encoder.finish()]);
-
-        // Read back all outputs (sequentially — GPU serialises anyway).
-        const result: Record<string, TypedArray> = {};
-        for (const [key, staging] of stagingBuffers) {
-            const cfg = outputs[key];
-            const Ctor = cfg.arrayType ?? Uint8Array;
-            result[key] = await this.mapReadBuffer(staging, Ctor as new (ab: ArrayBuffer) => TypedArray);
-        }
-
-        for (const buf of inputBuffers.values()) {
-            buf.destroy();
-        }
-        for (const buf of outputBuffers.values()) {
-            buf.destroy();
-        }
-
-        return result;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
