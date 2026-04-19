@@ -10,15 +10,12 @@ import type {
 
 export { ComputeGpgpu, ComputeRender };
 export { generateViewOrigins, expandCameraSamples, buildCameraMatrices } from './viewpoint';
-export { GpuPipeline } from './compute-pipeline';
 
 export type {
     RenderLayer,
     RenderPipelineParams,
     GpgpuPipelineParams,
 } from './api';
-
-export type { ComputeConfig, GlobalVarMeta } from './types-gpgpu';
 
 export type {
     ViewProjectionParams,
