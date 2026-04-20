@@ -64,13 +64,17 @@ export abstract class ChartBase {
      */
     private _selectedFeatureIds: Set<number> = new Set();
 
-    /** Dot-path attributes used to read values from row objects. */
+    /** Dot-path attributes used to read values from source rows. */
     protected _axisAttributes!: string[];
+    /** Dot-path attributes used to read values from transformed rows, when applicable. */
+    protected _transformAttributes: string[] | undefined = undefined;
     /** User-facing axis labels. */
     protected _axisLabels!: string[];
     
-    /** Dot-path attribute used for color encoding, if any. */
+    /** Dot-path attribute used for color encoding on source rows, if any. */
     protected _colorAttribute: string | undefined = undefined;
+    /** Dot-path attribute used for color encoding on transformed rows, when applicable. */
+    protected _transformColorAttribute: string | undefined = undefined;
     /** User-facing label for the color dimension. */
     protected _colorLabel: string | undefined = undefined;
     
@@ -156,7 +160,7 @@ export abstract class ChartBase {
         this._axisLabels = axisLabels.length > 0
             ? axisLabels
             : axisAttributes.map(attr => attr === '@transform' ? String(reducer) : attr);
-        this._axisAttributes = axisAttributes;
+        this._axisAttributes = [...axisAttributes];
 
         this._colorLabel = config.labels?.color;
         this._colorAttribute = config.attributes?.color ?? config.labels?.color;
@@ -292,6 +296,8 @@ export abstract class ChartBase {
      * Do not override — implement `render()` instead.
      */
     public draw(): void {
+        this._transformAttributes = undefined;
+        this._transformColorAttribute = undefined;
         this.computeTransform();
         this.computeColorDomain();
         this.render();
@@ -306,20 +312,35 @@ export abstract class ChartBase {
     protected computeTransform(): void {}
 
     /**
+     * Returns the attributes used to read the current rendered rows.
+     */
+    protected get renderAxisAttributes(): string[] {
+        return this._transformAttributes ?? this._axisAttributes;
+    }
+
+    /**
+     * Returns the color attribute used to read the current rendered rows.
+     */
+    protected get renderColorAttribute(): string | undefined {
+        return this._transformColorAttribute ?? this._colorAttribute;
+    }
+
+    /**
      * Resolves and caches the color domain for the active color attribute.
      *
-     * Extracts all values for `_colorAttribute` from `this.data`, then calls
+     * Extracts all values for the active render color attribute from `this.data`, then calls
      * `ColorMap.resolveDomainFromData()` using the configured interpolator and
      * domain spec. The result is stored in `_resolvedDomain`.
      *
-     * No-op when no `_colorAttribute` is set.
+     * No-op when no active render color attribute is set.
      */
     protected computeColorDomain(): void {
-        if (!this._colorAttribute) return;
+        const colorAttribute = this.renderColorAttribute;
+        if (!colorAttribute) return;
 
         const values = this.data
             .filter(d => d != null)
-            .map(d => valueAtPath(d!, this._colorAttribute!))
+            .map(d => valueAtPath(d!, colorAttribute))
             .filter(v => v != null && !(typeof v === 'number' && !Number.isFinite(v)));
 
         if (values.length === 0) return;
@@ -354,20 +375,21 @@ export abstract class ChartBase {
             return ChartStyle.highlight;
         }
 
-        if (!this._colorAttribute || !this._resolvedDomain) {
+        const colorAttribute = this.renderColorAttribute;
+        if (!colorAttribute || !this._resolvedDomain) {
             return ChartStyle.default;
         }
 
         if (typeof this._resolvedDomain[0] === 'string') {
             const categories = this._resolvedDomain as string[];
-            const rawVal = String(valueAtPath(datum, this._colorAttribute));
+            const rawVal = String(valueAtPath(datum, colorAttribute));
             const idx = categories.indexOf(rawVal);
             const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
             const interpolator = this._categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
             const { r, g, b } = ColorMap.getColor(t, interpolator, categories);
             return `rgb(${r},${g},${b})`;
         } else {
-            const rawVal = Number(valueAtPath(datum, this._colorAttribute)) || 0;
+            const rawVal = Number(valueAtPath(datum, colorAttribute)) || 0;
             const numDomain = this._resolvedDomain as [number, number] | [number, number, number];
             const interpolator = this._colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
             const { r, g, b } = ColorMap.getColor(rawVal, interpolator, numDomain);

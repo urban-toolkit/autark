@@ -76,8 +76,8 @@ export class Heatmatrix extends ChartBase {
         const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
         const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning2dTransform;
         this.data = transformed.rows as any;
-        this._axisAttributes = ['x', 'y'];
-        this._colorAttribute = 'value';
+        this._transformAttributes = ['x', 'y'];
+        this._transformColorAttribute = 'value';
     }
 
     /**
@@ -173,8 +173,8 @@ export class Heatmatrix extends ChartBase {
             .data(this.data)
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', d => mapX(d ? String(valueAtPath(d, this._axisAttributes[0])) : '') ?? 0)
-            .attr('y', d => mapY(d ? String(valueAtPath(d, this._axisAttributes[1])) : '') ?? 0)
+            .attr('x', d => mapX(d ? String(valueAtPath(d, this.renderAxisAttributes[0])) : '') ?? 0)
+            .attr('y', d => mapY(d ? String(valueAtPath(d, this.renderAxisAttributes[1])) : '') ?? 0)
             .attr('width',  mapX.bandwidth())
             .attr('height', mapY.bandwidth())
             .style('fill', d => this.getMarkColor(d))

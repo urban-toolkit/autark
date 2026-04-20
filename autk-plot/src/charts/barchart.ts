@@ -98,7 +98,7 @@ export class Barchart extends ChartBase {
         const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
         const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning1dTransform;
         this.data = transformed.rows as any;
-        this._axisAttributes = ['label', 'value'];
+        this._transformAttributes = ['label', 'value'];
     }
 
     /**
@@ -144,12 +144,12 @@ export class Barchart extends ChartBase {
 
         // ---- Scales
         const xDomain = this.data.map((d) => {
-            const val = d ? valueAtPath(d, this._axisAttributes[0]) : 'unknown';
+            const val = d ? valueAtPath(d, this.renderAxisAttributes[0]) : 'unknown';
             return String(val);
         });
         this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
@@ -236,11 +236,11 @@ export class Barchart extends ChartBase {
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', (d) => {
-                const val = d ? valueAtPath(d, this._axisAttributes[0]) : 'unknown';
+                const val = d ? valueAtPath(d, this.renderAxisAttributes[0]) : 'unknown';
                 return this.mapX(String(val)) || 0;
             })
-            .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0))
-            .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0))
+            .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0))
+            .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0))
             .attr('width', this.mapX.bandwidth())
             .style('fill', d => this.getMarkColor(d))
             .style('stroke', '#2f2f2f')
