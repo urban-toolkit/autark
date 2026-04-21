@@ -168,15 +168,16 @@ export class Triangles2DLayer extends VectorLayer {
      * @param {Camera} camera - The camera instance.
      */
     override renderPass(camera: Camera): void {
+        // VectorLayer.renderPass() clears dirty flags after updating the main
+        // fill/picking pipelines, so preserve the data-dirty state needed to
+        // keep the border buffers in sync for skip/geometry changes.
+        const dataDirty = this._dataIsDirty;
+
         super.renderPass(camera);
 
         if (!this._pipelineBorder) { return; }
 
-        if (this._renderInfoIsDirty) {
-            this._pipelineBorder.updateColorUniforms(this);
-        }
-
-        if (this._dataIsDirty) {
+        if (dataDirty) {
             this._pipelineBorder.updateVertexBuffers(this);
         }
 
