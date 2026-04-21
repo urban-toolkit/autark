@@ -180,15 +180,16 @@ export class Barchart extends ChartBase {
             .attr('dy', '-.40em')
             .attr('transform', 'rotate(-90)');
 
-        // X axis label:
         xAxisSelection
-            .append('text')
-            .attr('class', 'title')
+            .selectAll<SVGTextElement, string>('.axis-label')
+            .data([this._axisLabels[0]])
+            .join('text')
+            .attr('class', 'axis-label title')
             .attr('text-anchor', 'end')
             .attr('x', width)
             .attr('y', this._margins.bottom / 2 + 10)
             .style('visibility', 'visible')
-            .text(this._axisLabels[0]);
+            .text((d) => d);
 
         const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
 
@@ -202,16 +203,17 @@ export class Barchart extends ChartBase {
             .style('visibility', 'visible');
         yAxisSelection.call(yAxis);
 
-        // Y axis label:
         yAxisSelection
-            .append('text')
-            .attr('class', 'title')
+            .selectAll<SVGTextElement, string>('.axis-label')
+            .data([this._axisLabels[1]])
+            .join('text')
+            .attr('class', 'axis-label title')
             .attr('text-anchor', 'end')
             .attr('transform', 'rotate(-90)')
             .attr('y', -this._margins.left / 2 - 7)
             .attr('x', -this._margins.top)
             .style('visibility', 'visible')
-            .text(this._axisLabels[1]);
+            .text((d) => d);
 
         // ---- Bars
         const cGroup = svg
