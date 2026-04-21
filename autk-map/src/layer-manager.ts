@@ -1,6 +1,6 @@
-import { BBox, FeatureCollection, Geometry } from 'geojson';
+import { FeatureCollection, Geometry } from 'geojson';
 
-import { computeBoundingBox, computeOrigin } from './types-core';
+import { computeOrigin } from './types-core';
 import type { LayerType } from './types-core';
 import { LayerData, LayerInfo, LayerRenderInfo } from './types-layers';
 
@@ -24,10 +24,8 @@ const OSM_BASE: LayerType[] = ['surface', 'parks', 'water', 'roads'];
 export class LayerManager {
     /** Registered layers sorted by render order. */
     protected _layers: Layer[] = [];
-    /** Bounding box of the loaded dataset. */
-    protected _bbox!: BBox;
     /** World-space origin derived from the bounding box center. */
-    protected _origin!: number[];
+    protected _origin?: number[];
 
     /** Layer ids of non-OSM, non-buildings layers in insertion order. */
     private _dynamicOrder: string[] = [];
@@ -36,23 +34,21 @@ export class LayerManager {
     get layers(): Layer[] { return this._layers; }
 
     /** World-space origin derived from the current bounding box center. */
-    get origin(): number[] { return this._origin; }
+    get origin(): number[] {
+        if (!this._origin) {
+            throw new Error('Layer origin has not been initialized');
+        }
+        return this._origin;
+    }
 
-    /** Bounding box of the loaded data `[minLon, minLat, maxLon, maxLat]`. */
-    get bbox(): BBox { return this._bbox; }
+    /** Indicates whether the shared scene origin has been initialized. */
+    get hasOrigin(): boolean { return this._origin !== undefined; }
 
     /**
-     * Computes the bounding box from a collection and recomputes the derived origin.
-     * Uses `collection.bbox` when available, otherwise computes it from geometry.
+     * Computes the shared scene origin from the provided collection.
      * @param collection Source feature collection.
      */
-    computeBboxAndOrigin(collection: FeatureCollection<Geometry | null>): void {
-        const computed = computeBoundingBox(collection as FeatureCollection);
-        if (!collection.bbox && !computed) {
-            throw new Error('No valid coordinates found');
-        }
-        const bbox = collection.bbox ?? [computed!.minLon, computed!.minLat, computed!.maxLon, computed!.maxLat];
-        this._bbox = bbox;
+    initializeOrigin(collection: FeatureCollection<Geometry | null>): void {
         this._origin = computeOrigin(collection as FeatureCollection);
     }
 

@@ -179,8 +179,8 @@ export class AutkMap {
      * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
      */
     loadCollection(id: string, { collection, type = null, property }: LoadCollectionParams): void {
-        if (!this.layerManager.bbox) {
-            this.layerManager.computeBboxAndOrigin(collection);
+        if (!this.layerManager.hasOrigin) {
+            this.layerManager.initializeOrigin(collection);
         }
 
         let sType = type ?? (collection.features.length > 0 ? collection.features[0].geometry?.type : null);
@@ -381,7 +381,12 @@ export class AutkMap {
             const vectorLayer = layer as VectorLayer;
             const thematicValues = vectorLayer.thematic;
             if (thematicValues.length > 0) {
-                const domain = ColorMap.resolveDomainFromData(thematicValues, mergedColorMap);
+                const existingDomain = layer.layerRenderInfo.colormap.computedDomain;
+                const domain = Array.isArray(existingDomain)
+                    && existingDomain.length > 0
+                    && existingDomain.every(v => typeof v === 'string')
+                    ? existingDomain
+                    : ColorMap.resolveDomainFromData(thematicValues, mergedColorMap);
                 nextColormap.computedDomain = domain;
                 nextColormap.computedLabels = ColorMap.computeLabels(domain);
             }
