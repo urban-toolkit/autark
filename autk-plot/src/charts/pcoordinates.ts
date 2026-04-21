@@ -116,18 +116,18 @@ export class ParallelCoordinates extends ChartBase {
         // Build a scale for each dimension based on data type
         dimensions.forEach((dim) => {
             // Check if dimension is categorical or numerical
-            const sampleValues = this.data.map(d => d ? valueAtPath(d, dim) : null).filter(v => v !== null && v !== undefined);
+            const sampleValues = this._data.map(d => d ? valueAtPath(d, dim) : null).filter(v => v !== null && v !== undefined);
             const isNumerical = sampleValues.every(v => !isNaN(Number(v)));
 
             if (isNumerical) {
                 // Numerical scale
                 this.dimensionTypes.set(dim, 'numerical');
-                const extent = d3.extent(this.data, (d) => d ? Number(valueAtPath(d, dim)) || 0 : 0) as [number, number];
+                const extent = d3.extent(this._data, (d) => d ? Number(valueAtPath(d, dim)) || 0 : 0) as [number, number];
                 this.scales.set(dim, d3.scaleLinear().domain(extent).range([height, 0]));
             } else {
                 // Categorical scale
                 this.dimensionTypes.set(dim, 'categorical');
-                const uniqueValues = Array.from(new Set(this.data.map(d => d ? String(valueAtPath(d, dim)) : 'unknown')));
+                const uniqueValues = Array.from(new Set(this._data.map(d => d ? String(valueAtPath(d, dim)) : 'unknown')));
                 this.scales.set(dim, d3.scalePoint<string>().domain(uniqueValues).range([height, 0]).padding(0.5));
             }
         });
@@ -162,7 +162,7 @@ export class ParallelCoordinates extends ChartBase {
         // ---- Draw foreground lines (interactive)
         foreground
             .selectAll('.autkMark')
-            .data(this.data)
+            .data(this._data)
             .join('path')
             .attr('class', 'autkMark')
             .attr('data-idx', (_d, i) => i)
@@ -230,7 +230,7 @@ export class ParallelCoordinates extends ChartBase {
                     this._resolvedDomain = undefined;
                 }
                 this.updateAxisLabelStyles();
-                this.applyChartSelection();
+                this.renderSelection();
             });
     }
 
@@ -265,8 +265,8 @@ export class ParallelCoordinates extends ChartBase {
      * @returns SVG path string for the row.
      */
     protected path(d: any): string {
-        const dimensions = this._axisAttributes;
         const lineGenerator = d3.line<[number, number]>();
+        const dimensions = this._axisAttributes;
         const points: [number, number][] = dimensions.map((dim) => {
             const x = this.axisPositions(dim) || 0;
             const scale = this.scales.get(dim);

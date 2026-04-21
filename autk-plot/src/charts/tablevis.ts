@@ -80,7 +80,7 @@ export class TableVis extends ChartBase {
         })) as AutkDatum[];
 
         const transformed = run(allRows, this._transformConfig!, this._axisAttributes) as ExecutedSortTransform;
-        this.data = transformed.rows as any;
+        this._data = transformed.rows as any;
     }
 
     /**
@@ -170,8 +170,8 @@ export class TableVis extends ChartBase {
      * @param tbody Target tbody selection.
      */
     private renderRows(tbody: d3.Selection<HTMLTableSectionElement, unknown, any, unknown>): void {
-        const selectedRows = this.data.filter((row) => this.isMarkHighlighted(row));
-        const restRows = this.data.filter((row) => !this.isMarkHighlighted(row));
+        const selectedRows = this._data.filter((row) => this.isMarkHighlighted(row));
+        const restRows = this._data.filter((row) => !this.isMarkHighlighted(row));
         const displayRows = [...selectedRows, ...restRows];
 
         const numberFormatter = d3.format('');

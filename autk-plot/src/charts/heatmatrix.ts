@@ -75,7 +75,7 @@ export class Heatmatrix extends ChartBase {
 
         const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
         const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning2dTransform;
-        this.data = transformed.rows as any;
+        this._data = transformed.rows as any;
         this._transformAttributes = ['x', 'y'];
         this._transformColorAttribute = 'value';
     }
@@ -114,10 +114,10 @@ export class Heatmatrix extends ChartBase {
 
         // ---- Scales — derive sorted domains from xOrder/yOrder carried by the transform
         const xValues = Array.from(
-            new Map((this.data as Binning2dCellRow[]).map(d => [d.x, d.xOrder])).entries()
+            new Map((this._data as Binning2dCellRow[]).map(d => [d.x, d.xOrder])).entries()
         ).sort((a, b) => a[1] - b[1]).map(([label]) => label);
         const yValues = Array.from(
-            new Map((this.data as Binning2dCellRow[]).map(d => [d.y, d.yOrder])).entries()
+            new Map((this._data as Binning2dCellRow[]).map(d => [d.y, d.yOrder])).entries()
         ).sort((a, b) => a[1] - b[1]).map(([label]) => label);
 
         const mapX = d3.scaleBand().domain(xValues).range([0, width]).padding(0.05);
@@ -170,7 +170,7 @@ export class Heatmatrix extends ChartBase {
             .style('visibility', 'visible');
 
         cGroup.selectAll('.autkMark')
-            .data(this.data)
+            .data(this._data)
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', d => mapX(d ? String(valueAtPath(d, this.renderAxisAttributes[0])) : '') ?? 0)

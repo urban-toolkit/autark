@@ -110,10 +110,10 @@ export class Scatterplot extends ChartBase {
             .text((d) => d);
 
         // ---- Scales
-        const xExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0);
+        const xExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(this.data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Axes
@@ -186,7 +186,7 @@ export class Scatterplot extends ChartBase {
 
         cGroup
             .selectAll('.autkMark')
-            .data(this.data)
+            .data(this._data)
             .join('circle')
             .attr('class', 'autkMark')
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0))
