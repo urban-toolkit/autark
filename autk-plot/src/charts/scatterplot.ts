@@ -70,9 +70,8 @@ export class Scatterplot extends ChartBase {
 
     /**
      * Renders chart scaffolding, axes, and point marks.
-     * @returns Promise resolved when SVG nodes are synchronized.
      */
-    public async render(): Promise<void> {
+    public render(): void {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')

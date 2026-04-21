@@ -103,9 +103,8 @@ export class Barchart extends ChartBase {
 
     /**
      * Renders chart scaffolding, axes, and bar marks.
-     * @returns Promise resolved when SVG nodes are synchronized.
      */
-    async render(): Promise<void> {
+    render(): void {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')

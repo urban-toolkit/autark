@@ -85,9 +85,8 @@ export class TableVis extends ChartBase {
 
     /**
      * Renders table structure, headers, and rows.
-     * @returns Promise resolved when table nodes are synchronized.
      */
-    public async render(): Promise<void> {
+    public render(): void {
         const container = d3
             .select(this._div)
             .selectAll('.autk-table-container')

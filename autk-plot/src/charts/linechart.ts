@@ -130,10 +130,8 @@ export class Linechart extends ChartBase {
      * Renders the line chart, including axes, line path, dot marks, and empty state message.
      *
      * Synchronizes the SVG DOM with the current series data and attaches interaction listeners.
-     *
-     * @returns Promise resolved when SVG nodes are synchronized.
      */
-    public async render(): Promise<void> {
+    public render(): void {
         const innerW = this._width - this._margins.left - this._margins.right;
         const innerH = this._height - this._margins.top - this._margins.bottom;
 

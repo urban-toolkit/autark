@@ -118,10 +118,7 @@ export class AutkChart {
     /**
      * Triggers a redraw of the underlying chart implementation.
      *
-     * Implementations may perform synchronous or asynchronous rendering, so
-     * this method always returns a promise.
-     *
-     * @returns void
+     * Redraws synchronously using the current chart state.
      */
     public draw(): void {
         this._plot.draw();

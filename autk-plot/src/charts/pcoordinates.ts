@@ -69,9 +69,8 @@ export class ParallelCoordinates extends ChartBase {
 
     /**
      * Renders axes, paths, labels, and interaction layers.
-     * @returns Promise resolved when chart nodes are synchronized.
      */
-    public async render(): Promise<void> {
+    public render(): void {
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
