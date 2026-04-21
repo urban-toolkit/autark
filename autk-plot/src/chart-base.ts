@@ -51,19 +51,6 @@ export abstract class ChartBase {
     /** Normalized render rows bound to marks. */
     protected _data!: AutkDatum[];
 
-    /**
-     * Datums of marks directly selected by local interaction (brush/click).
-     * Owned exclusively by interaction handlers. Neither `setSelection` nor external
-     * callers may touch this field.
-     */
-    private _selectedMarkDatums: Set<object> = new Set();
-
-    /**
-     * Feature IDs set by an external linked view via `setSelection`.
-     * Owned exclusively by `setSelection`. Neither brush nor click handlers may touch this field.
-     */
-    private _selectedFeatureIds: Set<number> = new Set();
-
     /** Dot-path attributes used to read values from source rows. */
     protected _axisAttributes!: string[];
     /** Dot-path attributes used to read values from transformed rows, when applicable. */
@@ -90,29 +77,48 @@ export abstract class ChartBase {
     /** Plot margins in pixels. */
     protected _margins!: ChartMargins;
 
-    /** Typed event dispatcher used by chart interaction events. */
-    protected _chartEvents!: EventEmitter<ChartEventRecord>;
     /** Events explicitly enabled for this chart instance. */
     protected _enabledEvents: ChartEvent[] = [];
 
-    /** Domain specification for color encoding (from config). */
-    protected _domainSpec: ColorMapDomainSpec | undefined = undefined;
     /** Resolved color domain, computed from data after each transform. */
     protected _resolvedDomain: ResolvedDomain | undefined = undefined;
 
     /** CSS property to apply color to: 'fill' for area marks, 'stroke' for line marks. */
     protected _colorProperty: 'fill' | 'stroke' = 'fill';
-    /** Color interpolator used for continuous (numeric) color encoding. */
-    protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQ_REDS;
-    /** Color interpolator used when the color attribute contains categorical (string) values. */
-    protected _categoricalColorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.CAT_OBSERVABLE10;
 
     /** Optional transform config shared by chart implementations that support transformed views. */
     protected _transformConfig?: ChartTransformConfig;
 
-    
+    /**
+     * Datums of marks directly selected by local interaction (brush/click).
+     * Owned exclusively by interaction handlers. Neither `setSelection` nor external
+     * callers may touch this field.
+     */
+    private _selectedMarkDatums: Set<object> = new Set();
+    /**
+     * Feature IDs set by an external linked view via `setSelection`.
+     * Owned exclusively by `setSelection`. Neither brush nor click handlers may touch this field.
+     */
+    private _selectedFeatureIds: Set<number> = new Set();
+
+    /** Where the current selection was last authored from. */
+    private _selectionOrigin: 'local' | 'external' | null = null;
+    /** How selection should project back from feature ids to rendered marks. */
+    private _selectionProjection: 'bijective' | 'aggregated' = 'bijective';  
+
+    /** Typed event dispatcher used by chart interaction events. */
+    private _chartEvents!: EventEmitter<ChartEventRecord>;
+
+    /** Domain specification for color encoding (from config). */
+    private _domainSpec: ColorMapDomainSpec | undefined = undefined;
+
+    /** Color interpolator used for continuous (numeric) color encoding. */
+    private _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQ_REDS;
+    /** Color interpolator used when the color attribute contains categorical (string) values. */
+    private _categoricalColorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.CAT_OBSERVABLE10;
+
     /** Active brush rectangles keyed by brush id. Only one brush type is active at a time. */
-    protected _activeBrushes: Map<string, [number, number, number, number]> = new Map();
+    private _activeBrushes: Map<string, [number, number, number, number]> = new Map();
     /** Stored brush behavior instances keyed by brush id, used for programmatic visual clearing. */
     private _brushBehaviors: Map<string, d3.BrushBehavior<unknown>> = new Map();
     /** When true, brush event handlers skip event emission (used during programmatic brush clearing). */
@@ -180,6 +186,7 @@ export abstract class ChartBase {
         this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
 
         this._transformConfig = config.transform;
+        this._selectionProjection = this.resolveSelectionProjection(config.transform);
     }
 
 
@@ -205,16 +212,10 @@ export abstract class ChartBase {
     }
 
     /**
-     * Returns the feature IDs derived from the current interaction selection.
-     * Used by brush/click event emission. Does not include externally-set feature IDs.
+     * Returns the active selection as source feature ids.
      */
     get selection(): number[] {
-        const fids = new Set<number>();
-        for (const datum of this._selectedMarkDatums) {
-            const ids = (datum as AutkDatum).autkIds ?? [];
-            for (const fid of ids) fids.add(fid);
-        }
-        return Array.from(fids);
+        return Array.from(this._selectedFeatureIds);
     }
 
     /**
@@ -233,18 +234,19 @@ export abstract class ChartBase {
         })) as AutkDatum[];
         this._selectedMarkDatums = new Set();
         this._selectedFeatureIds = new Set();
+        this._selectionOrigin = null;
         this._activeBrushes.clear();
         this.draw();
     }
 
     /**
-     * Sets an external highlight from a linked view.
-     * Owns `_selectedFeatureIds` exclusively — does not touch `_selectedMarkDatums`.
+     * Sets an external highlight from a linked view and resolves matching mark datums.
      */
     setSelection(selection: number[]): void {
         this._selectedFeatureIds = new Set(selection);
+        this._selectionOrigin = selection.length > 0 ? 'external' : null;
+        this.syncSelectedMarksFromFeatures();
         if (selection.length === 0) {
-            this._selectedMarkDatums = new Set();
             this._activeBrushes.clear();
             this.clearBrushVisuals();
         }
@@ -326,6 +328,22 @@ export abstract class ChartBase {
     }
 
     /**
+     * Resolves the selection projection policy for the current chart config.
+     */
+    private resolveSelectionProjection(transform: ChartTransformConfig | undefined): 'bijective' | 'aggregated' {
+        const preset = transform?.preset;
+        if (
+            preset === 'binning-1d' ||
+            preset === 'binning-2d' ||
+            preset === 'binning-events' ||
+            preset === 'reduce-series'
+        ) {
+            return 'aggregated';
+        }
+        return 'bijective';
+    }
+
+    /**
      * Resolves and caches the color domain for the active color attribute.
      *
      * Extracts all values for the active render color attribute from `this.data`, then calls
@@ -400,22 +418,66 @@ export abstract class ChartBase {
     /**
      * Returns `true` when a mark should be highlighted.
      *
-     * Union of two independent layers:
-     * 1. Mark was directly selected by local interaction (`_selectedMarkDatums`).
-     * 2. Any of the mark's feature IDs are in the external selection (`_selectedFeatureIds`).
-     *
      * @param d Bound mark datum.
      */
     protected isMarkHighlighted(d: unknown): boolean {
         if (d == null || typeof d !== 'object') return false;
 
+        const datum = d as AutkDatum;
+
+        if (this._selectionProjection === 'aggregated') {
+            if (this._selectionOrigin === 'local') {
+                return this._selectedMarkDatums.has(d as object);
+            }
+            if (this._selectionOrigin === 'external') {
+                return (datum.autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
+            }
+            return false;
+        }
+
         if (this._selectedMarkDatums.has(d as object)) return true;
 
         if (this._selectedFeatureIds.size > 0) {
-            return ((d as AutkDatum).autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
+            return (datum.autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
         }
 
         return false;
+    }
+
+    /**
+     * Recomputes selected feature ids from the currently selected mark datums.
+     */
+    private syncSelectedFeaturesFromMarks(): void {
+        const fids = new Set<number>();
+        for (const datum of this._selectedMarkDatums) {
+            const ids = (datum as AutkDatum).autkIds ?? [];
+            for (const fid of ids) fids.add(fid);
+        }
+        this._selectedFeatureIds = fids;
+    }
+
+    /**
+     * Recomputes selected mark datums from the current selected feature ids.
+     */
+    private syncSelectedMarksFromFeatures(): void {
+        const selectedMarks = new Set<object>();
+
+        if (this._selectedFeatureIds.size === 0) {
+            this._selectedMarkDatums = selectedMarks;
+            return;
+        }
+
+        d3.select(this._div)
+            .selectAll('.autkMark')
+            .each((d) => {
+                if (d == null || typeof d !== 'object') return;
+                const ids = (d as AutkDatum).autkIds ?? [];
+                if (ids.some(fid => this._selectedFeatureIds.has(fid))) {
+                    selectedMarks.add(d as object);
+                }
+            });
+
+        this._selectedMarkDatums = selectedMarks;
     }
 
     /**
@@ -466,9 +528,8 @@ export abstract class ChartBase {
                 } else {
                     chart._selectedMarkDatums.add(d as object);
                 }
-                if (chart._selectedMarkDatums.size === 0) {
-                    chart._selectedFeatureIds = new Set();
-                }
+                chart.syncSelectedFeaturesFromMarks();
+                chart._selectionOrigin = chart._selectedFeatureIds.size > 0 ? 'local' : null;
                 chart.applyChartSelection();
                 chart.events.emit(ChartEvent.CLICK, { selection: chart.selection });
             });
@@ -477,6 +538,7 @@ export abstract class ChartBase {
         cls.on('click', function () {
             chart._selectedMarkDatums = new Set();
             chart._selectedFeatureIds = new Set();
+            chart._selectionOrigin = null;
             chart.applyChartSelection();
             chart.events.emit(ChartEvent.CLICK, { selection: [] });
         });
@@ -687,6 +749,8 @@ export abstract class ChartBase {
                 }
             });
 
+        this.syncSelectedFeaturesFromMarks();
+        this._selectionOrigin = this._selectedFeatureIds.size > 0 ? 'local' : null;
         return this.selection;
     }
 
@@ -699,6 +763,7 @@ export abstract class ChartBase {
         if (activeBrushes.size === 0) {
             this._selectedMarkDatums = new Set();
             this._selectedFeatureIds = new Set();
+            this._selectionOrigin = null;
         } else {
             this.resolveSelectionFromRects(activeBrushes);
         }

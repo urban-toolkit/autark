@@ -15,6 +15,7 @@ export class MapD3TemporalEvents {
     protected plotDiv!: HTMLElement;
 
     protected roads!: FeatureCollection<Geometry, GeoJsonProperties>;
+    protected selectionSource: 'map' | 'plot' | null = null;
 
     public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
         this.canvas = canvas;
@@ -83,7 +84,11 @@ export class MapD3TemporalEvents {
         this.map.draw();
 
         this.map.events.on(MapEvent.PICKING, ({ selection }) => {
+            if (this.selectionSource === 'plot') return;
+
+            this.selectionSource = 'map';
             this.plot.setSelection(selection);
+            this.selectionSource = null;
         });
     }
 
@@ -107,8 +112,12 @@ export class MapD3TemporalEvents {
         });
 
         this.plot.events.on(ChartEvent.BRUSH_X, ({ selection }) => {
+            if (this.selectionSource === 'map') return;
+
+            this.selectionSource = 'plot';
             const layer = this.map.layerManager.searchByLayerId('roads') as VectorLayer;
             layer?.setHighlightedIds(selection);
+            this.selectionSource = null;
         });
     }
 
