@@ -3,7 +3,7 @@
  *
  * Provides a D3-based table visualization with the following features:
  * - **Tabular rendering**: Displays feature properties as rows and columns
- * - **Sortable columns**: Clickable headers cycle through asc → desc → unsorted
+ * - **Sortable columns**: Clickable headers toggle between ascending and descending order
  * - **Selection and linked views**: Uses source feature ids for click selection and highlights, with selected rows pinned to the top
  * - **Customizable columns**: Axis/attribute mapping for flexible column selection and labeling
  *
