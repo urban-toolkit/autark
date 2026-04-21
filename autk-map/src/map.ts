@@ -534,6 +534,42 @@ export class AutkMap {
     }
 
     /**
+     * Removes all layers matching the provided id.
+     * @param id Layer identifier.
+     */
+    removeLayer(id: string): void {
+        this._layerManager.removeLayerById(id);
+        this._ui.refreshLayerList();
+    }
+
+    /**
+     * Replaces the highlighted selection of a pickable layer.
+     * @param id Layer identifier.
+     * @param selection Component ids to highlight.
+     */
+    setHighlightedIds(id: string, selection: number[]): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if (!layer || !layer.supportsHighlight) {
+            return;
+        }
+
+        layer.setHighlightedIds(selection);
+    }
+
+    /**
+     * Clears the highlighted selection of a pickable layer.
+     * @param id Layer identifier.
+     */
+    clearHighlightedIds(id: string): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if (!layer || !layer.supportsHighlight) {
+            return;
+        }
+
+        layer.clearHighlightedIds();
+    }
+
+    /**
      * Starts the continuous render loop.
      *
      * @param fps Target frames per second (default `60`). Pass `0` to render as fast as possible.

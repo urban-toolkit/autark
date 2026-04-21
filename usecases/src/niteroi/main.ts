@@ -1,5 +1,5 @@
 import type { FeatureCollection, Feature, Geometry, GeoJsonProperties } from 'geojson';
-import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, VectorLayer, MapStyle, MapEvent } from 'autk-map';
+import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, MapStyle, MapEvent } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 import { ComputeGpgpu } from 'autk-compute';
 import { AutkChart, ChartEvent, ChartStyle } from 'autk-plot';
@@ -243,8 +243,7 @@ export class OsmLayersApi {
         });
 
         this.plot.events.on(ChartEvent.BRUSH, ({ selection: ids }) => {
-            const layer = this.map.layerManager.searchByLayerId('table_osm_roads') as VectorLayer;
-            if (layer) layer.setHighlightedIds(ids);
+            this.map.setHighlightedIds('table_osm_roads', ids);
             this.map.draw();
 
             if (this._linechartDebounce) clearTimeout(this._linechartDebounce);

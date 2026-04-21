@@ -2,7 +2,7 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
 
-import { AutkMap, VectorLayer, MapEvent } from 'autk-map';
+import { AutkMap, MapEvent } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
@@ -53,8 +53,7 @@ export class MapD3 {
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
         this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
-            const layer = <VectorLayer>this.map.layerManager.searchByLayerId(layerId);
-            layer!.setHighlightedIds(selection);
+            this.map.setHighlightedIds(layerId, selection);
         });
     }
 }

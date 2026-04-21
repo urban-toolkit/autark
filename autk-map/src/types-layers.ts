@@ -70,8 +70,6 @@ export interface LayerData {
     raster?: Float32Array;
     /** Thematic values used for color mapping. */
     thematic?: LayerThematic[];
-    /** Highlighted component indices. */
-    highlighted?: number[];
 }
 
 /**

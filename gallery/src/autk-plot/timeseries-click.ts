@@ -1,7 +1,7 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
+import { AutkMap, MapEvent } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
@@ -61,15 +61,13 @@ export class MapD3Timeseries {
         });
 
         this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
-            layer?.setHighlightedIds(selection);
+            this.map.setHighlightedIds('neighborhoods', selection);
         });
     }
 
     protected updateMapListeners(): void {
         this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId('neighborhoods') as VectorLayer;
-            layer?.setHighlightedIds(selection);
+            this.map.setHighlightedIds('neighborhoods', selection);
 
             this.plot.setSelection(selection);
         });

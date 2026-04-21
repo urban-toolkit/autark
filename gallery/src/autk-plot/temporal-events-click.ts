@@ -1,7 +1,7 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import { AutkSpatialDb, LayerType } from 'autk-db';
-import { AutkMap, MapEvent, MapStyle, VectorLayer } from 'autk-map';
+import { AutkMap, MapEvent, MapStyle } from 'autk-map';
 import { AutkChart, ChartEvent } from 'autk-plot';
 
 const URL = (import.meta as any).env.BASE_URL;
@@ -115,8 +115,7 @@ export class MapD3TemporalEvents {
             if (this.selectionSource === 'map') return;
 
             this.selectionSource = 'plot';
-            const layer = this.map.layerManager.searchByLayerId('roads') as VectorLayer;
-            layer?.setHighlightedIds(selection);
+            this.map.setHighlightedIds('roads', selection);
             this.selectionSource = null;
         });
     }

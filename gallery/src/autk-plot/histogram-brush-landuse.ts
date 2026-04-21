@@ -1,7 +1,7 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
+import { AutkMap, MapEvent } from 'autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
@@ -46,8 +46,7 @@ export class MapD3HistogramLanduse {
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
         this.plot.events.on(ChartEvent.BRUSH_X, ({ selection }) => {
-            const layer = this.map.layerManager.searchByLayerId(layerId) as VectorLayer;
-            layer?.setHighlightedIds(selection);
+            this.map.setHighlightedIds(layerId, selection);
         });
     }
 

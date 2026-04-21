@@ -10,14 +10,14 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/autk-map.umd.cjs",
-  "module": "./dist/autk-map.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/autk-map.js",
-      "require": "./dist/autk-map.umd.cjs"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {

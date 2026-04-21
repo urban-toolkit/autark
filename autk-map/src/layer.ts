@@ -97,6 +97,12 @@ export abstract class Layer {
     clearHighlightedIds(): void {}
 
     /**
+     * Replaces the highlighted feature selection. No-op for layers that do not support highlighting.
+     * @param _ids Component ids to highlight.
+     */
+    setHighlightedIds(_ids: number[]): void {}
+
+    /**
      * Releases resources owned by this layer.
      * Override in subclasses that allocate GPU resources.
      */

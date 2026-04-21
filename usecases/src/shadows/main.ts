@@ -6,7 +6,7 @@ import { FeatureCollection } from 'geojson';
 
 import { AutkSpatialDb } from 'autk-db';
 import { ComputeGpgpu } from 'autk-compute';
-import { AutkMap, LayerType, VectorLayer, MapEvent } from 'autk-map';
+import { AutkMap, LayerType, MapEvent } from 'autk-map';
 import { AutkChart, ChartEvent } from 'autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
@@ -144,8 +144,7 @@ export class Shadows {
             : DEFAULT_MONTH;
         this.currentMonth = normalizedMonth;
 
-        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
-        roadsLayer?.clearHighlightedIds();
+        this.map.clearHighlightedIds(this.ROADS_LAYER);
 
         // Recompute accumulated shadows for the new date if a building is selected.
         if (this.selectedBuildingRing) {
@@ -167,8 +166,7 @@ export class Shadows {
     changeDisplayMode(mode: 'heatmap' | 'compute' | 'contribution'): void {
         this.displayMode = mode;
 
-        const roadsLayer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER) as VectorLayer;
-        roadsLayer?.clearHighlightedIds();
+        this.map.clearHighlightedIds(this.ROADS_LAYER);
 
         this.updateThematicData();
     }
@@ -331,8 +329,7 @@ export class Shadows {
         this.selectedBuildingId = id;
 
         // Enforce single-selection: clear any previously highlighted building.
-        const buildingsLayer = this.map.layerManager.searchByLayerId('table_osm_buildings') as VectorLayer;
-        buildingsLayer?.setHighlightedIds([id]);
+        this.map.setHighlightedIds('table_osm_buildings', [id]);
 
         // Buildings are now single features with GeometryCollection parts.
         // Use the largest available ring and the max part height.
@@ -406,8 +403,7 @@ export class Shadows {
      */
     protected updateHistogramListeners(): void {
         this.histogram.events.on(ChartEvent.BRUSH_X, ({ selection: roadIds }) => {
-            const layer = this.map.layerManager.searchByLayerId(this.ROADS_LAYER);
-            (<VectorLayer>layer)?.setHighlightedIds(roadIds);
+            this.map.setHighlightedIds(this.ROADS_LAYER, roadIds);
             this.map.draw();
         });
     }

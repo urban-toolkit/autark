@@ -4,7 +4,7 @@ import { FeatureCollection } from 'geojson';
 import { AutkSpatialDb } from 'autk-db';
 import { ComputeGpgpu, ComputeRender } from 'autk-compute';
 import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap, LayerType, MapEvent, VectorLayer } from 'autk-map';
+import { AutkMap, LayerType, MapEvent } from 'autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
 const URL = (import.meta as any).env.BASE_URL;
@@ -348,7 +348,7 @@ export class Urbane {
             if (this._currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
-            (<VectorLayer>this.map.layerManager.searchByLayerId(this._currentLevel))!.setHighlightedIds(selection);
+            this.map.setHighlightedIds(this._currentLevel, selection);
             this.parallel.setSelection(selection);
         });
 
@@ -356,7 +356,7 @@ export class Urbane {
             if (this._currentLevel === 'neighborhoods')
                 this.selectedNeighIds = selection;
 
-            (<VectorLayer>this.map.layerManager.searchByLayerId(this._currentLevel))!.setHighlightedIds(selection);
+            this.map.setHighlightedIds(this._currentLevel, selection);
             this.table.setSelection(selection);
         });
     }
@@ -472,7 +472,7 @@ export class Urbane {
             this.selectedNeighIds = [];
 
             await this.db.removeLayer('active_buildings');
-            this.map.layerManager.removeLayerById('active_buildings');
+            this.map.removeLayer('active_buildings');
             this.map.updateRenderInfo('table_osm_buildings', { isSkip: false, isPick: false });
             this.map.updateRenderInfo('neighborhoods', { isSkip: false, isPick: true });
         }

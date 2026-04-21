@@ -81,37 +81,7 @@ export type {
 export { MapStyle } from './map-style';
 export type { MapStylePresetId, MapStyleShape } from './map-style';
 
-// ─── Map UI ──────────────────────────────────────────────────────────────────
-
-export { AutkMapUi } from './map-ui';
-
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 export { MapEvent, MouseStatus } from './types-events';
 export type { MapEventData, MapEventRecord } from './types-events';
-
-export { KeyEvents } from './events-key';
-export { MouseEvents } from './events-mouse';
-export { ResizeEvents } from './events-resize';
-
-// ─── Layers ──────────────────────────────────────────────────────────────────
-
-export { Layer } from './layer';
-export { VectorLayer } from './layer-vector';
-export { Triangles2DLayer } from './layer-triangles2D';
-export { Triangles3DLayer } from './layer-triangles3D';
-export { RasterLayer } from './layer-raster';
-export { LayerManager } from './layer-manager';
-
-// ─── Render pipelines ────────────────────────────────────────────────────────
-
-export { Pipeline } from './pipeline';
-export { PipelineTriangleBorder } from './pipeline-triangle-border';
-export { PipelineTriangleFlat } from './pipeline-triangle-flat';
-export { PipelineTrianglePicking } from './pipeline-triangle-picking';
-export { PipelineTriangleRaster } from './pipeline-triangle-raster';
-export { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
-
-// ─── Renderer ────────────────────────────────────────────────────────────────
-
-export { Renderer } from './renderer';
