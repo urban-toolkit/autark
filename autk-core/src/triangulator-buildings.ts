@@ -10,7 +10,8 @@ export class TriangulatorBuildings {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];
 
-        for (const feature of geojson.features) {
+        for (let fId = 0; fId < geojson.features.length; fId++) {
+            const feature = geojson.features[fId];
             if (feature.geometry?.type !== 'GeometryCollection') {
                 console.warn('Expected GeometryCollection for building feature, got:', feature.geometry?.type);
                 continue;
@@ -65,14 +66,14 @@ export class TriangulatorBuildings {
                     mesh.push({ 
                         position: new Float32Array(chunk.flatCoords), 
                         indices: new Uint32Array(chunk.flatIds),
-                        featureIndex: comps.length,
+                        featureIndex: fId,
                     });
                     nPoints += chunk.flatCoords.length / 3;
                     nTriangles += chunk.flatIds.length / 3;
                 }
             }
 
-            comps.push({ nPoints, nTriangles });
+            comps.push({ nPoints, nTriangles, featureIndex: fId, featureId: feature.id });
         }
 
         return [mesh, comps];

@@ -78,7 +78,6 @@ export interface LayerData {
  * Numeric thematic payload associated with a layer.
  */
 export interface LayerThematic {
-    /** Values aligned with layer components or raster cells. */
+    /** Values aligned with rendered layer components or raster cells. */
     values: Float32Array;
 }
-

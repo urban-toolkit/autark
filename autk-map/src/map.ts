@@ -21,6 +21,7 @@ import {
     valueAtPath,
     LayerType,
     ResolvedDomain,
+    mapGeometryTypeToLayerType,
 } from './types-core';
 import { MapEvent } from './types-events';
 import type { MapEventRecord } from './types-events';
@@ -166,8 +167,11 @@ export class AutkMap {
     /**
      * Loads a GeoJSON feature collection as a map layer.
      *
-     * When `type` is omitted the layer type is inferred from the geometry of the
-     * first feature (Point → 'points', LineString → 'polylines', Polygon → 'polygons').
+     * When `type` is omitted the layer type is inferred from all non-null
+     * geometries in the collection. Implicit inference only works for
+     * collections that resolve to a single geometry family
+     * (Point → 'points', LineString → 'polylines', Polygon → 'polygons').
+     * Mixed-geometry collections must pass an explicit `type`.
      *
      * Supported layer types: 'surface', 'water', 'parks', 'roads', 'buildings',
      * 'points', 'polylines', 'polygons', 'raster'.
@@ -183,31 +187,23 @@ export class AutkMap {
             this.layerManager.initializeOrigin(collection);
         }
 
-        let sType = type ?? (collection.features.length > 0 ? collection.features[0].geometry?.type : null);
+        let sType = type ?? this.inferCollectionLayerType(collection, id);
+        if (!sType) { return; }
 
         switch (sType) {
-            case 'Polygon':
-            case 'MultiPolygon':
             case 'surface':
             case 'water':
             case 'parks':
             case 'polygons':
-                sType = sType === 'Polygon' || sType === 'MultiPolygon' ? 'polygons' : sType;
                 this.createPolygonsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
 
             case 'roads':
-            case 'LineString':
-            case 'MultiLineString':
             case 'polylines': {
-                sType = sType === 'LineString' || sType === 'MultiLineString' ? 'polylines' : sType;
                 this.createPolylinesLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
             }
-            case 'Point':
-            case 'MultiPoint':
             case 'points':
-                sType = sType === 'Point' || sType === 'MultiPoint' ? 'points' : sType;
                 this.createPointsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
                 break;
 
@@ -229,11 +225,60 @@ export class AutkMap {
     }
 
     /**
+     * Infers a layer type from a homogeneous collection of vector geometries.
+     *
+     * Returns `null` when the collection is empty, contains only null geometries,
+     * or mixes multiple geometry families that require an explicit layer type.
+     */
+    private inferCollectionLayerType(collection: FeatureCollection<Geometry | null>, layerId: string): LayerType | null {
+        const families = new Set<Extract<LayerType, 'points' | 'polygons' | 'polylines'>>();
+        const visitGeometry = (geometry: Geometry | null, featureIndex: number): void => {
+            if (!geometry) {
+                console.warn(`Layer "${layerId}": feature ${featureIndex} has null geometry and will be ignored during type inference.`);
+                return;
+            }
+
+            if (geometry.type === 'GeometryCollection') {
+                for (const child of geometry.geometries) {
+                    visitGeometry(child, featureIndex);
+                }
+                return;
+            }
+
+            families.add(mapGeometryTypeToLayerType(geometry.type));
+        };
+
+        for (let index = 0; index < collection.features.length; index++) {
+            const feature = collection.features[index];
+            visitGeometry(feature.geometry, index);
+            if (families.size > 1) {
+                console.error(
+                    `Layer "${layerId}": cannot infer layer type from mixed geometry families. Pass an explicit type or split the collection.`
+                );
+                return null;
+            }
+        }
+
+        const [family] = families;
+        if (family) {
+            return family;
+        }
+
+        console.error(`Layer "${layerId}": cannot infer layer type from an empty or geometry-less collection.`);
+        return null;
+    }
+
+    /**
      * Updates the thematic (color-mapped) values of a layer from a feature collection.
      *
      * Normalization to `[0, 1]` (required by the GPU shader) and legend label
-    * generation are delegated to `ColorMap` based on the active layer
-    * `colorMap` configuration.
+     * generation are delegated to `ColorMap` based on the active layer
+     * `colorMap` configuration.
+     *
+     * Thematic values are aligned to rendered components through source feature
+     * metadata captured during triangulation. When both the layer and the input
+     * collection expose feature ids, matching is done by `feature.id`; otherwise
+     * the update falls back to the original feature index order.
      *
      * For raster layers the raster texture is rebuilt from `property`.
      *
@@ -248,10 +293,11 @@ export class AutkMap {
         if (!layer) { return; }
         if (layer.layerInfo.typeLayer === 'raster') { return; };
 
-        const thematicData: LayerThematic[] = [];
-
         const features = collection.features;
         if (features.length === 0) { return; }
+
+        const components = layer.components;
+        if (components.length === 0) { return; }
 
         const propertyResolver = (item: unknown) => valueAtPath(item, property);
         const sample = features
@@ -265,10 +311,37 @@ export class AutkMap {
         }
 
         const dataType = isNumericLike(sample) ? 'number' : typeof sample;
+        if (dataType !== 'number' && dataType !== 'string') {
+            console.warn(`Unsupported thematic property type on layer '${id}': ${dataType}`);
+            this.updateRenderInfo(id, { isColorMap: false });
+            return;
+        }
 
         let resolvedDomain: ResolvedDomain = [];
 
         const colorMap = layer.layerRenderInfo.colormap.config;
+        const thematicByFeatureIndex: LayerThematic[] = [];
+        const canMatchById = components.every((component) => component.featureId !== undefined)
+            && features.every((feature) => feature.id !== undefined);
+        const thematicByFeatureId = canMatchById ? new Map<string | number, LayerThematic>() : null;
+
+        const storeThematicValue = (featureIndex: number, value: number): boolean => {
+            const thematic = { values: new Float32Array([value]) };
+            thematicByFeatureIndex[featureIndex] = thematic;
+
+            if (!thematicByFeatureId) {
+                return true;
+            }
+
+            const featureId = features[featureIndex].id as string | number;
+            if (thematicByFeatureId.has(featureId)) {
+                console.error(`Layer '${id}': duplicate feature id '${featureId}' prevents thematic matching.`);
+                return false;
+            }
+
+            thematicByFeatureId.set(featureId, thematic);
+            return true;
+        };
 
         if (dataType === 'number') {
             const rawValues = features.map(f => {
@@ -277,17 +350,50 @@ export class AutkMap {
             });
 
             resolvedDomain = ColorMap.resolveDomainFromData(rawValues, colorMap);
-            rawValues.forEach(v => thematicData.push({ values: new Float32Array([v]) }));
+            for (let featureIndex = 0; featureIndex < rawValues.length; featureIndex++) {
+                if (!storeThematicValue(featureIndex, rawValues[featureIndex])) {
+                    return;
+                }
+            }
         } 
         else if (dataType === 'string') {
             const rawValues = features.map(f => String(propertyResolver(f) ?? ''));
             const categoricalDomain = ColorMap.resolveDomainFromData(rawValues, colorMap) as string[];
             resolvedDomain = categoricalDomain;
-            rawValues.forEach(value => {
-                thematicData.push({ values: new Float32Array([
-                    categoricalDomain.indexOf(value)
-                ]) });
-            });
+            for (let featureIndex = 0; featureIndex < rawValues.length; featureIndex++) {
+                if (!storeThematicValue(featureIndex, categoricalDomain.indexOf(rawValues[featureIndex]))) {
+                    return;
+                }
+            }
+        }
+
+        const thematicData: LayerThematic[] = [];
+        if (thematicByFeatureId) {
+            for (const component of components) {
+                const thematic = thematicByFeatureId.get(component.featureId as string | number);
+                if (!thematic) {
+                    console.error(
+                        `Layer '${id}': missing thematic value for feature id '${String(component.featureId)}'.`
+                    );
+                    return;
+                }
+                thematicData.push(thematic);
+            }
+        } else {
+            for (const component of components) {
+                const thematic = thematicByFeatureIndex[component.featureIndex];
+                if (!thematic) {
+                    console.error(
+                        `Layer '${id}': missing thematic value for source feature index ${component.featureIndex}.`
+                    );
+                    return;
+                }
+                thematicData.push(thematic);
+            }
+        }
+
+        if (!layer.loadThematic(thematicData)) {
+            return;
         }
 
         layer.updateLayerRenderInfo({
@@ -299,7 +405,6 @@ export class AutkMap {
         });
         this._ui.refreshLegend(layer);
 
-        layer.loadThematic(thematicData);
         layer.makeLayerDataDirty();
     }
 

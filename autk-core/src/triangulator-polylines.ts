@@ -17,15 +17,19 @@ export class TriangulatorPolylines {
         let meshes: { flatCoords: number[], flatIds: number[] }[];
         for (let fId = 0; fId < collection.length; fId++) {
             const feature = collection[fId];
+            if (!feature.geometry) {
+                TriangulatorPolylines.warnSkippedFeature(fId, null);
+                continue;
+            }
 
             if (feature.geometry.type === 'LineString') {
                 meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
             } else if (feature.geometry.type === 'MultiLineString') {
                 meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
             } else if (feature.geometry.type === 'GeometryCollection') {
-                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, TriangulatorPolylines.offset);
+                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, TriangulatorPolylines.offset, fId);
             } else {
-                console.warn('Unsupported geometry type:', feature.geometry.type);
+                TriangulatorPolylines.warnSkippedFeature(fId, feature.geometry.type);
                 continue;
             }
 
@@ -41,7 +45,7 @@ export class TriangulatorPolylines {
                 nPoints += triangulation.flatCoords.length / 2;
                 nTriangles += triangulation.flatIds.length / 3;
             }
-            comps.push({ nPoints, nTriangles });
+            comps.push({ nPoints, nTriangles, featureIndex: fId, featureId: feature.id });
         }
         return [mesh, comps];
     }
@@ -80,7 +84,7 @@ export class TriangulatorPolylines {
         return meshes;
     }
 
-    static geometryCollectionToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
+    static geometryCollectionToPolyline(feature: Feature, origin: number[], offset: number, featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
         const meshes = [];
         for (const geom of geometries) {
@@ -89,8 +93,22 @@ export class TriangulatorPolylines {
                 meshes.push(...TriangulatorPolylines.lineStringToPolyline(syntheticFeature, origin, offset));
             } else if (geom.type === 'MultiLineString') {
                 meshes.push(...TriangulatorPolylines.multiLineStringToPolyline(syntheticFeature, origin, offset));
+            } else {
+                TriangulatorPolylines.warnSkippedGeometryCollectionChild(featureIndex, geom.type);
             }
         }
         return meshes;
+    }
+
+    private static warnSkippedFeature(featureIndex: number, geometryType: string | null): void {
+        console.warn(
+            `[autk-core] TriangulatorPolylines skipped feature ${featureIndex}: expected LineString or MultiLineString geometry, got ${geometryType ?? 'null'}.`
+        );
+    }
+
+    private static warnSkippedGeometryCollectionChild(featureIndex: number, geometryType: string): void {
+        console.warn(
+            `[autk-core] TriangulatorPolylines skipped GeometryCollection child in feature ${featureIndex}: expected LineString or MultiLineString geometry, got ${geometryType}.`
+        );
     }
 }

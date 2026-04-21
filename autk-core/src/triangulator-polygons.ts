@@ -14,6 +14,10 @@ export class TriangulatorPolygons {
         let meshes: { flatCoords: number[], flatIds: number[] }[];
         for (let fId=0; fId<collection.length; fId++) {
             const feature = collection[fId];
+            if (!feature.geometry) {
+                TriangulatorPolygons.warnSkippedFeature(fId, null);
+                continue;
+            }
 
             if (feature.geometry.type === 'LineString') {
                 meshes = TriangulatorPolygons.lineStringToMesh(feature, origin);
@@ -24,9 +28,9 @@ export class TriangulatorPolygons {
             } else if (feature.geometry.type === 'MultiPolygon') {
                 meshes = TriangulatorPolygons.multiPolygonToMesh(feature, origin);
             } else if (feature.geometry.type === 'GeometryCollection') {
-                meshes = TriangulatorPolygons.geometryCollectionToMesh(feature, origin);
+                meshes = TriangulatorPolygons.geometryCollectionToMesh(feature, origin, fId);
             } else {
-                console.warn('Unsupported geometry type:', feature.geometry.type);
+                TriangulatorPolygons.warnSkippedFeature(fId, feature.geometry.type);
                 continue;
             }
 
@@ -43,7 +47,7 @@ export class TriangulatorPolygons {
                 nTriangles += triangulation.flatIds.length / 3;
             }
 
-            comps.push({nPoints, nTriangles});
+            comps.push({ nPoints, nTriangles, featureIndex: fId, featureId: feature.id });
         }
 
         return [mesh, comps];
@@ -59,6 +63,10 @@ export class TriangulatorPolygons {
 
         for (let fId=0; fId<collection.length; fId++) {
             const feature = collection[fId];
+            if (!feature.geometry) {
+                TriangulatorPolygons.warnSkippedFeature(fId, null);
+                continue;
+            }
 
             if (feature.geometry.type === 'LineString') {
                 borders = TriangulatorPolygons.lineStringToBorderMesh(feature, origin);
@@ -69,9 +77,9 @@ export class TriangulatorPolygons {
             } else if (feature.geometry.type === 'MultiPolygon') {
                 borders = TriangulatorPolygons.multiPolygonToBorderMesh(feature, origin);
             } else if (feature.geometry.type === 'GeometryCollection') {
-                borders = TriangulatorPolygons.geometryCollectionToBorderMesh(feature, origin);
+                borders = TriangulatorPolygons.geometryCollectionToBorderMesh(feature, origin, fId);
             } else {
-                console.warn('Unsupported geometry type:', feature.geometry.type);
+                TriangulatorPolygons.warnSkippedFeature(fId, feature.geometry.type);
                 continue;
             }
 
@@ -193,7 +201,7 @@ export class TriangulatorPolygons {
         return borders;
     }
 
-    static geometryCollectionToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+    static geometryCollectionToMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
         const meshes = [];
         for (const geom of geometries) {
@@ -202,11 +210,12 @@ export class TriangulatorPolygons {
             else if (geom.type === 'MultiLineString') meshes.push(...TriangulatorPolygons.multiLineStringToMesh(syntheticFeature, origin));
             else if (geom.type === 'Polygon') meshes.push(...TriangulatorPolygons.polygonToMesh(syntheticFeature, origin));
             else if (geom.type === 'MultiPolygon') meshes.push(...TriangulatorPolygons.multiPolygonToMesh(syntheticFeature, origin));
+            else TriangulatorPolygons.warnSkippedGeometryCollectionChild(featureIndex, geom.type);
         }
         return meshes;
     }
 
-    static geometryCollectionToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+    static geometryCollectionToBorderMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
         const borders = [];
         for (const geom of geometries) {
@@ -215,8 +224,21 @@ export class TriangulatorPolygons {
             else if (geom.type === 'MultiLineString') borders.push(...TriangulatorPolygons.multiLineStringToBorderMesh(syntheticFeature, origin));
             else if (geom.type === 'Polygon') borders.push(...TriangulatorPolygons.polygonToBorderMesh(syntheticFeature, origin));
             else if (geom.type === 'MultiPolygon') borders.push(...TriangulatorPolygons.multiPolygonToBorderMesh(syntheticFeature, origin));
+            else TriangulatorPolygons.warnSkippedGeometryCollectionChild(featureIndex, geom.type);
         }
         return borders;
+    }
+
+    private static warnSkippedFeature(featureIndex: number, geometryType: string | null): void {
+        console.warn(
+            `[autk-core] TriangulatorPolygons skipped feature ${featureIndex}: expected LineString, MultiLineString, Polygon, or MultiPolygon geometry, got ${geometryType ?? 'null'}.`
+        );
+    }
+
+    private static warnSkippedGeometryCollectionChild(featureIndex: number, geometryType: string): void {
+        console.warn(
+            `[autk-core] TriangulatorPolygons skipped GeometryCollection child in feature ${featureIndex}: expected LineString, MultiLineString, Polygon, or MultiPolygon geometry, got ${geometryType}.`
+        );
     }
 
     protected static generateBorderIds(nCoords: number): number[] {

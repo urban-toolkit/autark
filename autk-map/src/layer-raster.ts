@@ -252,7 +252,9 @@ export class RasterLayer extends Layer {
 
             this._components.push({
                 nPoints: accum.nPoints,
-                nTriangles: accum.nTriangles
+                nTriangles: accum.nTriangles,
+                featureIndex: comp.featureIndex,
+                featureId: comp.featureId,
             });
         }
     }

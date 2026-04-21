@@ -29,7 +29,7 @@ export class TriangulatorRaster {
             indices: new Uint32Array(flatIds) 
         });
 
-        comps.push({ nPoints: flatCoords.length / 2, nTriangles: flatIds.length / 3 });
+        comps.push({ nPoints: flatCoords.length / 2, nTriangles: flatIds.length / 3, featureIndex: 0 });
 
         return [mesh, comps];
     }

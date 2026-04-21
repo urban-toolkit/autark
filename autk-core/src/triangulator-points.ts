@@ -12,15 +12,19 @@ export class TriangulatorPoints {
         let meshes: { flatCoords: number[], flatIds: number[] }[];
         for (let fId = 0; fId < collection.length; fId++) {
             const feature = collection[fId];
+            if (!feature.geometry) {
+                TriangulatorPoints.warnSkippedFeature(fId, null);
+                continue;
+            }
 
             if (feature.geometry.type === 'Point') {
                 meshes = TriangulatorPoints.pointToMesh(feature, origin);
             } else if (feature.geometry.type === 'MultiPoint') {
                 meshes = TriangulatorPoints.multiPointToMesh(feature, origin);
             } else if (feature.geometry.type === 'GeometryCollection') {
-                meshes = TriangulatorPoints.geometryCollectionToMesh(feature, origin);
+                meshes = TriangulatorPoints.geometryCollectionToMesh(feature, origin, fId);
             } else {
-                console.warn('Unsupported geometry type:', feature.geometry.type);
+                TriangulatorPoints.warnSkippedFeature(fId, feature.geometry.type);
                 continue;
             }
 
@@ -36,7 +40,7 @@ export class TriangulatorPoints {
                 nPoints += triangulation.flatCoords.length / 2;
                 nTriangles += triangulation.flatIds.length / 3;
             }
-            comps.push({ nPoints, nTriangles });
+            comps.push({ nPoints, nTriangles, featureIndex: fId, featureId: feature.id });
         }
 
         return [mesh, comps];
@@ -68,15 +72,28 @@ export class TriangulatorPoints {
         return meshes;
     }
 
-    static geometryCollectionToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
+    static geometryCollectionToMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
         const meshes = [];
         for (const geom of geometries) {
             const syntheticFeature = { ...feature, geometry: geom } as Feature;
             if (geom.type === 'Point') meshes.push(...TriangulatorPoints.pointToMesh(syntheticFeature, origin));
             else if (geom.type === 'MultiPoint') meshes.push(...TriangulatorPoints.multiPointToMesh(syntheticFeature, origin));
+            else TriangulatorPoints.warnSkippedGeometryCollectionChild(featureIndex, geom.type);
         }
         return meshes;
+    }
+
+    private static warnSkippedFeature(featureIndex: number, geometryType: string | null): void {
+        console.warn(
+            `[autk-core] TriangulatorPoints skipped feature ${featureIndex}: expected Point or MultiPoint geometry, got ${geometryType ?? 'null'}.`
+        );
+    }
+
+    private static warnSkippedGeometryCollectionChild(featureIndex: number, geometryType: string): void {
+        console.warn(
+            `[autk-core] TriangulatorPoints skipped GeometryCollection child in feature ${featureIndex}: expected Point or MultiPoint geometry, got ${geometryType}.`
+        );
     }
 
     static sampleCircle(centerX: number, centerY: number, radius: number, numPoints: number): [number, number][] {

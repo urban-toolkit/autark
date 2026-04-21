@@ -18,7 +18,7 @@ import type {
 export interface LoadCollectionParams {
     /** Source feature collection. Raster collections may contain null geometries. */
     collection: FeatureCollection<Geometry | null>;
-    /** Optional explicit geometry type override. */
+    /** Optional explicit layer type override. Required for mixed-geometry collections. */
     type?: LayerType | null;
     /**
      * Optional accessor used for immediate thematic mapping.
@@ -49,7 +49,7 @@ export interface UpdateRasterParams {
  * Parameters for updating a layer's thematic (color-mapped) values.
  */
 export interface UpdateThematicParams {
-    /** Source feature collection used to derive thematic values. */
+    /** Source feature collection used to derive thematic values. Prefer the original loaded feature ids/order. */
     collection: FeatureCollection;
     /** Dot-path accessor resolved from each item in the collection. */
     property: string;

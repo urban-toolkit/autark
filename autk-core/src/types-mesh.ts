@@ -11,6 +11,8 @@ export interface LayerGeometry {
 export interface LayerComponent {
     nPoints: number;
     nTriangles: number;
+    featureIndex: number;
+    featureId?: string | number;
 }
 
 /** Border (outline) vertex data. */

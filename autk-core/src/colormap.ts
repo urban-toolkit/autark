@@ -109,15 +109,16 @@ export class ColorMap {
     public static isCategorical(interpolator: ColorMapInterpolator): boolean {
         return CATEGORICAL_INTERPOLATORS.has(interpolator);
     }
+    
+    private static isDiverging(interpolator: ColorMapInterpolator): boolean {
+        return DIVERGING_INTERPOLATORS.has(interpolator);
+    }
 
     public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
         if (!ColorMap.isCategorical(interpolator)) return null;
         return (d3_scheme[interpolator] as string[]).length;
     }
 
-    private static isDiverging(interpolator: ColorMapInterpolator): boolean {
-        return DIVERGING_INTERPOLATORS.has(interpolator);
-    }
 
     /**
      * Resolves a numeric domain from data and color-map configuration.

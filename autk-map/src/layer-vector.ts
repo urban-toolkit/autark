@@ -247,7 +247,9 @@ export abstract class VectorLayer extends Layer {
 
             this._components.push({
                 nPoints: accum.nPoints,
-                nTriangles: accum.nTriangles
+                nTriangles: accum.nTriangles,
+                featureIndex: comp.featureIndex,
+                featureId: comp.featureId,
             });
         }
     }
@@ -255,8 +257,16 @@ export abstract class VectorLayer extends Layer {
     /**
      * Load the thematic data for the layer.
      * @param {LayerThematic[]} layerThematic - The thematic data to load.
+     * @returns {boolean} `true` when the thematic buffer was updated successfully.
      */
-    loadThematic(layerThematic: LayerThematic[]): void {
+    loadThematic(layerThematic: LayerThematic[]): boolean {
+        if (layerThematic.length !== this._components.length) {
+            console.error(
+                `VectorLayer.loadThematic: expected ${this._components.length} thematic entries, got ${layerThematic.length}.`
+            );
+            return false;
+        }
+
         const thematic = new Float32Array(this._vertexCount);
 
         let offset = 0;
@@ -266,8 +276,15 @@ export abstract class VectorLayer extends Layer {
             offset += aggr.length;
         }
 
-        console.assert(thematic.length === this._vertexCount);
+        if (offset !== this._vertexCount) {
+            console.error(
+                `VectorLayer.loadThematic: filled ${offset} thematic values for ${this._vertexCount} vertices.`
+            );
+            return false;
+        }
+
         this._thematic = thematic;
+        return true;
     }
 
     /**

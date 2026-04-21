@@ -75,7 +75,6 @@ export class ComputeRenderOsmVisibility {
             property: 'properties.compute.visibilityValue',
         });
         this.map.updateRenderInfo('table_osm_buildings', { isColorMap: true, isPick: true, opacity: 0.92 });
-        this.map.updateRenderInfo('table_osm_roads', { opacity: 0.2 });
     }
 
     protected updateMapListeners(): void {
