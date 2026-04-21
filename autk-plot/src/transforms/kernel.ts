@@ -32,7 +32,7 @@ export function reduceBuckets(options: {
     reducer: TransformReducer;
 }): ReducedBucket[] {
     const { rows, bucketOf, valueOf, reducer } = options;
-    const buckets = new Map<string, { count: number; sum: number; min: number; max: number; autkIds: number[] }>();
+    const buckets = new Map<string, { count: number; sum: number; min: number; max: number; autkIds: Set<number> }>();
 
     rows.forEach((row, rowIndex) => {
         const key = bucketOf(row);
@@ -43,17 +43,17 @@ export function reduceBuckets(options: {
             : [];
         const rowAutkIds = ids.length > 0 ? ids : [rowIndex];
 
-        if (!buckets.has(key)) {
-            buckets.set(key, { 
-                count: 0, 
-                sum: 0, 
-                min: Number.POSITIVE_INFINITY, 
-                max: Number.NEGATIVE_INFINITY, 
-                autkIds: [] 
-            });
+        let bucket = buckets.get(key);
+        if (!bucket) {
+            bucket = {
+                count: 0,
+                sum: 0,
+                min: Number.POSITIVE_INFINITY,
+                max: Number.NEGATIVE_INFINITY,
+                autkIds: new Set<number>(),
+            };
+            buckets.set(key, bucket);
         }
-
-        const bucket = buckets.get(key)!;
         const numericValue = valueOf ? valueOf(row) : 1;
         if (numericValue === null || !Number.isFinite(numericValue)) return;
 
@@ -62,8 +62,7 @@ export function reduceBuckets(options: {
         bucket.min = Math.min(bucket.min, numericValue);
         bucket.max = Math.max(bucket.max, numericValue);
 
-        const merged = [...bucket.autkIds, ...rowAutkIds];
-        bucket.autkIds = merged.length > 0 ? Array.from(new Set(merged)) : bucket.autkIds;
+        rowAutkIds.forEach(id => bucket!.autkIds.add(id));
     });
 
     return Array.from(buckets.entries())
@@ -75,7 +74,7 @@ export function reduceBuckets(options: {
             else if (reducer === 'min') value = b.count > 0 ? b.min : 0;
             else value = b.count > 0 ? b.max : 0;
 
-            return { key, value, count: b.count, autkIds: b.autkIds };
+            return { key, value, count: b.count, autkIds: Array.from(b.autkIds) };
         })
         .filter(item => item.count > 0);
 }
