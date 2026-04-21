@@ -1,9 +1,9 @@
 {
-    "background": "#bed2d7",
-    "surface": "#dce4e8",
+    "background": "#b2c7cd",
+    "surface": "#e2eaed",
     "parks": "#b8ccb0",
     "water": "#9ec0cb",
-    "roads": "#d9b504",
+    "roads": "#c89f12",
     "buildings": "#f0f4f6",
     "points": "#4a6570",
     "polylines": "#d9b504",
