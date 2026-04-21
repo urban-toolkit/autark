@@ -602,6 +602,13 @@ export class AutkMap {
      */
     private render() {
         this._camera.update();
+        const pendingPicks = this._layerManager.layers
+            .filter((layer) => !layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps)
+            .map((layer) => {
+                const [x, y] = layer.layerRenderInfo.pickedComps!;
+                layer.layerRenderInfo.pickedComps = undefined;
+                return { layer, vectorLayer: layer as VectorLayer, x, y };
+            });
 
         // Normal render pass
         this._renderer.start();
@@ -610,24 +617,30 @@ export class AutkMap {
                 layer.renderPass(this._camera);
             }
         });
-        this._renderer.finish();
 
-        // Picking render pass
-        this._renderer.startPickingRenderPass();
-        this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
+        let pickReadbackSlot: number | null = null;
+        if (pendingPicks.length > 0) {
+            this._renderer.startPickingRenderPass();
+            pendingPicks.forEach(({ layer }) => {
                 layer.renderPickingPass(this._camera);
+            });
+
+            pickReadbackSlot = this._renderer.reservePickingReadbackSlot(pendingPicks.length);
+            if (pickReadbackSlot === null) {
+                console.warn('Picking readback buffers are still busy; skipping this picking frame.');
+            } else {
+                pendingPicks.forEach(({ x, y }, index) => {
+                    this._renderer.enqueuePickingReadback(pickReadbackSlot!, index, x, y);
+                });
             }
-        });
+        }
+
         this._renderer.finish();
 
-        // Resolve picked IDs
-        this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps) {
-                const vectorLayer = layer as VectorLayer;
-                const [x, y] = layer.layerRenderInfo.pickedComps;
-                layer.layerRenderInfo.pickedComps = undefined;
-                layer.getPickedId(x, y).then((id) => {
+        if (pickReadbackSlot !== null) {
+            this._renderer.readPickingResults(pickReadbackSlot, pendingPicks.length).then((ids) => {
+                pendingPicks.forEach(({ layer, vectorLayer }, index) => {
+                    const id = ids[index] ?? -1;
                     console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
                     if (id >= 0) {
                         vectorLayer.toggleHighlightedIds([id]);
@@ -637,8 +650,8 @@ export class AutkMap {
                         this._mapEvents.emit(MapEvent.PICKING, { selection: [], layerId: layer.layerInfo.id });
                     }
                 });
-            }
-        });
+            });
+        }
     }
 
     /**

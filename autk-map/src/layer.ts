@@ -92,17 +92,6 @@ export abstract class Layer {
     renderPickingPass(_camera: Camera): void {}
 
     /**
-     * Reads the picked feature ID at the given canvas coordinates.
-     * Returns `-1` for layers that do not support picking.
-     * @param _x Canvas X coordinate in device pixels.
-     * @param _y Canvas Y coordinate in device pixels.
-     * @returns Promise with the picked feature id, or `-1` when unsupported.
-     */
-    getPickedId(_x: number, _y: number): Promise<number> {
-        return Promise.resolve(-1);
-    }
-
-    /**
      * Clears all highlighted features. No-op for layers that do not support highlighting.
      */
     clearHighlightedIds(): void {}

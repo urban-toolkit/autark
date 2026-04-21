@@ -171,52 +171,6 @@ export class PipelineTrianglePicking extends Pipeline {
     }
 
     /**
-     * Reads the picked object ID from the picking texture.
-     * @param {number} x The x-coordinate of the pick location
-     * @param {number} y The y-coordinate of the pick location
-     * @returns {Promise<number>} The picked object ID
-     */
-    async readPickedId(x: number, y: number): Promise<number> {
-        const px = Math.max(0, Math.min(this._renderer.canvas.width - 1, Math.floor(x)));
-        const py = Math.max(0, Math.min(this._renderer.canvas.height - 1, Math.floor(y)));
-
-        const alignedBytesPerRow = 256; // Must be multiple of 256
-        const bufferSize = alignedBytesPerRow * 1; // height = 1
-
-        const readBuffer = this._renderer.device.createBuffer({
-            size: bufferSize,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-        });
-
-        const commandEncoder = this._renderer.device.createCommandEncoder();
-
-        commandEncoder.copyTextureToBuffer(
-            {
-                texture: this._renderer.pickingTexture,
-                origin: { x: px, y: py },
-            },
-            {
-                buffer: readBuffer,
-                bytesPerRow: alignedBytesPerRow,
-            },
-            { width: 1, height: 1, depthOrArrayLayers: 1 }
-        );
-        this._renderer.device.queue.submit([commandEncoder.finish()]);
-
-        try {
-            await readBuffer.mapAsync(GPUMapMode.READ);
-            const arrayBuffer = readBuffer.getMappedRange();
-            const data = new Uint8Array(arrayBuffer);
-            return this._decodeColorToId(data[0], data[1], data[2]);
-        } finally {
-            if (readBuffer.mapState === 'mapped') {
-                readBuffer.unmap();
-            }
-            readBuffer.destroy();
-        }
-    }
-
-    /**
      * Encodes an object ID to RGB color for picking.
      * @param {number} id The object ID to encode
      * @returns {[number, number, number]} The encoded RGB color
@@ -227,18 +181,6 @@ export class PipelineTrianglePicking extends Pipeline {
         const g = ((shifted >> 8) & 0xff) / 255;
         const b = ((shifted >> 16) & 0xff) / 255;
         return [r, g, b];
-    }
-
-    /**
-     * Decodes an RGB color back to an object ID.
-     * @param {number} r The red component
-     * @param {number} g The green component
-     * @param {number} b The blue component
-     * @returns {number} The decoded object ID
-     */
-    private _decodeColorToId(r: number, g: number, b: number): number {
-        const id = (r & 0xff) | ((g & 0xff) << 8) | ((b & 0xff) << 16);
-        return id - 1;
     }
 
     /**

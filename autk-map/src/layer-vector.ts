@@ -329,16 +329,6 @@ export abstract class VectorLayer extends Layer {
     }
 
     /**
-     * Get the picked ID at the specified screen coordinates.
-     * @param x - The x-coordinate of the screen position.
-     * @param y - The y-coordinate of the screen position.
-     * @returns {Promise<number>} - A promise that resolves to the picked ID.
-     */
-    getPickedId(x: number, y: number): Promise<number> {
-        return this._pipelinePicking.readPickedId(x, y);
-    }
-
-    /**
      * Toggle highlighted IDs for the layer.
      * @param {number[]} ids - The IDs to highlight.
      */

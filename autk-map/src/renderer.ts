@@ -7,6 +7,8 @@ import { MapStyle } from './map-style';
  * render-pass bootstrap, and GPU resource lifecycle.
  */
 export class Renderer {
+    private static readonly PICK_READBACK_BYTES_PER_ROW = 256;
+    private static readonly PICK_READBACK_BUFFER_COUNT = 2;
     /** HTML canvas used as render surface. */
     protected _canvas: HTMLCanvasElement;
 
@@ -35,8 +37,14 @@ export class Renderer {
     /** Picking depth texture. */
     protected _pickingDepthTexture!: GPUTexture;
 
-    /** Active command encoder for the current pass bootstrap. */
-    protected _commandEncoder!: GPUCommandEncoder;
+    /** Active command encoder for the current frame. */
+    protected _commandEncoder: GPUCommandEncoder | null = null;
+
+    /** Double-buffered readback pool for picking copies. */
+    private _pickReadbackBuffers: Array<{ buffer: GPUBuffer | null; size: number; busy: boolean }> = Array.from(
+        { length: Renderer.PICK_READBACK_BUFFER_COUNT },
+        () => ({ buffer: null, size: 0, busy: false })
+    );
 
     /** MSAA sample count for the main render pass. */
     protected _sampleCount: number = 4;
@@ -82,6 +90,9 @@ export class Renderer {
 
     /** Active command encoder for the current frame pass setup. */
     get commandEncoder(): GPUCommandEncoder {
+        if (!this._commandEncoder) {
+            throw new Error('Renderer command encoder requested outside an active frame.');
+        }
         return this._commandEncoder;
     }
 
@@ -329,6 +340,7 @@ export class Renderer {
             depthStencilAttachment: this._depthBuffer,
         };
 
+        this._beginFrame();
         this._beginEmptyRenderPass(renderPassDesc);
     }
 
@@ -340,6 +352,7 @@ export class Renderer {
             return;
         }
         this._device.queue.submit([this._commandEncoder.finish()]);
+        this._commandEncoder = null;
     }
 
     /**
@@ -357,7 +370,87 @@ export class Renderer {
             depthStencilAttachment: this._pickingDepthBuffer,
         };
 
+        this._beginFrame();
         this._beginEmptyRenderPass(renderPassDesc);
+    }
+
+    /** Reserves one of the double-buffered picking readback buffers for the current frame. */
+    reservePickingReadbackSlot(pickCount: number): number | null {
+        if (!this._isInitialized || pickCount <= 0) {
+            return null;
+        }
+
+        const bufferSize = Renderer.PICK_READBACK_BYTES_PER_ROW * pickCount;
+        for (let index = 0; index < this._pickReadbackBuffers.length; index++) {
+            const slot = this._pickReadbackBuffers[index];
+            if (slot.busy) {
+                continue;
+            }
+
+            if (!slot.buffer || slot.size < bufferSize) {
+                slot.buffer?.destroy();
+                slot.buffer = this._device.createBuffer({
+                    label: `Picking readback buffer ${index}`,
+                    size: bufferSize,
+                    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+                });
+                slot.size = bufferSize;
+            }
+
+            slot.busy = true;
+            return index;
+        }
+
+        return null;
+    }
+
+    /** Queues a single-pixel picking texture readback into a reserved readback slot. */
+    enqueuePickingReadback(slotIndex: number, pickIndex: number, x: number, y: number): void {
+        const slot = this._pickReadbackBuffers[slotIndex];
+        if (!slot?.buffer) {
+            throw new Error(`Picking readback slot ${slotIndex} is not reserved.`);
+        }
+
+        const px = Math.max(0, Math.min(this._canvas.width - 1, Math.floor(x)));
+        const py = Math.max(0, Math.min(this._canvas.height - 1, Math.floor(y)));
+
+        this.commandEncoder.copyTextureToBuffer(
+            {
+                texture: this._pickingTexture,
+                origin: { x: px, y: py },
+            },
+            {
+                buffer: slot.buffer,
+                offset: pickIndex * Renderer.PICK_READBACK_BYTES_PER_ROW,
+                bytesPerRow: Renderer.PICK_READBACK_BYTES_PER_ROW,
+            },
+            { width: 1, height: 1, depthOrArrayLayers: 1 }
+        );
+    }
+
+    /** Maps a reserved readback slot and decodes all picked ids copied into it. */
+    async readPickingResults(slotIndex: number, pickCount: number): Promise<number[]> {
+        const slot = this._pickReadbackBuffers[slotIndex];
+        if (!slot?.buffer) {
+            return [];
+        }
+
+        try {
+            await slot.buffer.mapAsync(GPUMapMode.READ);
+            const arrayBuffer = slot.buffer.getMappedRange();
+            const data = new Uint8Array(arrayBuffer);
+            const ids: number[] = [];
+            for (let index = 0; index < pickCount; index++) {
+                const offset = index * Renderer.PICK_READBACK_BYTES_PER_ROW;
+                ids.push(this._decodeColorToId(data[offset], data[offset + 1], data[offset + 2]));
+            }
+            return ids;
+        } finally {
+            if (slot.buffer.mapState === 'mapped') {
+                slot.buffer.unmap();
+            }
+            slot.busy = false;
+        }
     }
 
     /**
@@ -369,9 +462,17 @@ export class Renderer {
         this._depthTexture?.destroy();
         this._pickingTexture?.destroy();
         this._pickingDepthTexture?.destroy();
+        this._pickReadbackBuffers.forEach((slot) => slot.buffer?.destroy());
         this._context?.unconfigure();
 
+        this._commandEncoder = null;
         this._isInitialized = false;
+    }
+
+    private _beginFrame(): void {
+        if (!this._commandEncoder) {
+            this._commandEncoder = this._device.createCommandEncoder();
+        }
     }
 
     /**
@@ -379,8 +480,12 @@ export class Renderer {
      * @param renderPassDesc Render pass descriptor to execute.
      */
     private _beginEmptyRenderPass(renderPassDesc: GPURenderPassDescriptor): void {
-        this._commandEncoder = this._device.createCommandEncoder();
-        const passEncoder = this._commandEncoder.beginRenderPass(renderPassDesc);
+        const passEncoder = this.commandEncoder.beginRenderPass(renderPassDesc);
         passEncoder.end();
+    }
+
+    private _decodeColorToId(r: number, g: number, b: number): number {
+        const id = (r & 0xff) | ((g & 0xff) << 8) | ((b & 0xff) << 16);
+        return id - 1;
     }
 }
