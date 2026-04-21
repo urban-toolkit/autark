@@ -13,7 +13,8 @@ import type {
  * Parameters for loading a feature collection as a map layer.
  *
  * Pass `type: 'raster'` together with `property` to load a GeoTIFF-derived
- * raster layer. For all other layer types `property` is unused.
+ * raster layer. For vector layers, `property` is an optional dot-path accessor
+ * used to initialize thematic mapping immediately after the layer is created.
  */
 export interface LoadCollectionParams {
     /** Source feature collection. Raster collections may contain null geometries. */
@@ -25,6 +26,7 @@ export interface LoadCollectionParams {
      *
      * Dot-path string accessor (e.g. `properties.shape_area`).
      *
+     * For vector layers, the path is resolved from each feature.
      * For raster layers, the path is resolved from each raster cell object.
      */
     property?: string;
