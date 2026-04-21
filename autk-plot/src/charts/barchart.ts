@@ -112,8 +112,8 @@ export class Barchart extends ChartBase {
             .data([0])
             .join('svg')
             .attr('id', 'plot')
-            .style('width', `${this._width}`)
-            .style('height', `${this._height || '500px'}`)
+            .style('width', `${this._width}px`)
+            .style('height', `${this._height}px`)
             .style('visibility', 'visible');
 
         const node = svg.node();
@@ -121,6 +121,8 @@ export class Barchart extends ChartBase {
         if (!svg || !node) {
             throw new Error('SVG element could not be created.');
         }
+
+        svg.attr('width', this._width).attr('height', this._height);
 
         // ---- Chart size
         const width = this._width - this._margins.left - this._margins.right;

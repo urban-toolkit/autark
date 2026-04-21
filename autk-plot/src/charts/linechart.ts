@@ -142,14 +142,16 @@ export class Linechart extends ChartBase {
             .data([0])
             .join('svg')
             .attr('id', 'plot')
-            .style('width', `${this._width}`)
-            .style('height', `${this._height || '500px'}`)
+            .style('width', `${this._width}px`)
+            .style('height', `${this._height}px`)
             .style('visibility', 'visible');
 
         const node = svg.node();
         if (!svg || !node) {
             throw new Error('SVG element could not be created.');
         }
+
+        svg.attr('width', this._width).attr('height', this._height);
 
         // ---- Title (optional)
         if (this._title && this._title.length > 0) {
