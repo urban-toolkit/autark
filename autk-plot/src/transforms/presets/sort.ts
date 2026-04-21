@@ -16,8 +16,8 @@ import type { SortTransformConfig } from '../../api';
 /**
  * Result produced by `runSort`.
  *
- * `attributes` contains the single sort column name. Rows carry their original
- * `autkIds` for downstream selection linking.
+ * Contains the `sort` preset tag plus rows carrying their original `autkIds`
+ * for downstream selection linking.
  */
 export type ExecutedSortTransform = {
     preset: 'sort';
