@@ -55,12 +55,17 @@ export class LayerManager {
     /**
         * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
         * Dynamic layer z-indices are recomputed after insertion.
+        * Layer ids are expected to be unique; duplicate ids are accepted but warned.
         * @param layerInfo Layer identity and type metadata.
         * @param layerRender Initial render configuration.
         * @param layerData Geometry and auxiliary layer payload.
         * @returns The created layer, or `null` if the type is not recognized.
-     */
+      */
     addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
+        if (this._layers.some((layer) => layer.layerInfo.id === layerInfo.id)) {
+            console.warn(`LayerManager: duplicate layer id '${layerInfo.id}' was added.`);
+        }
+
         const layer: Layer = layerInfo.typeLayer === 'buildings'
             ? new Triangles3DLayer(layerInfo, layerRender, layerData)
             : layerInfo.typeLayer === 'raster'
@@ -78,21 +83,8 @@ export class LayerManager {
     }
 
     /**
-     * Removes the first layer matching `layerId` and recomputes dynamic z-order.
-     * @param layerId Layer identifier to remove.
-     */
-    delLayer(layerId: string): void {
-        const idx = this._layers.findIndex(l => l.layerInfo.id === layerId);
-        if (idx !== -1) {
-            this._layers[idx].destroy();
-            this._layers.splice(idx, 1);
-        }
-        this._dynamicOrder = this._dynamicOrder.filter(id => id !== layerId);
-        this._recomputeZIndices();
-    }
-
-    /**
      * Removes all layers matching `layerId` and recomputes dynamic z-order.
+     * Layer ids are expected to be unique, but all matches are removed for safety.
      * @param layerId Layer identifier to remove.
      */
     removeLayerById(layerId: string): void {

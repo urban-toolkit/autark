@@ -429,7 +429,7 @@ export abstract class VectorLayer extends Layer {
         const nPoint = ePoint - sPoint;
 
         const thematic = new Float32Array(nPoint);
-        const value = layerThematic.values[0] ?? 0;
+        const value = layerThematic.value ?? 0;
         thematic.fill(value);
 
         return thematic;

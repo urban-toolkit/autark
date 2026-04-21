@@ -326,7 +326,7 @@ export class AutkMap {
         const thematicByFeatureId = canMatchById ? new Map<string | number, LayerThematic>() : null;
 
         const storeThematicValue = (featureIndex: number, value: number): boolean => {
-            const thematic = { values: new Float32Array([value]) };
+            const thematic = { value };
             thematicByFeatureIndex[featureIndex] = thematic;
 
             if (!thematicByFeatureId) {
@@ -701,7 +701,7 @@ export class AutkMap {
             borderComponents: layerBorder[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    values: new Float32Array([0]),
+                    value: 0,
                 };
             }),
         };
@@ -749,7 +749,7 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    values: new Float32Array([0]),
+                    value: 0,
                 };
             }),
         };
@@ -795,7 +795,7 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    values: new Float32Array([0]),
+                    value: 0,
                 };
             }),
         };
@@ -841,7 +841,7 @@ export class AutkMap {
             components: layerMesh[1],
             thematic: layerMesh[1].map(() => {
                 return {
-                    values: new Float32Array([0]),
+                    value: 0,
                 };
             }),
         };
