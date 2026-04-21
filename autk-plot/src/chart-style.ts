@@ -1,5 +1,4 @@
-import type { ColorHEX, ColorRGB } from './types-core';
-import { ColorMap } from './types-core';
+import type { ColorHEX } from './types-core';
 
 /**
  * Global style helpers shared by all chart implementations.
@@ -41,26 +40,10 @@ export class ChartStyle {
     }
 
     /**
-     * Gets the highlight color in RGB format.
-     * @returns Highlight color converted from hex to RGB channels.
-     */
-    public static getHighlightColor(): ColorRGB {
-        return ColorMap.hexToRgb(ChartStyle._highlight);
-    }
-
-    /**
      * Updates the global default color used for non-selected marks.
      * @param color Hex color string to apply as the default mark color.
      */
     public static setDefaultColor(color: ColorHEX): void {
         ChartStyle._default = color;
-    }
-
-    /**
-     * Gets the default mark color in RGB format.
-     * @returns Default color converted from hex to RGB channels.
-     */
-    public static getDefaultColor(): ColorRGB {
-        return ColorMap.hexToRgb(ChartStyle._default);
     }
 }

@@ -62,8 +62,6 @@ export abstract class ChartBase {
     protected _colorAttribute: string | undefined = undefined;
     /** Dot-path attribute used for color encoding on transformed rows, when applicable. */
     protected _transformColorAttribute: string | undefined = undefined;
-    /** User-facing label for the color dimension. */
-    protected _colorLabel: string | undefined = undefined;
     
     /** Plot title text. */
     protected _title!: string;
@@ -168,7 +166,6 @@ export abstract class ChartBase {
             : axisAttributes.map(attr => attr === '@transform' ? String(reducer) : attr);
         this._axisAttributes = [...axisAttributes];
 
-        this._colorLabel = config.labels?.color;
         this._colorAttribute = config.attributes?.color ?? config.labels?.color;
 
         this._title = config.labels?.title || 'Autk Plot';
