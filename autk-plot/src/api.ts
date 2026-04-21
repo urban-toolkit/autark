@@ -45,9 +45,9 @@ export type ChartConfig = {
     events?: ChartEvent[];
     /** Pixel margins around the plot drawing area. */
     margins?: ChartMargins;
-    /** Chart width in pixels. Defaults to the container width. */
+    /** Chart width in pixels. Defaults to `800`. */
     width?: number;
-    /** Chart height in pixels. Defaults to the container height. */
+    /** Chart height in pixels. Defaults to `500`. */
     height?: number;
     /** Display labels for axes, title, and color legend. */
     labels?: {
