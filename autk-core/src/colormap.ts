@@ -23,6 +23,32 @@ type CategoricalDomain = string[];
 /** Default number of texels used to sample continuous colormaps. */
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
 
+const CATEGORICAL_INTERPOLATORS = new Set<ColorMapInterpolator>([
+    ColorMapInterpolator.CAT_ACCENT,
+    ColorMapInterpolator.CAT_DARK2,
+    ColorMapInterpolator.CAT_CATEGORY10,
+    ColorMapInterpolator.CAT_OBSERVABLE10,
+    ColorMapInterpolator.CAT_PAIRED,
+    ColorMapInterpolator.CAT_PASTEL1,
+    ColorMapInterpolator.CAT_PASTEL2,
+    ColorMapInterpolator.CAT_SET1,
+    ColorMapInterpolator.CAT_SET2,
+    ColorMapInterpolator.CAT_SET3,
+    ColorMapInterpolator.CAT_TABLEAU10,
+]);
+
+const DIVERGING_INTERPOLATORS = new Set<ColorMapInterpolator>([
+    ColorMapInterpolator.DIV_BR_BG,
+    ColorMapInterpolator.DIV_PR_GN,
+    ColorMapInterpolator.DIV_PI_YG,
+    ColorMapInterpolator.DIV_PU_OR,
+    ColorMapInterpolator.DIV_RED_BLUE,
+    ColorMapInterpolator.DIV_RED_GREY,
+    ColorMapInterpolator.DIV_RED_YELLOW_BLUE,
+    ColorMapInterpolator.DIV_RED_YELLOW_GREEN,
+    ColorMapInterpolator.DIV_SPECTRAL,
+]);
+
 export class ColorMap {
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
@@ -80,9 +106,17 @@ export class ColorMap {
         return [min, max];
     }
 
+    public static isCategorical(interpolator: ColorMapInterpolator): boolean {
+        return CATEGORICAL_INTERPOLATORS.has(interpolator);
+    }
+
+    public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
+        if (!ColorMap.isCategorical(interpolator)) return null;
+        return (d3_scheme[interpolator] as string[]).length;
+    }
+
     private static isDiverging(interpolator: ColorMapInterpolator): boolean {
-        return interpolator === ColorMapInterpolator.DIV_RED_BLUE
-            || interpolator === ColorMapInterpolator.DIV_SPECTRAL;
+        return DIVERGING_INTERPOLATORS.has(interpolator);
     }
 
     /**
@@ -175,7 +209,7 @@ export class ColorMap {
         values: number[] | string[] | TypedArray,
         config: ColorMapConfig,
     ): ResolvedDomain {
-        const isCategorical = config.interpolator.startsWith('scheme')
+        const isCategorical = ColorMap.isCategorical(config.interpolator)
             || (config.domainSpec.type === ColorMapDomainStrategy.USER && config.domainSpec.params.some(v => typeof v === 'string'))
             || (!ArrayBuffer.isView(values) && (values as Array<number|string>).some(v => typeof v === 'string' && isNaN(Number(v))));
 
@@ -190,38 +224,22 @@ export class ColorMap {
         color: ColorMapInterpolator,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
     ): (t: number) => string {
-        switch (color) {
-            case ColorMapInterpolator.SEQ_REDS:
-                return d3_scale.scaleSequential(d3_scheme[ColorMapInterpolator.SEQ_REDS])
-                    .domain((domain as SequentialDomain) ?? [0, 1]);
-            case ColorMapInterpolator.SEQ_BLUES:
-                return d3_scale.scaleSequential(d3_scheme[ColorMapInterpolator.SEQ_BLUES])
-                    .domain((domain as SequentialDomain) ?? [0, 1]);
-            case ColorMapInterpolator.DIV_RED_BLUE:
-                return d3_scale.scaleDiverging(d3_scheme[ColorMapInterpolator.DIV_RED_BLUE])
-                    .domain((domain as DivergingDomain) ?? [0, 0.5, 1]);
-            case ColorMapInterpolator.DIV_SPECTRAL:
-                return d3_scale.scaleDiverging(d3_scheme[ColorMapInterpolator.DIV_SPECTRAL])
-                    .domain((domain as DivergingDomain) ?? [0, 0.5, 1]);
-            case ColorMapInterpolator.CAT_OBSERVABLE10: {
-                const scheme = d3_scheme[ColorMapInterpolator.CAT_OBSERVABLE10] as string[];
-                const n = domain?.length ?? scheme.length;
-                return (t: number) => {
-                    const idx = Math.min(Math.round(t * (n - 1)), scheme.length - 1);
-                    return scheme[idx];
-                };
-            }
-            case ColorMapInterpolator.CAT_PAIRED: {
-                const scheme = d3_scheme[ColorMapInterpolator.CAT_PAIRED] as string[];
-                const n = domain?.length ?? scheme.length;
-                return (t: number) => {
-                    const idx = Math.min(Math.round(t * (n - 1)), scheme.length - 1);
-                    return scheme[idx];
-                };
-            }
-            default:
-                throw new Error(`Unknown ColorMapInterpolator: ${color}`);
+        if (ColorMap.isCategorical(color)) {
+            const scheme = d3_scheme[color] as string[];
+            const n = domain?.length ?? scheme.length;
+            return (t: number) => {
+                const idx = Math.min(Math.round(t * (n - 1)), scheme.length - 1);
+                return scheme[idx];
+            };
         }
+
+        if (ColorMap.isDiverging(color)) {
+            return d3_scale.scaleDiverging(d3_scheme[color] as (t: number) => string)
+                .domain((domain as DivergingDomain) ?? [0, 0.5, 1]);
+        }
+
+        return d3_scale.scaleSequential(d3_scheme[color] as (t: number) => string)
+            .domain((domain as SequentialDomain) ?? [0, 1]);
     }
 
     private static computePercentile(values: number[] | TypedArray, p: number): number {
