@@ -5,9 +5,9 @@
  * can import from a single location instead of from individual implementation files.
  */
 
-/** Bar chart supporting categorical values and histogram bins. */
+/** Bar chart supporting categorical values and one-dimensional bins. */
 export { Barchart } from './barchart';
-/** Line chart for temporal and timeseries aggregated data. */
+/** Line chart for temporal event and reduced series data. */
 export { Linechart } from './linechart';
 /** Parallel coordinates chart for multivariate feature exploration. */
 export { ParallelCoordinates } from './pcoordinates';

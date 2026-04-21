@@ -5,7 +5,7 @@
 </div>
 <br>
 
-**autk-plot** is a data visualization library, part of the Autark ecosystem, built on top of D3 and Vega-Lite. The library can be used standalone or in conjunction with other Autark modules. To facilitate adoption, we provide a large collection of examples in the [Autark website](https://autarkjs.org/gallery/), demonstrating its functionalities both as an independent library and as part of the larger ecosystem of tools for urban data analytics.
+**autk-plot** is a data visualization library, part of the Autark ecosystem, built on top of D3. The library can be used standalone or in conjunction with other Autark modules. To facilitate adoption, we provide a large collection of examples in the [Autark website](https://autarkjs.org/gallery/), demonstrating its functionality both as an independent library and as part of the larger ecosystem of tools for urban data analytics.
 
 ## Resources
 
@@ -15,10 +15,11 @@
 
 ## Transformation Architecture
 
-`autk-plot` now exposes a shared transformation layer split into two modules:
+`autk-plot` exposes a shared transformation layer under `src/transforms/`:
 
-- `transform-engine.ts`: low-level primitives (bucket reduction, reducer runtime, provenance-safe `autkIds` merging).
-- `transform-presets.ts`: high-level ready-to-use transformations for common chart workflows.
+- `kernel.ts`: low-level primitives such as bucket reduction and provenance-safe `autkIds` merging.
+- `presets/*.ts`: preset runners for the supported chart workflows.
+- `index.ts`: the public transform entrypoint that re-exports helpers and the top-level `run(...)` dispatcher.
 
 The invariant is:
 
@@ -28,15 +29,23 @@ The invariant is:
 
 ```ts
 import {
-  presetHistogram,
-  presetEventsByResolution,
-  presetTimeseriesAggregate,
+  run,
+  reduceBuckets,
+  type ChartTransformConfig,
   type TransformResolution,
-  type TransformReducerName,
+  type TransformReducer,
 } from 'autk-plot';
 ```
 
-### Example: Events by Temporal Resolution
+Supported built-in presets:
+
+- `binning-1d`
+- `binning-2d`
+- `binning-events`
+- `reduce-series`
+- `sort`
+
+### Example: Run a Binning Events Transform
 
 ```ts
 const rows = collection.features.map((f, idx) => ({
@@ -44,35 +53,40 @@ const rows = collection.features.map((f, idx) => ({
   autkIds: [idx],
 }));
 
-const byMonth = presetEventsByResolution({
-  rows,
-  resolution: 'month',
-  reducer: 'count',
-  eventsOf: (row) => Array.isArray(row.events) ? row.events : [],
-  timestampOf: (event) => event?.timestamp,
-});
-```
-
-### Example: Aggregate Timeseries
-
-```ts
-const aggregated = presetTimeseriesAggregate({
-  rows,
-  reducer: 'avg',
-  pointsOf: (row) => {
-    const series = Array.isArray(row.timeseries) ? row.timeseries : [];
-    return series.map((value, i) => ({ timestamp: i, value: Number(value) }));
+const config: ChartTransformConfig = {
+  preset: 'binning-events',
+  options: {
+    resolution: 'month',
+    reducer: 'count',
+    timestamp: 'timestamp',
+    value: 'value',
   },
-});
+};
+
+const byMonth = run(rows, config, ['events', '@transform']);
 ```
 
-### Example: Histogram
+### Example: Run a Reduce Series Transform
 
 ```ts
-const bins = presetHistogram({
+const aggregated = run(
   rows,
-  column: 'sjoin.avg.jun',
-  numBins: 13,
+  {
+    preset: 'reduce-series',
+    options: { timestamp: 'year', value: 'population', reducer: 'avg' },
+  },
+  ['populationSeries', '@transform']
+);
+```
+
+### Example: Use `reduceBuckets` Directly
+
+```ts
+const buckets = reduceBuckets({
+  rows,
+  bucketOf: (row) => String(row.category ?? 'unknown'),
+  valueOf: (row) => Number(row.value ?? 0),
+  reducer: 'sum',
 });
 ```
 

@@ -1,20 +1,21 @@
 /**
- * @fileoverview Line chart visualization for event-based and timeseries data.
+ * @fileoverview Line chart visualization for event-based and series data.
  *
  * Provides a D3-based line chart implementation with the following features:
- * - **Single-series rendering**: Aggregates feature-level timeseries or event buckets into a unified line
+ * - **Single-series rendering**: Aggregates feature-level series points or event buckets into a unified line
  * - **Flexible bucket labeling**: Supports numeric, date, and custom bucket labels
  * - **Selection and linked views**: Uses source feature ids for brush interactions and linked selection across components
- * - **Transform support**: Accepts binning-events or timeseries transform presets for flexible aggregation
+ * - **Transform support**: Accepts `binning-events` or `reduce-series` transform presets for flexible aggregation
  *
  * @example
- * // Basic line chart with timeseries transform
+ * // Basic line chart with reduce-series transform
  * const plot = new AutkChart(plotDiv, {
  *   type: 'linechart',
  *   collection: geojson,
+ *   attributes: { axis: ['populationSeries', '@transform'] },
  *   transform: {
- *     preset: 'timeseries',
- *     attributes: { value: 'population' }
+ *     preset: 'reduce-series',
+ *     options: { timestamp: 'year', value: 'population', reducer: 'avg' }
  *   },
  *   labels: { axis: ['year', 'population'], title: 'Population Over Time' },
  * });
@@ -45,7 +46,7 @@ import { run } from '../transforms';
 import type { ExecutedReduceSeriesTransform } from '../transforms';
 
 /**
- * Line chart that aggregates feature-level timeseries into a single series.
+ * Line chart that aggregates feature-level series data into a single line.
  *
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
@@ -85,7 +86,7 @@ export class Linechart extends ChartBase {
     /**
      * Computes the transformed series data for the line chart based on the current selection and transform config.
      *
-     * Handles bucket label formatting, sorting, and aggregation for both binning-events and timeseries presets.
+     * Handles bucket label formatting, sorting, and aggregation for both `binning-events` and `reduce-series`.
      * Updates the internal _seriesData array used for rendering.
      */
     protected override computeTransform(): void {
@@ -286,7 +287,7 @@ export class Linechart extends ChartBase {
         // ---- Empty state
         cGroup
             .selectAll('.autk-empty')
-            .data(this._seriesData.length === 0 ? ['No timeseries data available'] : [])
+            .data(this._seriesData.length === 0 ? ['No series data available'] : [])
             .join('text')
             .attr('class', 'autk-empty')
             .attr('x', innerW / 2)

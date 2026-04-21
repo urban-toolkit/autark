@@ -1,8 +1,8 @@
 /**
- * @fileoverview Bar chart visualization supporting both categorical and histogram modes.
+ * @fileoverview Bar chart visualization supporting both categorical and binned modes.
  *
  * Provides a D3-based bar chart implementation with the following features:
- * - **Dual rendering modes**: Categorical bars and histogram bins from transformed data
+ * - **Dual rendering modes**: Categorical bars and one-dimensional binned output from transformed data
  * - **Two-axis mapping**: Category/bin labels on x and numeric values on y
  * - **Selection and linked views**: Uses source feature ids for click/brush interactions across components
  *
@@ -10,13 +10,13 @@
  * allowing selections to remain consistent across transformations.
  *
  * @example
- * // Histogram mode with map-plot linking
+ * // Binned mode with map-plot linking
  * const plot = new AutkChart(plotDiv, {
  *   type: 'barchart',
  *   collection: geojson,
+ *   attributes: { axis: ['shape_area', '@transform'] },
  *   transform: {
- *     preset: 'histogram',
- *     attributes: { value: 'shape_area' },
+ *     preset: 'binning-1d',
  *     options: { bins: 8 }
  *   },
  *   labels: { axis: ['area range', 'count'], title: 'Distribution' },
@@ -47,9 +47,9 @@ import { run } from '../transforms';
 import type { ExecutedBinning1dTransform } from '../transforms';
 
 /**
- * Bar chart implementation supporting categorical values and histogram mode.
+ * Bar chart implementation supporting categorical values and binned mode.
  *
- * In histogram mode, rendered bins are mapped back to original source feature
+ * In binned mode, rendered bins are mapped back to original source feature
  * indices so interaction payloads remain stable across transformations.
  */
 export class Barchart extends ChartBase {
@@ -61,7 +61,7 @@ export class Barchart extends ChartBase {
 
     /**
      * Creates a bar chart instance and performs the initial draw.
-     * @param config Plot configuration with categorical axes or histogram settings.
+     * @param config Plot configuration with categorical axes or binning settings.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
@@ -83,13 +83,13 @@ export class Barchart extends ChartBase {
     }
 
     /**
-     * Transforms raw feature values into histogram bins and stores source ids
+     * Transforms raw feature values into one-dimensional bins and stores source ids
      * directly on each rendered bin datum via `autkIds`.
      */
     protected override computeTransform(): void {
         if (!this._transformConfig) return;
 
-        // Always compute histogram from all features
+        // Always compute bins from all features
         const allRows = this._sourceFeatures.map((f, idx) => ({
             ...(f.properties ?? {}),
             autkIds: [idx],

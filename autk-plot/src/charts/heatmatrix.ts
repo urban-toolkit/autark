@@ -5,15 +5,15 @@
  * - **Grid rendering**: Each unique (x, y) category pair maps to a filled rectangle
  * - **Color encoding**: A third numeric attribute is mapped to a colormap interpolator
  * - **Selection and linked views**: Uses source feature ids for click/brush interactions across components
- * - **Transform required**: Data must be aggregated via the `heatmatrix` transform preset before rendering
+ * - **Transform required**: Data must be aggregated via the `binning-2d` transform preset before rendering
  *
  * @example
  * const plot = new AutkChart(plotDiv, {
  *   type: 'heatmatrix',
  *   collection: geojson,
+ *   attributes: { axis: ['day', 'hour'], color: '@transform' },
  *   transform: {
- *     preset: 'heatmatrix',
- *     attributes: { x: 'day', y: 'hour', value: 'count' },
+ *     preset: 'binning-2d',
  *     options: { reducer: 'sum' }
  *   },
  *   labels: { axis: ['Day', 'Hour'], title: 'Activity Heatmap' },
@@ -37,7 +37,7 @@ import type { ExecutedBinning2dTransform, Binning2dCellRow } from '../transforms
 /**
  * Heat matrix chart mapping two categorical dimensions to a grid of colored rectangles.
  *
- * Requires the `heatmatrix` transform preset. After `computeTransform` runs,
+ * Requires the `binning-2d` transform preset. After `computeTransform` runs,
  * `this._attributes` is `['x', 'y', 'value']` and `this.data` contains one row per
  * unique (x, y) cell.
  */
@@ -46,8 +46,8 @@ export class Heatmatrix extends ChartBase {
     /**
      * Creates a heat matrix instance and performs the initial draw.
      *
-     * @param config Plot configuration. Must include a `heatmatrix` transform preset.
-     * @throws If the transform preset is missing or not `'heatmatrix'`.
+     * @param config Plot configuration. Must include a `binning-2d` transform preset.
+     * @throws If the transform preset is missing or not `'binning-2d'`.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
@@ -62,7 +62,7 @@ export class Heatmatrix extends ChartBase {
     }
 
     /**
-     * Aggregates all source features into per-cell rows via the `heatmatrix` preset.
+     * Aggregates all source features into per-cell rows via the `binning-2d` preset.
      *
      * Updates `this.data` with one row per unique (x, y) pair and sets
      * `this._attributes` to `['x', 'y', 'value']`.
