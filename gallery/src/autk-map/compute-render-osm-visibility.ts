@@ -104,12 +104,18 @@ export class ComputeRenderOsmVisibility {
 
         const height = resolveBuildingHeight(pickedFeature);
         const viewpoints = buildVerticalViewpoints(footprint, height);
+        const sceneBuildings = {
+            ...this.buildingsForCompute,
+            // The viewpoints are placed inside the picked building volume, so keep that
+            // building out of the rendered scene to avoid self-occluding nearby buildings.
+            features: this.buildingsForCompute.features.filter((_, index) => index !== pickedId),
+        };
         const render = new ComputeRender();
 
         const pointResults = await render.run({
             layers: [{
                 layerId: 'table_osm_buildings',
-                geojson: this.buildingsForCompute,
+                geojson: sceneBuildings,
                 type: 'buildings',
                 layerType: 'buildings',
                 objectIdProperty: '_renderObjectId',
@@ -180,6 +186,7 @@ export class ComputeRenderOsmVisibility {
         });
         this.map.updateRenderInfo('table_osm_buildings', { isColorMap: true, isPick: true });
     }
+
 }
 
 function buildVerticalViewpoints(footprint: number[][], height: number): FeatureCollection<Point> {

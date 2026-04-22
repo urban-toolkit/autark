@@ -180,6 +180,7 @@ export class ComputeRender extends GpuPipeline {
                 const batchCameraData = cameras.subarray(batchStart * 16, (batchStart + batchCount) * 16);
 
                 const tileTexture = this.createTileTexture(device, texSize);
+                const depthTexture = this.createDepthTexture(device, texSize);
                 const cameraBuf = this.buildCameraBuffer(device, batchCameraData, batchCount, alignment).cameraBuf;
                 const countBuffers = this.buildCountBuffers(
                     device,
@@ -195,6 +196,7 @@ export class ComputeRender extends GpuPipeline {
 
                 try {
                     const tileView = tileTexture.createView();
+                    const depthView = depthTexture.createView();
                     const countBG = this.buildCountBindGroup(device, countBGL, tileView, countBuffers);
                     const camBG = device.createBindGroup({
                         layout: camBGL,
@@ -208,6 +210,7 @@ export class ComputeRender extends GpuPipeline {
                         batchGridSize,
                         tileSize,
                         tileView,
+                        depthView,
                         renderPipeline,
                         camBG,
                         cameraStride,
@@ -254,6 +257,7 @@ export class ComputeRender extends GpuPipeline {
                 } finally {
                     classStage?.destroy();
                     objectStage?.destroy();
+                    depthTexture.destroy();
                     tileTexture.destroy();
                     cameraBuf.destroy();
                     countBuffers.layerTypeBuf.destroy();
@@ -620,6 +624,14 @@ export class ComputeRender extends GpuPipeline {
         });
     }
 
+    private createDepthTexture(device: GPUDevice, texSize: number): GPUTexture {
+        return device.createTexture({
+            size: [texSize, texSize],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+
     private buildCameraBuffer(
         device: GPUDevice,
         cameras: Float32Array,
@@ -728,6 +740,11 @@ export class ComputeRender extends GpuPipeline {
                 entryPoint: 'main',
                 targets: [{ format: 'rgba8unorm' }],
             },
+            depthStencil: {
+                format: 'depth24plus',
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+            },
             primitive: { topology: 'triangle-list', cullMode: 'none' },
         });
 
@@ -805,6 +822,7 @@ export class ComputeRender extends GpuPipeline {
         gridSize: number,
         tileSize: number,
         tileView: GPUTextureView,
+        depthView: GPUTextureView,
         renderPipeline: GPURenderPipeline,
         camBG: GPUBindGroup,
         cameraStride: number,
@@ -822,6 +840,12 @@ export class ComputeRender extends GpuPipeline {
                     storeOp: 'store',
                     clearValue: { r: 0, g: 0, b: 0, a: 0 },
                 }],
+                depthStencilAttachment: {
+                    view: depthView,
+                    depthLoadOp: i === 0 ? 'clear' : 'load',
+                    depthStoreOp: 'store',
+                    depthClearValue: 1,
+                },
             });
 
             pass.setPipeline(renderPipeline);
