@@ -83,7 +83,10 @@ export abstract class Layer {
      * Executes the regular render pass for this layer.
      * @param camera Active camera used to compute view/projection transforms.
      */
-    abstract renderPass(camera: Camera): void;
+    abstract renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void;
+
+    /** Runs any offscreen or prepass work required before the shared main pass. */
+    prepareRender(_camera: Camera): void {}
 
     /**
      * Executes the picking render pass. No-op for layers that do not support picking.
@@ -101,6 +104,12 @@ export abstract class Layer {
      * @param _ids Component ids to highlight.
      */
     setHighlightedIds(_ids: number[]): void {}
+
+    /** Applies a skip mask to the provided component ids. No-op for unsupported layers. */
+    setSkippedIds(_ids: number[]): void {}
+
+    /** Clears the skip mask. No-op for unsupported layers. */
+    clearSkippedIds(): void {}
 
     /**
      * Releases resources owned by this layer.

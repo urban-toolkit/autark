@@ -79,12 +79,20 @@ export class Triangles3DLayer extends VectorLayer {
      * Recomputes normals if geometry changed.
      * @param {Camera} camera - The camera instance.
      */
-    override renderPass(camera: Camera): void {
+    override renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         if (this._normalsAreDirty) {
             this.computeNormals();
         }
 
-        super.renderPass(camera);
+        super.renderPass(camera, passEncoder);
+    }
+
+    override prepareRender(camera: Camera): void {
+        if (this._normalsAreDirty) {
+            this.computeNormals();
+        }
+
+        this._pipeline.prepareRender(camera);
     }
 
     private computeNormals(): void {

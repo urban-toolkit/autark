@@ -644,13 +644,7 @@ export class PipelineBuildingSSAO extends Pipeline {
     /**
      * Renders the second pass of the SSAO pipeline.
      */
-    pass02(): void {
-        // Create a new command encoder
-        const commandEncoder = this._renderer.commandEncoder;
-
-        // Create a new pass commands encoder
-        const passEncoder = this._beginMainRenderPass(commandEncoder);
-
+    pass02(passEncoder: GPURenderPassEncoder): void {
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline02);
 
@@ -660,13 +654,15 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         // draw command
         passEncoder.draw(6);
-        passEncoder.end();
     }
 
-    renderPass(camera: Camera): void {
+    override prepareRender(camera: Camera): void {
         this._ensureSharedTargets();
         this.pass01(camera);
-        this.pass02();
+    }
+
+    renderPass(_camera: Camera, passEncoder: GPURenderPassEncoder): void {
+        this.pass02(passEncoder);
     }
 
     /** Recreates shared pass-01 targets if canvas size changed. */

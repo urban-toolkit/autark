@@ -264,7 +264,7 @@ export class PipelineTrianglePicking extends Pipeline {
      * Renders the picking pass for the pipeline.
      * @param {Camera} camera The camera instance
      */
-    renderPass(camera: Camera): void {
+    renderPass(camera: Camera, _passEncoder?: GPURenderPassEncoder): void {
         if (!this._renderer) {
             return;
         }

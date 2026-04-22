@@ -21,6 +21,8 @@ export class AutkMapUi {
     protected _subMenu: HTMLDivElement | null = null;
     /** Legend panel for thematic colormap display. */
     protected _legend: HTMLDivElement | null = null;
+    /** Persistent menu toggle handler removed during teardown. */
+    protected _onMenuIconClick: ((event: MouseEvent) => void) | null = null;
 
     constructor(map: AutkMap) {
         this._map = map;
@@ -62,6 +64,7 @@ export class AutkMapUi {
      * @param layer Layer to activate.
      */
     changeActiveLayer(layer: Layer | null): void {
+        layer = this._resolveActiveLayer(layer);
         if (!layer) return;
         this._activeLayer = layer;
 
@@ -86,13 +89,39 @@ export class AutkMapUi {
         this.buildLegend();
     }
 
+    /** Removes injected UI DOM, listeners, and cached active state. */
+    destroy(): void {
+        if (this._menuIcon && this._onMenuIconClick) {
+            this._menuIcon.removeEventListener('click', this._onMenuIconClick);
+        }
+
+        this._menuIcon?.remove();
+        this._subMenu?.remove();
+        this._legend?.remove();
+
+        this._onMenuIconClick = null;
+        this._menuIcon = null;
+        this._subMenu = null;
+        this._legend = null;
+        this._activeLayer = null;
+    }
+
+    /** Clears active legend state when a layer is removed. */
+    handleLayerRemoved(layerId: string): void {
+        if (this._activeLayer?.layerInfo.id === layerId) {
+            this._activeLayer = null;
+        }
+        this.syncLegendVisibility();
+    }
+
     /**
         * Called when color-map or visibility state changes.
         * Updates the legend to reflect new state.
      */
     refreshLegend(layer: Layer | null): void {
-        if (layer && layer.layerRenderInfo.isColorMap) {
-            this._activeLayer = layer;
+        const resolvedLayer = this._resolveActiveLayer(layer);
+        if (resolvedLayer && resolvedLayer.layerRenderInfo.isColorMap) {
+            this._activeLayer = resolvedLayer;
         }
         this.syncLegendVisibility();
     }
@@ -110,6 +139,7 @@ export class AutkMapUi {
 
     protected syncLegendVisibility(): void {
         if (!this._legend) return;
+        this._activeLayer = this._resolveActiveLayer(this._activeLayer);
         const isColorMap = this._activeLayer?.layerRenderInfo.isColorMap ?? false;
         this._legend.style.visibility = isColorMap ? 'visible' : 'hidden';
         this.updateLegendContent();
@@ -140,13 +170,14 @@ export class AutkMapUi {
 
         this.map.canvas.parentElement?.appendChild(this._menuIcon);
 
-        this._menuIcon.addEventListener('click', (e) => {
+        this._onMenuIconClick = (e) => {
             e.stopPropagation();
             if (!this._subMenu) return;
             const opening = this._subMenu.style.visibility !== 'visible';
             if (opening) this.populateLayerList();
             this._subMenu.style.visibility = opening ? 'visible' : 'hidden';
-        });
+        };
+        this._menuIcon.addEventListener('click', this._onMenuIconClick);
     }
 
     protected buildSubMenu(): void {
@@ -213,7 +244,13 @@ export class AutkMapUi {
     // ── Legend content ────────────────────────────────────────────────────────
 
     protected updateLegendContent(width = 250, height = 80): void {
-        if (!this._legend || !this._activeLayer) return;
+        if (!this._legend) return;
+
+        this._activeLayer = this._resolveActiveLayer(this._activeLayer);
+        if (!this._activeLayer) {
+            this._legend.innerHTML = '';
+            return;
+        }
 
         this._legend.innerHTML = '';
 
@@ -324,5 +361,15 @@ export class AutkMapUi {
             color: '#222', borderBottom: '1px solid #e8e8e8',
         });
         return d;
+    }
+
+    /** Returns the layer only if it is still registered in the current map. */
+    private _resolveActiveLayer(layer: Layer | null): Layer | null {
+        if (!layer) {
+            return null;
+        }
+
+        const currentLayer = this.map.layerManager.searchByLayerId(layer.layerInfo.id);
+        return currentLayer === layer ? currentLayer : null;
     }
 }

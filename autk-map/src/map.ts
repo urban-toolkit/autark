@@ -537,6 +537,7 @@ export class AutkMap {
      */
     removeLayer(id: string): void {
         this._layerManager.removeLayerById(id);
+        this._ui.handleLayerRemoved(id);
         this._ui.refreshLayerList();
     }
 
@@ -565,6 +566,33 @@ export class AutkMap {
         }
 
         layer.clearHighlightedIds();
+    }
+
+    /**
+     * Toggles skipped rendering for the provided component ids of a vector layer.
+     * @param id Layer identifier.
+     * @param selection Component ids to skip/unskip.
+     */
+    setSkippedIds(id: string, selection: number[]): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if (!(layer instanceof VectorLayer)) {
+            return;
+        }
+
+        layer.setSkippedIds(selection);
+    }
+
+    /**
+     * Clears skipped rendering state for a vector layer.
+     * @param id Layer identifier.
+     */
+    clearSkippedIds(id: string): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if (!(layer instanceof VectorLayer)) {
+            return;
+        }
+
+        layer.clearSkippedIds();
     }
 
     /**
@@ -626,6 +654,7 @@ export class AutkMap {
             layer.destroy();
         });
 
+        this._ui.destroy();
         this._renderer.destroy();
 
         this._isDestroyed = true;
@@ -695,9 +724,16 @@ export class AutkMap {
         this._renderer.start();
         this._layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip) {
-                layer.renderPass(this._camera);
+                layer.prepareRender(this._camera);
             }
         });
+        const mainPassEncoder = this._renderer.beginMainRenderPass();
+        this._layerManager.layers.forEach((layer) => {
+            if (!layer.layerRenderInfo.isSkip) {
+                layer.renderPass(this._camera, mainPassEncoder);
+            }
+        });
+        mainPassEncoder.end();
 
         let pickReadbackSlot: number | null = null;
         if (pendingPick) {
@@ -718,7 +754,7 @@ export class AutkMap {
             this._renderer.readPickingResults(pickReadbackSlot, 1).then((ids) => {
                 const id = ids[0] ?? -1;
                 const { layer, vectorLayer } = pendingPick;
-                console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
+
                 if (id >= 0) {
                     vectorLayer.toggleHighlightedIds([id]);
                     this._mapEvents.emit(MapEvent.PICKING, { selection: vectorLayer.highlightedIds, layerId: layer.layerInfo.id });

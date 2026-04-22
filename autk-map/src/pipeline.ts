@@ -439,19 +439,6 @@ export abstract class Pipeline {
         this._cMapTexture?.destroy();
     }
 
-    /**
-     * Begins a standard main-scene render pass using renderer frame/depth buffers.
-     * Sets the color attachment load operation to `load` so pipelines can layer draws.
-     */
-    protected _beginMainRenderPass(commandEncoder: GPUCommandEncoder): GPURenderPassEncoder {
-        this._renderer.frameBuffer.loadOp = 'load';
-        const renderPassDesc: GPURenderPassDescriptor = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
-        };
-        return commandEncoder.beginRenderPass(renderPassDesc);
-    }
-
     /** Reuses or reallocates a float32 cache and copies source values into it. */
     protected _syncFloatData(
         cache: Float32Array<ArrayBuffer> | null,
@@ -499,6 +486,9 @@ export abstract class Pipeline {
         return cache;
     }
 
+    /** Runs any offscreen or preparatory work required before the shared main pass. */
+    prepareRender(_camera: Camera): void {}
+
     /**
      * Builds the pipeline.
      * @param {Layer} data The layer instance
@@ -517,6 +507,6 @@ export abstract class Pipeline {
      */
     abstract updateVertexBuffers(data: Layer): void;
 
-    /** Executes one render pass for this pipeline. */
-    abstract renderPass(camera: Camera): void;
+    /** Records draw commands for this pipeline into an existing main pass. */
+    abstract renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void;
 }

@@ -313,7 +313,7 @@ export abstract class VectorLayer extends Layer {
      * Render the layer for the current pass.
      * @param {Camera} camera - The camera instance.
      */
-    renderPass(camera: Camera): void {
+    renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         if (this._renderInfoIsDirty) {
             this._pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
@@ -326,7 +326,7 @@ export abstract class VectorLayer extends Layer {
         }
 
         this._pipeline.updateZIndex(this._layerInfo.zIndex);
-        this._pipeline.renderPass(camera);
+        this._pipeline.renderPass(camera, passEncoder);
     }
 
     /**

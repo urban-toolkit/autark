@@ -375,13 +375,29 @@ export class Renderer {
         const sky = MapStyle.getColor('background');
         this._frameBuffer.clearValue = { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 };
 
+        this._beginFrame();
+    }
+
+    /** Opens the shared main render pass for the current frame. */
+    beginMainRenderPass(): GPURenderPassEncoder {
+        if (!this._isInitialized) {
+            throw new Error('Renderer main pass requested before initialization.');
+        }
+
+        if (!this._context) {
+            throw new Error('GPU canvas context is null.');
+        }
+
+        this._frameBuffer.loadOp = 'clear';
+        this._frameBuffer.resolveTarget = this._context.getCurrentTexture().createView();
+        this._depthBuffer.depthLoadOp = 'clear';
+
         const renderPassDesc: GPURenderPassDescriptor = {
             colorAttachments: [this._frameBuffer],
             depthStencilAttachment: this._depthBuffer,
         };
 
-        this._beginFrame();
-        this._beginEmptyRenderPass(renderPassDesc);
+        return this.commandEncoder.beginRenderPass(renderPassDesc);
     }
 
     /**

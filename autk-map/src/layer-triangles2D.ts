@@ -167,13 +167,13 @@ export class Triangles2DLayer extends VectorLayer {
      * Renders the layer for the current pass, including the border.
      * @param {Camera} camera - The camera instance.
      */
-    override renderPass(camera: Camera): void {
+    override renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         // VectorLayer.renderPass() clears dirty flags after updating the main
         // fill/picking pipelines, so preserve the data-dirty state needed to
         // keep the border buffers in sync for skip/geometry changes.
         const dataDirty = this._dataIsDirty;
 
-        super.renderPass(camera);
+        super.renderPass(camera, passEncoder);
 
         if (!this._pipelineBorder) { return; }
 
@@ -182,7 +182,7 @@ export class Triangles2DLayer extends VectorLayer {
         }
 
         this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);
-        this._pipelineBorder.renderPass(camera);
+        this._pipelineBorder.renderPass(camera, passEncoder);
     }
 
     /** Releases GPU resources owned by 2D pipelines. */

@@ -246,13 +246,7 @@ export class PipelineTriangleBorder extends Pipeline {
      * Renders the border flat pipeline.
      * @param {Camera} camera The camera instance
      */
-    renderPass(camera: Camera): void {
-        // Create a new command encoder
-        const commandEncoder = this._renderer.commandEncoder;
-
-        // Create a new pass commands encoder
-        const passEncoder = this._beginMainRenderPass(commandEncoder);
-
+    renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
 
@@ -272,7 +266,6 @@ export class PipelineTriangleBorder extends Pipeline {
 
         const indexCount = this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT;
         if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
-        passEncoder.end();
     }
 
 }
