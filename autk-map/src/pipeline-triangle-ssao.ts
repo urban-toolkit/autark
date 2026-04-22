@@ -522,7 +522,7 @@ export class PipelineBuildingSSAO extends Pipeline {
             entryPoint: 'main',
             targets: [
                 {
-                    format: 'bgra8unorm',
+                    format: this._renderer.canvasFormat,
                     blend: {
                         color: {
                             srcFactor: 'one',
@@ -647,8 +647,8 @@ export class PipelineBuildingSSAO extends Pipeline {
 
     /** Recreates shared pass-01 targets if canvas size changed. */
     private _ensureSharedTargets(): void {
-        const width = 2 * this._renderer.canvas.width;
-        const height = 2 * this._renderer.canvas.height;
+        const width = 2 * this._renderer.pixelWidth;
+        const height = 2 * this._renderer.pixelHeight;
 
         if (width === this._sharedTargetsWidth && height === this._sharedTargetsHeight) {
             return;

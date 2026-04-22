@@ -46,6 +46,7 @@ import { ResizeEvents } from './events-resize';
 
 import { Renderer } from './renderer';
 
+import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
@@ -143,6 +144,11 @@ export class AutkMap {
         return this._mapEvents;
     }
 
+    /** Currently active pick-enabled layer, if any. */
+    get activePickingLayer(): Layer | null {
+        return this._layerManager.layers.find((layer) => layer.layerRenderInfo.isPick) ?? null;
+    }
+
     /**
      * Initializes renderer resources, event bindings, and UI.
      */
@@ -222,50 +228,6 @@ export class AutkMap {
         }
 
         this._ui.refreshLayerList();
-    }
-
-    /**
-     * Infers a layer type from a homogeneous collection of vector geometries.
-     *
-     * Returns `null` when the collection is empty, contains only null geometries,
-     * or mixes multiple geometry families that require an explicit layer type.
-     */
-    private inferCollectionLayerType(collection: FeatureCollection<Geometry | null>, layerId: string): LayerType | null {
-        const families = new Set<Extract<LayerType, 'points' | 'polygons' | 'polylines'>>();
-        const visitGeometry = (geometry: Geometry | null, featureIndex: number): void => {
-            if (!geometry) {
-                console.warn(`Layer "${layerId}": feature ${featureIndex} has null geometry and will be ignored during type inference.`);
-                return;
-            }
-
-            if (geometry.type === 'GeometryCollection') {
-                for (const child of geometry.geometries) {
-                    visitGeometry(child, featureIndex);
-                }
-                return;
-            }
-
-            families.add(mapGeometryTypeToLayerType(geometry.type));
-        };
-
-        for (let index = 0; index < collection.features.length; index++) {
-            const feature = collection.features[index];
-            visitGeometry(feature.geometry, index);
-            if (families.size > 1) {
-                console.error(
-                    `Layer "${layerId}": cannot infer layer type from mixed geometry families. Pass an explicit type or split the collection.`
-                );
-                return null;
-            }
-        }
-
-        const [family] = families;
-        if (family) {
-            return family;
-        }
-
-        console.error(`Layer "${layerId}": cannot infer layer type from an empty or geometry-less collection.`);
-        return null;
     }
 
     /**
@@ -421,8 +383,16 @@ export class AutkMap {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || layer.layerInfo.typeLayer !== 'raster') { return; }
 
+        if (collection.features.length === 0) {
+            console.warn(`Raster update skipped for layer '${id}': empty collection.`);
+            return;
+        }
+
         const props = collection.features[0].properties;
-        if (!props) { return; }
+        if (!props || !Array.isArray(props.raster)) {
+            console.warn(`Raster update skipped for layer '${id}': invalid raster payload.`);
+            return;
+        }
 
         const rasterValues = new Float32Array(props.raster.map((row: unknown) => Number(valueAtPath(row, property) ?? 0)));
 
@@ -511,6 +481,8 @@ export class AutkMap {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
 
+        const nextInfo: Partial<LayerRenderInfo> = { ...info };
+
         let needsLegend = false;
         let needsLayerList = false;
 
@@ -521,13 +493,16 @@ export class AutkMap {
         if ('isSkip' in info) {
             needsLayerList = true;
         }
-        if ('isPick' in info) {
-            if (info.isPick === false) { 
-                layer.clearHighlightedIds(); 
+        if ('isPick' in nextInfo) {
+            if (nextInfo.isPick === true) {
+                this.deactivateOtherPickingLayers(id);
+            } else if (nextInfo.isPick === false) {
+                layer.clearHighlightedIds();
+                nextInfo.pickedComps = undefined;
             }
             needsLayerList = true;
         }
-        layer.updateLayerRenderInfo(info);
+        layer.updateLayerRenderInfo(nextInfo);
 
         if (needsLegend) { this._ui.refreshLegend(layer); }
         if (needsLayerList) { this._ui.refreshLayerList(); }
@@ -634,17 +609,64 @@ export class AutkMap {
     }
 
     /**
+     * Infers a layer type from a homogeneous collection of vector geometries.
+     *
+     * Returns `null` when the collection is empty, contains only null geometries,
+     * or mixes multiple geometry families that require an explicit layer type.
+     */
+    private inferCollectionLayerType(collection: FeatureCollection<Geometry | null>, layerId: string): LayerType | null {
+        const families = new Set<Extract<LayerType, 'points' | 'polygons' | 'polylines'>>();
+        const visitGeometry = (geometry: Geometry | null, featureIndex: number): void => {
+            if (!geometry) {
+                console.warn(`Layer "${layerId}": feature ${featureIndex} has null geometry and will be ignored during type inference.`);
+                return;
+            }
+
+            if (geometry.type === 'GeometryCollection') {
+                for (const child of geometry.geometries) {
+                    visitGeometry(child, featureIndex);
+                }
+                return;
+            }
+
+            families.add(mapGeometryTypeToLayerType(geometry.type));
+        };
+
+        for (let index = 0; index < collection.features.length; index++) {
+            const feature = collection.features[index];
+            visitGeometry(feature.geometry, index);
+            if (families.size > 1) {
+                console.error(
+                    `Layer "${layerId}": cannot infer layer type from mixed geometry families. Pass an explicit type or split the collection.`
+                );
+                return null;
+            }
+        }
+
+        const [family] = families;
+        if (family) {
+            return family;
+        }
+
+        console.error(`Layer "${layerId}": cannot infer layer type from an empty or geometry-less collection.`);
+        return null;
+    }
+
+    /**
      * Executes one render frame, including normal and picking passes.
      */
     private render() {
         this._camera.update();
-        const pendingPicks = this._layerManager.layers
-            .filter((layer) => !layer.layerRenderInfo.isSkip && layer.layerRenderInfo.isPick && layer.layerRenderInfo.pickedComps)
-            .map((layer) => {
-                const [x, y] = layer.layerRenderInfo.pickedComps!;
-                layer.layerRenderInfo.pickedComps = undefined;
-                return { layer, vectorLayer: layer as VectorLayer, x, y };
-            });
+        const activePickingLayer = this.activePickingLayer;
+        const pendingPick = activePickingLayer
+            && !activePickingLayer.layerRenderInfo.isSkip
+            && activePickingLayer.layerRenderInfo.pickedComps
+            ? (() => {
+                const [x, y] = activePickingLayer.layerRenderInfo.pickedComps!;
+                activePickingLayer.layerRenderInfo.pickedComps = undefined;
+                return { layer: activePickingLayer, vectorLayer: activePickingLayer as VectorLayer, x, y };
+            })()
+            : null;
 
         // Normal render pass
         this._renderer.start();
@@ -655,39 +677,46 @@ export class AutkMap {
         });
 
         let pickReadbackSlot: number | null = null;
-        if (pendingPicks.length > 0) {
+        if (pendingPick) {
             this._renderer.startPickingRenderPass();
-            pendingPicks.forEach(({ layer }) => {
-                layer.renderPickingPass(this._camera);
-            });
+            pendingPick.layer.renderPickingPass(this._camera);
 
-            pickReadbackSlot = this._renderer.reservePickingReadbackSlot(pendingPicks.length);
+            pickReadbackSlot = this._renderer.reservePickingReadbackSlot(1);
             if (pickReadbackSlot === null) {
                 console.warn('Picking readback buffers are still busy; skipping this picking frame.');
             } else {
-                pendingPicks.forEach(({ x, y }, index) => {
-                    this._renderer.enqueuePickingReadback(pickReadbackSlot!, index, x, y);
-                });
+                this._renderer.enqueuePickingReadback(pickReadbackSlot, 0, pendingPick.x, pendingPick.y);
             }
         }
 
         this._renderer.finish();
 
-        if (pickReadbackSlot !== null) {
-            this._renderer.readPickingResults(pickReadbackSlot, pendingPicks.length).then((ids) => {
-                pendingPicks.forEach(({ layer, vectorLayer }, index) => {
-                    const id = ids[index] ?? -1;
-                    console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
-                    if (id >= 0) {
-                        vectorLayer.toggleHighlightedIds([id]);
-                        this._mapEvents.emit(MapEvent.PICKING, { selection: vectorLayer.highlightedIds, layerId: layer.layerInfo.id });
-                    } else {
-                        layer.clearHighlightedIds();
-                        this._mapEvents.emit(MapEvent.PICKING, { selection: [], layerId: layer.layerInfo.id });
-                    }
-                });
+        if (pickReadbackSlot !== null && pendingPick) {
+            this._renderer.readPickingResults(pickReadbackSlot, 1).then((ids) => {
+                const id = ids[0] ?? -1;
+                const { layer, vectorLayer } = pendingPick;
+                console.log(`Picked id ${id} on layer ${layer.layerInfo.id}`);
+                if (id >= 0) {
+                    vectorLayer.toggleHighlightedIds([id]);
+                    this._mapEvents.emit(MapEvent.PICKING, { selection: vectorLayer.highlightedIds, layerId: layer.layerInfo.id });
+                } else {
+                    layer.clearHighlightedIds();
+                    this._mapEvents.emit(MapEvent.PICKING, { selection: [], layerId: layer.layerInfo.id });
+                }
             });
         }
+    }
+
+    /** Clears picking state from every layer except the requested one. */
+    private deactivateOtherPickingLayers(activeLayerId: string): void {
+        this._layerManager.layers.forEach((otherLayer) => {
+            if (otherLayer.layerInfo.id === activeLayerId || !otherLayer.layerRenderInfo.isPick) {
+                return;
+            }
+
+            otherLayer.clearHighlightedIds();
+            otherLayer.updateLayerRenderInfo({ isPick: false, pickedComps: undefined });
+        });
     }
 
     /**

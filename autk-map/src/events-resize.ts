@@ -40,12 +40,10 @@ export class ResizeEvents {
         const canvas = this._map.canvas;
         const width = canvas.offsetWidth;
         const height = canvas.offsetHeight;
-
-        canvas.width = width * (window.devicePixelRatio || 1);
-        canvas.height = height * (window.devicePixelRatio || 1);
+        const devicePixelRatio = window.devicePixelRatio || 1;
 
         this._map.camera.resize(width, height);
-        this._map.renderer.resize(width, height);
+        this._map.renderer.resize(width, height, devicePixelRatio);
         this._map.ui.handleResize();
     }
 }

@@ -114,7 +114,8 @@ export class MouseEvents {
 
         if (this._status !== MouseStatus.DRAG) return;
 
-        const canvas = this._map.renderer.canvas;
+        const cssWidth = this._map.renderer.cssWidth;
+        const cssHeight = this._map.renderer.cssHeight;
         event.preventDefault();
         event.stopPropagation();
 
@@ -123,10 +124,10 @@ export class MouseEvents {
         const dy =  point[1] - this._lastPoint[1];
 
         if ((event.buttons & 1) === 1 && event.shiftKey) {
-            this._map.camera.yaw(dx / canvas.offsetWidth);
-            this._map.camera.pitch(dy / canvas.offsetHeight);
+            this._map.camera.yaw(dx / cssWidth);
+            this._map.camera.pitch(dy / cssHeight);
         } else {
-            this._map.camera.translate(dx / canvas.offsetWidth, dy / canvas.offsetHeight);
+            this._map.camera.translate(dx / cssWidth, dy / cssHeight);
         }
 
         this._lastPoint = point;
@@ -148,10 +149,9 @@ export class MouseEvents {
         event.preventDefault();
         event.stopPropagation();
 
-        const canvas = this._map.renderer.canvas;
-        const rect = canvas.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / canvas.offsetWidth;
-        const y = 1.0 - (event.clientY - rect.top) / canvas.offsetHeight;
+        const rect = this._map.renderer.canvas.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / this._map.renderer.cssWidth;
+        const y = 1.0 - (event.clientY - rect.top) / this._map.renderer.cssHeight;
 
         this._map.camera.zoom(event.deltaY * 0.01, x, y);
     }
@@ -160,22 +160,14 @@ export class MouseEvents {
         event.preventDefault();
         event.stopPropagation();
 
-        const canvas = this._map.renderer.canvas;
-        const rect = canvas.getBoundingClientRect();
+        const rect = this._map.renderer.canvas.getBoundingClientRect();
 
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
 
-        const scaleX = canvas.width / canvas.offsetWidth;
-        const scaleY = canvas.height / canvas.offsetHeight;
-
-        const adjustedX = Math.floor(mouseX * scaleX);
-        const adjustedY = Math.floor(mouseY * scaleY);
-
-        this._map.layerManager.layers.forEach((layer) => {
-            if (layer.layerRenderInfo.isPick) {
-                layer.layerRenderInfo.pickedComps = [adjustedX, adjustedY];
-            }
-        });
+        const activePickingLayer = this._map.activePickingLayer;
+        if (activePickingLayer?.layerRenderInfo.isPick) {
+            activePickingLayer.layerRenderInfo.pickedComps = [mouseX, mouseY];
+        }
     }
 }

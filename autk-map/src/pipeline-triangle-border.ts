@@ -191,7 +191,7 @@ export class PipelineTriangleBorder extends Pipeline {
             entryPoint: 'main',
             targets: [
                 {
-                    format: 'bgra8unorm',
+                    format: this._renderer.canvasFormat,
                     blend: {
                         color: {
                             srcFactor: 'one',

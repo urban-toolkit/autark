@@ -46,7 +46,7 @@ export interface LayerRenderInfo {
     isPick?: boolean;
     /** Colormap configuration and computed runtime domain/labels. */
     colormap: LayerColormap;
-    /** Indices of currently picked components, if any. */
+    /** Pending pick coordinates in CSS pixels, if any. */
     pickedComps?: number[];
 }
 

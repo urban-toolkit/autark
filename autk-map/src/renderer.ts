@@ -54,6 +54,16 @@ export class Renderer {
     protected _canvasFormat!: GPUTextureFormat;
     /** Renderer initialization state. */
     protected _isInitialized: boolean = false;
+    /** Canvas layout width in CSS pixels. */
+    protected _cssWidth: number = 1;
+    /** Canvas layout height in CSS pixels. */
+    protected _cssHeight: number = 1;
+    /** Canvas backing-store width in device pixels. */
+    protected _pixelWidth: number = 1;
+    /** Canvas backing-store height in device pixels. */
+    protected _pixelHeight: number = 1;
+    /** Device pixel ratio used to derive backing-store size. */
+    protected _devicePixelRatio: number = 1;
 
     /**
      * Creates a renderer bound to a canvas.
@@ -61,11 +71,42 @@ export class Renderer {
      */
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
+        this._syncCanvasMetrics(canvas.offsetWidth || canvas.width, canvas.offsetHeight || canvas.height, window.devicePixelRatio || 1);
     }
 
     /** Underlying render canvas. */
     get canvas(): HTMLCanvasElement {
         return this._canvas;
+    }
+
+    /** Canvas layout width in CSS pixels. */
+    get cssWidth(): number {
+        return this._cssWidth;
+    }
+
+    /** Canvas layout height in CSS pixels. */
+    get cssHeight(): number {
+        return this._cssHeight;
+    }
+
+    /** Canvas backing-store width in device pixels. */
+    get pixelWidth(): number {
+        return this._pixelWidth;
+    }
+
+    /** Canvas backing-store height in device pixels. */
+    get pixelHeight(): number {
+        return this._pixelHeight;
+    }
+
+    /** Device pixel ratio currently applied to the render surface. */
+    get devicePixelRatio(): number {
+        return this._devicePixelRatio;
+    }
+
+    /** Preferred canvas format negotiated with WebGPU. */
+    get canvasFormat(): GPUTextureFormat {
+        return this._canvasFormat;
     }
 
     /** Active WebGPU canvas context (if configured). */
@@ -163,17 +204,16 @@ export class Renderer {
 
     /**
      * Resizes the canvas and recreates size-dependent render targets.
-     * @param width New canvas width in pixels.
-     * @param height New canvas height in pixels.
+     * @param cssWidth New layout width in CSS pixels.
+     * @param cssHeight New layout height in CSS pixels.
+     * @param devicePixelRatio Backing-store scale factor.
      */
-    resize(width: number, height: number): void {
+    resize(cssWidth: number, cssHeight: number, devicePixelRatio: number = window.devicePixelRatio || 1): void {
+        this._syncCanvasMetrics(cssWidth, cssHeight, devicePixelRatio);
+
         if (!this._isInitialized) {
             return;
         }
-
-        // Avoid invalid zero-sized GPU textures when the host container is collapsed.
-        this._canvas.width = Math.max(1, Math.floor(width));
-        this._canvas.height = Math.max(1, Math.floor(height));
 
         this.configureContext();
         this.configureFrameBuffer();
@@ -216,7 +256,7 @@ export class Renderer {
         this._pickingDepthTexture?.destroy();
 
         const desc: GPUTextureDescriptor = {
-            size: [this._canvas.width, this._canvas.height],
+            size: [this._pixelWidth, this._pixelHeight],
             format: 'rgba8unorm',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
             sampleCount: this._pickingSampleCount,
@@ -233,7 +273,7 @@ export class Renderer {
         };
 
         const depthDesc: GPUTextureDescriptor = {
-            size: [this._canvas.width, this._canvas.height],
+            size: [this._pixelWidth, this._pixelHeight],
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
             sampleCount: this._pickingSampleCount,
@@ -268,7 +308,7 @@ export class Renderer {
         const colorTextureView = colorTexture.createView();
 
         const multiSampleDesc: GPUTextureDescriptor = {
-            size: [this._canvas.width, this._canvas.height],
+            size: [this._pixelWidth, this._pixelHeight],
             sampleCount: this._sampleCount,
             format: this._canvasFormat,
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
@@ -298,7 +338,7 @@ export class Renderer {
         this._depthTexture?.destroy();
 
         const depthTextureDesc: GPUTextureDescriptor = {
-            size: [this._canvas.width, this._canvas.height, 1],
+            size: [this._pixelWidth, this._pixelHeight, 1],
             sampleCount: this._sampleCount,
             dimension: '2d',
             format: 'depth32float',
@@ -411,8 +451,7 @@ export class Renderer {
             throw new Error(`Picking readback slot ${slotIndex} is not reserved.`);
         }
 
-        const px = Math.max(0, Math.min(this._canvas.width - 1, Math.floor(x)));
-        const py = Math.max(0, Math.min(this._canvas.height - 1, Math.floor(y)));
+        const [px, py] = this.toPixelCoordinates(x, y);
 
         this.commandEncoder.copyTextureToBuffer(
             {
@@ -487,5 +526,26 @@ export class Renderer {
     private _decodeColorToId(r: number, g: number, b: number): number {
         const id = (r & 0xff) | ((g & 0xff) << 8) | ((b & 0xff) << 16);
         return id - 1;
+    }
+
+    /** Converts CSS-relative coordinates into clamped backing-store pixel coordinates. */
+    toPixelCoordinates(x: number, y: number): [number, number] {
+        const scaleX = this._cssWidth > 0 ? this._pixelWidth / this._cssWidth : 1;
+        const scaleY = this._cssHeight > 0 ? this._pixelHeight / this._cssHeight : 1;
+        const px = Math.max(0, Math.min(this._pixelWidth - 1, Math.floor(x * scaleX)));
+        const py = Math.max(0, Math.min(this._pixelHeight - 1, Math.floor(y * scaleY)));
+        return [px, py];
+    }
+
+    /** Synchronizes CSS and backing-store metrics before any GPU reallocation work. */
+    private _syncCanvasMetrics(cssWidth: number, cssHeight: number, devicePixelRatio: number): void {
+        this._cssWidth = Math.max(1, Math.floor(cssWidth));
+        this._cssHeight = Math.max(1, Math.floor(cssHeight));
+        this._devicePixelRatio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+        this._pixelWidth = Math.max(1, Math.floor(this._cssWidth * this._devicePixelRatio));
+        this._pixelHeight = Math.max(1, Math.floor(this._cssHeight * this._devicePixelRatio));
+
+        this._canvas.width = this._pixelWidth;
+        this._canvas.height = this._pixelHeight;
     }
 }
