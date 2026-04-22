@@ -145,12 +145,7 @@ export class TriangulatorPolygons {
             holes.push(coords.length);
             coordinates[i].forEach((cord: number[]) => coords.push(cord));
         }
-        if (holes.length > 0) {
-            console.log('[autk-core] Triangulating polygon with holes', {
-                featureId: feature.id ?? null,
-                holeCount: holes.length,
-            });
-        }
+
         const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
         const flatIds = earcut(flatCoords, holes.length > 0 ? holes : undefined);
         return [{ flatCoords, flatIds }];
@@ -175,12 +170,7 @@ export class TriangulatorPolygons {
                 holes.push(coords.length);
                 polygon[i].forEach((cord: number[]) => coords.push(cord));
             }
-            if (holes.length > 0) {
-                console.log('[autk-core] Triangulating multipolygon part with holes', {
-                    featureId: feature.id ?? null,
-                    holeCount: holes.length,
-                });
-            }
+            
             const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
             const flatIds = earcut(flatCoords, holes.length > 0 ? holes : undefined);
             meshes.push({ flatCoords, flatIds });
