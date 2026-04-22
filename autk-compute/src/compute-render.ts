@@ -3,7 +3,6 @@
 import { FeatureCollection } from 'geojson';
 
 import {
-    flattenMesh,
     LayerGeometry,
     TriangulatorBuildings,
     TriangulatorPoints,
@@ -501,7 +500,53 @@ export class ComputeRender extends GpuPipeline {
         layerMesh: LayerMeshData,
         layerTypeIndex: number,
     ): GpuFeatureDraw[] {
-        const mesh = flattenMesh(layerMesh.geometries);
+        const dimension = layerMesh.layer.type === 'buildings' ? 3 : 2;
+
+        let totalVerts = 0;
+        let totalIndices = 0;
+        for (const geometry of layerMesh.geometries) {
+            if (geometry.position.length % dimension !== 0) {
+                throw new Error(
+                    `ComputeRender: layer '${layerMesh.layer.layerId}' has invalid position data for ${dimension}D geometry.`
+                );
+            }
+
+            totalVerts += (geometry.position.length / dimension) * 3;
+            totalIndices += geometry.indices?.length ?? 0;
+        }
+
+        const positions = new Float32Array(totalVerts);
+        const indices = new Uint32Array(totalIndices);
+
+        let vOffset = 0;
+        let iOffset = 0;
+        let vertexCount = 0;
+
+        for (const geometry of layerMesh.geometries) {
+            const vertsAdded = geometry.position.length / dimension;
+
+            if (dimension === 2) {
+                for (let i = 0, j = 0; i < geometry.position.length; i += 2, j += 3) {
+                    positions[vOffset + j] = geometry.position[i];
+                    positions[vOffset + j + 1] = geometry.position[i + 1];
+                    positions[vOffset + j + 2] = 0;
+                }
+            } else {
+                positions.set(geometry.position, vOffset);
+            }
+
+            if (geometry.indices) {
+                for (let i = 0; i < geometry.indices.length; i++) {
+                    indices[iOffset + i] = geometry.indices[i] + vertexCount;
+                }
+                iOffset += geometry.indices.length;
+            }
+
+            vOffset += vertsAdded * 3;
+            vertexCount += vertsAdded;
+        }
+
+        const mesh = { positions, indices };
         if (mesh.indices.length === 0) {
             return [];
         }

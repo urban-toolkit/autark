@@ -103,5 +103,3 @@ export { isLayerType } from './utils-geo';
 export { mapGeometryTypeToLayerType } from './utils-geo';
 /** Builds a closed planar offset polygon from a local-space polyline. */
 export { offsetPolyline } from './utils-geo';
-/** Flattens an array of LayerGeometry pieces into continuous typed arrays. */
-export { flattenMesh } from './utils-mesh';

@@ -132,7 +132,7 @@ export class ColorMap {
 
         if (mode === ColorMapDomainStrategy.USER) {
             const params = config.domainSpec.params;
-            if (!params.length || params.some(v => typeof v !== 'number')) {
+            if (!params.length || params.some(v => typeof v !== 'number' || !Number.isFinite(v))) {
                 throw new Error('ColorMap USER domain for numeric interpolators must be number[].');
             }
             const numeric = params as number[];
@@ -150,18 +150,25 @@ export class ColorMap {
             return [numeric[0], numeric[numeric.length - 1]];
         }
 
+        const finiteValues = (ArrayBuffer.isView(values) ? Array.from(values) : values)
+            .filter((value) => Number.isFinite(value));
+
+        if (finiteValues.length === 0) {
+            return ColorMap.isDiverging(interpolator) ? [0, 0, 0] : [0, 0];
+        }
+
         if (mode === ColorMapDomainStrategy.PERCENTILE) {
             const [lowerPercentile, upperPercentile] = config.domainSpec.params ?? [2, 98];
-            const low = ColorMap.computePercentile(values, lowerPercentile / 100);
-            const high = ColorMap.computePercentile(values, upperPercentile / 100);
+            const low = ColorMap.computePercentile(finiteValues, lowerPercentile / 100);
+            const high = ColorMap.computePercentile(finiteValues, upperPercentile / 100);
             if (ColorMap.isDiverging(interpolator)) {
-                const center = ColorMap.computePercentile(values, 50 / 100);
+                const center = ColorMap.computePercentile(finiteValues, 50 / 100);
                 return [low, center, high];
             }
             return [low, high];
         }
 
-        const [min, max] = ColorMap.computeMinMaxRange(values);
+        const [min, max] = ColorMap.computeMinMaxRange(finiteValues);
         if (ColorMap.isDiverging(interpolator)) {
             const center = (min + max) / 2;
             return [min, center, max];

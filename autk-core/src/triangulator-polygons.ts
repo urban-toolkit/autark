@@ -111,7 +111,7 @@ export class TriangulatorPolygons {
     static lineStringToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
         const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-        const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
+        const flatIds = TriangulatorPolygons.generateOpenBorderIds(flatCoords.length / 2);
         return [{ flatCoords, flatIds }];
     }
 
@@ -131,7 +131,7 @@ export class TriangulatorPolygons {
         const borders = [];
         for (const lineString of coordinates) {
             const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-            const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
+            const flatIds = TriangulatorPolygons.generateOpenBorderIds(flatCoords.length / 2);
             borders.push({ flatCoords, flatIds });
         }
         return borders;
@@ -160,7 +160,7 @@ export class TriangulatorPolygons {
         const { coordinates } = <Polygon>feature.geometry;
         return coordinates.map((ring: number[][]) => {
             const flatCoords = ring.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-            const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
+            const flatIds = TriangulatorPolygons.generateClosedBorderIds(ring);
             return { flatCoords, flatIds };
         });
     }
@@ -194,7 +194,7 @@ export class TriangulatorPolygons {
         for (const polygon of coordinates) {
             for (const ring of polygon) {
                 const flatCoords = ring.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
-                const flatIds = TriangulatorPolygons.generateBorderIds(flatCoords.length / 2);
+                const flatIds = TriangulatorPolygons.generateClosedBorderIds(ring);
                 borders.push({ flatCoords, flatIds });
             }
         }
@@ -241,10 +241,29 @@ export class TriangulatorPolygons {
         );
     }
 
-    protected static generateBorderIds(nCoords: number): number[] {
+    protected static generateOpenBorderIds(nCoords: number): number[] {
         const ids = [];
         for (let i = 0; i < nCoords - 1; i++) ids.push(i, i + 1);
-        ids.push(nCoords - 1, 0);
+        return ids;
+    }
+
+    protected static generateClosedBorderIds(ring: number[][]): number[] {
+        const pointCount = ring.length;
+        if (pointCount < 2) {
+            return [];
+        }
+
+        const isExplicitlyClosed = pointCount > 1
+            && ring[0][0] === ring[pointCount - 1][0]
+            && ring[0][1] === ring[pointCount - 1][1]
+            && (ring[0][2] ?? 0) === (ring[pointCount - 1][2] ?? 0);
+        const uniquePointCount = isExplicitlyClosed ? pointCount - 1 : pointCount;
+        const ids = TriangulatorPolygons.generateOpenBorderIds(uniquePointCount);
+
+        if (uniquePointCount > 1) {
+            ids.push(uniquePointCount - 1, 0);
+        }
+
         return ids;
     }
 }

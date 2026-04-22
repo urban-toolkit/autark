@@ -215,25 +215,28 @@ function computePolygonCentroid(rings: Position[][]): WeightedCentroid | null {
     let weightedX = 0;
     let weightedY = 0;
     let weightedZ = 0;
-    let totalSignedArea = 0;
+    let totalAreaContribution = 0;
 
-    for (const ring of rings) {
+    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+        const ring = rings[ringIndex];
         const ringCentroid = computeRingCentroid(ring);
         if (!ringCentroid) continue;
-        weightedX += ringCentroid.centroid[0] * ringCentroid.signedArea;
-        weightedY += ringCentroid.centroid[1] * ringCentroid.signedArea;
-        weightedZ += ringCentroid.centroid[2] * ringCentroid.signedArea;
-        totalSignedArea += ringCentroid.signedArea;
+
+        const areaContribution = Math.abs(ringCentroid.signedArea) * (ringIndex === 0 ? 1 : -1);
+        weightedX += ringCentroid.centroid[0] * areaContribution;
+        weightedY += ringCentroid.centroid[1] * areaContribution;
+        weightedZ += ringCentroid.centroid[2] * areaContribution;
+        totalAreaContribution += areaContribution;
     }
 
-    const totalArea = Math.abs(totalSignedArea);
+    const totalArea = Math.abs(totalAreaContribution);
     if (totalArea === 0) {
         const flattened = rings.flat();
         return averagePositions(flattened);
     }
 
     return {
-        centroid: [weightedX / totalSignedArea, weightedY / totalSignedArea, weightedZ / totalSignedArea],
+        centroid: [weightedX / totalAreaContribution, weightedY / totalAreaContribution, weightedZ / totalAreaContribution],
         weight: totalArea,
     };
 }
