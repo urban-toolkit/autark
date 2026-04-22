@@ -53,17 +53,18 @@ export class LayerManager {
     }
 
     /**
-        * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
-        * Dynamic layer z-indices are recomputed after insertion.
-        * Layer ids are expected to be unique; duplicate ids are accepted but warned.
-        * @param layerInfo Layer identity and type metadata.
-        * @param layerRender Initial render configuration.
-        * @param layerData Geometry and auxiliary layer payload.
-        * @returns The created layer, or `null` if the type is not recognized.
-      */
+     * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
+     * Dynamic layer z-indices are recomputed after insertion.
+     * Layer ids must be unique; duplicate ids are rejected.
+     * @param layerInfo Layer identity and type metadata.
+     * @param layerRender Initial render configuration.
+     * @param layerData Geometry and auxiliary layer payload.
+     * @returns The created layer, or `null` when insertion is rejected.
+       */
     addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
         if (this._layers.some((layer) => layer.layerInfo.id === layerInfo.id)) {
-            console.warn(`LayerManager: duplicate layer id '${layerInfo.id}' was added.`);
+            console.error(`LayerManager: layer id '${layerInfo.id}' already exists.`);
+            return null;
         }
 
         const layer: Layer = layerInfo.typeLayer === 'buildings'
@@ -83,18 +84,18 @@ export class LayerManager {
     }
 
     /**
-     * Removes all layers matching `layerId` and recomputes dynamic z-order.
-     * Layer ids are expected to be unique, but all matches are removed for safety.
+     * Removes the layer matching `layerId` and recomputes dynamic z-order.
      * @param layerId Layer identifier to remove.
      */
     removeLayerById(layerId: string): void {
-        this._layers.forEach((layer) => {
-            if (layer.layerInfo.id === layerId) {
-                layer.destroy();
-            }
-        });
-        this._layers = this._layers.filter(l => l.layerInfo.id !== layerId);
-        this._dynamicOrder = this._dynamicOrder.filter(id => id !== layerId);
+        const layer = this.searchByLayerId(layerId);
+        if (!layer) {
+            return;
+        }
+
+        layer.destroy();
+        this._layers = this._layers.filter((candidate) => candidate.layerInfo.id !== layerId);
+        this._dynamicOrder = this._dynamicOrder.filter((id) => id !== layerId);
         this._recomputeZIndices();
     }
 
