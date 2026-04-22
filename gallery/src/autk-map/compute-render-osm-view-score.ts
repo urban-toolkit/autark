@@ -1,8 +1,8 @@
 import { ComputeRender } from 'autk-compute';
-import { ColorMapDomainStrategy } from 'autk-core';
+import { ColorMapDomainStrategy, computeGeometryCentroid } from 'autk-core';
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType, MapEvent } from 'autk-map';
-import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import { Feature, FeatureCollection, GeoJsonProperties, Geometry, Point } from 'geojson';
 
 export class ComputeRenderOsmViewScore {
     protected map!: AutkMap;
@@ -34,47 +34,46 @@ export class ComputeRenderOsmViewScore {
         const buildingsGeoJson = await this.db.getLayer('table_osm_buildings');
         const parksGeoJson = await this.db.getLayer('table_osm_parks');
         const waterGeoJson = await this.db.getLayer('table_osm_water');
+        const buildingViewpoints = buildBuildingViewpoints(buildingsGeoJson);
         const renderLayers = [
             {
                 layerId: 'table_osm_buildings',
                 geojson: buildingsGeoJson,
-                type: 'buildings' as const,
                 layerType: 'buildings',
             },
             {
                 layerId: 'table_osm_parks',
                 geojson: parksGeoJson,
-                type: 'parks' as const,
                 layerType: 'parks',
             },
             {
                 layerId: 'table_osm_water',
                 geojson: waterGeoJson,
-                type: 'water' as const,
                 layerType: 'water',
             },
         ];
 
         const render = new ComputeRender();
-        const buildingsWithClasses = await render.run({
+        const viewpointsWithClasses = await render.run({
             layers: renderLayers,
-            source: buildingsGeoJson,
+            source: buildingViewpoints,
             aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
-            viewSampling: { directions: 36 },
+            viewSampling: { directions: 36, pitchDeg: -12 },
             tileSize: 32,
         });
 
         this.buildingsWithScore = {
-            ...buildingsWithClasses,
-            features: buildingsWithClasses.features
+            ...buildingsGeoJson,
+            features: buildingsGeoJson.features
                 .filter((building: Feature): building is Feature<Geometry, GeoJsonProperties> => building.geometry !== null)
-                .map((building: Feature) => {
-                    const classMetrics = ((building.properties as any)?.compute?.render ?? {}) as Record<string, unknown>;
+                .map((building: Feature, index) => {
+                    const viewpoint = viewpointsWithClasses.features[index];
+                    const classMetrics = ((viewpoint?.properties as any)?.compute?.render ?? {}) as Record<string, unknown>;
                     const classes = (classMetrics.classes ?? {}) as Record<string, number>;
                     const parksVisibility = Number(classes.parks ?? 0);
                     const waterVisibility = Number(classes.water ?? 0);
                     const skyVisibility = Number(classes.sky ?? 0);
-                    const viewScore = waterVisibility * 0.2 + parksVisibility * 0.35 + skyVisibility * 0.45;
+                    const viewScore = waterVisibility * 1.0 + parksVisibility * 0.0 + skyVisibility * 0.0;
 
                     return {
                         ...building,
@@ -262,3 +261,27 @@ async function main() {
     await example.run(canvas);
 }
 main();
+
+function buildBuildingViewpoints(buildings: FeatureCollection<Geometry, GeoJsonProperties>): FeatureCollection<Point> {
+    return {
+        type: 'FeatureCollection',
+        features: buildings.features.map((building, index) => {
+            const centroid = building.geometry ? computeGeometryCentroid(building.geometry) : null;
+            const [x, y] = centroid ?? [0, 0, 0];
+            const height = resolveBuildingHeight(building) ?? 20;
+            const eyeHeight = Math.max(1.7, Math.min(Math.max(1.7, height * 0.6), height + 1.7));
+
+            return {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [x, y, eyeHeight],
+                },
+                properties: {
+                    sourceIndex: index,
+                    height,
+                },
+            };
+        }),
+    };
+}

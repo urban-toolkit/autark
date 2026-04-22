@@ -116,7 +116,6 @@ export class ComputeRenderOsmVisibility {
             layers: [{
                 layerId: 'table_osm_buildings',
                 geojson: sceneBuildings,
-                type: 'buildings',
                 layerType: 'buildings',
                 objectIdProperty: '_renderObjectId',
             }],

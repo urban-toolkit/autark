@@ -142,7 +142,6 @@ export class Urbane {
                 layerId: 'table_osm_buildings',
                 geojson: buildingsGeoJson,
                 layerType: 'buildings',
-                type: 'buildings',
             }],
             source: roadsGeoJson,
             aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
