@@ -125,12 +125,13 @@ export class Camera {
     /**
      * Zooms the camera toward or away from the point under the cursor.
      *
-     * @param delta - Scroll delta — negative scrolls zoom out, positive zooms in.
+     * @param delta - Normalized scroll delta. Positive values zoom out, negative values zoom in.
      * @param x - Normalised cursor X position (0–1, left to right).
      * @param y - Normalised cursor Y position (0–1, bottom to top).
      */
     public zoom(delta: number, x: number, y: number): void {
-        delta = delta < 0 ? 100 * (this.wEye[2] * 0.001) : -100 * (this.wEye[2] * 0.001);
+        const zoomScale = Math.max(Math.abs(this.wEye[2]), 1) * 0.2;
+        delta = -delta * zoomScale;
         const dir = this.screenCoordToWorldDir(x, y);
         vec3.scaleAndAdd(this.wEye, this.wEye, dir, delta);
         vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));

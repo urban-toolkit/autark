@@ -8,6 +8,8 @@ const EYE_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><pa
 const RAMP_SVG  = `<svg viewBox="0 0 16 16" width="20" height="20"><rect x="1"   y="6" width="3.5" height="5" rx="1" fill="#4169e1"/><rect x="4.5" y="6" width="3"   height="5"        fill="#44cccc"/><rect x="7.5" y="6" width="3"   height="5"        fill="#fdd34d"/><rect x="10.5" y="6" width="3.5" height="5" rx="1" fill="#e04444"/></svg>`;
 const CURSOR_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><path d="M2 1l4.5 13 2.1-5.1L14 6.8z"/></svg>`;
 
+const DEBUG_FPS = false;
+
 export class AutkMapUi {
     /** Parent map instance used for UI interactions and layer updates. */
     protected _map: AutkMap;
@@ -21,6 +23,8 @@ export class AutkMapUi {
     protected _subMenu: HTMLDivElement | null = null;
     /** Legend panel for thematic colormap display. */
     protected _legend: HTMLDivElement | null = null;
+    /** Performance overlay showing smoothed FPS and render time. */
+    protected _performanceOverlay: HTMLDivElement | null = null;
     /** Persistent menu toggle handler removed during teardown. */
     protected _onMenuIconClick: ((event: MouseEvent) => void) | null = null;
 
@@ -55,6 +59,10 @@ export class AutkMapUi {
             this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth  - 2 - width  - this._uiMargin) + 'px';
             this._legend.style.top  = (this.map.canvas.offsetTop  + this.map.canvas.clientHeight - 2 - height - this._uiMargin) + 'px';
         }
+        if (this._performanceOverlay) {
+            this._performanceOverlay.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 92 - this._uiMargin) + 'px';
+            this._performanceOverlay.style.top = (this.map.canvas.offsetTop + this._uiMargin) + 'px';
+        }
     }
 
     // ── Active layer ──────────────────────────────────────────────────────────
@@ -87,6 +95,10 @@ export class AutkMapUi {
         this.buildSubMenu();
         this.buildLayerList();
         this.buildLegend();
+
+        if(DEBUG_FPS) {
+            this.buildPerformanceOverlay(); 
+        }
     }
 
     /** Removes injected UI DOM, listeners, and cached active state. */
@@ -98,12 +110,23 @@ export class AutkMapUi {
         this._menuIcon?.remove();
         this._subMenu?.remove();
         this._legend?.remove();
+        this._performanceOverlay?.remove();
 
         this._onMenuIconClick = null;
         this._menuIcon = null;
         this._subMenu = null;
         this._legend = null;
+        this._performanceOverlay = null;
         this._activeLayer = null;
+    }
+
+    /** Updates the on-screen performance meter. */
+    updatePerformance(fps: number, frameTimeMs: number): void {
+        if (!this._performanceOverlay) {
+            return;
+        }
+
+        this._performanceOverlay.innerHTML = `<div style="font-weight:600;">${fps.toFixed(1)} fps</div><div>${frameTimeMs.toFixed(1)} ms</div>`;
     }
 
     /** Clears active legend state when a layer is removed. */
@@ -226,6 +249,26 @@ export class AutkMapUi {
         });
 
         this.map.canvas.parentElement?.appendChild(this._legend);
+    }
+
+    protected buildPerformanceOverlay(): void {
+        if (this._performanceOverlay) return;
+
+        this._performanceOverlay = document.createElement('div');
+        this._performanceOverlay.id = 'autkMapPerformanceOverlay';
+        Object.assign(this._performanceOverlay.style, {
+            position: 'absolute', display: 'block', zIndex: '11',
+            minWidth: '82px', padding: '8px 10px',
+            backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: '10px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#222',
+            textAlign: 'right',
+            left: (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 92 - this._uiMargin - 10) + 'px',
+            top: (this.map.canvas.offsetTop + this._uiMargin) + 'px',
+        });
+        this._performanceOverlay.innerHTML = '<div style="font-weight:600;">0.0 fps</div><div>0.0 ms</div>';
+
+        this.map.canvas.parentElement?.appendChild(this._performanceOverlay);
     }
 
     // ── Layer list population ─────────────────────────────────────────────────

@@ -611,6 +611,8 @@ export class AutkMap {
         }
 
         let previousDelta = 0;
+        let smoothedFps = 0;
+        let smoothedFrameTime = 0;
 
         const update = (currentDelta: number) => {
             if (this._isDestroyed) {
@@ -625,7 +627,16 @@ export class AutkMap {
                 return;
             }
 
+            const frameStart = performance.now();
             this.render();
+            const frameTime = performance.now() - frameStart;
+
+            if (delta > 0) {
+                const currentFps = 1000 / delta;
+                smoothedFps = smoothedFps === 0 ? currentFps : smoothedFps * 0.9 + currentFps * 0.1;
+            }
+            smoothedFrameTime = smoothedFrameTime === 0 ? frameTime : smoothedFrameTime * 0.9 + frameTime * 0.1;
+            this._ui.updatePerformance(smoothedFps, smoothedFrameTime);
             previousDelta = currentDelta;
         };
 

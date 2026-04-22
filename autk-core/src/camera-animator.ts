@@ -200,6 +200,7 @@ export class CameraAnimator {
                         center[2] + newEyeOff[2],
                     ];
                     camera.resetCamera(newUp, center, newEye);
+                    camera.update();
 
                 } else if (step.type === 'yaw') {
                     const newEyeOff = this.rotateAround(eyeOffset, [0, 0, 1], step.amount * currEased);
@@ -210,6 +211,7 @@ export class CameraAnimator {
                         sceneCenter[2] + newEyeOff[2],
                     ];
                     camera.resetCamera(newUp, sceneCenter, newEye);
+                    camera.update();
 
                 } else if (step.type === 'zoom') {
                     const scale = Math.exp(zoomLogEnd * currEased);
@@ -219,10 +221,12 @@ export class CameraAnimator {
                         sceneCenter[2] + eyeOffset[2] * scale,
                     ];
                     camera.resetCamera(startState.up, sceneCenter, newEye);
+                    camera.update();
 
                 } else if (step.type === 'roll') {
                     const newUp = this.rotateAround(startState.up, startState.forward, step.amount * currEased);
                     camera.resetCamera(newUp, startState.lookAt, startState.eye);
+                    camera.update();
                 }
 
                 if (currProgress < 1) {
