@@ -1,9 +1,9 @@
 /**
  * Roof geometry generation for OSM buildings.
- *
- * Supports: flat, pyramidal, skillion, gabled, hipped.
+ * Supports: flat, pyramidal, skillion, gabled, hipped, dome, round, mansard, saltbox.
  * Hipped and gabled use an iterative straight-skeleton algorithm.
  * Concave polygons fall back to flat.
+ * @module triangulator-roofs
  */
 
 import earcut from "earcut";

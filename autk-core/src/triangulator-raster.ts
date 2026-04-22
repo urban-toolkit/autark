@@ -2,6 +2,11 @@ import { FeatureCollection, Geometry } from 'geojson';
 
 import { LayerGeometry, LayerComponent } from './types-mesh';
 
+/**
+ * Converts a GeoTIFF FeatureCollection (with bounding box) into a 2-triangle quad mesh.
+ * UV coordinates map directly to the raster's normalized [0,1]² texture space for GPU sampling.
+ * @module triangulator-raster
+ */
 export class TriangulatorRaster {
     static buildMesh(geotiff: FeatureCollection<Geometry | null>, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];

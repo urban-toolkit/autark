@@ -1,4 +1,10 @@
 /**
+ * @module EventEmitter
+ * A lightweight, type-safe event emitter for handling custom events within the application.
+ * It provides a simple `on`, `off`, and `emit` interface for event management.
+ */
+
+/**
  * Generic event listener type.
  * @template T - The event payload type.
  */

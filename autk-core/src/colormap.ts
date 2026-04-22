@@ -1,3 +1,9 @@
+/**
+ * @module ColorMap
+ * A comprehensive color management utility that leverages d3-scale and d3-scale-chromatic.
+ * It handles resolving color domains from data, generating color textures for WebGPU,
+ * creating legend labels, and converting between color formats.
+ */
 import * as d3_color from 'd3-color';
 import * as d3_format from 'd3-format';
 import * as d3_scale from 'd3-scale';

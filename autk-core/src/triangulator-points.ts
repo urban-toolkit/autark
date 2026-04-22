@@ -2,6 +2,11 @@ import { FeatureCollection, Feature, Point, MultiPoint, GeometryCollection } fro
 
 import { LayerGeometry, LayerComponent } from './types-mesh';
 
+/**
+ * Converts GeoJSON Point and MultiPoint features into triangulated mesh data for WebGPU rendering.
+ * Points are tessellated as circle fans with a fixed resolution for consistent screen-space appearance.
+ * @module triangulator-points
+ */
 export class TriangulatorPoints {
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];

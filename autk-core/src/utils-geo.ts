@@ -1,3 +1,9 @@
+/**
+ * @module GeoUtils
+ * A collection of geometry-related utility functions for processing GeoJSON data.
+ * Includes functions for calculating bounding boxes, origins, centroids,
+ * and performing geometric operations like polyline offsetting.
+ */
 import { FeatureCollection, Geometry, Position } from 'geojson';
 
 import type { BoundingBox, LayerType } from './types-layer';

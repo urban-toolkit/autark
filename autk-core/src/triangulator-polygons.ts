@@ -4,6 +4,12 @@ import { LayerBorder, LayerBorderComponent, LayerComponent, LayerGeometry } from
 
 import earcut from "earcut";
 
+/**
+ * Converts GeoJSON Polygon and MultiPolygon features into triangulated mesh data for WebGPU rendering.
+ * Supports flat polygon fill meshes and per-ring border outlines for line rendering.
+ * Hole rings are handled via earcut's hole index array.
+ * @module triangulator-polygons
+ */
 export class TriangulatorPolygons {
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];

@@ -1,3 +1,8 @@
+/**
+ * @module CameraAnimator
+ * Provides a fluent API for creating sequential, animated camera movements.
+ * Supports zoom, pitch, and yaw operations that orbit around a calculated scene center.
+ */
 import { Camera } from './camera';
 
 type StepType = 'zoom' | 'pitch' | 'yaw' | 'roll';

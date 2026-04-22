@@ -5,6 +5,11 @@ import { LayerGeometry, LayerComponent } from './types-mesh';
 import { offsetPolyline } from './utils-geo';
 import earcut from 'earcut';
 
+/**
+ * Converts GeoJSON LineString and MultiLineString features into triangulated mesh data for WebGPU rendering.
+ * Polylines are converted to closed polygons via planar offset (parallel curve), then triangulated with earcut.
+ * @module triangulator-polylines
+ */
 export class TriangulatorPolylines {
     static offset: number = 5;
 

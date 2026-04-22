@@ -1,4 +1,11 @@
 /**
+ * @module TransferFunction
+ * Defines how scalar data values are mapped to opacity. This is crucial for visualizing
+ * raster data where color is handled by a colormap texture and opacity is controlled
+ * separately to highlight specific data ranges.
+ */
+
+/**
  * Configures how scalar values map to opacity.
  */
 export interface TransferFunction {

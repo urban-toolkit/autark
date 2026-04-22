@@ -5,6 +5,12 @@ import { buildBuildingPartMesh, MeshData } from "./triangulator-roofs";
 
 type Vec2 = [number, number];
 
+/**
+ * Converts OSM building GeometryCollections into extruded 3-D mesh geometry for WebGPU rendering.
+ * Each feature contains a GeometryCollection of part polygons with `height`, `levels`, or `min_height` properties.
+ * Delegates roof geometry to `triangulator-roofs`.
+ * @module triangulator-buildings
+ */
 export class TriangulatorBuildings {
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];

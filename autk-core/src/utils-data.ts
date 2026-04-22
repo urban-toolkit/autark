@@ -1,4 +1,9 @@
 /**
+ * @module DataUtils
+ * Provides utility functions for common data access and validation tasks.
+ */
+
+/**
  * Resolves a dot-path from an unknown object.
  */
 export function valueAtPath(item: unknown, path: string): unknown {

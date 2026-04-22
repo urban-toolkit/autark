@@ -1,3 +1,9 @@
+/**
+ * @module Camera
+ * Provides an interactive 3-DOF orbit camera for navigating 3D scenes.
+ * Manages view and projection matrices and handles user input for zoom, pan, pitch, and yaw.
+ */
+
 import { vec3, mat4 } from 'gl-matrix';
 
 /**
