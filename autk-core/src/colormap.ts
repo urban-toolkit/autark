@@ -61,6 +61,12 @@ export class ColorMap {
         res: number = DEFAULT_COLORMAP_RESOLUTION,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
     ): ColorTEX {
+        if (res <= 0) { return []; }
+        if (res === 1) {
+            const { r, g, b } = d3_color.rgb(ColorMap.buildInterpolator(color, domain)(0.5));
+            return [r, g, b, 1];
+        }
+
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const tex: number[] = [];
         for (let id = 0; id < res; id++) {
@@ -75,6 +81,12 @@ export class ColorMap {
         res: number = DEFAULT_COLORMAP_RESOLUTION,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
     ): ColorRGB[] {
+        if (res <= 0) { return []; }
+        if (res === 1) {
+            const { r, g, b } = d3_color.rgb(ColorMap.buildInterpolator(color, domain)(0.5));
+            return [{ r, g, b, alpha: 1 }];
+        }
+
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const result: ColorRGB[] = [];
         for (let id = 0; id < res; id++) {
