@@ -54,6 +54,17 @@ type RenderObjectMetric = {
     sampleRatio: number;
 };
 
+type CachedRenderPipeline = {
+    renderPipeline: GPURenderPipeline;
+    camBGL: GPUBindGroupLayout;
+    idBGL: GPUBindGroupLayout;
+};
+
+type CachedCountPipeline = {
+    countPipeline: GPUComputePipeline;
+    countBGL: GPUBindGroupLayout;
+};
+
 const ENCODED_LAYER_TYPE_BYTE_COUNT = 1;
 const ENCODED_OBJECT_ID_BYTE_COUNT = 2;
 const MAX_ENCODED_LAYER_TYPE_COUNT = (1 << (ENCODED_LAYER_TYPE_BYTE_COUNT * 8)) - 1;
@@ -71,6 +82,9 @@ const MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES = 256 * 1024 * 1024;
  * @see {@link ComputeGpgpu} for the GPGPU analytical pipeline.
  */
 export class ComputeRender extends GpuPipeline {
+    private renderPipelineCache = new WeakMap<GPUDevice, CachedRenderPipeline>();
+    private countPipelineCache = new WeakMap<GPUDevice, CachedCountPipeline>();
+
     /**
      * Renders views from each source feature origin and aggregates class shares
      * and object visibility metrics back onto the source features.
@@ -142,8 +156,8 @@ export class ComputeRender extends GpuPipeline {
                 createdBuffers.push(draw.vBuf, draw.iBuf, draw.idBuf);
             }
 
-            const { renderPipeline, camBGL, idBGL } = this.buildRenderPipeline(device);
-            const { countPipeline, countBGL } = this.buildCountPipeline(device);
+            const { renderPipeline, camBGL, idBGL } = this.getRenderPipeline(device);
+            const { countPipeline, countBGL } = this.getCountPipeline(device);
             const idBGs = draws.map((draw) =>
                 device.createBindGroup({
                     layout: idBGL,
@@ -176,6 +190,8 @@ export class ComputeRender extends GpuPipeline {
                     batchSamples,
                     metadata
                 );
+                let classStage: GPUBuffer | null = null;
+                let objectStage: GPUBuffer | null = null;
 
                 try {
                     const tileView = tileTexture.createView();
@@ -200,11 +216,11 @@ export class ComputeRender extends GpuPipeline {
                     );
                     this.encodeCountPass(encoder, countPipeline, countBG, tileSize, batchCount);
 
-                    const classStage = countBuffers.layerTypeSize > 0
-                        ? this.getReusableStagingBuffer(device, 'render:classes', countBuffers.layerTypeSize)
+                    classStage = countBuffers.layerTypeSize > 0
+                        ? this.createStagingBuffer(device, countBuffers.layerTypeSize)
                         : null;
-                    const objectStage = countBuffers.objectSize > 0
-                        ? this.getReusableStagingBuffer(device, 'render:objects', countBuffers.objectSize)
+                    objectStage = countBuffers.objectSize > 0
+                        ? this.createStagingBuffer(device, countBuffers.objectSize)
                         : null;
 
                     if (classStage) {
@@ -236,6 +252,8 @@ export class ComputeRender extends GpuPipeline {
                         );
                     }
                 } finally {
+                    classStage?.destroy();
+                    objectStage?.destroy();
                     tileTexture.destroy();
                     cameraBuf.destroy();
                     countBuffers.layerTypeBuf.destroy();
@@ -716,6 +734,17 @@ export class ComputeRender extends GpuPipeline {
         return { renderPipeline, camBGL, idBGL };
     }
 
+    private getRenderPipeline(device: GPUDevice): CachedRenderPipeline {
+        const cached = this.renderPipelineCache.get(device);
+        if (cached) {
+            return cached;
+        }
+
+        const pipeline = this.buildRenderPipeline(device);
+        this.renderPipelineCache.set(device, pipeline);
+        return pipeline;
+    }
+
     private buildCountPipeline(device: GPUDevice): {
         countPipeline: GPUComputePipeline;
         countBGL: GPUBindGroupLayout;
@@ -739,6 +768,17 @@ export class ComputeRender extends GpuPipeline {
         });
 
         return { countPipeline, countBGL };
+    }
+
+    private getCountPipeline(device: GPUDevice): CachedCountPipeline {
+        const cached = this.countPipelineCache.get(device);
+        if (cached) {
+            return cached;
+        }
+
+        const pipeline = this.buildCountPipeline(device);
+        this.countPipelineCache.set(device, pipeline);
+        return pipeline;
     }
 
     private buildCountBindGroup(

@@ -27,7 +27,6 @@ import { getSharedGpuDevice } from './device-manager';
  * @see {@link ComputeRender} for the render pipeline implementation.
  */
 export abstract class GpuPipeline {
-    private reusableStagingBuffers = new Map<string, { buffer: GPUBuffer; size: number }>();
     /**
      * Returns the shared GPU device, initialising it on first call.
      *
@@ -99,24 +98,6 @@ export abstract class GpuPipeline {
             size,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
         });
-    }
-
-    /**
-     * Returns a reusable staging buffer that is at least `size` bytes large.
-     *
-     * Buffers are cached by `cacheKey` and resized only when a larger capacity
-     * is needed. The caller must ensure the buffer is not currently mapped.
-     */
-    protected getReusableStagingBuffer(device: GPUDevice, cacheKey: string, size: number): GPUBuffer {
-        const existing = this.reusableStagingBuffers.get(cacheKey);
-        if (existing && existing.size >= size) {
-            return existing.buffer;
-        }
-
-        existing?.buffer.destroy();
-        const buffer = this.createStagingBuffer(device, size);
-        this.reusableStagingBuffers.set(cacheKey, { buffer, size });
-        return buffer;
     }
 
     /**

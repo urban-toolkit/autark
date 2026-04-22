@@ -213,7 +213,7 @@ export class ComputeGpgpu extends GpuPipeline {
 
             for (const [key, buf] of outputBuffers) {
                 const size = outputSizes.get(key)!;
-                const staging = this.getReusableStagingBuffer(device, `gpgpu:${key}`, size);
+                const staging = this.createStagingBuffer(device, size);
                 stagingBuffers.set(key, staging);
                 encoder.copyBufferToBuffer(buf, 0, staging, 0, size);
             }
@@ -229,6 +229,9 @@ export class ComputeGpgpu extends GpuPipeline {
 
             return result;
         } finally {
+            for (const buf of stagingBuffers.values()) {
+                buf.destroy();
+            }
             for (const buf of inputBuffers.values()) {
                 buf.destroy();
             }
