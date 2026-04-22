@@ -287,8 +287,8 @@ export class AutkMap {
             && features.every((feature) => feature.id !== undefined);
         const thematicByFeatureId = canMatchById ? new Map<string | number, LayerThematic>() : null;
 
-        const storeThematicValue = (featureIndex: number, value: number): boolean => {
-            const thematic = { value };
+        const storeThematicValue = (featureIndex: number, value: number, valid: number): boolean => {
+            const thematic = { value, valid };
             thematicByFeatureIndex[featureIndex] = thematic;
 
             if (!thematicByFeatureId) {
@@ -306,24 +306,47 @@ export class AutkMap {
         };
 
         if (dataType === 'number') {
-            const rawValues = features.map(f => {
-                const numeric = Number(propertyResolver(f));
-                return Number.isFinite(numeric) ? numeric : 0;
+            const rawValues = features.map((feature) => {
+                const resolved = propertyResolver(feature);
+                const numeric = Number(resolved);
+                return Number.isFinite(numeric) ? numeric : undefined;
             });
+            const validValues = rawValues.filter((value): value is number => value !== undefined);
 
-            resolvedDomain = ColorMap.resolveDomainFromData(rawValues, colorMap);
+            if (validValues.length === 0) {
+                console.warn(`No valid numeric thematic values found on layer '${id}': ${property}`);
+                this.updateRenderInfo(id, { isColorMap: false });
+                return;
+            }
+
+            resolvedDomain = ColorMap.resolveDomainFromData(validValues, colorMap);
             for (let featureIndex = 0; featureIndex < rawValues.length; featureIndex++) {
-                if (!storeThematicValue(featureIndex, rawValues[featureIndex])) {
+                const rawValue = rawValues[featureIndex];
+                if (!storeThematicValue(featureIndex, rawValue ?? 0, rawValue === undefined ? 0 : 1)) {
                     return;
                 }
             }
         } 
         else if (dataType === 'string') {
-            const rawValues = features.map(f => String(propertyResolver(f) ?? ''));
-            const categoricalDomain = ColorMap.resolveDomainFromData(rawValues, colorMap) as string[];
+            const rawValues = features.map((feature) => {
+                const resolved = propertyResolver(feature);
+                return resolved === undefined || resolved === null ? undefined : String(resolved);
+            });
+            const validValues = rawValues.filter((value): value is string => value !== undefined);
+
+            if (validValues.length === 0) {
+                console.warn(`No valid categorical thematic values found on layer '${id}': ${property}`);
+                this.updateRenderInfo(id, { isColorMap: false });
+                return;
+            }
+
+            const categoricalDomain = ColorMap.resolveDomainFromData(validValues, colorMap) as string[];
             resolvedDomain = categoricalDomain;
             for (let featureIndex = 0; featureIndex < rawValues.length; featureIndex++) {
-                if (!storeThematicValue(featureIndex, categoricalDomain.indexOf(rawValues[featureIndex]))) {
+                const rawValue = rawValues[featureIndex];
+                const categoryIndex = rawValue === undefined ? 0 : categoricalDomain.indexOf(rawValue);
+                const isValid = rawValue !== undefined && categoryIndex >= 0 ? 1 : 0;
+                if (!storeThematicValue(featureIndex, categoryIndex >= 0 ? categoryIndex : 0, isValid)) {
                     return;
                 }
             }
@@ -767,6 +790,7 @@ export class AutkMap {
             thematic: layerMesh[1].map(() => {
                 return {
                     value: 0,
+                    valid: 1,
                 };
             }),
         };
@@ -815,6 +839,7 @@ export class AutkMap {
             thematic: layerMesh[1].map(() => {
                 return {
                     value: 0,
+                    valid: 1,
                 };
             }),
         };
@@ -861,6 +886,7 @@ export class AutkMap {
             thematic: layerMesh[1].map(() => {
                 return {
                     value: 0,
+                    valid: 1,
                 };
             }),
         };
@@ -907,6 +933,7 @@ export class AutkMap {
             thematic: layerMesh[1].map(() => {
                 return {
                     value: 0,
+                    valid: 1,
                 };
             }),
         };

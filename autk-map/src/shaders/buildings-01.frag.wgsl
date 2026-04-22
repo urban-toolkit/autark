@@ -6,6 +6,7 @@
 @group(0) @binding(5) var cMapSampler : sampler;
 @group(0) @binding(6) var<uniform> opacity : f32;
 @group(0) @binding(7) var<uniform> domainParams : vec4f;
+@group(0) @binding(8) var<uniform> invalidValueColor : vec4f;
 
 struct BufferOut {
     @location(0) color  : vec4f,
@@ -13,7 +14,7 @@ struct BufferOut {
 }
 
 @fragment
-fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inSkipped: f32) -> BufferOut {
+fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inThematicValid: f32, @location(4) inSkipped: f32) -> BufferOut {
 
     if (inSkipped > 0.0) {
         discard;
@@ -47,6 +48,9 @@ fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @locati
 
     if(showHighlight > 0 && inHighlighted > 0) {
         color = vec4f(highlightColor.r / 255, highlightColor.g / 255, highlightColor.b / 255, highlightColor.a);
+    }
+    else if (showThematic > 0 && inThematicValid < 0.5) {
+        color = vec4f(invalidValueColor.r / 255, invalidValueColor.g / 255, invalidValueColor.b / 255, invalidValueColor.a);
     }
     else if (showThematic > 0) {
         color = sampledColor;

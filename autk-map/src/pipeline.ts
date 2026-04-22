@@ -50,6 +50,8 @@ export abstract class Pipeline {
      * Highlight color uniform buffer
      */
     protected _highlightColorBuffer!: GPUBuffer;
+    /** Invalid thematic value color uniform buffer. */
+    protected _invalidValueColorBuffer!: GPUBuffer;
 
     /**
      * Color map texture
@@ -94,6 +96,8 @@ export abstract class Pipeline {
     private _colorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
     /** Cached highlight-color uniform payload (rgba). */
     private _highlightColorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
+    /** Cached invalid-value-color uniform payload (rgba). */
+    private _invalidValueColorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
     /** Cached use-colormap flag uniform payload. */
     private _useColorMapData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
     /** Cached use-highlight flag uniform payload. */
@@ -206,6 +210,12 @@ export abstract class Pipeline {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
+        this._invalidValueColorBuffer = this._renderer.device.createBuffer({
+            label: 'Invalid thematic value color buffer',
+            size: 4 * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
         this._useColorMap = this._renderer.device.createBuffer({
             label: 'Enable colormap on render',
             size: 4,
@@ -287,6 +297,11 @@ export abstract class Pipeline {
                     visibility: GPUShaderStage.FRAGMENT,
                     buffer: {},
                 },
+                {
+                    binding: 8, // invalid thematic value color
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {},
+                },
             ],
         });
 
@@ -325,6 +340,10 @@ export abstract class Pipeline {
                     binding: 7,
                     resource: { buffer: this._domainBuffer },
                 },
+                {
+                    binding: 8,
+                    resource: { buffer: this._invalidValueColorBuffer },
+                },
             ],
         });
     }
@@ -346,6 +365,7 @@ export abstract class Pipeline {
         const colors = {
             color: MapStyle.getColor(layer.layerInfo.typeLayer),
             highlightColor: MapStyle.getHighlightColor(),
+            invalidValueColor: MapStyle.getInvalidValueColor(),
             colorMap: ColorMap.getColorMap(
                 layer.layerRenderInfo.colormap.config.interpolator,
                 undefined,
@@ -370,6 +390,11 @@ export abstract class Pipeline {
         this._highlightColorData[2] = colors.highlightColor.b;
         this._highlightColorData[3] = 1.0;
 
+        this._invalidValueColorData[0] = colors.invalidValueColor.r;
+        this._invalidValueColorData[1] = colors.invalidValueColor.g;
+        this._invalidValueColorData[2] = colors.invalidValueColor.b;
+        this._invalidValueColorData[3] = 1.0;
+
         this._useColorMapData[0] = colors.useColorMap ? 1.0 : 0.0;
         this._useHighlightData[0] = colors.useHighlight ? 1.0 : 0.0;
         this._opacityData[0] = colors.opacity;
@@ -382,6 +407,7 @@ export abstract class Pipeline {
 
         this._renderer.device.queue.writeBuffer(this._colorBuffer, 0, this._colorData);
         this._renderer.device.queue.writeBuffer(this._highlightColorBuffer, 0, this._highlightColorData);
+        this._renderer.device.queue.writeBuffer(this._invalidValueColorBuffer, 0, this._invalidValueColorData);
         this._renderer.device.queue.writeBuffer(this._useHighlight, 0, this._useHighlightData);
         this._renderer.device.queue.writeBuffer(this._useColorMap, 0, this._useColorMapData);
         this._renderer.device.queue.writeTexture(
@@ -405,6 +431,7 @@ export abstract class Pipeline {
 
         this._colorBuffer?.destroy();
         this._highlightColorBuffer?.destroy();
+        this._invalidValueColorBuffer?.destroy();
         this._useColorMap?.destroy();
         this._useHighlight?.destroy();
         this._opacity?.destroy();

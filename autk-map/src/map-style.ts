@@ -54,10 +54,8 @@ export class MapStyle {
      */
     protected static _default: MapStyleShape = defaultStyle as MapStyleShape;
 
-    /**
-     * Not found color
-     */
-    protected static _notFound: ColorHEX = '#FFFFFF';
+    /** Color used for invalid thematic values. */
+    protected static _invalidValue: ColorHEX = '#FFFFFF';
     /**
      * Highlight color
      */
@@ -87,15 +85,20 @@ export class MapStyle {
 
     /**
      * Get the feature color for a style key.
-     * Unknown keys fall back to `_notFound`.
+     * Unknown keys fall back to the polygons color.
      */
     static getColor(type: string): ColorRGB {
         const style = MapStyle._current;
         const hex = (Object.prototype.hasOwnProperty.call(style, type)
             ? style[type as keyof MapStyleShape]
-            : undefined) ?? MapStyle._notFound;
+            : undefined) ?? style.polygons;
 
         return ColorMap.hexToRgb(hex);
+    }
+
+    /** Returns the color used for invalid thematic values. */
+    static getInvalidValueColor(): ColorRGB {
+        return ColorMap.hexToRgb(MapStyle._invalidValue);
     }
 
     /**
@@ -132,6 +135,11 @@ export class MapStyle {
      */
     static setHighlightColor(color: ColorHEX): void {
         MapStyle._highlight = color;
+    }
+
+    /** Sets the color used for invalid thematic values. */
+    static setInvalidValueColor(color: ColorHEX): void {
+        MapStyle._invalidValue = color;
     }
 
     private static _isPresetId(style: string): style is MapStylePresetId {

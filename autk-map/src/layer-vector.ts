@@ -37,6 +37,8 @@ export abstract class VectorLayer extends Layer {
      * @type {Float32Array}
      */
     protected _thematic!: Float32Array;
+    /** Per-vertex validity mask for thematic values. */
+    protected _thematicValidity!: Float32Array;
 
     /**
      * Indices of the triangles.
@@ -127,6 +129,11 @@ export abstract class VectorLayer extends Layer {
      */
     get thematic(): Float32Array {
         return this._thematic;
+    }
+
+    /** Get the thematic validity mask of the layer. */
+    get thematicValidity(): Float32Array {
+        return this._thematicValidity;
     }
 
     /**
@@ -268,12 +275,14 @@ export abstract class VectorLayer extends Layer {
         }
 
         const thematic = new Float32Array(this._vertexCount);
+        const thematicValidity = new Float32Array(this._vertexCount);
 
         let offset = 0;
         for (let compId = 0; compId < layerThematic.length; compId++) {
             const aggr = this.aggregateThematicComponent(compId, layerThematic[compId]);
-            thematic.set(aggr, offset);
-            offset += aggr.length;
+            thematic.set(aggr.value, offset);
+            thematicValidity.set(aggr.valid, offset);
+            offset += aggr.value.length;
         }
 
         if (offset !== this._vertexCount) {
@@ -284,6 +293,7 @@ export abstract class VectorLayer extends Layer {
         }
 
         this._thematic = thematic;
+        this._thematicValidity = thematicValidity;
         return true;
     }
 
@@ -423,16 +433,18 @@ export abstract class VectorLayer extends Layer {
      * @param {LayerThematic} layerThematic - The thematic data to aggregate.
      * @returns {Float32Array} - The aggregated thematic data.
      */
-    private aggregateThematicComponent(component: number, layerThematic: LayerThematic): Float32Array {
+    private aggregateThematicComponent(component: number, layerThematic: LayerThematic): { value: Float32Array; valid: Float32Array } {
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;
         const nPoint = ePoint - sPoint;
 
         const thematic = new Float32Array(nPoint);
+        const thematicValidity = new Float32Array(nPoint);
         const value = layerThematic.value ?? 0;
         thematic.fill(value);
+        thematicValidity.fill(layerThematic.valid ?? 0);
 
-        return thematic;
+        return { value: thematic, valid: thematicValidity };
     }
 
     /**

@@ -6,16 +6,18 @@ struct VSOut {
     @builtin(position) outPosition: vec4<f32>,
     @location(0) outThematic: f32,
     @location(1) outHighlighted: f32,
-    @location(2) outSkipped: f32
+    @location(2) outThematicValid: f32,
+    @location(3) outSkipped: f32
  };
 
 @vertex
-fn main(@location(0) inPosition: vec2f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inSkipped: f32) -> VSOut {
+fn main(@location(0) inPosition: vec2f, @location(1) inThematic: f32, @location(2) inHighlighted: f32, @location(3) inThematicValid: f32, @location(4) inSkipped: f32) -> VSOut {
     var vsOut: VSOut;
 
     vsOut.outPosition = projection * modelView * vec4f(inPosition.x, inPosition.y, zIndex, 1);
     vsOut.outThematic = inThematic;
     vsOut.outHighlighted = inHighlighted;
+    vsOut.outThematicValid = inThematicValid;
     vsOut.outSkipped = inSkipped;
 
     return vsOut;

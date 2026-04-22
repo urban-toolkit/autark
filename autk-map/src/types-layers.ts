@@ -78,4 +78,6 @@ export interface LayerData {
 export interface LayerThematic {
     /** Scalar value aligned with one rendered layer component or raster cell. */
     value: number;
+    /** Whether the thematic value is valid for color mapping. */
+    valid: number;
 }

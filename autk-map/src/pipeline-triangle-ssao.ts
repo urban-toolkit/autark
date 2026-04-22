@@ -34,6 +34,8 @@ export class PipelineBuildingSSAO extends Pipeline {
      * @type {GPUBuffer}
      */
     protected _thematicBuffer!: GPUBuffer;
+    /** Buffer for thematic validity data. */
+    protected _thematicValidityBuffer!: GPUBuffer;
 
     /**
      * Highlighted buffer for vertex data.
@@ -136,6 +138,8 @@ export class PipelineBuildingSSAO extends Pipeline {
     private _normalData: Float32Array<ArrayBuffer> | null = null;
     /** Reused upload buffer for thematic values. */
     private _thematicData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused upload buffer for thematic validity flags. */
+    private _thematicValidityData: Float32Array<ArrayBuffer> | null = null;
     /** Reused upload buffer for highlighted flags. */
     private _highlightedData: Float32Array<ArrayBuffer> | null = null;
     /** Reused upload buffer for skipped flags. */
@@ -156,6 +160,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._positionBuffer?.destroy();
         this._normalBuffer?.destroy();
         this._thematicBuffer?.destroy();
+        this._thematicValidityBuffer?.destroy();
         this._highlightedBuffer?.destroy();
         this._skippedBuffer?.destroy();
         this._indicesBuffer?.destroy();
@@ -249,6 +254,12 @@ export class PipelineBuildingSSAO extends Pipeline {
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
+        this._thematicValidityBuffer = this._renderer.device.createBuffer({
+            label: 'Thematic validity buffer',
+            size: mesh.thematicValidity.length * 4,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+
         // vertex data
         this._highlightedBuffer = this._renderer.device.createBuffer({
             label: 'Highlighted data buffer',
@@ -279,6 +290,7 @@ export class PipelineBuildingSSAO extends Pipeline {
     updateVertexBuffers(mesh: Triangles3DLayer): void {
         this._normalData = this._syncFloatData(this._normalData, mesh.normal);
         this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
+        this._thematicValidityData = this._syncFloatData(this._thematicValidityData, mesh.thematicValidity);
         this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
         this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);
         this._positionData = this._syncFloatData(this._positionData, mesh.position);
@@ -286,6 +298,7 @@ export class PipelineBuildingSSAO extends Pipeline {
 
         this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, this._normalData);
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, this._thematicData);
+        this._renderer.device.queue.writeBuffer(this._thematicValidityBuffer, 0, this._thematicValidityData);
         this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
         this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
@@ -428,8 +441,13 @@ export class PipelineBuildingSSAO extends Pipeline {
             offset: 0,
             format: 'float32',
         };
-        const skippedAttribDesc: GPUVertexAttribute = {
+        const thematicValidityAttribDesc: GPUVertexAttribute = {
             shaderLocation: 4,
+            offset: 0,
+            format: 'float32',
+        };
+        const skippedAttribDesc: GPUVertexAttribute = {
+            shaderLocation: 5,
             offset: 0,
             format: 'float32',
         };
@@ -454,6 +472,11 @@ export class PipelineBuildingSSAO extends Pipeline {
             arrayStride: 4 * 1, // sizeof(float) * 3
             stepMode: 'vertex',
         };
+        const thematicValidityBufferDesc: GPUVertexBufferLayout = {
+            attributes: [thematicValidityAttribDesc],
+            arrayStride: 4 * 1,
+            stepMode: 'vertex',
+        };
         const skippedBufferDesc: GPUVertexBufferLayout = {
             attributes: [skippedAttribDesc],
             arrayStride: 4 * 1, // sizeof(float) * 3
@@ -464,7 +487,7 @@ export class PipelineBuildingSSAO extends Pipeline {
         const vertex: GPUVertexState = {
             module: this._vertModule01,
             entryPoint: 'main',
-            buffers: [positionBufferDesc, normalBufferDesc, thematicBufferDesc, highlightedBufferDesc, skippedBufferDesc],
+            buffers: [positionBufferDesc, normalBufferDesc, thematicBufferDesc, highlightedBufferDesc, thematicValidityBufferDesc, skippedBufferDesc],
         };
 
         // Fragment Shader
@@ -602,7 +625,8 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.setVertexBuffer(1, this._normalBuffer);
         passEncoder.setVertexBuffer(2, this._thematicBuffer);
         passEncoder.setVertexBuffer(3, this._highlightedBuffer);
-        passEncoder.setVertexBuffer(4, this._skippedBuffer);
+        passEncoder.setVertexBuffer(4, this._thematicValidityBuffer);
+        passEncoder.setVertexBuffer(5, this._skippedBuffer);
 
         // sets primitive indices buffer
         passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');
