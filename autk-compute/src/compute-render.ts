@@ -361,11 +361,23 @@ export class ComputeRender extends GpuPipeline {
                 }
                 seenLayerIds?.add(layer.layerId);
 
+                const seenObjectKeys = layer.objectIdProperty ? new Set<string>() : null;
                 const featureMeta = layer.geojson.features.map((feature, featureIndex) => {
                     const rawId = layer.objectIdProperty
                         ? feature.properties?.[layer.objectIdProperty]
                         : undefined;
-                    const objectKey = this.buildObjectKey(layer.layerId, rawId ?? featureIndex);
+                    const objectKey =
+                        rawId === undefined || rawId === null
+                            ? this.buildObjectKey(layer.layerId, featureIndex)
+                            : this.buildObjectKey(layer.layerId, rawId);
+
+                    if (seenObjectKeys?.has(objectKey)) {
+                        throw new Error(
+                            `ComputeRender: duplicate ${layer.objectIdProperty} value "${String(rawId)}" in layer "${layer.layerId}" is not allowed for object aggregation.`
+                        );
+                    }
+                    seenObjectKeys?.add(objectKey);
+
                     const objectIndex = objectKeys.length;
                     objectKeys.push(objectKey);
                     return { layerTypeIndex, objectIndex };
@@ -377,7 +389,13 @@ export class ComputeRender extends GpuPipeline {
         });
 
         if (includeBackgroundLayerType) {
-            layerTypes.push(aggregation.backgroundLayerType ?? 'background');
+            const backgroundLayerType = aggregation.backgroundLayerType ?? 'background';
+            if (layerTypeIndexById.has(backgroundLayerType)) {
+                throw new Error(
+                    `ComputeRender: backgroundLayerType "${backgroundLayerType}" must not match a layerType when class aggregation includes background.`
+                );
+            }
+            layerTypes.push(backgroundLayerType);
         }
 
         if (includeClasses && layerTypes.length > MAX_ENCODED_LAYER_TYPE_COUNT) {

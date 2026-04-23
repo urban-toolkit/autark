@@ -15,7 +15,7 @@ export interface RenderLayer {
     type: LayerType;
 
     /** Semantic layer bucket used by higher-level render aggregations. */
-    layerType: string;
+    layerType: LayerType;
 
     /** Optional source property to be used as a stable object identifier. */
     objectIdProperty?: string;
