@@ -27,7 +27,10 @@ import { ChartEvent } from './types-events';
 import type { ChartEventRecord } from './types-events';
 
 import { ChartStyle } from './chart-style';
-import { run, type ExecutedChartTransform } from './transforms';
+
+import { run } from './transforms';
+import type { ExecutedChartTransform } from './transforms';
+
 
 type ResolvedChartTransform = {
     rows: AutkDatum[];
@@ -68,7 +71,7 @@ export abstract class ChartBase {
     /** Dot-path attribute used for color encoding on source rows, if any. */
     private _sourceColorAttribute: string | undefined = undefined;
     /** Dot-path attribute used for color encoding on transformed rows, when applicable. */
-    protected _transformColorAttribute: string | undefined = undefined;
+    protected _transformColorAttribute: string | null | undefined = undefined;
     
     /** Plot title text. */
     protected _title!: string;
@@ -255,6 +258,7 @@ export abstract class ChartBase {
         this._transformAttributes = undefined;
         this._transformColorAttribute = undefined;
         this.applyConfiguredTransform();
+        this.restoreLocalSelectionAfterDraw();
         this.validateRenderedAttributeBindings();
         this.computeColorDomain();
         this.render();
@@ -326,6 +330,21 @@ export abstract class ChartBase {
         })) as AutkDatum[];
     }
 
+    private restoreLocalSelectionAfterDraw(): void {
+        if (this._selectionProjection !== 'aggregated' || this._selectionOrigin !== 'local') {
+            return;
+        }
+
+        const selectedMarks = new Set<object>();
+        for (const datum of this._data) {
+            const ids = datum.autkIds ?? [];
+            if (ids.some(fid => this._selectedFeatureIds.has(fid))) {
+                selectedMarks.add(datum as object);
+            }
+        }
+        this._selectedMarkDatums = selectedMarks;
+    }
+
     /**
      * Attaches only the interaction handlers requested in the event config.
      *
@@ -380,6 +399,9 @@ export abstract class ChartBase {
      * Returns the color attribute used to read the current rendered rows.
      */
     protected get renderColorAttribute(): string | undefined {
+        if (this._transformColorAttribute === null) {
+            return undefined;
+        }
         return this._transformColorAttribute ?? this._sourceColorAttribute;
     }
 
@@ -388,7 +410,7 @@ export abstract class ChartBase {
      */
     protected setRenderColorAttribute(attribute: string | undefined): void {
         if (this._transformAttributes) {
-            this._transformColorAttribute = attribute;
+            this._transformColorAttribute = attribute ?? null;
             return;
         }
 
@@ -405,6 +427,8 @@ export abstract class ChartBase {
      * No-op when no active render color attribute is set.
      */
     protected computeColorDomain(): void {
+        this._resolvedDomain = undefined;
+
         const colorAttribute = this.renderColorAttribute;
         if (!colorAttribute) return;
 
@@ -452,14 +476,28 @@ export abstract class ChartBase {
 
         if (typeof this._resolvedDomain[0] === 'string') {
             const categories = this._resolvedDomain as string[];
-            const rawVal = String(valueAtPath(datum, colorAttribute));
+            const rawValue = valueAtPath(datum, colorAttribute);
+            if (rawValue === null || rawValue === undefined) {
+                return ChartStyle.default;
+            }
+
+            const rawVal = String(rawValue);
             const idx = categories.indexOf(rawVal);
+            if (idx < 0) {
+                return ChartStyle.default;
+            }
+
             const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
             const interpolator = this._categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
             const { r, g, b } = ColorMap.getColor(t, interpolator, categories);
             return `rgb(${r},${g},${b})`;
         } else {
-            const rawVal = Number(valueAtPath(datum, colorAttribute)) || 0;
+            const rawValue = valueAtPath(datum, colorAttribute);
+            const rawVal = Number(rawValue);
+            if (rawValue === null || rawValue === undefined || !Number.isFinite(rawVal)) {
+                return ChartStyle.default;
+            }
+
             const numDomain = this._resolvedDomain as [number, number] | [number, number, number];
             const interpolator = this._colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
             const { r, g, b } = ColorMap.getColor(rawVal, interpolator, numDomain);

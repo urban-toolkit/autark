@@ -232,6 +232,9 @@ export class ParallelCoordinates extends ChartBase {
                 this.updateAxisLabelStyles();
                 this.renderSelection();
             });
+
+        this.updateAxisLabelStyles();
+        this.renderSelection();
     }
 
     /**

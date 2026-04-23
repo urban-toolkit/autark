@@ -35,9 +35,9 @@ import type { Binning2dCellRow } from '../transforms';
 /**
  * Heat matrix chart mapping two categorical dimensions to a grid of colored rectangles.
  *
- * Requires the `binning-2d` transform preset. After `computeTransform` runs,
- * `this._attributes` is `['x', 'y', 'value']` and `this.data` contains one row per
- * unique (x, y) cell.
+ * Requires the `binning-2d` transform preset. `ChartBase` resolves that transform
+ * into rendered rows with `x`/`y` axis bindings and a `value` color binding,
+ * producing one row per unique (x, y) cell.
  */
 export class Heatmatrix extends ChartBase {
 
