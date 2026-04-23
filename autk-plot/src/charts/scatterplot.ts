@@ -11,8 +11,8 @@
  * const plot = new AutkChart(plotDiv, {
  *   type: 'scatterplot',
  *   collection: geojson,
- *   attributes: ['population', 'income'],
- *   labels: { axis: ['population', 'income'], title: 'Population vs Income' }
+ *   attributes: { axis: ['population', 'income'] },
+ *   labels: { axis: ['Population', 'Income'], title: 'Population vs Income' }
  * });
  *
  * @example
@@ -20,7 +20,7 @@
  * const plot = new AutkChart(plotDiv, {
  *   type: 'scatterplot',
  *   collection: geojson,
- *   attributes: ['x', 'y'],
+ *   attributes: { axis: ['x', 'y'] },
  *   events: [ChartEvent.CLICK, ChartEvent.BRUSH]
  * });
  */
@@ -61,7 +61,7 @@ export class Scatterplot extends ChartBase {
         }
         super(config);
 
-        if (this._axisAttributes.length < 2) {
+        if (this.renderAxisAttributes.length < 2) {
             throw new Error('Scatterplot requires two dimensions.');
         }
 
@@ -72,6 +72,8 @@ export class Scatterplot extends ChartBase {
      * Renders chart scaffolding, axes, and point marks.
      */
     public render(): void {
+        const [xAttribute, yAttribute] = this.renderAxisAttributes;
+
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
@@ -109,10 +111,10 @@ export class Scatterplot extends ChartBase {
             .text((d) => d);
 
         // ---- Scales
-        const xExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0);
+        const xExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, xAttribute)) || 0 : 0);
         this.mapX = d3.scaleLinear().domain(xExtent).range([0, width]);
 
-        const yExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0);
+        const yExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, yAttribute)) || 0 : 0);
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Axes
@@ -188,8 +190,8 @@ export class Scatterplot extends ChartBase {
             .data(this._data)
             .join('circle')
             .attr('class', 'autkMark')
-            .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, this._axisAttributes[0])) || 0 : 0))
-            .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, this._axisAttributes[1])) || 0 : 0))
+            .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, xAttribute)) || 0 : 0))
+            .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, yAttribute)) || 0 : 0))
             .attr('r', 5)
             .style('fill', ChartStyle.default)
             .style('visibility', 'inherit');

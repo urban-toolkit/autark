@@ -13,7 +13,7 @@
  * const plot = new AutkChart(plotDiv, {
  *   type: 'parallel-coordinates',
  *   collection: geojson,
- *   attributes: ['attr1', 'attr2', 'attr3'],
+ *   attributes: { axis: ['attr1', 'attr2', 'attr3'] },
  *   labels: { axis: ['A', 'B', 'C'], title: 'Parallel Coordinates' }
  * });
  *
@@ -23,7 +23,7 @@
  *   type: 'parallel-coordinates',
  *   collection: geojson,
  *   events: [ChartEvent.BRUSH_X, ChartEvent.BRUSH_Y],
- *   attributes: ['height', 'type', 'value'],
+ *   attributes: { axis: ['height', 'type', 'value'] },
  *   labels: { axis: ['Height', 'Type', 'Value'], title: 'Multivariate Exploration' }
  * });
  */
@@ -71,6 +71,8 @@ export class ParallelCoordinates extends ChartBase {
      * Renders axes, paths, labels, and interaction layers.
      */
     public render(): void {
+        const dimensions = this.renderAxisAttributes;
+
         const svg = d3
             .select(this._div)
             .selectAll('#plot')
@@ -110,8 +112,6 @@ export class ParallelCoordinates extends ChartBase {
         }
 
         // ---- Scales for each dimension
-        const dimensions = this._axisAttributes;
-
         // Build a scale for each dimension based on data type
         dimensions.forEach((dim) => {
             // Check if dimension is categorical or numerical
@@ -222,8 +222,9 @@ export class ParallelCoordinates extends ChartBase {
             .style('visibility', 'visible')
             .text((_d, i) => this._axisLabels[i] ?? _d)
             .on('click', (_event, dim) => {
-                this._colorAttribute = this._colorAttribute === dim ? undefined : dim;
-                if (this._colorAttribute) {
+                this.setRenderColorAttribute(this.renderColorAttribute === dim ? undefined : dim);
+
+                if (this.renderColorAttribute) {
                     this.computeColorDomain();
                 } else {
                     this._resolvedDomain = undefined;
@@ -254,8 +255,8 @@ export class ParallelCoordinates extends ChartBase {
      */
     protected updateAxisLabelStyles(): void {
         d3.select(this._div).selectAll<SVGTextElement, string>('.axis-label')
-            .style('fill', (dim) => this._colorAttribute === dim ? '#cc3300' : '#000')
-            .style('text-decoration', (dim) => this._colorAttribute === dim ? 'underline' : 'none');
+            .style('fill', (dim) => this.renderColorAttribute === dim ? '#cc3300' : '#000')
+            .style('text-decoration', (dim) => this.renderColorAttribute === dim ? 'underline' : 'none');
     }
 
     /**
@@ -265,7 +266,7 @@ export class ParallelCoordinates extends ChartBase {
      */
     protected path(d: any): string {
         const lineGenerator = d3.line<[number, number]>();
-        const dimensions = this._axisAttributes;
+        const dimensions = this.renderAxisAttributes;
         const points: [number, number][] = dimensions.map((dim) => {
             const x = this.axisPositions(dim) || 0;
             const scale = this.scales.get(dim);

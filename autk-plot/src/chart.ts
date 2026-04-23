@@ -30,6 +30,7 @@ import {
  * const plot = new AutkChart(plotDiv, {
  *   type: 'scatterplot',
  *   collection,
+ *   attributes: { axis: ['x', 'y'] },
  *   labels: { axis: ['x', 'y'], title: 'Example' }
  * });
  *

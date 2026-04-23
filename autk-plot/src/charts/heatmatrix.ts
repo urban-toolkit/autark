@@ -25,14 +25,12 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../types-core';
 
-import type { AutkDatum } from '../types-chart';
 import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartEvent } from '../types-events';
 
-import { run } from '../transforms';
-import type { ExecutedBinning2dTransform, Binning2dCellRow } from '../transforms';
+import type { Binning2dCellRow } from '../transforms';
 
 /**
  * Heat matrix chart mapping two categorical dimensions to a grid of colored rectangles.
@@ -59,25 +57,6 @@ export class Heatmatrix extends ChartBase {
 
         super(config);
         this.draw();
-    }
-
-    /**
-     * Aggregates all source features into per-cell rows via the `binning-2d` preset.
-     *
-     * Updates `this.data` with one row per unique (x, y) pair and sets
-     * `this._attributes` to `['x', 'y', 'value']`.
-     */
-    protected override computeTransform(): void {
-        const allRows = this._sourceFeatures.map((f, idx) => ({
-            ...(f.properties ?? {}),
-            autkIds: [idx],
-        })) as AutkDatum[];
-
-        const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
-        const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning2dTransform;
-        this._data = transformed.rows as any;
-        this._transformAttributes = ['x', 'y'];
-        this._transformColorAttribute = 'value';
     }
 
     /**

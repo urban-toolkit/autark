@@ -37,6 +37,7 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'scatterplot',
             collection: this.geojson,
+            attributes: { axis: ['shape_area', 'shape_leng'] },
             labels: { axis: ['shape_area', 'shape_leng'], title: 'Scatterplot example' },
             width: 790,
             events: [ChartEvent.BRUSH]

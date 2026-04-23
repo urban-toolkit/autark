@@ -27,6 +27,13 @@ import { ChartEvent } from './types-events';
 import type { ChartEventRecord } from './types-events';
 
 import { ChartStyle } from './chart-style';
+import { run, type ExecutedChartTransform } from './transforms';
+
+type ResolvedChartTransform = {
+    rows: AutkDatum[];
+    axisAttributes?: string[];
+    colorAttribute?: string;
+};
 
 /**
  * Base class for all chart implementations.
@@ -52,14 +59,14 @@ export abstract class ChartBase {
     protected _data!: AutkDatum[];
 
     /** Dot-path attributes used to read values from source rows. */
-    protected _axisAttributes!: string[];
+    private _sourceAxisAttributes!: string[];
     /** Dot-path attributes used to read values from transformed rows, when applicable. */
     protected _transformAttributes: string[] | undefined = undefined;
     /** User-facing axis labels. */
     protected _axisLabels!: string[];
     
     /** Dot-path attribute used for color encoding on source rows, if any. */
-    protected _colorAttribute: string | undefined = undefined;
+    private _sourceColorAttribute: string | undefined = undefined;
     /** Dot-path attribute used for color encoding on transformed rows, when applicable. */
     protected _transformColorAttribute: string | undefined = undefined;
     
@@ -153,20 +160,23 @@ export abstract class ChartBase {
         ].includes('@transform');
 
         if (config.transform?.preset === 'sort' && hasTransformPlaceholder) {
-            throw new Error("'@transform' cannot be used with the 'sort' preset.");
+            throw new Error("ChartBase: '@transform' cannot be used with the 'sort' preset.");
+        }
+
+        const axisAttributes = config.attributes?.axis;
+        if (!axisAttributes || axisAttributes.length === 0) {
+            throw new Error('ChartBase: attributes.axis must contain at least one attribute.');
         }
 
         const axisLabels = config.labels?.axis ?? [];
-        const axisAttributes = config.attributes?.axis ?? axisLabels;
-        const transformOptions = config.transform?.options as { reducer?: string } | undefined;
-        const reducer = transformOptions?.reducer ?? 'count';
+        this.validateSourceAttributeBindings(axisAttributes, config.attributes?.color, config.transform);
 
         this._axisLabels = axisLabels.length > 0
             ? axisLabels
-            : axisAttributes.map(attr => attr === '@transform' ? String(reducer) : attr);
-        this._axisAttributes = [...axisAttributes];
+            : [...axisAttributes];
+        this._sourceAxisAttributes = [...axisAttributes];
 
-        this._colorAttribute = config.attributes?.color ?? config.labels?.color;
+        this._sourceColorAttribute = config.attributes?.color;
 
         this._title = config.labels?.title || 'Autk Plot';
         this._tickFormats = config.tickFormats ?? ['', ''];
@@ -241,11 +251,79 @@ export abstract class ChartBase {
      * Do not override — implement `render()` instead.
      */
     public draw(): void {
+        this._data = this.buildSourceRows();
         this._transformAttributes = undefined;
         this._transformColorAttribute = undefined;
-        this.computeTransform();
+        this.applyConfiguredTransform();
+        this.validateRenderedAttributeBindings();
         this.computeColorDomain();
         this.render();
+    }
+
+    private applyConfiguredTransform(): void {
+        if (!this._transformConfig) {
+            return;
+        }
+
+        const inputColumns = this._sourceAxisAttributes.filter(column => column !== '@transform');
+        const executed = run(this._data, this._transformConfig, inputColumns);
+        const resolved = this.resolveTransformResult(executed);
+
+        this._data = resolved.rows;
+        this._transformAttributes = resolved.axisAttributes;
+        this._transformColorAttribute = resolved.colorAttribute;
+    }
+
+    private validateSourceAttributeBindings(
+        axisAttributes: string[],
+        colorAttribute: string | undefined,
+        transform: ChartTransformConfig | undefined,
+    ): void {
+        const bindings = [
+            ...axisAttributes.map((attribute, index) => ({ attribute, channel: `attributes.axis[${index}]` })),
+            ...(colorAttribute ? [{ attribute: colorAttribute, channel: 'attributes.color' }] : []),
+        ];
+
+        for (const { attribute, channel } of bindings) {
+            if (attribute === '@transform') {
+                if (!transform) {
+                    throw new Error(`ChartBase: ${channel} cannot be "@transform" without a transform configuration.`);
+                }
+                continue;
+            }
+
+            if (!this.hasAttribute(this._data, attribute)) {
+                throw new Error(`ChartBase: ${channel} "${attribute}" does not exist in the source data.`);
+            }
+        }
+    }
+
+    private validateRenderedAttributeBindings(): void {
+        for (const [index, attribute] of this.renderAxisAttributes.entries()) {
+            if (!this.hasAttribute(this._data, attribute)) {
+                throw new Error(`ChartBase: attributes.axis[${index}] "${attribute}" does not exist in the rendered data.`);
+            }
+        }
+
+        const colorAttribute = this.renderColorAttribute;
+        if (colorAttribute && !this.hasAttribute(this._data, colorAttribute)) {
+            throw new Error(`ChartBase: attributes.color "${colorAttribute}" does not exist in the rendered data.`);
+        }
+    }
+
+    private hasAttribute(rows: AutkDatum[], attribute: string): boolean {
+        if (rows.length === 0) {
+            return true;
+        }
+
+        return rows.some(row => valueAtPath(row, attribute) !== undefined);
+    }
+
+    private buildSourceRows(): AutkDatum[] {
+        return this._sourceFeatures.map((feature, idx) => ({
+            ...(feature.properties ?? {}),
+            autkIds: [idx],
+        })) as AutkDatum[];
     }
 
     /**
@@ -275,25 +353,46 @@ export abstract class ChartBase {
 
 
     /**
-     * Transforms `this._data` before rendering.
-     *
-     * The default implementation is a no-op. Override this method to aggregate
-     * or reorder data while preserving `autkIds` on each rendered datum.
+     * Maps an executed transform result onto the rendered row schema for this chart.
      */
-    protected computeTransform(): void {}
+    protected resolveTransformResult(result: ExecutedChartTransform): ResolvedChartTransform {
+        switch (result.preset) {
+            case 'binning-1d':
+                return { rows: result.rows as AutkDatum[], axisAttributes: ['label', 'value'] };
+            case 'binning-2d':
+                return { rows: result.rows as AutkDatum[], axisAttributes: ['x', 'y'], colorAttribute: 'value' };
+            case 'sort':
+                return { rows: result.rows as AutkDatum[] };
+            case 'binning-events':
+            case 'reduce-series':
+                return { rows: result.rows as AutkDatum[], axisAttributes: ['bucket', 'value'] };
+        }
+    }
 
     /**
      * Returns the attributes used to read the current rendered rows.
      */
     protected get renderAxisAttributes(): string[] {
-        return this._transformAttributes ?? this._axisAttributes;
+        return this._transformAttributes ?? this._sourceAxisAttributes;
     }
 
     /**
      * Returns the color attribute used to read the current rendered rows.
      */
     protected get renderColorAttribute(): string | undefined {
-        return this._transformColorAttribute ?? this._colorAttribute;
+        return this._transformColorAttribute ?? this._sourceColorAttribute;
+    }
+
+    /**
+     * Sets the active render-time color attribute, respecting transformed schemas.
+     */
+    protected setRenderColorAttribute(attribute: string | undefined): void {
+        if (this._transformAttributes) {
+            this._transformColorAttribute = attribute;
+            return;
+        }
+
+        this._sourceColorAttribute = attribute;
     }
 
     /**

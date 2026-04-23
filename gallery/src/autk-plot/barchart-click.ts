@@ -37,6 +37,7 @@ export class MapD3 {
         this.plot = new AutkChart(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
+            attributes: { axis: ['ntaname', 'shape_area'] },
             labels: { 
                 axis: ['ntaname', 'shape_area'], 
                 title: 'Barchart example' 

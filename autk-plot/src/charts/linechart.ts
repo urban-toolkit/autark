@@ -25,6 +25,7 @@
  * const plot = new AutkChart(plotDiv, {
  *   type: 'linechart',
  *   collection: geojson,
+ *   attributes: { axis: ['events', '@transform'] },
  *   transform: {
  *     preset: 'binning-events',
  *     options: { value: 'cases', timestamp: 'date', resolution: 'month', reducer: 'sum' }
@@ -35,15 +36,12 @@
  */
 import * as d3 from 'd3';
 
-import type { AutkDatum } from '../types-chart';
 import type { ChartConfig } from '../api';
 
 import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
 
-import { run } from '../transforms';
-
-import type { ExecutedReduceSeriesTransform } from '../transforms';
+import type { ExecutedChartTransform } from '../transforms';
 
 /**
  * Line chart that aggregates feature-level series data into a single line.
@@ -52,10 +50,6 @@ import type { ExecutedReduceSeriesTransform } from '../transforms';
  * preserves provenance via `autkIds`.
  */
 export class Linechart extends ChartBase {
-
-    /** Computed render data for the current selection: one entry per time bucket. */
-    private _seriesData: Array<{ x: number; label: string; y: number; autkIds: number[] }> = [];
-
     /**
      * Creates a line chart instance and renders the initial state.
      * @param config Linechart configuration.
@@ -83,47 +77,25 @@ export class Linechart extends ChartBase {
         this.draw();
     }
 
-    /**
-     * Computes the transformed series data for the line chart based on the current selection and transform config.
-     *
-     * Handles bucket label formatting, sorting, and aggregation for both `binning-events` and `reduce-series`.
-     * Updates the internal _seriesData array used for rendering.
-     */
-    protected override computeTransform(): void {
-        const formatBucketLabel = (bucket: string): string => {
-            const numericBucket = Number(bucket);
-            if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-                return d3.format(this._tickFormats[0])(numericBucket);
-            }
-            return bucket;
+    protected override resolveTransformResult(result: ExecutedChartTransform) {
+        const resolved = super.resolveTransformResult(result);
+        if (result.preset !== 'binning-events' && result.preset !== 'reduce-series') {
+            return resolved;
+        }
+
+        const rows = [...result.rows]
+            .sort((a, b) => this.compareBuckets(a.bucket, b.bucket))
+            .map((item, idx) => ({
+                x: idx,
+                label: this.formatBucketLabel(item.bucket),
+                y: item.value,
+                autkIds: item.autkIds,
+            }));
+
+        return {
+            rows,
+            axisAttributes: ['label', 'y'],
         };
-
-        const compareBuckets = (a: string, b: string): number => {
-            const dateA = new Date(a);
-            const dateB = new Date(b);
-            const validDateA = Number.isFinite(dateA.getTime());
-            const validDateB = Number.isFinite(dateB.getTime());
-            if (validDateA && validDateB) { return dateA.getTime() - dateB.getTime(); }
-            const numA = Number(a);
-            const numB = Number(b);
-            if (Number.isFinite(numA) && Number.isFinite(numB)) { return numA - numB; }
-            return a.localeCompare(b);
-        };
-
-        const sourceRows = this._sourceFeatures.map((f, idx) => ({
-            ...(f.properties ?? {}),
-            autkIds: [idx],
-        })) as AutkDatum[];
-
-        const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
-        const transformed = run(sourceRows, this._transformConfig!, inputColumns) as ExecutedReduceSeriesTransform;
-        const reducedSeries = [...transformed.rows].sort((a, b) => compareBuckets(a.bucket, b.bucket));
-        this._seriesData = reducedSeries.map((item, idx) => ({
-            x: idx,
-            label: formatBucketLabel(item.bucket),
-            y: item.value,
-            autkIds: item.autkIds,
-        }));
     }
 
     /**
@@ -132,6 +104,7 @@ export class Linechart extends ChartBase {
      * Synchronizes the SVG DOM with the current series data and attaches interaction listeners.
      */
     public render(): void {
+        const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[] }>;
         const innerW = this._width - this._margins.left - this._margins.right;
         const innerH = this._height - this._margins.top - this._margins.bottom;
 
@@ -169,8 +142,8 @@ export class Linechart extends ChartBase {
         }
 
         // ---- Scales
-        const n = Math.max(this._seriesData.length, 1);
-        const allY = this._seriesData.map((item) => item.y);
+        const n = Math.max(seriesData.length, 1);
+        const allY = seriesData.map((item) => item.y);
         const yMin = allY.length > 0 ? Math.min(...allY) : 0;
         const yMax = allY.length > 0 ? Math.max(...allY) : 50;
         const yPad = (yMax - yMin) * 0.1 || 1;
@@ -181,7 +154,7 @@ export class Linechart extends ChartBase {
         // ---- Axes
         const xAxis = d3.axisBottom(xScale)
             .ticks(Math.min(n, 12))
-            .tickFormat((d) => this._seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
+            .tickFormat((d) => seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('#axisX')
@@ -262,7 +235,7 @@ export class Linechart extends ChartBase {
 
         cGroup
             .selectAll<SVGPathElement, Array<{ x: number; y: number }>>('.autk-line')
-            .data([this._seriesData])
+            .data([seriesData])
             .join('path')
             .attr('class', 'autk-line')
             .attr('fill', 'none')
@@ -273,7 +246,7 @@ export class Linechart extends ChartBase {
         // ---- Dots (marks)
         cGroup
             .selectAll('.autkMark')
-            .data(this._seriesData)
+            .data(seriesData)
             .join('circle')
             .attr('class', 'autkMark')
             .attr('cx', (d) => xScale(d.x))
@@ -285,7 +258,7 @@ export class Linechart extends ChartBase {
         // ---- Empty state
         cGroup
             .selectAll('.autk-empty')
-            .data(this._seriesData.length === 0 ? ['No series data available'] : [])
+            .data(seriesData.length === 0 ? ['No series data available'] : [])
             .join('text')
             .attr('class', 'autk-empty')
             .attr('x', innerW / 2)
@@ -296,5 +269,27 @@ export class Linechart extends ChartBase {
             .text((d) => d);
 
         this.configureSignalListeners();
+    }
+
+    private formatBucketLabel(bucket: string): string {
+        const numericBucket = Number(bucket);
+        if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+            return d3.format(this._tickFormats[0])(numericBucket);
+        }
+        return bucket;
+    }
+
+    private compareBuckets(a: string, b: string): number {
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        const validDateA = Number.isFinite(dateA.getTime());
+        const validDateB = Number.isFinite(dateB.getTime());
+        if (validDateA && validDateB) { return dateA.getTime() - dateB.getTime(); }
+
+        const numA = Number(a);
+        const numB = Number(b);
+        if (Number.isFinite(numA) && Number.isFinite(numB)) { return numA - numB; }
+
+        return a.localeCompare(b);
     }
 }

@@ -28,6 +28,7 @@
  * const plot = new AutkChart(plotDiv, {
  *   type: 'barchart',
  *   collection: features,
+ *   attributes: { axis: ['category', 'value'] },
  *   labels: { axis: ['category', 'value'] }
  * });
  */
@@ -41,10 +42,6 @@ import type { ChartConfig } from '../api';
 import { ChartBase } from '../chart-base';
 
 import { ChartEvent } from '../types-events';
-
-import { run } from '../transforms';
-
-import type { ExecutedBinning1dTransform } from '../transforms';
 
 /**
  * Bar chart implementation supporting categorical values and binned mode.
@@ -80,25 +77,6 @@ export class Barchart extends ChartBase {
         super(config);
 
         this.draw();
-    }
-
-    /**
-     * Transforms raw feature values into one-dimensional bins and stores source ids
-     * directly on each rendered bin datum via `autkIds`.
-     */
-    protected override computeTransform(): void {
-        if (!this._transformConfig) return;
-
-        // Always compute bins from all features
-        const allRows = this._sourceFeatures.map((f, idx) => ({
-            ...(f.properties ?? {}),
-            autkIds: [idx],
-        }));
-
-        const inputColumns = this._axisAttributes.filter(c => c !== '@transform');
-        const transformed = run(allRows, this._transformConfig!, inputColumns) as ExecutedBinning1dTransform;
-        this._data = transformed.rows as any;
-        this._transformAttributes = ['label', 'value'];
     }
 
     /**

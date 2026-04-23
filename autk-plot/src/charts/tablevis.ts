@@ -12,7 +12,7 @@
  * const plot = new AutkChart(plotDiv, {
  *   type: 'table',
  *   collection: geojson,
- *   attributes: ['name', 'population', 'area'],
+ *   attributes: { axis: ['name', 'population', 'area'] },
  *   labels: { axis: ['Name', 'Population', 'Area'], title: 'City Table' }
  * });
  *
@@ -22,7 +22,7 @@
  *   type: 'table',
  *   collection: geojson,
  *   events: [ChartEvent.CLICK],
- *   attributes: ['id', 'value'],
+ *   attributes: { axis: ['id', 'value'] },
  *   labels: { axis: ['ID', 'Value'], title: 'Data Table' }
  * });
  */
@@ -37,8 +37,6 @@ import { ChartBase } from '../chart-base';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../types-events';
 
-import { run } from '../transforms';
-import type { ExecutedSortTransform } from '../transforms/presets/sort';
 /**
  * Table-based visualization with sorting and row selection interactions.
  *
@@ -64,23 +62,6 @@ export class TableVis extends ChartBase {
         super(config);
 
         this.draw();
-    }
-
-    /**
-     * Sorts feature rows by the configured sort column and direction.
-     *
-     * The default no-op sort (no transform config) preserves insertion order.
-     */
-    protected override computeTransform(): void {
-        if (!this._transformConfig) return;
-
-        const allRows = this._sourceFeatures.map((f, idx) => ({
-            ...(f.properties ?? {}),
-            autkIds: [idx],
-        })) as AutkDatum[];
-
-        const transformed = run(allRows, this._transformConfig!, this._axisAttributes) as ExecutedSortTransform;
-        this._data = transformed.rows as any;
     }
 
     /**
@@ -135,10 +116,10 @@ export class TableVis extends ChartBase {
             .text((d) => String(d))
             .on('click', (_event, axisLabel) => {
                 const attrIdx = this._axisLabels.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
+                const attr = attrIdx >= 0 ? this.renderAxisAttributes[attrIdx] : axisLabel;
 
                 const sortConfig = this._transformConfig as SortTransformConfig;
-                if ((sortConfig.options?.column ?? this._axisAttributes[0]) === attr) {
+                if ((sortConfig.options?.column ?? this.renderAxisAttributes[0]) === attr) {
                     const direction = sortConfig.options?.direction === 'asc' ? 'desc' : 'asc';
                     this._transformConfig = { preset: 'sort', options: { column: attr, direction } };
                 } else {
@@ -187,7 +168,7 @@ export class TableVis extends ChartBase {
 
         rows
             .selectAll('td')
-            .data((d) => this._axisAttributes.map((attr, i) => ({
+            .data((d) => this.renderAxisAttributes.map((attr, i) => ({
                 column: this._axisLabels[i] ?? attr,
                 value: d ? valueAtPath(d, attr) : 'unknown'
             })))
@@ -216,14 +197,14 @@ export class TableVis extends ChartBase {
             .selectAll<HTMLTableCellElement, string>('th')
             .style('color', (axisLabel) => {
                 const attrIdx = this._axisLabels.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
-                const sortCol = (this._transformConfig as SortTransformConfig)?.options?.column ?? this._axisAttributes[0];
+                const attr = attrIdx >= 0 ? this.renderAxisAttributes[attrIdx] : axisLabel;
+                const sortCol = (this._transformConfig as SortTransformConfig)?.options?.column ?? this.renderAxisAttributes[0];
                 return sortCol === attr ? '#cc3300' : '#000';
             })
             .style('text-decoration', (axisLabel) => {
                 const attrIdx = this._axisLabels.indexOf(axisLabel);
-                const attr = attrIdx >= 0 ? this._axisAttributes[attrIdx] : axisLabel;
-                const sortCol = (this._transformConfig as SortTransformConfig)?.options?.column ?? this._axisAttributes[0];
+                const attr = attrIdx >= 0 ? this.renderAxisAttributes[attrIdx] : axisLabel;
+                const sortCol = (this._transformConfig as SortTransformConfig)?.options?.column ?? this.renderAxisAttributes[0];
                 return sortCol === attr ? 'underline' : 'none';
             });
     }

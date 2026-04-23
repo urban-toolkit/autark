@@ -37,6 +37,7 @@ export class MapParallelCoordinates {
         this.plot = new AutkChart(plotDiv, {
             type: 'parallel-coordinates',
             collection: this.geojson,
+            attributes: { axis: ['shape_area', 'shape_leng', 'cdta2020'] },
             labels: { 
                 axis: ['shape_area', 'shape_leng', 'cdta2020'], 
                 title: 'Neighborhood Characteristics' 
