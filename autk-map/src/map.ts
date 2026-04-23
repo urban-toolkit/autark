@@ -35,6 +35,7 @@ import {
 
 import {
     LoadCollectionParams,
+    LoadMeshParams,
     UpdateColorMapParams,
     UpdateRasterParams,
     UpdateThematicParams,
@@ -50,6 +51,8 @@ import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
+import { Triangles3DLayer } from './layer-triangles3D';
+import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 
 import { AutkMapUi } from './map-ui';
 
@@ -227,6 +230,39 @@ export class AutkMap {
                 break;
         }
 
+        this._ui.refreshLayerList();
+    }
+
+    /**
+     * Loads a prebuilt 3D triangle mesh directly into the map.
+     *
+     * Mesh coordinates must already be expressed in the map's local coordinate
+     * space, relative to the current shared origin.
+     */
+    loadMesh(id: string, { geometry, components, thematic, type = 'buildings' }: LoadMeshParams): void {
+        if (!this.layerManager.hasOrigin) {
+            throw new Error(`Layer '${id}': map origin must be initialized before loading a mesh.`);
+        }
+
+        const layerInfo: LayerInfo = {
+            id,
+            zIndex: this._layerManager.computeZindex(type),
+            typeLayer: type,
+        };
+        const layerRenderInfo: LayerRenderInfo = {
+            opacity: 1.0,
+            colormap: { config: this.defaultColorMap() },
+            isColorMap: false,
+            isPick: false,
+            isSkip: false,
+        };
+        const layerData: LayerData = {
+            geometry,
+            components,
+            thematic: thematic ?? components.map(() => ({ value: 0, valid: 1 })),
+        };
+
+        this.createLayer(layerInfo, layerRenderInfo, layerData);
         this._ui.refreshLayerList();
     }
 
@@ -733,17 +769,30 @@ export class AutkMap {
 
         // Normal render pass
         this._renderer.start();
+        const visible3DLayers = this._layerManager.layers.filter(
+            (layer): layer is Triangles3DLayer => !layer.layerRenderInfo.isSkip && layer instanceof Triangles3DLayer
+        );
         this._layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip) {
                 layer.prepareRender(this._camera);
             }
         });
+        if (visible3DLayers.length > 0) {
+            const geometryPassEncoder = PipelineBuildingSSAO.beginSharedGeometryPass(this._renderer);
+            visible3DLayers.forEach((layer) => {
+                layer.renderSceneGeometry(this._camera, geometryPassEncoder);
+            });
+            geometryPassEncoder.end();
+        }
         const mainPassEncoder = this._renderer.beginMainRenderPass();
         this._layerManager.layers.forEach((layer) => {
-            if (!layer.layerRenderInfo.isSkip) {
+            if (!layer.layerRenderInfo.isSkip && !(layer instanceof Triangles3DLayer)) {
                 layer.renderPass(this._camera, mainPassEncoder);
             }
         });
+        if (visible3DLayers.length > 0) {
+            PipelineBuildingSSAO.compositeSharedPass(this._renderer, mainPassEncoder);
+        }
         mainPassEncoder.end();
 
         let pickReadbackSlot: number | null = null;

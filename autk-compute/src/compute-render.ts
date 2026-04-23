@@ -17,7 +17,7 @@ import COUNT_SHADER from './shaders/render-count.wgsl?raw';
 import FRAG_SHADER from './shaders/render-frag.wgsl?raw';
 import VERT_SHADER from './shaders/render-vert.wgsl?raw';
 import type { GpuFeatureDraw } from './types-render';
-import { buildCameraMatrices, expandCameraSamples, generateViewOrigins, type CameraSample } from './viewpoint';
+import { buildCameraMatrices, resolveRenderViewpoints, type CameraSample } from './viewpoint';
 
 type LayerMeshData = {
     geometries: LayerGeometry[];
@@ -106,6 +106,7 @@ export class ComputeRender extends GpuPipeline {
             layers,
             source,
             aggregation,
+            viewpoints,
             viewSampling,
             fov = 90,
             near = 1,
@@ -120,16 +121,17 @@ export class ComputeRender extends GpuPipeline {
             throw new Error('ComputeRender: tileSize must be a multiple of 8.');
         }
 
-        const viewOrigins = generateViewOrigins(source);
-        const samples = expandCameraSamples(viewOrigins, viewSampling);
+        const resolvedViewpoints = resolveRenderViewpoints(source, viewpoints, viewSampling);
+        const resolvedSource = resolvedViewpoints.source;
+        const samples = resolvedViewpoints.samples;
         const metadata = this.buildRenderMetadata(layers, aggregation);
         const sampleCount = samples.length;
 
         if (sampleCount === 0) {
-            return this.applyAggregation(source, samples, metadata, new Uint32Array(0), new Uint32Array(0), tileSize);
+            return this.applyAggregation(resolvedSource, samples, metadata, new Uint32Array(0), new Uint32Array(0), tileSize);
         }
 
-        const origin = computeOrigin(source);
+        const origin = computeOrigin(resolvedSource);
         const layerMeshes = layers
             .map((layer, layerIndex) => this.triangulateLayer(layer, origin, layerIndex))
             .filter((entry): entry is LayerMeshData => entry !== null);
@@ -138,8 +140,8 @@ export class ComputeRender extends GpuPipeline {
         const device = await this.getDevice();
         const alignment = device.limits.minUniformBufferOffsetAlignment;
         const cameraStride = Math.max(64, alignment);
-        this.validateAggregationBufferSizes(device, source.features.length, metadata);
-        this.validateObjectAggregationCpuBufferSize(source.features.length, metadata);
+        this.validateAggregationBufferSizes(device, resolvedSource.features.length, metadata);
+        this.validateObjectAggregationCpuBufferSize(resolvedSource.features.length, metadata);
         const batchSize = this.computeMaxBatchSize(device, tileSize, cameraStride, metadata);
 
         const createdBuffers: GPUBuffer[] = [];
@@ -166,10 +168,10 @@ export class ComputeRender extends GpuPipeline {
             );
 
             const rawClasses = metadata.includeClasses
-                ? new Uint32Array(source.features.length * metadata.layerTypes.length)
+                ? new Uint32Array(resolvedSource.features.length * metadata.layerTypes.length)
                 : new Uint32Array(0);
             const objectVisibleCounts = metadata.includeObjects
-                ? new Uint32Array(source.features.length * metadata.objectKeys.length)
+                ? new Uint32Array(resolvedSource.features.length * metadata.objectKeys.length)
                 : new Uint32Array(0);
 
             for (let batchStart = 0; batchStart < sampleCount; batchStart += batchSize) {
@@ -184,7 +186,7 @@ export class ComputeRender extends GpuPipeline {
                 const cameraBuf = this.buildCameraBuffer(device, batchCameraData, batchCount, alignment).cameraBuf;
                 const countBuffers = this.buildCountBuffers(
                     device,
-                    source.features.length,
+                    resolvedSource.features.length,
                     batchCount,
                     batchGridSize,
                     tileSize,
@@ -267,7 +269,7 @@ export class ComputeRender extends GpuPipeline {
                 }
             }
 
-            return this.applyAggregation(source, samples, metadata, rawClasses, objectVisibleCounts, tileSize);
+            return this.applyAggregation(resolvedSource, samples, metadata, rawClasses, objectVisibleCounts, tileSize);
         } finally {
             for (const buffer of createdBuffers) {
                 buffer.destroy();

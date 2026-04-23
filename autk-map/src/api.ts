@@ -6,8 +6,12 @@ import {
 import type {
     ColorMapConfig,
     TransferFunction,
+    LayerComponent,
+    LayerGeometry,
     LayerType,
 } from './types-core';
+
+import type { LayerThematic } from './types-layers';
 
 /**
  * Parameters for loading a feature collection as a map layer.
@@ -30,6 +34,18 @@ export interface LoadCollectionParams {
      * For raster layers, the path is resolved from each raster cell object.
      */
     property?: string;
+}
+
+/** Parameters for loading a prebuilt triangle mesh directly. */
+export interface LoadMeshParams {
+    /** Mesh geometry in map-local coordinates relative to the current map origin. */
+    geometry: LayerGeometry[];
+    /** Per-component picking/thematic metadata aligned with the mesh geometry. */
+    components: LayerComponent[];
+    /** Optional thematic values aligned one-to-one with `components`. */
+    thematic?: LayerThematic[];
+    /** Mesh render type. The first public version supports only 3D building-like meshes. */
+    type?: 'buildings';
 }
 
 /**

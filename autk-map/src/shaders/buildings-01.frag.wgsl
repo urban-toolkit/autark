@@ -59,7 +59,7 @@ fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @locati
     var shade: vec4f = color * (diffuse + ambient);
 
     var output : BufferOut;
-    output.color  = vec4f(shade.rgb, 1.0);
+    output.color  = vec4f(shade.rgb * opacity, opacity);
     // Store depth in normal.a (mapped to [0.001, 0.999] so geometry is always > 0,
     // distinguishable from background which is cleared to 0.0).
     output.normal = vec4f(normal * 0.5 + 0.5, fragPos.z * 0.998 + 0.001);

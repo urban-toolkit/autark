@@ -9,11 +9,20 @@ import type {
 } from './api';
 
 export { ComputeGpgpu, ComputeRender };
-export { generateViewOrigins, expandCameraSamples, buildCameraMatrices } from './viewpoint';
+export {
+    generateViewOrigins,
+    expandCameraSamples,
+    buildCameraMatrices,
+} from './viewpoint';
+export {
+    TriangulatorBuildingWithWindows,
+} from 'autk-core';
+export type { BuildingWindowLayoutEntry, BuildingWindowLayoutResult } from 'autk-core';
 
 export type {
     RenderLayer,
     RenderPipelineParams,
+    RenderViewpoints,
     GpgpuPipelineParams,
 } from './api';
 

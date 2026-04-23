@@ -2,10 +2,16 @@ import {
     FeatureCollection,
 } from 'geojson';
 
-import { Camera, computeGeometryCentroid } from 'autk-core';
+import {
+    BuildingWindowLayoutEntry,
+    Camera,
+    computeGeometryCentroid,
+    TriangulatorBuildingWithWindows,
+} from 'autk-core';
 
-import type { RenderViewSampling } from './api';
+import type { RenderViewSampling, RenderViewpoints } from './api';
 
+const BUILDING_WINDOW_DIRECTION_OFFSETS = [-30, 0, 30] as const;
 export interface ViewOrigin {
     sourceIndex: number;
     origin: [number, number, number];
@@ -15,6 +21,12 @@ export interface CameraSample {
     sourceIndex: number;
     eye: [number, number, number];
     lookAt: [number, number, number];
+}
+
+export interface ResolvedRenderViewpoints {
+    source: FeatureCollection;
+    samples: CameraSample[];
+    windows?: BuildingWindowLayoutEntry[];
 }
 
 /**
@@ -78,6 +90,27 @@ export function expandCameraSamples(
     return samples;
 }
 
+export function resolveRenderViewpoints(
+    source: FeatureCollection,
+    viewpoints: RenderViewpoints | undefined,
+    viewSampling: RenderViewSampling = {},
+): ResolvedRenderViewpoints {
+    if (viewpoints?.type === 'building-windows') {
+        const layout = TriangulatorBuildingWithWindows.buildWindowLayout(source, viewpoints.floors);
+        return {
+            source: layout.collection,
+            samples: buildBuildingWindowCameraSamples(layout.windows),
+            windows: layout.windows,
+        };
+    }
+
+    const origins = generateViewOrigins(source);
+    return {
+        source,
+        samples: expandCameraSamples(origins, viewSampling),
+    };
+}
+
 /**
  * Builds row-major view-projection matrices for each camera sample.
  *
@@ -125,6 +158,38 @@ export function buildCameraMatrices(
     }
 
     return cameras;
+}
+
+function buildBuildingWindowCameraSamples(windows: BuildingWindowLayoutEntry[]): CameraSample[] {
+    const samples: CameraSample[] = [];
+
+    windows.forEach((window, sourceIndex) => {
+        for (const angleOffset of BUILDING_WINDOW_DIRECTION_OFFSETS) {
+            const dir = rotateXY(window.normal, angleOffset);
+            samples.push({
+                sourceIndex,
+                eye: [...window.center],
+                lookAt: [
+                    window.center[0] + dir[0],
+                    window.center[1] + dir[1],
+                    window.center[2] + dir[2],
+                ],
+            });
+        }
+    });
+
+    return samples;
+}
+
+function rotateXY(vector: [number, number, number], angleDeg: number): [number, number, number] {
+    const angleRad = degToRad(angleDeg);
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    return [
+        vector[0] * cos - vector[1] * sin,
+        vector[0] * sin + vector[1] * cos,
+        vector[2],
+    ];
 }
 
 function degToRad(value: number): number {

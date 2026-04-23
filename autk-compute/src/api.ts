@@ -32,6 +32,10 @@ export interface RenderViewSampling {
     pitchDeg?: number;
 }
 
+export type RenderViewpoints =
+    | { type: 'centroid' }
+    | { type: 'building-windows'; floors: number };
+
 export type RenderAggregation =
     | {
         type: 'classes';
@@ -51,6 +55,9 @@ export interface RenderPipelineParams {
 
     /** Reduction strategy applied after the tiled render pass. */
     aggregation: RenderAggregation;
+
+    /** Strategy used to derive view origins from the source features. */
+    viewpoints?: RenderViewpoints;
 
     /** Camera sampling controls for each source origin. */
     viewSampling?: RenderViewSampling;

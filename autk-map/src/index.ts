@@ -61,6 +61,7 @@ export type {
 
 export type {
     LoadCollectionParams,
+    LoadMeshParams,
     UpdateRasterParams,
     UpdateThematicParams,
     UpdateColorMapParams,

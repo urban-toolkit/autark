@@ -87,12 +87,30 @@ export class Triangles3DLayer extends VectorLayer {
         super.renderPass(camera, passEncoder);
     }
 
-    override prepareRender(camera: Camera): void {
+    override prepareRender(_camera: Camera): void {
+        if (this._normalsAreDirty) {
+            this.computeNormals();
+        }
+    }
+
+    renderSceneGeometry(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         if (this._normalsAreDirty) {
             this.computeNormals();
         }
 
-        this._pipeline.prepareRender(camera);
+        if (this._renderInfoIsDirty) {
+            this._pipeline.updateColorUniforms(this);
+            this._renderInfoIsDirty = false;
+        }
+
+        if (this._dataIsDirty) {
+            this._pipeline.updateVertexBuffers(this);
+            this._pipelinePicking.updateVertexBuffers(this);
+            this._dataIsDirty = false;
+        }
+
+        this._pipeline.updateZIndex(this._layerInfo.zIndex);
+        (this._pipeline as PipelineBuildingSSAO).renderGeometryPass(camera, passEncoder);
     }
 
     private computeNormals(): void {

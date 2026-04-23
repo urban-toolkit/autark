@@ -56,6 +56,11 @@ export { TriangulatorPoints }    from './triangulator-points';
 export { TriangulatorPolylines } from './triangulator-polylines';
 export { TriangulatorPolygons }  from './triangulator-polygons';
 export { TriangulatorBuildings } from './triangulator-buildings';
+export { TriangulatorBuildingWithWindows } from './triangulator-windows';
+export type {
+    BuildingWindowLayoutEntry,
+    BuildingWindowLayoutResult,
+} from './triangulator-windows';
 export { TriangulatorRaster }    from './triangulator-raster';
 
 // ─── Camera ──────────────────────────────────────────────────────────────────
