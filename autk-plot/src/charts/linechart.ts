@@ -77,8 +77,8 @@ export class Linechart extends ChartBase {
         this.draw();
     }
 
-    protected override resolveTransformResult(result: ExecutedChartTransform) {
-        const resolved = super.resolveTransformResult(result);
+    protected resolveTransformResult(result: ExecutedChartTransform) {
+        const resolved = this._transformHandler.resolveTransformResult(result);
         if (result.preset !== 'binning-events' && result.preset !== 'reduce-series') {
             return resolved;
         }
