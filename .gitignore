@@ -4,6 +4,8 @@ autk*/dist/
 autk*/src/*.js
 dist/
 
+.vite/
+
 # Dependencies
 node_modules/
 *package-lock.json
