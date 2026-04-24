@@ -62,7 +62,6 @@ export type {
  *   layers: [{
  *     layerId: 'buildings',
  *     geojson: buildings,
- *     type: 'buildings',
  *     layerType: 'buildings'
  *   }],
  *   source: streetNetwork,
@@ -155,7 +154,6 @@ export class AutkComputeEngine {
      *   layers: [{
      *     layerId: 'buildings',
      *     geojson: buildings,
-     *     type: 'buildings',
      *     layerType: 'buildings'
      *   }],
      *   source: streets,

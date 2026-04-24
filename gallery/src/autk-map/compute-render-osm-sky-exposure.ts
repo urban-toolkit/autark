@@ -39,7 +39,6 @@ export class ComputeRenderOsmSkyExposure {
             layers: [{
                 layerId: 'table_osm_buildings',
                 geojson: buildingsGeoJson,
-                type: 'buildings',
                 layerType: 'buildings',
             }],
             source: roadsGeoJson,

@@ -129,19 +129,16 @@ export class ComputeRenderOsmViewScore {
                 {
                     layerId: 'table_osm_buildings',
                     geojson: sceneBuildings,
-                    type: 'buildings',
                     layerType: 'buildings',
                 },
                 {
                     layerId: 'table_osm_parks',
                     geojson: parksGeoJson,
-                    type: 'parks',
                     layerType: 'parks',
                 },
                 {
                     layerId: 'table_osm_water',
                     geojson: waterGeoJson,
-                    type: 'water',
                     layerType: 'water',
                 },
             ],
@@ -337,3 +334,27 @@ async function main() {
     await example.run(canvas);
 }
 main();
+
+function buildBuildingViewpoints(buildings: FeatureCollection<Geometry, GeoJsonProperties>): FeatureCollection<Point> {
+    return {
+        type: 'FeatureCollection',
+        features: buildings.features.map((building, index) => {
+            const centroid = building.geometry ? computeGeometryCentroid(building.geometry) : null;
+            const [x, y] = centroid ?? [0, 0, 0];
+            const height = resolveBuildingHeight(building) ?? 20;
+            const eyeHeight = Math.max(1.7, Math.min(Math.max(1.7, height * 0.6), height + 1.7));
+
+            return {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [x, y, eyeHeight],
+                },
+                properties: {
+                    sourceIndex: index,
+                    height,
+                },
+            };
+        }),
+    };
+}

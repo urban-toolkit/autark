@@ -428,7 +428,7 @@ export class ComputeRender extends GpuPipeline {
 
     private triangulateLayer(layer: RenderLayer, origin: [number, number], layerIndex: number): LayerMeshData | null {
         let geometries;
-        switch (layer.type) {
+        switch (layer.layerType) {
             case 'buildings':
                 [geometries] = TriangulatorBuildings.buildMesh(layer.geojson, origin);
                 break;
@@ -446,7 +446,7 @@ export class ComputeRender extends GpuPipeline {
                 [geometries] = TriangulatorPoints.buildMesh(layer.geojson, origin);
                 break;
             default:
-                console.warn(`ComputeRender: unsupported layer type "${layer.type}", skipping.`);
+                console.warn(`ComputeRender: unsupported layer type "${layer.layerType}", skipping.`);
                 return null;
         }
 
@@ -542,7 +542,7 @@ export class ComputeRender extends GpuPipeline {
         layerMesh: LayerMeshData,
         layerTypeIndex: number,
     ): GpuFeatureDraw[] {
-        const dimension = layerMesh.layer.type === 'buildings' ? 3 : 2;
+        const dimension = layerMesh.layer.layerType === 'buildings' ? 3 : 2;
 
         let totalVerts = 0;
         let totalIndices = 0;

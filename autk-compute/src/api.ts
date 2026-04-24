@@ -11,10 +11,7 @@ export interface RenderLayer {
     /** GeoJSON source features rendered for this layer. */
     geojson: FeatureCollection;
 
-    /** Triangulation strategy used to mesh the GeoJSON geometries. */
-    type: LayerType;
-
-    /** Semantic layer bucket used by higher-level render aggregations. */
+    /** Layer type used both for meshing and higher-level render aggregations. */
     layerType: LayerType;
 
     /** Optional source property to be used as a stable object identifier. */
