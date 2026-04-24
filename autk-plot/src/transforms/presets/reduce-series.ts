@@ -26,7 +26,9 @@ import { reduceBuckets } from '../kernel';
  * Result produced by `runReduceSeries`.
  */
 export type ExecutedReduceSeriesTransform = {
+    /** Preset discriminator identifying the executed transform. */
     preset: 'reduce-series';
+    /** Reduced series rows ready for downstream chart rendering. */
     rows: ReduceSeriesBucketRow[];
 };
 
@@ -37,9 +39,13 @@ export type ExecutedReduceSeriesTransform = {
  * timestamp string for object-based series.
  */
 export type ReduceSeriesBucketRow = {
+    /** Timestamp or index key identifying the reduced bucket. */
     bucket: string;
+    /** Reduced numeric result for the bucket. */
     value: number;
+    /** Number of source points collapsed into the bucket. */
     count: number;
+    /** Merged source feature ids represented by the bucket. */
     autkIds: number[];
 };
 
@@ -47,6 +53,11 @@ export type ReduceSeriesBucketRow = {
 
 /**
  * Runs a reduce-series transform and returns chart-ready rows.
+ *
+ * @param rows Input feature rows containing series arrays.
+ * @param config Transform configuration controlling timestamp/value extraction and reduction.
+ * @param columns Ordered source columns; `columns[0]` is the series attribute.
+ * @returns Executed reduced-series transform payload.
  */
 export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransformConfig, columns: string[]): ExecutedReduceSeriesTransform {
     const seriesAttr = columns[0] ?? '';
@@ -54,6 +65,7 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
     const valueAttr = config.options?.value ?? 'value';
     const reducer = config.options?.reducer ?? 'avg';
 
+    /** Intermediate flattened series-point row consumed by `reduceBuckets()`. */
     type PointRow = { autkIds: number[]; __bucket: string; __value: number | null };
     const pointRows: PointRow[] = [];
 

@@ -39,7 +39,7 @@ import { valueAtPath } from '../types-core';
 
 import type { ChartConfig } from '../api';
 
-import { ChartBase } from '../chart-base';
+import { ChartBaseInteractive } from '../chart-base-interactive';
 
 import { ChartEvent } from '../types-events';
 
@@ -49,7 +49,7 @@ import { ChartEvent } from '../types-events';
  * In binned mode, rendered bins are mapped back to original source feature
  * indices so interaction payloads remain stable across transformations.
  */
-export class Barchart extends ChartBase {
+export class Barchart extends ChartBaseInteractive {
 
     /** Band scale mapping category/bin labels to pixel positions. */
     protected mapX!: d3.ScaleBand<string>;
@@ -58,7 +58,9 @@ export class Barchart extends ChartBase {
 
     /**
      * Creates a bar chart instance and performs the initial draw.
+     *
      * @param config Plot configuration with categorical axes or binning settings.
+     * @throws If a transform is configured with a preset other than `binning-1d`.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
@@ -81,6 +83,8 @@ export class Barchart extends ChartBase {
 
     /**
      * Renders chart scaffolding, axes, and bar marks.
+     *
+     * @throws If the root SVG element cannot be created.
      */
     render(): void {
         const svg = d3

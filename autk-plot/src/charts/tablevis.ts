@@ -33,7 +33,7 @@ import { valueAtPath } from '../types-core';
 import type { AutkDatum } from '../types-chart';
 import type { SortTransformConfig, ChartConfig } from '../api';
 
-import { ChartBase } from '../chart-base';
+import { ChartBaseInteractive } from '../chart-base-interactive';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../types-events';
 
@@ -42,11 +42,13 @@ import { ChartEvent } from '../types-events';
  *
  * Selected rows are pinned to the top and keep stable source index mapping.
  */
-export class TableVis extends ChartBase {
+export class TableVis extends ChartBaseInteractive {
 
     /**
      * Creates a table visualization and performs the initial draw.
+     *
      * @param config Plot configuration for table rendering.
+     * @throws If a transform is configured with a preset other than `sort`.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
@@ -66,6 +68,8 @@ export class TableVis extends ChartBase {
 
     /**
      * Renders table structure, headers, and rows.
+     *
+     * @throws If the root table element cannot be created.
      */
     public render(): void {
         const container = d3
@@ -180,6 +184,8 @@ export class TableVis extends ChartBase {
 
     /**
      * Re-renders rows and re-attaches click handlers after selection styles are applied.
+     *
+     * This keeps pinned-row ordering and click behavior in sync after selection updates.
      */
     protected override onSelectionUpdated(): void {
         const tbody = d3.select(this._div).select<HTMLTableSectionElement>('.autk-table tbody');

@@ -20,7 +20,9 @@ import { reduceBuckets } from '../kernel';
  * Result produced by `runBinningEvents`.
  */
 export type ExecutedBinningEventsTransform = {
+    /** Preset discriminator identifying the executed transform. */
     preset: 'binning-events';
+    /** Event bucket rows ready for downstream chart rendering. */
     rows: BinningEventsBucketRow[];
 };
 
@@ -30,9 +32,13 @@ export type ExecutedBinningEventsTransform = {
  * `bucket` is a formatted string key (e.g. `"2024-03"` for monthly resolution).
  */
 export type BinningEventsBucketRow = {
+    /** Formatted bucket identifier (for example `"2024-03"`). */
     bucket: string;
+    /** Reduced numeric result for the bucket. */
     value: number;
+    /** Number of source event rows collapsed into the bucket. */
     count: number;
+    /** Merged source feature ids represented by the bucket. */
     autkIds: number[];
 };
 
@@ -40,6 +46,11 @@ export type BinningEventsBucketRow = {
 
 /**
  * Runs a binning-events transform and returns chart-ready rows.
+ *
+ * @param rows Input feature rows containing nested event arrays.
+ * @param config Transform configuration controlling timestamp parsing and reduction.
+ * @param columns Ordered source columns; `columns[0]` is the event-array attribute.
+ * @returns Executed event-binning transform payload.
  */
 export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransformConfig, columns: string[]): ExecutedBinningEventsTransform {
     const eventsAttr = columns[0] ?? '';
@@ -48,6 +59,7 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
     const resolution = config.options?.resolution ?? 'month';
     const reducer = config.options?.reducer ?? 'count';
 
+    /** Intermediate flattened event row consumed by `reduceBuckets()`. */
     type EventRow = { autkIds: number[]; __bucket: string; __value: number | null };
     const eventRows: EventRow[] = [];
 
@@ -104,8 +116,13 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
 
 /**
  * Formats a date into a string bucket key according to the specified resolution.
+ *
+ * @param date UTC date to encode into a bucket key.
+ * @param resolution Temporal resolution used to derive the key.
+ * @returns Bucket label consumed by downstream chart rendering.
  */
 function formatEventBucket(date: Date, resolution: TransformResolution): string {
+    /** Left-pads a numeric component to two digits. */
     const pad2 = (value: number): string => String(value).padStart(2, '0');
 
     if (resolution === 'hour') {

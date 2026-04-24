@@ -60,8 +60,9 @@ export type {
 export { ChartEvent } from './types-events';
 export type { ChartEventData, ChartEventRecord } from './types-events';
 
-/** Base class for all concrete chart implementations. */
-export { ChartBase } from './chart-base';
+/** Shared chart base classes for data/transform and interactive behavior. */
+export { ChartBaseData } from './chart-base-data';
+export { ChartBaseInteractive } from './chart-base-interactive';
 
 // ─── Shared style helpers ───────────────────────────────────────────────────
 

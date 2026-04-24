@@ -31,7 +31,7 @@ import { valueAtPath } from '../types-core';
 
 import type { ChartConfig } from '../api';
 
-import { ChartBase } from '../chart-base';
+import { ChartBaseInteractive } from '../chart-base-interactive';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../types-events';
 
@@ -43,7 +43,7 @@ import { ChartEvent } from '../types-events';
  * The chart delegates interaction mechanics (click/brush selection, highlight
  * styling, and selection event emission) to the shared ChartD3 base class.
  */
-export class Scatterplot extends ChartBase {
+export class Scatterplot extends ChartBaseInteractive {
 
     /** Linear scale mapping the x-attribute domain to pixel coordinates. */
     protected mapX!: d3.ScaleLinear<number, number>;
@@ -52,7 +52,9 @@ export class Scatterplot extends ChartBase {
 
     /**
      * Creates a scatter plot instance and performs the initial draw.
+     *
      * @param config Plot configuration containing two attributes and optional events.
+     * @throws If fewer than two active axis bindings are available.
      */
     constructor(config: ChartConfig) {
         if(config.events === undefined) { config.events = [ChartEvent.CLICK]; }
@@ -70,6 +72,8 @@ export class Scatterplot extends ChartBase {
 
     /**
      * Renders chart scaffolding, axes, and point marks.
+     *
+     * @throws If the root SVG element cannot be created.
      */
     public render(): void {
         const [xAttribute, yAttribute] = this.renderAxisAttributes;

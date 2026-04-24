@@ -33,7 +33,7 @@ import { valueAtPath } from '../types-core';
 
 import type { ChartConfig } from '../api';
 
-import { ChartBase } from '../chart-base';
+import { ChartBaseInteractive } from '../chart-base-interactive';
 import { ChartStyle } from '../chart-style';
 import { ChartEvent } from '../types-events';
 
@@ -42,7 +42,7 @@ import { ChartEvent } from '../types-events';
  *
  * Supports mixed numeric/categorical dimensions and multi-axis brushing.
  */
-export class ParallelCoordinates extends ChartBase {
+export class ParallelCoordinates extends ChartBaseInteractive {
 
     /** Per-dimension scales: linear for numerical dimensions, point for categorical ones. */
     protected scales: Map<string, d3.ScaleLinear<number, number> | d3.ScalePoint<string>> = new Map();
@@ -52,6 +52,7 @@ export class ParallelCoordinates extends ChartBase {
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
     /**
      * Creates a parallel coordinates chart and performs the initial draw.
+     *
      * @param config Plot configuration for parallel coordinates rendering.
      */
     constructor(config: ChartConfig) {
@@ -69,6 +70,8 @@ export class ParallelCoordinates extends ChartBase {
 
     /**
      * Renders axes, paths, labels, and interaction layers.
+     *
+     * @throws If the root SVG element cannot be created.
      */
     public render(): void {
         const dimensions = this.renderAxisAttributes;
@@ -239,6 +242,8 @@ export class ParallelCoordinates extends ChartBase {
 
     /**
      * Applies stroke color via base class, then adjusts opacity, stroke-width, and z-order.
+     *
+     * @param svgs Selection containing rendered line-mark nodes.
      */
     protected override applyMarkStyles(svgs: d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>): void {
         super.applyMarkStyles(svgs);
@@ -254,7 +259,6 @@ export class ParallelCoordinates extends ChartBase {
 
     /**
      * Updates axis label style to reflect the active color dimension.
-     * @returns Nothing. Updates label styles in place.
      */
     protected updateAxisLabelStyles(): void {
         d3.select(this._div).selectAll<SVGTextElement, string>('.axis-label')
@@ -264,6 +268,7 @@ export class ParallelCoordinates extends ChartBase {
 
     /**
      * Generates the polyline path through all configured dimensions.
+     *
      * @param d Render row object.
      * @returns SVG path string for the row.
      */

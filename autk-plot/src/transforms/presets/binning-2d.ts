@@ -27,7 +27,9 @@ import { buildBinMapper } from './binning-1d';
  * cell rows ready for heat matrix rendering.
  */
 export type ExecutedBinning2dTransform = {
+    /** Preset discriminator identifying the executed transform. */
     preset: 'binning-2d';
+    /** Aggregated cell rows ready for downstream heat-matrix rendering. */
     rows: Binning2dCellRow[];
 };
 

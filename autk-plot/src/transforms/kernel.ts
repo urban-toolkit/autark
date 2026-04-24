@@ -1,6 +1,11 @@
 import type { TransformReducer } from '../api';
 
-/** Minimum row shape expected by `reduceBuckets`. Covers both `AutkDatum` rows and synthetic intermediate rows created by temporal and timeseries presets. */
+/**
+ * Minimum row shape expected by `reduceBuckets`.
+ *
+ * Covers both `AutkDatum` rows and synthetic intermediate rows created by
+ * temporal and timeseries presets.
+ */
 export type Row = { autkIds?: number[]; [key: string]: unknown };
 
 /**
@@ -26,9 +31,13 @@ export type ReducedBucket = {
  * @param options.reducer - How to collapse all values in a bucket: `count`, `sum`, `avg`, `min`, or `max`.
  */
 export function reduceBuckets(options: {
+    /** Input rows to aggregate. */
     rows: Row[];
+    /** Assigns a bucket key to each row; return `null` to skip the row. */
     bucketOf: (row: Row) => string | null;
+    /** Optional numeric extractor used for non-count reducers. */
     valueOf?: (row: Row) => number | null;
+    /** Aggregation strategy applied within each bucket. */
     reducer: TransformReducer;
 }): ReducedBucket[] {
     const { rows, bucketOf, valueOf, reducer } = options;

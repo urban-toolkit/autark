@@ -27,7 +27,7 @@ import { valueAtPath } from '../types-core';
 
 import type { ChartConfig } from '../api';
 
-import { ChartBase } from '../chart-base';
+import { ChartBaseInteractive } from '../chart-base-interactive';
 import { ChartEvent } from '../types-events';
 
 import type { Binning2dCellRow } from '../transforms';
@@ -35,11 +35,11 @@ import type { Binning2dCellRow } from '../transforms';
 /**
  * Heat matrix chart mapping two categorical dimensions to a grid of colored rectangles.
  *
- * Requires the `binning-2d` transform preset. `ChartBase` resolves that transform
+ * Requires the `binning-2d` transform preset. `ChartBaseData` resolves that transform
  * into rendered rows with `x`/`y` axis bindings and a `value` color binding,
  * producing one row per unique (x, y) cell.
  */
-export class Heatmatrix extends ChartBase {
+export class Heatmatrix extends ChartBaseInteractive {
 
     /**
      * Creates a heat matrix instance and performs the initial draw.
@@ -61,6 +61,8 @@ export class Heatmatrix extends ChartBase {
 
     /**
      * Renders chart scaffolding, axes, and cell marks.
+     *
+     * @throws If the root SVG element cannot be created.
      */
     public render(): void {
         const svg = d3.select(this._div)

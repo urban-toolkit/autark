@@ -19,7 +19,7 @@ export class ChartStyle {
      * Gets the default mark color.
      * @returns Hex color used for non-selected marks.
      */
-    static get default(): ColorHEX {
+    public static get default(): ColorHEX {
         return ChartStyle._default;
     }
 
@@ -27,7 +27,7 @@ export class ChartStyle {
      * Gets the highlight mark color.
      * @returns Hex color used for selected marks.
      */
-    static get highlight(): ColorHEX {
+    public static get highlight(): ColorHEX {
         return ChartStyle._highlight;
     }
 

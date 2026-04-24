@@ -23,7 +23,9 @@ import { reduceBuckets } from '../kernel';
  * ready for bar-chart rendering.
  */
 export type ExecutedBinning1dTransform = {
+    /** Preset discriminator identifying the executed transform. */
     preset: 'binning-1d';
+    /** Binned rows ready for downstream chart rendering. */
     rows: Binning1dBinRow[];
 };
 

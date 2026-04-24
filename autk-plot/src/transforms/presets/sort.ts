@@ -20,7 +20,9 @@ import type { SortTransformConfig } from '../../api';
  * for downstream selection linking.
  */
 export type ExecutedSortTransform = {
+    /** Preset discriminator identifying the executed transform. */
     preset: 'sort';
+    /** Sorted rows preserving their original `autkIds` provenance. */
     rows: AutkDatum[];
 };
 
@@ -31,9 +33,10 @@ export type ExecutedSortTransform = {
  *
  * Sorts the input rows by the specified column and direction (asc/desc).
  *
- * @param rows Input data rows (AutkDatum[])
- * @param config Sort transform configuration
- * @returns Executed sort transform result
+ * @param rows Input data rows.
+ * @param config Sort transform configuration.
+ * @param columns Ordered source columns used when no explicit sort column is configured.
+ * @returns Executed sort transform result.
  */
 export function runSort(rows: AutkDatum[], config: SortTransformConfig, columns: string[]): ExecutedSortTransform {
     const column = config.options?.column ?? columns[0] ?? '';

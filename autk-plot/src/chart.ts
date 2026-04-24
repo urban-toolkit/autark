@@ -4,7 +4,7 @@ import type { EventEmitter } from './types-core';
 
 import type { ChartEventRecord } from './types-events';
 
-import { ChartBase } from './chart-base';
+import { ChartBaseInteractive } from './chart-base-interactive';
 
 
 import {
@@ -39,7 +39,9 @@ import {
  * });
  */
 export class AutkChart {
-    private _plot: ChartBase;
+    /** Concrete chart implementation selected from the discriminated config. */
+    private _plot: ChartBaseInteractive;
+    /** Active chart type handled by this wrapper instance. */
     private _type: ChartType;
 
     /**
@@ -73,7 +75,7 @@ export class AutkChart {
      *
      * @returns Internal chart implementation instance.
      */
-    get instance(): ChartBase {
+    get instance(): ChartBaseInteractive {
         return this._plot;
     }
 
@@ -136,7 +138,7 @@ export class AutkChart {
      * @returns Concrete chart instance matching `config.type`.
      * @throws If `config.type` is not supported.
      */
-    private createPlot(div: HTMLElement, config: UnifiedChartConfig): ChartBase {
+    private createPlot(div: HTMLElement, config: UnifiedChartConfig): ChartBaseInteractive {
         switch (config.type) {
             case 'scatterplot': {
                 const { type, ...chartConfig } = config;

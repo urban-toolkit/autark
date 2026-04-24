@@ -25,8 +25,16 @@ export enum ChartEvent {
     BRUSH_X = 'brushX'
 }
 
-/** Payload emitted by all chart interaction events. */
+/**
+ * Payload emitted by all chart interaction events.
+ *
+ * Reuses the shared `SelectionData` shape from `autk-core`.
+ */
 export type ChartEventData = SelectionData;
 
-/** Event map consumed by the typed chart event emitter. */
+/**
+ * Event map consumed by the typed chart event emitter.
+ *
+ * Each chart interaction event resolves to a `ChartEventData` payload.
+ */
 export type ChartEventRecord = Record<ChartEvent, ChartEventData>;

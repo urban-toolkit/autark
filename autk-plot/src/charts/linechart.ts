@@ -38,7 +38,7 @@ import * as d3 from 'd3';
 
 import type { ChartConfig } from '../api';
 
-import { ChartBase } from '../chart-base';
+import { ChartBaseInteractive } from '../chart-base-interactive';
 import { ChartStyle } from '../chart-style';
 
 import type { ExecutedChartTransform } from '../transforms';
@@ -49,10 +49,12 @@ import type { ExecutedChartTransform } from '../transforms';
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
  */
-export class Linechart extends ChartBase {
+export class Linechart extends ChartBaseInteractive {
     /**
      * Creates a line chart instance and renders the initial state.
+     *
      * @param config Linechart configuration.
+     * @throws If no transform is configured or if the preset is unsupported.
      */
     constructor(config: ChartConfig) {
         if (config.events === undefined) { config.events = []; }
@@ -77,8 +79,14 @@ export class Linechart extends ChartBase {
         this.draw();
     }
 
-    protected resolveTransformResult(result: ExecutedChartTransform) {
-        const resolved = this._transformHandler.resolveTransformResult(result);
+    /**
+     * Normalizes temporal transform output into the rendered line-series schema.
+     *
+     * @param result Executed transform payload from the shared dispatcher.
+     * @returns Render rows shaped as `{ x, label, y, autkIds }` for line rendering.
+     */
+    protected override resolveTransformResult(result: ExecutedChartTransform) {
+        const resolved = super.resolveTransformResult(result);
         if (result.preset !== 'binning-events' && result.preset !== 'reduce-series') {
             return resolved;
         }
@@ -102,6 +110,8 @@ export class Linechart extends ChartBase {
      * Renders the line chart, including axes, line path, dot marks, and empty state message.
      *
      * Synchronizes the SVG DOM with the current series data and attaches interaction listeners.
+     *
+     * @throws If the root SVG element cannot be created.
      */
     public render(): void {
         const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[] }>;
@@ -271,6 +281,15 @@ export class Linechart extends ChartBase {
         this.configureSignalListeners();
     }
 
+    /**
+     * Formats a bucket label for axis rendering.
+     *
+     * Numeric buckets are formatted using the configured x-axis tick format;
+     * all other labels are returned unchanged.
+     *
+     * @param bucket Raw bucket label from the transform result.
+     * @returns Display label used on the x axis.
+     */
     private formatBucketLabel(bucket: string): string {
         const numericBucket = Number(bucket);
         if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
@@ -279,6 +298,13 @@ export class Linechart extends ChartBase {
         return bucket;
     }
 
+    /**
+     * Compares two bucket labels for stable temporal/numeric/string ordering.
+     *
+     * @param a First bucket label.
+     * @param b Second bucket label.
+     * @returns Negative when `a < b`, positive when `a > b`, or zero when equal.
+     */
     private compareBuckets(a: string, b: string): number {
         const dateA = new Date(a);
         const dateB = new Date(b);
