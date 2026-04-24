@@ -8,11 +8,11 @@ export { ColorMapInterpolator } from './types-colormap';
 export { ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './colormap';
 
 export type {
-    /** Resolved (computed) domain: `number[]` for numeric scales, `string[]` for categorical. */
+    /** Resolved (computed) domain values for numeric or categorical scales. */
     ResolvedDomain,
-    /** Input specification describing how to build a domain (USER / MIN_MAX / PERCENTILE). */
+    /** Input specification describing how the colormap domain is derived. */
     ColorMapDomainSpec,
-    /** Full colormap configuration: interpolator + domain spec. */
+    /** Full colormap configuration combining interpolator and domain strategy. */
     ColorMapConfig,
 } from './types-colormap';
 
@@ -21,65 +21,98 @@ export type {
 export type {
     /** Hex color string, e.g. `#ff5733`. */
     ColorHEX,
-    /** RGBA color with components in `[0–255]` and alpha in `[0–1]`. */
+    /** RGBA color with byte components and normalized alpha. */
     ColorRGB,
-    /** Flat RGBA texture array: `[r, g, b, a, r, g, b, a, …]`. */
+    /** Flat RGBA texture array suitable for upload to GPU-backed textures. */
     ColorTEX,
 } from './types-colormap';
 
 // ─── Raster / transfer function ──────────────────────────────────────────────
 
 export {
+    /** Default transfer-function configuration for scalar-to-opacity mapping. */
     DEFAULT_TRANSFER_FUNCTION,
+    /** Precomputes min/max and opacity parameters for efficient alpha evaluation. */
     buildTransferContext,
+    /** Maps a scalar value to an 8-bit alpha channel using a transfer context. */
     computeAlphaByte,
 } from './transfer-function';
 
 export type {
+    /** Transfer-function options controlling how scalar values map to opacity. */
     TransferFunction,
+    /** Derived transfer-function state used during per-value alpha evaluation. */
     TransferContext,
+    /** Fully resolved transfer-function config with defaults applied. */
     RequiredTransferFunction,
 } from './transfer-function';
 
 // ─── Geometry / mesh ─────────────────────────────────────────────────────────
 
 export type {
+    /** Mesh geometry buffers for a rendered layer fragment. */
     LayerGeometry,
+    /** Aggregate counts describing one triangulated layer component. */
     LayerComponent,
+    /** Border geometry buffers for stroked or outlined layers. */
     LayerBorder,
+    /** Aggregate counts describing one triangulated border component. */
     LayerBorderComponent,
 } from './types-mesh';
 
 // ─── Triangulators ───────────────────────────────────────────────────────────
 
+/** Triangulates point features into renderable marker geometry. */
 export { TriangulatorPoints }    from './triangulator-points';
+/** Triangulates polyline features into stroked mesh geometry. */
 export { TriangulatorPolylines } from './triangulator-polylines';
+/** Triangulates polygon features into filled mesh geometry. */
 export { TriangulatorPolygons }  from './triangulator-polygons';
+/** Triangulates OSM-style building features into extruded 3D meshes. */
 export { TriangulatorBuildings } from './triangulator-buildings';
+/** Triangulates simplified building shells and emits procedural window layouts. */
 export { TriangulatorBuildingWithWindows } from './triangulator-windows';
+
 export type {
+    /** Describes one generated procedural window instance on a building facade. */
     BuildingWindowLayoutEntry,
+    /** Generated window point collection plus detailed per-window layout metadata. */
     BuildingWindowLayoutResult,
 } from './triangulator-windows';
+/** Triangulates raster cells into renderable grid geometry. */
 export { TriangulatorRaster }    from './triangulator-raster';
 
 // ─── Camera ──────────────────────────────────────────────────────────────────
 
+/** Interactive 3-DOF map camera with view and projection matrix management. */
 export { Camera } from './camera';
-export type { CameraData, ViewProjectionParams } from './camera';
-export { CameraAnimator } from './camera-animator';
+export type {
+    /** Initial camera position and orientation parameters. */
+    CameraData,
+    /** One-shot parameters for constructing a view-projection matrix. */
+    ViewProjectionParams,
+} from './camera';
+
+/** Sequential camera motion builder for smooth view transitions. */
+export { CameraMotion } from './camera-motion';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
+/** Lightweight typed event emitter used across interaction and rendering layers. */
 export { EventEmitter } from './event-emitter';
-export type { EventListener, SelectionData } from './event-emitter';
+export type {
+    /** Listener callback invoked with a typed event payload. */
+    EventListener,
+    /** Shared selection payload used across interaction events. */
+    SelectionData,
+} from './event-emitter';
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
 export type {
     /** Geographic bounding box with named coordinate fields. */
     BoundingBox,
-    /** Layer geometry kind identifier. */
+    /** Shared layer geometry kind identifier used across rendering modules. */
     LayerType,
 } from './types-layer';
 
@@ -88,7 +121,7 @@ export type {
     TypedArray,
     /** Constructors for supported TypedArray views. */
     TypedArrayConstructor,
-} from './types-utils';
+} from './types-buffer';
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
@@ -97,14 +130,14 @@ export { valueAtPath } from './utils-data';
 /** Returns `true` if the value can be coerced to a finite number. */
 export { isNumericLike } from './utils-data';
 /** Computes the central origin of a GeoJSON FeatureCollection. */
-export { computeOrigin } from './utils-geo';
+export { computeOrigin } from './utils-geojson';
 /** Computes a geometry-aware centroid for a GeoJSON geometry. */
-export { computeGeometryCentroid } from './utils-geo';
+export { computeGeometryCentroid } from './utils-geojson';
 /** Computes the bounding box of a GeoJSON collection or geometry. */
-export { computeBoundingBox } from './utils-geo';
+export { computeBoundingBox } from './utils-geojson';
 /** Returns true when a string matches a shared layer type. */
-export { isLayerType } from './utils-geo';
+export { isLayerType } from './utils-layer';
 /** Maps a GeoJSON geometry type to the shared layer taxonomy. */
-export { mapGeometryTypeToLayerType } from './utils-geo';
+export { mapGeometryTypeToLayerType } from './utils-layer';
 /** Builds a closed planar offset polygon from a local-space polyline. */
-export { offsetPolyline } from './utils-geo';
+export { offsetPolyline } from './utils-geometry';

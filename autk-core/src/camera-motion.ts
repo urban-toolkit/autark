@@ -1,50 +1,65 @@
 /**
- * @module CameraAnimator
+ * @module CameraMotion
  * Provides a fluent API for creating sequential, animated camera movements.
  * Supports zoom, pitch, and yaw operations that orbit around a calculated scene center.
  */
 import { Camera } from './camera';
 
+/** Supported motion step kinds in a camera motion sequence. */
 type StepType = 'zoom' | 'pitch' | 'yaw' | 'roll';
 
+/** One queued camera motion step with its timing and parameters. */
 interface CameraStep {
+    /** Motion operation to perform. */
     type: StepType;
     /** radians for pitch/yaw/roll; zoom factor for zoom (positive = out, negative = in) */
     amount: number;
+    /** Duration of the step in milliseconds. */
     durationMs: number;
     /** pitch only: world-unit forward translation applied simultaneously with the orbit */
     pan?: number;
 }
 
+/** Snapshot of camera basis vectors and world-space position reconstructed from the view matrix. */
 interface CameraState {
+    /** Camera eye position in world space. */
     eye:     [number, number, number];
+    /** Camera right basis vector in world space. */
     right:   [number, number, number];
+    /** Camera forward basis vector in world space. */
     forward: [number, number, number];
+    /** Camera up basis vector in world space. */
     up:      [number, number, number];
+    /** Camera look-at target reconstructed from eye and forward. */
     lookAt:  [number, number, number];
 }
 
 /**
  * Fluent builder for sequential camera animations.
  *
- * Each method enqueues a step; call {@link CameraAnimator.play} to execute
+ * Each method enqueues a step; call {@link CameraMotion.play} to execute
  * them in order. All operations orbit around the scene center (the point where
  * the camera's forward ray intersects the ground plane at z = 0), and use
  * ease-in-out interpolation for smooth acceleration and deceleration.
  *
  * @example
- * await new CameraAnimator()
+ * await new CameraMotion()
  *     .zoomOut(4, 2.5)        // 4× zoom out over 2.5 s
  *     .pitch(-45, 2.5, 2000)  // tilt 45° over 2.5 s, pan 2000 units forward
  *     .zoomIn(1.5, 2)         // 1.5× zoom in over 2 s
  *     .play(map.camera);
  */
-export class CameraAnimator {
+export class CameraMotion {
+    /** Queued motion steps executed sequentially by {@link CameraMotion.play}. */
     private steps: CameraStep[] = [];
 
     /**
      * Zoom out by `factor` (multiplicative distance increase) over `durationSec` seconds.
      * E.g. `zoomOut(2, 5)` doubles the camera distance from the scene center.
+     *
+     * @param factor - Multiplicative zoom-out factor.
+     * @param durationSec - Animation duration in seconds.
+     * @returns The motion builder for fluent chaining.
      */
     zoomOut(factor: number, durationSec: number): this {
         this.steps.push({ type: 'zoom', amount: Math.abs(factor), durationMs: durationSec * 1000 });
@@ -54,6 +69,10 @@ export class CameraAnimator {
     /**
      * Zoom in by `factor` (multiplicative distance decrease) over `durationSec` seconds.
      * E.g. `zoomIn(2, 5)` halves the camera distance from the scene center.
+     *
+     * @param factor - Multiplicative zoom-in factor.
+     * @param durationSec - Animation duration in seconds.
+     * @returns The motion builder for fluent chaining.
      */
     zoomIn(factor: number, durationSec: number): this {
         this.steps.push({ type: 'zoom', amount: -Math.abs(factor), durationMs: durationSec * 1000 });
@@ -64,6 +83,11 @@ export class CameraAnimator {
      * Pitch the camera by `degrees` over `durationSec` seconds, orbiting around the scene center.
      * Optional `pan` (world units) translates the orbit center forward simultaneously,
      * keeping the map data centered as the view tilts.
+     *
+     * @param degrees - Pitch angle in degrees.
+     * @param durationSec - Animation duration in seconds.
+     * @param pan - Optional forward translation of the orbit center in world units.
+     * @returns The motion builder for fluent chaining.
      */
     pitch(degrees: number, durationSec: number, pan: number = 0): this {
         this.steps.push({ type: 'pitch', amount: degrees * (Math.PI / 180), durationMs: durationSec * 1000, pan });
@@ -73,6 +97,10 @@ export class CameraAnimator {
     /**
      * Yaw the camera around the world Z-axis by `degrees` over `durationSec` seconds,
      * orbiting around the scene center.
+     *
+     * @param degrees - Yaw angle in degrees.
+     * @param durationSec - Animation duration in seconds.
+     * @returns The motion builder for fluent chaining.
      */
     yaw(degrees: number, durationSec: number): this {
         this.steps.push({ type: 'yaw', amount: degrees * (Math.PI / 180), durationMs: durationSec * 1000 });
@@ -81,13 +109,22 @@ export class CameraAnimator {
 
     /**
      * Roll (bank) the camera around its forward axis by `degrees` over `durationSec` seconds.
+     *
+     * @param degrees - Roll angle in degrees.
+     * @param durationSec - Animation duration in seconds.
+     * @returns The motion builder for fluent chaining.
      */
     roll(degrees: number, durationSec: number): this {
         this.steps.push({ type: 'roll', amount: degrees * (Math.PI / 180), durationMs: durationSec * 1000 });
         return this;
     }
 
-    /** Execute all enqueued steps sequentially. Resolves when the last step completes. */
+    /**
+     * Executes all queued motion steps sequentially.
+     *
+     * @param camera - Camera instance to animate.
+     * @returns Promise that resolves when the final step completes.
+     */
     play(camera: Camera): Promise<void> {
         return this.steps.reduce(
             (promise, step) => promise.then(() => this.runStep(camera, step)),
@@ -95,6 +132,12 @@ export class CameraAnimator {
         );
     }
 
+    /**
+     * Applies symmetric ease-in-out interpolation to normalized progress.
+     *
+     * @param t - Normalized progress in `[0, 1]`.
+     * @returns Eased progress value.
+     */
     private easeInOut(t: number): number {
         return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     }
@@ -110,6 +153,9 @@ export class CameraAnimator {
      *
      * lookAt is reconstructed as eye + forward * 1 (the camera always maintains
      * a distance-1 look-at after any zoom/translate/yaw/pitch call).
+     *
+     * @param camera - Camera whose current view matrix should be decoded.
+     * @returns World-space camera basis vectors and position derived from the matrix.
      */
     private stateFromViewMatrix(camera: Camera): CameraState {
         const m = camera.getModelViewMatrix();
@@ -131,6 +177,11 @@ export class CameraAnimator {
 
     /**
      * Rotates vector `v` around unit `axis` by `angle` radians (Rodrigues' formula).
+     *
+     * @param v - Vector to rotate.
+     * @param axis - Unit rotation axis.
+     * @param angle - Rotation angle in radians.
+     * @returns Rotated vector.
      */
     private rotateAround(
         v:     [number, number, number],
@@ -150,6 +201,13 @@ export class CameraAnimator {
         ];
     }
 
+    /**
+     * Runs one queued motion step against the camera.
+     *
+     * @param camera - Camera instance to animate.
+     * @param step - Motion step to execute.
+     * @returns Promise that resolves when the step finishes.
+     */
     private runStep(camera: Camera, step: CameraStep): Promise<void> {
         return new Promise((resolve) => {
             const startTime = performance.now();

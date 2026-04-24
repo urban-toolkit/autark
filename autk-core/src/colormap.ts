@@ -19,16 +19,20 @@ import {
     ColorTEX,
 } from './types-colormap';
 
-import type { TypedArray } from './types-utils';
+import type { TypedArray } from './types-buffer';
 
 // Internal shape aliases kept private to this module
+/** Two-point numeric domain used by sequential color interpolators. */
 type SequentialDomain = [number, number];
+/** Three-point numeric domain used by diverging color interpolators. */
 type DivergingDomain = [number, number, number];
+/** Ordered set of category labels used by categorical color schemes. */
 type CategoricalDomain = string[];
 
 /** Default number of texels used to sample continuous colormaps. */
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
 
+/** Interpolators backed by discrete categorical color schemes. */
 const CATEGORICAL_INTERPOLATORS = new Set<ColorMapInterpolator>([
     ColorMapInterpolator.CAT_ACCENT,
     ColorMapInterpolator.CAT_DARK2,
@@ -43,6 +47,7 @@ const CATEGORICAL_INTERPOLATORS = new Set<ColorMapInterpolator>([
     ColorMapInterpolator.CAT_TABLEAU10,
 ]);
 
+/** Interpolators backed by diverging continuous color scales. */
 const DIVERGING_INTERPOLATORS = new Set<ColorMapInterpolator>([
     ColorMapInterpolator.DIV_BR_BG,
     ColorMapInterpolator.DIV_PR_GN,
@@ -55,13 +60,33 @@ const DIVERGING_INTERPOLATORS = new Set<ColorMapInterpolator>([
     ColorMapInterpolator.DIV_SPECTRAL,
 ]);
 
+/**
+ * Color utility for sampling interpolators, resolving domains, and formatting
+ * values for legends and GPU color textures.
+ */
 export class ColorMap {
+    /**
+     * Samples a color interpolator at a normalized value.
+     *
+     * @param value - Normalized sample position within the interpolator domain.
+     * @param color - Interpolator identifier to sample.
+     * @param domain - Optional explicit domain used when building the interpolator.
+     * @returns Sampled color in RGBA object form.
+     */
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const { r, g, b } = d3_color.rgb(interpolator(value));
         return { r, g, b, alpha: 1 };
     }
 
+    /**
+     * Builds a flat RGBA texture array sampled from a color interpolator.
+     *
+     * @param color - Interpolator identifier to sample.
+     * @param res - Number of texels to generate.
+     * @param domain - Optional explicit domain used when building the interpolator.
+     * @returns Flat RGBA texture values suitable for GPU upload.
+     */
     public static getColorMap(
         color: ColorMapInterpolator,
         res: number = DEFAULT_COLORMAP_RESOLUTION,
@@ -82,6 +107,14 @@ export class ColorMap {
         return tex;
     }
 
+    /**
+     * Builds an array of sampled RGBA color objects from a color interpolator.
+     *
+     * @param color - Interpolator identifier to sample.
+     * @param res - Number of samples to generate.
+     * @param domain - Optional explicit domain used when building the interpolator.
+     * @returns Array of sampled RGBA color objects.
+     */
     public static getColorArray(
         color: ColorMapInterpolator,
         res: number = DEFAULT_COLORMAP_RESOLUTION,
@@ -102,16 +135,34 @@ export class ColorMap {
         return result;
     }
 
+    /**
+     * Converts an RGBA color object into a hex color string.
+     *
+     * @param color - RGB color to convert.
+     * @returns Hexadecimal color string.
+     */
     public static rgbToHex(color: ColorRGB): ColorHEX {
         const hex = d3_color.rgb(color.r, color.g, color.b, 1).formatHex();
         return <ColorHEX>hex;
     }
 
+    /**
+     * Converts a hex color string into an RGBA color object.
+     *
+     * @param color - Hexadecimal color string to convert.
+     * @returns RGBA color object with alpha fixed to `1`.
+     */
     public static hexToRgb(color: ColorHEX): ColorRGB {
         const rgb = d3_color.rgb(color);
         return { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 1.0 };
     }
 
+    /**
+     * Computes the numeric minimum and maximum of a value array.
+     *
+     * @param values - Numeric values to inspect.
+     * @returns Two-element tuple `[min, max]`, or `[0, 0]` for empty input.
+     */
     public static computeMinMaxRange(values: number[] | TypedArray): [number, number] {
         if (values.length === 0) return [0, 0];
         let min = Infinity;
@@ -124,14 +175,32 @@ export class ColorMap {
         return [min, max];
     }
 
+    /**
+     * Returns true when an interpolator uses a discrete categorical scheme.
+     *
+     * @param interpolator - Interpolator identifier to classify.
+     * @returns `true` for categorical schemes, otherwise `false`.
+     */
     public static isCategorical(interpolator: ColorMapInterpolator): boolean {
         return CATEGORICAL_INTERPOLATORS.has(interpolator);
     }
     
+    /**
+     * Returns true when an interpolator uses a diverging continuous scale.
+     *
+     * @param interpolator - Interpolator identifier to classify.
+     * @returns `true` for diverging interpolators, otherwise `false`.
+     */
     private static isDiverging(interpolator: ColorMapInterpolator): boolean {
         return DIVERGING_INTERPOLATORS.has(interpolator);
     }
 
+    /**
+     * Returns the number of colors exposed by a categorical color scheme.
+     *
+     * @param interpolator - Interpolator identifier to inspect.
+     * @returns Scheme size for categorical interpolators, or `null` otherwise.
+     */
     public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
         if (!ColorMap.isCategorical(interpolator)) return null;
         return (d3_scheme[interpolator] as string[]).length;
@@ -140,6 +209,11 @@ export class ColorMap {
 
     /**
      * Resolves a numeric domain from data and color-map configuration.
+     *
+     * @param values - Numeric input values used to derive the domain.
+     * @param config - Color-map configuration controlling the domain strategy.
+     * @param interpolator - Interpolator used to decide sequential vs diverging behavior.
+     * @returns Resolved sequential or diverging numeric domain.
      */
     private static resolveNumericDomainFromConfig(
         values: number[] | TypedArray,
@@ -194,7 +268,13 @@ export class ColorMap {
         return [min, max];
     }
 
-    /** Resolves a categorical domain from a color-map configuration. */
+    /**
+     * Resolves a categorical domain from a color-map configuration.
+     *
+     * @param values - Input category values.
+     * @param config - Color-map configuration controlling the domain strategy.
+     * @returns Ordered categorical domain labels.
+     */
     private static resolveCategoricalDomainFromConfig(
         values: string[],
         config: ColorMapConfig,
@@ -246,6 +326,13 @@ export class ColorMap {
         }
     }
 
+    /**
+     * Builds a d3-compatible interpolator function for the requested color scheme.
+     *
+     * @param color - Interpolator identifier to build.
+     * @param domain - Optional explicit domain used to parameterize the scale.
+     * @returns Function that maps normalized scalar values to CSS color strings.
+     */
     private static buildInterpolator(
         color: ColorMapInterpolator,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
@@ -268,6 +355,13 @@ export class ColorMap {
             .domain((domain as SequentialDomain) ?? [0, 1]);
     }
 
+    /**
+     * Computes a percentile value from a numeric array.
+     *
+     * @param values - Numeric values to sample.
+     * @param p - Percentile in normalized `[0, 1]` form.
+     * @returns Interpolated percentile value.
+     */
     private static computePercentile(values: number[] | TypedArray, p: number): number {
         if (values.length === 0) return 0;
         const sorted = (ArrayBuffer.isView(values) ? new Float32Array(values) : [...values]).sort((a, b) => a - b);

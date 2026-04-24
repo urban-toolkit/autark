@@ -26,8 +26,14 @@ export interface TransferFunction {
     zeroCenter?: number;
 }
 
+/**
+ * Transfer-function configuration with all optional fields resolved to defaults.
+ */
 export type RequiredTransferFunction = Required<TransferFunction>;
 
+/**
+ * Default transfer-function configuration used when options are omitted.
+ */
 export const DEFAULT_TRANSFER_FUNCTION: RequiredTransferFunction = {
     mode: 'far-zero',
     opacityMin: 0,
@@ -40,16 +46,26 @@ export const DEFAULT_TRANSFER_FUNCTION: RequiredTransferFunction = {
  * Precomputed transfer-function context for efficient per-value alpha mapping.
  */
 export interface TransferContext {
+    /** Minimum scalar value found in the source dataset. */
     min: number;
+    /** Maximum scalar value found in the source dataset. */
     max: number;
+    /** Difference between `max` and `min`. */
     range: number;
+    /** Maximum absolute distance from `config.zeroCenter`. */
     maxAbsDistance: number;
+    /** Number of valid scalar values used to build the context. */
     validCount: number;
+    /** Fully resolved transfer-function configuration used during evaluation. */
     config: RequiredTransferFunction;
 }
 
 /**
  * Builds a transfer-function context from valid values.
+ *
+ * @param values - Valid scalar values used to derive dataset statistics.
+ * @param config - Optional transfer-function overrides applied on top of defaults.
+ * @returns Precomputed transfer-function context for repeated alpha evaluation.
  */
 export function buildTransferContext(
     values: number[],
@@ -92,6 +108,10 @@ export function buildTransferContext(
 /**
  * Computes alpha as an 8-bit channel value for a scalar value.
  * `NaN` values are always transparent.
+ *
+ * @param value - Scalar value to map into an alpha byte.
+ * @param context - Precomputed transfer-function context.
+ * @returns Alpha channel value in the integer range `[0, 255]`.
  */
 export function computeAlphaByte(value: number, context: TransferContext): number {
     if (isNaN(value)) {

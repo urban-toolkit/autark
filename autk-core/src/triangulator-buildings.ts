@@ -1,17 +1,42 @@
-import { FeatureCollection, Feature, LineString, MultiLineString, MultiPolygon, Polygon, GeometryCollection, GeoJsonProperties } from "geojson";
-
-import { LayerComponent, LayerGeometry } from "./types-mesh";
-import { buildBuildingPartMesh, MeshData } from "./triangulator-roofs";
-
-type Vec2 = [number, number];
-
 /**
  * Converts OSM building GeometryCollections into extruded 3-D mesh geometry for WebGPU rendering.
  * Each feature contains a GeometryCollection of part polygons with `height`, `levels`, or `min_height` properties.
  * Delegates roof geometry to `triangulator-roofs`.
  * @module triangulator-buildings
  */
+
+import { 
+    FeatureCollection,
+    Feature, 
+    LineString, 
+    MultiLineString, 
+    MultiPolygon, 
+    Polygon, 
+    GeometryCollection, 
+    GeoJsonProperties 
+} from "geojson";
+
+import { LayerComponent, LayerGeometry } from "./types-mesh";
+
+import { buildBuildingPartMesh, MeshData } from "./triangulator-roofs";
+
+/**
+ * Triangulator for extruded building geometry based on OSM-style building features. Each building feature is expected 
+ * to contain a `GeometryCollection` of part geometries plus aligned part metadata in `feature.properties.parts`.
+ * Building heights are derived from OSM tags like `height`, `levels`, and `min_height`.
+ * The resulting mesh includes wall geometry; roof geometry is delegated to `triangulator-roofs`.
+ */
 export class TriangulatorBuildings {
+    /**
+     * Builds extruded building geometry for an OSM-style building collection.
+     *
+     * Each feature is expected to contain a `GeometryCollection` of building
+     * part geometries plus aligned part metadata in `feature.properties.parts`.
+     *
+     * @param geojson - Source building feature collection.
+     * @param origin - World-space origin used to convert coordinates into local XY space.
+     * @returns A tuple containing building geometry chunks and their per-feature component metadata.
+     */
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];
@@ -41,24 +66,24 @@ export class TriangulatorBuildings {
 
                 if (partGeom.type === 'LineString') {
                     const { coordinates } = <LineString>partFeature.geometry;
-                    const ring: Vec2[] = coordinates.map(c => TriangulatorBuildings.toLocal(c, origin));
+                    const ring: [number, number][] = coordinates.map(c => TriangulatorBuildings.toLocal(c, origin));
                     chunks = buildBuildingPartMesh([ring], heightInfo[0], heightInfo[1], partFeature.properties);
                 } else if (partGeom.type === 'MultiLineString') {
                     const { coordinates } = <MultiLineString>partFeature.geometry;
                     for (const lineString of coordinates) {
-                        const ring: Vec2[] = lineString.map(c => TriangulatorBuildings.toLocal(c, origin));
+                        const ring: [number, number][] = lineString.map(c => TriangulatorBuildings.toLocal(c, origin));
                         chunks.push(...buildBuildingPartMesh([ring], heightInfo[0], heightInfo[1], partFeature.properties));
                     }
                 } else if (partGeom.type === 'Polygon') {
                     const { coordinates } = <Polygon>partFeature.geometry;
-                    const rings: Vec2[][] = coordinates.map(ring =>
+                    const rings: [number, number][][] = coordinates.map(ring =>
                         ring.map(c => TriangulatorBuildings.toLocal(c, origin))
                     );
                     chunks = buildBuildingPartMesh(rings, heightInfo[0], heightInfo[1], partFeature.properties);
                 } else if (partGeom.type === 'MultiPolygon') {
                     const { coordinates } = <MultiPolygon>partFeature.geometry;
                     for (const polygon of coordinates) {
-                        const rings: Vec2[][] = polygon.map(ring =>
+                        const rings: [number, number][][] = polygon.map(ring =>
                             ring.map(c => TriangulatorBuildings.toLocal(c, origin))
                         );
                         chunks.push(...buildBuildingPartMesh(rings, heightInfo[0], heightInfo[1], partFeature.properties));
@@ -85,6 +110,16 @@ export class TriangulatorBuildings {
         return [mesh, comps];
     }
 
+    /**
+     * Resolves wall base and top heights from OSM-style building properties.
+     *
+     * Height tags take precedence over level-count tags. Invalid or degenerate
+     * height combinations return an empty array.
+     *
+     * @param props - Building-part properties to inspect.
+     * @returns A two-element array `[minHeight, height]`, or an empty array when
+     * no valid height range can be derived.
+     */
     private static computeBuildingHeights(props: GeoJsonProperties): number[] {
         const FLOOR_HEIGHT = 3.4;
 
@@ -106,7 +141,14 @@ export class TriangulatorBuildings {
         return [min_height, height];
     }
 
-    private static toLocal(coord: number[], origin: number[]): Vec2 {
+    /**
+     * Converts a world-space coordinate into local planar coordinates.
+     *
+     * @param coord - World-space coordinate with at least XY components.
+     * @param origin - World-space origin used as the local offset basis.
+     * @returns Local planar coordinate `[x, y]` relative to `origin`.
+     */
+    private static toLocal(coord: number[], origin: number[]): [number, number] {
         return [coord[0] - origin[0], coord[1] - origin[1]];
     }
 }

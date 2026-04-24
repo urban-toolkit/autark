@@ -1,13 +1,30 @@
-import { FeatureCollection, Geometry } from 'geojson';
-
-import { LayerGeometry, LayerComponent } from './types-mesh';
-
 /**
  * Converts a GeoTIFF FeatureCollection (with bounding box) into a 2-triangle quad mesh.
  * UV coordinates map directly to the raster's normalized [0,1]² texture space for GPU sampling.
  * @module triangulator-raster
  */
+
+import { FeatureCollection, Geometry } from 'geojson';
+
+import { LayerGeometry, LayerComponent } from './types-mesh';
+
+/**
+ * Triangulator for raster data represented as GeoTIFF features. Generates a single quad mesh
+ * covering the raster's bounding box, with UV coordinates for texture mapping. This allows
+ * the raster to be rendered as a textured surface in 3D space, with the texture sampled
+ * from the original GeoTIFF data.
+ */
 export class TriangulatorRaster {
+    /**
+     * Builds a single textured quad covering the raster bounding box.
+     *
+     * The raster is represented as one rectangle in local XY space, with UV
+     * coordinates spanning the normalized texture domain used for GPU sampling.
+     *
+     * @param geotiff - Raster feature collection whose `bbox` defines the quad extent.
+     * @param origin - World-space origin used to convert raster corners into local coordinates.
+     * @returns A tuple containing the raster quad geometry and its component metadata.
+     */
     static buildMesh(geotiff: FeatureCollection<Geometry | null>, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];

@@ -1,7 +1,7 @@
 // Common interface for all examples
 import { AutkSpatialDb } from 'autk-db';
 import { AutkMap, LayerType, MapStyle } from 'autk-map';
-import { CameraAnimator, ColorMapDomainStrategy, ColorMapInterpolator } from 'autk-core';
+import { CameraMotion, ColorMapDomainStrategy, ColorMapInterpolator } from 'autk-core';
 import { ComputeGpgpu } from 'autk-compute';
 import { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
@@ -28,7 +28,7 @@ class CameraAnimationVis {
 
         this.map.draw();
 
-        await new CameraAnimator()
+        await new CameraMotion()
             .zoomOut(4, 2.5)
             .pitch(-45, 2.5, 2000)
             .zoomIn(1.5, 2)
@@ -74,7 +74,7 @@ class OsmLayersApi {
 
         this.map.draw();
 
-        await new CameraAnimator()
+        await new CameraMotion()
             .zoomIn(2.5, 2.5)
             .pitch(-45, 2.5, 300)
             .yaw(-10, 2)
@@ -153,7 +153,7 @@ class SpatialJoinNear {
 
         this.map.draw();
 
-        await new CameraAnimator()
+        await new CameraMotion()
             .zoomIn(2.5, 2.5)
             .pitch(-45, 2.5, 300)
             .yaw(-10, 2)
@@ -237,7 +237,7 @@ class Heatmap {
 
         this.map.draw();
 
-        await new CameraAnimator()
+        await new CameraMotion()
             .zoomOut(3.5, 2.5)
             .pitch(-45, 2.5, 2000)
             .yaw(-10, 2)
@@ -314,7 +314,7 @@ class ComputeFunction {
 
         this.map.draw();
 
-        await new CameraAnimator()
+        await new CameraMotion()
             .zoomOut(3.5, 2.5)
             .pitch(-45, 2.5, 2000)
             .yaw(-10, 2)

@@ -7,18 +7,36 @@
  */
 
 import earcut from "earcut";
+
 import { GeoJsonProperties } from "geojson";
+
+import { 
+    computeRingArea, 
+    isConvex, 
+    normalizeRing, 
+    polygonPerimeter 
+} from './utils-geometry';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Local 2D point representation used by roof geometry helpers. */
 type Vec2 = [number, number];
 
+/**
+ * Flat mesh buffers produced by roof and wall triangulation helpers.
+ */
 export interface MeshData {
+    /** Flat vertex position buffer packed as consecutive XYZ triples. */
     flatCoords: number[];
+    /** Triangle index buffer referencing vertices in `flatCoords`. */
     flatIds: number[];
 }
 
+/**
+ * Parsed OSM roof attributes used to select and parameterize roof generation.
+ */
 export interface RoofInfo {
+    /** Roof shape identifier derived from `roof:shape`. */
     shape: string;
     /** Explicit roof height above wall top (0 = derive from angle/geometry). */
     height: number;
@@ -30,71 +48,27 @@ export interface RoofInfo {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+/** Default roof pitch angle used when no explicit OSM roof angle is provided. */
 const DEFAULT_ROOF_ANGLE = 30;
+/** Merge tolerance used when collapsing nearly coincident skeleton vertices. */
 const MERGE_EPS = 0.05; // 5 cm to aggressively merge coincident vertices
+/** Maximum allowed straight-skeleton bisector speed before treating the solve as unstable. */
 const MAX_BISECTOR_SPEED = 10.0;
 
 // ─── Polygon helpers ──────────────────────────────────────────────────────────
 
-/** Remove the closing vertex if present (GeoJSON rings are closed). */
-function openRing(ring: Vec2[]): Vec2[] {
-    const n = ring.length;
-    if (n > 2) {
-        const [x0, y0] = ring[0];
-        const [xN, yN] = ring[n - 1];
-        if (Math.abs(x0 - xN) < 1e-9 && Math.abs(y0 - yN) < 1e-9) return ring.slice(0, n - 1);
-    }
-    return ring;
-}
-
-/** Signed area (positive = CCW in standard y-up math coords). */
-function signedArea(ring: Vec2[]): number {
-    let a = 0;
-    const n = ring.length;
-    for (let i = 0; i < n; i++) {
-        const j = (i + 1) % n;
-        a += ring[i][0] * ring[j][1] - ring[j][0] * ring[i][1];
-    }
-    return a / 2;
-}
-
-function polygonPerimeter(ring: Vec2[]): number {
-    let p = 0;
-    const n = ring.length;
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-        const dx = ring[i][0] - ring[j][0];
-        const dy = ring[i][1] - ring[j][1];
-        p += Math.sqrt(dx * dx + dy * dy);
-    }
-    return p;
-}
-
 /**
- * Returns true if the ring is convex (all cross products have the same sign).
- * Assumes the ring is already open (no duplicate closing vertex).
+ * Estimates roof height from a polygon footprint and a pitch angle.
+ *
+ * Uses the polygon inradius approximation `2A / P` and converts the supplied
+ * pitch angle into a vertical rise.
+ *
+ * @param ring - Open roof footprint ring in local planar coordinates.
+ * @param angleDeg - Roof pitch angle in degrees.
+ * @returns Estimated roof height above the wall top.
  */
-function isConvex(ring: Vec2[]): boolean {
-    const n = ring.length;
-    let sign = 0;
-    for (let i = 0; i < n; i++) {
-        const prev = (i + n - 1) % n;
-        const next = (i + 1) % n;
-        const e1x = ring[i][0] - ring[prev][0];
-        const e1y = ring[i][1] - ring[prev][1];
-        const e2x = ring[next][0] - ring[i][0];
-        const e2y = ring[next][1] - ring[i][1];
-        const cross = e1x * e2y - e1y * e2x;
-        if (Math.abs(cross) < 1e-10) continue;
-        const s = cross > 0 ? 1 : -1;
-        if (sign === 0) sign = s;
-        else if (s !== sign) return false;
-    }
-    return true;
-}
-
-/** Estimate roof height from the polygon's inradius and the given pitch angle. */
 function heightFromAngle(ring: Vec2[], angleDeg: number): number {
-    const area = Math.abs(signedArea(ring));
+    const area = Math.abs(computeRingArea(ring));
     const perim = polygonPerimeter(ring);
     return perim > 1e-9 ? (2 * area / perim) * Math.tan((angleDeg * Math.PI) / 180) : 0;
 }
@@ -104,6 +78,11 @@ function heightFromAngle(ring: Vec2[], angleDeg: number): number {
 /**
  * Generate vertical quad walls for every ring in `rings` between `minH` and `maxH`.
  * `rings[0]` is the outer ring; subsequent rings are holes.
+ *
+ * @param rings - Polygon rings in local planar coordinates.
+ * @param minH - Wall base elevation.
+ * @param maxH - Wall top elevation.
+ * @returns Wall mesh buffers for all ring segments.
  */
 export function buildWalls(rings: Vec2[][], minH: number, maxH: number): MeshData {
     const flatCoords: number[] = [];
@@ -111,8 +90,8 @@ export function buildWalls(rings: Vec2[][], minH: number, maxH: number): MeshDat
 
     for (let ri = 0; ri < rings.length; ri++) {
         // Outer ring must be CCW (outward normals); inner rings (holes) must be CW.
-        let open = openRing(rings[ri]);
-        const area = signedArea(open);
+        let open = normalizeRing(rings[ri]) as Vec2[];
+        const area = computeRingArea(open);
         if (ri === 0 && area < 0) open = [...open].reverse();
         if (ri > 0 && area > 0) open = [...open].reverse();
         const n = open.length;
@@ -138,16 +117,22 @@ export function buildWalls(rings: Vec2[][], minH: number, maxH: number): MeshDat
 
 // ─── Flat roof ────────────────────────────────────────────────────────────────
 
-/** Flat triangulated cap (supports holes). */
+/**
+ * Builds a flat triangulated roof cap, including hole support.
+ *
+ * @param rings - Polygon rings in local planar coordinates.
+ * @param height - Z elevation of the flat roof plane.
+ * @returns Triangulated roof-cap mesh buffers.
+ */
 export function flatRoof(rings: Vec2[][], height: number): MeshData {
-    let outer = openRing(rings[0]);
+    let outer = normalizeRing(rings[0]) as Vec2[];
     // Enforce CCW so earcut produces outward-facing (upward) triangles.
-    if (signedArea(outer) < 0) outer = [...outer].reverse();
+    if (computeRingArea(outer) < 0) outer = [...outer].reverse();
     const allVerts: Vec2[] = [...outer];
     const holeStarts: number[] = [];
     for (let i = 1; i < rings.length; i++) {
         holeStarts.push(allVerts.length);
-        allVerts.push(...openRing(rings[i]));
+        allVerts.push(...(normalizeRing(rings[i]) as Vec2[]));
     }
     const flat2D = allVerts.flatMap(v => v);
     const triIds = earcut(flat2D, holeStarts.length > 0 ? holeStarts : undefined);
@@ -155,18 +140,24 @@ export function flatRoof(rings: Vec2[][], height: number): MeshData {
     return { flatCoords, flatIds: triIds };
 }
 
-/** Flat downward-facing triangulated floor (supports holes) for floating building parts. */
+/**
+ * Builds a flat downward-facing floor cap for floating building parts.
+ *
+ * @param rings - Polygon rings in local planar coordinates.
+ * @param height - Z elevation of the floor plane.
+ * @returns Triangulated floor-cap mesh buffers.
+ */
 export function flatFloor(rings: Vec2[][], height: number): MeshData {
-    let outer = openRing(rings[0]);
+    let outer = normalizeRing(rings[0]) as Vec2[];
     // Enforce CW so earcut produces downward-facing (-Z) triangles.
-    if (signedArea(outer) > 0) outer = [...outer].reverse();
+    if (computeRingArea(outer) > 0) outer = [...outer].reverse();
     const allVerts: Vec2[] = [...outer];
     const holeStarts: number[] = [];
     for (let i = 1; i < rings.length; i++) {
         holeStarts.push(allVerts.length);
         // Holes inside CW outer ring must be CCW to punch correctly in earcut.
-        let hole = openRing(rings[i]);
-        if (signedArea(hole) < 0) hole = [...hole].reverse();
+        let hole = normalizeRing(rings[i]) as Vec2[];
+        if (computeRingArea(hole) < 0) hole = [...hole].reverse();
         allVerts.push(...hole);
     }
     const flat2D = allVerts.flatMap(v => v);
@@ -177,11 +168,18 @@ export function flatFloor(rings: Vec2[][], height: number): MeshData {
 
 // ─── Pyramid roof ─────────────────────────────────────────────────────────────
 
-/** Fan triangulation from each edge to a central apex. */
+/**
+ * Builds a pyramid roof by fan-triangulating edges to a central apex.
+ *
+ * @param ring - Outer roof footprint ring in local planar coordinates.
+ * @param baseH - Wall top elevation.
+ * @param roofH - Additional height of the roof apex above `baseH`.
+ * @returns Triangulated pyramid-roof mesh buffers.
+ */
 export function pyramidRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
-    let open = openRing(ring);
+    let open = normalizeRing(ring) as Vec2[];
     // Enforce CCW so all face normals point outward.
-    if (signedArea(open) < 0) open = [...open].reverse();
+    if (computeRingArea(open) < 0) open = [...open].reverse();
     const n = open.length;
     const cx = open.reduce((s, v) => s + v[0], 0) / n;
     const cy = open.reduce((s, v) => s + v[1], 0) / n;
@@ -207,10 +205,17 @@ export function pyramidRoof(ring: Vec2[], baseH: number, roofH: number): MeshDat
 
 // ─── Dome roof ────────────────────────────────────────────────────────────────
 
-/** Tessellated curved dome. */
+/**
+ * Builds a tessellated curved dome roof.
+ *
+ * @param ring - Outer roof footprint ring in local planar coordinates.
+ * @param baseH - Wall top elevation.
+ * @param roofH - Additional dome height above `baseH`.
+ * @returns Tessellated dome-roof mesh buffers.
+ */
 export function domeRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
-    let open = openRing(ring);
-    if (signedArea(open) < 0) open = [...open].reverse();
+    let open = normalizeRing(ring) as Vec2[];
+    if (computeRingArea(open) < 0) open = [...open].reverse();
     const n = open.length;
     const cx = open.reduce((s, v) => s + v[0], 0) / n;
     const cy = open.reduce((s, v) => s + v[1], 0) / n;
@@ -280,11 +285,31 @@ export function domeRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
 
 // ─── Round roof ───────────────────────────────────────────────────────────────
 
+/**
+ * Subdivides each triangle in a mesh into four smaller triangles.
+ *
+ * Shared edge midpoints are cached so adjacent triangles reuse the same new
+ * vertex instead of duplicating it.
+ *
+ * @param flatCoords - Input flat XYZ coordinate buffer.
+ * @param flatIds - Input triangle index buffer.
+ * @returns Refined mesh buffers with subdivided triangles.
+ */
 function subdivideMesh(flatCoords: number[], flatIds: number[]): { flatCoords: number[], flatIds: number[] } {
     const nextCoords = [...flatCoords];
     const nextIds: number[] = [];
     const edgeCache = new Map<string, number>();
 
+    /**
+     * Returns the index of the midpoint vertex between two mesh vertices.
+     *
+     * Midpoints are cached per undirected edge so repeated requests return the
+     * same vertex index.
+     *
+     * @param i1 - First vertex index.
+     * @param i2 - Second vertex index.
+     * @returns Index of the midpoint vertex in `nextCoords`.
+     */
     function getMidpoint(i1: number, i2: number): number {
         const minI = Math.min(i1, i2);
         const maxI = Math.max(i1, i2);
@@ -320,10 +345,17 @@ function subdivideMesh(flatCoords: number[], flatIds: number[]): { flatCoords: n
     return { flatCoords: nextCoords, flatIds: nextIds };
 }
 
-/** Half-cylinder (barrel vault) roof. */
+/**
+ * Builds a half-cylinder (barrel vault) roof.
+ *
+ * @param ring - Outer roof footprint ring in local planar coordinates.
+ * @param baseH - Wall top elevation.
+ * @param roofH - Additional roof height above `baseH`.
+ * @returns Barrel-vault roof mesh buffers including skirt geometry.
+ */
 export function roundRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
-    let open = openRing(ring);
-    if (signedArea(open) < 0) open = [...open].reverse();
+    let open = normalizeRing(ring) as Vec2[];
+    if (computeRingArea(open) < 0) open = [...open].reverse();
     
     let maxLen = 0;
     let dx = 1, dy = 0;
@@ -438,10 +470,16 @@ export function roundRoof(ring: Vec2[], baseH: number, roofH: number): MeshData 
 /**
  * Single-plane sloped roof.
  * `directionDeg` is the compass bearing of the downslope direction (low end).
+ *
+ * @param ring - Outer roof footprint ring in local planar coordinates.
+ * @param baseH - Wall top elevation.
+ * @param roofH - Additional roof height above `baseH`.
+ * @param directionDeg - Compass bearing of the downslope direction.
+ * @returns Skillion-roof mesh buffers including skirt geometry.
  */
 export function skillionRoof(ring: Vec2[], baseH: number, roofH: number, directionDeg: number): MeshData {
-    let open = openRing(ring);
-    if (signedArea(open) < 0) open = [...open].reverse();
+    let open = normalizeRing(ring) as Vec2[];
+    if (computeRingArea(open) < 0) open = [...open].reverse();
     const rad = (directionDeg * Math.PI) / 180;
     const dx = Math.sin(rad);
     const dy = Math.cos(rad);
@@ -500,15 +538,25 @@ export function skillionRoof(ring: Vec2[], baseH: number, roofH: number, directi
 
 // ─── Straight skeleton (hipped / gabled) ─────────────────────────────────────
 
+/** Vertex state used during straight-skeleton simulation. */
 interface SkelVert {
+    /** Current 2D vertex position. */
     pos: Vec2;
+    /** Current propagated roof height at this vertex. */
     h: number;
+    /** Index of the source edge currently associated with the vertex. */
     edgeIdx: number;
 }
 
+/** One straight-skeleton face described as a list of 3D vertices. */
 type Face3D = [number, number, number][];
 
-/** Inward unit normals for each edge of a CCW polygon. */
+/**
+ * Computes inward unit normals for each edge of a CCW polygon.
+ *
+ * @param pts - CCW polygon vertices.
+ * @returns Inward-facing unit normal for each polygon edge.
+ */
 function inwardNormals(pts: Vec2[]): Vec2[] {
     const n = pts.length;
     return pts.map((_, i) => {
@@ -522,6 +570,11 @@ function inwardNormals(pts: Vec2[]): Vec2[] {
 
 /**
  * Bisector velocity at each vertex given edge speeds.
+ *
+ * @param sv - Current straight-skeleton vertices.
+ * @param norms - Inward unit edge normals for the current polygon state.
+ * @param speeds - Per-edge propagation speeds.
+ * @returns Velocity vector for each skeleton vertex.
  */
 function bisectorVelocities(sv: SkelVert[], norms: Vec2[], speeds: number[]): Vec2[] {
     const n = sv.length;
@@ -542,6 +595,15 @@ function bisectorVelocities(sv: SkelVert[], norms: Vec2[], speeds: number[]): Ve
     });
 }
 
+/**
+ * Estimates the time until two moving vertices collapse together.
+ *
+ * @param pi - First vertex position.
+ * @param pj - Second vertex position.
+ * @param vi - Velocity of the first vertex.
+ * @param vj - Velocity of the second vertex.
+ * @returns Estimated collapse time, or `Infinity` when no collapse occurs.
+ */
 function collapseTime(pi: Vec2, pj: Vec2, vi: Vec2, vj: Vec2): number {
     const dPx = pj[0] - pi[0];
     const dPy = pj[1] - pi[1];
@@ -558,6 +620,13 @@ function collapseTime(pi: Vec2, pj: Vec2, vi: Vec2, vj: Vec2): number {
     return t;
 }
 
+/**
+ * Removes adjacent near-duplicate vertices before skeleton processing begins.
+ *
+ * @param verts - Initial polygon vertices.
+ * @param eps - Merge tolerance.
+ * @returns Filtered vertex list with adjacent duplicates removed.
+ */
 function deduplicateVertsInitial(verts: SkelVert[], eps: number): SkelVert[] {
     const res: SkelVert[] = [];
     const n = verts.length;
@@ -572,6 +641,12 @@ function deduplicateVertsInitial(verts: SkelVert[], eps: number): SkelVert[] {
     return res;
 }
 
+/**
+ * Classifies polygon edges as gable candidates based on their orientation.
+ *
+ * @param ring - Open roof footprint ring.
+ * @returns Boolean flags indicating which edges behave as gable ends.
+ */
 function classifyGables(ring: Vec2[]): boolean[] {
     const n = ring.length;
     const edges = ring.map((p, i) => {
@@ -598,6 +673,13 @@ function classifyGables(ring: Vec2[]): boolean[] {
     });
 }
 
+/**
+ * Derives straight-skeleton edge speeds from roof-shape metadata.
+ *
+ * @param ring - Open roof footprint ring.
+ * @param info - Parsed roof configuration.
+ * @returns Per-edge propagation speeds used by the skeleton solver.
+ */
 function getEdgeSpeeds(ring: Vec2[], info: RoofInfo): number[] {
     const n = ring.length;
     const defaultSpeeds = new Array(n).fill(1.0);
@@ -628,6 +710,14 @@ function getEdgeSpeeds(ring: Vec2[], info: RoofInfo): number[] {
     return defaultSpeeds;
 }
 
+/**
+ * Builds a straight skeleton for a convex roof footprint.
+ *
+ * @param ring - Open convex roof footprint ring.
+ * @param speeds - Per-edge propagation speeds.
+ * @param maxHCap - Maximum allowed propagated skeleton height.
+ * @returns Generated skeleton faces and the maximum skeleton height reached.
+ */
 function buildStraightSkeleton(
     ring: Vec2[], 
     speeds: number[],
@@ -753,6 +843,15 @@ function buildStraightSkeleton(
     return { faces, maxH };
 }
 
+/**
+ * Converts straight-skeleton faces into final roof mesh buffers.
+ *
+ * @param faces - Skeleton faces expressed as 3D polygons.
+ * @param baseH - Wall top elevation.
+ * @param roofH - Desired roof height above `baseH`.
+ * @param maxSkH - Maximum skeleton height used for height normalization.
+ * @returns Roof mesh buffers derived from the skeleton faces.
+ */
 function skeletonToMesh(faces: Face3D[], baseH: number, roofH: number, maxSkH: number): MeshData {
     const flatCoords: number[] = [];
     const flatIds: number[] = [];
@@ -809,16 +908,23 @@ function skeletonToMesh(faces: Face3D[], baseH: number, roofH: number, maxSkH: n
  * Falls back to a flat cap when the skeleton cannot complete (concave polygon,
  * degenerate velocities, etc.). `allRings` is used for the flat fallback so that
  * courtyard holes are respected — pass `[outerRing, ...holeRings]`.
+ *
+ * @param ring - Outer roof footprint ring in local planar coordinates.
+ * @param baseH - Wall top elevation.
+ * @param roofH - Desired roof height above `baseH`.
+ * @param info - Parsed roof configuration.
+ * @param _allRings - Full polygon rings for potential fallback handling.
+ * @returns Roof mesh buffers, or `null` when the skeleton cannot be resolved.
  */
 export function skeletonRoof(ring: Vec2[], baseH: number, roofH: number, info: RoofInfo, _allRings?: Vec2[][]): MeshData | null {
-    let outer = openRing(ring);
-    if (signedArea(outer) < 0) outer = [...outer].reverse();
+    let outer = normalizeRing(ring) as Vec2[];
+    if (computeRingArea(outer) < 0) outer = [...outer].reverse();
     
     const speeds = getEdgeSpeeds(outer, info);
     
     let maxHCap = Infinity;
     if (info.shape === 'mansard') {
-        const area = Math.abs(signedArea(outer));
+        const area = Math.abs(computeRingArea(outer));
         const perim = polygonPerimeter(outer);
         const inradius = perim > 0 ? (2 * area / perim) : 0;
         maxHCap = inradius * 0.7; 
@@ -831,6 +937,12 @@ export function skeletonRoof(ring: Vec2[], baseH: number, roofH: number, info: R
 
 // ─── Property extraction ──────────────────────────────────────────────────────
 
+/**
+ * Extracts roof-generation parameters from OSM-style building properties.
+ *
+ * @param props - GeoJSON properties containing roof-related OSM tags.
+ * @returns Normalized roof configuration with defaults applied.
+ */
 export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
     if (!props) return { shape: 'flat', height: 0, angle: DEFAULT_ROOF_ANGLE, direction: 0 };
     const rawAngle = parseFloat(String(props['roof:angle'] ?? String(DEFAULT_ROOF_ANGLE))) || DEFAULT_ROOF_ANGLE;
@@ -848,11 +960,11 @@ export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
 /**
  * Build the complete mesh (walls + roof) for one building part polygon.
  *
- * @param rings    `[outerRing, ...holes]` — coordinates already relative to origin.
- * @param minH     Bottom of the walls (min_height).
- * @param maxH     Top of the walls (height).
- * @param props    OSM properties for this building part.
- * @returns        Array of `MeshData` chunks to be merged into one `LayerGeometry`.
+ * @param rings - `[outerRing, ...holes]` coordinates already relative to the origin.
+ * @param minH - Bottom of the walls (`min_height`).
+ * @param maxH - Top of the walls (`height`).
+ * @param props - OSM properties for this building part.
+ * @returns Array of mesh chunks to be merged into one `LayerGeometry`.
  */
 export function buildBuildingPartMesh(
     rings: Vec2[][],
@@ -864,17 +976,17 @@ export function buildBuildingPartMesh(
 
     let roofH = info.height;
     if (roofH <= 0 && info.shape !== 'flat') {
-        roofH = heightFromAngle(openRing(rings[0]), info.angle);
+        roofH = heightFromAngle(normalizeRing(rings[0]) as Vec2[], info.angle);
     }
 
     // Cap roof height: a 60° pitch is already very steep; anything beyond that
     // indicates a bad OSM tag (e.g. roof:height set to the building's full height).
     if (info.shape !== 'flat') {
-        const maxRoofH = heightFromAngle(openRing(rings[0]), 60);
+        const maxRoofH = heightFromAngle(normalizeRing(rings[0]) as Vec2[], 60);
         if (maxRoofH > 0 && roofH > maxRoofH) roofH = maxRoofH;
     }
 
-    const outer = openRing(rings[0]);
+    const outer = normalizeRing(rings[0]) as Vec2[];
 
     const meshes: MeshData[] = [];
     meshes.push(buildWalls(rings, minH, maxH));

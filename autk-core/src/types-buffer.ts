@@ -1,4 +1,13 @@
 /**
+ * @module BufferTypes
+ * Shared binary-buffer type aliases used across core color processing and GPU
+ * compute pipelines.
+ *
+ * These types capture the supported TypedArray instances and constructors used
+ * when reading, writing, and wrapping numeric buffer data.
+ */
+
+/**
  * Supported TypedArray views for binary data buffers.
  */
 export type TypedArray =

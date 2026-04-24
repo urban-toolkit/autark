@@ -1,15 +1,25 @@
 /**
- * @module GeoUtils
- * A collection of geometry-related utility functions for processing GeoJSON data.
- * Includes functions for calculating bounding boxes, origins, centroids,
- * and performing geometric operations like polyline offsetting.
+ * @module GeoJsonUtils
+ * GeoJSON-focused utility functions for deriving spatial metadata from feature
+ * collections and geometries.
+ * Includes helpers for bounding boxes, collection origins, and
+ * geometry-aware centroids.
  */
-import { FeatureCollection, Geometry, Position } from 'geojson';
+import { 
+    FeatureCollection, 
+    Geometry, 
+    Position 
+} from 'geojson';
 
-import type { BoundingBox, LayerType } from './types-layer';
+import type { BoundingBox } from './types-layer';
 
 /**
  * Computes the central origin of a GeoJSON FeatureCollection.
+ *
+ * @param geojson - Feature collection whose bounding box center should be used
+ * as the origin.
+ * @returns The `[longitude, latitude]` center of the collection bounding box,
+ * or `[0, 0]` when no valid coordinates are present.
  */
 export function computeOrigin(geojson: FeatureCollection): [number, number] {
     const bbox = computeBoundingBox(geojson);
@@ -22,6 +32,11 @@ export function computeOrigin(geojson: FeatureCollection): [number, number] {
 
 /**
  * Computes the bounding box of a GeoJSON feature collection or geometry.
+ *
+ * @param source - GeoJSON feature collection or geometry to inspect.
+ * Pass `null` to receive a `null` result.
+ * @returns A named geographic bounding box spanning all coordinates in the
+ * source, or `null` when the source is empty or contains no valid geometry.
  */
 export function computeBoundingBox(source: FeatureCollection | Geometry | null): BoundingBox | null {
     if (!source) {
@@ -64,6 +79,10 @@ export function computeBoundingBox(source: FeatureCollection | Geometry | null):
  * length-weighted segment midpoints, and point geometries use coordinate
  * averages. Geometry collections combine child centroids using those same
  * geometric weights.
+ *
+ * @param geometry - GeoJSON geometry whose centroid should be computed.
+ * @returns A three-component centroid tuple `[x, y, z]`, or `null` when the
+ * geometry is `null` or cannot yield a meaningful centroid.
  */
 export function computeGeometryCentroid(geometry: Geometry | null): [number, number, number] | null {
     if (!geometry) return null;
@@ -72,40 +91,13 @@ export function computeGeometryCentroid(geometry: Geometry | null): [number, num
 }
 
 /**
- * Returns true when the string matches one of the shared layer types.
+ * Visits every coordinate contained in a GeoJSON geometry.
+ *
+ * @param geom - Geometry whose coordinates should be traversed.
+ * @param expand - Callback invoked for each coordinate position encountered.
+ * @returns Nothing. The provided callback is used for side effects such as
+ * updating running bounds.
  */
-export function isLayerType(value: string): value is LayerType {
-    return value === 'surface'
-        || value === 'water'
-        || value === 'parks'
-        || value === 'roads'
-        || value === 'buildings'
-        || value === 'points'
-        || value === 'polygons'
-        || value === 'polylines'
-        || value === 'raster';
-}
-
-/**
- * Maps a GeoJSON geometry type to the toolkit layer taxonomy.
- */
-export function mapGeometryTypeToLayerType(
-    geometryType: Geometry['type'],
-): Extract<LayerType, 'points' | 'polygons' | 'polylines'> {
-    switch (geometryType) {
-        case 'Point':
-        case 'MultiPoint':
-            return 'points';
-        case 'LineString':
-        case 'MultiLineString':
-            return 'polylines';
-        case 'Polygon':
-        case 'MultiPolygon':
-        case 'GeometryCollection':
-            return 'polygons';
-    }
-}
-
 function expandGeometry(geom: Geometry, expand: (c: number[]) => void): void {
     switch (geom.type) {
         case 'Point':
@@ -138,11 +130,26 @@ function expandGeometry(geom: Geometry, expand: (c: number[]) => void): void {
     }
 }
 
+/**
+ * Internal weighted centroid used when combining centroid contributions from
+ * multiple geometries or geometry parts.
+ */
 type WeightedCentroid = {
     centroid: [number, number, number];
     weight: number;
 };
 
+/**
+ * Computes a geometry centroid together with the weight used to combine it
+ * with other centroids.
+ *
+ * Point geometries contribute unit weight, line geometries contribute total
+ * length, and polygon geometries contribute total area.
+ *
+ * @param geometry - Geometry to reduce into a weighted centroid.
+ * @returns The weighted centroid and its aggregation weight, or `null` when no
+ * meaningful centroid can be derived.
+ */
 function computeWeightedCentroid(geometry: Geometry): WeightedCentroid | null {
     switch (geometry.type) {
         case 'Point':
@@ -165,6 +172,15 @@ function computeWeightedCentroid(geometry: Geometry): WeightedCentroid | null {
     }
 }
 
+/**
+ * Computes the arithmetic mean of a list of positions.
+ *
+ * Missing Z components are treated as `0`.
+ *
+ * @param positions - Positions to average.
+ * @returns A weighted centroid whose weight equals the number of positions, or
+ * `null` when the input is empty.
+ */
 function averagePositions(positions: Position[]): WeightedCentroid | null {
     if (positions.length === 0) return null;
 
@@ -183,6 +199,16 @@ function averagePositions(positions: Position[]): WeightedCentroid | null {
     };
 }
 
+/**
+ * Computes a length-weighted centroid for a line string.
+ *
+ * Each segment contributes its midpoint weighted by segment length. Degenerate
+ * zero-length lines fall back to a simple average of the input positions.
+ *
+ * @param positions - Ordered line positions.
+ * @returns A weighted centroid whose weight equals total line length, or
+ * `null` when no positions are provided.
+ */
 function computeLineCentroid(positions: Position[]): WeightedCentroid | null {
     if (positions.length === 0) return null;
     if (positions.length === 1) return averagePositions(positions);
@@ -214,6 +240,17 @@ function computeLineCentroid(positions: Position[]): WeightedCentroid | null {
     };
 }
 
+/**
+ * Computes an area-weighted centroid for a polygon with optional holes.
+ *
+ * The exterior ring contributes positive area and interior rings subtract from
+ * the total, matching standard polygon centroid calculations.
+ *
+ * @param rings - Polygon rings in GeoJSON order, with the shell first and any
+ * holes following.
+ * @returns A weighted centroid whose weight equals polygon area, or `null`
+ * when the polygon has no usable coordinates.
+ */
 function computePolygonCentroid(rings: Position[][]): WeightedCentroid | null {
     const shell = rings[0];
     if (!shell || shell.length === 0) return null;
@@ -247,6 +284,13 @@ function computePolygonCentroid(rings: Position[][]): WeightedCentroid | null {
     };
 }
 
+/**
+ * Computes the signed-area centroid for a single polygon ring.
+ *
+ * @param ring - Closed polygon ring to analyze.
+ * @returns The ring centroid and signed area contribution, or `null` when the
+ * ring has fewer than three positions or zero area.
+ */
 function computeRingCentroid(ring: Position[]): { centroid: [number, number, number]; signedArea: number } | null {
     if (ring.length < 3) return null;
 
@@ -278,6 +322,14 @@ function computeRingCentroid(ring: Position[]): { centroid: [number, number, num
     };
 }
 
+/**
+ * Combines multiple weighted centroids into a single weighted centroid.
+ *
+ * @param centroids - Weighted centroid candidates to aggregate.
+ * `null` entries and zero-weight centroids are ignored.
+ * @returns The combined weighted centroid, or `null` when no valid weighted
+ * centroids are provided.
+ */
 function combineWeightedCentroids(
     centroids: Array<WeightedCentroid | null>,
 ): WeightedCentroid | null {
@@ -300,160 +352,4 @@ function combineWeightedCentroids(
         centroid: [weightedX / totalWeight, weightedY / totalWeight, weightedZ / totalWeight],
         weight: totalWeight,
     };
-}
-
-
-//------------------------------------------------------------------
-
-
-
-/**
- * Builds a closed polygon that represents a planar offset of a polyline.
- *
- * Input coordinates are expected to already be in a local planar system
- * (for example, shifted projected meters). The returned polygon is suitable
- * for triangulation with earcut.
- */
-export function offsetPolyline(points: number[][], distance: number): [number, number][] {
-    const clean = points.filter((point, index) => {
-        if (index === 0) return true;
-        const prev = points[index - 1];
-        return point[0] !== prev[0] || point[1] !== prev[1];
-    }) as [number, number][];
-
-    if (clean.length < 2 || distance === 0) {
-        return [];
-    }
-
-    const left: [number, number][] = [];
-    const right: [number, number][] = [];
-
-    for (let i = 0; i < clean.length; i++) {
-        const prev = i > 0 ? clean[i - 1] : null;
-        const curr = clean[i];
-        const next = i < clean.length - 1 ? clean[i + 1] : null;
-
-        const prevNormal = prev ? getUnitLeftNormal(prev, curr) : null;
-        const nextNormal = next ? getUnitLeftNormal(curr, next) : null;
-
-        const leftPoint = computeOffsetPoint(prev, curr, next, prevNormal, nextNormal, distance, 1);
-        const rightPoint = computeOffsetPoint(prev, curr, next, prevNormal, nextNormal, distance, -1);
-
-        left.push(leftPoint);
-        right.push(rightPoint);
-    }
-
-    const polygon = [...left, ...right.reverse()];
-    if (polygon.length > 0) {
-        polygon.push([polygon[0][0], polygon[0][1]]);
-    }
-
-    return polygon;
-}
-
-function getUnitLeftNormal(a: [number, number], b: [number, number]): [number, number] | null {
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    const length = Math.hypot(dx, dy);
-
-    if (length === 0) {
-        return null;
-    }
-
-    return [-dy / length, dx / length];
-}
-
-function computeOffsetPoint(
-    prev: [number, number] | null,
-    curr: [number, number],
-    next: [number, number] | null,
-    prevNormal: [number, number] | null,
-    nextNormal: [number, number] | null,
-    distance: number,
-    side: 1 | -1,
-): [number, number] {
-    if (!prevNormal && !nextNormal) {
-        return curr;
-    }
-
-    if (!prev || !prevNormal) {
-        return [
-            curr[0] + nextNormal![0] * distance * side,
-            curr[1] + nextNormal![1] * distance * side,
-        ];
-    }
-
-    if (!next || !nextNormal) {
-        return [
-            curr[0] + prevNormal[0] * distance * side,
-            curr[1] + prevNormal[1] * distance * side,
-        ];
-    }
-
-    const prevOffsetA: [number, number] = [
-        prev[0] + prevNormal[0] * distance * side,
-        prev[1] + prevNormal[1] * distance * side,
-    ];
-    const prevOffsetB: [number, number] = [
-        curr[0] + prevNormal[0] * distance * side,
-        curr[1] + prevNormal[1] * distance * side,
-    ];
-    const nextOffsetA: [number, number] = [
-        curr[0] + nextNormal[0] * distance * side,
-        curr[1] + nextNormal[1] * distance * side,
-    ];
-    const nextOffsetB: [number, number] = [
-        next[0] + nextNormal[0] * distance * side,
-        next[1] + nextNormal[1] * distance * side,
-    ];
-
-    const intersection = intersectLines(prevOffsetA, prevOffsetB, nextOffsetA, nextOffsetB);
-    if (intersection) {
-        return intersection;
-    }
-
-    const avgX = prevNormal[0] + nextNormal[0];
-    const avgY = prevNormal[1] + nextNormal[1];
-    const avgLength = Math.hypot(avgX, avgY);
-
-    if (avgLength === 0) {
-        return [
-            curr[0] + nextNormal[0] * distance * side,
-            curr[1] + nextNormal[1] * distance * side,
-        ];
-    }
-
-    return [
-        curr[0] + (avgX / avgLength) * distance * side,
-        curr[1] + (avgY / avgLength) * distance * side,
-    ];
-}
-
-function intersectLines(
-    a1: [number, number],
-    a2: [number, number],
-    b1: [number, number],
-    b2: [number, number],
-): [number, number] | null {
-    const x1 = a1[0];
-    const y1 = a1[1];
-    const x2 = a2[0];
-    const y2 = a2[1];
-    const x3 = b1[0];
-    const y3 = b1[1];
-    const x4 = b2[0];
-    const y4 = b2[1];
-
-    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (Math.abs(denom) < 1e-9) {
-        return null;
-    }
-
-    const detA = x1 * y2 - y1 * x2;
-    const detB = x3 * y4 - y3 * x4;
-
-    return [
-        (detA * (x3 - x4) - (x1 - x2) * detB) / denom,
-        (detA * (y3 - y4) - (y1 - y2) * detB) / denom,
-    ];
 }

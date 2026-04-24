@@ -1,31 +1,71 @@
 import { Feature, FeatureCollection, GeoJsonProperties, Geometry, Point } from 'geojson';
 
 import { LayerComponent, LayerGeometry } from './types-mesh';
+import { computePointConvexHull, computeRingArea, normalizeRing } from './utils-geometry';
 
+/** Target spacing, in local planar units, between generated facade windows. */
 const BUILDING_WINDOW_TARGET_SPACING = 6;
+/** Fraction of each facade cell width and height occupied by the window quad. */
 const BUILDING_WINDOW_CELL_FILL = 1;
+/** Fallback building height used when no height metadata can be resolved. */
 const DEFAULT_BUILDING_HEIGHT = 20;
+/** Fallback floor-to-floor height used when deriving height from level counts. */
 const DEFAULT_FLOOR_HEIGHT = 3.4;
 
+/**
+ * Describes one generated procedural window placed on a building facade.
+ */
 export interface BuildingWindowLayoutEntry {
+    /** Stable identifier for the generated window instance. */
     windowId: string;
+    /** Index of the source feature that produced this window. */
     sourceFeatureIndex: number;
+    /** Index of the hull edge on which the window is placed. */
     edgeIndex: number;
+    /** Zero-based floor index of the window. */
     floorIndex: number;
+    /** Zero-based window index within its edge and floor. */
     windowIndex: number;
+    /** World-space window center `[x, y, z]`. */
     center: [number, number, number];
+    /** Outward-facing facade normal `[x, y, z]`. */
     normal: [number, number, number];
+    /** Window width in local planar units. */
     width: number;
+    /** Window height in local vertical units. */
     height: number;
+    /** Resolved building height used when generating the window. */
     buildingHeight: number;
 }
 
+/**
+ * Result of procedural window-layout generation for a building collection.
+ */
 export interface BuildingWindowLayoutResult {
+    /** GeoJSON point features representing generated window centers. */
     collection: FeatureCollection<Point>;
+    /** Detailed metadata for each generated window instance. */
     windows: BuildingWindowLayoutEntry[];
 }
 
+/**
+ * Triangulates simplified building roofs and procedural facade windows.
+ *
+ * This helper computes a convex facade hull per input building feature, derives
+ * a procedural window layout from that hull, and emits renderable roof and
+ * window quad geometry for downstream WebGPU pipelines.
+ */
 export class TriangulatorBuildingWithWindows {
+    /**
+     * Builds renderable roof and window geometry for a building collection.
+     *
+     * @param geojson - Source building features.
+     * @param origin - World-space origin used to convert generated geometry into
+     * local coordinates.
+     * @param floors - Requested number of procedural floors for window layout.
+     * @returns A tuple containing geometry chunks and their per-feature
+     * component metadata.
+     */
     static buildMesh(geojson: FeatureCollection, origin: number[], floors: number): [LayerGeometry[], LayerComponent[]] {
         const geometry: LayerGeometry[] = [];
         const components: LayerComponent[] = [];
@@ -55,26 +95,10 @@ export class TriangulatorBuildingWithWindows {
                 geometry,
                 components,
                 corners: [
-                    toLocal([
-                        window.center[0] - tangent[0] * halfWidth,
-                        window.center[1] - tangent[1] * halfWidth,
-                        window.center[2] - halfHeight,
-                    ], origin),
-                    toLocal([
-                        window.center[0] + tangent[0] * halfWidth,
-                        window.center[1] + tangent[1] * halfWidth,
-                        window.center[2] - halfHeight,
-                    ], origin),
-                    toLocal([
-                        window.center[0] + tangent[0] * halfWidth,
-                        window.center[1] + tangent[1] * halfWidth,
-                        window.center[2] + halfHeight,
-                    ], origin),
-                    toLocal([
-                        window.center[0] - tangent[0] * halfWidth,
-                        window.center[1] - tangent[1] * halfWidth,
-                        window.center[2] + halfHeight,
-                    ], origin),
+                    [window.center[0] - tangent[0] * halfWidth - origin[0], window.center[1] - tangent[1] * halfWidth - origin[1], window.center[2] - halfHeight],
+                    [window.center[0] + tangent[0] * halfWidth - origin[0], window.center[1] + tangent[1] * halfWidth - origin[1], window.center[2] - halfHeight],
+                    [window.center[0] + tangent[0] * halfWidth - origin[0], window.center[1] + tangent[1] * halfWidth - origin[1], window.center[2] + halfHeight],
+                    [window.center[0] - tangent[0] * halfWidth - origin[0], window.center[1] - tangent[1] * halfWidth - origin[1], window.center[2] + halfHeight],
                 ],
                 featureIndex: window.sourceFeatureIndex,
                 featureId: window.windowId,
@@ -84,6 +108,15 @@ export class TriangulatorBuildingWithWindows {
         return [geometry, components];
     }
 
+    /**
+     * Generates a procedural facade-window layout for a building collection.
+     *
+     * @param source - Source building features.
+     * @param floors - Requested number of procedural floors. Values below `1`
+     * are clamped to one floor.
+     * @returns Generated window metadata together with a GeoJSON point
+     * collection of window centers.
+     */
     static buildWindowLayout(source: FeatureCollection, floors: number): BuildingWindowLayoutResult {
         const safeFloors = Math.max(1, Math.floor(floors));
         const features: Array<Feature<Point>> = [];
@@ -164,28 +197,16 @@ export class TriangulatorBuildingWithWindows {
         return { collection: { type: 'FeatureCollection', features }, windows };
     }
 
-    static resolveFootprint(feature: Feature<Geometry | null, GeoJsonProperties>): number[][] | null {
-        const geometry = feature.geometry;
-        if (!geometry) return null;
-
-        let bestRing: number[][] | null = null;
-        let bestArea = -1;
-
-        const consider = (ring: number[][] | undefined) => {
-            if (!ring || ring.length < 3) return;
-            const normalized = normalizeRing(ring);
-            if (normalized.length < 3) return;
-            const area = Math.abs(computeRingArea(normalized));
-            if (area > bestArea) {
-                bestArea = area;
-                bestRing = normalized;
-            }
-        };
-
-        visitFootprintRings(geometry, consider);
-        return bestRing;
-    }
-
+    /**
+     * Resolves an effective building height from feature and part metadata.
+     *
+     * Height values take precedence over level counts. When part metadata is
+     * present, the tallest resolved part height is used. Missing metadata falls
+     * back to a default building height.
+     *
+     * @param feature - Building feature whose height metadata should be parsed.
+     * @returns Resolved building height in world units.
+     */
     static resolveHeight(feature: Feature<Geometry | null, GeoJsonProperties>): number {
         const rootProps = (feature.properties ?? {}) as Record<string, unknown>;
         const parts = Array.isArray(rootProps.parts) ? (rootProps.parts as GeoJsonProperties[]) : [];
@@ -207,16 +228,36 @@ export class TriangulatorBuildingWithWindows {
         return parseHeight(rootProps as GeoJsonProperties) ?? DEFAULT_BUILDING_HEIGHT;
     }
 
-    static computeConvexHull(feature: Feature<Geometry | null, GeoJsonProperties>): number[][] | null {
-        const footprintPoints = collectBuildingFootprintPoints(feature);
+    /**
+     * Computes a convex hull for the visible building footprint of a feature.
+     *
+     * @param feature - Building feature whose footprint should be reduced to a
+     * convex hull.
+     * @returns Hull vertices in world coordinates, or `null` when the feature
+     * does not contain enough usable footprint points.
+     */
+    private static computeConvexHull(feature: Feature<Geometry | null, GeoJsonProperties>): number[][] | null {
+        const footprintPoints = this.collectBuildingFootprintPoints(feature);
         if (footprintPoints.length < 3) {
             return null;
         }
 
-        const hull = computeConvexHull(footprintPoints);
+        const hull = computePointConvexHull(footprintPoints);
         return hull.length >= 3 ? hull : null;
     }
 
+    /**
+     * Adds a triangulated roof fan for one convex hull.
+     *
+     * @param params - Roof geometry construction parameters.
+     * @param params.geometry - Output geometry array to append to.
+     * @param params.components - Output component array to append to.
+     * @param params.hull - Convex hull vertices in world coordinates.
+     * @param params.roofZ - Roof elevation to assign to every hull vertex.
+     * @param params.origin - World-space origin used for local conversion.
+     * @param params.featureIndex - Source feature index associated with the roof.
+     * @returns Nothing. Geometry and component arrays are mutated in place.
+     */
     private static addRoofGeometry(params: {
         geometry: LayerGeometry[];
         components: LayerComponent[];
@@ -233,8 +274,7 @@ export class TriangulatorBuildingWithWindows {
         const indices = new Uint32Array((params.hull.length - 2) * 3);
 
         params.hull.forEach(([x, y], index) => {
-            const local = toLocal([x, y, params.roofZ], params.origin);
-            position.set(local, index * 3);
+            position.set([x - params.origin[0], y - params.origin[1], params.roofZ], index * 3);
         });
 
         let offset = 0;
@@ -252,6 +292,17 @@ export class TriangulatorBuildingWithWindows {
         });
     }
 
+    /**
+     * Adds a single quad geometry chunk representing one procedural window.
+     *
+     * @param params - Window quad construction parameters.
+     * @param params.geometry - Output geometry array to append to.
+     * @param params.components - Output component array to append to.
+     * @param params.corners - Quad corner positions in local coordinates.
+     * @param params.featureIndex - Source feature index associated with the quad.
+     * @param params.featureId - Optional stable identifier for the generated quad.
+     * @returns Nothing. Geometry and component arrays are mutated in place.
+     */
     private static addQuadGeometry(params: {
         geometry: LayerGeometry[];
         components: LayerComponent[];
@@ -269,102 +320,56 @@ export class TriangulatorBuildingWithWindows {
             featureId: params.featureId,
         });
     }
-}
 
-function collectBuildingFootprintPoints(feature: Feature<Geometry | null, GeoJsonProperties>): number[][] {
-    const geometry = feature.geometry;
-    if (!geometry) {
-        return [];
-    }
-
-    const points: number[][] = [];
-    visitFootprintRings(geometry, (ring) => {
-        if (!ring || ring.length < 3) return;
-        const normalized = normalizeRing(ring);
-        if (normalized.length < 3) return;
-        for (const point of normalized) {
-            points.push(point);
+    /**
+     * Collects all normalized footprint points from a building feature.
+     *
+     * @param feature - Building feature whose footprint points should be
+     * extracted.
+     * @returns Normalized footprint points gathered from supported polygonal
+     * geometries.
+     */
+    private static collectBuildingFootprintPoints(feature: Feature<Geometry | null, GeoJsonProperties>): number[][] {
+        const geometry = feature.geometry;
+        if (!geometry) {
+            return [];
         }
-    });
-    return points;
-}
 
-function visitFootprintRings(geometry: Geometry, visit: (ring: number[][] | undefined) => void): void {
-    if (geometry.type === 'Polygon') {
-        visit(geometry.coordinates[0]);
-        return;
+        const points: number[][] = [];
+        this.visitFootprintRings(geometry, (ring) => {
+            if (!ring || ring.length < 3) return;
+            const normalized = normalizeRing(ring);
+            if (normalized.length < 3) return;
+            for (const point of normalized) {
+                points.push(point);
+            }
+        });
+        return points;
     }
-    if (geometry.type === 'MultiPolygon') {
-        for (const polygon of geometry.coordinates) {
-            visit(polygon[0]);
+
+    /**
+     * Visits the exterior footprint ring of each supported building geometry.
+     *
+     * @param geometry - Geometry to traverse for footprint rings.
+     * @param visit - Callback invoked with each discovered exterior ring.
+     * @returns Nothing. The provided callback is used for side effects.
+     */
+    private static visitFootprintRings(geometry: Geometry, visit: (ring: number[][] | undefined) => void): void {
+        if (geometry.type === 'Polygon') {
+            visit(geometry.coordinates[0]);
+            return;
         }
-        return;
-    }
-    if (geometry.type === 'GeometryCollection') {
-        for (const child of geometry.geometries) {
-            if (child) visitFootprintRings(child, visit);
+        if (geometry.type === 'MultiPolygon') {
+            for (const polygon of geometry.coordinates) {
+                visit(polygon[0]);
+            }
+            return;
+        }
+        if (geometry.type === 'GeometryCollection') {
+            for (const child of geometry.geometries) {
+                if (child) this.visitFootprintRings(child, visit);
+            }
         }
     }
-}
 
-function toLocal(point: [number, number, number], origin: number[]): [number, number, number] {
-    return [point[0] - origin[0], point[1] - origin[1], point[2]];
-}
-
-function normalizeRing(ring: number[][]): number[][] {
-    if (ring.length < 2) return [...ring];
-    const normalized = [...ring];
-    const first = normalized[0];
-    const last = normalized[normalized.length - 1];
-    if (first[0] === last[0] && first[1] === last[1]) {
-        normalized.pop();
-    }
-    return normalized;
-}
-
-function computeConvexHull(points: number[][]): number[][] {
-    const unique = Array.from(new Map(
-        normalizeRing(points).map((point) => [`${point[0]},${point[1]}`, point as [number, number]])
-    ).values());
-
-    if (unique.length <= 3) {
-        return unique.map(([x, y]) => [x, y]);
-    }
-
-    unique.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
-
-    const lower: Array<[number, number]> = [];
-    for (const point of unique) {
-        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
-            lower.pop();
-        }
-        lower.push(point);
-    }
-
-    const upper: Array<[number, number]> = [];
-    for (let i = unique.length - 1; i >= 0; i--) {
-        const point = unique[i];
-        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
-            upper.pop();
-        }
-        upper.push(point);
-    }
-
-    lower.pop();
-    upper.pop();
-    return [...lower, ...upper].map(([x, y]) => [x, y]);
-}
-
-function cross(a: [number, number], b: [number, number], c: [number, number]): number {
-    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-}
-
-function computeRingArea(ring: number[][]): number {
-    let area = 0;
-    for (let i = 0; i < ring.length; i++) {
-        const [x1, y1] = ring[i];
-        const [x2, y2] = ring[(i + 1) % ring.length];
-        area += x1 * y2 - x2 * y1;
-    }
-    return area * 0.5;
 }
