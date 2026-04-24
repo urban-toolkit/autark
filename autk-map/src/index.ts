@@ -1,5 +1,6 @@
 // ─── Map entry point ─────────────────────────────────────────────────────────
 
+/** Main map controller for rendering, interaction, and layer lifecycle. */
 export { AutkMap } from './map';
 
 // ─── Color mapping (re-exported from autk-core) ──────────────────────────────
@@ -60,11 +61,18 @@ export type {
 // ─── API / params ─────────────────────────────────────────────────────────────
 
 export type {
+    /** Parameters for loading a GeoJSON feature collection as a map layer. */
     LoadCollectionParams,
+    /** Parameters for loading a prebuilt triangle mesh directly into the map. */
     LoadMeshParams,
+    /** Parameters for updating raster values and optional transfer-function state. */
     UpdateRasterParams,
+    /** Parameters for updating thematic values from a feature collection. */
     UpdateThematicParams,
+    /** Parameters for patching a layer's color-map configuration. */
     UpdateColorMapParams,
+    /** Parameters for patching one or more layer render properties. */
+    UpdateRenderInfoParams,
 } from './api';
 
 // ─── Layer types ─────────────────────────────────────────────────────────────

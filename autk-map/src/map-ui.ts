@@ -79,11 +79,11 @@ export class AutkMapUi {
         // Exclusive isPick: disable on all other vector layers
         this._map.layerManager.layers.forEach((l: Layer) => {
             if (l.layerInfo.id !== layer.layerInfo.id) {
-                this.map.updateRenderInfo(l.layerInfo.id, { isPick: false });
+                this.map.updateRenderInfo(l.layerInfo.id, { renderInfo: { isPick: false } });
             }
         });
 
-        this.map.updateRenderInfo(layer.layerInfo.id, { isPick: true });
+        this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isPick: true } });
         this.updateLegendContent();
     }
 
@@ -353,11 +353,11 @@ export class AutkMapUi {
         });
 
         const eyeBtn = this.makeIconButton(EYE_SVG, !layer.layerRenderInfo.isSkip, () => {
-            this.map.updateRenderInfo(layer.layerInfo.id, { isSkip: !layer.layerRenderInfo.isSkip });
+            this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isSkip: !layer.layerRenderInfo.isSkip } });
         });
 
         const paletteBtn = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
-            this.map.updateRenderInfo(layer.layerInfo.id, { isColorMap: !layer.layerRenderInfo.isColorMap });
+            this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
         });
 
         const isRaster = layer.layerInfo.typeLayer === 'raster';

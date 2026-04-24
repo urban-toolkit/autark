@@ -1,3 +1,19 @@
+/**
+ * @module AutkMap
+ * A WebGPU-based map rendering engine for GeoJSON data.
+ *
+ * This module defines the `AutkMap` class, which serves as the main controller
+ * for rendering, interaction, and layer lifecycle management. It provides
+ * high-level APIs for loading GeoJSON feature collections and prebuilt meshes,
+ * updating thematic mappings and color configurations, and handling user
+ * interactions such as picking and highlighting.
+ *
+ * The `AutkMap` class integrates a WebGPU renderer, a camera system, a layer
+ * manager, and event controllers for keyboard, mouse, and resize events. It
+ * also exposes a public event bus for map events (e.g., picking) and a UI
+ * controller for managing the map's user interface components.
+ */
+
 /// <reference types="@webgpu/types" />
 
 import {
@@ -23,6 +39,7 @@ import {
     ResolvedDomain,
     mapGeometryTypeToLayerType,
 } from './types-core';
+
 import { MapEvent } from './types-events';
 import type { MapEventRecord } from './types-events';
 
@@ -37,6 +54,7 @@ import {
     LoadCollectionParams,
     LoadMeshParams,
     UpdateColorMapParams,
+    UpdateRenderInfoParams,
     UpdateRasterParams,
     UpdateThematicParams,
 } from './api';
@@ -154,6 +172,8 @@ export class AutkMap {
 
     /**
      * Initializes renderer resources, event bindings, and UI.
+     *
+     * @returns Promise that resolves when renderer initialization completes.
      */
     async init() {
         if (this._isDestroyed) {
@@ -238,6 +258,14 @@ export class AutkMap {
      *
      * Mesh coordinates must already be expressed in the map's local coordinate
      * space, relative to the current shared origin.
+     *
+     * @param id Layer identifier.
+     * @param params Mesh loading parameters.
+     * @param params.geometry Prebuilt mesh geometry chunks.
+     * @param params.components Per-feature mesh component metadata.
+     * @param params.thematic Optional precomputed thematic values.
+     * @param params.type Optional layer type override for the mesh.
+     * @returns Nothing. The mesh layer is created and registered with the map.
      */
     loadMesh(id: string, { geometry, components, thematic, type = 'buildings' }: LoadMeshParams): void {
         if (!this.layerManager.hasOrigin) {
@@ -304,14 +332,14 @@ export class AutkMap {
 
         if (sample === undefined || sample === null) {
             console.warn(`Thematic property not found on layer '${id}': ${property}`);
-            this.updateRenderInfo(id, { isColorMap: false });
+            this.updateRenderInfo(id, { renderInfo: { isColorMap: false } });
             return;
         }
 
         const dataType = isNumericLike(sample) ? 'number' : typeof sample;
         if (dataType !== 'number' && dataType !== 'string') {
             console.warn(`Unsupported thematic property type on layer '${id}': ${dataType}`);
-            this.updateRenderInfo(id, { isColorMap: false });
+            this.updateRenderInfo(id, { renderInfo: { isColorMap: false } });
             return;
         }
 
@@ -351,7 +379,7 @@ export class AutkMap {
 
             if (validValues.length === 0) {
                 console.warn(`No valid numeric thematic values found on layer '${id}': ${property}`);
-                this.updateRenderInfo(id, { isColorMap: false });
+                this.updateRenderInfo(id, { renderInfo: { isColorMap: false } });
                 return;
             }
 
@@ -372,7 +400,7 @@ export class AutkMap {
 
             if (validValues.length === 0) {
                 console.warn(`No valid categorical thematic values found on layer '${id}': ${property}`);
-                this.updateRenderInfo(id, { isColorMap: false });
+                this.updateRenderInfo(id, { renderInfo: { isColorMap: false } });
                 return;
             }
 
@@ -481,6 +509,7 @@ export class AutkMap {
      *
      * @param id Layer identifier.
      * @param params Color-map update parameters.
+     * @returns Nothing. The target layer render configuration is updated in place.
      */
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -534,11 +563,15 @@ export class AutkMap {
      * Updates one or more render properties of a layer.
      *
      * @param id Layer identifier.
-     * @param info Render properties to update.
+     * @param params Render update parameters.
+     * @param params.renderInfo Render properties to update.
+     * @returns Nothing. The target layer render state is updated in place.
      */
-    updateRenderInfo(id: string, info: Partial<LayerRenderInfo>): void {
+    updateRenderInfo(id: string, params: UpdateRenderInfoParams | Partial<LayerRenderInfo>): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
+
+        const info = 'renderInfo' in params ? params.renderInfo : params;
 
         const nextInfo: Partial<LayerRenderInfo> = { ...info };
 
@@ -569,7 +602,9 @@ export class AutkMap {
 
     /**
      * Removes all layers matching the provided id.
+     *
      * @param id Layer identifier.
+     * @returns Nothing. Matching layers are removed from the map.
      */
     removeLayer(id: string): void {
         this._layerManager.removeLayerById(id);
@@ -579,8 +614,10 @@ export class AutkMap {
 
     /**
      * Replaces the highlighted selection of a pickable layer.
+     *
      * @param id Layer identifier.
      * @param selection Component ids to highlight.
+     * @returns Nothing. Unsupported layers are ignored.
      */
     setHighlightedIds(id: string, selection: number[]): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -593,7 +630,9 @@ export class AutkMap {
 
     /**
      * Clears the highlighted selection of a pickable layer.
+     *
      * @param id Layer identifier.
+     * @returns Nothing. Unsupported layers are ignored.
      */
     clearHighlightedIds(id: string): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -606,8 +645,10 @@ export class AutkMap {
 
     /**
      * Toggles skipped rendering for the provided component ids of a vector layer.
+     *
      * @param id Layer identifier.
      * @param selection Component ids to skip/unskip.
+     * @returns Nothing. Non-vector layers are ignored.
      */
     setSkippedIds(id: string, selection: number[]): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -620,7 +661,9 @@ export class AutkMap {
 
     /**
      * Clears skipped rendering state for a vector layer.
+     *
      * @param id Layer identifier.
+     * @returns Nothing. Non-vector layers are ignored.
      */
     clearSkippedIds(id: string): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -635,6 +678,7 @@ export class AutkMap {
      * Starts the continuous render loop.
      *
      * @param fps Target frames per second (default `60`). Pass `0` to render as fast as possible.
+     * @returns Nothing. Rendering is scheduled via `requestAnimationFrame`.
      */
     draw(fps: number = 60) {
         if (this._isDestroyed) {
@@ -647,8 +691,6 @@ export class AutkMap {
         }
 
         let previousDelta = 0;
-        let smoothedFps = 0;
-        let smoothedFrameTime = 0;
 
         const update = (currentDelta: number) => {
             if (this._isDestroyed) {
@@ -663,16 +705,7 @@ export class AutkMap {
                 return;
             }
 
-            const frameStart = performance.now();
             this.render();
-            const frameTime = performance.now() - frameStart;
-
-            if (delta > 0) {
-                const currentFps = 1000 / delta;
-                smoothedFps = smoothedFps === 0 ? currentFps : smoothedFps * 0.9 + currentFps * 0.1;
-            }
-            smoothedFrameTime = smoothedFrameTime === 0 ? frameTime : smoothedFrameTime * 0.9 + frameTime * 0.1;
-            this._ui.updatePerformance(smoothedFps, smoothedFrameTime);
             previousDelta = currentDelta;
         };
 
@@ -682,6 +715,8 @@ export class AutkMap {
     /**
      * Tears down map resources and event bindings.
      * Cancels the render loop, detaches DOM listeners, and releases GPU resources.
+     *
+     * @returns Nothing. Repeated calls after destruction are ignored.
      */
     destroy(): void {
         if (this._isDestroyed) {
@@ -712,6 +747,10 @@ export class AutkMap {
      *
      * Returns `null` when the collection is empty, contains only null geometries,
      * or mixes multiple geometry families that require an explicit layer type.
+     *
+     * @param collection Source feature collection to inspect.
+     * @param layerId Layer identifier used in diagnostics.
+     * @returns Inferred layer family, or `null` when inference fails.
      */
     private inferCollectionLayerType(collection: FeatureCollection<Geometry | null>, layerId: string): LayerType | null {
         const families = new Set<Extract<LayerType, 'points' | 'polygons' | 'polylines'>>();
@@ -753,6 +792,8 @@ export class AutkMap {
 
     /**
      * Executes one render frame, including normal and picking passes.
+     *
+     * @returns Nothing. Rendering commands are recorded and submitted to the GPU.
      */
     private render() {
         this._camera.update();
@@ -826,7 +867,12 @@ export class AutkMap {
         }
     }
 
-    /** Clears picking state from every layer except the requested one. */
+    /**
+     * Clears picking state from every layer except the requested one.
+     *
+     * @param activeLayerId Identifier of the layer that should remain pick-enabled.
+     * @returns Nothing. Other pick-enabled layers are deactivated.
+     */
     private deactivateOtherPickingLayers(activeLayerId: string): void {
         this._layerManager.layers.forEach((otherLayer) => {
             if (otherLayer.layerInfo.id === activeLayerId || !otherLayer.layerRenderInfo.isPick) {
@@ -844,8 +890,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-    * @param property Optional value extractor used to initialize thematic data.
-     */
+     * @param property Optional value extractor used to initialize thematic data.
+     * @returns Nothing. The layer is created when triangulation succeeds.
+      */
     private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
@@ -904,9 +951,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-     * @param offset Polyline extrusion offset used by triangulation.
-    * @param property Optional value extractor used to initialize thematic data.
-     */
+     * @param property Optional value extractor used to initialize thematic data.
+     * @returns Nothing. The layer is created when triangulation succeeds.
+      */
     private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
@@ -953,8 +1000,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-    * @param property Optional value extractor used to initialize thematic data.
-     */
+     * @param property Optional value extractor used to initialize thematic data.
+     * @returns Nothing. The layer is created when triangulation succeeds.
+      */
     private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
@@ -1000,8 +1048,9 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
-    * @param property Optional value extractor used to initialize thematic data.
-     */
+     * @param property Optional value extractor used to initialize thematic data.
+     * @returns Nothing. The layer is created when triangulation succeeds.
+      */
     private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
@@ -1047,6 +1096,7 @@ export class AutkMap {
      * @param layerName Target layer id.
      * @param geotiff GeoTIFF-derived feature collection.
      * @param property Value extractor for each raster row/cell payload.
+     * @returns Nothing. The raster layer is created and initialized.
      */
     private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, property: string) {
         const layerInfo: LayerInfo = {
@@ -1086,24 +1136,30 @@ export class AutkMap {
         this.updateRaster(layerName, { collection: geotiff, property  });
     }
 
-    private defaultColorMap(): ColorMapConfig {
-        return {
-            interpolator: ColorMapInterpolator.SEQ_REDS,
-            domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
-        };
-    }
-
     /**
      * Creates a layer from the provided information.
      *
      * @param layerInfo Metadata describing the layer.
      * @param layerRenderInfo Initial render configuration.
      * @param layerData Triangulated geometry/components payload.
+     * @returns Nothing. The layer pipeline is created when layer registration succeeds.
      */
     private createLayer(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
         if (layer) {
             layer.createPipeline(this._renderer);
         }
+    }
+
+    /**
+     * Returns the default color-map configuration used for newly created layers.
+     *
+     * @returns Default sequential red colormap with min/max numeric domain inference.
+     */
+    private defaultColorMap(): ColorMapConfig {
+        return {
+            interpolator: ColorMapInterpolator.SEQ_REDS,
+            domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
+        };
     }
 }

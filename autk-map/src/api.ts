@@ -11,7 +11,10 @@ import type {
     LayerType,
 } from './types-core';
 
-import type { LayerThematic } from './types-layers';
+import type { 
+    LayerRenderInfo, 
+    LayerThematic 
+} from './types-layers';
 
 /**
  * Parameters for loading a feature collection as a map layer.
@@ -44,7 +47,7 @@ export interface LoadMeshParams {
     components: LayerComponent[];
     /** Optional thematic values aligned one-to-one with `components`. */
     thematic?: LayerThematic[];
-    /** Mesh render type. The first public version supports only 3D building-like meshes. */
+    /** Mesh render type. Currently only `'buildings'` is supported. */
     type?: 'buildings';
 }
 
@@ -67,7 +70,13 @@ export interface UpdateRasterParams {
  * Parameters for updating a layer's thematic (color-mapped) values.
  */
 export interface UpdateThematicParams {
-    /** Source feature collection used to derive thematic values. Prefer the original loaded feature ids/order. */
+    /**
+     * Source feature collection used to derive thematic values.
+     *
+     * Prefer the original loaded feature collection, or one with stable
+     * matching `feature.id` values, so thematic values align correctly to the
+     * rendered components.
+     */
     collection: FeatureCollection;
     /** Dot-path accessor resolved from each item in the collection. */
     property: string;
@@ -79,4 +88,12 @@ export interface UpdateThematicParams {
 export interface UpdateColorMapParams {
     /** Partial color-map patch merged with existing layer color-map state. */
     colorMap: Partial<ColorMapConfig>;
+}
+
+/**
+ * Parameters for updating one or more render properties of a layer.
+ */
+export interface UpdateRenderInfoParams {
+    /** Partial render-state patch applied to the target layer. */
+    renderInfo: Partial<LayerRenderInfo>;
 }

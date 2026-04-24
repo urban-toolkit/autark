@@ -5,12 +5,15 @@ import { AutkMap } from './map';
  * It keeps the canvas, camera, renderer, and UI in sync with the layout size.
  */
 export class ResizeEvents {
+    /** Reference to the owning map instance. */
     private _map: AutkMap;
 
     /** Bound resize handler stored for add/remove listener symmetry. */
     private _onResize: () => void;
 
     /**
+     * Creates a resize interaction controller for a map instance.
+     *
      * @param map Target map instance.
      */
     constructor(map: AutkMap) {
@@ -20,6 +23,8 @@ export class ResizeEvents {
 
     /**
      * Attaches the resize listener to the window.
+     *
+     * @returns Nothing. Future window resize events are forwarded to {@link ResizeEvents.resize}.
      */
     bindEvents(): void {
         window.addEventListener('resize', this._onResize);
@@ -27,6 +32,8 @@ export class ResizeEvents {
 
     /**
      * Removes the resize listener from the window.
+     *
+     * @returns Nothing. Registered resize listeners are detached.
      */
     destroyEvents(): void {
         window.removeEventListener('resize', this._onResize);
@@ -35,6 +42,8 @@ export class ResizeEvents {
     /**
      * Resizes the canvas to match its CSS layout size and updates the camera,
      * renderer, and UI accordingly. Called once on init and on every window resize.
+     *
+     * @returns Nothing. The map viewport and UI are synchronized to the current layout size.
      */
     resize(): void {
         const canvas = this._map.canvas;
