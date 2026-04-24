@@ -1,3 +1,14 @@
+/**
+ * @module LayerTriangles2D
+ * 2D triangle layer with optional border rendering.
+ *
+ * This module defines `Triangles2DLayer`, a vector layer specialization for
+ * triangulated 2D polygonal geometry. In addition to the standard filled
+ * triangle rendering provided by `VectorLayer`, it manages derived border
+ * geometry and an auxiliary border pipeline so outlines stay synchronized with
+ * the main layer data.
+ */
+
 import { Camera, LayerBorder, LayerBorderComponent } from './types-core';
 
 import {
@@ -13,39 +24,38 @@ import { Renderer } from './renderer';
 import { PipelineTriangleBorder } from './pipeline-triangle-border';
 
 /**
- * 2D Triangles layer class.
- * Inherits from VectorLayer and provides additional methods for handling border geometry.
+ * Vector layer for triangulated 2D geometry with optional borders.
+ *
+ * `Triangles2DLayer` extends `VectorLayer` with additional geometry and GPU
+ * pipeline management for line-based borders associated with filled triangle
+ * meshes. Border data is loaded alongside the main layer geometry and, when
+ * present, is rendered as a separate pass using a dedicated pipeline.
  */
 export class Triangles2DLayer extends VectorLayer {
-    /**
-     * Border positions of the triangles.
-     * @type {Float32Array}
-     */
+    /** Packed 2D border vertex positions. */
     protected _borderPosition: Float32Array = new Float32Array(0);
 
-    /**
-     * Border indices of the triangles.
-     * @type {Uint32Array}
-     */
+    /** Packed border index buffer. */
     protected _borderIndices: Uint32Array = new Uint32Array(0);
 
-    /**
-     * Border components of the layer.
-     * @type {LayerBorderComponent[]}
-     */
+    /** Cumulative border component ranges aligned with rendered features. */
     protected _borderComponents: LayerBorderComponent[] = [];
 
-    /**
-     * Rendering pipeline for the border.
-     * @type {PipelineTriangleBorder}
-     */
+    /** Border rendering pipeline, created only when border geometry exists. */
     protected _pipelineBorder!: PipelineTriangleBorder;
 
     /**
      * Creates a 2D triangles layer.
-     * @param {LayerInfo} layerInfo - The layer information.
-     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {LayerData} layerData - The layer data.
+     *
+     * Border geometry is reloaded after the base `VectorLayer` constructor runs
+     * because field initializers reset the border arrays after the polymorphic
+     * `loadLayerData` call made by the parent class.
+     *
+     * @param layerInfo Static layer metadata such as id, type, and z-index.
+     * @param layerRenderInfo Mutable rendering configuration for visibility,
+     * color mapping, opacity, and picking.
+     * @param layerData Geometry, thematic values, and optional border data used
+     * to populate the layer.
      */
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo, layerData, 2);
@@ -56,33 +66,32 @@ export class Triangles2DLayer extends VectorLayer {
         this.loadBorderComponent(layerData.borderComponents ?? []);
     }
 
-    /**
-     * Gets the border positions of the triangles.
-     * @returns {Float32Array} The border positions.
-     */
+    /** Packed 2D border vertex positions. */
     get borderPosition(): Float32Array {
         return this._borderPosition;
     }
 
-    /**
-     * Gets the border indices of the triangles.
-     * @returns {Uint32Array} The border indices.
-     */
+    /** Packed border index buffer. */
     get borderIndices(): Uint32Array {
         return this._borderIndices;
     }
 
-    /**
-     * Gets the border components of the layer.
-     * @returns {LayerBorderComponent[]} The border components.
-     */
+    /** Cumulative border component ranges aligned with rendered features. */
     get borderComponents(): LayerBorderComponent[] {
         return this._borderComponents;
     }
 
     /**
-     * Loads the layer data, including border geometry and components.
-     * @param {LayerData} layerData - The layer data to load.
+     * Loads layer geometry, thematic data, and border metadata.
+     *
+     * This extends the base `VectorLayer` loading path by rebuilding the packed
+     * border buffers and cumulative border-component ranges from the optional
+     * border data stored in `layerData`.
+     *
+     * @param layerData Layer payload containing triangle geometry and optional
+     * border geometry/components.
+     * @returns Nothing. The layer's CPU-side geometry caches are replaced in
+     * place.
      */
     override loadLayerData(layerData: LayerData): void {
         super.loadLayerData(layerData);
@@ -92,8 +101,15 @@ export class Triangles2DLayer extends VectorLayer {
     }
 
     /**
-     * Load the border geometry data for the layer.
-     * @param {LayerBorder[]} border - The border geometry data to load.
+     * Packs per-feature border geometry into contiguous buffers.
+     *
+     * Input border segments are concatenated into single position and index
+     * arrays. Indices are rebased as each segment is appended so the resulting
+     * buffers can be uploaded directly to the border pipeline.
+     *
+     * @param border Border geometry chunks to merge.
+     * @returns Nothing. Existing packed border position and index buffers are
+     * replaced.
      */
     loadBorderGeometry(border: LayerBorder[]): void {
         let totalVerts = 0;
@@ -130,8 +146,14 @@ export class Triangles2DLayer extends VectorLayer {
     }
 
     /**
-     * Loads the border components of the layer.
-     * @param {LayerBorderComponent[]} borderComponents - The border components to load.
+     * Builds cumulative border component ranges for feature-level lookup.
+     *
+     * Each stored component accumulates point and line counts from the start of
+     * the border buffers through the corresponding feature, matching the range
+     * convention used by the main vector components.
+     *
+     * @param borderComponents Per-feature border component metadata.
+     * @returns Nothing. Existing border component ranges are replaced.
      */
     loadBorderComponent(borderComponents: LayerBorderComponent[]): void {
         this._borderComponents = [];
@@ -151,8 +173,15 @@ export class Triangles2DLayer extends VectorLayer {
     }
 
     /**
-     * Creates the rendering pipeline for the layer, including the border pipeline.
-     * @param {Renderer} renderer - The renderer instance.
+     * Creates GPU pipelines for the filled triangles and optional border pass.
+     *
+     * The border pipeline is created only when packed border geometry is
+     * available.
+     *
+     * @param renderer Renderer that owns the WebGPU device and shared render
+     * state.
+     * @returns Nothing. Required GPU pipeline resources are created for the
+     * layer.
      */
     override createPipeline(renderer: Renderer): void {
         super.createPipeline(renderer);
@@ -164,8 +193,17 @@ export class Triangles2DLayer extends VectorLayer {
     }
 
     /**
-     * Renders the layer for the current pass, including the border.
-     * @param {Camera} camera - The camera instance.
+     * Renders the filled geometry and, when present, the border pass.
+     *
+     * The border pipeline reuses the layer's current z-index and updates its
+     * vertex buffers whenever the layer data was dirty at the start of the pass.
+     * This preserves synchronization between filled geometry updates and border
+     * rendering.
+     *
+     * @param camera Active view and projection camera.
+     * @param passEncoder Render pass encoder for the current frame.
+     * @returns Nothing. Draw commands are recorded into the provided render
+     * pass.
      */
     override renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         // VectorLayer.renderPass() clears dirty flags after updating the main
@@ -185,7 +223,12 @@ export class Triangles2DLayer extends VectorLayer {
         this._pipelineBorder.renderPass(camera, passEncoder);
     }
 
-    /** Releases GPU resources owned by 2D pipelines. */
+    /**
+     * Releases GPU resources owned by the layer and its border pipeline.
+     *
+     * @returns Nothing. After destruction, GPU resources owned by this layer
+     * are no longer usable.
+     */
     override destroy(): void {
         super.destroy();
         this._pipelineBorder?.destroy();

@@ -1,14 +1,29 @@
+/**
+ * @module LayerManager
+ * Layer ordering and shared-origin management for map layers.
+ *
+ * This module defines the `LayerManager` class, which owns the registered layer
+ * list, computes the shared scene origin used by geometry loaders, and enforces
+ * the render-stack ordering rules for base OSM layers, dynamic layers, and
+ * buildings. It also creates the concrete layer implementation that matches each
+ * layer type and handles layer insertion and removal lifecycle.
+ */
+
 import { FeatureCollection, Geometry } from 'geojson';
 
 import { computeOrigin } from './types-core';
 import type { LayerType } from './types-core';
-import { LayerData, LayerInfo, LayerRenderInfo } from './types-layers';
+
+import { 
+    LayerData, 
+    LayerInfo, 
+    LayerRenderInfo
+} from './types-layers';
 
 import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
-
 
 /**
  * OSM base layer types with a fixed bottom-up render order.
@@ -17,9 +32,14 @@ import { Triangles2DLayer } from './layer-triangles2D';
  */
 const OSM_BASE: LayerType[] = ['surface', 'parks', 'water', 'roads'];
 
-
 /**
  * Manages all map layers as a single ordered list.
+ *
+ * `LayerManager` stores every registered layer in render order, computes the
+ * shared local origin from the first loaded collection, and assigns z-indices
+ * according to the map's layering rules. Base OSM layers occupy fixed slots,
+ * dynamic layers are ordered by insertion, and buildings are always rendered
+ * last.
  */
 export class LayerManager {
     /** Registered layers sorted by render order. */
@@ -30,7 +50,7 @@ export class LayerManager {
     /** Layer ids of non-OSM, non-buildings layers in insertion order. */
     private _dynamicOrder: string[] = [];
 
-    /** Registered layers sorted by z-index. */
+    /** Registered layers sorted by render z-index. */
     get layers(): Layer[] { return this._layers; }
 
     /** World-space origin derived from the current bounding box center. */
@@ -46,7 +66,12 @@ export class LayerManager {
 
     /**
      * Computes the shared scene origin from the provided collection.
+     *
+     * The origin is derived from the collection bounding box center and is used
+     * as the common local reference for subsequently loaded geometry.
+     *
      * @param collection Source feature collection.
+     * @returns Nothing. Updates the manager's shared origin in place.
      */
     initializeOrigin(collection: FeatureCollection<Geometry | null>): void {
         this._origin = computeOrigin(collection as FeatureCollection);
@@ -54,13 +79,19 @@ export class LayerManager {
 
     /**
      * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
+     *
      * Dynamic layer z-indices are recomputed after insertion.
      * Layer ids must be unique; duplicate ids are rejected.
+     * The created layer implementation depends on `layerInfo.typeLayer`:
+     * buildings use `Triangles3DLayer`, raster layers use `RasterLayer`, and all
+     * other layer types use `Triangles2DLayer`.
+     *
      * @param layerInfo Layer identity and type metadata.
      * @param layerRender Initial render configuration.
      * @param layerData Geometry and auxiliary layer payload.
-     * @returns The created layer, or `null` when insertion is rejected.
-       */
+     * @returns The created layer, or `null` if a layer with the same id is
+     * already registered.
+     */
     addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
         if (this._layers.some((layer) => layer.layerInfo.id === layerInfo.id)) {
             console.error(`LayerManager: layer id '${layerInfo.id}' already exists.`);
@@ -85,7 +116,10 @@ export class LayerManager {
 
     /**
      * Removes the layer matching `layerId` and recomputes dynamic z-order.
+     *
      * @param layerId Layer identifier to remove.
+     * @returns Nothing. If the layer exists, it is destroyed and removed from the
+     * manager; unknown ids are ignored.
      */
     removeLayerById(layerId: string): void {
         const layer = this.searchByLayerId(layerId);
@@ -101,7 +135,10 @@ export class LayerManager {
 
     /**
      * Returns the layer with the given `layerId`, or `null` if not found.
+     *
      * @param layerId Layer identifier to search for.
+     * @returns The matching layer instance, or `null` when no registered layer
+     * has that id.
      */
     searchByLayerId(layerId: string): Layer | null {
         return this._layers.find(l => l.layerInfo.id === layerId) ?? null;
@@ -109,9 +146,14 @@ export class LayerManager {
 
     /**
      * Returns a preliminary z-index placeholder used when constructing `LayerInfo`.
+     *
      * The definitive value is assigned by `_recomputeZIndices` inside `addLayer`.
+     * Base OSM layers receive their fixed slot immediately; all other layer types
+     * return `0` until they are inserted and reordered.
+     *
      * @param layerType Layer type to place in the render stack.
-     * @returns Fixed base-slot index for OSM layers, otherwise `0` as a placeholder.
+     * @returns The fixed OSM base-slot index for known base layers, otherwise `0`
+     * as a placeholder before insertion.
      */
     computeZindex(layerType: LayerType): number {
         const osmIdx = OSM_BASE.indexOf(layerType);
@@ -120,9 +162,13 @@ export class LayerManager {
 
     /**
      * Reassigns z-indices across all registered layers:
+     *
      * - OSM base types: fixed slots 0…N-1 (by `OSM_BASE` order)
      * - Dynamic layers: slots N, N+1, … in load-insertion order
      * - Buildings: always last (N + dynamic count)
+     *
+     * @returns Nothing. Updates each registered layer's `layerInfo.zIndex` in
+     * place.
      */
     private _recomputeZIndices(): void {
         const buildingsZ = OSM_BASE.length + this._dynamicOrder.length;

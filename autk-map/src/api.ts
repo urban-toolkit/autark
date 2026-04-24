@@ -1,3 +1,14 @@
+/**
+ * @module AutkMapApi
+ * Parameter interfaces for loading and updating map layers.
+ *
+ * This module defines the public request shapes used by `AutkMap` layer APIs.
+ * The interfaces describe how GeoJSON collections, prebuilt mesh data, raster
+ * payloads, thematic mappings, color-map patches, and render-state updates are
+ * passed into the map so layer creation and incremental updates can be applied
+ * consistently.
+ */
+
 import {
     FeatureCollection,
     Geometry,
@@ -19,55 +30,112 @@ import type {
 /**
  * Parameters for loading a feature collection as a map layer.
  *
- * Pass `type: 'raster'` together with `property` to load a GeoTIFF-derived
- * raster layer. For vector layers, `property` is an optional dot-path accessor
- * used to initialize thematic mapping immediately after the layer is created.
+ * When `type` is omitted, the map may infer a vector layer type from the
+ * collection's non-null geometries. Mixed-geometry collections require an
+ * explicit `type`. Pass `type: 'raster'` together with `property` to load a
+ * GeoTIFF-derived raster layer.
+ *
+ * For vector layers, `property` is optional and is used to initialize thematic
+ * mapping immediately after the layer is created. For raster layers, `property`
+ * is required so a numeric value can be extracted from each raster cell.
  */
 export interface LoadCollectionParams {
-    /** Source feature collection. Raster collections may contain null geometries. */
+    /**
+     * Source feature collection to load.
+     *
+     * Raster-derived collections may contain `null` geometries because values
+     * are resolved from raster cell payloads rather than vector geometry.
+     */
     collection: FeatureCollection<Geometry | null>;
-    /** Optional explicit layer type override. Required for mixed-geometry collections. */
+    /**
+     * Optional explicit layer type override.
+     *
+     * Provide this when geometry-based inference is ambiguous, such as for
+     * mixed-geometry collections, or when the intended semantic layer type
+     * should not be derived automatically.
+     */
     type?: LayerType | null;
     /**
-     * Optional accessor used for immediate thematic mapping.
+     * Property accessor used to derive layer values.
      *
-     * Dot-path string accessor (e.g. `properties.shape_area`).
+     * Use a dot-path string accessor such as `properties.shape_area`.
      *
-     * For vector layers, the path is resolved from each feature.
-     * For raster layers, the path is resolved from each raster cell object.
+     * For vector layers, the path is resolved from each feature and is applied
+     * immediately as the initial thematic mapping when provided.
+     *
+     * For raster layers, the path is resolved from each raster cell object and
+     * is required to populate the raster value texture.
      */
     property?: string;
 }
 
-/** Parameters for loading a prebuilt triangle mesh directly. */
+/**
+ * Parameters for loading a prebuilt triangle mesh directly.
+ *
+ * Mesh inputs bypass GeoJSON triangulation and are added as already-prepared
+ * geometry. The geometry, components, and optional thematic values are expected
+ * to remain aligned by index so rendering, picking, and color mapping refer to
+ * the same logical mesh parts.
+ */
 export interface LoadMeshParams {
-    /** Mesh geometry in map-local coordinates relative to the current map origin. */
+    /**
+     * Mesh geometry in map-local coordinates.
+     *
+     * Coordinates must already be expressed relative to the map's current
+     * shared origin.
+     */
     geometry: LayerGeometry[];
-    /** Per-component picking/thematic metadata aligned with the mesh geometry. */
+    /**
+     * Per-component metadata aligned with `geometry`.
+     *
+     * Component ordering is used for picking and for associating thematic data
+     * with rendered mesh parts.
+     */
     components: LayerComponent[];
-    /** Optional thematic values aligned one-to-one with `components`. */
+    /**
+     * Optional thematic values aligned one-to-one with `components`.
+     *
+     * When provided, each thematic entry should correspond to the component at
+     * the same index.
+     */
     thematic?: LayerThematic[];
-    /** Mesh render type. Currently only `'buildings'` is supported. */
+    /**
+     * Mesh render type.
+     *
+     * Currently only `'buildings'` is supported by the map mesh-loading API.
+     */
     type?: 'buildings';
 }
 
 /**
  * Parameters for updating a raster layer's values.
  *
- * `property` is resolved for each raw raster cell payload from
+ * Raster updates replace the value source for an existing raster layer. The
+ * `property` accessor is resolved for each raw raster cell payload from
  * `collection.features[0].properties.raster`.
  */
 export interface UpdateRasterParams {
-    /** GeoTIFF-derived feature collection. */
+    /**
+     * GeoTIFF-derived feature collection containing raster payload data.
+     */
     collection: FeatureCollection<Geometry | null>;
-    /** Dot-path accessor for numeric value in each raster cell. */
+    /**
+     * Dot-path accessor for the numeric value in each raster cell.
+     */
     property: string;
-    /** Optional transfer function controlling opacity mapping for raster values. */
+    /**
+     * Optional transfer function used to derive raster opacity from values.
+     */
     transferFunction?: TransferFunction;
 }
 
 /**
  * Parameters for updating a layer's thematic (color-mapped) values.
+ *
+ * The supplied collection is used to recompute thematic values for an existing
+ * layer. Correct alignment depends on how the target layer matches source data,
+ * so callers should preserve stable feature ordering or identifiers when
+ * preparing update collections.
  */
 export interface UpdateThematicParams {
     /**
@@ -78,22 +146,34 @@ export interface UpdateThematicParams {
      * rendered components.
      */
     collection: FeatureCollection;
-    /** Dot-path accessor resolved from each item in the collection. */
+    /**
+     * Dot-path accessor resolved from each item in the collection.
+     */
     property: string;
 }
 
 /**
  * Parameters for patching a layer's color-map configuration.
+ *
+ * The provided object is treated as a partial patch and merged into the layer's
+ * existing color-map state rather than replacing the full configuration.
  */
 export interface UpdateColorMapParams {
-    /** Partial color-map patch merged with existing layer color-map state. */
+    /**
+     * Partial color-map patch merged with the existing layer color-map state.
+     */
     colorMap: Partial<ColorMapConfig>;
 }
 
 /**
  * Parameters for updating one or more render properties of a layer.
+ *
+ * Use this to patch render-state fields such as visibility, opacity, picking,
+ * or other supported layer render flags without rebuilding the layer.
  */
 export interface UpdateRenderInfoParams {
-    /** Partial render-state patch applied to the target layer. */
+    /**
+     * Partial render-state patch applied to the target layer.
+     */
     renderInfo: Partial<LayerRenderInfo>;
 }

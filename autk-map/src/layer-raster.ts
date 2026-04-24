@@ -1,10 +1,20 @@
+/**
+ * @module RasterLayer
+ * Raster-backed map layer rendering.
+ *
+ * This module defines the `RasterLayer` class, which stores triangulated raster
+ * surface geometry, raster texture payloads, and the WebGPU pipeline state used
+ * to render them. It is responsible for loading raster geometry and component
+ * metadata, converting scalar rasters into RGBA texture data using the active
+ * color-map and transfer-function configuration, and synchronizing those data
+ * updates with the raster rendering pipeline.
+ */
+
 import { 
     LayerInfo,
     LayerRenderInfo,
     LayerData,
 } from "./types-layers";
-
-import { Layer } from "./layer";
 
 import {
     Camera,
@@ -21,52 +31,44 @@ import type {
     RequiredTransferFunction
 } from './types-core';
 
+import { Layer } from "./layer";
+
 import { Renderer } from "./renderer";
 
 import { Pipeline } from "./pipeline";
+
 import { PipelineTriangleRaster } from "./pipeline-triangle-raster";
 
+/**
+ * Raster layer implementation backed by triangulated geometry and texture data.
+ *
+ * `RasterLayer` extends the generic layer lifecycle with raster-specific data
+ * loading and rendering behavior. It stores flattened 2D triangle geometry,
+ * cumulative component metadata, raster resolution, and both scalar and RGBA
+ * raster payloads. Scalar rasters are colorized on load using the active
+ * colormap configuration and transfer function before being uploaded through
+ * the raster pipeline.
+ */
 export class RasterLayer extends Layer {
-    /**
-     * Positions of the triangles.
-     * @type {Float32Array}
-     */
+    /** Triangle vertex positions. */
     protected _position!: Float32Array;
 
-    /**
-     * Indices of the triangles.
-     * @type {Uint32Array}
-     */
+    /** Triangle index buffer. */
     protected _indices!: Uint32Array;
 
-    /**
-     * The texture coordinates for the layer.
-     * @type {Float32Array}
-     */
+    /** Texture coordinates aligned with raster vertices. */
     protected _texCoord!: Float32Array;
 
-    /**
-     * Components of the layer.
-     * @type {LayerComponent[]}
-     */
+    /** Cumulative per-feature component metadata. */
     protected _components: LayerComponent[] = [];
 
-    /**
-     * The raster resolution in X direction.
-     * @type {number}
-     */
+    /** Raster width in pixels. */
     protected _rasterResX!: number;
 
-    /**
-     * The raster resolution in Y direction.
-     * @type {number}
-     */
+    /** Raster height in pixels. */
     protected _rasterResY!: number;
 
-    /**
-     * The raster data for the layer.
-     * @type {Float32Array}
-     */
+    /** RGBA raster payload consumed by the GPU pipeline. */
     protected _rasterData!: Float32Array;
 
     /** Canonical scalar raster payload used for domain recomputation. */
@@ -75,16 +77,19 @@ export class RasterLayer extends Layer {
     /** Opacity transfer-function configuration used while rebuilding raster RGBA data. */
     protected _transferFunction: RequiredTransferFunction = { ...DEFAULT_TRANSFER_FUNCTION };
 
-    /**
-        * Pipeline used to render raster layers.
-     */
+    /** WebGPU pipeline used to render the raster layer. */
     protected _pipeline!: Pipeline;
 
     /**
-     * Constructor for Raster
-     * @param {LayerInfo} layerInfo - The layer information.
-     * @param {LayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {LayerData} layerData - The layer data.
+     * Creates a raster layer from precomputed layer metadata and raster payloads.
+     *
+     * The constructor delegates all geometry, component, and raster loading to
+     * `loadLayerData`, which also initializes the raster resolution and derives
+     * RGBA texture data when scalar raster values are provided.
+     *
+     * @param layerInfo Static layer identity and ordering information.
+     * @param layerRenderInfo Render-state configuration, including colormap settings.
+     * @param layerData Geometry, component metadata, raster resolution, and raster values.
      */
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo);
@@ -92,58 +97,37 @@ export class RasterLayer extends Layer {
         this.loadLayerData(layerData);
     }
 
-    /**
-     * Get the positions of the triangles.
-     * @returns {Float32Array} - The positions of the triangles.
-     */
+    /** Triangle vertex positions. */
     get position(): Float32Array {
         return this._position;
     }
 
-    /**
-     * Get the indices of the triangles.
-     * @returns {Uint32Array} - The indices of the triangles.
-     */
+    /** Triangle index buffer. */
     get indices(): Uint32Array {
         return this._indices;
     }
 
-    /**
-     * Get the texture coordinates.
-     * @returns {Float32Array} - The texture coordinates.
-     */
+    /** Texture coordinates aligned with raster vertices. */
     get texCoord(): Float32Array {
         return this._texCoord;
     }
 
-    /**
-     * Get the components of the layer.
-     * @returns {LayerComponent[]} - The components of the layer.
-     */
+    /** Cumulative per-feature component metadata. */
     get components(): LayerComponent[] {
         return this._components;
     }
 
-    /**
-     * Get the raster resolution in X direction.
-     * @returns {number} - The raster resolution in X direction.
-     */
+    /** Raster width in pixels. */
     get rasterResX(): number {
         return this._rasterResX;
     }
 
-    /**
-     * Get the raster resolution in Y direction.
-     * @returns {number} - The raster resolution in Y direction.
-     */
+    /** Raster height in pixels. */
     get rasterResY(): number {
         return this._rasterResY;
     }
 
-    /**
-     * Get the raster data.
-     * @returns {Float32Array} - The raster data.
-     */
+    /** RGBA raster payload consumed by the GPU pipeline. */
     get rasterData(): Float32Array {
         return this._rasterData;
     }
@@ -155,6 +139,13 @@ export class RasterLayer extends Layer {
 
     /**
      * Updates the transfer-function configuration used to map scalar values to opacity.
+     *
+     * The provided values are merged into the existing transfer-function state.
+     * This only updates the stored configuration; callers must reload raster
+     * values separately if they need the RGBA raster payload to be rebuilt.
+     *
+     * @param config Partial transfer-function override to apply.
+     * @returns Nothing. The transfer-function configuration is updated in place.
      */
     setTransferFunction(config: TransferFunction): void {
         this._transferFunction = {
@@ -164,8 +155,14 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Load the layer data.
-     * @param {LayerData} layerData - The layer data.
+     * Loads geometry, components, raster resolution, and raster payloads.
+     *
+     * Geometry and component metadata are always loaded. Raster resolution is
+     * updated only when both `rasterResX` and `rasterResY` are present. Raster
+     * values are loaded only when a non-empty raster payload is provided.
+     *
+     * @param layerData Layer data bundle for the raster layer.
+     * @returns Nothing. The layer's CPU-side geometry and raster state are replaced.
      */
     loadLayerData(layerData: LayerData): void {
         this.loadGeometry(layerData.geometry);
@@ -182,8 +179,15 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Load the texture coordinates from the layer data.
-     * @param {LayerGeometry[]} layerGeometry - The layer data.
+     * Flattens raster geometry chunks into contiguous position, index, and UV buffers.
+     *
+     * Indices from each geometry chunk are rebased to the cumulative vertex
+     * count so the merged buffers can be rendered as a single indexed mesh.
+     * Raster geometry is expected to remain 2D, with one texture-coordinate pair
+     * for each vertex.
+     *
+     * @param layerGeometry Geometry chunks to merge into layer-local buffers.
+     * @returns Nothing. The layer geometry buffers are rebuilt in memory.
      */
     loadGeometry(layerGeometry: LayerGeometry[]): void {
         let totalVerts = 0;
@@ -237,8 +241,15 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Load the components of the layer.
-     * @param {LayerComponent[]} layerComponents - The components to load.
+     * Builds cumulative component metadata for the merged raster geometry.
+     *
+     * Each stored component keeps running totals for points and triangles so
+     * downstream consumers can address the flattened geometry by feature.
+     * Feature index and feature id metadata are preserved from the source
+     * components.
+     *
+     * @param layerComponents Per-feature component metadata to accumulate.
+     * @returns Nothing. The component list is rebuilt from the provided data.
      */
     loadComponent(layerComponents: LayerComponent[]): void {
         this._components = [];
@@ -260,8 +271,20 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Load raster values and rebuild the texture.
-     * @param rasterValues Flattened raster values to colorize.
+     * Loads raster values and rebuilds the RGBA texture payload.
+     *
+     * If the input length matches `rasterResX * rasterResY * 4`, the values are
+     * treated as a precomputed RGBA raster and copied directly. Otherwise the
+     * input is treated as a scalar raster, colorized using the active colormap,
+     * and assigned per-pixel opacity using the current transfer function.
+     * `NaN` samples produce fully transparent pixels.
+     *
+     * When a numeric computed colormap domain is available, transfer-function
+     * statistics are derived from values inside that domain. If no valid scalar
+     * values remain, the raster payload is cleared to transparent black.
+     *
+     * @param rasterValues Flattened scalar or RGBA raster values.
+     * @returns Nothing. The stored scalar values and RGBA raster payload are updated when input is non-empty.
      */
     loadRaster(rasterValues: Float32Array): void {
         if (!rasterValues || rasterValues.length === 0) {
@@ -337,8 +360,13 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Create the rendering pipeline for the layer.
-     * @param {Renderer} renderer - The renderer instance.
+     * Creates the raster rendering pipeline for this layer.
+     *
+     * The pipeline is instantiated as `PipelineTriangleRaster` and built against
+     * the layer's current geometry and raster state.
+     *
+     * @param renderer Renderer that owns the GPU device and shared resources.
+     * @returns Nothing. The layer becomes ready for raster draw calls.
      */
     createPipeline(renderer: Renderer): void {
         this._pipeline = new PipelineTriangleRaster(renderer);
@@ -346,8 +374,16 @@ export class RasterLayer extends Layer {
     }
 
     /**
-     * Render the layer for the current pass.
-     * @param {Camera} camera - The camera instance.
+     * Renders the raster layer during the current render pass.
+     *
+     * Dirty geometry or raster data trigger raster vertex-buffer and uniform
+     * updates before drawing. Dirty render-info state triggers a color-uniform
+     * update. The layer z-index is refreshed on every call before delegating the
+     * draw to the underlying pipeline.
+     *
+     * @param camera Active camera used to populate view-dependent uniforms.
+     * @param passEncoder Render-pass encoder receiving the draw commands.
+     * @returns Nothing. The layer uploads pending state changes and issues its draw call.
      */
     renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         if (this._dataIsDirty) {
@@ -366,7 +402,11 @@ export class RasterLayer extends Layer {
         this._pipeline.renderPass(camera, passEncoder);
     }
 
-    /** Releases GPU resources owned by the raster pipeline. */
+    /**
+     * Releases GPU resources owned by the raster pipeline.
+     *
+     * @returns Nothing. Any pipeline resources currently allocated for this layer are destroyed.
+     */
     override destroy(): void {
         this._pipeline?.destroy();
     }

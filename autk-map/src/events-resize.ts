@@ -1,8 +1,22 @@
+/**
+ * @module ResizeEvents
+ * Window resize controller for a map instance.
+ *
+ * This module defines the `ResizeEvents` class, which keeps the map viewport in
+ * sync with the canvas layout size. It updates the camera and renderer using the
+ * canvas's current CSS dimensions and the active device pixel ratio, then notifies
+ * the map UI so overlay layout can react to the new viewport size.
+ */
+
 import { AutkMap } from './map';
 
 /**
- * ResizeEvents handles window resize interactions with the map.
- * It keeps the canvas, camera, renderer, and UI in sync with the layout size.
+ * Window resize controller for the map viewport.
+ *
+ * `ResizeEvents` binds a single window-level resize listener and forwards each
+ * event to the module's resize function. The resize routine reads the canvas's
+ * current layout size, updates the camera and renderer to match, and then asks
+ * the map UI to recompute any size-dependent layout.
  */
 export class ResizeEvents {
     /** Reference to the owning map instance. */
@@ -24,6 +38,9 @@ export class ResizeEvents {
     /**
      * Attaches the resize listener to the window.
      *
+     * Repeated calls register the same bound handler again because the method does
+     * not guard against duplicate bindings.
+     *
      * @returns Nothing. Future window resize events are forwarded to {@link ResizeEvents.resize}.
      */
     bindEvents(): void {
@@ -33,17 +50,24 @@ export class ResizeEvents {
     /**
      * Removes the resize listener from the window.
      *
-     * @returns Nothing. Registered resize listeners are detached.
+     * This only removes the handler previously registered by
+     * {@link ResizeEvents.bindEvents}.
+     *
+     * @returns Nothing. The bound window resize listener is detached.
      */
     destroyEvents(): void {
         window.removeEventListener('resize', this._onResize);
     }
 
     /**
-     * Resizes the canvas to match its CSS layout size and updates the camera,
-     * renderer, and UI accordingly. Called once on init and on every window resize.
+     * Synchronizes the map viewport with the canvas's current layout size.
      *
-     * @returns Nothing. The map viewport and UI are synchronized to the current layout size.
+     * The method reads the canvas element's `offsetWidth` and `offsetHeight`,
+     * uses `window.devicePixelRatio` with a fallback of `1`, then propagates the
+     * updated dimensions to the camera, renderer, and UI. It does not modify the
+     * canvas size directly in this class; resizing is delegated to the renderer.
+     *
+     * @returns Nothing. The camera, renderer, and UI are updated for the current viewport size.
      */
     resize(): void {
         const canvas = this._map.canvas;

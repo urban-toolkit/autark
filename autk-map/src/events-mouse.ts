@@ -1,11 +1,24 @@
+/**
+ * @module MouseEvents
+ * Pointer and mouse interaction controller for the map canvas.
+ *
+ * This module defines the `MouseEvents` class, which translates DOM pointer,
+ * wheel, and double-click input into camera navigation and picking behavior
+ * for an `AutkMap` instance. It coordinates drag state, pointer-position
+ * tracking, and event binding so map interactions continue to work even when
+ * listeners are attached at the document level.
+ */
+
 import { MouseStatus } from './types-events';
 import { AutkMap } from './map';
 
 /**
  * Handles pointer interactions for the map canvas.
  *
- * This controller wires DOM mouse events to camera operations
- * (pan, rotate, zoom) and feature picking.
+ * This controller binds DOM pointer, wheel, and double-click events to the
+ * map camera and active picking layer. It is responsible for panning,
+ * orbit-style rotation, scroll-wheel zooming, and forwarding double-click
+ * positions to the currently pick-enabled layer.
  *
  * All drag-related listeners (`pointerdown`, `pointermove`, `pointerup`) are
  * registered on the document in capture phase during `bindEvents()`, before
@@ -37,7 +50,7 @@ export class MouseEvents {
     /**
      * Creates a mouse and pointer interaction controller for a map instance.
      *
-     * @param map - Map instance whose camera and picking state are controlled by pointer input.
+     * @param map Map instance whose camera navigation and picking behavior are controlled by pointer input.
      */
     constructor(map: AutkMap) {
         this._map = map;
@@ -59,7 +72,12 @@ export class MouseEvents {
      * are added before Playwright's recorder (or any other injected script)
      * and therefore fire first in the event propagation chain.
      *
-     * @returns Nothing. Existing listeners are replaced by bound handler references.
+     * Canvas-scoped listeners handle wheel, context-menu suppression, and
+     * double-click picking. Document-scoped listeners allow an active drag to
+     * continue receiving move and release events even when the pointer leaves
+     * the canvas bounds.
+     *
+     * @returns Attaches the bound event handlers to the canvas and document.
      */
     bindEvents(): void {
         const canvas = this._map.renderer.canvas;
@@ -74,7 +92,11 @@ export class MouseEvents {
     /**
      * Removes all pointer listeners.
      *
-     * @returns Nothing. Registered listeners are detached from the canvas and document.
+     * This should be called during map teardown to prevent further pointer
+     * handling and to release the listener references registered by
+     * `bindEvents()`.
+     *
+     * @returns Detaches the registered event handlers from the canvas and document.
      */
     destroyEvents(): void {
         const canvas = this._map.renderer.canvas;
@@ -89,8 +111,8 @@ export class MouseEvents {
     /**
      * Suppresses the browser context menu over the map canvas.
      *
-     * @param event - Fired pointer event.
-     * @returns Nothing. Default browser behavior is prevented.
+     * @param event Pointer event raised for the context-menu gesture.
+     * @returns Prevents the browser context menu from opening and stops further propagation.
      */
     contextMenu(event: PointerEvent): void {
         event.preventDefault();
@@ -101,10 +123,11 @@ export class MouseEvents {
      * Starts a drag when the pointer goes down over the canvas.
      *
      * The canvas bounds check is necessary because this listener fires for
-     * all document pointerdown events.
+     * all document `pointerdown` events. Only primary-button and middle-button
+     * presses over the map canvas begin a drag interaction.
      *
-     * @param event - Fired pointer event.
-     * @returns Nothing. Drag state is updated when the event targets the map canvas.
+     * @param event Pointer event raised on press.
+     * @returns Records the drag start position and switches the interaction state to drag when the event targets the canvas.
      */
     pointerDown(event: PointerEvent): void {
         if (event.target !== this._map.renderer.canvas) return;
@@ -121,10 +144,15 @@ export class MouseEvents {
      * Applies camera pan or orbit while dragging.
      *
      * If pointerdown was deferred (e.g. by Playwright's recorder), we detect
-     * drag start here by checking event.buttons while in IDLE state.
+     * drag start here by checking `event.buttons` while in the idle state.
+     * During a drag, `Shift` + primary button rotates the camera by updating
+     * yaw and pitch; all other supported drags translate the camera.
      *
-     * @param event - Fired pointer event.
-     * @returns Nothing. Camera motion is applied while dragging.
+     * Movement deltas are normalized by the renderer's CSS width and height
+     * before being passed to the camera.
+     *
+     * @param event Pointer event raised on move.
+     * @returns Updates the camera and the stored pointer position while an active drag is in progress.
      */
     pointerMove(event: PointerEvent): void {
         if (this._status === MouseStatus.IDLE && (event.buttons === 1 || event.buttons === 4)
@@ -156,10 +184,11 @@ export class MouseEvents {
 
     /**
      * Ends the current drag interaction.
-     * No-op when not in DRAG state.
      *
-     * @param event - Fired pointer event.
-     * @returns Nothing. Drag state is reset to idle when appropriate.
+     * Calls received while the controller is not in drag mode are ignored.
+     *
+     * @param event Pointer event raised on release.
+     * @returns Resets the interaction state to idle and suppresses the handled release event.
      */
     pointerUp(event: PointerEvent): void {
         if (this._status !== MouseStatus.DRAG) return;
@@ -172,8 +201,11 @@ export class MouseEvents {
     /**
      * Applies scroll-wheel zoom centered on the pointer position.
      *
-     * @param event - Fired wheel event.
-     * @returns Nothing. Camera zoom is updated based on wheel delta.
+     * The wheel position is converted into normalized canvas coordinates so
+     * zooming can be anchored to the current pointer location.
+     *
+     * @param event Wheel event raised over the canvas.
+     * @returns Updates the camera zoom and suppresses the browser's default scroll handling.
      */
     mouseWheel(event: WheelEvent) {
         event.preventDefault();
@@ -189,8 +221,12 @@ export class MouseEvents {
     /**
      * Triggers picking on double click for the currently active pick-enabled layer.
      *
-     * @param event - Fired mouse event.
-     * @returns Nothing. Picking coordinates are queued on the active picking layer when present.
+     * If no active picking layer is available, or the active layer is not
+     * currently configured for picking, the event is ignored after its default
+     * browser behavior is suppressed.
+     *
+     * @param event Mouse event raised on double click.
+     * @returns Stores the canvas-relative click position on the active picking layer when picking is enabled.
      */
     mouseDoubleClick(event: MouseEvent) {
         event.preventDefault();
@@ -210,8 +246,11 @@ export class MouseEvents {
     /**
      * Computes pointer coordinates in canvas-local CSS pixels.
      *
-     * @param event - Pointer or mouse event containing viewport coordinates.
-     * @returns Two-element array `[x, y]` relative to the canvas bounds.
+     * The returned coordinates are measured from the top-left corner of the
+     * renderer canvas using the canvas's current client bounding box.
+     *
+     * @param event Pointer or mouse event containing viewport coordinates.
+     * @returns Two-element array `[x, y]` relative to the canvas bounds in CSS pixels.
      */
     private _getPoint(event: PointerEvent | MouseEvent): number[] {
         const canvas = this._map.renderer.canvas;

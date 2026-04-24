@@ -1,4 +1,5 @@
 import { ColorMap } from './types-core';
+import type { ColorRGB } from './types-core';
 import { Layer } from './layer';
 import { AutkMap } from './map';
 
@@ -323,7 +324,7 @@ export class AutkMapUi {
         const rectH     = innerHeight * 0.3;
         const g         = svg.append('g').attr('transform', `translate(${2 * padding}, 0)`);
 
-        g.selectAll('rect').data(colorMap).join('rect')
+        g.selectAll<SVGRectElement, ColorRGB>('rect').data(colorMap).join('rect')
             .attr('x', (_d, i) => i * rectWidth).attr('y', 0)
             .attr('width', rectWidth).attr('height', rectH)
             .style('fill',   (d) => `rgb(${d.r},${d.g},${d.b})`)
