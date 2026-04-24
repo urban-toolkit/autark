@@ -94,6 +94,8 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
         this._selectedFeatureIds = new Set();
         this._selectionOrigin = null;
         this._activeBrushes.clear();
+        this.clearBrushVisuals();
+        this._brushBehaviors.clear();
         this.draw();
     }
 

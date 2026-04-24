@@ -107,9 +107,18 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
  */
 export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number) {
     const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
+    const isNumericLike = (value: unknown): boolean => {
+        if (typeof value === 'number') return Number.isFinite(value);
+        if (typeof value !== 'string') return false;
+
+        const trimmed = value.trim();
+        return trimmed.length > 0 && Number.isFinite(Number(trimmed));
+    };
 
     const isCategorical = sampleValues.some(v =>
-        typeof v === 'string' || (typeof v === 'number' && !Number.isFinite(v as number))
+        (typeof v === 'number' && !Number.isFinite(v)) ||
+        (typeof v === 'string' && !isNumericLike(v)) ||
+        (typeof v !== 'number' && typeof v !== 'string')
     );
 
     if (isCategorical) {

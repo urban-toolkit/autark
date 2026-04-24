@@ -8,8 +8,8 @@
  *
  * @example
  * // Basic scatter plot
- * const plot = new AutkChart(plotDiv, {
- *   type: 'scatterplot',
+ * const plot = new Scatterplot({
+ *   div: plotDiv,
  *   collection: geojson,
  *   attributes: { axis: ['population', 'income'] },
  *   labels: { axis: ['Population', 'Income'], title: 'Population vs Income' }
@@ -17,8 +17,8 @@
  *
  * @example
  * // Scatter plot with interaction events
- * const plot = new AutkChart(plotDiv, {
- *   type: 'scatterplot',
+ * const plot = new Scatterplot({
+ *   div: plotDiv,
  *   collection: geojson,
  *   attributes: { axis: ['x', 'y'] },
  *   events: [ChartEvent.CLICK, ChartEvent.BRUSH]
