@@ -4,6 +4,7 @@
   "plugin": ["typedoc-plugin-markdown"],
   "out": "docs",
   "entryPoints": ["src"],
+  "excludeProtected": true,
   "navigationLinks": {
     "Github": "https://github.com/urban-toolkit/autark"
   }

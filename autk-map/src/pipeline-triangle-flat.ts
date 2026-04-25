@@ -1,3 +1,14 @@
+/**
+ * @module PipelineTriangleFlat
+ * WebGPU pipeline for rendering flat indexed triangle geometry.
+ *
+ * This module defines the `PipelineTriangleFlat` class, a vector-layer render
+ * pipeline that uploads per-vertex position, thematic, validity, highlight,
+ * and skip state into GPU buffers and draws them with a triangle-list render
+ * pipeline. It works with `VectorLayer` mesh data and integrates shared camera
+ * and render-info uniform bind groups provided by the base `Pipeline` class.
+ */
+
 /// <reference types="@webgpu/types" />
 
 import trianglesVertexSource from './shaders/triangle-01.vert.wgsl';
@@ -11,88 +22,75 @@ import { Camera } from './types-core';
 import { VectorLayer } from './layer-vector';
 
 /**
- * PipelineTriangleFlat is a rendering pipeline for drawing flat triangles in 2D space.
- * It uses WebGPU to render triangles based on the provided mesh data.
+ * Renders flat indexed triangles for a vector layer.
+ *
+ * `PipelineTriangleFlat` owns the GPU resources needed to draw triangle meshes
+ * whose vertex data is supplied by a `VectorLayer`. It creates shader modules,
+ * allocates and updates vertex and index buffers, binds shared render-info and
+ * camera uniforms from the base pipeline, and records indexed draw calls for
+ * the current render pass.
  */
 export class PipelineTriangleFlat extends Pipeline {
-    /**
-     * Position buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing 2D positions. */
     protected _positionBuffer!: GPUBuffer;
 
-    /**
-     * Buffer for thematic data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing per-vertex thematic values. */
     protected _thematicBuffer!: GPUBuffer;
-    /** Buffer for thematic validity data. */
+    /** GPU vertex buffer containing per-vertex thematic validity flags. */
     protected _thematicValidityBuffer!: GPUBuffer;
 
-    /**
-     * Buffer for highlighted data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing per-vertex highlight flags. */
     protected _highlightedBuffer!: GPUBuffer;
 
-    /**
-     * Buffer for skipped data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing per-vertex skip flags. */
     protected _skippedBuffer!: GPUBuffer;
 
-    /**
-     * Buffer for primitive indices.
-     * @type {GPUBuffer}
-     */
+    /** GPU index buffer defining triangle primitives. */
     protected _indicesBuffer!: GPUBuffer;
 
-
-
-    /**
-     * Vertex shader module.
-     * @type {GPUShaderModule}
-     */
+    /** Compiled vertex shader module for triangle rendering. */
     protected _vertModule!: GPUShaderModule;
 
-    /**
-     * Fragment shader module.
-     * @type {GPUShaderModule}
-     */
+    /** Compiled fragment shader module for triangle rendering. */
     protected _fragModule!: GPUShaderModule;
 
-
-
-    /**
-     * Render pipeline for drawing triangles.
-     * @type {GPURenderPipeline}
-     */
+    /** WebGPU render pipeline used for indexed triangle draws. */
     protected _pipeline!: GPURenderPipeline;
 
-    /** Reused upload buffer for positions. */
+    /** Reused CPU-side upload buffer for positions. */
     private _positionData: Float32Array<ArrayBuffer> | null = null;
-    /** Reused upload buffer for thematic values. */
+    /** Reused CPU-side upload buffer for thematic values. */
     private _thematicData: Float32Array<ArrayBuffer> | null = null;
-    /** Reused upload buffer for thematic validity flags. */
+    /** Reused CPU-side upload buffer for thematic validity flags. */
     private _thematicValidityData: Float32Array<ArrayBuffer> | null = null;
-    /** Reused upload buffer for highlighted flags. */
+    /** Reused CPU-side upload buffer for highlighted flags. */
     private _highlightedData: Float32Array<ArrayBuffer> | null = null;
-    /** Reused upload buffer for skipped flags. */
+    /** Reused CPU-side upload buffer for skipped flags. */
     private _skippedData: Float32Array<ArrayBuffer> | null = null;
-    /** Reused upload buffer for indices. */
+    /** Reused CPU-side upload buffer for triangle indices. */
     private _indicesData: Uint32Array<ArrayBuffer> | null = null;
 
-
-
     /**
-     * Constructor for PipelineTriangleFlat
-     * @param {Renderer} renderer The renderer instance
+     * Creates a flat-triangle pipeline bound to a renderer.
+     *
+     * The renderer provides the WebGPU device, canvas format, multisampling
+     * configuration, and shared resources required to create pipeline state and
+     * upload buffers.
+     *
+     * @param renderer Renderer that owns the WebGPU device and render context.
      */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
-    /** Releases GPU resources owned by this pipeline. */
+    /**
+     * Releases GPU resources owned by this pipeline.
+     *
+     * This destroys all vertex and index buffers created by the pipeline and
+     * then delegates to the base pipeline to release shared resources.
+     *
+     * @returns Releases this pipeline's GPU allocations in place.
+     */
     override destroy(): void {
         this._positionBuffer?.destroy();
         this._thematicBuffer?.destroy();
@@ -103,11 +101,18 @@ export class PipelineTriangleFlat extends Pipeline {
         super.destroy();
     }
 
-
-
     /**
-     * Builds the pipeline with the provided mesh data.
-     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
+     * Builds all GPU resources needed to render a vector-layer triangle mesh.
+     *
+     * This method creates shader modules, allocates vertex and index buffers,
+     * initializes the shared color and camera uniform bind groups inherited from
+     * `Pipeline`, uploads the current mesh data, updates render-info uniforms,
+     * and finally creates the render pipeline state.
+     *
+     * @param mesh Vector layer whose typed arrays provide positions, thematic
+     * values, thematic validity flags, highlight flags, skip flags, and
+     * triangle indices.
+     * @returns Initializes this pipeline for subsequent render passes.
      */
     build(mesh: VectorLayer): void {
         this.createShaders();
@@ -123,7 +128,12 @@ export class PipelineTriangleFlat extends Pipeline {
     }
 
     /**
-     * Creates the vertex and fragment shaders for the pipeline.
+     * Creates the shader modules used by this pipeline.
+     *
+     * The modules are compiled from the flat-triangle WGSL vertex and fragment
+     * shader sources imported by this module.
+     *
+     * @returns Creates and stores the compiled shader modules on the pipeline.
      */
     createShaders(): void {
         // Vertex shader
@@ -140,8 +150,14 @@ export class PipelineTriangleFlat extends Pipeline {
     }
 
     /**
-     * Creates the vertex buffers for the pipeline.
-     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
+     * Allocates GPU vertex and index buffers sized for the current mesh.
+     *
+     * Buffer sizes are derived directly from the current lengths of the mesh's
+     * typed arrays. The buffers are created with copy destinations so their
+     * contents can be uploaded later by {@link updateVertexBuffers}.
+     *
+     * @param mesh Vector layer whose typed-array lengths determine buffer sizes.
+     * @returns Creates GPU buffers for all per-vertex attributes and indices.
      */
     createVertexBuffers(mesh: VectorLayer): void {
         // vertex data
@@ -187,8 +203,16 @@ export class PipelineTriangleFlat extends Pipeline {
     }
 
     /**
-     * Updates the vertex buffers with the provided mesh data.
-     * @param {VectorLayer} mesh The mesh data containing positions, thematic, and indices
+     * Uploads the current mesh data into the pipeline's GPU buffers.
+     *
+     * This method reuses cached CPU-side typed arrays when possible via the
+     * base pipeline sync helpers, then writes the synchronized data into the
+     * corresponding GPU buffers. It assumes the buffers have already been
+     * created with sizes compatible with the current mesh data.
+     *
+     * @param mesh Vector layer providing the latest position, thematic,
+     * thematic-validity, highlight, skip, and index arrays.
+     * @returns Updates the GPU buffer contents in place.
      */
     updateVertexBuffers(mesh: VectorLayer): void {
         this._positionData = this._syncFloatData(this._positionData, mesh.position);
@@ -207,7 +231,14 @@ export class PipelineTriangleFlat extends Pipeline {
     }
 
     /**
-     * Creates the render pipeline for drawing triangles.
+     * Creates the WebGPU render pipeline used to draw the triangle mesh.
+     *
+     * The pipeline defines the vertex buffer layouts expected by the shaders,
+     * configures alpha blending, uses a triangle-list primitive topology, and
+     * binds the render-info and camera uniform group layouts inherited from the
+     * base pipeline.
+     *
+     * @returns Creates and stores the render pipeline state object.
      */
     createPipeline(): void {
         // Vertex data
@@ -331,8 +362,18 @@ export class PipelineTriangleFlat extends Pipeline {
     }
 
     /**
-     * Renders the triangle flat pipeline.
-     * @param {Camera} camera The camera instance
+     * Records draw commands for this pipeline into a render pass.
+     *
+     * The method updates camera uniforms for the current frame, binds the
+     * pipeline, vertex buffers, index buffer, and uniform bind groups, and
+     * issues an indexed draw only when the index buffer contains at least one
+     * element.
+     *
+     * @param camera Camera whose current view and projection state is uploaded
+     * before drawing.
+     * @param passEncoder Active render pass encoder that receives the draw
+     * commands for this pipeline.
+     * @returns Records an indexed draw for the current mesh when indices are available.
      */
     renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         // sets the current pipeline

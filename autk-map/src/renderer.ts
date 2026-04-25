@@ -1,40 +1,56 @@
+/**
+ * @module Renderer
+ * WebGPU renderer and render-target manager for `autk-map`.
+ *
+ * This module provides the `Renderer` class, which configures the canvas
+ * context, allocates the main and picking render targets, manages command
+ * encoder lifetime, and handles size-dependent GPU resources. It also
+ * supports picking readback buffers and CSS-to-pixel coordinate conversion for
+ * input-driven readback operations.
+ */
+
 /// <reference types="@webgpu/types" />
 
 import { MapStyle } from './map-style';
 
 /**
- * WebGPU renderer responsible for canvas configuration, render target allocation,
- * render-pass bootstrap, and GPU resource lifecycle.
+ * WebGPU renderer responsible for canvas setup, render-target management, and
+ * frame-level GPU resource lifecycle.
+ *
+ * `Renderer` owns the WebGPU canvas context, allocates the multisampled main
+ * pass targets and the offscreen picking targets, and exposes helpers for
+ * starting render passes, submitting command buffers, and rebuilding
+ * size-dependent resources after resize events.
  */
 export class Renderer {
     private static readonly PICK_READBACK_BYTES_PER_ROW = 256;
     private static readonly PICK_READBACK_BUFFER_COUNT = 2;
-    /** HTML canvas used as render surface. */
+    /** HTML canvas used as the backing render surface. */
     protected _canvas: HTMLCanvasElement;
 
-    /** Logical GPU device. */
+    /** Logical WebGPU device used for all allocations. */
     protected _device!: GPUDevice;
 
-    /** WebGPU canvas context. */
+    /** Lazily configured WebGPU canvas context. */
     protected _context!: GPUCanvasContext | null;
 
-    /** Multisample color texture used before resolve. */
+    /** Multisampled color texture used by the main pass before resolve. */
     protected _multisampleTexture!: GPUTexture;
-    /** Main render-pass color attachment. */
+    /** Main render-pass color attachment descriptor. */
     protected _frameBuffer!: GPURenderPassColorAttachment;
 
-    /** Depth texture for the main render pass. */
+    /** Depth texture used by the main render pass. */
     protected _depthTexture!: GPUTexture;
-    /** Main render-pass depth attachment. */
+    /** Main render-pass depth attachment descriptor. */
     protected _depthBuffer!: GPURenderPassDepthStencilAttachment;
 
-    /** Picking render-pass color attachment. */
+    /** Offscreen color attachment used by the picking pass. */
     protected _pickingBuffer!: GPURenderPassColorAttachment;
-    /** Picking color texture. */
+    /** Offscreen color texture used for picking readback. */
     protected _pickingTexture!: GPUTexture;
-    /** Picking render-pass depth attachment. */
+    /** Depth attachment used by the picking pass. */
     protected _pickingDepthBuffer!: GPURenderPassDepthStencilAttachment;
-    /** Picking depth texture. */
+    /** Depth texture used by the picking pass. */
     protected _pickingDepthTexture!: GPUTexture;
 
     /** Active command encoder for the current frame. */
@@ -48,11 +64,11 @@ export class Renderer {
 
     /** MSAA sample count for the main render pass. */
     protected _sampleCount: number = 4;
-    /** Sample count for picking pass (usually 1). */
+    /** Sample count for the picking pass. */
     protected _pickingSampleCount: number = 1;
-    /** Preferred surface format returned by WebGPU. */
+    /** Preferred canvas format returned by WebGPU. */
     protected _canvasFormat!: GPUTextureFormat;
-    /** Renderer initialization state. */
+    /** Indicates whether WebGPU resources have been initialized. */
     protected _isInitialized: boolean = false;
     /** Canvas layout width in CSS pixels. */
     protected _cssWidth: number = 1;
@@ -67,6 +83,11 @@ export class Renderer {
 
     /**
      * Creates a renderer bound to a canvas.
+     *
+     * The renderer stores the canvas reference immediately and derives initial
+     * layout and backing-store metrics from the element size and current device
+     * pixel ratio. GPU resources are created later by {@link init}.
+     *
      * @param canvas Target HTML canvas.
      */
     constructor(canvas: HTMLCanvasElement) {
@@ -109,7 +130,7 @@ export class Renderer {
         return this._canvasFormat;
     }
 
-    /** Active WebGPU canvas context (if configured). */
+    /** Active WebGPU canvas context, if configured. */
     get context(): GPUCanvasContext | null {
         return this._context;
     }
@@ -129,7 +150,7 @@ export class Renderer {
         return this._depthBuffer;
     }
 
-    /** Active command encoder for the current frame pass setup. */
+    /** Active command encoder for the current frame. */
     get commandEncoder(): GPUCommandEncoder {
         if (!this._commandEncoder) {
             throw new Error('Renderer command encoder requested outside an active frame.');
@@ -159,6 +180,11 @@ export class Renderer {
 
     /**
      * Initializes WebGPU and creates all core render targets.
+     *
+     * This performs device negotiation, configures the canvas context, and
+     * allocates the main color/depth attachments as well as the picking
+     * textures. If WebGPU is unavailable, initialization fails without
+     * creating render targets.
      */
     async init(): Promise<void> {
         const api = await this.initWebGPU();
@@ -177,7 +203,9 @@ export class Renderer {
 
     /**
      * Initializes the WebGPU device and preferred canvas format.
-     * @returns True when initialization succeeds; otherwise false.
+     *
+     * @returns `true` when adapter and device acquisition succeed; otherwise
+     * `false`.
      */
     async initWebGPU(): Promise<boolean> {
         try {
@@ -204,6 +232,11 @@ export class Renderer {
 
     /**
      * Resizes the canvas and recreates size-dependent render targets.
+     *
+     * CSS metrics are normalized before backing-store dimensions are derived.
+     * When the renderer has already been initialized, the canvas context and
+     * all size-dependent GPU attachments are recreated to match the new size.
+     *
      * @param cssWidth New layout width in CSS pixels.
      * @param cssHeight New layout height in CSS pixels.
      * @param devicePixelRatio Backing-store scale factor.
@@ -223,6 +256,9 @@ export class Renderer {
 
     /**
      * Configures the WebGPU canvas context.
+     *
+     * The context is created lazily and then configured with the negotiated
+     * canvas format and render-attachment usage.
      */
     configureContext(): void {
         if (!this._device) {
@@ -245,7 +281,10 @@ export class Renderer {
     }
 
     /**
-     * Creates or recreates color/depth attachments for picking.
+     * Creates or recreates color and depth attachments for picking.
+     *
+     * The picking pass renders into an offscreen texture sized to the current
+     * backing store so object ids can be read back at pixel precision.
      */
     configurePickingBuffer(): void {
         if (!this._device) {
@@ -291,6 +330,9 @@ export class Renderer {
 
     /**
      * Creates or recreates the main color attachment and multisample texture.
+     *
+     * The attachment resolves into the current swap-chain texture and uses the
+     * configured background color as its clear value.
      */
     configureFrameBuffer(): void {
         if (!this._device) {
@@ -329,6 +371,9 @@ export class Renderer {
 
     /**
      * Creates or recreates the main depth attachment.
+     *
+     * The depth texture matches the current backing-store size and is used by
+     * the primary render pass.
      */
     configureDepthBuffer(): void {
         if (!this._device) {
@@ -358,6 +403,9 @@ export class Renderer {
 
     /**
      * Starts the main render pass by clearing configured attachments.
+     *
+     * This updates the frame buffer resolve target to the current canvas
+     * texture and prepares the shared command encoder for draw submission.
      */
     start(): void {
         if (!this._isInitialized) {
@@ -378,7 +426,12 @@ export class Renderer {
         this._beginFrame();
     }
 
-    /** Opens the shared main render pass for the current frame. */
+    /**
+     * Opens the shared main render pass for the current frame.
+     *
+     * @returns An encoder for the primary pass. The pass uses the current
+     * canvas texture as the resolve target and clears depth before drawing.
+     */
     beginMainRenderPass(): GPURenderPassEncoder {
         if (!this._isInitialized) {
             throw new Error('Renderer main pass requested before initialization.');
@@ -402,6 +455,9 @@ export class Renderer {
 
     /**
      * Submits the current command buffer.
+     *
+     * After submission the active encoder is cleared so the next frame starts
+     * with a fresh command buffer.
      */
     finish(): void {
         if (!this._isInitialized || !this._commandEncoder) {
@@ -413,6 +469,10 @@ export class Renderer {
 
     /**
      * Starts the picking render pass by clearing picking attachments.
+     *
+     * The picking pass uses offscreen attachments only; it does not resolve to
+     * the canvas. A fresh command encoder is created when needed before the
+     * empty pass is opened and closed.
      */
     startPickingRenderPass(): void {
         if (!this._isInitialized) {
@@ -430,7 +490,18 @@ export class Renderer {
         this._beginEmptyRenderPass(renderPassDesc);
     }
 
-    /** Reserves one of the double-buffered picking readback buffers for the current frame. */
+    /**
+     * Reserves one of the double-buffered picking readback buffers for the
+     * current frame.
+     *
+     * Existing buffers are reused when large enough; otherwise the slot is
+     * reallocated to match the requested pick count. Busy slots are skipped so
+     * readback work from the previous frame is not overwritten.
+     *
+     * @param pickCount Number of single-pixel readbacks that will be copied
+     * into the slot.
+     * @returns The reserved slot index, or `null` when no slot is available.
+     */
     reservePickingReadbackSlot(pickCount: number): number | null {
         if (!this._isInitialized || pickCount <= 0) {
             return null;
@@ -460,7 +531,18 @@ export class Renderer {
         return null;
     }
 
-    /** Queues a single-pixel picking texture readback into a reserved readback slot. */
+    /**
+     * Queues a single-pixel picking texture readback into a reserved readback
+     * slot.
+     *
+     * The supplied CSS-space coordinates are converted to backing-store pixel
+     * coordinates before copying from the picking texture.
+     *
+     * @param slotIndex Reserved readback slot index.
+     * @param pickIndex Offset within the slot for this pick.
+     * @param x CSS-relative x coordinate.
+     * @param y CSS-relative y coordinate.
+     */
     enqueuePickingReadback(slotIndex: number, pickIndex: number, x: number, y: number): void {
         const slot = this._pickReadbackBuffers[slotIndex];
         if (!slot?.buffer) {
@@ -483,7 +565,17 @@ export class Renderer {
         );
     }
 
-    /** Maps a reserved readback slot and decodes all picked ids copied into it. */
+    /**
+     * Maps a reserved readback slot and decodes all picked ids copied into it.
+     *
+     * The mapped buffer is always released in a `finally` block and the slot is
+     * marked idle again after readback completes or fails.
+     *
+     * @param slotIndex Reserved readback slot index.
+     * @param pickCount Number of copied pick records to decode.
+     * @returns Decoded object ids in copy order, or an empty array when the
+     * slot is unavailable.
+     */
     async readPickingResults(slotIndex: number, pickCount: number): Promise<number[]> {
         const slot = this._pickReadbackBuffers[slotIndex];
         if (!slot?.buffer) {
@@ -509,8 +601,11 @@ export class Renderer {
     }
 
     /**
-     * Explicitly release GPU resources and reset renderer state.
-     * Should be called when disposing the map to prevent leaks.
+     * Explicitly releases GPU resources and resets renderer state.
+     *
+     * Destroying the renderer frees owned textures and readback buffers,
+     * unconfigures the canvas context, and marks the renderer as uninitialized
+     * so it can no longer submit frames.
      */
     destroy(): void {
         this._multisampleTexture?.destroy();
@@ -524,6 +619,7 @@ export class Renderer {
         this._isInitialized = false;
     }
 
+    /** Ensures a command encoder exists for the current frame. */
     private _beginFrame(): void {
         if (!this._commandEncoder) {
             this._commandEncoder = this._device.createCommandEncoder();
@@ -531,7 +627,11 @@ export class Renderer {
     }
 
     /**
-     * Creates a command encoder and opens/closes an empty pass to clear attachments.
+     * Opens and immediately closes an empty render pass to clear attachments.
+     *
+     * The pass is started on the shared command encoder so attachment clear
+     * operations are encoded without issuing draw calls.
+     *
      * @param renderPassDesc Render pass descriptor to execute.
      */
     private _beginEmptyRenderPass(renderPassDesc: GPURenderPassDescriptor): void {
@@ -539,12 +639,19 @@ export class Renderer {
         passEncoder.end();
     }
 
+    /** Decodes an RGB picking color into the original object id. */
     private _decodeColorToId(r: number, g: number, b: number): number {
         const id = (r & 0xff) | ((g & 0xff) << 8) | ((b & 0xff) << 16);
         return id - 1;
     }
 
-    /** Converts CSS-relative coordinates into clamped backing-store pixel coordinates. */
+    /**
+     * Converts CSS-relative coordinates into clamped backing-store pixel
+     * coordinates.
+     *
+     * This is used to align input coordinates with the renderer's device-pixel
+     * backing store before performing picking readback copies.
+     */
     toPixelCoordinates(x: number, y: number): [number, number] {
         const scaleX = this._cssWidth > 0 ? this._pixelWidth / this._cssWidth : 1;
         const scaleY = this._cssHeight > 0 ? this._pixelHeight / this._cssHeight : 1;
@@ -553,7 +660,13 @@ export class Renderer {
         return [px, py];
     }
 
-    /** Synchronizes CSS and backing-store metrics before any GPU reallocation work. */
+    /**
+     * Synchronizes CSS and backing-store metrics before any GPU reallocation
+     * work.
+     *
+     * The canvas element is resized to the computed backing-store dimensions so
+     * subsequent render-target allocation uses the updated size.
+     */
     private _syncCanvasMetrics(cssWidth: number, cssHeight: number, devicePixelRatio: number): void {
         this._cssWidth = Math.max(1, Math.floor(cssWidth));
         this._cssHeight = Math.max(1, Math.floor(cssHeight));

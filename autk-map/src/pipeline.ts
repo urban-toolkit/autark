@@ -1,89 +1,82 @@
 /// <reference types="@webgpu/types" />
 
+/**
+ * @module Pipeline
+ * Shared WebGPU pipeline base for layer rendering.
+ *
+ * This module defines the abstract `Pipeline` base class used by layer-specific
+ * renderers. It owns the common camera and render-info GPU resources, creates
+ * bind groups for shared shader inputs, and provides cache helpers that
+ * subclasses reuse while building and updating their own draw pipelines.
+ */
+
 import { Layer } from './layer';
 
-import { Camera, ColorMap, DEFAULT_COLORMAP_RESOLUTION } from './types-core';
+import { 
+    Camera, 
+    ColorMap, 
+    DEFAULT_COLORMAP_RESOLUTION 
+} from './types-core';
+
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
 
 const COLORMAP_HEIGHT = 1;
 
 /**
- * Abstract class representing a rendering pipeline.
- * It provides methods for creating camera and color uniform bind groups,
- * updating camera and color uniforms, and defining the structure for building
- * and rendering the pipeline.
+ * Base class for layer rendering pipelines.
+ *
+ * `Pipeline` coordinates the shared WebGPU resources used by map layers,
+ * including camera uniforms, render-state uniforms, and their bind groups.
+ * Subclasses use it to initialize common GPU state, update per-frame and
+ * per-layer uniforms, and implement the layer-specific build, vertex upload,
+ * and draw-pass hooks.
  */
 export abstract class Pipeline {
-    /**
-     * Renderer reference
-     */
+    /** WebGPU renderer used to allocate and update GPU resources. */
     protected _renderer: Renderer;
 
-    /**
-     * ModelView matrix uniform buffer
-     */
+    /** Model-view matrix uniform buffer. */
     protected _mviewBuffer!: GPUBuffer;
 
-    /**
-     * Projection matrix uniform buffer
-     */
+    /** Projection matrix uniform buffer. */
     protected _projectionBuffer!: GPUBuffer;
+    /** Layer z-index uniform buffer. */
     protected _zIndexBuffer!: GPUBuffer;
 
-    /**
-     * Camera bind group
-     */
+    /** Camera bind group shared by vertex shaders. */
     protected _cameraBindGroup!: GPUBindGroup;
 
-    /**
-     * Camera bind group layout
-     */
+    /** Camera bind group layout. */
     protected _cameraBindGroupLayout!: GPUBindGroupLayout;
 
-    /**
-     * Color uniform buffer
-     */
+    /** Fixed color uniform buffer. */
     protected _colorBuffer!: GPUBuffer;
 
-    /**
-     * Highlight color uniform buffer
-     */
+    /** Highlight color uniform buffer. */
     protected _highlightColorBuffer!: GPUBuffer;
     /** Invalid thematic value color uniform buffer. */
     protected _invalidValueColorBuffer!: GPUBuffer;
 
-    /**
-     * Color map texture
-     */
+    /** Colormap texture. */
     protected _cMapTexture!: GPUTexture;
 
-    /**
-     * Use color map uniform buffer
-     */
+    /** Flag uniform that enables thematic color mapping. */
     protected _useColorMap!: GPUBuffer;
 
-    /**
-     * Use highlight uniform buffer
-     */
+    /** Flag uniform that enables highlight rendering. */
     protected _useHighlight!: GPUBuffer;
 
-    /**
-     * Opacity uniform buffer
-     */
+    /** Opacity uniform buffer. */
     protected _opacity!: GPUBuffer;
 
     /** Colormap domain parameters: [min, max, useNormalization, _pad]. */
     protected _domainBuffer!: GPUBuffer;
 
-    /**
-     * Render information bind group
-     */
+    /** Render-state bind group shared by fragment shaders. */
     protected _renderInfoBindGroup!: GPUBindGroup;
 
-    /**
-     * Render information bind group layout
-     */
+    /** Render-state bind group layout. */
     protected _renderInfoBindGroupLayout!: GPUBindGroupLayout;
 
     /** Cached matrix uniform data to avoid per-frame allocations. */
@@ -108,15 +101,20 @@ export abstract class Pipeline {
     private _domainData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
 
     /**
-     * Pipeline constructor
-     * @param {Renderer} renderer The renderer instance
+     * Creates a pipeline bound to the shared renderer.
+     *
+     * @param renderer Renderer used to create and update GPU resources.
      */
     constructor(renderer: Renderer) {
         this._renderer = renderer;
     }
 
     /**
-     * Creates the camera uniform bind group.
+     * Creates the shared camera uniform resources.
+     *
+     * Subclasses call this during setup before writing camera state. The bind
+     * group exposes the model-view matrix, projection matrix, and z-index
+     * uniforms to vertex shaders.
      */
     createCameraUniformBindGroup(): void {
         this._mviewBuffer = this._renderer.device.createBuffer({
@@ -177,8 +175,9 @@ export abstract class Pipeline {
     }
 
     /**
-     * Updates the camera uniform buffers with the current camera state.
-     * @param {Camera} camera The camera instance
+     * Writes the current camera state into the shared camera uniforms.
+     *
+     * @param camera Camera instance whose matrices are uploaded to the GPU.
      */
     updateCameraUniforms(camera: Camera): void {
         this._mviewData.set(camera.getModelViewMatrix());
@@ -188,14 +187,18 @@ export abstract class Pipeline {
         this._renderer.device.queue.writeBuffer(this._projectionBuffer, 0, this._projectionData);
     }
 
-    /** Writes the layer z-index to the uniform buffer used by vertex shaders. */
+    /** Writes the layer z-index to the shared vertex uniform buffer. */
     updateZIndex(value: number): void {
         this._zIndexData[0] = value;
         this._renderer.device.queue.writeBuffer(this._zIndexBuffer, 0, this._zIndexData);
     }
 
     /**
-     * Creates the color uniform bind group.
+     * Creates the shared render-state uniform resources.
+     *
+     * Subclasses call this during setup before writing layer styling state. The
+     * bind group exposes fixed colors, colormap state, opacity, and colormap
+     * domain data to fragment shaders.
      */
     createColorUniformBindGroup(): void {
         this._colorBuffer = this._renderer.device.createBuffer({
@@ -349,8 +352,13 @@ export abstract class Pipeline {
     }
 
     /**
-     * Updates the color uniform buffers with the current layer state.
-     * @param {Layer} layer The layer instance
+     * Writes the current layer styling state into the shared render uniforms.
+     *
+     * Numeric and categorical domains are encoded differently in the shared
+     * domain buffer so shader code can distinguish between fixed-color,
+     * continuous, and categorical colormap rendering.
+     *
+     * @param layer Layer instance whose render configuration is uploaded.
      */
     updateColorUniforms(layer: Layer): void {
         const computedDomain = layer.layerRenderInfo.colormap.computedDomain;
@@ -422,7 +430,10 @@ export abstract class Pipeline {
 
     /**
      * Releases GPU resources owned by this base pipeline.
-     * Subclasses should `override` and call `super.destroy()`.
+     *
+     * Missing resources are ignored, which makes the method safe after partial
+     * setup. Subclasses should override and call `super.destroy()` to release
+     * any additional GPU objects they own.
      */
     destroy(): void {
         this._mviewBuffer?.destroy();
@@ -439,7 +450,7 @@ export abstract class Pipeline {
         this._cMapTexture?.destroy();
     }
 
-    /** Reuses or reallocates a float32 cache and copies source values into it. */
+    /** Returns a float32 cache sized to the source and copies the values into it. */
     protected _syncFloatData(
         cache: Float32Array<ArrayBuffer> | null,
         source: ArrayLike<number>,
@@ -451,7 +462,7 @@ export abstract class Pipeline {
         return cache;
     }
 
-    /** Reuses or reallocates a uint32 cache and copies source values into it. */
+    /** Returns a uint32 cache sized to the source and copies the values into it. */
     protected _syncUintData(
         cache: Uint32Array<ArrayBuffer> | null,
         source: ArrayLike<number>,
@@ -463,7 +474,7 @@ export abstract class Pipeline {
         return cache;
     }
 
-    /** Reuses or reallocates a uint8 cache and copies source values into it. */
+    /** Returns a uint8 cache sized to the source and copies the values into it. */
     protected _syncU8Data(
         cache: Uint8Array<ArrayBuffer> | null,
         source: ArrayLike<number>,
@@ -475,7 +486,7 @@ export abstract class Pipeline {
         return cache;
     }
 
-    /** Reuses or reallocates a float32 cache with the requested length. */
+    /** Returns a float32 cache with the requested length. */
     protected _syncFloatLength(
         cache: Float32Array<ArrayBuffer> | null,
         length: number,
@@ -490,23 +501,30 @@ export abstract class Pipeline {
     prepareRender(_camera: Camera): void {}
 
     /**
-     * Builds the pipeline.
-     * @param {Layer} data The layer instance
+     * Builds the layer-specific pipeline state.
+     *
+     * Implementations are responsible for creating the GPU pipeline and any
+     * resources required by the layer, including the shared bind groups when
+     * they are part of the pipeline setup.
+     *
+     * @param data Layer instance used to derive pipeline configuration.
      */
     abstract build(data: Layer): void;
 
     /**
-     * Creates the vertex buffers.
-     * @param {Layer} data The layer instance
+     * Creates the vertex buffers for the layer.
+     *
+     * @param data Layer instance used to build vertex buffer contents.
      */
     abstract createVertexBuffers(data: Layer): void;
 
     /**
-     * Updates the vertex buffers with the provided data.
-     * @param {Layer} data The layer instance
+     * Updates the layer's vertex buffers from the current layer data.
+     *
+     * @param data Layer instance whose buffered data should be refreshed.
      */
     abstract updateVertexBuffers(data: Layer): void;
 
-    /** Records draw commands for this pipeline into an existing main pass. */
+    /** Records draw commands for this pipeline into an existing render pass. */
     abstract renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void;
 }

@@ -1,3 +1,15 @@
+/**
+ * @module PipelineBuildingSSAO
+ * WebGPU pipeline for rendering building geometry with a shared SSAO pass.
+ *
+ * This module defines the `PipelineBuildingSSAO` class, which builds the
+ * geometry pass for indexed 3D building meshes and the renderer-scoped shared
+ * resources used by the SSAO composite pass. It owns the per-instance vertex
+ * and index buffers, uploads mesh data into those buffers, and coordinates the
+ * two-pass render flow through shared offscreen textures and a fullscreen
+ * composite pipeline.
+ */
+
 /// <reference types="@webgpu/types" />
 
 import buildingsVS01 from './shaders/buildings-01.vert.wgsl';
@@ -28,34 +40,79 @@ type SharedSsaoState = {
 
 /**
  * Geometry pipeline for 3D building layers and shared SSAO composite helpers.
+ *
+ * `PipelineBuildingSSAO` renders indexed building meshes in an offscreen
+ * geometry pass, stores color and normal outputs in renderer-scoped shared
+ * textures, and exposes helpers for the fullscreen SSAO composite pass. The
+ * class manages mesh-specific GPU buffers and shader state, while shared
+ * textures, sampler state, and the composite pipeline are cached per renderer.
+ *
+ * @example
+ * const pipeline = new PipelineBuildingSSAO(renderer);
+ * pipeline.build(buildingMesh);
  */
 export class PipelineBuildingSSAO extends Pipeline {
+    /** Renderer-scoped shared SSAO state cache. */
     private static _sharedState = new WeakMap<Renderer, SharedSsaoState>();
 
+    /** GPU vertex buffer containing building positions. */
     protected _positionBuffer!: GPUBuffer;
+    /** GPU vertex buffer containing building normals. */
     protected _normalBuffer!: GPUBuffer;
+    /** GPU vertex buffer containing thematic values. */
     protected _thematicBuffer!: GPUBuffer;
+    /** GPU vertex buffer containing thematic validity flags. */
     protected _thematicValidityBuffer!: GPUBuffer;
+    /** GPU vertex buffer containing highlighted-vertex flags. */
     protected _highlightedBuffer!: GPUBuffer;
+    /** GPU vertex buffer containing skipped-vertex flags. */
     protected _skippedBuffer!: GPUBuffer;
+    /** GPU index buffer defining building triangles. */
     protected _indicesBuffer!: GPUBuffer;
 
+    /** Compiled vertex shader module for the geometry pass. */
     protected _vertModule01!: GPUShaderModule;
+    /** Compiled fragment shader module for the geometry pass. */
     protected _fragModule01!: GPUShaderModule;
+    /** Render pipeline used for the geometry pass. */
     protected _pipeline01!: GPURenderPipeline;
 
+    /** Reused CPU-side upload buffer for positions. */
     private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for normals. */
     private _normalData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for thematic values. */
     private _thematicData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for thematic validity flags. */
     private _thematicValidityData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for highlight flags. */
     private _highlightedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for skip flags. */
     private _skippedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for triangle indices. */
     private _indicesData: Uint32Array<ArrayBuffer> | null = null;
 
+    /**
+     * Creates a building SSAO pipeline bound to a renderer.
+     *
+     * The renderer provides the WebGPU device, canvas format, multisampling
+     * configuration, and shared state used to build the geometry and composite
+     * passes.
+     *
+     * @param renderer Renderer that owns the WebGPU device and canvas state.
+     */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
+    /**
+     * Releases GPU resources owned by this pipeline.
+     *
+     * This destroys the geometry buffers created by the pipeline and then
+     * delegates to the base pipeline for shared cleanup.
+     *
+     * @returns Releases this pipeline's GPU allocations in place.
+     */
     override destroy(): void {
         this._positionBuffer?.destroy();
         this._normalBuffer?.destroy();
@@ -67,6 +124,16 @@ export class PipelineBuildingSSAO extends Pipeline {
         super.destroy();
     }
 
+    /**
+     * Begins the shared geometry pass for all SSAO-enabled building layers.
+     *
+     * The pass writes color, normals, and depth into renderer-scoped offscreen
+     * textures. Those attachments are cleared before each use so callers can
+     * record one or more geometry draw calls into the returned encoder.
+     *
+     * @param renderer Renderer that owns the shared SSAO targets.
+     * @returns Render pass encoder targeting the shared geometry buffers.
+     */
     static beginSharedGeometryPass(renderer: Renderer): GPURenderPassEncoder {
         const shared = this._ensureSharedState(renderer);
         shared.colorsSharedBuffer.loadOp = 'clear';
@@ -79,6 +146,17 @@ export class PipelineBuildingSSAO extends Pipeline {
         });
     }
 
+    /**
+     * Draws the shared fullscreen SSAO composite pass.
+     *
+     * The pass samples the shared color and normal textures generated by the
+     * geometry pass and renders the composited result into the caller-provided
+     * pass encoder.
+     *
+     * @param renderer Renderer that owns the shared SSAO textures and pipeline.
+     * @param passEncoder Active render pass encoder for the final composite.
+     * @returns Records a fullscreen draw into the provided render pass.
+     */
     static compositeSharedPass(renderer: Renderer, passEncoder: GPURenderPassEncoder): void {
         const shared = this._ensureSharedState(renderer);
         passEncoder.setPipeline(shared.pipeline02);
@@ -86,6 +164,17 @@ export class PipelineBuildingSSAO extends Pipeline {
         passEncoder.draw(6);
     }
 
+    /**
+     * Builds the SSAO geometry and shared composite resources for a mesh.
+     *
+     * This creates shader modules, allocates and uploads per-mesh buffers,
+     * prepares the base pipeline bind groups, initializes the geometry render
+     * pipeline, and ensures that the renderer-scoped shared SSAO state exists.
+     *
+     * @param mesh Building mesh whose typed arrays provide geometry and render
+     * state for the pass.
+     * @returns Initializes this pipeline for subsequent render passes.
+     */
     build(mesh: Triangles3DLayer): void {
         this.createShaders();
         this.createVertexBuffers(mesh);
@@ -97,6 +186,14 @@ export class PipelineBuildingSSAO extends Pipeline {
         PipelineBuildingSSAO._ensureSharedState(this._renderer);
     }
 
+    /**
+     * Creates the shader modules used by the geometry pass.
+     *
+     * The modules are compiled from the WGSL sources imported for the building
+     * SSAO geometry stage.
+     *
+     * @returns Creates and stores the compiled shader modules on the pipeline.
+     */
     createShaders(): void {
         this._vertModule01 = this._renderer.device.createShaderModule({
             label: 'Buildings ssao: vertex shader pass 01',
@@ -108,6 +205,16 @@ export class PipelineBuildingSSAO extends Pipeline {
         });
     }
 
+    /**
+     * Allocates GPU buffers sized for the current building mesh.
+     *
+     * Buffer sizes are derived from the current typed-array lengths on the mesh.
+     * This method allocates buffers only; data upload happens in
+     * {@link updateVertexBuffers}.
+     *
+     * @param mesh Building mesh whose typed-array lengths determine buffer sizes.
+     * @returns Creates GPU buffers for all geometry attributes and indices.
+     */
     createVertexBuffers(mesh: Triangles3DLayer): void {
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
@@ -146,6 +253,16 @@ export class PipelineBuildingSSAO extends Pipeline {
         });
     }
 
+    /**
+     * Uploads the current mesh data into the pipeline's GPU buffers.
+     *
+     * The method reuses cached CPU-side typed arrays when possible and writes
+     * the synchronized data into the corresponding GPU buffers.
+     *
+     * @param mesh Building mesh providing the latest position, normal,
+     * thematic, highlight, skip, and index arrays.
+     * @returns Updates the GPU buffer contents in place.
+     */
     updateVertexBuffers(mesh: Triangles3DLayer): void {
         this._normalData = this._syncFloatData(this._normalData, mesh.normal);
         this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
@@ -164,6 +281,15 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
     }
 
+    /**
+     * Creates the geometry render pipeline for the building SSAO pass.
+     *
+     * The pipeline writes color and normal outputs to the shared offscreen
+     * textures used by the SSAO composite stage, and uses the base pipeline's
+     * render-info and camera bind group layouts.
+     *
+     * @returns Creates and stores the geometry render pipeline on the instance.
+     */
     createPipeline01(): void {
         const positionAttribDesc: GPUVertexAttribute = { shaderLocation: 0, offset: 0, format: 'float32x3' };
         const normalAttribDesc: GPUVertexAttribute = { shaderLocation: 1, offset: 0, format: 'float32x3' };
@@ -213,6 +339,17 @@ export class PipelineBuildingSSAO extends Pipeline {
         });
     }
 
+    /**
+     * Records the indexed geometry draw calls for the building pass.
+     *
+     * This binds the geometry pipeline, uploads the latest camera uniforms,
+     * binds the vertex and index buffers, and skips the draw when the mesh has
+     * no indices.
+     *
+     * @param camera Camera used to update the shared camera uniforms.
+     * @param passEncoder Active render pass encoder for the geometry pass.
+     * @returns Records indexed geometry draws into the provided render pass.
+     */
     renderGeometryPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         passEncoder.setPipeline(this._pipeline01);
         this.updateCameraUniforms(camera);
@@ -232,10 +369,37 @@ export class PipelineBuildingSSAO extends Pipeline {
         }
     }
 
+    /**
+     * No-op preparation hook for this pipeline's render flow.
+     *
+     * The SSAO pipeline is driven through the shared geometry and composite
+     * helpers instead of the base pipeline's per-layer render preparation.
+     *
+     * @returns Intentionally performs no per-frame preparation.
+     */
     override prepareRender(_camera: Camera): void {}
 
+    /**
+     * No-op render hook for this pipeline's render flow.
+     *
+     * The SSAO pipeline records work through {@link renderGeometryPass} and the
+     * static shared pass helpers rather than this base render entry point.
+     *
+     * @returns Intentionally performs no draw work.
+     */
     renderPass(_camera: Camera, _passEncoder: GPURenderPassEncoder): void {}
 
+    /**
+     * Returns the renderer-scoped shared SSAO resources, recreating them when
+     * the render target size changes.
+     *
+     * Shared textures are sized at twice the renderer's pixel dimensions and
+     * cached per renderer. When the size changes, the previous textures are
+     * destroyed and a new geometry/composite state bundle is created.
+     *
+     * @param renderer Renderer that owns the shared SSAO state.
+     * @returns Shared SSAO attachments, bind groups, and composite pipeline.
+     */
     private static _ensureSharedState(renderer: Renderer): SharedSsaoState {
         const width = 2 * renderer.pixelWidth;
         const height = 2 * renderer.pixelHeight;

@@ -1,3 +1,14 @@
+/**
+ * @module AutkMapUi
+ * DOM-based user interface controller for `AutkMap`.
+ *
+ * This module defines the `AutkMapUi` class, which creates and maintains the
+ * map's floating UI elements, including the layer menu, thematic legend, and
+ * optional performance overlay. It coordinates UI state with map layer render
+ * state so that visibility, color-map display, picking, and active-layer
+ * selection stay aligned with the current map contents.
+ */
+
 import { ColorMap } from './types-core';
 import type { ColorRGB } from './types-core';
 import { Layer } from './layer';
@@ -11,6 +22,21 @@ const CURSOR_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555">
 
 const DEBUG_FPS = false;
 
+/**
+ * Floating DOM UI controller for an `AutkMap` instance.
+ *
+ * `AutkMapUi` builds lightweight overlay controls in the map canvas container
+ * and keeps them synchronized with the current layer stack and render state.
+ * It exposes methods for building and tearing down the UI, responding to map
+ * resize and layer lifecycle events, and updating legend and performance
+ * displays.
+ *
+ * @example
+ * const map = new AutkMap(canvas);
+ * await map.init();
+ *
+ * map.ui.changeActiveLayer(map.layerManager.layers[0] ?? null);
+ */
 export class AutkMapUi {
     /** Parent map instance used for UI interactions and layer updates. */
     protected _map: AutkMap;
@@ -29,22 +55,37 @@ export class AutkMapUi {
     /** Persistent menu toggle handler removed during teardown. */
     protected _onMenuIconClick: ((event: MouseEvent) => void) | null = null;
 
+    /**
+     * Creates a UI controller bound to a map instance.
+     *
+     * The UI is not inserted into the DOM until {@link buildUi} is called.
+     *
+     * @param map Parent map whose canvas, layers, and update APIs are used by the UI.
+     */
     constructor(map: AutkMap) {
         this._map = map;
     }
 
     /** Parent map reference. */
     get map(): AutkMap { return this._map; }
-    /** Updates the parent map reference. */
+    /** Updates the parent map reference used by subsequent UI operations. */
     set map(map: AutkMap) { this._map = map; }
-    /** Currently active legend layer. */
+    /** Layer currently used for legend display and pick activation. */
     get activeLayer(): Layer | null { return this._activeLayer; }
-    /** Sets the currently active legend layer. */
+    /** Sets the cached active layer reference used by legend synchronization. */
     set activeLayer(layer: Layer | null) { this._activeLayer = layer; }
 
     // ── Resize ────────────────────────────────────────────────────────────────
 
-    /** Repositions floating UI controls after canvas/layout changes. */
+    /**
+     * Repositions floating UI elements to match the canvas location.
+     *
+     * This should be called after canvas size or page layout changes so the
+     * menu, submenu, legend, and performance overlay remain anchored to the
+     * correct corners of the map container.
+     *
+     * @returns Updates the inline position styles of any UI elements that have been built.
+     */
     handleResize(): void {
         if (this._menuIcon) {
             this._menuIcon.style.top  = (this.map.canvas.offsetTop  + this._uiMargin) + 'px';
@@ -69,8 +110,19 @@ export class AutkMapUi {
     // ── Active layer ──────────────────────────────────────────────────────────
 
     /**
-     * Activates a layer for picking/legend and disables picking in other layers.
+     * Activates a layer for picking and legend display.
+     *
+     * The provided layer is first validated against the current layer manager.
+     * When a valid layer is found, this method makes picking exclusive by
+     * disabling `isPick` on every other registered layer before enabling it on
+     * the selected one. The legend is then refreshed to reflect the new active
+     * layer.
+     *
+     * Calls with `null` or with a layer object that is no longer the currently
+     * registered instance are ignored.
+     *
      * @param layer Layer to activate.
+     * @returns Updates layer render state and refreshes the legend when activation succeeds.
      */
     changeActiveLayer(layer: Layer | null): void {
         layer = this._resolveActiveLayer(layer);
@@ -90,7 +142,15 @@ export class AutkMapUi {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /** Builds all UI containers and controls (idempotent). */
+    /**
+     * Builds the map UI overlays.
+     *
+     * This method creates the menu icon, submenu structure, layer list section,
+     * legend container, and optional performance overlay. Repeated calls are
+     * safe and reuse already-created elements.
+     *
+     * @returns Ensures the UI DOM structure exists for the current map.
+     */
     buildUi(): void {
         this.buildMenuIcon();
         this.buildSubMenu();
@@ -102,7 +162,14 @@ export class AutkMapUi {
         }
     }
 
-    /** Removes injected UI DOM, listeners, and cached active state. */
+    /**
+     * Removes all UI DOM nodes, listeners, and cached UI state.
+     *
+     * After teardown, the instance retains only its map reference. Calling
+     * {@link buildUi} again recreates the UI from scratch.
+     *
+     * @returns Detaches injected elements and clears cached element references.
+     */
     destroy(): void {
         if (this._menuIcon && this._onMenuIconClick) {
             this._menuIcon.removeEventListener('click', this._onMenuIconClick);
@@ -121,7 +188,15 @@ export class AutkMapUi {
         this._activeLayer = null;
     }
 
-    /** Updates the on-screen performance meter. */
+    /**
+     * Updates the on-screen performance overlay.
+     *
+     * If the performance overlay has not been created, the call is ignored.
+     *
+     * @param fps Smoothed frames-per-second value to display.
+     * @param frameTimeMs Frame time in milliseconds to display.
+     * @returns Updates the overlay contents when the performance UI is enabled.
+     */
     updatePerformance(fps: number, frameTimeMs: number): void {
         if (!this._performanceOverlay) {
             return;
@@ -130,7 +205,15 @@ export class AutkMapUi {
         this._performanceOverlay.innerHTML = `<div style="font-weight:600;">${fps.toFixed(1)} fps</div><div>${frameTimeMs.toFixed(1)} ms</div>`;
     }
 
-    /** Clears active legend state when a layer is removed. */
+    /**
+     * Clears active-layer UI state after a layer is removed from the map.
+     *
+     * If the removed layer was the current active layer, the cached reference is
+     * cleared before the legend visibility is recomputed.
+     *
+     * @param layerId Identifier of the removed layer.
+     * @returns Synchronizes legend visibility with the remaining layer state.
+     */
     handleLayerRemoved(layerId: string): void {
         if (this._activeLayer?.layerInfo.id === layerId) {
             this._activeLayer = null;
@@ -139,8 +222,14 @@ export class AutkMapUi {
     }
 
     /**
-        * Called when color-map or visibility state changes.
-        * Updates the legend to reflect new state.
+     * Refreshes legend state after layer render settings change.
+     *
+     * If the provided layer is still registered and has color-map rendering
+     * enabled, it becomes the active legend layer. The legend container is then
+     * shown or hidden according to the resolved active layer state.
+     *
+     * @param layer Layer whose legend-related state may have changed.
+     * @returns Recomputes legend visibility and content for the current active layer.
      */
     refreshLegend(layer: Layer | null): void {
         const resolvedLayer = this._resolveActiveLayer(layer);
@@ -151,8 +240,13 @@ export class AutkMapUi {
     }
 
     /**
-     * Called from updateRenderInfo when isSkip / isPick / isColorMap
-     * changes. Re-renders the layer list rows if the menu is open.
+     * Rebuilds the layer list when visible layer state changes.
+     *
+     * This method is intended to be called after updates to render flags such as
+     * `isSkip`, `isPick`, or `isColorMap`. To avoid unnecessary DOM work, the
+     * list is repopulated only while the submenu is currently visible.
+     *
+     * @returns Re-renders the visible layer rows when the submenu is open.
      */
     refreshLayerList(): void {
         if (this._subMenu?.style.visibility !== 'visible') return;
@@ -161,6 +255,15 @@ export class AutkMapUi {
 
     // ── State sync ────────────────────────────────────────────────────────────
 
+    /**
+     * Synchronizes legend visibility with the current active layer.
+     *
+     * The cached active layer is first validated against the current layer
+     * manager. The legend is visible only when that resolved layer exists and
+     * has color-map rendering enabled.
+     *
+     * @returns Updates legend visibility and redraws legend contents.
+     */
     protected syncLegendVisibility(): void {
         if (!this._legend) return;
         this._activeLayer = this._resolveActiveLayer(this._activeLayer);
@@ -171,6 +274,17 @@ export class AutkMapUi {
 
     // ── Build structure (idempotent) ───────────────────────────────────────────
 
+    /**
+     * Creates the floating menu toggle button.
+     *
+     * The button is positioned relative to the map canvas and toggles submenu
+     * visibility on click. When opening the submenu, the layer list is
+     * repopulated so the displayed rows reflect current map state.
+     *
+     * Repeated calls are ignored after the element has been created.
+     *
+     * @returns Inserts the menu button into the canvas parent element.
+     */
     protected buildMenuIcon(): void {
         if (this._menuIcon) return;
 
@@ -204,6 +318,16 @@ export class AutkMapUi {
         this._menuIcon.addEventListener('click', this._onMenuIconClick);
     }
 
+    /**
+     * Creates the submenu container used for layer controls.
+     *
+     * The container is initially hidden and positioned below the main menu
+     * button. It serves as the parent for layer-related headings and rows.
+     *
+     * Repeated calls are ignored after the element has been created.
+     *
+     * @returns Inserts the submenu container into the canvas parent element.
+     */
     protected buildSubMenu(): void {
         if (this._subMenu) return;
 
@@ -223,6 +347,15 @@ export class AutkMapUi {
         this.map.canvas.parentElement?.appendChild(this._subMenu);
     }
 
+    /**
+     * Creates the layer list section inside the submenu.
+     *
+     * This method adds the static heading and the container later populated by
+     * {@link populateLayerList}. If the section already exists, the call is
+     * ignored.
+     *
+     * @returns Ensures the submenu contains the layer-list structure.
+     */
     protected buildLayerList(): void {
         if (!this._subMenu || this._subMenu.querySelector('#layersTitle')) return;
 
@@ -234,6 +367,18 @@ export class AutkMapUi {
         this._subMenu.appendChild(section);
     }
 
+    /**
+     * Creates the floating legend container.
+     *
+     * The legend is positioned in the lower-right corner of the map canvas and
+     * remains hidden until an active layer with color-map rendering is available.
+     *
+     * Repeated calls are ignored after the element has been created.
+     *
+     * @param width Legend width in CSS pixels.
+     * @param height Legend height in CSS pixels.
+     * @returns Inserts the legend container into the canvas parent element.
+     */
     protected buildLegend(width = 250, height = 80): void {
         if (this._legend) return;
 
@@ -252,6 +397,16 @@ export class AutkMapUi {
         this.map.canvas.parentElement?.appendChild(this._legend);
     }
 
+    /**
+     * Creates the optional performance overlay.
+     *
+     * The overlay is positioned near the upper-right corner of the map canvas
+     * and displays FPS and frame time values supplied through
+     * {@link updatePerformance}. Repeated calls are ignored after the element
+     * has been created.
+     *
+     * @returns Inserts the performance overlay into the canvas parent element.
+     */
     protected buildPerformanceOverlay(): void {
         if (this._performanceOverlay) return;
 
@@ -274,6 +429,14 @@ export class AutkMapUi {
 
     // ── Layer list population ─────────────────────────────────────────────────
 
+    /**
+     * Repopulates the submenu with one row per current layer.
+     *
+     * Existing row content is cleared before rows are rebuilt in the current
+     * layer-manager order.
+     *
+     * @returns Recreates the layer list DOM when the section is available.
+     */
     protected populateLayerList(): void {
         const section = this._subMenu?.querySelector('#layerListSection') as HTMLDivElement | null;
         if (!section) return;
@@ -287,6 +450,21 @@ export class AutkMapUi {
 
     // ── Legend content ────────────────────────────────────────────────────────
 
+    /**
+     * Renders the legend contents for the active layer.
+     *
+     * The active layer is first validated against the current map state. When no
+     * valid active layer remains, the legend contents are cleared. Otherwise,
+     * this method renders the layer title and a color ramp derived from the
+     * layer's colormap interpolator and computed labels.
+     *
+     * Categorical color schemes are truncated to the supported scheme size,
+     * while continuous schemes render a 100-step ramp.
+     *
+     * @param width Legend width in CSS pixels.
+     * @param height Legend height in CSS pixels.
+     * @returns Rebuilds the legend DOM for the resolved active layer.
+     */
     protected updateLegendContent(width = 250, height = 80): void {
         if (!this._legend) return;
 
@@ -346,6 +524,15 @@ export class AutkMapUi {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Creates a layer-list row with visibility, color-map, and pick controls.
+     *
+     * Raster layers do not receive a picking button because they cannot be made
+     * the active picking layer by this UI.
+     *
+     * @param layer Layer represented by the row.
+     * @returns Newly created DOM row for the layer list.
+     */
     private makeLayerRow(layer: Layer): HTMLDivElement {
         const row = document.createElement('div');
         Object.assign(row.style, {
@@ -382,6 +569,17 @@ export class AutkMapUi {
         return row;
     }
 
+    /**
+     * Creates a compact icon button for a layer-row action.
+     *
+     * The button's opacity reflects whether the corresponding action is
+     * currently active.
+     *
+     * @param svg Inline SVG markup displayed inside the button.
+     * @param active Whether the action is currently enabled.
+     * @param onClick Click handler invoked when the button is pressed.
+     * @returns Configured button element.
+     */
     private makeIconButton(svg: string, active: boolean, onClick: () => void): HTMLButtonElement {
         const btn = document.createElement('button');
         btn.innerHTML = svg;
@@ -396,6 +594,13 @@ export class AutkMapUi {
         return btn;
     }
 
+    /**
+     * Creates a styled submenu or legend heading element.
+     *
+     * @param id Element id assigned to the heading.
+     * @param text Visible heading text.
+     * @returns Styled heading element.
+     */
     private makeHeading(id: string, text: string): HTMLDivElement {
         const d = document.createElement('div');
         d.id = id;
@@ -407,7 +612,16 @@ export class AutkMapUi {
         return d;
     }
 
-    /** Returns the layer only if it is still registered in the current map. */
+    /**
+     * Resolves a cached layer reference against the current layer manager.
+     *
+     * This guards against stale references after layers are removed or replaced.
+     * The layer is returned only when the current manager resolves the same
+     * object instance for the layer id.
+     *
+     * @param layer Candidate layer reference.
+     * @returns The current registered layer instance, or `null` when the reference is stale.
+     */
     private _resolveActiveLayer(layer: Layer | null): Layer | null {
         if (!layer) {
             return null;

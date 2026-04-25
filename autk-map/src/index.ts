@@ -11,6 +11,15 @@
 /** Main map controller for rendering, interaction, and layer lifecycle. */
 export { AutkMap } from './map';
 
+/** WebGPU renderer used by the map controller. */
+export { Renderer } from './renderer';
+
+/** Ordered layer stack manager used by the map controller. */
+export { LayerManager } from './layer-manager';
+
+/** DOM-based UI controller used by the map controller. */
+export { AutkMapUi } from './map-ui';
+
 /** Strategy enum controlling how a color-map domain is derived from data. */
 export { ColorMapDomainStrategy } from './types-core';
 
@@ -96,6 +105,9 @@ export type {
     /** Layer thematic values and domain metadata. */
     LayerThematic,
 } from './types-layers';
+
+/** Abstract base class returned by layer lookup and picking APIs. */
+export { Layer } from './layer';
 
 /** Built-in map style presets and helpers. */
 export { MapStyle } from './map-style';
