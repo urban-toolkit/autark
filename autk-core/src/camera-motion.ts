@@ -1,22 +1,26 @@
 /**
  * @module CameraMotion
- * Provides a fluent API for creating sequential, animated camera movements.
- * Supports zoom, pitch, and yaw operations that orbit around a calculated scene center.
+ * A fluent camera motion builder for sequential animated camera moves.
+ *
+ * This module defines `CameraMotion`, which queues motion steps and applies
+ * them to a `Camera` one after another. Zoom, pitch, and yaw orbit around the
+ * scene center on the ground plane, while roll banks the camera in place.
+ * All steps use the same ease-in-out timing curve.
  */
 import { Camera } from './camera';
 
-/** Supported motion step kinds in a camera motion sequence. */
+/** Motion kinds accepted by the queued builder steps. */
 type StepType = 'zoom' | 'pitch' | 'yaw' | 'roll';
 
 /** One queued camera motion step with its timing and parameters. */
 interface CameraStep {
     /** Motion operation to perform. */
     type: StepType;
-    /** radians for pitch/yaw/roll; zoom factor for zoom (positive = out, negative = in) */
+    /** Angle in radians for pitch/yaw/roll; signed zoom factor for zoom. */
     amount: number;
     /** Duration of the step in milliseconds. */
     durationMs: number;
-    /** pitch only: world-unit forward translation applied simultaneously with the orbit */
+    /** Optional pitch-only forward translation applied with the orbit. */
     pan?: number;
 }
 
@@ -37,10 +41,15 @@ interface CameraState {
 /**
  * Fluent builder for sequential camera animations.
  *
- * Each method enqueues a step; call {@link CameraMotion.play} to execute
- * them in order. All operations orbit around the scene center (the point where
- * the camera's forward ray intersects the ground plane at z = 0), and use
- * ease-in-out interpolation for smooth acceleration and deceleration.
+ * Each builder method appends a step to an internal queue. Call
+ * {@link CameraMotion.play} to execute the queued steps in order against a
+ * camera instance. The queue is not cleared after playback, so repeated calls
+ * replay the same sequence unless a new `CameraMotion` is created.
+ *
+ * Pitch, yaw, and zoom are applied relative to the scene center, defined as
+ * the intersection of the camera's forward ray with the ground plane at `z = 0`.
+ * Roll keeps the eye position and look-at target fixed while rotating the up
+ * vector around the forward axis. All steps use ease-in-out interpolation.
  *
  * @example
  * await new CameraMotion()
@@ -54,11 +63,14 @@ export class CameraMotion {
     private steps: CameraStep[] = [];
 
     /**
-     * Zoom out by `factor` (multiplicative distance increase) over `durationSec` seconds.
-     * E.g. `zoomOut(2, 5)` doubles the camera distance from the scene center.
+     * Zoom out by `factor` over `durationSec` seconds.
      *
-     * @param factor - Multiplicative zoom-out factor.
-     * @param durationSec - Animation duration in seconds.
+     * The factor is treated by magnitude only; the camera distance from the
+     * scene center increases multiplicatively. For example, `zoomOut(2, 5)`
+     * doubles the distance over five seconds.
+     *
+     * @param factor Multiplicative zoom-out factor.
+     * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
      */
     zoomOut(factor: number, durationSec: number): this {
@@ -67,11 +79,14 @@ export class CameraMotion {
     }
 
     /**
-     * Zoom in by `factor` (multiplicative distance decrease) over `durationSec` seconds.
-     * E.g. `zoomIn(2, 5)` halves the camera distance from the scene center.
+     * Zoom in by `factor` over `durationSec` seconds.
      *
-     * @param factor - Multiplicative zoom-in factor.
-     * @param durationSec - Animation duration in seconds.
+     * The factor is treated by magnitude only; the camera distance from the
+     * scene center decreases multiplicatively. For example, `zoomIn(2, 5)`
+     * halves the distance over five seconds.
+     *
+     * @param factor Multiplicative zoom-in factor.
+     * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
      */
     zoomIn(factor: number, durationSec: number): this {
@@ -80,13 +95,18 @@ export class CameraMotion {
     }
 
     /**
-     * Pitch the camera by `degrees` over `durationSec` seconds, orbiting around the scene center.
-     * Optional `pan` (world units) translates the orbit center forward simultaneously,
-     * keeping the map data centered as the view tilts.
+     * Pitch the camera by `degrees` over `durationSec` seconds.
      *
-     * @param degrees - Pitch angle in degrees.
-     * @param durationSec - Animation duration in seconds.
-     * @param pan - Optional forward translation of the orbit center in world units.
+     * Pitch orbits around the camera's right axis while keeping the scene
+     * center anchored. When `pan` is provided, the orbit center is translated
+     * forward in world space at the same time, which helps keep map content
+     * centered during the tilt. If the camera is nearly vertical, the pan
+     * offset is effectively skipped because the horizontal forward direction
+     * cannot be resolved.
+     *
+     * @param degrees Pitch angle in degrees.
+     * @param durationSec Animation duration in seconds.
+     * @param pan Optional forward translation of the orbit center in world units.
      * @returns The motion builder for fluent chaining.
      */
     pitch(degrees: number, durationSec: number, pan: number = 0): this {
@@ -95,11 +115,13 @@ export class CameraMotion {
     }
 
     /**
-     * Yaw the camera around the world Z-axis by `degrees` over `durationSec` seconds,
-     * orbiting around the scene center.
+     * Yaw the camera around the world Z axis by `degrees` over `durationSec` seconds.
      *
-     * @param degrees - Yaw angle in degrees.
-     * @param durationSec - Animation duration in seconds.
+     * Yaw rotates the eye and up vector together around the scene center while
+     * keeping the camera at the same distance from that center.
+     *
+     * @param degrees Yaw angle in degrees.
+     * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
      */
     yaw(degrees: number, durationSec: number): this {
@@ -110,8 +132,11 @@ export class CameraMotion {
     /**
      * Roll (bank) the camera around its forward axis by `degrees` over `durationSec` seconds.
      *
-     * @param degrees - Roll angle in degrees.
-     * @param durationSec - Animation duration in seconds.
+     * Roll changes only the camera's up vector, preserving the current eye and
+     * look-at positions.
+     *
+     * @param degrees Roll angle in degrees.
+     * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
      */
     roll(degrees: number, durationSec: number): this {
@@ -122,7 +147,10 @@ export class CameraMotion {
     /**
      * Executes all queued motion steps sequentially.
      *
-     * @param camera - Camera instance to animate.
+     * Steps are run one after another in the order they were queued. The motion
+     * list is not modified, so calling `play()` again replays the same sequence.
+     *
+     * @param camera Camera instance to animate.
      * @returns Promise that resolves when the final step completes.
      */
     play(camera: Camera): Promise<void> {
@@ -135,7 +163,7 @@ export class CameraMotion {
     /**
      * Applies symmetric ease-in-out interpolation to normalized progress.
      *
-     * @param t - Normalized progress in `[0, 1]`.
+     * @param t Normalized progress in `[0, 1]`.
      * @returns Eased progress value.
      */
     private easeInOut(t: number): number {
@@ -143,18 +171,13 @@ export class CameraMotion {
     }
 
     /**
-     * Extracts world-space camera vectors from the view matrix.
+     * Reconstructs world-space camera state from the current view matrix.
      *
-     * For a column-major lookAt matrix:
-     *   - Right:   [m[0], m[4], m[8]]
-     *   - Up:      [m[1], m[5], m[9]]
-     *   - Forward: [-m[2], -m[6], -m[10]]
-     *   - Eye:     -R^T * t  (where t = m[12..14])
+     * The returned state is used as the baseline for each queued motion step.
+     * `lookAt` is derived as one forward unit from the eye, matching the camera
+     * convention used by the motion routines.
      *
-     * lookAt is reconstructed as eye + forward * 1 (the camera always maintains
-     * a distance-1 look-at after any zoom/translate/yaw/pitch call).
-     *
-     * @param camera - Camera whose current view matrix should be decoded.
+     * @param camera Camera whose current view matrix should be decoded.
      * @returns World-space camera basis vectors and position derived from the matrix.
      */
     private stateFromViewMatrix(camera: Camera): CameraState {
@@ -176,11 +199,14 @@ export class CameraMotion {
     }
 
     /**
-     * Rotates vector `v` around unit `axis` by `angle` radians (Rodrigues' formula).
+     * Rotates vector `v` around unit `axis` by `angle` radians.
      *
-     * @param v - Vector to rotate.
-     * @param axis - Unit rotation axis.
-     * @param angle - Rotation angle in radians.
+     * This helper uses Rodrigues' rotation formula and is shared by pitch,
+     * yaw, and roll motion steps.
+     *
+     * @param v Vector to rotate.
+     * @param axis Unit rotation axis.
+     * @param angle Rotation angle in radians.
      * @returns Rotated vector.
      */
     private rotateAround(
@@ -204,8 +230,14 @@ export class CameraMotion {
     /**
      * Runs one queued motion step against the camera.
      *
-     * @param camera - Camera instance to animate.
-     * @param step - Motion step to execute.
+     * The step is evaluated from the camera state at the beginning of the
+     * animation frame sequence, then interpolated until the configured duration
+     * elapses. Pitch and yaw orbit around the scene center, zoom scales the
+     * eye-to-center distance, and roll rotates the up vector around the forward
+     * axis.
+     *
+     * @param camera Camera instance to animate.
+     * @param step Motion step to execute.
      * @returns Promise that resolves when the step finishes.
      */
     private runStep(camera: Camera, step: CameraStep): Promise<void> {

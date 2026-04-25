@@ -1,3 +1,14 @@
+/**
+ * @module triangulator-windows
+ * Procedural building roof and facade window generation.
+ *
+ * This module reduces building footprints to convex hulls, resolves effective
+ * building heights from common GeoJSON/OSM metadata, and derives a procedural
+ * facade layout from hull edges and requested floor counts. It then emits roof
+ * fan geometry and indexed window quads that can be consumed by downstream
+ * mesh pipelines.
+ */
+
 import { Feature, FeatureCollection, GeoJsonProperties, Geometry, Point } from 'geojson';
 
 import { LayerComponent, LayerGeometry } from './types-mesh';
@@ -13,7 +24,10 @@ const DEFAULT_BUILDING_HEIGHT = 20;
 const DEFAULT_FLOOR_HEIGHT = 3.4;
 
 /**
- * Describes one generated procedural window placed on a building facade.
+ * Metadata for one generated facade window.
+ *
+ * Each entry is derived from a convex hull edge and floor index, and mirrors a
+ * GeoJSON point feature in the returned layout collection.
  */
 export interface BuildingWindowLayoutEntry {
     /** Stable identifier for the generated window instance. */
@@ -39,7 +53,7 @@ export interface BuildingWindowLayoutEntry {
 }
 
 /**
- * Result of procedural window-layout generation for a building collection.
+ * Window-layout result for a building collection.
  */
 export interface BuildingWindowLayoutResult {
     /** GeoJSON point features representing generated window centers. */
@@ -51,13 +65,29 @@ export interface BuildingWindowLayoutResult {
 /**
  * Triangulates simplified building roofs and procedural facade windows.
  *
- * This helper computes a convex facade hull per input building feature, derives
- * a procedural window layout from that hull, and emits renderable roof and
- * window quad geometry for downstream WebGPU pipelines.
+ * The class extracts supported building footprints, reduces them to convex
+ * hulls, resolves a usable building height, and derives a facade layout by
+ * sampling hull edges across the requested floor count. Roof geometry is
+ * emitted as a triangulated fan at the resolved height, while window geometry
+ * is emitted as indexed quads centered on the generated layout entries.
+ *
+ * @example
+ * const [geometry, components] = TriangulatorBuildingWithWindows.buildMesh(
+ *   buildings,
+ *   origin,
+ *   floors,
+ * );
  */
 export class TriangulatorBuildingWithWindows {
     /**
      * Builds renderable roof and window geometry for a building collection.
+     *
+     * Each input feature is processed independently. A convex hull is computed
+     * from the footprint, a roof fan is emitted at the resolved building
+     * height, and the procedural window layout is converted into quad geometry
+     * using the same source feature index and origin offset.
+     *
+     * Features without a usable footprint hull are skipped.
      *
      * @param geojson - Source building features.
      * @param origin - World-space origin used to convert generated geometry into
@@ -110,6 +140,13 @@ export class TriangulatorBuildingWithWindows {
 
     /**
      * Generates a procedural facade-window layout for a building collection.
+     *
+     * Footprints are reduced to convex hulls before layout generation. The
+     * requested floor count is clamped to at least one floor, then used to
+     * derive a per-floor height from the resolved building height. Each hull
+     * edge receives one or more windows based on target edge spacing, and the
+     * resulting centers, normals, and dimensions are returned both as GeoJSON
+     * points and as detailed layout metadata.
      *
      * @param source - Source building features.
      * @param floors - Requested number of procedural floors. Values below `1`
@@ -200,9 +237,10 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Resolves an effective building height from feature and part metadata.
      *
-     * Height values take precedence over level counts. When part metadata is
-     * present, the tallest resolved part height is used. Missing metadata falls
-     * back to a default building height.
+     * Height tags take precedence over level counts. Part metadata, when
+     * present, is resolved independently and the tallest resolved part height is
+     * used for the building. Level counts are converted with a fixed floor
+     * height, and missing or invalid metadata falls back to a default height.
      *
      * @param feature - Building feature whose height metadata should be parsed.
      * @returns Resolved building height in world units.
@@ -231,6 +269,10 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Computes a convex hull for the visible building footprint of a feature.
      *
+     * Supported polygonal footprint rings are normalized before all points are
+     * collected and reduced to a single hull. The hull is used as the shared
+     * boundary for roof triangulation and facade-window placement.
+     *
      * @param feature - Building feature whose footprint should be reduced to a
      * convex hull.
      * @returns Hull vertices in world coordinates, or `null` when the feature
@@ -248,6 +290,10 @@ export class TriangulatorBuildingWithWindows {
 
     /**
      * Adds a triangulated roof fan for one convex hull.
+     *
+     * The hull vertices are converted into local coordinates with a constant Z
+     * elevation, then emitted as a triangle fan so the roof cap can be rendered
+     * as indexed mesh geometry.
      *
      * @param params - Roof geometry construction parameters.
      * @param params.geometry - Output geometry array to append to.
@@ -295,6 +341,9 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Adds a single quad geometry chunk representing one procedural window.
      *
+     * The quad is emitted from four local-space corners using two triangles and
+     * inherits the source feature index plus the generated window identifier.
+     *
      * @param params - Window quad construction parameters.
      * @param params.geometry - Output geometry array to append to.
      * @param params.components - Output component array to append to.
@@ -324,6 +373,10 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Collects all normalized footprint points from a building feature.
      *
+     * Only exterior rings from supported polygonal geometries are traversed.
+     * Each ring is normalized before its points are accumulated for convex-hull
+     * generation.
+     *
      * @param feature - Building feature whose footprint points should be
      * extracted.
      * @returns Normalized footprint points gathered from supported polygonal
@@ -349,6 +402,9 @@ export class TriangulatorBuildingWithWindows {
 
     /**
      * Visits the exterior footprint ring of each supported building geometry.
+     *
+     * Polygon, MultiPolygon, and nested GeometryCollection footprints are
+     * traversed recursively. Unsupported geometry types are ignored.
      *
      * @param geometry - Geometry to traverse for footprint rings.
      * @param visit - Callback invoked with each discovered exterior ring.

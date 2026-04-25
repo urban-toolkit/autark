@@ -1,9 +1,13 @@
 /**
- * Roof geometry generation for OSM buildings.
- * Supports: flat, pyramidal, skillion, gabled, hipped, dome, round, mansard, saltbox.
- * Hipped and gabled use an iterative straight-skeleton algorithm.
- * Concave polygons fall back to flat.
  * @module triangulator-roofs
+ * Roof geometry generation for OSM building footprints.
+ *
+ * This module turns footprint rings plus OSM roof tags into mesh buffers for
+ * walls, floors, flat caps, and several roof styles. It supports direct cap
+ * generation for flat, cone/pyramid, dome, round, and skillion roofs, and uses an
+ * iterative straight-skeleton solve for hipped, gabled, half-hipped, mansard,
+ * and saltbox roofs. When the skeleton solve cannot complete, callers fall
+ * back to a flat roof cap.
  */
 
 import earcut from "earcut";
@@ -34,6 +38,9 @@ export interface MeshData {
 
 /**
  * Parsed OSM roof attributes used to select and parameterize roof generation.
+ *
+ * `shape` drives the roof generator selection, while `height`, `angle`, and
+ * `direction` provide the numeric parameters used by the active roof style.
  */
 export interface RoofInfo {
     /** Roof shape identifier derived from `roof:shape`. */
@@ -58,10 +65,10 @@ const MAX_BISECTOR_SPEED = 10.0;
 // ─── Polygon helpers ──────────────────────────────────────────────────────────
 
 /**
- * Estimates roof height from a polygon footprint and a pitch angle.
+ * Estimates roof height from a footprint and pitch angle.
  *
- * Uses the polygon inradius approximation `2A / P` and converts the supplied
- * pitch angle into a vertical rise.
+ * The height estimate uses the footprint inradius approximation `2A / P` and
+ * converts the pitch angle into a vertical rise above the wall top.
  *
  * @param ring - Open roof footprint ring in local planar coordinates.
  * @param angleDeg - Roof pitch angle in degrees.
@@ -76,8 +83,10 @@ function heightFromAngle(ring: Vec2[], angleDeg: number): number {
 // ─── Wall generation ──────────────────────────────────────────────────────────
 
 /**
- * Generate vertical quad walls for every ring in `rings` between `minH` and `maxH`.
- * `rings[0]` is the outer ring; subsequent rings are holes.
+ * Generates vertical wall quads for a footprint between two elevations.
+ *
+ * `rings[0]` is treated as the outer footprint and subsequent rings are hole
+ * boundaries. Each ring segment becomes one outward-facing quad strip.
  *
  * @param rings - Polygon rings in local planar coordinates.
  * @param minH - Wall base elevation.
@@ -120,6 +129,9 @@ export function buildWalls(rings: Vec2[][], minH: number, maxH: number): MeshDat
 /**
  * Builds a flat triangulated roof cap, including hole support.
  *
+ * The cap follows the full footprint at a constant Z elevation and preserves
+ * interior holes.
+ *
  * @param rings - Polygon rings in local planar coordinates.
  * @param height - Z elevation of the flat roof plane.
  * @returns Triangulated roof-cap mesh buffers.
@@ -142,6 +154,9 @@ export function flatRoof(rings: Vec2[][], height: number): MeshData {
 
 /**
  * Builds a flat downward-facing floor cap for floating building parts.
+ *
+ * The floor uses the same footprint topology as the roof cap but flips the
+ * outer winding so the cap faces downward.
  *
  * @param rings - Polygon rings in local planar coordinates.
  * @param height - Z elevation of the floor plane.
@@ -169,7 +184,10 @@ export function flatFloor(rings: Vec2[][], height: number): MeshData {
 // ─── Pyramid roof ─────────────────────────────────────────────────────────────
 
 /**
- * Builds a pyramid roof by fan-triangulating edges to a central apex.
+ * Builds a pyramid roof by fan-triangulating the outer footprint to an apex.
+ *
+ * The footprint is used only for the outer ring; the roof height is added on
+ * top of `baseH` at a single center apex.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
@@ -207,6 +225,9 @@ export function pyramidRoof(ring: Vec2[], baseH: number, roofH: number): MeshDat
 
 /**
  * Builds a tessellated curved dome roof.
+ *
+ * The outer footprint is progressively shrunk toward the center, and the
+ * supplied roof height sets the apex above `baseH`.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
@@ -348,6 +369,9 @@ function subdivideMesh(flatCoords: number[], flatIds: number[]): { flatCoords: n
 /**
  * Builds a half-cylinder (barrel vault) roof.
  *
+ * The longest footprint edge defines the barrel axis; the footprint is then
+ * projected into a rounded profile and capped with side skirts where needed.
+ *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
  * @param roofH - Additional roof height above `baseH`.
@@ -468,8 +492,10 @@ export function roundRoof(ring: Vec2[], baseH: number, roofH: number): MeshData 
 // ─── Skillion roof ────────────────────────────────────────────────────────────
 
 /**
- * Single-plane sloped roof.
- * `directionDeg` is the compass bearing of the downslope direction (low end).
+ * Builds a single-plane sloped roof.
+ *
+ * `directionDeg` controls the downslope bearing, and the footprint is lifted
+ * into a plane whose height varies across the outer ring.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
@@ -569,7 +595,7 @@ function inwardNormals(pts: Vec2[]): Vec2[] {
 }
 
 /**
- * Bisector velocity at each vertex given edge speeds.
+ * Computes vertex velocities from inward edge normals and propagation speeds.
  *
  * @param sv - Current straight-skeleton vertices.
  * @param norms - Inward unit edge normals for the current polygon state.
@@ -676,6 +702,9 @@ function classifyGables(ring: Vec2[]): boolean[] {
 /**
  * Derives straight-skeleton edge speeds from roof-shape metadata.
  *
+ * `gabled`, `half-hipped`, and `saltbox` adjust speeds on edges classified as
+ * gable ends; other supported skeleton roofs use uniform propagation.
+ *
  * @param ring - Open roof footprint ring.
  * @param info - Parsed roof configuration.
  * @returns Per-edge propagation speeds used by the skeleton solver.
@@ -712,6 +741,9 @@ function getEdgeSpeeds(ring: Vec2[], info: RoofInfo): number[] {
 
 /**
  * Builds a straight skeleton for a convex roof footprint.
+ *
+ * Concave footprints, unstable bisector motion, or geometry that escapes the
+ * footprint bounds abort the solve and return an empty result.
  *
  * @param ring - Open convex roof footprint ring.
  * @param speeds - Per-edge propagation speeds.
@@ -846,6 +878,9 @@ function buildStraightSkeleton(
 /**
  * Converts straight-skeleton faces into final roof mesh buffers.
  *
+ * The resulting faces are normalized so the tallest skeleton point reaches the
+ * requested roof height above `baseH`.
+ *
  * @param faces - Skeleton faces expressed as 3D polygons.
  * @param baseH - Wall top elevation.
  * @param roofH - Desired roof height above `baseH`.
@@ -904,16 +939,18 @@ function skeletonToMesh(faces: Face3D[], baseH: number, roofH: number, maxSkH: n
 }
 
 /**
- * Hipped (and gabled) roof via straight skeleton.
- * Falls back to a flat cap when the skeleton cannot complete (concave polygon,
- * degenerate velocities, etc.). `allRings` is used for the flat fallback so that
- * courtyard holes are respected — pass `[outerRing, ...holeRings]`.
+ * Builds hipped, gabled, half-hipped, mansard, and saltbox roofs.
+ *
+ * These roof styles use the outer footprint and a straight-skeleton solve to
+ * propagate slopes inward. Mansard roofs additionally cap the skeleton height
+ * from the footprint inradius. When the solve cannot complete, the function
+ * returns `null` so the caller can fall back to a flat cap.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
  * @param roofH - Desired roof height above `baseH`.
  * @param info - Parsed roof configuration.
- * @param _allRings - Full polygon rings for potential fallback handling.
+ * @param _allRings - Full polygon rings passed through by the caller.
  * @returns Roof mesh buffers, or `null` when the skeleton cannot be resolved.
  */
 export function skeletonRoof(ring: Vec2[], baseH: number, roofH: number, info: RoofInfo, _allRings?: Vec2[][]): MeshData | null {
@@ -940,6 +977,10 @@ export function skeletonRoof(ring: Vec2[], baseH: number, roofH: number, info: R
 /**
  * Extracts roof-generation parameters from OSM-style building properties.
  *
+ * Missing or unparseable tags fall back to `flat`, zero height, a 30° pitch,
+ * and a zero direction. Numeric values are parsed from stringified property
+ * values.
+ *
  * @param props - GeoJSON properties containing roof-related OSM tags.
  * @returns Normalized roof configuration with defaults applied.
  */
@@ -958,7 +999,16 @@ export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 /**
- * Build the complete mesh (walls + roof) for one building part polygon.
+ * Builds the complete mesh for one building-part polygon.
+ *
+ * The footprint first becomes wall geometry, then a floor cap is added when
+ * `minH > 0`, and finally the roof style is selected from OSM tags. Flat,
+ * cone, pyramidal, pyramid, dome, round, and skillion roofs are generated
+ * directly from the outer footprint; hipped, gabled, half-hipped, mansard,
+ * and saltbox roofs attempt a straight-skeleton solve and fall back to a flat
+ * cap when that solve fails. Roof height comes from `roof:height` when
+ * present, otherwise it is derived from `roof:angle` for non-flat roofs and
+ * clamped to a steepness equivalent to 60°.
  *
  * @param rings - `[outerRing, ...holes]` coordinates already relative to the origin.
  * @param minH - Bottom of the walls (`min_height`).

@@ -1,8 +1,12 @@
 /**
- * Converts OSM building GeometryCollections into extruded 3-D mesh geometry for WebGPU rendering.
- * Each feature contains a GeometryCollection of part polygons with `height`, `levels`, or `min_height` properties.
- * Delegates roof geometry to `triangulator-roofs`.
  * @module triangulator-buildings
+ * Triangulates OSM-style building features into extruded mesh geometry.
+ *
+ * This module converts building `GeometryCollection` features into local-space
+ * mesh chunks that can be consumed by the WebGPU layer pipeline. It aligns
+ * part geometries with `feature.properties.parts`, resolves wall base and top
+ * heights from common OSM tags, and delegates roof generation to
+ * `triangulator-roofs`.
  */
 
 import { 
@@ -21,21 +25,36 @@ import { LayerComponent, LayerGeometry } from "./types-mesh";
 import { buildBuildingPartMesh, MeshData } from "./triangulator-roofs";
 
 /**
- * Triangulator for extruded building geometry based on OSM-style building features. Each building feature is expected 
- * to contain a `GeometryCollection` of part geometries plus aligned part metadata in `feature.properties.parts`.
- * Building heights are derived from OSM tags like `height`, `levels`, and `min_height`.
- * The resulting mesh includes wall geometry; roof geometry is delegated to `triangulator-roofs`.
+ * Builds extruded mesh geometry for OSM-style buildings.
+ *
+ * Each feature is expected to contain a `GeometryCollection` whose entries are
+ * matched by index against `feature.properties.parts`. For every supported part
+ * geometry, the triangulator converts world coordinates into local XY space,
+ * resolves wall heights from part metadata, and emits mesh chunks with feature
+ * component counts. Roof geometry is delegated to `triangulator-roofs`.
+ *
+ * @example
+ * const [mesh, components] = TriangulatorBuildings.buildMesh(buildings, origin);
  */
 export class TriangulatorBuildings {
     /**
      * Builds extruded building geometry for an OSM-style building collection.
      *
-     * Each feature is expected to contain a `GeometryCollection` of building
-     * part geometries plus aligned part metadata in `feature.properties.parts`.
+     * Features without a `GeometryCollection` are skipped. Building parts are
+     * processed in geometry order, paired with `feature.properties.parts` by
+     * index when available, and ignored when no valid height range can be
+     * resolved. Supported part geometries are `LineString`, `MultiLineString`,
+     * `Polygon`, and `MultiPolygon`.
      *
-     * @param geojson - Source building feature collection.
-     * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @returns A tuple containing building geometry chunks and their per-feature component metadata.
+     * Coordinates are converted from world space into local planar coordinates
+     * using the provided origin before extrusion.
+     *
+     * Roof geometry is delegated to `buildBuildingPartMesh`, which receives the
+     * local rings, resolved height range, and part properties.
+     *
+     * @param geojson Source building feature collection.
+     * @param origin World-space origin used to convert coordinates into local XY space.
+     * @returns A tuple containing mesh chunks and per-feature component metadata.
      */
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
@@ -113,10 +132,12 @@ export class TriangulatorBuildings {
     /**
      * Resolves wall base and top heights from OSM-style building properties.
      *
-     * Height tags take precedence over level-count tags. Invalid or degenerate
-     * height combinations return an empty array.
+     * Height tags take precedence over level-count tags. `height` and
+     * `min_height` are used directly when present; otherwise level counts are
+     * converted using a fixed floor height. Invalid, missing, or degenerate
+     * ranges return an empty array.
      *
-     * @param props - Building-part properties to inspect.
+     * @param props Building-part properties to inspect.
      * @returns A two-element array `[minHeight, height]`, or an empty array when
      * no valid height range can be derived.
      */
@@ -144,8 +165,8 @@ export class TriangulatorBuildings {
     /**
      * Converts a world-space coordinate into local planar coordinates.
      *
-     * @param coord - World-space coordinate with at least XY components.
-     * @param origin - World-space origin used as the local offset basis.
+     * @param coord World-space coordinate with at least XY components.
+     * @param origin World-space origin used as the local offset basis.
      * @returns Local planar coordinate `[x, y]` relative to `origin`.
      */
     private static toLocal(coord: number[], origin: number[]): [number, number] {

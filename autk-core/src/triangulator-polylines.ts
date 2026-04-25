@@ -6,9 +6,13 @@ import { offsetPolyline } from './utils-geometry';
 import earcut from 'earcut';
 
 /**
- * Converts GeoJSON LineString and MultiLineString features into triangulated mesh data for WebGPU rendering.
- * Polylines are converted to closed polygons via planar offset (parallel curve), then triangulated with earcut.
  * @module triangulator-polylines
+ * Polyline triangulation helpers for GeoJSON line geometries.
+ *
+ * This module converts `LineString`, `MultiLineString`, and supported
+ * `GeometryCollection` children into closed buffered polygons in local planar
+ * coordinates, then triangulates the resulting rings with `earcut` for mesh
+ * rendering.
  */
 export class TriangulatorPolylines {
     /** Default half-width, in local planar units, used when buffering source polylines. */
@@ -17,11 +21,15 @@ export class TriangulatorPolylines {
     /**
      * Builds triangulated polyline geometry for a GeoJSON feature collection.
      *
+     * Each feature is converted to local XY coordinates relative to the
+     * provided origin before buffering. The buffered outline is expected to be
+     * a closed polygon; invalid or degenerate buffer results are skipped.
      * Supported geometries are `LineString`, `MultiLineString`, and
      * `GeometryCollection` containing those geometry types.
      *
-     * @param geojson - Source feature collection containing polyline geometries.
-     * @param origin - World-space origin used to convert coordinates into local XY space.
+     * @param geojson Source feature collection containing polyline geometries.
+     * @param origin World-space origin subtracted from every coordinate before
+     * converting the line to local planar space.
      * @returns A tuple containing triangulated geometry chunks and their
      * per-feature component metadata.
      */
@@ -70,11 +78,15 @@ export class TriangulatorPolylines {
     /**
      * Converts a single `LineString` feature into triangulated polyline mesh data.
      *
-     * @param feature - Source feature with `LineString` geometry.
-     * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @param offset - Polyline half-width used for planar buffering.
-     * @returns One triangulated polygon mesh, or an empty array when the line
-     * cannot produce a valid buffered polygon.
+     * The source coordinates are shifted into local planar space by subtracting
+     * the origin, then expanded with a parallel offset curve. The resulting
+     * closed polygon is flattened and triangulated with `earcut`.
+     *
+     * @param feature Source feature with `LineString` geometry.
+     * @param origin World-space origin subtracted before buffering.
+     * @param offset Polyline half-width used for planar buffering.
+     * @returns One triangulated polygon mesh, or an empty array when buffering
+     * does not produce a valid closed polygon.
      */
     static lineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
         const base = <LineString>feature.geometry;
@@ -93,11 +105,13 @@ export class TriangulatorPolylines {
     /**
      * Converts a `MultiLineString` feature into triangulated polyline meshes.
      *
-     * Each constituent line string is buffered and triangulated independently.
+     * Each constituent line string is processed independently: coordinates are
+     * converted to local planar space, buffered into a closed polygon, and
+     * triangulated with `earcut`. Invalid buffered lines are ignored.
      *
-     * @param feature - Source feature with `MultiLineString` geometry.
-     * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @param offset - Polyline half-width used for planar buffering.
+     * @param feature Source feature with `MultiLineString` geometry.
+     * @param origin World-space origin subtracted before buffering.
+     * @param offset Polyline half-width used for planar buffering.
      * @returns Triangulated meshes for each valid buffered line string.
      */
     static multiLineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
@@ -123,12 +137,14 @@ export class TriangulatorPolylines {
     /**
      * Converts supported children of a `GeometryCollection` into triangulated polyline meshes.
      *
-     * Unsupported child geometries are skipped with a warning.
+     * Supported child geometries are converted using the same local-coordinate
+     * buffering and triangulation flow as top-level line features. Unsupported
+     * children are skipped with a warning.
      *
-     * @param feature - Source feature with `GeometryCollection` geometry.
-     * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @param offset - Polyline half-width used for planar buffering.
-     * @param featureIndex - Index of the parent feature in the source collection.
+     * @param feature Source feature with `GeometryCollection` geometry.
+     * @param origin World-space origin subtracted before buffering.
+     * @param offset Polyline half-width used for planar buffering.
+     * @param featureIndex Index of the parent feature in the source collection.
      * @returns Triangulated meshes for all supported child geometries.
      */
     static geometryCollectionToPolyline(feature: Feature, origin: number[], offset: number, featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
@@ -150,8 +166,8 @@ export class TriangulatorPolylines {
     /**
      * Emits a warning when a feature does not contain a supported polyline geometry.
      *
-     * @param featureIndex - Index of the skipped feature in the source collection.
-     * @param geometryType - Encountered geometry type, or `null` when geometry is missing.
+     * @param featureIndex Index of the skipped feature in the source collection.
+     * @param geometryType Encountered geometry type, or `null` when geometry is missing.
      * @returns Nothing. A warning is written to the console.
      */
     private static warnSkippedFeature(featureIndex: number, geometryType: string | null): void {
@@ -163,8 +179,8 @@ export class TriangulatorPolylines {
     /**
      * Emits a warning when a `GeometryCollection` child is not a supported polyline geometry.
      *
-     * @param featureIndex - Index of the parent feature in the source collection.
-     * @param geometryType - Encountered unsupported child geometry type.
+     * @param featureIndex Index of the parent feature in the source collection.
+     * @param geometryType Encountered unsupported child geometry type.
      * @returns Nothing. A warning is written to the console.
      */
     private static warnSkippedGeometryCollectionChild(featureIndex: number, geometryType: string): void {

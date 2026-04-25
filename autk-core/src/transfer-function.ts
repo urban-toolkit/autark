@@ -1,38 +1,49 @@
 /**
  * @module TransferFunction
- * Defines how scalar data values are mapped to opacity. This is crucial for visualizing
- * raster data where color is handled by a colormap texture and opacity is controlled
- * separately to highlight specific data ranges.
+ * Utilities for mapping scalar data values to opacity.
+ *
+ * This module defines the transfer-function configuration, resolved runtime
+ * context, and alpha evaluation used by raster rendering. It resolves default
+ * options once, precomputes dataset statistics, and converts scalar values into
+ * 8-bit opacity values while treating `NaN` as transparent.
  */
 
 /**
  * Configures how scalar values map to opacity.
+ *
+ * The active mode determines which values receive higher opacity after the
+ * input values are normalized against the current transfer context.
  */
 export interface TransferFunction {
     /**
-     * Opacity mapping mode:
-     * - `near-zero`: higher opacity close to `zeroCenter`
-     * - `far-zero`: higher opacity farther from `zeroCenter`
-     * - `linear`: higher opacity toward the numeric max value
+     * Opacity mapping mode.
+     *
+     * - `near-zero`: values closer to `zeroCenter` are more opaque.
+     * - `far-zero`: values farther from `zeroCenter` are more opaque.
+     * - `linear`: opacity increases monotonically across the dataset range.
      */
     mode?: 'near-zero' | 'far-zero' | 'linear';
     /** Lower bound for output opacity in `[0, 1]`. */
     opacityMin?: number;
     /** Upper bound for output opacity in `[0, 1]`. */
     opacityMax?: number;
-    /** Curve shaping factor (`1` linear, `>1` emphasizes high values). */
+    /** Curve shaping factor; values `<= 0` are clamped to a tiny positive exponent at evaluation time. */
     gamma?: number;
     /** Reference center used by zero-distance modes (default `0`). */
     zeroCenter?: number;
 }
 
 /**
- * Transfer-function configuration with all optional fields resolved to defaults.
+ * Transfer-function configuration with all optional fields resolved.
+ *
+ * This is the shape used by `buildTransferContext` and `computeAlphaByte`
+ * after user overrides have been merged with the defaults.
  */
 export type RequiredTransferFunction = Required<TransferFunction>;
 
 /**
- * Default transfer-function configuration used when options are omitted.
+ * Default transfer-function configuration merged into user options before
+ * evaluation.
  */
 export const DEFAULT_TRANSFER_FUNCTION: RequiredTransferFunction = {
     mode: 'far-zero',
@@ -46,9 +57,9 @@ export const DEFAULT_TRANSFER_FUNCTION: RequiredTransferFunction = {
  * Precomputed transfer-function context for efficient per-value alpha mapping.
  */
 export interface TransferContext {
-    /** Minimum scalar value found in the source dataset. */
+    /** Minimum scalar value found among valid source values. */
     min: number;
-    /** Maximum scalar value found in the source dataset. */
+    /** Maximum scalar value found among valid source values. */
     max: number;
     /** Difference between `max` and `min`. */
     range: number;
@@ -62,6 +73,12 @@ export interface TransferContext {
 
 /**
  * Builds a transfer-function context from valid values.
+ *
+ * The returned context caches dataset bounds and the resolved configuration so
+ * repeated alpha evaluation does not need to recompute them. When `values` is
+ * empty, the context is zeroed and `validCount` is `0`; callers can still use it
+ * for evaluation, but the output will fall back to the configured opacity range
+ * for the selected mode.
  *
  * @param values - Valid scalar values used to derive dataset statistics.
  * @param config - Optional transfer-function overrides applied on top of defaults.
@@ -107,7 +124,10 @@ export function buildTransferContext(
 
 /**
  * Computes alpha as an 8-bit channel value for a scalar value.
- * `NaN` values are always transparent.
+ *
+ * `NaN` values are always transparent. The mapping uses the precomputed
+ * context bounds and the resolved transfer-function configuration, then clamps
+ * the result to the byte range `[0, 255]`.
  *
  * @param value - Scalar value to map into an alpha byte.
  * @param context - Precomputed transfer-function context.

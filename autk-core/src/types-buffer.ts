@@ -1,14 +1,18 @@
 /**
  * @module BufferTypes
- * Shared binary-buffer type aliases used across core color processing and GPU
- * compute pipelines.
+ * Shared binary-buffer type aliases for core numeric data handling.
  *
- * These types capture the supported TypedArray instances and constructors used
- * when reading, writing, and wrapping numeric buffer data.
+ * This module centralizes the TypedArray views and constructors accepted by
+ * color processing, raster and transfer-function code, and GPU-facing buffer
+ * utilities. It keeps buffer-oriented APIs aligned on the same supported
+ * numeric types when reading, writing, or wrapping binary data.
  */
 
 /**
- * Supported TypedArray views for binary data buffers.
+ * Supported TypedArray views for shared binary data buffers.
+ *
+ * Use this alias for APIs that accept existing numeric buffer views across
+ * color processing, raster payloads, and GPU upload paths.
  */
 export type TypedArray =
   | Float32Array
@@ -22,7 +26,10 @@ export type TypedArray =
   | Uint32Array;
 
 /**
- * Constructors for supported TypedArray views.
+ * Constructors for the supported TypedArray views.
+ *
+ * Use this alias when code needs to allocate or re-create buffer views from a
+ * shared binary source without narrowing to a single numeric representation.
  */
 export type TypedArrayConstructor =
   | Float32ArrayConstructor

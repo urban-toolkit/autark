@@ -1,18 +1,18 @@
 /**
  * @module DataUtils
- * Generic data-access and scalar-validation helpers shared across the toolkit.
+ * Data-access and scalar-validation helpers for loosely typed values.
  *
- * These utilities operate on unknown records and loosely typed values, making
- * them useful when reading attribute paths from row-like objects or inferring
- * whether values can participate in numeric processing.
+ * This module provides small utilities for reading nested properties from
+ * unknown record-like values and for checking whether inputs can participate
+ * in finite numeric processing.
  */
 
 /**
- * Resolves a dot-path from an unknown object.
+ * Resolves a dot-delimited property path from an unknown value.
  *
- * Each path segment is treated as a property lookup on the current object.
- * If any intermediate value is `null`, `undefined`, or not object-like, the
- * resolution stops and `undefined` is returned.
+ * Each segment is read as a property key on the current value. Traversal stops
+ * as soon as an intermediate value is `null`, `undefined`, or not object-like,
+ * and `undefined` is returned.
  *
  * @param item - Source value to traverse.
  * @param path - Dot-delimited property path, for example `properties.area`.
@@ -29,8 +29,8 @@ export function valueAtPath(item: unknown, path: string): unknown {
 /**
  * Returns true when the value can be treated as a finite numeric scalar.
  *
- * Numeric strings are accepted after trimming surrounding whitespace. Empty
- * strings, non-finite numbers, and non-scalar values return `false`.
+ * Numbers are accepted only when finite. String inputs are trimmed before
+ * conversion; empty strings and non-finite results are rejected.
  *
  * @param value - Value to test for numeric scalar compatibility.
  * @returns `true` when the value is a finite number or a string that can be

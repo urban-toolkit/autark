@@ -1,25 +1,26 @@
 /**
  * @module GeometryUtils
- * Planar geometry helpers used by triangulation code.
- * This module provides utilities for expanding local-space polylines into
- * closed polygons, normalizing rings, computing signed ring areas, and
- * deriving convex hulls from 2D point sets.
+ * Planar geometry helpers for triangulation and ring analysis.
+ *
+ * This module groups small 2D primitives used to offset local-space
+ * polylines, normalize polygon rings, measure ring properties, test
+ * convexity, and derive convex hulls. The helpers assume coordinates are
+ * already expressed in a local planar system.
  */
 
 /**
- * Builds a closed polygon that represents a planar offset of a polyline.
+ * Builds a closed polygon buffer around a polyline.
  *
- * Input coordinates are expected to already be in a local planar system
- * (for example, shifted projected meters). The returned polygon is suitable
- * for triangulation with earcut.
+ * Input coordinates are expected to already be in a local planar system.
+ * Consecutive duplicate points are skipped before the offset is computed.
+ * The returned polygon includes a repeated closing vertex and is suitable for
+ * triangulation with earcut.
  *
  * @param points - Ordered local-space polyline coordinates.
- * Consecutive duplicate points are ignored before the offset is computed.
  * @param distance - Offset distance applied on both sides of the polyline.
- * A value of `0` returns an empty polygon.
  * @returns A closed polygon describing the buffered polyline footprint in
- * local planar coordinates. Returns an empty array when the input does not
- * contain at least two distinct points.
+ * local planar coordinates. Returns an empty array when the input contains
+ * fewer than two distinct points or when `distance` is `0`.
  */
 export function offsetPolyline(points: number[][], distance: number): [number, number][] {
     const clean = points.filter((point, index) => {
@@ -59,7 +60,10 @@ export function offsetPolyline(points: number[][], distance: number): [number, n
 }
 
 /**
- * Removes a duplicated closing vertex from a ring when present.
+ * Returns a shallow copy of a ring without a duplicated closing vertex.
+ *
+ * Only the final vertex is removed, and only when it matches the first vertex
+ * exactly. Rings that are already open are copied unchanged.
  *
  * @param ring - Polygon ring to normalize.
  * @returns A shallow copy of the ring without a repeated closing point.
@@ -76,9 +80,11 @@ export function normalizeRing(ring: number[][]): number[][] {
 }
 
 /**
- * Computes a convex hull from an arbitrary set of 2D points.
+ * Computes the convex hull of a 2D point set.
  *
- * Uses the monotonic chain algorithm after removing duplicate points.
+ * Uses the monotonic chain algorithm after removing duplicate points. Collinear
+ * interior points are discarded from the outer boundary. Degenerate inputs with
+ * three or fewer unique points are returned as shallow copies.
  *
  * @param points - Input points to reduce to a convex hull.
  * @returns Hull points ordered around the outer boundary.
@@ -119,6 +125,9 @@ export function computePointConvexHull(points: number[][]): number[][] {
 /**
  * Computes the signed planar area of a polygon ring.
  *
+ * Positive area indicates counterclockwise winding; negative area indicates
+ * clockwise winding.
+ *
  * @param ring - Ring vertices in order around the polygon.
  * @returns Signed area of the ring. Counterclockwise rings produce positive
  * area and clockwise rings produce negative area.
@@ -135,6 +144,9 @@ export function computeRingArea(ring: number[][]): number {
 
 /**
  * Computes the total perimeter length of a polygon ring.
+ *
+ * The ring is traversed in order and closed automatically between the last
+ * and first vertex.
  *
  * @param ring - Ring vertices in order around the polygon.
  * @returns Sum of Euclidean edge lengths around the ring.
@@ -180,7 +192,7 @@ export function isConvex(ring: number[][]): boolean {
 }
 
 /**
- * Computes the unit left-hand normal for the directed segment from `a` to `b`.
+ * Computes the unit left-hand normal for a directed segment.
  *
  * @param a - Start point of the segment.
  * @param b - End point of the segment.
@@ -200,11 +212,11 @@ function getUnitLeftNormal(a: [number, number], b: [number, number]): [number, n
 }
 
 /**
- * Computes the offset vertex for one side of a polyline at the current point.
+ * Computes the offset vertex for one side of a polyline.
  *
- * Uses the previous and next segment normals to construct either a joined
- * offset corner or a fallback averaged direction when the offset segments do
- * not intersect cleanly.
+ * Endpoints fall back to a single segment normal. Interior vertices are formed
+ * by intersecting the adjacent offset segments when possible, and otherwise
+ * by using the averaged normal direction.
  *
  * @param prev - Previous polyline point, or `null` when `curr` is the first point.
  * @param curr - Current polyline point being offset.

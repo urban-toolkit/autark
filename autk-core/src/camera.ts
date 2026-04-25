@@ -1,13 +1,17 @@
 /**
  * @module Camera
- * Provides an interactive 3-DOF orbit camera for navigating 3D scenes.
- * Manages view and projection matrices and handles user input for zoom, pan, pitch, and yaw.
+ * Interactive camera primitives for WebGPU scene navigation.
+ *
+ * This module defines the `Camera` class, which keeps the current eye,
+ * look-at, and up vectors in sync with view and projection matrices. It also
+ * exposes a one-shot helper for building view-projection matrices from
+ * explicit parameters when a persistent camera instance is not needed.
  */
 
 import { vec3, mat4 } from 'gl-matrix';
 
 /**
- * Initialisation parameters for the interactive map camera.
+ * Initial camera state used to seed or reset a `Camera` instance.
  */
 export interface CameraData {
     /** World-space up vector. */
@@ -19,8 +23,7 @@ export interface CameraData {
 }
 
 /**
- * Parameters for building a one-shot view-projection matrix,
- * typically used in the GPU compute pipeline.
+ * Explicit parameters for building a single view-projection matrix.
  */
 export interface ViewProjectionParams {
     /** Eye (camera) position in world space. */
@@ -40,11 +43,18 @@ export interface ViewProjectionParams {
 }
 
 /**
- * Interactive 3-DOF map camera supporting zoom, pan, yaw, and pitch.
+ * Interactive 3-DOF camera for orbit-style navigation.
  *
- * Maintains a view matrix and a projection matrix that are updated whenever
- * the viewport is resized or {@link Camera.update} is called. Subclasses can
- * access the protected camera state to extend or override behaviour.
+ * The camera tracks world-space eye, look-at, and up vectors together with the
+ * current viewport size. Call the navigation methods to adjust state, then
+ * call {@link Camera.update} to rebuild the matrices. Projection uses
+ * reversed-Z depth mapping for improved precision at distance.
+ *
+ * @example
+ * const camera = new Camera();
+ * camera.resize(width, height);
+ * camera.zoom(-1, 0.5, 0.5);
+ * camera.update();
  */
 export class Camera {
     /** Eye (camera) position in world space. */
@@ -75,8 +85,12 @@ export class Camera {
     };
 
     /**
+     * Creates a camera with the provided initial state.
+     *
+     * When omitted, the camera starts above the origin looking at the world
+     * center with a world-up vector of `[0, 1, 0]`.
+     *
      * @param params - Initial camera position and orientation.
-     *   Defaults to a top-down view at height 10 000.
      */
     constructor(params: CameraData = Camera.defaultParams) {
         this.resetCamera(params.up, params.lookAt, params.eye);
@@ -84,7 +98,10 @@ export class Camera {
 
     /**
      * Resets the camera to a new position and orientation.
-     * Restores the default FOV and clipping planes.
+     *
+     * This also restores the default field of view and clipping planes and
+     * clears the cached matrices so the next {@link Camera.update} call
+     * rebuilds them from the new state.
      *
      * @param wUp - World-space up vector.
      * @param wLookAt - Point to look at in world space.
@@ -104,6 +121,9 @@ export class Camera {
 
     /**
      * Returns the current projection matrix.
+     *
+     * Call {@link Camera.update} first if the camera state or viewport has
+     * changed.
      */
     public getProjectionMatrix(): mat4 {
         return this.mProjectionMatrix;
@@ -111,6 +131,9 @@ export class Camera {
 
     /**
      * Returns the current view matrix.
+     *
+     * Call {@link Camera.update} first if the camera state or viewport has
+     * changed.
      */
     public getModelViewMatrix(): mat4 {
         return this.mViewMatrix;
@@ -118,6 +141,9 @@ export class Camera {
 
     /**
      * Updates the viewport dimensions and recomputes the view and projection matrices.
+     *
+     * The viewport aspect ratio is derived from the supplied width and height,
+     * so callers should pass the drawable canvas size rather than CSS size.
      *
      * @param width - Viewport width in pixels.
      * @param height - Viewport height in pixels.
@@ -131,9 +157,13 @@ export class Camera {
     /**
      * Zooms the camera toward or away from the point under the cursor.
      *
-     * @param delta - Normalized scroll delta. Positive values zoom out, negative values zoom in.
-     * @param x - Normalised cursor X position (0–1, left to right).
-     * @param y - Normalised cursor Y position (0–1, bottom to top).
+     * The zoom target is derived from the normalized screen position, so the
+     * motion preserves the point under the cursor in world space.
+     *
+     * @param delta - Normalized scroll delta. Positive values zoom out and
+     *   negative values zoom in.
+     * @param x - Normalized cursor X position (0–1, left to right).
+     * @param y - Normalized cursor Y position (0–1, bottom to top).
      */
     public zoom(delta: number, x: number, y: number): void {
         const zoomScale = Math.max(Math.abs(this.wEye[2]), 1) * 0.2;
@@ -144,10 +174,13 @@ export class Camera {
     }
 
     /**
-     * Pans the camera in the view plane by a normalised screen-space offset.
+     * Pans the camera in the view plane by a normalized screen-space offset.
      *
-     * @param dx - Normalised horizontal drag delta (0–1).
-     * @param dy - Normalised vertical drag delta (0–1).
+     * The translation is expressed in world units relative to the current
+     * camera distance, so the visible scene moves consistently as you zoom.
+     *
+     * @param dx - Normalized horizontal drag delta (0–1).
+     * @param dy - Normalized vertical drag delta (0–1).
      */
     public translate(dx: number, dy: number): void {
         const scale = this.wEye[2];
@@ -193,9 +226,11 @@ export class Camera {
 
     /**
      * Recomputes the view and projection matrices from the current camera state.
-     * Called automatically by {@link Camera.resize}; call manually after
-     * {@link Camera.zoom}, {@link Camera.translate}, {@link Camera.yaw}, or
-     * {@link Camera.pitch} to apply changes.
+     *
+     * The projection uses reversed-Z depth mapping (`near` and `far` are passed
+     * to the perspective helper in swapped order) to improve depth precision at
+     * long range. Call this after changing camera navigation state or the
+     * viewport size.
      */
     public update(): void {
         const aspect = this.viewportWidth / this.viewportHeight;
@@ -209,7 +244,9 @@ export class Camera {
 
     /**
      * Builds a combined view-projection matrix from explicit camera parameters.
-     * Uses a WebGPU-compatible depth range (Z maps to [0, 1]).
+     *
+     * This helper is stateless and does not update any `Camera` instance. It is
+     * useful when a caller needs a single matrix for compute or upload paths.
      *
      * @param p - Camera and projection parameters.
      * @returns A column-major `Float32Array` of length 16.
@@ -221,11 +258,14 @@ export class Camera {
     }
 
     /**
-     * Converts a normalised screen coordinate to a world-space direction vector.
+     * Converts a normalized screen coordinate to a world-space direction vector.
      *
-     * @param x - Normalised screen X (0–1, left to right).
-     * @param y - Normalised screen Y (0–1, bottom to top).
-     * @returns Normalised direction vector in world space.
+     * The result points from the camera eye through the given screen position
+     * using the current field of view, aspect ratio, and orientation vectors.
+     *
+     * @param x - Normalized screen X (0–1, left to right).
+     * @param y - Normalized screen Y (0–1, bottom to top).
+     * @returns Normalized direction vector in world space.
      */
     protected screenCoordToWorldDir(x: number, y: number): vec3 {
         const wRight = vec3.create();
@@ -240,7 +280,10 @@ export class Camera {
     }
 
     /**
-     * Recomputes {@link Camera.wEyeDir} from the current eye and look-at positions.
+     * Recomputes the normalized eye direction from the current eye and look-at positions.
+     *
+     * This is used when the camera state is reset so dependent navigation logic
+     * starts from a consistent direction vector.
      */
     protected updateEyeDirAndLen(): void {
         this.wEyeDir = vec3.create();

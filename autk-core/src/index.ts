@@ -1,3 +1,15 @@
+/**
+ * @module AutkCore
+ * Shared color, geometry, camera, event, and utility exports for Autark.
+ *
+ * This entry point re-exports the core building blocks used across the
+ * workspace: colormap configuration and color primitives, transfer-function
+ * helpers, geometry types and triangulators, camera and camera-motion
+ * utilities, typed events, shared layer and buffer types, and general data
+ * helpers.
+ */
+
+/** Colormap configuration, domain strategies, and color primitives. */
 // ─── Color mapping ───────────────────────────────────────────────────────────
 
 /** Strategy enum controlling how a colormap domain is derived from data. */
@@ -16,6 +28,7 @@ export type {
     ColorMapConfig,
 } from './types-colormap';
 
+/** Hex, RGBA, and texture-ready color representations. */
 // ─── Color primitives ────────────────────────────────────────────────────────
 
 export type {
@@ -27,6 +40,7 @@ export type {
     ColorTEX,
 } from './types-colormap';
 
+/** Scalar-to-opacity transfer-function helpers used by raster rendering. */
 // ─── Raster / transfer function ──────────────────────────────────────────────
 
 export {
@@ -47,6 +61,7 @@ export type {
     RequiredTransferFunction,
 } from './transfer-function';
 
+/** Shared geometry buffer and component types for generated meshes. */
 // ─── Geometry / mesh ─────────────────────────────────────────────────────────
 
 export type {
@@ -60,6 +75,7 @@ export type {
     LayerBorderComponent,
 } from './types-mesh';
 
+/** Feature triangulators for points, lines, polygons, buildings, and raster grids. */
 // ─── Triangulators ───────────────────────────────────────────────────────────
 
 /** Triangulates point features into renderable marker geometry. */
@@ -82,6 +98,7 @@ export type {
 /** Triangulates raster cells into renderable grid geometry. */
 export { TriangulatorRaster }    from './triangulator-raster';
 
+/** Camera primitives and motion utilities for map navigation. */
 // ─── Camera ──────────────────────────────────────────────────────────────────
 
 /** Interactive 3-DOF map camera with view and projection matrix management. */
@@ -96,6 +113,7 @@ export type {
 /** Sequential camera motion builder for smooth view transitions. */
 export { CameraMotion } from './camera-motion';
 
+/** Typed event emitter helpers shared across interaction and rendering layers. */
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 /** Lightweight typed event emitter used across interaction and rendering layers. */
@@ -107,6 +125,7 @@ export type {
     SelectionData,
 } from './event-emitter';
 
+/** Layer, geometry, and typed-array types shared across packages. */
 // ─── Shared types ────────────────────────────────────────────────────────────
 
 export type {
@@ -123,6 +142,7 @@ export type {
     TypedArrayConstructor,
 } from './types-buffer';
 
+/** General-purpose GeoJSON, layer, and path utilities. */
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
 /** Resolves a dot-path accessor against an object (e.g. `"properties.area"`). */

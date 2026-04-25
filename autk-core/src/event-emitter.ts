@@ -1,30 +1,34 @@
 /**
  * @module EventEmitter
- * A lightweight, type-safe event emitter for handling custom events within the application.
- * It provides a simple `on`, `off`, and `emit` interface for event management.
+ * A lightweight, type-safe event emitter for custom application events.
+ *
+ * This module provides a generic event bus keyed by an event record, along with
+ * a shared selection payload used across visualization packages. It exposes the
+ * minimal `on`, `off`, and `emit` lifecycle needed to register listeners,
+ * remove them by reference, and dispatch typed payloads synchronously.
  */
 
-/**
- * Generic event listener type.
- * @template T - The event payload type.
- */
+/** Listener callback for a single typed event payload. */
 export type EventListener<T> = (event: T) => void;
 
 /**
- * Base payload shared by all selection-based interaction events.
+ * Base payload shared by selection-driven visualization events.
  *
- * Both map (autk-map) and chart (autk-plot) events extend or alias this type,
- * ensuring a consistent selection contract across all visualization libraries.
+ * Packages such as `autk-map` and `autk-plot` extend or alias this shape so
+ * selection interactions follow a consistent contract across the toolkit.
  */
 export interface SelectionData {
-    /** Source feature indices of the current selection. */
+    /** Source feature indices included in the current selection. */
     selection: number[];
 }
 
 /**
- * A lightweight, type-safe event emitter.
+ * Type-safe event emitter keyed by an event record.
  *
- * @template Events - A record mapping event names to their payload types.
+ * Each event name maps to a specific payload type, and listeners are stored per
+ * event key. Listener removal requires the original function reference.
+ *
+ * @template Events Record mapping event names to their payload types.
  *
  * @example
  * type MapEvents = { pick: { selection: number[]; layerId: string } };
@@ -37,8 +41,12 @@ export class EventEmitter<Events extends Record<string, unknown>> {
 
     /**
      * Registers a listener for the given event.
-     * @param event - The event name.
-     * @param listener - Callback invoked when the event fires.
+     *
+     * Multiple registrations of the same callback are allowed and are treated as
+     * separate listener entries.
+     *
+     * @param event Event name to subscribe to.
+     * @param listener Callback invoked when the event fires.
      */
     on<K extends keyof Events>(event: K, listener: EventListener<Events[K]>): void {
         if (!this._listeners[event]) {
@@ -49,8 +57,12 @@ export class EventEmitter<Events extends Record<string, unknown>> {
 
     /**
      * Removes a previously registered listener.
-     * @param event - The event name.
-     * @param listener - The exact listener reference to remove.
+     *
+     * Only the exact function reference passed to {@link on} is removed. If the
+     * listener was not registered, the call has no effect.
+     *
+     * @param event Event name to unsubscribe from.
+     * @param listener Exact listener reference to remove.
      */
     off<K extends keyof Events>(event: K, listener: EventListener<Events[K]>): void {
         const arr = this._listeners[event];
@@ -60,9 +72,12 @@ export class EventEmitter<Events extends Record<string, unknown>> {
     }
 
     /**
-     * Fires an event, invoking all registered listeners with the given payload.
-     * @param event - The event name.
-     * @param payload - Data passed to every listener.
+     * Dispatches an event payload to all registered listeners.
+     *
+     * Listeners are invoked synchronously in registration order.
+     *
+     * @param event Event name to dispatch.
+     * @param payload Payload passed to each listener.
      */
     emit<K extends keyof Events>(event: K, payload: Events[K]): void {
         this._listeners[event]?.forEach(l => l(payload));

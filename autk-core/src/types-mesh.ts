@@ -1,29 +1,38 @@
 /**
  * @module MeshTypes
- * Shared mesh buffer types used by triangulators and rendering layers.
+ * Shared mesh buffer types for triangulator output and mesh renderers.
  *
- * These interfaces describe the geometry payloads emitted by `autk-core`
- * triangulators and consumed by map and compute rendering pipelines.
+ * These interfaces define the buffer layout and per-feature metadata emitted by
+ * `autk-core` triangulators. Renderers consume them to upload vertex data,
+ * index buffers, normals, texture coordinates, and feature-level counts for
+ * fill, outline, and border passes.
  */
 
 /**
- * Vertex data for one triangulated geometry piece.
+ * Triangulated vertex buffers for one renderable geometry piece.
+ *
+ * The buffers are emitted in the same vertex order expected by renderers.
+ * Optional arrays are present only when the triangulation pipeline produces
+ * them for the target material or pass.
  */
 export interface LayerGeometry {
-    /** Flat vertex position buffer. Components are packed sequentially per vertex. */
+    /** Flat vertex position buffer packed sequentially per vertex. */
     position: Float32Array;
-    /** Optional flat vertex normal buffer aligned with `position`. */
+    /** Optional vertex normal buffer aligned with `position`. */
     normal?: Float32Array;
     /** Optional triangle index buffer referencing vertices in `position`. */
     indices?: Uint32Array;
-    /** Optional flat texture-coordinate buffer aligned with `position`. */
+    /** Optional texture-coordinate buffer aligned with `position`. */
     texCoord?: Float32Array;
     /** Optional source feature index associated with this geometry chunk. */
     featureIndex?: number;
 }
 
 /**
- * Per-feature point and triangle counts for a triangulated layer component.
+ * Per-feature counts for a triangulated mesh component.
+ *
+ * The counts let renderers relate emitted geometry back to the source feature
+ * and determine how many vertices and triangles belong to each component.
  */
 export interface LayerComponent {
     /** Number of vertices contributed by the component. */
@@ -37,7 +46,10 @@ export interface LayerComponent {
 }
 
 /**
- * Border or outline geometry buffers for line-based rendering.
+ * Border or outline buffers for line-based rendering.
+ *
+ * This structure carries the vertex positions and line indices for a border
+ * pass separate from the filled mesh geometry.
  */
 export interface LayerBorder {
     /** Flat vertex position buffer for the outline geometry. */
@@ -47,7 +59,10 @@ export interface LayerBorder {
 }
 
 /**
- * Per-feature point and line counts for a border-rendering component.
+ * Per-feature counts for a border or outline component.
+ *
+ * These counts describe the line-oriented geometry emitted for a source
+ * feature.
  */
 export interface LayerBorderComponent {
     /** Number of vertices contributed by the border component. */

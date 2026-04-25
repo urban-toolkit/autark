@@ -1,7 +1,11 @@
 /**
- * Converts GeoJSON Point and MultiPoint features into triangulated mesh data for WebGPU rendering.
- * Points are tessellated as circle fans with a fixed resolution for consistent screen-space appearance.
  * @module triangulator-points
+ * Point-marker triangulation helpers for GeoJSON features.
+ *
+ * This module converts `Point`, `MultiPoint`, and supported
+ * `GeometryCollection` children into triangle-fan marker meshes suitable for
+ * WebGPU rendering. Coordinates are shifted into local space using the shared
+ * origin before sampling each marker circle.
  */
 
 import { 
@@ -15,21 +19,34 @@ import {
 import { LayerGeometry, LayerComponent } from './types-mesh';
 
 /**
- * Triangulator for point geometries. Generates triangulated marker meshes for `Point`, `MultiPoint`, 
- * and supported `GeometryCollection` features.  Each point is tessellated as a circle fan with a fixed resolution, 
- * ensuring consistent screen-space size regardless of zoom level. Unsupported geometries are skipped with a warning.
+ * Converts point-based GeoJSON features into triangulated marker meshes.
+ *
+ * The class walks a feature collection in order and emits one or more
+ * triangle-fan meshes per supported feature. `Point` and `MultiPoint`
+ * geometries are converted directly; `GeometryCollection` features are
+ * flattened to supported point children, while unsupported geometries are
+ * skipped with a warning.
+ *
+ * @example
+ * const [meshes, components] = TriangulatorPoints.buildMesh(collection, origin);
  */
 export class TriangulatorPoints {
     /**
      * Builds triangulated point-marker geometry for a feature collection.
      *
-     * Supported geometries are `Point`, `MultiPoint`, and `GeometryCollection`
-     * containing those geometry types.
+     * Each supported feature is converted into one or more local-space marker
+     * meshes by subtracting the provided origin from the source coordinates and
+     * sampling a fixed-radius circle fan. Unsupported features and missing
+     * geometries are skipped.
+     *
+     * `GeometryCollection` features are flattened by child geometry type: only
+     * `Point` and `MultiPoint` children are triangulated, and all other child
+     * geometries are ignored with a warning.
      *
      * @param geojson - Source feature collection containing point geometries.
      * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @returns A tuple containing point-marker geometry chunks and their
-     * per-feature component metadata.
+     * @returns A tuple containing the generated mesh chunks and per-feature
+     * component metadata, both aligned to the input feature order.
      */
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
@@ -75,11 +92,14 @@ export class TriangulatorPoints {
     }
 
     /**
-     * Converts a single `Point` feature into triangulated marker geometry.
+     * Converts a single `Point` feature into a triangle-fan marker mesh.
+     *
+     * The point is translated into local space by subtracting `origin`, then
+     * sampled as a fixed-radius circle with a fixed perimeter resolution.
      *
      * @param feature - Source feature with `Point` geometry.
      * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @returns Triangulated marker meshes for the feature.
+     * @returns A single mesh chunk for the point marker.
      */
     static pointToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Point>feature.geometry;
@@ -93,13 +113,14 @@ export class TriangulatorPoints {
     }
 
     /**
-     * Converts a `MultiPoint` feature into triangulated marker geometry.
+     * Converts a `MultiPoint` feature into triangle-fan marker meshes.
      *
-     * Each point is tessellated independently into its own circle fan.
+     * Each coordinate is translated into local space independently and emitted
+     * as its own marker mesh.
      *
      * @param feature - Source feature with `MultiPoint` geometry.
      * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @returns Triangulated marker meshes for each point in the collection.
+     * @returns One mesh chunk per point in the collection.
      */
     static multiPointToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiPoint>feature.geometry;
@@ -117,14 +138,16 @@ export class TriangulatorPoints {
     }
 
     /**
-     * Converts supported children of a `GeometryCollection` into triangulated point-marker meshes.
+     * Converts supported children of a `GeometryCollection` into marker meshes.
      *
-     * Unsupported child geometries are skipped with a warning.
+     * Only `Point` and `MultiPoint` children are triangulated. Other child
+     * geometry types are skipped with a warning and do not contribute to the
+     * returned mesh list.
      *
      * @param feature - Source feature with `GeometryCollection` geometry.
      * @param origin - World-space origin used to convert coordinates into local XY space.
      * @param featureIndex - Index of the parent feature in the source collection.
-     * @returns Triangulated marker meshes for all supported child geometries.
+     * @returns Mesh chunks for all supported child geometries in collection order.
      */
     static geometryCollectionToMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
@@ -167,7 +190,9 @@ export class TriangulatorPoints {
     /**
      * Samples a circle as a center point plus evenly spaced perimeter vertices.
      *
-     * The returned point order is suitable for triangle-fan index generation.
+     * The returned point order is suitable for triangle-fan index generation,
+     * with the center vertex first and the perimeter vertices ordered around
+     * the circumference.
      *
      * @param centerX - Circle center X coordinate.
      * @param centerY - Circle center Y coordinate.

@@ -1,8 +1,11 @@
 /**
  * @module ColorMap
- * A comprehensive color management utility that leverages d3-scale and d3-scale-chromatic.
- * It handles resolving color domains from data, generating color textures for WebGPU,
- * creating legend labels, and converting between color formats.
+ * Color-domain resolution, sampling, and legend-label utilities.
+ *
+ * This module centralizes the logic for turning raw numeric or categorical
+ * inputs into resolved color-map domains, d3-backed interpolators, GPU-ready
+ * texture data, and human-readable legend labels. It also exposes helpers for
+ * converting between RGB and hex representations.
  */
 import * as d3_color from 'd3-color';
 import * as d3_format from 'd3-format';
@@ -21,7 +24,6 @@ import {
 
 import type { TypedArray } from './types-buffer';
 
-// Internal shape aliases kept private to this module
 /** Two-point numeric domain used by sequential color interpolators. */
 type SequentialDomain = [number, number];
 /** Three-point numeric domain used by diverging color interpolators. */
@@ -29,7 +31,7 @@ type DivergingDomain = [number, number, number];
 /** Ordered set of category labels used by categorical color schemes. */
 type CategoricalDomain = string[];
 
-/** Default number of texels used to sample continuous colormaps. */
+/** Default number of texels used to sample continuous color maps. */
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
 
 /** Interpolators backed by discrete categorical color schemes. */
@@ -61,16 +63,26 @@ const DIVERGING_INTERPOLATORS = new Set<ColorMapInterpolator>([
 ]);
 
 /**
- * Color utility for sampling interpolators, resolving domains, and formatting
- * values for legends and GPU color textures.
+ * Color utility for resolving domains, sampling color scales, and building
+ * legend and texture representations.
+ *
+ * `ColorMap` decides whether a scheme should be treated as categorical,
+ * sequential, or diverging; derives a compatible domain from data and
+ * configuration; and exposes helpers for sampling colors or generating flat
+ * RGBA textures for GPU upload.
  */
 export class ColorMap {
     /**
      * Samples a color interpolator at a normalized value.
      *
-     * @param value - Normalized sample position within the interpolator domain.
+     * The interpolator is rebuilt from the requested scheme and optional domain
+     * before sampling. Categorical schemes snap to the nearest scheme entry;
+     * continuous schemes are evaluated through d3's sequential or diverging
+     * scales.
+     *
+     * @param value - Normalized sample position.
      * @param color - Interpolator identifier to sample.
-     * @param domain - Optional explicit domain used when building the interpolator.
+     * @param domain - Optional explicit domain used to parameterize the scale.
      * @returns Sampled color in RGBA object form.
      */
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
@@ -82,9 +94,14 @@ export class ColorMap {
     /**
      * Builds a flat RGBA texture array sampled from a color interpolator.
      *
+     * The returned array is laid out as `[r, g, b, a, ...]` and is suitable for
+     * direct upload to a GPU texture buffer. A non-positive resolution returns
+     * an empty array. A resolution of `1` samples the midpoint of the scale to
+     * avoid bias toward either endpoint.
+     *
      * @param color - Interpolator identifier to sample.
      * @param res - Number of texels to generate.
-     * @param domain - Optional explicit domain used when building the interpolator.
+     * @param domain - Optional explicit domain used to parameterize the scale.
      * @returns Flat RGBA texture values suitable for GPU upload.
      */
     public static getColorMap(
@@ -110,9 +127,13 @@ export class ColorMap {
     /**
      * Builds an array of sampled RGBA color objects from a color interpolator.
      *
+     * This is the object-form counterpart to {@link getColorMap}. Empty or
+     * non-positive resolutions return an empty array, and a resolution of `1`
+     * samples the midpoint of the scale.
+     *
      * @param color - Interpolator identifier to sample.
      * @param res - Number of samples to generate.
-     * @param domain - Optional explicit domain used when building the interpolator.
+     * @param domain - Optional explicit domain used to parameterize the scale.
      * @returns Array of sampled RGBA color objects.
      */
     public static getColorArray(
@@ -161,7 +182,7 @@ export class ColorMap {
      * Computes the numeric minimum and maximum of a value array.
      *
      * @param values - Numeric values to inspect.
-     * @returns Two-element tuple `[min, max]`, or `[0, 0]` for empty input.
+     * @returns Two-element tuple `[min, max]`, or `[0, 0]` when the input is empty.
      */
     public static computeMinMaxRange(values: number[] | TypedArray): [number, number] {
         if (values.length === 0) return [0, 0];
@@ -178,6 +199,9 @@ export class ColorMap {
     /**
      * Returns true when an interpolator uses a discrete categorical scheme.
      *
+     * Categorical schemes are resolved separately from continuous domains and
+     * are sampled by index rather than by interpolation.
+     *
      * @param interpolator - Interpolator identifier to classify.
      * @returns `true` for categorical schemes, otherwise `false`.
      */
@@ -187,6 +211,9 @@ export class ColorMap {
     
     /**
      * Returns true when an interpolator uses a diverging continuous scale.
+     *
+     * Diverging schemes resolve to three-point domains with an explicit center
+     * value; all other non-categorical schemes are treated as sequential.
      *
      * @param interpolator - Interpolator identifier to classify.
      * @returns `true` for diverging interpolators, otherwise `false`.
@@ -200,6 +227,9 @@ export class ColorMap {
      *
      * @param interpolator - Interpolator identifier to inspect.
      * @returns Scheme size for categorical interpolators, or `null` otherwise.
+     *
+     * @remarks The returned size comes from the underlying d3 categorical
+     * scheme and is not inferred from any user-provided domain.
      */
     public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
         if (!ColorMap.isCategorical(interpolator)) return null;
@@ -209,6 +239,13 @@ export class ColorMap {
 
     /**
      * Resolves a numeric domain from data and color-map configuration.
+     *
+     * USER domains must contain finite numbers and must match the interpolator
+     * shape: sequential schemes require at least two values, while diverging
+     * schemes accept either two endpoints or an explicit three-point domain.
+     * Percentile resolution ignores non-finite values. When no finite values are
+     * available, sequential schemes fall back to `[0, 0]` and diverging schemes
+     * fall back to `[0, 0, 0]`.
      *
      * @param values - Numeric input values used to derive the domain.
      * @param config - Color-map configuration controlling the domain strategy.
@@ -271,6 +308,9 @@ export class ColorMap {
     /**
      * Resolves a categorical domain from a color-map configuration.
      *
+     * USER domains are used verbatim after string conversion. Data-derived
+     * domains preserve first-seen order and remove duplicates.
+     *
      * @param values - Input category values.
      * @param config - Color-map configuration controlling the domain strategy.
      * @returns Ordered categorical domain labels.
@@ -288,9 +328,9 @@ export class ColorMap {
     /**
      * Derives human-readable legend labels from a domain.
      *
-     * - `SequentialDomain` → `["min", "max"]`
-     * - `DivergingDomain`  → `["min", "center", "max"]`
-     * - `CategoricalDomain` → the category strings as-is
+     * Categorical domains are returned as-is. Numeric domains are formatted
+     * with a magnitude-aware d3 formatter so legend labels remain compact for
+     * large values and readable for small decimals.
      *
      * @param domain Any supported color-scale domain.
      * @returns Ordered label strings suitable for a legend.
@@ -311,6 +351,19 @@ export class ColorMap {
         return numeric.map(v => formatter(v));
     }
 
+    /**
+     * Resolves a color domain from data and configuration.
+     *
+     * The method infers categorical handling when the selected interpolator is
+     * categorical, when a USER domain contains string values, or when the input
+     * array contains non-numeric strings. Numeric-looking strings in normal
+     * arrays are still treated as numeric values. Unsupported domain shapes are
+     * not coerced beyond this inference.
+     *
+     * @param values - Source values used to derive the domain.
+     * @param config - Color-map configuration controlling the resolution mode.
+     * @returns Resolved categorical or numeric domain.
+     */
     public static resolveDomainFromData(
         values: number[] | string[] | TypedArray,
         config: ColorMapConfig,
@@ -328,6 +381,11 @@ export class ColorMap {
 
     /**
      * Builds a d3-compatible interpolator function for the requested color scheme.
+     *
+     * Categorical schemes map values by index into the underlying d3 scheme.
+     * When no domain is provided, the full categorical scheme length is used.
+     * Diverging scales default to `[0, 0.5, 1]` and sequential scales default to
+     * `[0, 1]`.
      *
      * @param color - Interpolator identifier to build.
      * @param domain - Optional explicit domain used to parameterize the scale.
@@ -360,7 +418,7 @@ export class ColorMap {
      *
      * @param values - Numeric values to sample.
      * @param p - Percentile in normalized `[0, 1]` form.
-     * @returns Interpolated percentile value.
+     * @returns Interpolated percentile value, or `0` for empty input.
      */
     private static computePercentile(values: number[] | TypedArray, p: number): number {
         if (values.length === 0) return 0;

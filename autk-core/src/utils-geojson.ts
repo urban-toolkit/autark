@@ -1,9 +1,12 @@
 /**
  * @module GeoJsonUtils
- * GeoJSON-focused utility functions for deriving spatial metadata from feature
- * collections and geometries.
- * Includes helpers for bounding boxes, collection origins, and
- * geometry-aware centroids.
+ * GeoJSON spatial helpers for deriving bounding boxes, shared origins, and
+ * centroids.
+ *
+ * This module provides small geometry utilities used to summarize feature
+ * collections and raw geometries. It covers bounding-box derivation, origin
+ * calculation from a collection extent, and geometry-aware centroid
+ * aggregation across points, lines, polygons, and geometry collections.
  */
 import { 
     FeatureCollection, 
@@ -14,12 +17,15 @@ import {
 import type { BoundingBox } from './types-layer';
 
 /**
- * Computes the central origin of a GeoJSON FeatureCollection.
+ * Computes a collection origin from its bounding-box center.
  *
- * @param geojson - Feature collection whose bounding box center should be used
- * as the origin.
- * @returns The `[longitude, latitude]` center of the collection bounding box,
- * or `[0, 0]` when no valid coordinates are present.
+ * The origin is derived from the collection extent, which makes it suitable
+ * for positioning layers in a shared local coordinate space. When the
+ * collection has no valid coordinates, the origin falls back to `[0, 0]`.
+ *
+ * @param geojson - Feature collection to summarize.
+ * @returns The `[longitude, latitude]` center of the computed bounding box,
+ * or `[0, 0]` when no usable geometry is present.
  */
 export function computeOrigin(geojson: FeatureCollection): [number, number] {
     const bbox = computeBoundingBox(geojson);
@@ -32,6 +38,10 @@ export function computeOrigin(geojson: FeatureCollection): [number, number] {
 
 /**
  * Computes the bounding box of a GeoJSON feature collection or geometry.
+ *
+ * Null geometries inside feature collections are ignored. When the source
+ * contains no coordinates, the function returns `null` instead of a degenerate
+ * box.
  *
  * @param source - GeoJSON feature collection or geometry to inspect.
  * Pass `null` to receive a `null` result.
@@ -75,10 +85,10 @@ export function computeBoundingBox(source: FeatureCollection | Geometry | null):
 /**
  * Computes a geometry centroid using geometry-aware weighting.
  *
- * Polygonal geometries use area-weighted centroids, linear geometries use
- * length-weighted segment midpoints, and point geometries use coordinate
- * averages. Geometry collections combine child centroids using those same
- * geometric weights.
+ * Point and multipoint geometries use coordinate averages. Line strings and
+ * multiline strings use length-weighted segment midpoints. Polygons and
+ * multipolygons use area-weighted ring centroids, and geometry collections
+ * combine child centroids using the same weighting rules.
  *
  * @param geometry - GeoJSON geometry whose centroid should be computed.
  * @returns A three-component centroid tuple `[x, y, z]`, or `null` when the
