@@ -19,7 +19,7 @@ export class LayerOpacity {
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: ['surface', 'parks', 'water', 'roads'] as Array<
+                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
                 dropOsmTable: true,
