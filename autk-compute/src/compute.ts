@@ -16,6 +16,17 @@ import type {
     RenderPipelineParams,
 } from './api';
 
+export type {
+    RenderLayer,
+    RenderViewSampling,
+    RenderViewpointStrategy,
+    RenderViewpoints,
+    RenderCameraOptions,
+    RenderAggregation,
+    GpgpuPipelineParams,
+    RenderPipelineParams,
+} from './api';
+
 /**
  * Main compute engine for GPGPU analysis and render sampling.
  *
