@@ -114,14 +114,16 @@ export class ComputeRenderOsmVisibility {
 
         const pointResults = await render.run({
             layers: [{
-                layerId: 'table_osm_buildings',
-                geojson: sceneBuildings,
-                layerType: 'buildings',
+                id: 'table_osm_buildings',
+                collection: sceneBuildings,
+                type: 'buildings',
                 objectIdProperty: '_renderObjectId',
             }],
-            source: viewpoints,
+            viewpoints: {
+                collection: viewpoints,
+                sampling: { directions: 36 },
+            },
             aggregation: { type: 'objects' },
-            viewSampling: { directions: 36 },
             tileSize: 64,
         });
 

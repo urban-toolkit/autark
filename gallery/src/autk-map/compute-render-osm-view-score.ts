@@ -127,23 +127,25 @@ export class ComputeRenderOsmViewScore {
         const windowScores = await render.run({
             layers: [
                 {
-                    layerId: 'table_osm_buildings',
-                    geojson: sceneBuildings,
-                    layerType: 'buildings',
+                    id: 'table_osm_buildings',
+                    collection: sceneBuildings,
+                    type: 'buildings',
                 },
                 {
-                    layerId: 'table_osm_parks',
-                    geojson: parksGeoJson,
-                    layerType: 'parks',
+                    id: 'table_osm_parks',
+                    collection: parksGeoJson,
+                    type: 'parks',
                 },
                 {
-                    layerId: 'table_osm_water',
-                    geojson: waterGeoJson,
-                    layerType: 'water',
+                    id: 'table_osm_water',
+                    collection: waterGeoJson,
+                    type: 'water',
                 },
             ],
-            source: pickedCollection,
-            viewpoints: { type: 'building-windows', floors: this.analysisFloors },
+            viewpoints: {
+                collection: pickedCollection,
+                strategy: { type: 'building-windows', floors: this.analysisFloors },
+            },
             aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
             tileSize: 32,
         });
@@ -334,27 +336,3 @@ async function main() {
     await example.run(canvas);
 }
 main();
-
-function buildBuildingViewpoints(buildings: FeatureCollection<Geometry, GeoJsonProperties>): FeatureCollection<Point> {
-    return {
-        type: 'FeatureCollection',
-        features: buildings.features.map((building, index) => {
-            const centroid = building.geometry ? computeGeometryCentroid(building.geometry) : null;
-            const [x, y] = centroid ?? [0, 0, 0];
-            const height = resolveBuildingHeight(building) ?? 20;
-            const eyeHeight = Math.max(1.7, Math.min(Math.max(1.7, height * 0.6), height + 1.7));
-
-            return {
-                type: 'Feature',
-                geometry: {
-                    type: 'Point',
-                    coordinates: [x, y, eyeHeight],
-                },
-                properties: {
-                    sourceIndex: index,
-                    height,
-                },
-            };
-        }),
-    };
-}

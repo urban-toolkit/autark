@@ -1,3 +1,12 @@
+/**
+ * @module AutkComputeGpgpu
+ * GeoJSON-to-WGSL compute pipeline for feature-level GPU analysis.
+ *
+ * This module defines `ComputeGpgpu`, which packs feature data into GPU
+ * buffers, generates a compute shader, and writes results back to
+ * `feature.properties.compute`.
+ */
+
 import { Feature, FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import {
@@ -8,6 +17,7 @@ import {
 import { GpuPipeline } from './compute-pipeline';
 
 import type { GpgpuPipelineParams } from './api';
+
 import type { GlobalVarMeta, ComputeConfig } from './types-gpgpu';
 
 type ComputeFeature = Feature<Geometry, GeoJsonProperties>;
@@ -30,76 +40,24 @@ const WGSL_RESERVED_WORDS = new Set([
 const INTERNAL_WGSL_SYMBOLS = new Set(['ArrayF32', 'OutputArray', 'compute_value', 'main', 'idx', 'id', 'i']);
 
 /**
- * GPGPU compute engine for executing WGSL functions over GeoJSON feature properties.
+ * GPGPU compute engine for feature-level GeoJSON analysis.
  *
- * `ComputeGpgpu` transforms feature data into columnar GPU buffers, dispatches a
- * compute shader with one thread per feature, and writes results back to
- * `feature.properties.compute`.
- *
- * The pipeline supports:
- * - Scalar, array, and matrix inputs per feature
- * - Global constants (scalars, arrays, matrices) shared across all features
- * - Auto-sized matrices that adapt to per-feature row counts
- * - Multiple output columns via the `OutputArray` return type
- *
- * @extends GpuPipeline
- *
- * @example
- * // Calculate building floor area ratio
- * const gpgpu = new ComputeGpgpu();
- * const result = await gpgpu.run({
- *   collection: buildings,
- *   variableMapping: { height: 'height', footprint: 'area' },
- *   wgslBody: `return height * footprint;`,
- *   resultField: 'floorAreaRatio'
- * });
- *
- * @example
- * // Multiple outputs: compute hourly solar irradiance
- * const result = await gpgpu.run({
- *   collection: parcels,
- *   variableMapping: { orientation: 'rotation' },
- *   attributeArrays: { hourlyShading: 24 },
- *   uniforms: { sunAzimuth: 180, sunElevation: 45 },
- *   wgslBody: `
- *     var result: OutputArray;
- *     for (var i = 0u; i < 24u; i++) {
- *       result[i] = computeIrradiance(orientation, hourlyShading[i], sunAzimuth, sunElevation);
- *     }
- *     return result;
- *   `,
- *   outputColumns: ['h00', 'h01', 'h02', ...  'h23']
- * });
+ * `ComputeGpgpu` converts collection data into GPU inputs, builds a compute
+ * shader around the user body, and writes the results into a copied feature
+ * collection.
  */
 export class ComputeGpgpu extends GpuPipeline {
     /**
-     * Executes a WGSL compute shader over feature properties in a single columnar GPU pass.
+     * Executes a WGSL compute shader over a feature collection.
      *
-     * Each feature in `params.collection` receives one GPU thread. Properties are
-     * extracted according to `params.variableMapping` and passed as typed WGSL
-     * parameters. Results are written to `feature.properties.compute`.
-     *
-     * @param params - Computation parameters including the feature collection and WGSL shader body.
-     * @param params.collection - GeoJSON FeatureCollection to process.
-     * @param params.variableMapping - Maps WGSL variable names to feature property dot-paths.
-     * @param params.attributeArrays - Per-feature fixed-length arrays.
-     * @param params.attributeMatrices - Per-feature matrices with fixed or auto rows.
-     * @param params.uniforms - Global scalar constants uploaded once for the dispatch.
-     * @param params.uniformArrays - Global array constants uploaded once for the dispatch.
-     * @param params.uniformMatrices - Global matrix constants uploaded once for the dispatch.
-     * @param params.wgslBody - WGSL function body returning f32 or OutputArray.
-     * @param params.resultField - Single output field name (optional).
-     * @param params.outputColumns - Multiple output field names (optional, takes priority).
-     * @returns A new FeatureCollection with computed values written to `feature.properties.compute`.
+     * @param params Compute parameters.
+     * @param params.collection Source GeoJSON feature collection.
+     * @param params.variableMapping WGSL variable-to-property mapping.
+     * @param params.wgslBody WGSL function body.
+     * @param params.resultField Output field name for single-value results.
+     * @param params.outputColumns Output field names for multi-value results.
+     * @returns Promise resolving to a copied collection with results in `feature.properties.compute`.
      * @throws If neither `resultField` nor `outputColumns` is provided.
-     *
-     * @example
-     * const result = await gpgpu.run({
-     *   collection: buildings,
-     *   variableMapping: { height: 'properties.height' },
-     *   wgslBody: `return height * 0.5;`,
-     *   resultField: 'shadowHeight'
-     * });
      */
     async run(params: GpgpuPipelineParams): Promise<FeatureCollection> {
         const { collection, variableMapping, attributeArrays = {}, attributeMatrices = {}, wgslBody } = params;
@@ -137,18 +95,15 @@ export class ComputeGpgpu extends GpuPipeline {
     }
 
     /**
-     * Low-level compute dispatch: creates GPU buffers, runs the shader, and reads back results.
+     * Runs a prepared compute configuration and reads back typed output buffers.
      *
-     * This method is exposed as `protected` to allow subclasses to build custom compute
-     * pipelines that bypass the high-level {@link run} interface.
-     *
-     * @param config - Compute configuration including shader, dispatch size, and buffer bindings.
-     * @param config.shader - WGSL shader source code.
-     * @param config.entryPoint - Shader entry point (default: 'main').
-     * @param config.dispatchSize - Workgroup dispatch dimensions.
-     * @param config.inputs - Named input buffers.
-     * @param config.outputs - Named output buffers with readback configuration.
-     * @returns Object mapping output names to typed arrays.
+     * @param config Compute configuration.
+     * @param config.shader WGSL shader source code.
+     * @param config.entryPoint Shader entry point.
+     * @param config.dispatchSize Workgroup dispatch dimensions.
+     * @param config.inputs Named input buffers.
+     * @param config.outputs Named output buffers.
+     * @returns Output names mapped to readback typed arrays.
      * @protected
      */
     protected async runCompute(config: ComputeConfig): Promise<{ [outputName: string]: TypedArray }> {
@@ -244,15 +199,15 @@ export class ComputeGpgpu extends GpuPipeline {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
-     * Builds the {@link runCompute} config and dispatches the compute shader.
+     * Builds a compute dispatch from packed inputs and generated shader code.
      *
-     * @param orderedVarNames - Ordered list of variable names for buffer bindings.
-     * @param inputArrays - Input data arrays keyed by variable name.
-     * @param shader - WGSL shader source code.
-     * @param featureCount - Number of features (determines dispatch size and output buffer size).
-     * @param numOutputs - Number of output columns to create.
-     * @returns Object mapping output names (`out0`, `out1`, ...) to Float32Array results.
-     * @private
+     * @param featureVarNames Ordered feature-variable names.
+     * @param globalVarNames Ordered global-variable names.
+     * @param inputArrays Packed input buffers keyed by variable name.
+     * @param shader Complete WGSL shader source code.
+     * @param featureCount Number of features to dispatch.
+     * @param numOutputs Number of output columns.
+     * @returns Output names mapped to `Float32Array` results.
      */
     private async dispatch(
         featureVarNames: string[],
@@ -289,6 +244,11 @@ export class ComputeGpgpu extends GpuPipeline {
         });
     }
 
+    /**
+     * Validates user-facing WGSL names before shader generation.
+     *
+     * @param params Pipeline parameters to validate.
+     */
     private validateShaderIdentifiers(params: GpgpuPipelineParams): void {
         const {
             variableMapping,
@@ -343,6 +303,12 @@ export class ComputeGpgpu extends GpuPipeline {
         }
     }
 
+    /**
+     * Validates that a string is a legal WGSL identifier.
+     *
+     * @param name Candidate WGSL identifier.
+     * @param context Identifier source used in error messages.
+     */
     private validateWgslIdentifier(name: string, context: string): void {
         if (!WGSL_IDENTIFIER_PATTERN.test(name)) {
             throw new Error(`ComputeGpgpu: invalid WGSL identifier "${name}" in ${context}.`);
@@ -352,6 +318,13 @@ export class ComputeGpgpu extends GpuPipeline {
         }
     }
 
+    /**
+     * Reserves generated WGSL symbols and rejects collisions.
+     *
+     * @param claimedSymbols Shared registry of already claimed symbols.
+     * @param symbols Newly generated symbols to reserve.
+     * @param owner Owner label used in collision errors.
+     */
     private claimGeneratedSymbols(
         claimedSymbols: Map<string, string>,
         symbols: string[],
@@ -368,6 +341,13 @@ export class ComputeGpgpu extends GpuPipeline {
         }
     }
 
+    /**
+     * Returns the WGSL helper symbols generated for a feature variable.
+     *
+     * @param name Variable name.
+     * @param kind Variable shape used by the shader builder.
+     * @returns Generated symbol names for the feature variable.
+     */
     private getFeatureGeneratedSymbols(name: string, kind: 'scalar' | 'array' | 'matrix'): string[] {
         const symbols = [name, `${name}Buf`];
         if (kind !== 'scalar') {
@@ -382,6 +362,13 @@ export class ComputeGpgpu extends GpuPipeline {
         return symbols;
     }
 
+    /**
+     * Returns the WGSL helper symbols generated for a global variable.
+     *
+     * @param name Variable name.
+     * @param kind Variable shape used by the shader builder.
+     * @returns Generated symbol names for the global variable.
+     */
     private getGlobalGeneratedSymbols(name: string, kind: 'scalar' | 'array' | 'matrix'): string[] {
         const symbols = [name, `${name}Buf`, `${name}_Uniform`, `${name}_uniform_at`];
         if (kind === 'array') {
@@ -395,18 +382,12 @@ export class ComputeGpgpu extends GpuPipeline {
     /**
      * Extracts and flattens per-feature input data into columnar typed arrays.
      *
-     * This method performs three passes:
-     * 1. Resolve max row count for auto-sized matrices
-     * 2. Allocate contiguous typed array buffers
-     * 3. Populate buffers in a single feature iteration
-     *
-     * @param features - Array of GeoJSON features to extract data from.
-     * @param variableMapping - Maps WGSL variable names to property paths.
-     * @param arrayVariables - Per-feature array variable definitions.
-     * @param matrixVariables - Per-feature matrix variable definitions.
-     * @param featureCount - Total number of features.
-     * @returns Object containing ordered variable names, input arrays, and variable metadata.
-     * @private
+     * @param features Source features to read from.
+     * @param variableMapping Maps WGSL variable names to property paths.
+     * @param arrayVariables Per-feature array lengths keyed by variable name.
+     * @param matrixVariables Per-feature matrix definitions keyed by variable name.
+     * @param featureCount Total number of features in the dispatch.
+     * @returns Packed input arrays, ordered variable names, and shader metadata.
      */
     private extractInputData(
         features: ComputeFeature[],
@@ -551,9 +532,8 @@ export class ComputeGpgpu extends GpuPipeline {
     /**
      * Extracts global constant data (scalars, arrays, matrices) from pipeline parameters.
      *
-     * @param params - GPGPU pipeline parameters containing uniform definitions.
-     * @returns Object containing variable names, input arrays, and metadata for global constants.
-     * @private
+     * @param params Pipeline parameters containing uniform definitions.
+     * @returns Ordered global variable names, packed input arrays, and shader metadata.
      */
     private extractGlobalData(params: GpgpuPipelineParams) {
         const { uniforms = {}, uniformArrays = {}, uniformMatrices = {} } = params;
@@ -595,12 +575,11 @@ export class ComputeGpgpu extends GpuPipeline {
     /**
      * Writes computed results back to feature properties under `.compute`.
      *
-     * @param geojson - Original FeatureCollection to write results into.
-     * @param features - Array of features to update.
-     * @param result - Computed output arrays from the GPU.
-     * @param outputColumns - Names for each output column.
+     * @param geojson Original FeatureCollection used as the base for the return value.
+     * @param features Features that were dispatched to the GPU.
+     * @param result Computed output arrays read back from the GPU.
+     * @param outputColumns Output field names aligned with `out0`, `out1`, and so on.
      * @returns New FeatureCollection with results written to `feature.properties.compute`.
-     * @private
      */
     private applyResultsToFeatures(
         geojson: FeatureCollection,
@@ -623,21 +602,13 @@ export class ComputeGpgpu extends GpuPipeline {
     /**
      * Generates WGSL shader code from variable metadata and the user-provided function body.
      *
-     * The generated shader:
-     * 1. Declares `ArrayF32` struct for buffer access
-     * 2. Creates buffer bindings for all inputs and outputs
-     * 3. Generates type aliases for array/matrix variables
-     * 4. Wraps `wgslBody` in a `compute_value` function
-     * 5. Implements the `main` compute entry point with index bounds checking
-     *
-     * @param scalarVars - Names of scalar variables.
-     * @param arrayVars - Array variable metadata (name, length).
-     * @param matrixVars - Matrix variable metadata (name, rows, cols, variableRows).
-     * @param globalMeta - Global uniform metadata.
-     * @param wgslBody - User-provided WGSL function body.
-     * @param numOutputs - Number of output columns (determines OutputArray size).
+     * @param scalarVars Scalar variable names.
+     * @param arrayVars Array variable metadata.
+     * @param matrixVars Matrix variable metadata.
+     * @param globalMeta Global uniform metadata.
+     * @param wgslBody User-provided WGSL function body.
+     * @param numOutputs Number of output columns.
      * @returns Complete WGSL shader source code.
-     * @private
      */
     private buildShader(
         scalarVars: string[],
@@ -798,6 +769,12 @@ export class ComputeGpgpu extends GpuPipeline {
         }`;
     }
 
+    /**
+     * Packs uniform values into a `vec4`-aligned float buffer.
+     *
+     * @param values Numeric values to pack.
+     * @returns Padded `Float32Array` ready for uniform upload.
+     */
     private packUniformFloats(values: ArrayLike<number>): Float32Array {
         const packed = new Float32Array(Math.max(4, Math.ceil(values.length / 4) * 4));
         for (let i = 0; i < values.length; i++) {
@@ -809,18 +786,8 @@ export class ComputeGpgpu extends GpuPipeline {
     /**
      * Normalizes a property path to ensure it has the correct prefix.
      *
-     * Paths that already start with `properties.`, `geometry.`, or equal `id`
-     * are returned unchanged. All other paths are prefixed with `properties.`.
-     *
-     * @param path - The property path to normalize.
-     * @returns Normalized path with appropriate prefix.
-     * @private
-     *
-     * @example
-     * this.normalizePropertyPath('height');           // 'properties.height'
-     * this.normalizePropertyPath('properties.height'); // 'properties.height'
-     * this.normalizePropertyPath('geometry.type');     // 'geometry.type'
-     * this.normalizePropertyPath('id');                // 'id'
+     * @param path Property path to normalize.
+     * @returns Normalized path with the expected prefix.
      */
     private normalizePropertyPath(path: string): string {
         return (path.startsWith('properties.') ||

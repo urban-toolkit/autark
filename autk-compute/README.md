@@ -10,7 +10,7 @@
 1. `gpgpuPipeline`
    Executes WGSL compute code over feature properties and writes results into `feature.properties.compute`.
 2. `renderPipeline`
-   Samples rendered views from source features and writes class or object visibility metrics into `feature.properties.compute.render`.
+   Samples rendered views from a viewpoints collection and writes class or object visibility metrics into `feature.properties.compute.render`.
 
 ## Render pipeline
 
@@ -26,13 +26,15 @@ Background can be counted as an extra class bucket when using `classes`:
 ```ts
 const result = await compute.renderPipeline({
   layers: [
-    { layerId: 'buildings', geojson: buildings, type: 'buildings', layerType: 'buildings' },
-    { layerId: 'parks', geojson: parks, type: 'surface', layerType: 'parks' },
-    { layerId: 'water', geojson: water, type: 'surface', layerType: 'water' },
+    { id: 'buildings', collection: buildings, type: 'buildings' },
+    { id: 'parks', collection: parks, type: 'parks' },
+    { id: 'water', collection: water, type: 'water' },
   ],
-  source: roads,
+  viewpoints: {
+    collection: roads,
+    sampling: { directions: 1 },
+  },
   aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
-  viewSampling: { directions: 1 },
   tileSize: 64,
 });
 
@@ -47,19 +49,25 @@ result.features.forEach((feature) => {
 
 Render-layer inputs:
 
-- `layerId`: unique per rendered layer in the request; used to scope object keys
-- `layerType`: semantic aggregation bucket for class-share results
+- `id`: unique per rendered layer in the request; used to scope object keys
+- `type`: semantic aggregation bucket for class-share results
 - `objectIdProperty`: optional stable feature property used for object aggregation keys; when omitted, the feature index is used
 
-View sampling inputs:
+Viewpoint inputs:
 
-- `directions`: number of azimuth samples per source feature
+- `collection`: collection used to derive camera origins and receive aggregated results
+- `strategy`: optional origin-generation strategy, such as `centroid` or `building-windows`
+- `sampling`: optional direction sampling controls per derived origin
+
+Sampling inputs:
+
+- `directions`: number of azimuth samples per collection feature
 - `azimuthOffsetDeg`: rotates the first sampled view direction
 - `pitchDeg`: applies a shared vertical pitch to every sampled direction
 
 Use `objects` only when you really need per-feature visibility. It is materially heavier than `classes`.
 
-Object aggregation returns keys scoped by `layerId`, not `layerType`, so two layers can share the same semantic `layerType` without colliding in `render.objects`.
+Object aggregation returns keys scoped by `id`, not `type`, so two layers can share the same semantic `type` without colliding in `render.objects`.
 
 ## GPGPU pipeline
 
@@ -86,10 +94,10 @@ With `attributeMatrices`, using `rows: 'auto'` tells the pipeline to infer the r
 
 ## Limits
 
-1. `renderPipeline` class aggregation is limited by `maxStorageBufferBindingSize` for `sourceCount * layerTypeCount`.
-2. `classes` aggregation supports at most `255` encoded `layerType` buckets, including the optional background bucket.
+1. `renderPipeline` class aggregation is limited by `maxStorageBufferBindingSize` for `collectionCount * layerTypeCount`.
+2. `classes` aggregation supports at most `255` encoded `type` buckets, including the optional background bucket.
 3. `objects` aggregation supports at most `65535` rendered objects.
-4. `objects` aggregation also has a CPU-side accumulation limit for the final `sourceCount * objectCount` visibility buffer.
+4. `objects` aggregation also has a CPU-side accumulation limit for the final `collectionCount * objectCount` visibility buffer.
 5. Large render workloads should still prefer modest `tileSize` and direction counts.
 
 ## Resources

@@ -1,4 +1,19 @@
+/**
+ * @module AutkComputeRender
+ * Render-compute pipeline for sampled viewpoint aggregation.
+ *
+ * This module defines `ComputeRender`, which triangulates render layers,
+ * uploads them to WebGPU, runs a tiled visibility pass for each sampled
+ * viewpoint, and writes aggregated render metrics back onto the source
+ * feature collection. It also owns pipeline caching, batch sizing, and the
+ * aggregation limits used for class and object visibility accumulation.
+ */
+
 /// <reference types="@webgpu/types" />
+
+import COUNT_SHADER from './shaders/render-count.wgsl?raw';
+import FRAG_SHADER from './shaders/render-frag.wgsl?raw';
+import VERT_SHADER from './shaders/render-vert.wgsl?raw';
 
 import { FeatureCollection } from 'geojson';
 
@@ -12,58 +27,27 @@ import {
 } from 'autk-core';
 
 import type { RenderAggregation, RenderLayer, RenderPipelineParams } from './api';
+
 import { GpuPipeline } from './compute-pipeline';
-import COUNT_SHADER from './shaders/render-count.wgsl?raw';
-import FRAG_SHADER from './shaders/render-frag.wgsl?raw';
-import VERT_SHADER from './shaders/render-vert.wgsl?raw';
-import type { GpuFeatureDraw } from './types-render';
-import { buildCameraMatrices, resolveRenderViewpoints, type CameraSample } from './viewpoint';
 
-type LayerMeshData = {
-    geometries: LayerGeometry[];
-    layer: RenderLayer;
-    layerIndex: number;
-};
+import type {
+    CachedCountPipeline,
+    CachedRenderPipeline,
+    CountBuffers,
+    GpuFeatureDraw,
+    LayerFeatureMeta,
+    LayerMeshData,
+    RenderMetadata,
+    RenderObjectMetric,
+} from './types-render';
 
-type LayerFeatureMeta = {
-    layerTypeIndex: number;
-    objectIndex: number;
-};
+import { 
+    buildCameraMatrices,
+    resolveRenderViewpoints
+} from './viewpoint';
 
-type RenderMetadata = {
-    layerTypes: string[];
-    objectKeys: string[];
-    layerTypeIndexByLayer: number[];
-    featureMetaByLayer: LayerFeatureMeta[][];
-    includeClasses: boolean;
-    includeObjects: boolean;
-    flags: number;
-};
+import type { CameraSample } from './viewpoint';
 
-type CountBuffers = {
-    layerTypeBuf: GPUBuffer;
-    objectBuf: GPUBuffer;
-    sampleSourcesBuf: GPUBuffer;
-    paramsBuf: GPUBuffer;
-    layerTypeSize: number;
-    objectSize: number;
-};
-
-type RenderObjectMetric = {
-    visible: boolean;
-    sampleRatio: number;
-};
-
-type CachedRenderPipeline = {
-    renderPipeline: GPURenderPipeline;
-    camBGL: GPUBindGroupLayout;
-    idBGL: GPUBindGroupLayout;
-};
-
-type CachedCountPipeline = {
-    countPipeline: GPUComputePipeline;
-    countBGL: GPUBindGroupLayout;
-};
 
 const ENCODED_LAYER_TYPE_BYTE_COUNT = 1;
 const ENCODED_OBJECT_ID_BYTE_COUNT = 2;
@@ -74,45 +58,49 @@ const OBJECT_VISIBILITY_COUNT_BYTES_PER_ENTRY = Uint32Array.BYTES_PER_ELEMENT;
 const MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES = 256 * 1024 * 1024;
 
 /**
- * Samples rendered views from source feature origins and aggregates class
- * shares and object visibility back onto the source features.
+ * Computes render-derived metrics for a feature collection.
  *
- * @extends GpuPipeline
- *
- * @see {@link ComputeGpgpu} for the GPGPU analytical pipeline.
+ * `ComputeRender` coordinates triangulation, GPU upload, batched render and
+ * count passes, and CPU-side reduction of the sampled results. The class
+ * caches device-scoped pipelines and enforces the supported limits for class
+ * and object aggregation.
  */
 export class ComputeRender extends GpuPipeline {
+    /** Cached render pipeline per GPU device. */
     private renderPipelineCache = new WeakMap<GPUDevice, CachedRenderPipeline>();
+    /** Cached count pipeline per GPU device. */
     private countPipelineCache = new WeakMap<GPUDevice, CachedCountPipeline>();
 
     /**
-     * Renders views from each source feature origin and aggregates class shares
-     * and object visibility metrics back onto the source features.
+     * Samples each resolved viewpoint, aggregates the render results, and writes
+     * the metrics back into the collection.
      *
-     * @param params - Render pipeline parameters.
-     * @param params.layers - Geometry layers to render.
-     * @param params.source - Source features used to derive view origins.
-     * @param params.aggregation - Reduction strategy applied to sampled renders.
-     * @param params.viewSampling - Direction sampling applied to each origin.
-     * @param params.fov - Horizontal FOV in degrees (default: 90).
-     * @param params.near - Near clip plane (default: 1).
-     * @param params.far - Far clip plane (default: 5000).
-     * @param params.tileSize - Tile resolution in pixels, must be multiple of 8 (default: 64).
-     * @returns A new FeatureCollection with aggregated render metrics in `.properties.compute.render`.
+     * The render pass is executed in batches sized to the current WebGPU device
+     * limits. Each batch renders all eligible layers into a tiled texture,
+     * counts visible classes and objects, and accumulates the raw counts before
+     * a final aggregation step updates `feature.properties.compute.render`.
+     *
+     * @returns A copied collection with per-feature render metrics attached.
+     *
+     * @param params Render pipeline parameters.
+     * @param params.layers Geometry layers to render.
+     * @param params.viewpoints Viewpoint collection and sampling strategy.
+     * @param params.aggregation Reduction strategy applied to sampled renders.
+     * @param params.camera Optional camera controls.
+     * @param params.tileSize Tile resolution in pixels; must be a multiple of 8.
      * @throws If no layers are provided or tileSize is not a multiple of 8.
      */
     async run(params: RenderPipelineParams): Promise<FeatureCollection> {
         const {
             layers,
-            source,
-            aggregation,
             viewpoints,
-            viewSampling,
-            fov = 90,
-            near = 1,
-            far = 5000,
+            aggregation,
+            camera,
             tileSize = 64,
         } = params;
+        const fov = camera?.fov ?? 90;
+        const near = camera?.clip?.near ?? 1;
+        const far = camera?.clip?.far ?? 5000;
 
         if (layers.length === 0) {
             throw new Error('ComputeRender: at least one layer is required.');
@@ -121,17 +109,17 @@ export class ComputeRender extends GpuPipeline {
             throw new Error('ComputeRender: tileSize must be a multiple of 8.');
         }
 
-        const resolvedViewpoints = resolveRenderViewpoints(source, viewpoints, viewSampling);
-        const resolvedSource = resolvedViewpoints.source;
+        const resolvedViewpoints = resolveRenderViewpoints(viewpoints);
+        const resolvedCollection = resolvedViewpoints.collection;
         const samples = resolvedViewpoints.samples;
         const metadata = this.buildRenderMetadata(layers, aggregation);
         const sampleCount = samples.length;
 
         if (sampleCount === 0) {
-            return this.applyAggregation(resolvedSource, samples, metadata, new Uint32Array(0), new Uint32Array(0), tileSize);
+            return this.applyAggregation(resolvedCollection, samples, metadata, new Uint32Array(0), new Uint32Array(0), tileSize);
         }
 
-        const origin = computeOrigin(resolvedSource);
+        const origin = computeOrigin(resolvedCollection);
         const layerMeshes = layers
             .map((layer, layerIndex) => this.triangulateLayer(layer, origin, layerIndex))
             .filter((entry): entry is LayerMeshData => entry !== null);
@@ -140,8 +128,8 @@ export class ComputeRender extends GpuPipeline {
         const device = await this.getDevice();
         const alignment = device.limits.minUniformBufferOffsetAlignment;
         const cameraStride = Math.max(64, alignment);
-        this.validateAggregationBufferSizes(device, resolvedSource.features.length, metadata);
-        this.validateObjectAggregationCpuBufferSize(resolvedSource.features.length, metadata);
+        this.validateAggregationBufferSizes(device, resolvedCollection.features.length, metadata);
+        this.validateObjectAggregationCpuBufferSize(resolvedCollection.features.length, metadata);
         const batchSize = this.computeMaxBatchSize(device, tileSize, cameraStride, metadata);
 
         const createdBuffers: GPUBuffer[] = [];
@@ -168,10 +156,10 @@ export class ComputeRender extends GpuPipeline {
             );
 
             const rawClasses = metadata.includeClasses
-                ? new Uint32Array(resolvedSource.features.length * metadata.layerTypes.length)
+                ? new Uint32Array(resolvedCollection.features.length * metadata.layerTypes.length)
                 : new Uint32Array(0);
             const objectVisibleCounts = metadata.includeObjects
-                ? new Uint32Array(resolvedSource.features.length * metadata.objectKeys.length)
+                ? new Uint32Array(resolvedCollection.features.length * metadata.objectKeys.length)
                 : new Uint32Array(0);
 
             for (let batchStart = 0; batchStart < sampleCount; batchStart += batchSize) {
@@ -186,7 +174,7 @@ export class ComputeRender extends GpuPipeline {
                 const cameraBuf = this.buildCameraBuffer(device, batchCameraData, batchCount, alignment).cameraBuf;
                 const countBuffers = this.buildCountBuffers(
                     device,
-                    resolvedSource.features.length,
+                    resolvedCollection.features.length,
                     batchCount,
                     batchGridSize,
                     tileSize,
@@ -269,7 +257,7 @@ export class ComputeRender extends GpuPipeline {
                 }
             }
 
-            return this.applyAggregation(resolvedSource, samples, metadata, rawClasses, objectVisibleCounts, tileSize);
+            return this.applyAggregation(resolvedCollection, samples, metadata, rawClasses, objectVisibleCounts, tileSize);
         } finally {
             for (const buffer of createdBuffers) {
                 buffer.destroy();
@@ -277,6 +265,13 @@ export class ComputeRender extends GpuPipeline {
         }
     }
 
+    /**
+     * Computes the largest sample batch supported by the current device.
+     *
+     * The batch size is constrained by tile texture dimensions, uniform-buffer
+     * capacity, storage-buffer limits, and compute workgroup limits. Object
+     * aggregation adds an additional storage-buffer bound.
+     */
     private computeMaxBatchSize(
         device: GPUDevice,
         tileSize: number,
@@ -300,16 +295,22 @@ export class ComputeRender extends GpuPipeline {
         return batchSize;
     }
 
+    /**
+     * Ensures class aggregation fits within the device storage-buffer limit.
+     *
+     * Object aggregation is validated separately because it uses CPU-side
+     * accumulation after the GPU pass.
+     */
     private validateAggregationBufferSizes(
         device: GPUDevice,
-        sourceCount: number,
+        collectionCount: number,
         metadata: RenderMetadata,
     ): void {
         if (!metadata.includeClasses) {
             return;
         }
 
-        const layerTypeBufferSize = sourceCount * metadata.layerTypes.length * 4;
+        const layerTypeBufferSize = collectionCount * metadata.layerTypes.length * 4;
         if (layerTypeBufferSize > device.limits.maxStorageBufferBindingSize) {
             throw new Error(
                 `RenderPipeline: class aggregation requires ${layerTypeBufferSize} bytes, exceeding maxStorageBufferBindingSize ${device.limits.maxStorageBufferBindingSize}.`
@@ -317,13 +318,16 @@ export class ComputeRender extends GpuPipeline {
         }
     }
 
-    private validateObjectAggregationCpuBufferSize(sourceCount: number, metadata: RenderMetadata): void {
+    /**
+     * Ensures object visibility accumulation fits within the supported CPU budget.
+     */
+    private validateObjectAggregationCpuBufferSize(collectionCount: number, metadata: RenderMetadata): void {
         if (!metadata.includeObjects) {
             return;
         }
 
         const requiredBytes =
-            sourceCount * metadata.objectKeys.length * OBJECT_VISIBILITY_COUNT_BYTES_PER_ENTRY;
+            collectionCount * metadata.objectKeys.length * OBJECT_VISIBILITY_COUNT_BYTES_PER_ENTRY;
         if (requiredBytes > MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES) {
             throw new Error(
                 `ComputeRender: object aggregation requires ${requiredBytes} bytes on the CPU, exceeding the supported accumulation limit of ${MAX_CPU_OBJECT_VISIBILITY_ACCUMULATION_BYTES} bytes.`
@@ -331,6 +335,14 @@ export class ComputeRender extends GpuPipeline {
         }
     }
 
+    /**
+     * Resolves aggregation metadata for the current layer set.
+     *
+     * This collects the distinct layer types used for class aggregation,
+     * prepares object keys and per-feature lookup metadata when object
+     * visibility is requested, and encodes the flags consumed by the GPU
+     * count pass.
+     */
     private buildRenderMetadata(layers: RenderLayer[], aggregation: RenderAggregation): RenderMetadata {
         const layerTypes: string[] = [];
         const layerTypeIndexById = new Map<string, number>();
@@ -344,36 +356,36 @@ export class ComputeRender extends GpuPipeline {
         const seenLayerIds = includeObjects ? new Set<string>() : null;
 
         layers.forEach((layer) => {
-            let layerTypeIndex = layerTypeIndexById.get(layer.layerType);
+            let layerTypeIndex = layerTypeIndexById.get(layer.type);
             if (layerTypeIndex === undefined) {
                 layerTypeIndex = layerTypes.length;
-                layerTypes.push(layer.layerType);
-                layerTypeIndexById.set(layer.layerType, layerTypeIndex);
+                layerTypes.push(layer.type);
+                layerTypeIndexById.set(layer.type, layerTypeIndex);
             }
 
             layerTypeIndexByLayer.push(layerTypeIndex);
             if (includeObjects) {
-                if (layer.layerId.length === 0) {
-                    throw new Error('ComputeRender: layerId must be non-empty when object aggregation is enabled.');
+                if (layer.id.length === 0) {
+                    throw new Error('ComputeRender: layer id must be non-empty when object aggregation is enabled.');
                 }
-                if (seenLayerIds?.has(layer.layerId)) {
-                    throw new Error(`ComputeRender: duplicate layerId "${layer.layerId}" is not allowed for object aggregation.`);
+                if (seenLayerIds?.has(layer.id)) {
+                    throw new Error(`ComputeRender: duplicate layer id "${layer.id}" is not allowed for object aggregation.`);
                 }
-                seenLayerIds?.add(layer.layerId);
+                seenLayerIds?.add(layer.id);
 
                 const seenObjectKeys = layer.objectIdProperty ? new Set<string>() : null;
-                const featureMeta = layer.geojson.features.map((feature, featureIndex) => {
+                const featureMeta = layer.collection.features.map((feature, featureIndex) => {
                     const rawId = layer.objectIdProperty
                         ? feature.properties?.[layer.objectIdProperty]
                         : undefined;
                     const objectKey =
                         rawId === undefined || rawId === null
-                            ? this.buildObjectKey(layer.layerId, featureIndex)
-                            : this.buildObjectKey(layer.layerId, rawId);
+                            ? this.buildObjectKey(layer.id, featureIndex)
+                            : this.buildObjectKey(layer.id, rawId);
 
                     if (seenObjectKeys?.has(objectKey)) {
                         throw new Error(
-                            `ComputeRender: duplicate ${layer.objectIdProperty} value "${String(rawId)}" in layer "${layer.layerId}" is not allowed for object aggregation.`
+                            `ComputeRender: duplicate ${layer.objectIdProperty} value "${String(rawId)}" in layer "${layer.id}" is not allowed for object aggregation.`
                         );
                     }
                     seenObjectKeys?.add(objectKey);
@@ -392,7 +404,7 @@ export class ComputeRender extends GpuPipeline {
             const backgroundLayerType = aggregation.backgroundLayerType ?? 'background';
             if (layerTypeIndexById.has(backgroundLayerType)) {
                 throw new Error(
-                    `ComputeRender: backgroundLayerType "${backgroundLayerType}" must not match a layerType when class aggregation includes background.`
+                    `ComputeRender: backgroundLayerType "${backgroundLayerType}" must not match a rendered layer type when class aggregation includes background.`
                 );
             }
             layerTypes.push(backgroundLayerType);
@@ -426,33 +438,46 @@ export class ComputeRender extends GpuPipeline {
         };
     }
 
+    /**
+     * Triangulates a render layer into mesh data relative to the shared origin.
+     *
+     * Unsupported layer types are skipped so they do not participate in the
+     * render pass.
+     */
     private triangulateLayer(layer: RenderLayer, origin: [number, number], layerIndex: number): LayerMeshData | null {
         let geometries;
-        switch (layer.layerType) {
+        switch (layer.type) {
             case 'buildings':
-                [geometries] = TriangulatorBuildings.buildMesh(layer.geojson, origin);
+                [geometries] = TriangulatorBuildings.buildMesh(layer.collection, origin);
                 break;
             case 'polygons':
             case 'surface':
             case 'water':
             case 'parks':
-                [geometries] = TriangulatorPolygons.buildMesh(layer.geojson, origin);
+                [geometries] = TriangulatorPolygons.buildMesh(layer.collection, origin);
                 break;
             case 'roads':
             case 'polylines':
-                [geometries] = TriangulatorPolylines.buildMesh(layer.geojson, origin);
+                [geometries] = TriangulatorPolylines.buildMesh(layer.collection, origin);
                 break;
             case 'points':
-                [geometries] = TriangulatorPoints.buildMesh(layer.geojson, origin);
+                [geometries] = TriangulatorPoints.buildMesh(layer.collection, origin);
                 break;
             default:
-                console.warn(`ComputeRender: unsupported layer type "${layer.layerType}", skipping.`);
+                console.warn(`ComputeRender: unsupported layer type "${layer.type}", skipping.`);
                 return null;
         }
 
         return { geometries, layer, layerIndex };
     }
 
+    /**
+     * Uploads per-feature geometry for object aggregation.
+     *
+     * Geometries are grouped by source feature, flattened into shared GPU
+     * buffers, and tagged with encoded layer and object identifiers so the
+     * fragment shader can write visibility counts back into the correct slots.
+     */
     private uploadLayerToGpu(
         device: GPUDevice,
         layerMesh: LayerMeshData,
@@ -537,21 +562,28 @@ export class ComputeRender extends GpuPipeline {
         return draws;
     }
 
+    /**
+     * Uploads a layer as a single draw for class aggregation.
+     *
+     * This path merges all geometry in the layer into one GPU draw and encodes
+     * only the layer type, which is sufficient when object-level visibility is
+     * not requested.
+     */
     private uploadMergedLayerToGpu(
         device: GPUDevice,
         layerMesh: LayerMeshData,
         layerTypeIndex: number,
     ): GpuFeatureDraw[] {
-        const dimension = layerMesh.layer.layerType === 'buildings' ? 3 : 2;
+        const dimension = layerMesh.layer.type === 'buildings' ? 3 : 2;
 
         let totalVerts = 0;
         let totalIndices = 0;
         for (const geometry of layerMesh.geometries) {
             if (geometry.position.length % dimension !== 0) {
                 throw new Error(
-                    `ComputeRender: layer '${layerMesh.layer.layerId}' has invalid position data for ${dimension}D geometry.`
-                );
-            }
+                        `ComputeRender: layer '${layerMesh.layer.id}' has invalid position data for ${dimension}D geometry.`
+                    );
+                }
 
             totalVerts += (geometry.position.length / dimension) * 3;
             totalIndices += geometry.indices?.length ?? 0;
@@ -620,6 +652,9 @@ export class ComputeRender extends GpuPipeline {
         }];
     }
 
+    /**
+     * Encodes layer and object identifiers for shader consumption.
+     */
     private encodeIds(layerTypeIndex: number, objectIndex: number): Float32Array {
         const encodedObject = objectIndex + 1;
         const low = encodedObject & ENCODED_BYTE_MASK;
@@ -632,10 +667,16 @@ export class ComputeRender extends GpuPipeline {
         ]);
     }
 
+    /**
+     * Builds a stable object key from the layer id and source object id.
+     */
     private buildObjectKey(layerId: string, rawObjectId: unknown): string {
         return `${encodeURIComponent(layerId)}:${encodeURIComponent(String(rawObjectId))}`;
     }
 
+    /**
+     * Creates the shared color attachment used by tiled render sampling.
+     */
     private createTileTexture(device: GPUDevice, texSize: number): GPUTexture {
         return device.createTexture({
             size: [texSize, texSize],
@@ -644,6 +685,9 @@ export class ComputeRender extends GpuPipeline {
         });
     }
 
+    /**
+     * Creates the depth attachment used by tiled render sampling.
+     */
     private createDepthTexture(device: GPUDevice, texSize: number): GPUTexture {
         return device.createTexture({
             size: [texSize, texSize],
@@ -652,6 +696,9 @@ export class ComputeRender extends GpuPipeline {
         });
     }
 
+    /**
+     * Packs per-sample camera matrices into a uniform buffer.
+     */
     private buildCameraBuffer(
         device: GPUDevice,
         cameras: Float32Array,
@@ -672,16 +719,19 @@ export class ComputeRender extends GpuPipeline {
         return { cameraBuf, cameraStride };
     }
 
+    /**
+     * Allocates the storage and uniform buffers required by the count pass.
+     */
     private buildCountBuffers(
         device: GPUDevice,
-        sourceCount: number,
+        collectionCount: number,
         sampleCount: number,
         gridSize: number,
         tileSize: number,
         samples: CameraSample[],
         metadata: RenderMetadata,
     ): CountBuffers {
-        const layerTypeSize = metadata.includeClasses ? sourceCount * metadata.layerTypes.length * 4 : 0;
+        const layerTypeSize = metadata.includeClasses ? collectionCount * metadata.layerTypes.length * 4 : 0;
         const objectSize = metadata.includeObjects ? sampleCount * metadata.objectKeys.length * 4 : 0;
         const sampleSourcesSize = Math.max(4, sampleCount * 4);
 
@@ -697,7 +747,7 @@ export class ComputeRender extends GpuPipeline {
             device,
             sampleSourcesSize,
             GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-            new Uint32Array(samples.map(sample => sample.sourceIndex))
+            new Uint32Array(samples.map(sample => sample.collectionIndex))
         );
 
         const paramsData = new ArrayBuffer(32);
@@ -725,6 +775,9 @@ export class ComputeRender extends GpuPipeline {
         };
     }
 
+    /**
+     * Builds the render pipeline used to rasterize each sampled viewport.
+     */
     private buildRenderPipeline(device: GPUDevice): {
         renderPipeline: GPURenderPipeline;
         camBGL: GPUBindGroupLayout;
@@ -771,6 +824,9 @@ export class ComputeRender extends GpuPipeline {
         return { renderPipeline, camBGL, idBGL };
     }
 
+    /**
+     * Returns the cached render pipeline for a device, building it on demand.
+     */
     private getRenderPipeline(device: GPUDevice): CachedRenderPipeline {
         const cached = this.renderPipelineCache.get(device);
         if (cached) {
@@ -782,6 +838,9 @@ export class ComputeRender extends GpuPipeline {
         return pipeline;
     }
 
+    /**
+     * Builds the compute pipeline that reduces tiled render output.
+     */
     private buildCountPipeline(device: GPUDevice): {
         countPipeline: GPUComputePipeline;
         countBGL: GPUBindGroupLayout;
@@ -807,6 +866,9 @@ export class ComputeRender extends GpuPipeline {
         return { countPipeline, countBGL };
     }
 
+    /**
+     * Returns the cached count pipeline for a device, building it on demand.
+     */
     private getCountPipeline(device: GPUDevice): CachedCountPipeline {
         const cached = this.countPipelineCache.get(device);
         if (cached) {
@@ -818,6 +880,9 @@ export class ComputeRender extends GpuPipeline {
         return pipeline;
     }
 
+    /**
+     * Binds the tile texture and reduction buffers for the count pass.
+     */
     private buildCountBindGroup(
         device: GPUDevice,
         countBGL: GPUBindGroupLayout,
@@ -836,6 +901,12 @@ export class ComputeRender extends GpuPipeline {
         });
     }
 
+    /**
+     * Encodes one render pass per sample into the tiled target texture.
+     *
+     * Each sample writes into a viewport-scoped tile, reusing the same shared
+     * attachments across the batch.
+     */
     private encodeRenderPasses(
         encoder: GPUCommandEncoder,
         sampleCount: number,
@@ -885,6 +956,9 @@ export class ComputeRender extends GpuPipeline {
         }
     }
 
+    /**
+     * Encodes the compute pass that counts visible classes and objects.
+     */
     private encodeCountPass(
         encoder: GPUCommandEncoder,
         countPipeline: GPUComputePipeline,
@@ -900,8 +974,15 @@ export class ComputeRender extends GpuPipeline {
         cPass.end();
     }
 
+    /**
+     * Writes aggregated render metrics back onto the feature collection.
+     *
+     * Class metrics are normalized by rendered pixels and sample count, while
+     * object metrics are written only for objects observed in at least one
+     * sample.
+     */
     private applyAggregation(
-        source: FeatureCollection,
+        collection: FeatureCollection,
         samples: CameraSample[],
         metadata: RenderMetadata,
         rawClasses: Uint32Array,
@@ -909,15 +990,15 @@ export class ComputeRender extends GpuPipeline {
         tileSize: number,
     ): FeatureCollection {
         const totalPixels = tileSize * tileSize;
-        const sampleCounts = new Uint32Array(source.features.length);
+        const sampleCounts = new Uint32Array(collection.features.length);
         for (const sample of samples) {
-            sampleCounts[sample.sourceIndex] += 1;
+            sampleCounts[sample.collectionIndex] += 1;
         }
 
         return {
-            ...source,
-            features: source.features.map((feature, sourceIndex) => {
-                const sampleCount = sampleCounts[sourceIndex];
+            ...collection,
+            features: collection.features.map((feature, collectionIndex) => {
+                const sampleCount = sampleCounts[collectionIndex];
                 const render: Record<string, unknown> = {
                     sampleCount,
                 };
@@ -925,7 +1006,7 @@ export class ComputeRender extends GpuPipeline {
                 if (metadata.includeClasses) {
                     const classes: Record<string, number> = {};
                     for (let layerTypeIndex = 0; layerTypeIndex < metadata.layerTypes.length; layerTypeIndex++) {
-                        const raw = rawClasses[sourceIndex * metadata.layerTypes.length + layerTypeIndex] ?? 0;
+                        const raw = rawClasses[collectionIndex * metadata.layerTypes.length + layerTypeIndex] ?? 0;
                         classes[metadata.layerTypes[layerTypeIndex]] = sampleCount > 0 ? raw / (totalPixels * sampleCount) : 0;
                     }
                     render.classes = classes;
@@ -935,7 +1016,7 @@ export class ComputeRender extends GpuPipeline {
                     const objects: Record<string, RenderObjectMetric> = {};
                     for (let objectIndex = 0; objectIndex < metadata.objectKeys.length; objectIndex++) {
                         const visibleSamples =
-                            objectVisibleCounts[sourceIndex * metadata.objectKeys.length + objectIndex] ?? 0;
+                            objectVisibleCounts[collectionIndex * metadata.objectKeys.length + objectIndex] ?? 0;
 
                         if (visibleSamples > 0) {
                             objects[metadata.objectKeys[objectIndex]] = {
@@ -964,6 +1045,9 @@ export class ComputeRender extends GpuPipeline {
         } as FeatureCollection;
     }
 
+    /**
+     * Accumulates per-object visibility counts from one batch into the totals.
+     */
     private accumulateObjectVisibilityCounts(
         objectVisibleCounts: Uint32Array,
         batchObjects: Uint32Array,
@@ -971,14 +1055,14 @@ export class ComputeRender extends GpuPipeline {
         objectCount: number,
     ): void {
         for (let sampleIndex = 0; sampleIndex < batchSamples.length; sampleIndex++) {
-            const sourceIndex = batchSamples[sampleIndex]?.sourceIndex;
-            if (sourceIndex === undefined) continue;
+            const collectionIndex = batchSamples[sampleIndex]?.collectionIndex;
+            if (collectionIndex === undefined) continue;
 
             const batchOffset = sampleIndex * objectCount;
-            const sourceOffset = sourceIndex * objectCount;
+            const collectionOffset = collectionIndex * objectCount;
             for (let objectIndex = 0; objectIndex < objectCount; objectIndex++) {
                 if ((batchObjects[batchOffset + objectIndex] ?? 0) > 0) {
-                    objectVisibleCounts[sourceOffset + objectIndex] += 1;
+                    objectVisibleCounts[collectionOffset + objectIndex] += 1;
                 }
             }
         }

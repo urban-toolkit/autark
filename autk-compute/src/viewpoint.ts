@@ -1,3 +1,11 @@
+/**
+ * @module AutkComputeViewpoint
+ * Viewpoint resolution and camera sampling helpers for render pipelines.
+ *
+ * This module derives camera origins from a viewpoints collection, expands
+ * them into sampled camera positions, and builds view-projection matrices.
+ */
+
 import {
     FeatureCollection,
 } from 'geojson';
@@ -9,52 +17,74 @@ import {
     TriangulatorBuildingWithWindows,
 } from 'autk-core';
 
-import type { RenderViewSampling, RenderViewpoints } from './api';
+import type { RenderViewSampling, RenderViewpointStrategy, RenderViewpoints } from './api';
 
 const BUILDING_WINDOW_DIRECTION_OFFSETS = [-30, 0, 30] as const;
+
+/** View origin derived from a source feature. */
 export interface ViewOrigin {
-    sourceIndex: number;
+    /** Source feature index in the viewpoints collection. */
+    collectionIndex: number;
+
+    /** World-space origin used as the camera eye position. */
     origin: [number, number, number];
 }
 
+/** Concrete camera sample resolved from a view origin. */
 export interface CameraSample {
-    sourceIndex: number;
+    /** Index used to align sampled results back to the resolved collection or window layout. */
+    collectionIndex: number;
+
+    /** Camera eye position in world space. */
     eye: [number, number, number];
+
+    /** Look-at point paired with the sampled eye position. */
     lookAt: [number, number, number];
 }
 
+/** Resolved viewpoints and any strategy-specific auxiliary data. */
 export interface ResolvedRenderViewpoints {
-    source: FeatureCollection;
+    /** Viewpoints collection used as the basis for sampling and result alignment. */
+    collection: FeatureCollection;
+
+    /** Camera samples generated from the resolved viewpoint strategy. */
     samples: CameraSample[];
+
+    /** Window layout returned by the building-window strategy, if used. */
     windows?: BuildingWindowLayoutEntry[];
 }
 
 /**
- * Derives view origins from each feature's geometry centroid.
+ * Derives view origins from feature geometry centroids.
  *
- * @param source - GeoJSON FeatureCollection to extract origins from.
+ * Features without geometry or centroid output are skipped.
+ *
+ * @param collection GeoJSON FeatureCollection to extract origins from.
  * @returns Array of view origins, one per feature with a valid geometry.
  */
-export function generateViewOrigins(source: FeatureCollection): ViewOrigin[] {
+export function generateViewOrigins(collection: FeatureCollection): ViewOrigin[] {
     const origins: ViewOrigin[] = [];
 
-    source.features.forEach((feature, sourceIndex) => {
+    collection.features.forEach((feature, collectionIndex) => {
         if (!feature.geometry) return;
 
         const origin = computeGeometryCentroid(feature.geometry);
         if (!origin) return;
 
-        origins.push({ sourceIndex, origin });
+        origins.push({ collectionIndex, origin });
     });
 
     return origins;
 }
 
 /**
- * Expands view origins into camera samples by generating azimuthal directions.
+ * Expands view origins into camera samples.
  *
- * @param origins - View origins from {@link generateViewOrigins}.
- * @param viewSampling - Sampling controls for direction count, offset, and pitch.
+ * Each origin is sampled around a horizontal ring. The direction count is
+ * clamped to at least `1`.
+ *
+ * @param origins View origins from {@link generateViewOrigins}.
+ * @param viewSampling Sampling controls for direction count, azimuth offset, and pitch.
  * @returns Array of camera samples, one per direction per origin.
  */
 export function expandCameraSamples(
@@ -76,7 +106,7 @@ export function expandCameraSamples(
             const dirZ = Math.sin(pitchRad);
 
             samples.push({
-                sourceIndex: viewOrigin.sourceIndex,
+                collectionIndex: viewOrigin.collectionIndex,
                 eye: [...viewOrigin.origin],
                 lookAt: [
                     viewOrigin.origin[0] + dirX,
@@ -90,35 +120,49 @@ export function expandCameraSamples(
     return samples;
 }
 
+/**
+ * Resolves a viewpoints configuration into a collection and camera samples.
+ *
+ * The default strategy samples feature centroids. The building-window strategy
+ * derives a window layout first and returns that layout's collection.
+ *
+ * @param viewpoints Viewpoints collection, strategy, and sampling controls.
+ * @returns Resolved collection, samples, and optional building-window layout.
+ */
 export function resolveRenderViewpoints(
-    source: FeatureCollection,
-    viewpoints: RenderViewpoints | undefined,
-    viewSampling: RenderViewSampling = {},
+    viewpoints: RenderViewpoints,
 ): ResolvedRenderViewpoints {
-    if (viewpoints?.type === 'building-windows') {
-        const layout = TriangulatorBuildingWithWindows.buildWindowLayout(source, viewpoints.floors);
+    const collection = viewpoints.collection;
+    const strategy: RenderViewpointStrategy = viewpoints.strategy ?? { type: 'centroid' };
+    const sampling: RenderViewSampling = viewpoints.sampling ?? {};
+
+    if (strategy.type === 'building-windows') {
+        const layout = TriangulatorBuildingWithWindows.buildWindowLayout(collection, strategy.floors);
         return {
-            source: layout.collection,
+            collection: layout.collection,
             samples: buildBuildingWindowCameraSamples(layout.windows),
             windows: layout.windows,
         };
     }
 
-    const origins = generateViewOrigins(source);
+    const origins = generateViewOrigins(collection);
     return {
-        source,
-        samples: expandCameraSamples(origins, viewSampling),
+        collection,
+        samples: expandCameraSamples(origins, sampling),
     };
 }
 
 /**
- * Builds row-major view-projection matrices for each camera sample.
+ * Builds view-projection matrices for sampled viewpoints.
  *
- * @param samples - Camera samples from {@link expandCameraSamples}.
- * @param origin - Reference origin for relative camera positioning.
- * @param fovDeg - Horizontal field of view in degrees.
- * @param near - Near clipping plane distance.
- * @param far - Far clipping plane distance.
+ * Matrices are emitted in sample order. X and Y are shifted by the provided
+ * origin before building each camera.
+ *
+ * @param samples Camera samples from {@link expandCameraSamples}.
+ * @param origin Reference origin used to shift sample positions into local coordinates.
+ * @param fovDeg Horizontal field of view in degrees.
+ * @param near Near clipping plane distance.
+ * @param far Far clipping plane distance.
  * @returns Float32Array of 16-element view-projection matrices.
  */
 export function buildCameraMatrices(
@@ -160,14 +204,21 @@ export function buildCameraMatrices(
     return cameras;
 }
 
+/**
+ * Builds camera samples for a building-window layout.
+ *
+ * Each window produces three samples, rotating the window normal by the fixed
+ * direction offsets. The returned `collectionIndex` is the window index within
+ * the layout output.
+ */
 function buildBuildingWindowCameraSamples(windows: BuildingWindowLayoutEntry[]): CameraSample[] {
     const samples: CameraSample[] = [];
 
-    windows.forEach((window, sourceIndex) => {
+    windows.forEach((window, collectionIndex) => {
         for (const angleOffset of BUILDING_WINDOW_DIRECTION_OFFSETS) {
             const dir = rotateXY(window.normal, angleOffset);
             samples.push({
-                sourceIndex,
+                collectionIndex,
                 eye: [...window.center],
                 lookAt: [
                     window.center[0] + dir[0],
@@ -181,6 +232,7 @@ function buildBuildingWindowCameraSamples(windows: BuildingWindowLayoutEntry[]):
     return samples;
 }
 
+/** Rotates a vector around the Z axis in the XY plane. */
 function rotateXY(vector: [number, number, number], angleDeg: number): [number, number, number] {
     const angleRad = degToRad(angleDeg);
     const cos = Math.cos(angleRad);
@@ -192,6 +244,7 @@ function rotateXY(vector: [number, number, number], angleDeg: number): [number, 
     ];
 }
 
+/** Converts degrees to radians. */
 function degToRad(value: number): number {
     return (value * Math.PI) / 180;
 }
