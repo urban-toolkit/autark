@@ -4,6 +4,7 @@ import { PlotEvent, Scatterplot } from 'autk-plot';
 import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
 import {
   createAutarkProvenance,
+  PlotType,
   renderProvenanceTrailUI,
   computeGraphMetrics,
   computeSelectionFrequency,
@@ -133,11 +134,15 @@ function renderFreqCard(
   const freq = computeSelectionFrequency(graph);
 
   const topMap = [...freq.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const topPlot = [...freq.plot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const topPlotsByPlot = [...freq.plots.entries()].map(([plotId, plotFreq]) => ({
+    plotId,
+    top: [...plotFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
+  })).filter(({ top }) => top.length > 0);
+  const allTopPlot = topPlotsByPlot.flatMap(({ top }) => top);
 
   el.innerHTML = '';
 
-  if (topMap.length === 0 && topPlot.length === 0) {
+  if (topMap.length === 0 && allTopPlot.length === 0) {
     const empty = document.createElement('span');
     empty.className = 'freq-empty';
     empty.textContent = 'No selections yet. Click features on the map or brush the scatterplot.';
@@ -145,7 +150,7 @@ function renderFreqCard(
     return;
   }
 
-  const maxCount = Math.max(...[...topMap, ...topPlot].map(([, c]) => c), 1);
+  const maxCount = Math.max(...[...topMap, ...allTopPlot].map(([, c]) => c), 1);
 
   const renderGroup = (label: string, items: [number, number][]): void => {
     if (items.length === 0) return;
@@ -183,7 +188,9 @@ function renderFreqCard(
   };
 
   renderGroup('Map features', topMap);
-  renderGroup('Plot features', topPlot);
+  for (const { plotId, top } of topPlotsByPlot) {
+    renderGroup(`Plot: ${plotId}`, top);
+  }
 }
 
 function renderSummaryCard(el: HTMLElement, provenance: ReturnType<typeof createAutarkProvenance>): void {
@@ -264,7 +271,11 @@ async function main() {
     }
   });
 
-  const provenance = createAutarkProvenance({ map, plot, db });
+  const scatterplotForProvenance = Object.assign(plot, {
+    plotId: 'scatter-neighborhoods',
+    plotType: PlotType.SCATTERPLOT,
+  });
+  const provenance = createAutarkProvenance({ map, plots: [scatterplotForProvenance], db });
 
   // ── Export / Import ──────────────────────────────────────────────────────
   const exportBtn = document.querySelector('#exportBtn') as HTMLButtonElement;

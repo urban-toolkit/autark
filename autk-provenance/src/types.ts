@@ -8,6 +8,18 @@ export interface MapViewState {
   up: [number, number, number];
 }
 
+export enum PlotType {
+  SCATTERPLOT = 'scatterplot',
+  BARCHART = 'barchart',
+  PARALLEL_COORDINATES = 'parallel_coordinates',
+  HISTOGRAM = 'histogram',
+}
+
+export interface PlotSelectionState {
+  ids: number[];
+  plotType: PlotType;
+}
+
 /**
  * Canonical state shape for autark provenance.
  * Captures everything needed to restore the current analysis state.
@@ -15,7 +27,8 @@ export interface MapViewState {
 export interface AutarkProvenanceState {
   selection: {
     map: { layerId: string; ids: number[] } | null;
-    plot: number[];
+    /** Per-plot selection state, keyed by plotId. */
+    plots: Record<string, PlotSelectionState>;
   };
   ui?: {
     mapMenuOpen?: boolean;
@@ -29,6 +42,12 @@ export interface AutarkProvenanceState {
     layerTableNames: string[];
     activeLayerIds?: string[];
   };
+  /**
+   * Arbitrary filter / temporal state contributed by custom UI controls
+   * (e.g. month dropdowns, range sliders, dataset pickers).
+   * Keys are defined by the app via CustomControlConfig.getStateDelta.
+   */
+  filters?: Record<string, unknown>;
 }
 
 /**
@@ -45,11 +64,15 @@ export enum ProvenanceAction {
   MAP_UI_VISIBLE_LAYER_TOGGLE = 'MAP_UI_VISIBLE_LAYER_TOGGLE',
   MAP_UI_ACTIVE_LAYER_CHANGE = 'MAP_UI_ACTIVE_LAYER_CHANGE',
   MAP_UI_THEMATIC_TOGGLE = 'MAP_UI_THEMATIC_TOGGLE',
+  PLOT_ADD = 'PLOT_ADD',
+  PLOT_REMOVE = 'PLOT_REMOVE',
   PLOT_CLICK = 'PLOT_CLICK',
   PLOT_BRUSH = 'PLOT_BRUSH',
   PLOT_BRUSH_X = 'PLOT_BRUSH_X',
   PLOT_BRUSH_Y = 'PLOT_BRUSH_Y',
   PLOT_DATA = 'PLOT_DATA',
+  MAP_UI_CUSTOM_CONTROL = 'MAP_UI_CUSTOM_CONTROL',
+  COMPUTE_RUN = 'COMPUTE_RUN',
   DB_INIT = 'DB_INIT',
   DB_WORKSPACE = 'DB_WORKSPACE',
   DB_LOAD_OSM = 'DB_LOAD_OSM',
@@ -140,8 +163,12 @@ export interface IMapForProvenance {
 
 /**
  * Minimal plot-like interface needed by PlotAdapter.
+ * Each plot must supply a stable plotId and its PlotType so that provenance
+ * state is keyed correctly and interaction labels are meaningful.
  */
 export interface IPlotForProvenance {
+  plotId: string;
+  plotType: PlotType;
   plotEvents: {
     addEventListener(event: string, listener: (selection: number[]) => void): void;
     removeEventListener?(event: string, listener: (selection: number[]) => void): void;

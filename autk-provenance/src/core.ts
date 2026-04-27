@@ -17,7 +17,10 @@ function deepMergeState(
   const next: AutarkProvenanceState = {
     selection: {
       map: delta.selection?.map ?? base.selection.map,
-      plot: delta.selection?.plot ?? base.selection.plot,
+      // Spread-merge so a delta for one plot doesn't wipe the others.
+      plots: delta.selection?.plots !== undefined
+        ? { ...base.selection.plots, ...delta.selection.plots }
+        : base.selection.plots,
     },
   };
   if (base.ui || delta.ui) {
@@ -28,6 +31,9 @@ function deepMergeState(
   }
   if (base.view || delta.view) next.view = delta.view ?? base.view;
   if (base.data || delta.data) next.data = delta.data ?? base.data;
+  if (base.filters || delta.filters) {
+    next.filters = { ...(base.filters ?? {}), ...(delta.filters ?? {}) };
+  }
   return next;
 }
 

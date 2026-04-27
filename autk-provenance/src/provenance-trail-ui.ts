@@ -322,8 +322,11 @@ function renderInsightsPanel(
 
   // ── Selection focus (Feature 2: aggregate selection frequency) ────────────
   const topMap = [...freq.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const topPlot = [...freq.plot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const hasFreqData = topMap.length > 0 || topPlot.length > 0;
+  const topPlotsByPlot = [...freq.plots.entries()].map(([plotId, plotFreq]) => ({
+    plotId,
+    top: [...plotFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
+  })).filter(({ top }) => top.length > 0 && top[0][1] > 1);
+  const hasFreqData = topMap.length > 0 || topPlotsByPlot.length > 0;
 
   if (hasFreqData) {
     const freqSection = document.createElement('div');
@@ -334,10 +337,11 @@ function renderInsightsPanel(
     freqTitle.textContent = 'Selection focus (all branches)';
     freqSection.appendChild(freqTitle);
 
-    const maxCount = Math.max(
-      ...[...topMap, ...topPlot].map(([, c]) => c),
-      1
-    );
+    const allCounts = [
+      ...topMap.map(([, c]) => c),
+      ...topPlotsByPlot.flatMap(({ top }) => top.map(([, c]) => c)),
+    ];
+    const maxCount = Math.max(...allCounts, 1);
 
     const renderFreqGroup = (label: string, items: [number, number][]): void => {
       if (items.length === 0) return;
@@ -373,7 +377,9 @@ function renderInsightsPanel(
     };
 
     renderFreqGroup('Map', topMap);
-    renderFreqGroup('Plot', topPlot);
+    for (const { plotId, top } of topPlotsByPlot) {
+      renderFreqGroup(`Plot: ${plotId}`, top);
+    }
 
     container.appendChild(freqSection);
   }

@@ -19,8 +19,8 @@ import type { AutarkProvenanceState, ProvenanceGraph } from './types';
 export interface SelectionFrequency {
   /** Map feature IDs → count of provenance states where that feature was selected */
   map: Map<number, number>;
-  /** Plot feature IDs → count of provenance states where that feature was selected */
-  plot: Map<number, number>;
+  /** Per-plot feature frequency: plotId → (featureId → count) */
+  plots: Map<string, Map<number, number>>;
 }
 
 /**
@@ -32,7 +32,7 @@ export function computeSelectionFrequency(
   graph: ProvenanceGraph<AutarkProvenanceState>
 ): SelectionFrequency {
   const mapFreq = new Map<number, number>();
-  const plotFreq = new Map<number, number>();
+  const plotsFreq = new Map<string, Map<number, number>>();
 
   for (const node of graph.nodes.values()) {
     const sel = node.state.selection;
@@ -41,14 +41,17 @@ export function computeSelectionFrequency(
         mapFreq.set(id, (mapFreq.get(id) ?? 0) + 1);
       }
     }
-    if (sel?.plot && sel.plot.length > 0) {
-      for (const id of sel.plot) {
-        plotFreq.set(id, (plotFreq.get(id) ?? 0) + 1);
+    for (const [plotId, plotSel] of Object.entries(sel?.plots ?? {})) {
+      if (!plotSel?.ids?.length) continue;
+      if (!plotsFreq.has(plotId)) plotsFreq.set(plotId, new Map());
+      const freq = plotsFreq.get(plotId)!;
+      for (const id of plotSel.ids) {
+        freq.set(id, (freq.get(id) ?? 0) + 1);
       }
     }
   }
 
-  return { map: mapFreq, plot: plotFreq };
+  return { map: mapFreq, plots: plotsFreq };
 }
 
 // ---------------------------------------------------------------------------
@@ -243,15 +246,17 @@ export function generateSessionNarrative(
   // Selection focus (ProWis-inspired: aggregate across all paths)
   const freq = computeSelectionFrequency(graph);
   const topMap = [...freq.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const topPlot = [...freq.plot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   if (topMap.length > 0) {
     const items = topMap.map(([id, c]) => `feature #${id} (${c} state${c !== 1 ? 's' : ''})`).join(', ');
     lines.push(`\nMost revisited map features across all branches: ${items}.`);
   }
-  if (topPlot.length > 0 && topPlot[0][1] > 1) {
-    const items = topPlot.map(([id, c]) => `#${id} (${c}×)`).join(', ');
-    lines.push(`Most revisited plot features: ${items}.`);
+  for (const [plotId, plotFreq] of freq.plots.entries()) {
+    const top = [...plotFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (top.length > 0 && top[0][1] > 1) {
+      const items = top.map(([id, c]) => `#${id} (${c}×)`).join(', ');
+      lines.push(`Most revisited features in plot "${plotId}": ${items}.`);
+    }
   }
 
   if (annotations.length > 0) {

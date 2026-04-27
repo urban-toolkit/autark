@@ -1,0 +1,422 @@
+:root {
+  --bg: #eef3f8;
+  --surface: #ffffff;
+  --surface-muted: #f6f9fc;
+  --border: #d4dde7;
+  --text: #1b3148;
+  --text-muted: #546b80;
+  --accent: #2f5f96;
+  --radius: 12px;
+  --shadow: 0 8px 24px rgba(28,53,76,.09);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 16px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: radial-gradient(circle at top left, #f4f8ff, var(--bg) 60%);
+}
+
+#app {
+  max-width: 1700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-muted));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.header-text h1 { margin: 0; font-size: 22px; line-height: 1.2; }
+.header-text p  { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; }
+
+.header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.hdr-btn {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hdr-btn:hover { background: #edf5ff; border-color: var(--accent); color: var(--accent); }
+
+/* ── Main layout: two equal columns ─────────────────────────────────────── */
+
+#layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+/* ── Left column: map ────────────────────────────────────────────────────── */
+
+#mapColumn {
+  display: flex;
+  flex-direction: column;
+}
+
+.map-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  min-height: 600px;
+}
+
+.map-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #c8dae6;
+}
+
+.map-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctrl-label { font-size: 11px; color: var(--text-muted); }
+
+.thematic-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.thematic-select:focus { outline: none; border-color: var(--accent); }
+
+/* ── Right column: tabbed panel ──────────────────────────────────────────── */
+
+#rightColumn {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  background: var(--surface-muted);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-muted);
+  transition: background .15s;
+}
+.tab-btn:hover:not(.active) { background: #f0f5fb; }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--surface);
+}
+
+.tab-label { font-size: 13px; font-weight: 600; }
+.tab-hint  { font-size: 11px; opacity: .75; }
+
+/* Tab content */
+.tab-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tab-content.hidden { display: none; }
+
+/* ── Charts tab: 2×2 plot grid ───────────────────────────────────────────── */
+
+#plotGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+}
+
+.plot-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.plot-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+#scatterBody, #barBody, #pcBody, #histBody {
+  position: absolute;
+  inset: 0;
+}
+
+svg { display: block; overflow: visible; }
+
+/* ── Shared panel header ─────────────────────────────────────────────────── */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface), var(--surface-muted));
+  flex-shrink: 0;
+}
+.panel-title { font-size: 13px; font-weight: 600; }
+.panel-hint  { font-size: 11px; color: var(--text-muted); }
+
+/* ── Provenance tab ──────────────────────────────────────────────────────── */
+
+#provenanceTab { overflow: hidden; }
+
+#provenanceTrail {
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#provenanceTrail.autk-provenance-root { gap: 8px; min-height: 0; }
+#provenanceTrail .autk-provenance-graph-wrap { height: 260px; max-height: 320px; }
+#provenanceTrail .autk-provenance-path { max-height: 160px; flex-shrink: 0; }
+#provenanceTrail .autk-prov-insights-wrap { flex: 1; min-height: 0; max-height: none; }
+
+/* ── Insights section ────────────────────────────────────────────────────── */
+
+.insights-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.insights-card {
+  padding: 14px 16px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+}
+.insights-card:last-child { border-right: none; }
+
+.insights-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+
+.insights-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insights-loading {
+  font-size: 12px;
+  color: var(--text-muted);
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* ── Insight card content ────────────────────────────────────────────────── */
+
+.strategy-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  align-self: flex-start;
+}
+
+.strategy-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+.metrics-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.metric-chip {
+  padding: 3px 8px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.annotation-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.annotation-textarea {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  resize: vertical;
+  box-sizing: border-box;
+  flex: 1;
+  min-height: 70px;
+}
+.annotation-textarea:focus { outline: none; border-color: var(--accent); }
+
+.annotation-save-btn {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.annotation-save-btn:hover:not(:disabled) { background: #edf5ff; border-color: var(--accent); color: var(--accent); }
+.annotation-save-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.freq-empty { font-size: 12px; color: var(--text-muted); }
+.freq-group-label { font-size: 11px; font-weight: 600; color: var(--text); margin-top: 4px; }
+.freq-row { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.freq-id { font-size: 11px; color: var(--text-muted); width: 110px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.freq-bar-wrap { flex: 1; height: 7px; background: #e7eef6; border-radius: 4px; overflow: hidden; }
+.freq-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+.freq-count { font-size: 11px; width: 24px; text-align: right; flex-shrink: 0; }
+
+.summary-pre {
+  flex: 1;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  overflow-y: auto;
+  max-height: 140px;
+}
+
+.copy-btn {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.copy-btn:hover { background: #edf5ff; }
+
+/* ── D3 chart chrome ─────────────────────────────────────────────────────── */
+
+.tick line { stroke: #dde4ec; stroke-width: 1; }
+.domain { stroke: #cfd8e3; }
+.title  { font-size: 12px; fill: var(--text); font-weight: 600; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+  #layout { grid-template-columns: 1fr; }
+  .map-panel { min-height: 420px; max-height: 500px; }
+  .insights-grid { grid-template-columns: 1fr 1fr; }
+  .insights-card:nth-child(2) { border-right: none; }
+  .insights-card:nth-child(1),
+  .insights-card:nth-child(2) { border-bottom: 1px solid var(--border); }
+}
+
+@media (max-width: 700px) {
+  body { padding: 8px; }
+  #plotGrid { grid-template-columns: 1fr; grid-template-rows: repeat(4, 280px); }
+  .insights-grid { grid-template-columns: 1fr; }
+  .insights-card { border-right: none; border-bottom: 1px solid var(--border); }
+  .insights-card:last-child { border-bottom: none; }
+}

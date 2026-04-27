@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Autark – All Visualizations with Provenance</title>
+  <link rel="stylesheet" href="/src/autk-provenance/all-plots-provenance.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Header ──────────────────────────────────────────────────────────── -->
+    <header class="page-header">
+      <div class="header-text">
+        <h1>Autark Provenance</h1>
+        <p>Manhattan neighborhoods · Scatterplot · Bar Chart · Parallel Coordinates · Histogram — every interaction captured in one shared provenance graph</p>
+      </div>
+      <div class="header-actions">
+        <button id="exportBtn" class="hdr-btn">⬇ Export Session</button>
+        <button id="importBtn" class="hdr-btn">⬆ Import Session</button>
+        <input id="importFile" type="file" accept=".json" hidden />
+      </div>
+    </header>
+
+    <!-- ── Main two-panel layout ──────────────────────────────────────────── -->
+    <div id="layout">
+
+      <!-- Left: map (always visible) -->
+      <div id="mapColumn">
+        <div class="panel map-panel">
+          <div class="panel-header">
+            <span class="panel-title">Map</span>
+            <div class="map-header-controls">
+              <label class="ctrl-label" for="thematicSelect">Color by:</label>
+              <select id="thematicSelect" class="thematic-select">
+                <option value="">None</option>
+                <option value="shape_area">Area</option>
+                <option value="shape_leng">Perimeter</option>
+                <option value="compactness">Compactness</option>
+              </select>
+            </div>
+          </div>
+          <div class="map-body">
+            <canvas></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: tabbed panel (Charts / Provenance Trail) -->
+      <div id="rightColumn">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="charts">
+            <span class="tab-label">Charts</span>
+            <span class="tab-hint">4 chart types · brush or click to select</span>
+          </button>
+          <button class="tab-btn" data-tab="provenance">
+            <span class="tab-label">Provenance Trail</span>
+            <span class="tab-hint" id="nodeCountBadge">0 steps recorded</span>
+          </button>
+        </div>
+
+        <!-- Charts tab -->
+        <div id="chartsTab" class="tab-content">
+          <div id="plotGrid">
+
+            <div class="panel plot-panel">
+              <div class="panel-header">
+                <span class="panel-title">Scatterplot</span>
+                <span class="panel-hint">Area vs Perimeter · drag to brush</span>
+              </div>
+              <div class="plot-body">
+                <div id="scatterBody"></div>
+              </div>
+            </div>
+
+            <div class="panel plot-panel">
+              <div class="panel-header">
+                <span class="panel-title">Bar Chart</span>
+                <span class="panel-hint">Neighborhoods per district · click a bar</span>
+              </div>
+              <div class="plot-body">
+                <div id="barBody"></div>
+              </div>
+            </div>
+
+            <div class="panel plot-panel">
+              <div class="panel-header">
+                <span class="panel-title">Parallel Coordinates</span>
+                <span class="panel-hint">Area · Perimeter · Compactness · brush any axis</span>
+              </div>
+              <div class="plot-body">
+                <div id="pcBody"></div>
+              </div>
+            </div>
+
+            <div class="panel plot-panel">
+              <div class="panel-header">
+                <span class="panel-title">Histogram</span>
+                <span class="panel-hint">Neighborhood area distribution · click a bar</span>
+              </div>
+              <div class="plot-body">
+                <div id="histBody"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Provenance tab -->
+        <div id="provenanceTab" class="tab-content hidden">
+          <div id="provenanceTrail"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Insights (always visible below) ───────────────────────────────── -->
+    <section class="panel insights-panel">
+      <div class="panel-header">
+        <span class="panel-title">Session Insights</span>
+        <span class="panel-hint">Updates as you interact with any visualization</span>
+      </div>
+      <div id="insightsGrid" class="insights-grid">
+
+        <div class="insights-card" id="insightsMetrics">
+          <div class="insights-card-title">Analysis Strategy</div>
+          <div class="insights-card-body insights-loading">Interact with any visualization to begin…</div>
+        </div>
+
+        <div class="insights-card" id="insightsAnnotate">
+          <div class="insights-card-title">Annotate This Step</div>
+          <div class="insights-card-body insights-loading">Interact with any visualization to begin…</div>
+        </div>
+
+        <div class="insights-card" id="insightsFreq">
+          <div class="insights-card-title">Selection Focus</div>
+          <div class="insights-card-body insights-loading">Interact with any visualization to begin…</div>
+        </div>
+
+        <div class="insights-card" id="insightsSummary">
+          <div class="insights-card-title">Analysis Summary</div>
+          <div class="insights-card-body insights-loading">Interact with any visualization to begin…</div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+  <script type="module" src="/src/autk-provenance/all-plots-provenance.ts"></script>
+</body>
+</html>

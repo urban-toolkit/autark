@@ -18,61 +18,152 @@ export interface PlotAdapterApi {
   applyState(state: AutarkProvenanceState): void;
 }
 
+const EVENT_ACTION_MAP: Record<string, ProvenanceAction> = {
+  [PLOT_CLICK]: ProvenanceAction.PLOT_CLICK,
+  [PLOT_BRUSH]: ProvenanceAction.PLOT_BRUSH,
+  [PLOT_BRUSH_X]: ProvenanceAction.PLOT_BRUSH_X,
+  [PLOT_BRUSH_Y]: ProvenanceAction.PLOT_BRUSH_Y,
+};
+
 function selectionSignature(selection: number[]): string {
   return selection.join(',');
 }
 
+function plotTypeLabel(plotType: string): string {
+  return plotType.replace(/_/g, ' ');
+}
+
+interface PlotEntry {
+  plot: IPlotForProvenance;
+  listeners: Array<{ event: string; fn: (selection: number[]) => void }>;
+  lastSelectionSig: string | null;
+  dataDescriptorRestorer: (() => void) | null;
+}
+
 export function createPlotAdapter(
-  plot: IPlotForProvenance,
+  plots: IPlotForProvenance[],
   onRecord: PlotRecordCallback
 ): PlotAdapterApi {
-  const listeners: Array<{ event: string; fn: (selection: number[]) => void }> = [];
-  let lastSelectionSig: string | null = null;
-  const events: Array<{ event: string; actionType: ProvenanceAction }> = [
-    { event: PLOT_CLICK, actionType: ProvenanceAction.PLOT_CLICK },
-    { event: PLOT_BRUSH, actionType: ProvenanceAction.PLOT_BRUSH },
-    { event: PLOT_BRUSH_X, actionType: ProvenanceAction.PLOT_BRUSH_X },
-    { event: PLOT_BRUSH_Y, actionType: ProvenanceAction.PLOT_BRUSH_Y },
-  ];
+  let isApplyingState = false;
 
-  function startRecording(): void {
-    if (listeners.length > 0) return;
-    for (const { event, actionType } of events) {
+  const entries: PlotEntry[] = plots.map((plot) => ({
+    plot,
+    listeners: [],
+    lastSelectionSig: null,
+    dataDescriptorRestorer: null,
+  }));
+
+  function attachListeners(entry: PlotEntry): void {
+    if (entry.listeners.length > 0) return;
+    const { plot } = entry;
+
+    for (const [event, actionType] of Object.entries(EVENT_ACTION_MAP)) {
       const fn = (selection: number[]) => {
         const sig = selectionSignature(selection);
-        if (sig === lastSelectionSig) return;
-        lastSelectionSig = sig;
+        if (sig === entry.lastSelectionSig) return;
+        entry.lastSelectionSig = sig;
 
+        const typeLabel = plotTypeLabel(plot.plotType);
         const label =
           selection.length === 0
-            ? `Cleared plot selection`
-            : `${event}: ${selection.length} point(s) selected`;
+            ? `Cleared selection on ${typeLabel} (${plot.plotId})`
+            : `${event}: ${selection.length} point(s) on ${typeLabel} (${plot.plotId})`;
+
         onRecord(actionType, label, {
           selection: {
             map: null,
-            plot: selection,
+            plots: {
+              [plot.plotId]: { ids: selection, plotType: plot.plotType },
+            },
           },
         });
       };
-      listeners.push({ event, fn });
+      entry.listeners.push({ event, fn });
       plot.plotEvents.addEventListener(event, fn);
     }
   }
 
-  function stopRecording(): void {
-    for (const { event, fn } of listeners) {
-      if (plot.plotEvents.removeEventListener) {
-        plot.plotEvents.removeEventListener(event, fn);
-      }
+  function detachListeners(entry: PlotEntry): void {
+    const { plot } = entry;
+    for (const { event, fn } of entry.listeners) {
+      plot.plotEvents.removeEventListener?.(event, fn);
     }
-    listeners.length = 0;
+    entry.listeners.length = 0;
+  }
+
+  function wrapDataSetter(entry: PlotEntry): void {
+    if (entry.dataDescriptorRestorer) return;
+    const plotObj = entry.plot as unknown as object;
+    const proto = Object.getPrototypeOf(plotObj);
+    const descriptor = Object.getOwnPropertyDescriptor(proto, 'data')
+      ?? Object.getOwnPropertyDescriptor(plotObj, 'data');
+    if (!descriptor?.set) return;
+
+    const { plot } = entry;
+
+    // Override on the instance to shadow the prototype property.
+    // The original setter still runs so the plot's internal state stays correct.
+    Object.defineProperty(plotObj, 'data', {
+      get: descriptor.get ? () => descriptor.get!.call(plotObj) : undefined,
+      set(value: unknown) {
+        descriptor.set!.call(plotObj, value);
+        if (!isApplyingState) {
+          const dataLen = Array.isArray(value) ? value.length : 0;
+          const label = `Data updated: ${dataLen} row(s) on ${plotTypeLabel(plot.plotType)} (${plot.plotId})`;
+          // Reset selection for this plot — indices are no longer valid after a data swap.
+          onRecord(ProvenanceAction.PLOT_DATA, label, {
+            selection: {
+              map: null,
+              plots: { [plot.plotId]: { ids: [], plotType: plot.plotType } },
+            },
+          });
+        }
+      },
+      configurable: true,
+      enumerable: descriptor.enumerable ?? false,
+    });
+
+    entry.dataDescriptorRestorer = () => {
+      // Remove the own-property override so the prototype setter is visible again.
+      try {
+        delete (plotObj as Record<string, unknown>)['data'];
+      } catch {
+        // non-configurable — leave it
+      }
+    };
+  }
+
+  function unwrapDataSetter(entry: PlotEntry): void {
+    entry.dataDescriptorRestorer?.();
+    entry.dataDescriptorRestorer = null;
+  }
+
+  function startRecording(): void {
+    for (const entry of entries) {
+      attachListeners(entry);
+      wrapDataSetter(entry);
+    }
+  }
+
+  function stopRecording(): void {
+    for (const entry of entries) {
+      detachListeners(entry);
+      unwrapDataSetter(entry);
+    }
   }
 
   function applyState(state: AutarkProvenanceState): void {
-    const plotSelection = state.selection?.plot;
-    if (Array.isArray(plotSelection)) {
-      lastSelectionSig = selectionSignature(plotSelection);
-      plot.setHighlightedIds(plotSelection);
+    isApplyingState = true;
+    try {
+      for (const entry of entries) {
+        const { plot } = entry;
+        const plotState = state.selection?.plots?.[plot.plotId];
+        const ids = plotState?.ids ?? state.selection?.map?.ids ?? [];
+        entry.lastSelectionSig = selectionSignature(ids);
+        plot.setHighlightedIds(ids);
+      }
+    } finally {
+      isApplyingState = false;
     }
   }
 

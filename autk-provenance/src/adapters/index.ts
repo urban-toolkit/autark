@@ -1,5 +1,5 @@
 export { createMapAdapter } from './map-adapter';
-export type { MapAdapterApi, MapRecordCallback } from './map-adapter';
+export type { MapAdapterApi, MapRecordCallback, MapSelectorConfig, CustomControlConfig } from './map-adapter';
 export { createPlotAdapter } from './plot-adapter';
 export type { PlotAdapterApi, PlotRecordCallback } from './plot-adapter';
 export {
@@ -11,3 +11,9 @@ export type {
   DbRecordCallback,
   IDbForProvenance,
 } from './db-adapter';
+export { createComputeAdapter } from './compute-adapter';
+export type {
+  ComputeAdapterApi,
+  ComputeRecordCallback,
+  IComputeForProvenance,
+} from './compute-adapter';

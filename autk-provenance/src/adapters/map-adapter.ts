@@ -23,6 +23,59 @@ export type MapRecordCallback = (
   stateDelta: Partial<AutarkProvenanceState>
 ) => void;
 
+/**
+ * Config for a single custom DOM control to track in provenance.
+ * Use this to track app-specific UI such as temporal dropdowns,
+ * dataset pickers, or custom layer toggles.
+ *
+ * Example — month dropdown in a shadows analysis app:
+ * ```ts
+ * {
+ *   selector: '#monthSelect',
+ *   event: 'change',
+ *   actionType: 'SHADOW_MONTH_CHANGE',
+ *   getLabel: (el) => `Month: ${(el as HTMLSelectElement).value}`,
+ *   getStateDelta: (el) => ({ filters: { month: (el as HTMLSelectElement).value } }),
+ *   applyState: (el, state) => { (el as HTMLSelectElement).value = state.filters?.month as string ?? ''; },
+ * }
+ * ```
+ */
+export interface CustomControlConfig {
+  /** CSS selector used to find the element inside the map container. */
+  selector: string;
+  /** DOM event type that triggers recording. */
+  event: 'click' | 'change';
+  /** ProvenanceAction type (or any string) to store on the node. */
+  actionType: ProvenanceAction | string;
+  /** Derive the human-readable action label from the element at event time. */
+  getLabel(el: Element): string;
+  /** Derive the state delta from the element at event time. */
+  getStateDelta(el: Element): Partial<AutarkProvenanceState>;
+  /** Restore this control's visual state during provenance replay. Called in applyState. */
+  applyState?(el: Element, state: AutarkProvenanceState): void;
+}
+
+/**
+ * Override the CSS selectors the map adapter uses to locate standard map UI.
+ * All fields are optional — unset fields fall back to the built-in defaults.
+ */
+export interface MapSelectorConfig {
+  /** Default: '#menuIcon' */
+  menuIcon?: string;
+  /** Default: '#autkMapSubMenu' */
+  subMenu?: string;
+  /** Default: '#showThematicCheckbox' */
+  thematicCheckbox?: string;
+  /** Default: '#autkMapLegend' */
+  legend?: string;
+  /** Default: '.active-layer-radio' */
+  activeLayerRadioClass?: string;
+  /** Default: '#visibleLayerDropdownList' */
+  visibleLayerList?: string;
+  /** Extra controls to track (e.g. temporal dropdowns, custom toggles). */
+  customControls?: CustomControlConfig[];
+}
+
 export interface MapAdapterApi {
   startRecording(): void;
   stopRecording(): void;
@@ -35,8 +88,20 @@ function isElement(value: unknown): value is Element {
 
 export function createMapAdapter(
   map: IMapForProvenance,
-  onRecord: MapRecordCallback
+  onRecord: MapRecordCallback,
+  selectorConfig?: MapSelectorConfig
 ): MapAdapterApi {
+  // Resolved selectors (config overrides fall back to defaults)
+  const SEL = {
+    menuIcon: selectorConfig?.menuIcon ?? '#menuIcon',
+    subMenu: selectorConfig?.subMenu ?? '#autkMapSubMenu',
+    thematicCheckbox: selectorConfig?.thematicCheckbox ?? '#showThematicCheckbox',
+    legend: selectorConfig?.legend ?? '#autkMapLegend',
+    activeLayerRadioClass: selectorConfig?.activeLayerRadioClass ?? '.active-layer-radio',
+    visibleLayerList: selectorConfig?.visibleLayerList ?? '#visibleLayerDropdownList',
+  };
+  const customControls: CustomControlConfig[] = selectorConfig?.customControls ?? [];
+
   const mapObj = map as unknown as Record<string, unknown>;
   let pickListener: ((selection: number[], layerId: string) => void) | null = null;
   let viewListener: ((state: MapViewState) => void) | null = null;
@@ -68,7 +133,7 @@ export function createMapAdapter(
   function getMenuOpen(): boolean {
     const parent = map.canvas.parentElement;
     if (!parent) return false;
-    const submenu = parent.querySelector('#autkMapSubMenu') as HTMLElement | null;
+    const submenu = parent.querySelector(SEL.subMenu) as HTMLElement | null;
     return submenu ? submenu.style.visibility === 'visible' : false;
   }
 
@@ -107,27 +172,37 @@ export function createMapAdapter(
     const parent = map.canvas.parentElement;
     if (!parent) return;
 
-    const submenu = parent.querySelector('#autkMapSubMenu') as HTMLElement | null;
+    const submenu = parent.querySelector(SEL.subMenu) as HTMLElement | null;
     if (submenu) submenu.style.visibility = ui.mapMenuOpen ? 'visible' : 'hidden';
 
-    const thematicCheckbox = parent.querySelector('#showThematicCheckbox') as HTMLInputElement | null;
+    const thematicCheckbox = parent.querySelector(SEL.thematicCheckbox) as HTMLInputElement | null;
     if (thematicCheckbox) thematicCheckbox.checked = ui.thematicEnabled;
 
-    const legend = parent.querySelector('#autkMapLegend') as HTMLElement | null;
+    const legend = parent.querySelector(SEL.legend) as HTMLElement | null;
     if (legend) legend.style.visibility = ui.thematicEnabled ? 'visible' : 'hidden';
 
     const visibleSet = new Set(ui.visibleLayerIds);
     const visibleCheckboxes = parent.querySelectorAll(
-      '#visibleLayerDropdownList input[type="checkbox"]'
+      `${SEL.visibleLayerList} input[type="checkbox"]`
     ) as NodeListOf<HTMLInputElement>;
     visibleCheckboxes.forEach((checkbox) => {
       checkbox.checked = visibleSet.has(checkbox.value);
     });
 
-    const activeRadios = parent.querySelectorAll('.active-layer-radio') as NodeListOf<HTMLInputElement>;
+    const activeRadios = parent.querySelectorAll(SEL.activeLayerRadioClass) as NodeListOf<HTMLInputElement>;
     activeRadios.forEach((radio) => {
       radio.checked = !!ui.activeLayerId && radio.value === ui.activeLayerId;
     });
+  }
+
+  function syncCustomControlsDom(state: AutarkProvenanceState): void {
+    const parent = map.canvas.parentElement;
+    if (!parent || customControls.length === 0) return;
+    for (const ctrl of customControls) {
+      if (!ctrl.applyState) continue;
+      const el = parent.querySelector(ctrl.selector);
+      if (el) ctrl.applyState(el, state);
+    }
   }
 
   function inMapContainer(target: EventTarget | null): boolean {
@@ -206,7 +281,7 @@ export function createMapAdapter(
       onRecord(ProvenanceAction.MAP_PICK, label, {
         selection: {
           map: { layerId, ids: selection },
-          plot: selection,
+          plots: {},
         },
       });
     };
@@ -223,11 +298,27 @@ export function createMapAdapter(
 
     if (typeof document !== 'undefined') {
       clickListener = (event: Event) => {
-        if (isApplyingState || !inMapContainer(event.target)) return;
+        if (isApplyingState) return;
         const target = event.target;
         if (!isElement(target)) return;
 
-        if (target.closest('#menuIcon')) {
+        // Custom click controls are checked first — no container restriction needed
+        // because their selectors are specific enough to avoid false matches.
+        for (const ctrl of customControls) {
+          if (ctrl.event !== 'click') continue;
+          const matchEl = target.matches(ctrl.selector)
+            ? target
+            : target.closest(ctrl.selector);
+          if (matchEl) {
+            onRecord(ctrl.actionType, ctrl.getLabel(matchEl), ctrl.getStateDelta(matchEl));
+            return;
+          }
+        }
+
+        // Standard map controls require the target to be inside the map container.
+        if (!inMapContainer(target)) return;
+
+        if (target.closest(SEL.menuIcon)) {
           recordUiEvent(
             ProvenanceAction.MAP_UI_MENU_TOGGLE,
             getMenuOpen() ? 'Opened map menu' : 'Closed map menu',
@@ -238,11 +329,27 @@ export function createMapAdapter(
       document.addEventListener('click', clickListener);
 
       changeListener = (event: Event) => {
-        if (isApplyingState || !inMapContainer(event.target)) return;
+        if (isApplyingState) return;
         const target = event.target;
+        if (!isElement(target)) return;
+
+        // Custom change controls are checked first — no container restriction.
+        for (const ctrl of customControls) {
+          if (ctrl.event !== 'change') continue;
+          const matchEl = target.matches(ctrl.selector)
+            ? target
+            : target.closest(ctrl.selector);
+          if (matchEl) {
+            onRecord(ctrl.actionType, ctrl.getLabel(matchEl), ctrl.getStateDelta(matchEl));
+            return;
+          }
+        }
+
+        // Standard map controls require the target to be inside the map container.
+        if (!inMapContainer(target)) return;
         if (!(target instanceof HTMLInputElement)) return;
 
-        if (target.id === 'showThematicCheckbox') {
+        if (target.id === SEL.thematicCheckbox.replace(/^#/, '')) {
           recordUiEvent(
             ProvenanceAction.MAP_UI_THEMATIC_TOGGLE,
             target.checked ? 'Enabled thematic legend' : 'Disabled thematic legend',
@@ -251,7 +358,7 @@ export function createMapAdapter(
           return;
         }
 
-        if (target.classList.contains('active-layer-radio')) {
+        if (target.classList.contains(SEL.activeLayerRadioClass.replace(/^\./, ''))) {
           const activeLayerId = getActiveLayerId() ?? target.value;
           recordUiEvent(
             ProvenanceAction.MAP_UI_ACTIVE_LAYER_CHANGE,
@@ -261,7 +368,8 @@ export function createMapAdapter(
           return;
         }
 
-        if (target.type === 'checkbox' && target.closest('#visibleLayerDropdownList')) {
+        const listSel = SEL.visibleLayerList.replace(/^#/, '');
+        if (target.type === 'checkbox' && target.closest(`#${listSel}`)) {
           const layerId = target.value || 'layer';
           recordUiEvent(
             ProvenanceAction.MAP_UI_VISIBLE_LAYER_TOGGLE,
@@ -308,7 +416,7 @@ export function createMapAdapter(
       }
 
       const parent = map.canvas.parentElement;
-      const thematicCheckbox = parent?.querySelector('#showThematicCheckbox') as HTMLInputElement | null;
+      const thematicCheckbox = parent?.querySelector(SEL.thematicCheckbox) as HTMLInputElement | null;
       if (thematicCheckbox) thematicCheckbox.checked = ui.thematicEnabled;
 
       if (ui.activeLayerId) {
@@ -326,6 +434,7 @@ export function createMapAdapter(
       }
 
       syncUiDom(ui);
+      syncCustomControlsDom(state);
 
       if (state.view && map.setViewState) {
         map.setViewState(state.view);
@@ -334,7 +443,8 @@ export function createMapAdapter(
       if (selection) {
         const targetLayerId = selection.map?.layerId;
         const targetIds = selection.map?.ids ?? [];
-        const fallbackPlotIds = selection.plot ?? [];
+        const allPlotIds = Object.values(selection.plots ?? {}).flatMap((p) => p.ids);
+        const fallbackPlotIds = [...new Set(allPlotIds)];
         const fallbackLayerId = ui.activeLayerId;
 
         for (const layer of map.layerManager.vectorLayers ?? []) {
