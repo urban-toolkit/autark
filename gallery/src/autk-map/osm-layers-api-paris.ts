@@ -12,12 +12,28 @@ export class OsmLayersApi {
         await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'Île-de-France',
-                areas: ['Paris'],
+                areas: [
+                    'Paris 1er Arrondissement',
+                    'Paris 2e Arrondissement',
+                    'Paris 3e Arrondissement',
+                    'Paris 4e Arrondissement',
+                    'Paris 5e Arrondissement',
+                    'Paris 6e Arrondissement',
+                    'Paris 7e Arrondissement',
+                    'Paris 8e Arrondissement',
+                    'Paris 9e Arrondissement'
+                ],
             },
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
-                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+                layers: [
+                    'surface',
+                    'parks',
+                    'water',
+                    'roads',
+                    'buildings'
+                ] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
                 dropOsmTable: true,
