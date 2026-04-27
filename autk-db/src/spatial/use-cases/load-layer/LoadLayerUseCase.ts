@@ -69,9 +69,10 @@ export class LoadLayerUseCase {
     });
     const describeTableResponse = await this.conn.query(layerQuery);
     let columns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
+    let totalSkippedRelations = 0;
 
     if (params.layer === 'water' || params.layer === 'parks') {
-      await this.appendRelationAreaGeometries({
+      totalSkippedRelations = await this.appendRelationAreaGeometries({
         inputTableName: params.osmInputTableName,
         outputTableName: layerOutputTableName,
         layer: params.layer,
@@ -85,7 +86,7 @@ export class LoadLayerUseCase {
     }
 
     if (params.layer === 'buildings') {
-      await this.appendRelationAreaGeometries({
+      totalSkippedRelations = await this.appendRelationAreaGeometries({
         inputTableName: params.osmInputTableName,
         outputTableName: layerOutputTableName,
         layer: 'buildings',
@@ -96,6 +97,10 @@ export class LoadLayerUseCase {
 
       const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${qualifiedOutputTableName}`);
       columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
+    }
+
+    if (totalSkippedRelations > 0) {
+      console.warn(`[LoadLayerUseCase] loaded ${params.layer}: ${totalSkippedRelations} relations skipped.`);
     }
 
     // Post-processing for building layers: assign persistent building_id column and add aggregated geometry
@@ -128,9 +133,9 @@ export class LoadLayerUseCase {
     coordinateFormat: string;
     boundingBox?: BoundingBox;
     workspace: string;
-  }): Promise<void> {
-    const records = await this.buildRelationAreaRecords(params.inputTableName, params.layer, params.workspace);
-    if (records.length === 0) return;
+  }): Promise<number> {
+    const { records, skipped } = await this.buildRelationAreaRecords(params.inputTableName, params.layer, params.workspace);
+    if (records.length === 0) return skipped;
 
     const fileName = `temp_${params.layer}_relations_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
     await this.db.registerFileText(fileName, JSON.stringify(records));
@@ -165,13 +170,15 @@ export class LoadLayerUseCase {
     } finally {
       await this.db.dropFile(fileName);
     }
+
+    return skipped;
   }
 
   private async buildRelationAreaRecords(
     inputTableName: string,
     layer: 'buildings' | 'parks' | 'water',
     workspace: string,
-  ): Promise<RelationAreaRecord[]> {
+  ): Promise<{ records: RelationAreaRecord[]; skipped: number }> {
     const qualifiedInputTableName = `${workspace}.${inputTableName}`;
     const relationTableName = layer === 'buildings' ? 'buildings_rels' : qualifiedInputTableName;
     const relations = (await this.conn.query(`
@@ -180,7 +187,7 @@ export class LoadLayerUseCase {
       WHERE map_extract(tags, '__autk_layer')[1] = '${layer}';
     `)).toArray() as unknown as RelationRow[];
 
-    if (relations.length === 0) return [];
+    if (relations.length === 0) return { records: [], skipped: 0 };
 
     const ways = (await this.conn.query(`
       SELECT id, refs
@@ -204,10 +211,11 @@ export class LoadLayerUseCase {
     }
 
     const records: RelationAreaRecord[] = [];
+    let skipped = 0;
     for (const relation of relations) {
       const geometry = this.buildRelationGeometry(relation, refsByWayId, coordinateByNodeId);
       if (!geometry) {
-        console.warn(`[autk-db] Skipped ${layer} relation ${String(relation.id)}: could not build polygon geometry.`);
+        skipped++;
         continue;
       }
 
@@ -219,7 +227,11 @@ export class LoadLayerUseCase {
       });
     }
 
-    return records;
+    if (skipped > 0) {
+      console.warn(`[autk-db] ${layer}: ${skipped} relations skipped (missing member ways or geometry).`);
+    }
+
+    return { records, skipped };
   }
 
   private buildRelationGeometry(
