@@ -31,7 +31,6 @@ const WATER_NATURAL_VALUES = ['water', 'wetland', 'strait', 'spring'] as const;
 const WATER_WATER_VALUES = ['pond', 'reservoir', 'lagoon', 'stream_pool', 'lake', 'pool', 'canal', 'river'] as const;
 
 const EXCLUDED_ROAD_HIGHWAY_VALUES = ['cycleway', 'elevator', 'footway', 'steps', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'] as const;
-const BUILDING_HEIGHT_KEYS = ['height', 'levels', 'building:levels'] as const;
 
 export class LoadOsmFromOverpassApiUseCase {
   private db: AsyncDuckDB;
@@ -474,11 +473,11 @@ export class LoadOsmFromOverpassApiUseCase {
           wayFilters.add(`"highway"]["area"!="yes"]["highway"!~"^(${EXCLUDED_ROAD_HIGHWAY_VALUES.join('|')})$"`);
           break;
         case 'buildings':
-          BUILDING_HEIGHT_KEYS.forEach((heightKey) => {
-            wayFilters.add(`"building"]["building"!="roof"]["${heightKey}"`);
-            wayFilters.add(`"building:part"]["building:part"!="roof"]["${heightKey}"`);
-            wayFilters.add(`"type"="building"]["${heightKey}"`);
-          });
+          wayFilters.add(`"building"]["building"!="roof"`);
+          wayFilters.add(`"building:part"]["building:part"!="roof"`);
+          wayFilters.add(`"type"="building"`);
+          relationFilters.add(`"building"]["building"!~"roof"`);
+          relationFilters.add(`"building:part"]["building:part"!~"roof"`);
           break;
         case 'parks':
           wayFilters.add(this.buildExactValueSelector('leisure', PARKS_LEISURE_VALUES));
@@ -705,7 +704,8 @@ export class LoadOsmFromOverpassApiUseCase {
     const hasBuildingKind =
       (tags.building !== undefined && tags.building !== 'roof') ||
       (tags['building:part'] !== undefined && tags['building:part'] !== 'roof') ||
-      tags.type === 'building';
+      tags.type === 'building' ||
+      (tags.type === 'multipolygon' && tags.building !== undefined && tags.building !== 'roof');
 
     return hasBuildingKind;
   }

@@ -84,6 +84,20 @@ export class LoadLayerUseCase {
       columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
     }
 
+    if (params.layer === 'buildings') {
+      await this.appendRelationAreaGeometries({
+        inputTableName: params.osmInputTableName,
+        outputTableName: layerOutputTableName,
+        layer: 'buildings',
+        coordinateFormat: params.coordinateFormat,
+        boundingBox: params.boundingBox,
+        workspace,
+      });
+
+      const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${qualifiedOutputTableName}`);
+      columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
+    }
+
     // Post-processing for building layers: assign persistent building_id column and add aggregated geometry
     if (params.layer === 'buildings') {
       await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName, workspace });
@@ -110,7 +124,7 @@ export class LoadLayerUseCase {
   private async appendRelationAreaGeometries(params: {
     inputTableName: string;
     outputTableName: string;
-    layer: 'parks' | 'water';
+    layer: 'buildings' | 'parks' | 'water';
     coordinateFormat: string;
     boundingBox?: BoundingBox;
     workspace: string;
@@ -155,14 +169,15 @@ export class LoadLayerUseCase {
 
   private async buildRelationAreaRecords(
     inputTableName: string,
-    layer: 'parks' | 'water',
+    layer: 'buildings' | 'parks' | 'water',
     workspace: string,
   ): Promise<RelationAreaRecord[]> {
     const qualifiedInputTableName = `${workspace}.${inputTableName}`;
+    const relationTableName = layer === 'buildings' ? 'buildings_rels' : qualifiedInputTableName;
     const relations = (await this.conn.query(`
       SELECT id, refs, ref_roles, ref_types, CAST(tags AS JSON) AS tags_json
-      FROM ${qualifiedInputTableName}
-      WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = '${layer}';
+      FROM ${relationTableName}
+      WHERE map_extract(tags, '__autk_layer')[1] = '${layer}';
     `)).toArray() as unknown as RelationRow[];
 
     if (relations.length === 0) return [];

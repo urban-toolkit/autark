@@ -205,8 +205,11 @@ const GET_WATER = (tableName: string) => `
 
 const GET_BUILDINGS = (tableName: string) => `
    CREATE OR REPLACE TEMP TABLE buildings AS
-    SELECT id, tags, refs FROM ${tableName}
-      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
+     SELECT id, tags, refs FROM ${tableName}
+       WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
+   CREATE OR REPLACE TEMP TABLE buildings_rels AS
+     SELECT id, refs, ref_roles, ref_types, tags FROM ${tableName}
+       WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
 `;
 
 const GET_ROADS = (tableName: string) => `
