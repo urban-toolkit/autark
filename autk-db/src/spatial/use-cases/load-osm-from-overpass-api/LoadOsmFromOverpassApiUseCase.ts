@@ -707,7 +707,7 @@ export class LoadOsmFromOverpassApiUseCase {
       (tags['building:part'] !== undefined && tags['building:part'] !== 'roof') ||
       tags.type === 'building';
 
-    return hasBuildingKind && BUILDING_HEIGHT_KEYS.some((key) => tags[key] !== undefined);
+    return hasBuildingKind;
   }
 
   private hasTagValue(tags: Record<string, string>, key: string, values: readonly string[]): boolean {
