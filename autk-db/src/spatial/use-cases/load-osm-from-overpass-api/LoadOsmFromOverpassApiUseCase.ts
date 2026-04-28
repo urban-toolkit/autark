@@ -152,8 +152,13 @@ export class LoadOsmFromOverpassApiUseCase {
     console.log('[autk-db] Fetching boundary data from Overpass API…');
     const boundariesResponse = await this.fetchWithRetry(this.buildBoundariesQuery(queryArea));
     onProgress?.('downloading-osm-data');
-    let combined: OverpassApiResponse = await boundariesResponse.json();
-    console.log(`[autk-db] Boundaries: ${combined.elements?.length ?? 0} elements`);
+    const boundariesData: OverpassApiResponse = await boundariesResponse.json();
+    console.log(`[autk-db] Boundaries: ${boundariesData.elements?.length ?? 0} elements`);
+    let combined: OverpassApiResponse = boundariesData;
+
+    // Compute the area bbox once from boundary data only — independent of which
+    // layers are requested, so parks/roads/etc. never pollute the extent.
+    const boundariesBbox = this.computeBboxFromElements(boundariesData.elements ?? []);
 
     // Requests 2–4: one per layer group, skipped when not requested.
     // Buildings are fetched as a 2×2 tiled grid to stay within Overpass maxsize limits.
@@ -170,9 +175,8 @@ export class LoadOsmFromOverpassApiUseCase {
       if (activeGroup.length === 0) continue;
 
       if (activeGroup.includes('buildings')) {
-        const bbox = this.computeBboxFromElements(combined.elements ?? []);
-        const tileQueries = bbox
-          ? this.buildBuildingsTileQueries(queryArea, bbox)
+        const tileQueries = boundariesBbox
+          ? this.buildBuildingsTileQueries(queryArea, boundariesBbox)
           : [this.buildLayerGroupQuery(queryArea, activeGroup)!];
 
         let buildingsTotal = 0;
@@ -573,8 +577,9 @@ export class LoadOsmFromOverpassApiUseCase {
           const i = idx + 1;
           areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
           areaLines.push(`(
-        way["building"](area.area${i})(${tileBbox});
-        way["building:part"](area.area${i})(${tileBbox});
+        way["building"]["building"!="roof"](area.area${i})(${tileBbox});
+        way["building:part"]["building:part"!="roof"](area.area${i})(${tileBbox});
+        way["type"="building"](area.area${i})(${tileBbox});
       )->.dataWays${i};`);
           dataWaySelectors.push(`.dataWays${i};`);
           areaLines.push(`(
@@ -741,10 +746,13 @@ export class LoadOsmFromOverpassApiUseCase {
     };
   }
 
-  /** Merges two Overpass responses, deduplicating nodes by ID. */
+  /** Merges two Overpass responses, deduplicating all elements by (type, id). */
   private mergeResponses(a: OverpassApiResponse, b: OverpassApiResponse): OverpassApiResponse {
-    const nodeIds = new Set(a.elements.filter(e => e.type === 'node').map(e => e.id));
-    const dedupedB = b.elements.filter(e => e.type !== 'node' || !nodeIds.has(e.id));
+    const existingIds = new Set<string>();
+    for (const e of a.elements) {
+      existingIds.add(`${e.type}:${e.id}`);
+    }
+    const dedupedB = b.elements.filter(e => !existingIds.has(`${e.type}:${e.id}`));
     return { elements: [...a.elements, ...dedupedB] };
   }
 
