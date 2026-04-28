@@ -251,6 +251,7 @@ svg { display: block; overflow: visible; }
 #provenanceTrail.autk-provenance-root { gap: 8px; min-height: 0; }
 #provenanceTrail .autk-provenance-graph-wrap { height: 260px; max-height: 320px; }
 #provenanceTrail .autk-provenance-path { max-height: 160px; flex-shrink: 0; }
+#provenanceTrail .autk-prov-insights-wrap { display: none; }
 
 /* ── Provenance session insights (row 2, shown only on provenance tab) ────── */
 #provTrailInsights {
