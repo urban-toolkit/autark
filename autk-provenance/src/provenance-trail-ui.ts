@@ -2,7 +2,6 @@ import type { AutarkProvenanceState, PathNode, ProvenanceNode } from './types';
 import type { AutarkProvenanceApi } from './create-autark-provenance';
 import {
   computeGraphMetrics,
-  computeSelectionFrequency,
   generateSessionNarrative,
   getInsightAnnotations,
   type StrategyLabel,
@@ -11,6 +10,7 @@ import {
 export interface ProvenanceTrailUIOptions {
   provenance: AutarkProvenanceApi;
   container: HTMLElement;
+  insightsContainer?: HTMLElement;
   showBackForward?: boolean;
   showTimestamps?: boolean;
   showGraph?: boolean;
@@ -254,7 +254,6 @@ function renderInsightsPanel(
   const graph = provenance.getGraph();
   const currentNode = provenance.getCurrentNode();
   const metrics = computeGraphMetrics(graph);
-  const freq = computeSelectionFrequency(graph);
   const annotations = getInsightAnnotations(graph);
 
   // ── Strategy + metrics row ────────────────────────────────────────────────
@@ -319,70 +318,6 @@ function renderInsightsPanel(
   annotateSection.appendChild(saveBtn);
 
   container.appendChild(annotateSection);
-
-  // ── Selection focus (Feature 2: aggregate selection frequency) ────────────
-  const topMap = [...freq.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const topPlotsByPlot = [...freq.plots.entries()].map(([plotId, plotFreq]) => ({
-    plotId,
-    top: [...plotFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
-  })).filter(({ top }) => top.length > 0 && top[0][1] > 1);
-  const hasFreqData = topMap.length > 0 || topPlotsByPlot.length > 0;
-
-  if (hasFreqData) {
-    const freqSection = document.createElement('div');
-    freqSection.className = 'autk-prov-insights-section';
-
-    const freqTitle = document.createElement('div');
-    freqTitle.className = 'autk-prov-insights-section-title';
-    freqTitle.textContent = 'Selection focus (all branches)';
-    freqSection.appendChild(freqTitle);
-
-    const allCounts = [
-      ...topMap.map(([, c]) => c),
-      ...topPlotsByPlot.flatMap(({ top }) => top.map(([, c]) => c)),
-    ];
-    const maxCount = Math.max(...allCounts, 1);
-
-    const renderFreqGroup = (label: string, items: [number, number][]): void => {
-      if (items.length === 0) return;
-      const groupLabel = document.createElement('div');
-      groupLabel.className = 'autk-prov-freq-group-label';
-      groupLabel.textContent = label;
-      freqSection.appendChild(groupLabel);
-
-      for (const [id, count] of items) {
-        const row = document.createElement('div');
-        row.className = 'autk-prov-freq-row';
-
-        const idSpan = document.createElement('span');
-        idSpan.className = 'autk-prov-freq-id';
-        idSpan.textContent = `#${id}`;
-        row.appendChild(idSpan);
-
-        const bar = document.createElement('div');
-        bar.className = 'autk-prov-freq-bar-wrap';
-        const fill = document.createElement('div');
-        fill.className = 'autk-prov-freq-bar-fill';
-        fill.style.width = `${Math.round((count / maxCount) * 100)}%`;
-        bar.appendChild(fill);
-        row.appendChild(bar);
-
-        const countSpan = document.createElement('span');
-        countSpan.className = 'autk-prov-freq-count';
-        countSpan.textContent = `${count}×`;
-        row.appendChild(countSpan);
-
-        freqSection.appendChild(row);
-      }
-    };
-
-    renderFreqGroup('Map', topMap);
-    for (const { plotId, top } of topPlotsByPlot) {
-      renderFreqGroup(`Plot: ${plotId}`, top);
-    }
-
-    container.appendChild(freqSection);
-  }
 
   // ── Recorded insight annotations list ─────────────────────────────────────
   if (annotations.length > 0) {
@@ -459,6 +394,7 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
   const {
     provenance,
     container,
+    insightsContainer,
     showBackForward = true,
     showTimestamps = true,
     showGraph = true,
@@ -888,7 +824,7 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
     insightsChevron.textContent = insightsOpen ? '\u25b4' : '\u25be';
   });
 
-  container.appendChild(insightsWrap);
+  (insightsContainer ?? container).appendChild(insightsWrap);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1051,5 +987,6 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
     closeGraphModal();
     container.innerHTML = '';
     container.classList.remove('autk-provenance-root');
+    if (insightsContainer) insightsContainer.innerHTML = '';
   };
 }

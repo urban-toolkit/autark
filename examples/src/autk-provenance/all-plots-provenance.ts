@@ -218,16 +218,18 @@ function renderSummaryCard(el: HTMLElement, provenance: ProvenanceApi): void {
 // ---------------------------------------------------------------------------
 
 function setupTabs(provenance: ProvenanceApi): void {
-  const chartsTab = document.getElementById('chartsTab')!;
-  const provTab   = document.getElementById('provenanceTab')!;
-  const badge     = document.getElementById('nodeCountBadge')!;
+  const chartsTab      = document.getElementById('chartsTab')!;
+  const provTab        = document.getElementById('provenanceTab')!;
+  const provInsights   = document.getElementById('provTrailInsights')!;
+  const badge          = document.getElementById('nodeCountBadge')!;
 
   document.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab as 'charts' | 'provenance';
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-      chartsTab.classList.toggle('hidden', tab !== 'charts');
-      provTab.classList.toggle('hidden',   tab !== 'provenance');
+      chartsTab.classList.toggle('hidden',   tab !== 'charts');
+      provTab.classList.toggle('hidden',     tab !== 'provenance');
+      provInsights.classList.toggle('hidden', tab !== 'provenance');
     });
   });
 
@@ -370,21 +372,18 @@ async function main(): Promise<void> {
   // ── Provenance trail UI ───────────────────────────────────────────────────
   renderProvenanceTrailUI({
     provenance, container: document.getElementById('provenanceTrail')!,
+    insightsContainer: document.getElementById('provTrailInsights')!,
     showTimestamps: true, showGraph: true, showPathList: true, showBackForward: true,
   });
 
   setupTabs(provenance);
 
   // ── Session insight cards ─────────────────────────────────────────────────
-  const metricsEl  = document.querySelector('#insightsMetrics  .insights-card-body') as HTMLElement;
   const annotateEl = document.querySelector('#insightsAnnotate .insights-card-body') as HTMLElement;
-  const freqEl     = document.querySelector('#insightsFreq     .insights-card-body') as HTMLElement;
   const summaryEl  = document.querySelector('#insightsSummary  .insights-card-body') as HTMLElement;
 
   function refreshInsights(): void {
-    renderMetricsCard(metricsEl,  provenance);
     renderAnnotateCard(annotateEl, provenance);
-    renderFreqCard(freqEl,        provenance, featureName);
     renderSummaryCard(summaryEl,  provenance);
   }
   provenance.addObserver(refreshInsights);

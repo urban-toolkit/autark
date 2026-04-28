@@ -8,6 +8,7 @@
   --accent: #2f5f96;
   --radius: 12px;
   --shadow: 0 8px 24px rgba(28,53,76,.09);
+  --viz-height: 640px;
 }
 
 * { box-sizing: border-box; }
@@ -79,7 +80,7 @@ body {
 }
 
 .map-panel {
-  flex: 1;
+  height: var(--viz-height);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border);
@@ -87,19 +88,22 @@ body {
   background: var(--surface);
   overflow: hidden;
   box-shadow: var(--shadow);
-  min-height: 600px;
 }
 
 .map-body {
   flex: 1;
   min-height: 0;
-  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 canvas {
   display: block;
-  width: 100%;
   height: 100%;
+  width: auto;
+  max-width: 100%;
   background: #c8dae6;
 }
 
@@ -126,6 +130,7 @@ canvas {
 /* ── Right column: tabbed panel ──────────────────────────────────────────── */
 
 #rightColumn {
+  height: var(--viz-height);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border);
@@ -246,7 +251,30 @@ svg { display: block; overflow: visible; }
 #provenanceTrail.autk-provenance-root { gap: 8px; min-height: 0; }
 #provenanceTrail .autk-provenance-graph-wrap { height: 260px; max-height: 320px; }
 #provenanceTrail .autk-provenance-path { max-height: 160px; flex-shrink: 0; }
-#provenanceTrail .autk-prov-insights-wrap { flex: 1; min-height: 0; max-height: none; }
+
+/* ── Provenance session insights (row 2, shown only on provenance tab) ────── */
+#provTrailInsights {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+#provTrailInsights.hidden { display: none; }
+
+/* Strip the inner wrap's own border/background so it merges with the row panel */
+#provTrailInsights .autk-prov-insights-wrap {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  max-height: none;
+  overflow-y: visible;
+}
+#provTrailInsights .autk-prov-insights-body {
+  max-height: none;
+  overflow-y: visible;
+}
 
 /* ── Insights section ────────────────────────────────────────────────────── */
 
@@ -260,7 +288,7 @@ svg { display: block; overflow: visible; }
 
 .insights-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .insights-card {
@@ -406,11 +434,7 @@ svg { display: block; overflow: visible; }
 
 @media (max-width: 1200px) {
   #layout { grid-template-columns: 1fr; }
-  .map-panel { min-height: 420px; max-height: 500px; }
-  .insights-grid { grid-template-columns: 1fr 1fr; }
-  .insights-card:nth-child(2) { border-right: none; }
-  .insights-card:nth-child(1),
-  .insights-card:nth-child(2) { border-bottom: 1px solid var(--border); }
+  :root { --viz-height: 480px; }
 }
 
 @media (max-width: 700px) {
