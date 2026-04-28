@@ -43,8 +43,5 @@
     "typescript": "^6.0.2",
     "vite": "^8.0.8",
     "vite-plugin-dts": "^4.5.4"
-  },
-  "dependencies": {
-    "autk-core": "*"
   }
 }
