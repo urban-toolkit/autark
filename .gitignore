@@ -59,3 +59,6 @@ performance/public/data/noise.csv
 .tool-versions
 /test-web-gpu
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+
+*new-york-260427.osm.pbf

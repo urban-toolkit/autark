@@ -57,6 +57,8 @@ export type LoadOsmParams = {
     geocodeArea: string;
     areas: string[];
   };
+  /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
+  pbfFileUrl?: string;
   workspace?: string;
   onProgress?: OnLoadingProgress;
 };
