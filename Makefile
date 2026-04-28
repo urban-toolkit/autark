@@ -110,8 +110,7 @@ clean:
 		"cd autk-plot && $(RIMRAF) dist build" \
 		"cd autk-compute && $(RIMRAF) dist build" \
 		"cd gallery && $(RIMRAF) dist build" \
-		"cd usecases && $(RIMRAF) dist build" \
-		"cd performance && $(RIMRAF) dist build"
+		"cd usecases && $(RIMRAF) dist build"
 
 publish:
 	@if [ -z "$(LIB)" ]; then \
