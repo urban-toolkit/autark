@@ -321,7 +321,7 @@ async function main(): Promise<void> {
     labels: { axis: ['shape_area', 'Count'], title: 'Area Distribution' },
     width: hd.width, height: hd.height,
     margins: { left: 55, right: 16, top: 36, bottom: 48 },
-    events: [PlotEvent.CLICK, PlotEvent.BRUSH_X],
+    events: [PlotEvent.CLICK],
   });
 
   // ── Thematic dropdown (custom control tracked by provenance) ──────────────
