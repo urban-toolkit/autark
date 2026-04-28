@@ -14,9 +14,12 @@ function deepMergeState(
   base: AutarkProvenanceState,
   delta: Partial<AutarkProvenanceState>
 ): AutarkProvenanceState {
+  const hasSelectionMap =
+    delta.selection !== undefined &&
+    Object.prototype.hasOwnProperty.call(delta.selection, 'map');
   const next: AutarkProvenanceState = {
     selection: {
-      map: delta.selection?.map ?? base.selection.map,
+      map: hasSelectionMap ? (delta.selection?.map ?? null) : base.selection.map,
       // Spread-merge so a delta for one plot doesn't wipe the others.
       plots: delta.selection?.plots !== undefined
         ? { ...base.selection.plots, ...delta.selection.plots }

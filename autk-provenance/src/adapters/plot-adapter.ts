@@ -71,11 +71,10 @@ export function createPlotAdapter(
 
         onRecord(actionType, label, {
           selection: {
-            map: null,
             plots: {
               [plot.plotId]: { ids: selection, plotType: plot.plotType },
             },
-          },
+          } as unknown as AutarkProvenanceState['selection'],
         });
       };
       entry.listeners.push({ event, fn });
@@ -113,9 +112,8 @@ export function createPlotAdapter(
           // Reset selection for this plot — indices are no longer valid after a data swap.
           onRecord(ProvenanceAction.PLOT_DATA, label, {
             selection: {
-              map: null,
               plots: { [plot.plotId]: { ids: [], plotType: plot.plotType } },
-            },
+            } as unknown as AutarkProvenanceState['selection'],
           });
         }
       },
@@ -155,12 +153,14 @@ export function createPlotAdapter(
   function applyState(state: AutarkProvenanceState): void {
     isApplyingState = true;
     try {
+      const coordinatedIds = [...new Set([
+        ...(state.selection?.map?.ids ?? []),
+        ...Object.values(state.selection?.plots ?? {}).flatMap((plotState) => plotState.ids),
+      ])];
+
       for (const entry of entries) {
-        const { plot } = entry;
-        const plotState = state.selection?.plots?.[plot.plotId];
-        const ids = plotState?.ids ?? state.selection?.map?.ids ?? [];
-        entry.lastSelectionSig = selectionSignature(ids);
-        plot.setHighlightedIds(ids);
+        entry.lastSelectionSig = selectionSignature(coordinatedIds);
+        entry.plot.setHighlightedIds(coordinatedIds);
       }
     } finally {
       isApplyingState = false;

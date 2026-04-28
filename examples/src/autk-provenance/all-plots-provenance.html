@@ -62,40 +62,52 @@
         <div id="chartsTab" class="tab-content">
           <div id="plotGrid">
 
-            <div class="panel plot-panel">
-              <div class="panel-header">
-                <span class="panel-title">Scatterplot</span>
-                <span class="panel-hint">Area vs Perimeter · drag to brush</span>
+            <div class="panel plot-panel" data-chart-key="scatter">
+              <div class="panel-header plot-panel-header" role="button" tabindex="0" aria-label="Open Scatterplot in modal">
+                <div class="panel-header-main">
+                  <span class="panel-title">Scatterplot</span>
+                  <span class="panel-hint">Area vs Perimeter · drag to brush</span>
+                </div>
+                <button class="panel-expand-btn" type="button" aria-label="Open Scatterplot">Open</button>
               </div>
               <div class="plot-body">
                 <div id="scatterBody"></div>
               </div>
             </div>
 
-            <div class="panel plot-panel">
-              <div class="panel-header">
-                <span class="panel-title">Bar Chart</span>
-                <span class="panel-hint">Neighborhoods per district · click a bar</span>
+            <div class="panel plot-panel" data-chart-key="bar">
+              <div class="panel-header plot-panel-header" role="button" tabindex="0" aria-label="Open Bar Chart in modal">
+                <div class="panel-header-main">
+                  <span class="panel-title">Bar Chart</span>
+                  <span class="panel-hint">Neighborhoods per district · click a bar</span>
+                </div>
+                <button class="panel-expand-btn" type="button" aria-label="Open Bar Chart">Open</button>
               </div>
               <div class="plot-body">
                 <div id="barBody"></div>
               </div>
             </div>
 
-            <div class="panel plot-panel">
-              <div class="panel-header">
-                <span class="panel-title">Parallel Coordinates</span>
-                <span class="panel-hint">Area · Perimeter · Compactness · brush any axis</span>
+            <div class="panel plot-panel" data-chart-key="pc">
+              <div class="panel-header plot-panel-header" role="button" tabindex="0" aria-label="Open Parallel Coordinates in modal">
+                <div class="panel-header-main">
+                  <span class="panel-title">Parallel Coordinates</span>
+                  <span class="panel-hint">Area · Perimeter · Compactness · brush any axis</span>
+                </div>
+                <button class="panel-expand-btn" type="button" aria-label="Open Parallel Coordinates">Open</button>
               </div>
               <div class="plot-body">
                 <div id="pcBody"></div>
               </div>
             </div>
 
-            <div class="panel plot-panel">
-              <div class="panel-header">
-                <span class="panel-title">Histogram</span>
-                <span class="panel-hint">Neighborhood area distribution · click bins to select</span>
+            <div class="panel plot-panel" data-chart-key="hist">
+              <div class="panel-header plot-panel-header" role="button" tabindex="0" aria-label="Open Histogram in modal">
+                <div class="panel-header-main">
+                  <span class="panel-title">Histogram</span>
+                  <span class="panel-hint">Neighborhood area distribution · click bins to select</span>
+                </div>
+                <button class="panel-expand-btn" type="button" aria-label="Open Histogram">Open</button>
               </div>
               <div class="plot-body">
                 <div id="histBody"></div>

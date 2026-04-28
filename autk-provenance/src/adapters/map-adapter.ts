@@ -108,6 +108,9 @@ export function createMapAdapter(
   let clickListener: ((event: Event) => void) | null = null;
   let changeListener: ((event: Event) => void) | null = null;
   let isApplyingState = false;
+  let currentState: AutarkProvenanceState = {
+    selection: { map: null, plots: {} },
+  };
 
   const wrappedMapMethods = new Map<string, unknown>();
 
@@ -274,13 +277,17 @@ export function createMapAdapter(
     });
 
     pickListener = (selection: number[], layerId: string) => {
+      const activePlotIds = new Set(
+        Object.values(currentState.selection?.plots ?? {}).flatMap((plotState) => plotState.ids)
+      );
+      const mapOwnedSelection = selection.filter((id) => !activePlotIds.has(id));
       const label =
-        selection.length === 0
+        mapOwnedSelection.length === 0
           ? `Cleared selection on ${layerId}`
-          : `Picked ${selection.length} feature(s) on ${layerId}`;
+          : `Picked ${mapOwnedSelection.length} feature(s) on ${layerId}`;
       onRecord(ProvenanceAction.MAP_PICK, label, {
         selection: {
-          map: { layerId, ids: selection },
+          map: { layerId, ids: mapOwnedSelection },
           plots: {},
         },
       });
@@ -405,6 +412,7 @@ export function createMapAdapter(
   function applyState(state: AutarkProvenanceState): void {
     isApplyingState = true;
     try {
+      currentState = state;
       const { selection } = state;
       const ui = resolveUiState(state.ui);
 
@@ -450,12 +458,16 @@ export function createMapAdapter(
         for (const layer of map.layerManager.vectorLayers ?? []) {
           const layerId = layer.layerInfo?.id;
           if (!layerId) continue;
-          const isMapTarget = !!targetLayerId && layerId === targetLayerId;
-          const isPlotTarget = !targetLayerId && !!fallbackLayerId && layerId === fallbackLayerId;
-          if (isMapTarget && targetIds.length > 0) {
-            layer.setHighlightedIds?.(targetIds);
-          } else if (isPlotTarget && fallbackPlotIds.length > 0) {
-            layer.setHighlightedIds?.(fallbackPlotIds);
+          const combinedIds = new Set<number>();
+          if (targetLayerId && layerId === targetLayerId) {
+            targetIds.forEach((id) => combinedIds.add(id));
+          }
+          if (fallbackLayerId && layerId === fallbackLayerId) {
+            fallbackPlotIds.forEach((id) => combinedIds.add(id));
+          }
+
+          if (combinedIds.size > 0) {
+            layer.setHighlightedIds?.([...combinedIds]);
           } else {
             layer.clearHighlightedIds?.();
           }

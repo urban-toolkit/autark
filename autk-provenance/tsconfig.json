@@ -11,6 +11,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "declaration": true,
+    "rootDir": "./src",
     "declarationDir": "./dist",
     "emitDeclarationOnly": true,
     "outDir": "./dist",

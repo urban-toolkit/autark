@@ -207,6 +207,49 @@ canvas {
   min-height: 0;
 }
 
+.plot-panel:hover {
+  border-color: #bfd0e3;
+  box-shadow: 0 10px 26px rgba(30, 55, 80, .08);
+}
+
+.plot-panel .plot-panel-header {
+  cursor: zoom-in;
+  gap: 12px;
+}
+
+.plot-panel .panel-header-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plot-panel .panel-header-main .panel-hint {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-expand-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panel-expand-btn:hover,
+.panel-expand-btn:focus-visible {
+  background: #edf5ff;
+  border-color: var(--accent);
+  outline: none;
+}
+
 .plot-body {
   flex: 1;
   min-height: 0;
@@ -220,6 +263,136 @@ canvas {
 }
 
 svg { display: block; overflow: visible; }
+
+.chart-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(14, 24, 36, .56);
+}
+
+.chart-modal {
+  width: min(1320px, 96vw);
+  height: min(900px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 221, 231, .85);
+  background: linear-gradient(180deg, #f9fcff, #f3f8fd);
+  box-shadow: 0 32px 90px rgba(13, 26, 40, .45);
+}
+
+.chart-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, .92);
+}
+
+.chart-modal-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chart-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chart-modal-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chart-modal-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.chart-modal-btn {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chart-modal-btn:hover,
+.chart-modal-btn:focus-visible {
+  background: #edf5ff;
+  border-color: var(--accent);
+  outline: none;
+}
+
+.chart-modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+}
+
+.chart-modal-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(207, 220, 232, .35) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(rgba(207, 220, 232, .35) 1px, transparent 1px) 0 0 / 32px 32px,
+    #ffffff;
+}
+
+.chart-modal-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.chart-modal-stage svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.chart-modal-hint {
+  min-width: 0;
+}
+
+.chart-modal-scale {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Shared panel header ─────────────────────────────────────────────────── */
 
@@ -444,4 +617,8 @@ svg { display: block; overflow: visible; }
   .insights-grid { grid-template-columns: 1fr; }
   .insights-card { border-right: none; border-bottom: 1px solid var(--border); }
   .insights-card:last-child { border-bottom: none; }
+  .chart-modal { width: 96vw; height: 92vh; }
+  .chart-modal-header,
+  .chart-modal-footer { flex-direction: column; align-items: flex-start; }
+  .chart-modal-controls { justify-content: flex-start; }
 }

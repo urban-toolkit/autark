@@ -59,7 +59,7 @@ export class Histogram extends PlotD3 {
     }
 
     const values: BinDatum[] = this.data.map((d, i) => ({
-      value: d ? +d[this._axis[0]] || 0 : 0,
+      value: Number(d?.[this._axis[0]] ?? 0),
       index: i,
     }));
 
@@ -286,14 +286,17 @@ export class Histogram extends PlotD3 {
     });
   }
 
-  // Highlight bars that contain any of the given feature row indices.
+  // Highlight a bin only when every feature mapped to that bin is selected.
   updatePlotSelection(): void {
     const selectedSet = new Set(this._selection);
     const plot = this;
     d3.select(this._div).selectAll('.autkMark').style('fill', function (_d: unknown, binIdx: number) {
       const bin = plot.binData[binIdx];
-      const hasSelected = bin ? bin.some((d) => selectedSet.has(d.index)) : false;
-      return hasSelected ? PlotStyle.highlight : PlotStyle.default;
+      const fullySelected =
+        !!bin &&
+        bin.length > 0 &&
+        bin.every((d) => selectedSet.has(d.index));
+      return fullySelected ? PlotStyle.highlight : PlotStyle.default;
     });
   }
 }
