@@ -59,6 +59,7 @@ export class TriangulatorBuildings {
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];
+        let skippedNoHeight = 0;
 
         for (let fId = 0; fId < geojson.features.length; fId++) {
             const feature = geojson.features[fId];
@@ -77,8 +78,11 @@ export class TriangulatorBuildings {
                 const partGeom = geometries[i];
                 const partProps = parts[i] ?? {};
 
-                const heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
-                if (!heightInfo.length) { continue; }
+                let heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
+                if (!heightInfo.length) { 
+                    skippedNoHeight++;
+                    heightInfo = [0, (3 + 4 * Math.random()) * 3.4]; // Fallback to a default height when no valid metadata is found
+                }
 
                 const partFeature: Feature = { type: 'Feature', geometry: partGeom, properties: partProps };
                 let chunks: MeshData[] = [];
@@ -124,6 +128,10 @@ export class TriangulatorBuildings {
             }
 
             comps.push({ nPoints, nTriangles, featureIndex: fId, featureId: feature.id });
+        }
+
+        if (skippedNoHeight > 0) {
+            console.warn(`[TriangulatorBuildings] ${skippedNoHeight} parts: no valid height metadata`);
         }
 
         return [mesh, comps];

@@ -15,15 +15,44 @@
  * selection, and thematic handling.
  */
 export type LayerType =
+  | 'background'
   | 'surface'
-  | 'water'
   | 'parks'
+  | 'water'
   | 'roads'
   | 'buildings'
   | 'points'
   | 'polygons'
   | 'polylines'
   | 'raster';
+
+/** All `LayerType` values as a readonly array, in union definition order. */
+export const LAYER_TYPE_VALUES: readonly LayerType[] = [
+  'background',
+  'surface',
+  'parks',
+  'water',
+  'roads',
+  'buildings',
+  'points',
+  'polygons',
+  'polylines',
+  'raster',
+] as const;
+
+/**
+ * OSM base layer types in fixed bottom-up render order.
+ *
+ * Buildings are always rendered last and are not included here.
+ * This order is independent of the `LayerType` union definition order.
+ */
+export const OSM_BASE_LAYER_ORDER: readonly LayerType[] = [
+  'surface',
+  'parks',
+  'water',
+  'roads',
+  'buildings'
+] as const;
 
 /**
  * Named geographic bounding box returned by GeoJSON utility helpers.

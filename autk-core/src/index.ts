@@ -135,6 +135,12 @@ export type {
     LayerType,
 } from './types-layer';
 
+/** OSM base layer types in fixed bottom-up render order. */
+export { OSM_BASE_LAYER_ORDER } from './types-layer';
+
+/** All `LayerType` values as a readonly array. */
+export { LAYER_TYPE_VALUES } from './types-layer';
+
 export type {
     /** Supported TypedArray views for binary data buffers. */
     TypedArray,

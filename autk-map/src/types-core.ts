@@ -55,6 +55,9 @@ export type { LayerGeometry, LayerComponent, LayerBorder, LayerBorderComponent }
 /** Common shared types used across layer management and GPU data handling. */
 export type { BoundingBox, LayerType, TypedArray, TypedArrayConstructor } from 'autk-core';
 
+/** OSM base layer render order shared with autk-core. */
+export { OSM_BASE_LAYER_ORDER, LAYER_TYPE_VALUES } from 'autk-core';
+
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
 /** Generic lookup and geometry helpers used by layer-loading and update paths. */

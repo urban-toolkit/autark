@@ -11,7 +11,7 @@
 
 import { FeatureCollection, Geometry } from 'geojson';
 
-import { computeOrigin } from './types-core';
+import { computeOrigin, OSM_BASE_LAYER_ORDER } from './types-core';
 import type { LayerType } from './types-core';
 
 import { 
@@ -24,13 +24,6 @@ import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
-
-/**
- * OSM base layer types with a fixed bottom-up render order.
- * 'buildings' is always rendered last; everything else goes here
- * and is ordered by load insertion.
- */
-const OSM_BASE: LayerType[] = ['surface', 'parks', 'water', 'roads'];
 
 /**
  * Manages all map layers as a single ordered list.
@@ -104,7 +97,7 @@ export class LayerManager {
                 ? new RasterLayer(layerInfo, layerRender, layerData)
                 : new Triangles2DLayer(layerInfo, layerRender, layerData);
 
-        if (!OSM_BASE.includes(layerInfo.typeLayer) && layerInfo.typeLayer !== 'buildings') {
+        if (!OSM_BASE_LAYER_ORDER.includes(layerInfo.typeLayer) && layerInfo.typeLayer !== 'buildings') {
             this._dynamicOrder.push(layerInfo.id);
         }
         this._layers.push(layer);
@@ -156,7 +149,7 @@ export class LayerManager {
      * as a placeholder before insertion.
      */
     computeZindex(layerType: LayerType): number {
-        const osmIdx = OSM_BASE.indexOf(layerType);
+        const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(layerType);
         return osmIdx !== -1 ? osmIdx : 0;
     }
 
@@ -171,18 +164,18 @@ export class LayerManager {
      * place.
      */
     private _recomputeZIndices(): void {
-        const buildingsZ = OSM_BASE.length + this._dynamicOrder.length;
+        const buildingsZ = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.length;
 
         for (const layer of this._layers) {
             const { typeLayer, id } = layer.layerInfo;
-            const osmIdx = OSM_BASE.indexOf(typeLayer);
+            const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(typeLayer);
 
             if (osmIdx !== -1) {
                 layer.layerInfo.zIndex = osmIdx;
             } else if (typeLayer === 'buildings') {
                 layer.layerInfo.zIndex = buildingsZ;
             } else {
-                layer.layerInfo.zIndex = OSM_BASE.length + this._dynamicOrder.indexOf(id);
+                layer.layerInfo.zIndex = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.indexOf(id);
             }
         }
     }

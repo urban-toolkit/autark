@@ -1,4 +1,12 @@
 export type { LayerType, BoundingBox } from 'autk-core';
+export {
+  PARKS_LEISURE_VALUES,
+  PARKS_LANDUSE_VALUES,
+  PARKS_NATURAL_VALUES,
+  WATER_NATURAL_VALUES,
+  WATER_WATER_VALUES,
+  EXCLUDED_ROAD_HIGHWAY_VALUES,
+} from './shared/osm-tag-definitions';
 export type { Layer, LoadLayerParams } from './spatial/use-cases/load-layer/interfaces';
 export type { LoadGeoTiffParams } from './spatial/use-cases/load-geotiff';
 export type { CommonTable, Table, OsmTable, LayerTable, CustomLayerTable, CsvTable, JsonTable, AnyTable, GridLayerTable, GeoTiffTable, Column } from './shared/interfaces';
