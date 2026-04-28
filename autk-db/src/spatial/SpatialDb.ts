@@ -17,6 +17,8 @@ import { BoundingBox } from '../shared/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
 import { LoadOsmParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
+import { LoadOsmFromPbfUseCase } from './use-cases/load-osm-from-pbf';
+import { OsmProcessingPipeline } from './use-cases/osm-processing-pipeline/OsmProcessingPipeline';
 import type { OsmLoadTimings } from './use-cases/load-osm-from-overpass-api/interfaces';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
 import { GridLayerTable, GeoTiffTable } from '../shared/interfaces';
@@ -55,7 +57,9 @@ export class AutkSpatialDb {
     return this.getCurrentWorkspaceData().tables;
   }
   
+  private osmProcessingPipeline?: OsmProcessingPipeline;
   private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
+  private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
@@ -105,7 +109,9 @@ export class AutkSpatialDb {
       osmBoundingBox: undefined,
     });
 
-    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
+    this.osmProcessingPipeline = new OsmProcessingPipeline(this.db, this.conn);
+    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.conn, this.osmProcessingPipeline);
+    this.loadOsmFromPbfUseCase = new LoadOsmFromPbfUseCase(this.conn, this.osmProcessingPipeline);
     this.loadCsvUseCase = new LoadCsvUseCase(this.db, this.conn);
     this.loadJsonUseCase = new LoadJsonUseCase(this.db, this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.db, this.conn);
@@ -181,22 +187,30 @@ export class AutkSpatialDb {
 
   // ---- LOAD's methods
 
-  private async clipLayerToSurface(layerTableName: string, surfaceTableName: string, workspace: string): Promise<void> {
+  private async clipLayerToSurface(
+    layerTableName: string,
+    surfaceTableName: string,
+    workspace: string,
+    cropGeometry: boolean = true,
+  ): Promise<void> {
     const qualifiedLayer = `${workspace}.${layerTableName}`;
     const qualifiedSurface = `${workspace}.${surfaceTableName}`;
+    const geometrySelect = cropGeometry ? 'ST_Intersection(l.geometry, surf.geom)' : 'l.geometry';
+    const emptyFilter = cropGeometry ? 'WHERE NOT ST_IsEmpty(geometry)' : '';
+
     await this.conn!.query(`
       CREATE OR REPLACE TABLE ${qualifiedLayer} AS
       WITH surf AS (
         SELECT ST_Union_Agg(geometry) AS geom FROM ${qualifiedSurface}
       ),
       clipped AS (
-        SELECT l.id, l.properties, l.refs,
-          ST_Intersection(l.geometry, surf.geom) AS geometry
+        SELECT l.* EXCLUDE (geometry),
+          ${geometrySelect} AS geometry
         FROM ${qualifiedLayer} l, surf
         WHERE ST_Intersects(l.geometry, surf.geom)
       )
-      SELECT id, properties, refs, geometry FROM clipped
-      WHERE NOT ST_IsEmpty(geometry);
+      SELECT * FROM clipped
+      ${emptyFilter};
     `);
   }
 
@@ -214,6 +228,7 @@ export class AutkSpatialDb {
       !this.db ||
       !this.conn ||
       !this.loadOsmFromOverpassApiUseCase ||
+      !this.loadOsmFromPbfUseCase ||
       !this.dropTableUseCase ||
       !this.getBoundingBoxFromOsmUseCase ||
       !this.transformBoundingBoxCoordinatesUseCase ||
@@ -221,7 +236,9 @@ export class AutkSpatialDb {
     )
       throw new Error('Database not initialized. Please call init() first.');
 
-    const execResult = await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
+    const execResult = params.pbfFileUrl
+      ? await this.loadOsmFromPbfUseCase.exec({ ...params, workspace: this.currentWorkspace })
+      : await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
     for (const table of execResult.tables) {
       this._registerTable(table);
     }
@@ -252,7 +269,7 @@ export class AutkSpatialDb {
       const clippableLayerNames: string[] = [];
 
       for (const layer of params.autoLoadLayers.layers) {
-        const shouldCrop = layer !== 'buildings'; // avoid crop buildings layer
+        const shouldCropToBbox = layer !== 'buildings';
 
         const layerParams: LoadLayerParams = {
           osmInputTableName: params.outputTableName,
@@ -260,7 +277,7 @@ export class AutkSpatialDb {
           layer,
         };
 
-        layerParams.boundingBox = shouldCrop ? workspaceData.osmBoundingBox : undefined;
+        layerParams.boundingBox = shouldCropToBbox ? workspaceData.osmBoundingBox : undefined;
 
         const t0 = performance.now();
         const layerTable = await this.loadLayer(layerParams);
@@ -282,15 +299,16 @@ export class AutkSpatialDb {
           const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
           if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
           surfaceLayerName = layerTable.name;
-        } else if (layer !== 'buildings') {
+        } else {
           clippableLayerNames.push(layerTable.name);
         }
       }
 
-      // Clip roads, parks, and water to the surface polygon
+      // Clip thematic layers to the surface polygon. Buildings are only filtered by overlap.
       if (surfaceLayerName && clippableLayerNames.length > 0) {
         for (const layerName of clippableLayerNames) {
-          await this.clipLayerToSurface(layerName, surfaceLayerName, this.currentWorkspace);
+          const cropGeometry = !layerName.endsWith('_buildings');
+          await this.clipLayerToSurface(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
         }
       }
 

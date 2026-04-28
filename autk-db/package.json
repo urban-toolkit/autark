@@ -43,6 +43,8 @@
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.33.1-dev42.0",
+    "@osmix/pbf": "^0.0.9",
+    "@osmix/shared": "^0.0.13",
     "@turf/turf": "^7.3.4",
     "apache-arrow": "^21.1.0",
     "geotiff": "^3.0.5",
