@@ -1,5 +1,3 @@
-// TODO: 1. falta layer de ROADS
-
 import { LayerType } from './interfaces';
 import { BoundingBox } from '../../../shared/interfaces';
 
@@ -12,11 +10,7 @@ type Params = {
   workspace?: string;
 };
 
-/**
- * Creates geometries based on OSM way structure:
- * - Closed ways (first node = last node, >3 nodes): Polygon (for areas like buildings, parks, water)
- * - Open ways: LineString (for linear features like roads)
- */
+const AREA_LAYERS: LayerType[] = ['buildings', 'parks', 'water'];
 
 export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox, workspace = 'main' }: Params) => {
   const query = getLayerQuery(layer);
@@ -26,7 +20,6 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
   
   let actualTableName = qualifiedInputTableName;
   if (layer === 'surface') {
-    // For surface layer, we need to reference the boundaries table
     const baseTableName = tableName.replace(new RegExp(`^${workspace}\\.`), '');
     actualTableName = `${workspace}.${baseTableName}_boundaries`;
   }
@@ -64,23 +57,10 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
   `;
 };
 
-function buildGeometrySelect({
-  outputFormat,
-  boundingBox,
-  layer,
-}: {
-  outputFormat: string;
-  boundingBox?: BoundingBox;
-  layer: LayerType;
-}) {
-  // Define which layers should create polygons for closed ways
-  const areaLayers = ['buildings', 'parks', 'water'];
-
-  const baseGeometry = areaLayers.includes(layer)
-    ? `
+function buildAreaGeometryExpression(outputFormat: string, boundingBox?: BoundingBox) {
+  const baseGeometry = `
     CASE 
       WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
-        -- Closed way with more than 3 nodes: create polygon
         ST_Transform(
           ST_MakePolygon(
             ST_MakeLine(
@@ -92,7 +72,6 @@ function buildGeometrySelect({
           always_xy := true
         )
       ELSE
-        -- Open way: create linestring
         ST_Transform(
           ST_MakeLine(
             list(nodes.geometry ORDER BY ref_idx ASC)
@@ -101,22 +80,33 @@ function buildGeometrySelect({
           '${outputFormat}',
           always_xy := true
         )
-    END`
-    : `
-    -- Always create linestring for linear features
-    ST_Transform(
-      ST_MakeLine(
-        list(nodes.geometry ORDER BY ref_idx ASC)
-      ),
-      'EPSG:4326',
-      '${outputFormat}',
-      always_xy := true
-    )`;
+    END`;
 
   if (!boundingBox) return baseGeometry;
 
   const clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
   return `ST_Intersection(${baseGeometry}, ${clippingGeometry})`;
+}
+
+function buildGeometrySelect({
+  outputFormat,
+  boundingBox,
+  layer,
+}: {
+  outputFormat: string;
+  boundingBox?: BoundingBox;
+  layer: LayerType;
+}) {
+  return AREA_LAYERS.includes(layer)
+    ? buildAreaGeometryExpression(outputFormat, boundingBox)
+    : `ST_Transform(
+        ST_MakeLine(
+          list(nodes.geometry ORDER BY ref_idx ASC)
+        ),
+        'EPSG:4326',
+        '${outputFormat}',
+        always_xy := true
+      )`;
 }
 
 function buildHavingClause({
@@ -128,50 +118,11 @@ function buildHavingClause({
   boundingBox?: BoundingBox;
   layer: LayerType;
 }) {
-  if (!boundingBox) return '';
+  if (!boundingBox || !AREA_LAYERS.includes(layer)) return '';
 
-  // Define which layers should create polygons for closed ways
-  const areaLayers = ['buildings', 'parks', 'water'];
-
-  const baseGeometry = areaLayers.includes(layer)
-    ? `
-    CASE 
-      WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
-        -- Closed way with more than 3 nodes: create polygon
-        ST_Transform(
-          ST_MakePolygon(
-            ST_MakeLine(
-              list(nodes.geometry ORDER BY ref_idx ASC)
-            )
-          ),
-          'EPSG:4326',
-          '${outputFormat}',
-          always_xy := true
-        )
-      ELSE
-        -- Open way: create linestring
-        ST_Transform(
-          ST_MakeLine(
-            list(nodes.geometry ORDER BY ref_idx ASC)
-          ),
-          'EPSG:4326',
-          '${outputFormat}',
-          always_xy := true
-        )
-    END`
-    : `
-    -- Always create linestring for linear features
-    ST_Transform(
-      ST_MakeLine(
-        list(nodes.geometry ORDER BY ref_idx ASC)
-      ),
-      'EPSG:4326',
-      '${outputFormat}',
-      always_xy := true
-    )`;
-
+  const geometry = buildAreaGeometryExpression(outputFormat, boundingBox);
   const clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
-  return `HAVING ST_Intersects(${baseGeometry}, ${clippingGeometry})`;
+  return `HAVING ST_Intersects(${geometry}, ${clippingGeometry})`;
 }
 
 function getLayerQuery(layer: string): (t: string) => string {
@@ -204,12 +155,9 @@ const GET_WATER = (tableName: string) => `
 `;
 
 const GET_BUILDINGS = (tableName: string) => `
-   CREATE OR REPLACE TEMP TABLE buildings AS
-     SELECT id, tags, refs FROM ${tableName}
-       WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
-   CREATE OR REPLACE TEMP TABLE buildings_rels AS
-     SELECT id, refs, ref_roles, ref_types, tags FROM ${tableName}
-       WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
+  CREATE OR REPLACE TEMP TABLE buildings AS
+    SELECT id, tags, refs FROM ${tableName}
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
 `;
 
 const GET_ROADS = (tableName: string) => `
@@ -218,7 +166,6 @@ const GET_ROADS = (tableName: string) => `
       WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'roads' AND array_length(refs) > 1;
 `;
 
-// Get all ways
 const GET_SURFACE = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE surface AS
     SELECT id, tags, refs FROM ${tableName}

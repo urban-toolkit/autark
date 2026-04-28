@@ -1,13 +1,14 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import type { Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 
-import { LoadLayerParams } from './interfaces';
+import { LoadLayerParams, LayerType } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
 import { BoundingBox, LayerTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 import { AssignBuildingIdsUseCase } from '../assign-building-ids/AssignBuildingIdsUseCase';
 import { AggregateBuildingLayerUseCase } from '../aggregate-building-layer/AggregateBuildingLayerUseCase';
+import { getOsmProcessingConfig } from './osm-processing-config';
 
 type RelationRow = {
   id: number | bigint;
@@ -71,7 +72,10 @@ export class LoadLayerUseCase {
     let columns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
     let totalSkippedRelations = 0;
 
-    if (params.layer === 'water' || params.layer === 'parks') {
+    const config = getOsmProcessingConfig(params.layer);
+    if (!config) throw new Error(`Unsupported layer type for OSM processing: ${params.layer}`);
+
+    if (config.processesRelations) {
       totalSkippedRelations = await this.appendRelationAreaGeometries({
         inputTableName: params.osmInputTableName,
         outputTableName: layerOutputTableName,
@@ -85,35 +89,18 @@ export class LoadLayerUseCase {
       columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
     }
 
-    if (params.layer === 'buildings') {
-      totalSkippedRelations = await this.appendRelationAreaGeometries({
-        inputTableName: params.osmInputTableName,
-        outputTableName: layerOutputTableName,
-        layer: 'buildings',
-        coordinateFormat: params.coordinateFormat,
-        boundingBox: params.boundingBox,
-        workspace,
-      });
-
-      const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${qualifiedOutputTableName}`);
-      columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
-    }
-
     if (totalSkippedRelations > 0) {
       console.warn(`[LoadLayerUseCase] loaded ${params.layer}: ${totalSkippedRelations} relations skipped.`);
     }
 
-    // Post-processing for building layers: assign persistent building_id column and add aggregated geometry
-    if (params.layer === 'buildings') {
+    if (config.postProcessing === 'building-aggregation') {
       await this.assignBuildingIdsUseCase.exec({ tableName: layerOutputTableName, workspace });
 
-      // Add aggregated geometry column to the main building table
       await this.aggregateBuildingLayerUseCase.exec({
         inputTableName: layerOutputTableName,
         workspace,
       });
 
-      // Update columns to include the new agg_geometry column
       const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${qualifiedOutputTableName}`);
       columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
     }
@@ -129,7 +116,7 @@ export class LoadLayerUseCase {
   private async appendRelationAreaGeometries(params: {
     inputTableName: string;
     outputTableName: string;
-    layer: 'buildings' | 'parks' | 'water';
+    layer: LayerType;
     coordinateFormat: string;
     boundingBox?: BoundingBox;
     workspace: string;
@@ -176,15 +163,14 @@ export class LoadLayerUseCase {
 
   private async buildRelationAreaRecords(
     inputTableName: string,
-    layer: 'buildings' | 'parks' | 'water',
+    layer: LayerType,
     workspace: string,
   ): Promise<{ records: RelationAreaRecord[]; skipped: number }> {
     const qualifiedInputTableName = `${workspace}.${inputTableName}`;
-    const relationTableName = layer === 'buildings' ? 'buildings_rels' : qualifiedInputTableName;
     const relations = (await this.conn.query(`
       SELECT id, refs, ref_roles, ref_types, CAST(tags AS JSON) AS tags_json
-      FROM ${relationTableName}
-      WHERE map_extract(tags, '__autk_layer')[1] = '${layer}';
+        FROM ${qualifiedInputTableName}
+        WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = '${layer}';
     `)).toArray() as unknown as RelationRow[];
 
     if (relations.length === 0) return { records: [], skipped: 0 };

@@ -32,8 +32,8 @@ import { toPlain } from './shared/utils';
 
 interface WorkspaceData {
   tables: Array<Table>;
-  osmBoudingBox?: BoundingBox;
-  osmBoudingBoxWgs84?: BoundingBox;
+  osmBoundingBox?: BoundingBox;
+  osmBoundingBoxWgs84?: BoundingBox;
 }
 
 /**
@@ -102,7 +102,7 @@ export class AutkSpatialDb {
     await this.conn.query('CREATE SCHEMA IF NOT EXISTS main');
     this.workspaces.set('main', {
       tables: [],
-      osmBoudingBox: undefined,
+      osmBoundingBox: undefined,
     });
 
     this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
@@ -139,7 +139,7 @@ export class AutkSpatialDb {
       await this.conn.query(`CREATE SCHEMA IF NOT EXISTS ${name}`);
       this.workspaces.set(name, {
         tables: [],
-        osmBoudingBox: undefined,
+        osmBoundingBox: undefined,
       });
     }
 
@@ -242,8 +242,8 @@ export class AutkSpatialDb {
       });
 
       const workspaceData = this.getCurrentWorkspaceData();
-      workspaceData.osmBoudingBoxWgs84 = rawBoundingBox;
-      workspaceData.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
+      workspaceData.osmBoundingBoxWgs84 = rawBoundingBox;
+      workspaceData.osmBoundingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: rawBoundingBox,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
@@ -260,7 +260,7 @@ export class AutkSpatialDb {
           layer,
         };
 
-        layerParams.boundingBox = shouldCrop ? workspaceData.osmBoudingBox : undefined;
+        layerParams.boundingBox = shouldCrop ? workspaceData.osmBoundingBox : undefined;
 
         const t0 = performance.now();
         const layerTable = await this.loadLayer(layerParams);
@@ -282,7 +282,7 @@ export class AutkSpatialDb {
           const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
           if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
           surfaceLayerName = layerTable.name;
-        } else if (['roads', 'parks', 'water'].includes(layer)) {
+        } else if (layer !== 'buildings') {
           clippableLayerNames.push(layerTable.name);
         }
       }
@@ -375,7 +375,7 @@ export class AutkSpatialDb {
     const workspaceData = this.getCurrentWorkspaceData();
     const table = await this.loadCustomLayerUseCase.exec({ 
       ...params, 
-      boundingBox: workspaceData.osmBoudingBox,
+      boundingBox: workspaceData.osmBoundingBox,
       workspace: this.currentWorkspace 
     });
     this._registerTable(table);
@@ -397,7 +397,7 @@ export class AutkSpatialDb {
     const workspaceData = this.getCurrentWorkspaceData();
     const table = await this.loadGridLayerUseCase.exec({
       ...params,
-      boundingBox: params.boundingBox || workspaceData.osmBoudingBox,
+      boundingBox: params.boundingBox || workspaceData.osmBoundingBox,
       workspace: this.currentWorkspace
     });
     this._registerTable(table);
@@ -539,13 +539,13 @@ export class AutkSpatialDb {
    */
   getOsmBoundingBox(): [number, number, number, number] | null {
     const workspaceData = this.getCurrentWorkspaceData();
-    if (!workspaceData.osmBoudingBox) return null;
+    if (!workspaceData.osmBoundingBox) return null;
 
     return [
-      workspaceData.osmBoudingBox.minLon,
-      workspaceData.osmBoudingBox.minLat,
-      workspaceData.osmBoudingBox.maxLon,
-      workspaceData.osmBoudingBox.maxLat,
+      workspaceData.osmBoundingBox.minLon,
+      workspaceData.osmBoundingBox.minLat,
+      workspaceData.osmBoundingBox.maxLon,
+      workspaceData.osmBoundingBox.maxLat,
     ]
   }
 
@@ -555,7 +555,7 @@ export class AutkSpatialDb {
    * @returns The bounding box or null if no OSM data has been loaded.
    */
   getOsmBoundingBoxWgs84(): BoundingBox | null {
-    return this.getCurrentWorkspaceData().osmBoudingBoxWgs84 ?? null;
+    return this.getCurrentWorkspaceData().osmBoundingBoxWgs84 ?? null;
   }
 
   /**
@@ -728,7 +728,7 @@ export class AutkSpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const workspaceData = this.getCurrentWorkspaceData();
-    const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.osmBoudingBox);
+    const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.osmBoundingBox);
     this._registerTable(table);
 
     return table;

@@ -81,7 +81,7 @@ export class TriangulatorBuildings {
                 let heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
                 if (!heightInfo.length) { 
                     skippedNoHeight++;
-                    heightInfo = [0, 5 * 3.4]; // Fallback to a default height when no valid metadata is found
+                    heightInfo = [0, (2 + 4 * Math.random()) * 3.4]; // Fallback to a default height when no valid metadata is found
                 }
 
                 const partFeature: Feature = { type: 'Feature', geometry: partGeom, properties: partProps };

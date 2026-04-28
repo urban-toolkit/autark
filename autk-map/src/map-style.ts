@@ -8,7 +8,8 @@
  * resolving style colors into the RGB values consumed by the renderer.
  */
 
-import { ColorHEX, ColorRGB, ColorMap } from './types-core';
+import { ColorHEX, ColorRGB, ColorMap, LAYER_TYPE_VALUES } from './types-core';
+import type { LayerType } from './types-core';
 
 import defaultStyle from './styles/default.json';
 import light from './styles/light.json';
@@ -21,18 +22,10 @@ export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm';
 
 /** Ordered preset ids used for keyboard style cycling. */
 const PRESET_IDS: readonly MapStylePresetId[] = ['default', 'light', 'google', 'apple', 'osm'];
-/** Required keys for a valid map style object. */
-const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = [
-    'background',
-    'surface',
-    'parks',
-    'water',
-    'roads',
-    'buildings',
-    'points',
-    'polylines',
-    'polygons',
-];
+/** Required keys for a valid map style object — derived from `LayerType` minus `raster`. */
+const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = LAYER_TYPE_VALUES.filter(
+  (l): l is Exclude<LayerType, 'raster'> => l !== 'raster',
+) as Array<keyof MapStyleShape>;
 /** Accepts #RGB, #RRGGBB and #RRGGBBAA color literals. */
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 

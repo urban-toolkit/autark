@@ -1,6 +1,14 @@
 import { LayerType, BoundingBox } from 'autk-core';
 
 export type { BoundingBox };
+export {
+  PARKS_LEISURE_VALUES,
+  PARKS_LANDUSE_VALUES,
+  PARKS_NATURAL_VALUES,
+  WATER_NATURAL_VALUES,
+  WATER_WATER_VALUES,
+  EXCLUDED_ROAD_HIGHWAY_VALUES,
+} from './osm-tag-definitions';
 
 export type GridLayerTable = CommonTable & { source: 'user'; type: LayerType };
 export type GeoTiffTable   = CommonTable & { source: 'geotiff'; type: 'raster' };

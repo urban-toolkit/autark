@@ -5,6 +5,14 @@ import { OsmTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from './queries';
 import { HttpCache } from '../../../shared/HttpCache';
+import {
+  PARKS_LEISURE_VALUES,
+  PARKS_LANDUSE_VALUES,
+  PARKS_NATURAL_VALUES,
+  WATER_NATURAL_VALUES,
+  WATER_WATER_VALUES,
+  EXCLUDED_ROAD_HIGHWAY_VALUES,
+} from '../../../shared/osm-tag-definitions';
 
 interface OverpassApiResponse {
   elements: OsmElement[];
@@ -22,15 +30,6 @@ type OverpassTagSelectors = {
   way: string[];
   relation: string[];
 };
-
-const PARKS_LEISURE_VALUES = ['dog_park', 'park', 'playground', 'recreation_ground'] as const;
-const PARKS_LANDUSE_VALUES = ['wood', 'grass', 'forest', 'orchard', 'village_green', 'vineyard', 'cemetery', 'meadow'] as const;
-const PARKS_NATURAL_VALUES = ['wood', 'grass', 'grassland', 'forest', 'scrub', 'heath', 'meadow'] as const;
-
-const WATER_NATURAL_VALUES = ['water', 'wetland', 'strait', 'spring'] as const;
-const WATER_WATER_VALUES = ['pond', 'reservoir', 'lagoon', 'stream_pool', 'lake', 'pool', 'canal', 'river'] as const;
-
-const EXCLUDED_ROAD_HIGHWAY_VALUES = ['cycleway', 'elevator', 'footway', 'steps', 'pedestrian', 'proposed', 'construction', 'abandoned', 'platform', 'raceway'] as const;
 
 export class LoadOsmFromOverpassApiUseCase {
   private db: AsyncDuckDB;
@@ -567,6 +566,8 @@ export class LoadOsmFromOverpassApiUseCase {
         const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
         const areaLines: string[] = [];
         const dataWaySelectors: string[] = [];
+        const dataRelationSelectors: string[] = [];
+        const relationWaySelectors: string[] = [];
 
         queryArea.areas.forEach((areaName, idx) => {
           const i = idx + 1;
@@ -576,7 +577,16 @@ export class LoadOsmFromOverpassApiUseCase {
         way["building:part"](area.area${i})(${tileBbox});
       )->.dataWays${i};`);
           dataWaySelectors.push(`.dataWays${i};`);
+          areaLines.push(`(
+        relation["building"]["building"!~"roof"](area.area${i})(${tileBbox});
+        relation["building:part"]["building:part"!~"roof"](area.area${i})(${tileBbox});
+      )->.dataRelations${i};`);
+          areaLines.push(`way(r.dataRelations${i})->.dataRelationWays${i};`);
+          dataRelationSelectors.push(`.dataRelations${i};`);
+          relationWaySelectors.push(`.dataRelationWays${i};`);
         });
+
+        const allWaySelectors = [...dataWaySelectors, ...relationWaySelectors];
 
         queries.push(`
       [out:json][timeout:60][maxsize:268435456];
@@ -584,7 +594,10 @@ export class LoadOsmFromOverpassApiUseCase {
       ${geocodeLine}
       ${areaLines.join('\n      ')}
 
-      ( ${dataWaySelectors.join(' ')} );
+      ( ${dataRelationSelectors.join(' ')} );
+      out body;
+
+      ( ${allWaySelectors.join(' ')} );
       out geom qt;
     `);
       }
@@ -705,7 +718,8 @@ export class LoadOsmFromOverpassApiUseCase {
       (tags.building !== undefined && tags.building !== 'roof') ||
       (tags['building:part'] !== undefined && tags['building:part'] !== 'roof') ||
       tags.type === 'building' ||
-      (tags.type === 'multipolygon' && tags.building !== undefined && tags.building !== 'roof');
+      (tags.type === 'multipolygon' && tags.building !== undefined && tags.building !== 'roof') ||
+      (tags.type === 'multipolygon' && tags['building:part'] !== undefined && tags['building:part'] !== 'roof');
 
     return hasBuildingKind;
   }
