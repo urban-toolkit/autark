@@ -3,6 +3,7 @@ import { readOsmPbf } from '@osmix/pbf';
 
 import { OsmTable } from '../../../shared/interfaces';
 import {
+  EXCLUDED_BUILDING_VALUES,
   EXCLUDED_ROAD_HIGHWAY_VALUES,
   PARKS_LANDUSE_VALUES,
   PARKS_LEISURE_VALUES,
@@ -551,11 +552,11 @@ export class LoadOsmFromPbfUseCase {
 
   private isBuildingTagSet(tags: Record<string, string>): boolean {
     return (
-      (tags.building !== undefined && tags.building !== 'roof') ||
-      (tags['building:part'] !== undefined && tags['building:part'] !== 'roof') ||
+      (tags.building !== undefined && !this.hasTagValue(tags, 'building', EXCLUDED_BUILDING_VALUES)) ||
+      (tags['building:part'] !== undefined && !this.hasTagValue(tags, 'building:part', EXCLUDED_BUILDING_VALUES)) ||
       tags.type === 'building' ||
-      (tags.type === 'multipolygon' && tags.building !== undefined && tags.building !== 'roof') ||
-      (tags.type === 'multipolygon' && tags['building:part'] !== undefined && tags['building:part'] !== 'roof')
+      (tags.type === 'multipolygon' && tags.building !== undefined && !this.hasTagValue(tags, 'building', EXCLUDED_BUILDING_VALUES)) ||
+      (tags.type === 'multipolygon' && tags['building:part'] !== undefined && !this.hasTagValue(tags, 'building:part', EXCLUDED_BUILDING_VALUES))
     );
   }
 

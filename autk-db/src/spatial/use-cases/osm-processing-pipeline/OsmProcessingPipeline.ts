@@ -8,6 +8,7 @@ import {
   WATER_NATURAL_VALUES,
   WATER_WATER_VALUES,
   EXCLUDED_ROAD_HIGHWAY_VALUES,
+  EXCLUDED_BUILDING_VALUES,
 } from '../../../shared/osm-tag-definitions';
 
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from '../load-osm-from-overpass-api/queries';
@@ -323,11 +324,11 @@ export class OsmProcessingPipeline {
 
   private isBuildingTagSet(tags: Record<string, string>): boolean {
     const hasBuildingKind =
-      (tags.building !== undefined && tags.building !== 'roof') ||
-      (tags['building:part'] !== undefined && tags['building:part'] !== 'roof') ||
+      (tags.building !== undefined && !this.hasTagValue(tags, 'building', EXCLUDED_BUILDING_VALUES)) ||
+      (tags['building:part'] !== undefined && !this.hasTagValue(tags, 'building:part', EXCLUDED_BUILDING_VALUES)) ||
       tags.type === 'building' ||
-      (tags.type === 'multipolygon' && tags.building !== undefined && tags.building !== 'roof') ||
-      (tags.type === 'multipolygon' && tags['building:part'] !== undefined && tags['building:part'] !== 'roof');
+      (tags.type === 'multipolygon' && tags.building !== undefined && !this.hasTagValue(tags, 'building', EXCLUDED_BUILDING_VALUES)) ||
+      (tags.type === 'multipolygon' && tags['building:part'] !== undefined && !this.hasTagValue(tags, 'building:part', EXCLUDED_BUILDING_VALUES));
 
     return hasBuildingKind;
   }
