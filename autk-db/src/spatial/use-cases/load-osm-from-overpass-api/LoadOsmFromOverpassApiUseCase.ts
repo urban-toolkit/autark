@@ -52,7 +52,12 @@ export class LoadOsmFromOverpassApiUseCase {
     const workspace = params.workspace || 'main';
     const onProgress = params.onProgress;
 
-    const combined = await this.fetchCombinedOsmData(params.queryArea, params.autoLoadLayers?.layers, onProgress);
+    const combined = await this.fetchCombinedOsmData(
+      params.queryArea,
+      params.autoLoadLayers?.layers,
+      onProgress,
+      params.forceRefresh,
+    );
 
     // Verify every requested area has an admin boundary relation in the response.
     const relationNames = new Set(
@@ -106,12 +111,12 @@ export class LoadOsmFromOverpassApiUseCase {
   private getCacheKey(queryArea: { geocodeArea: string; areas: string[] }, layers?: string[]): string {
     const areas = [...queryArea.areas].sort().join(',');
     const layerKey = layers && layers.length > 0 ? `-layers:${[...layers].sort().join('+')}` : '';
-    return `overpass-combined-v2-${queryArea.geocodeArea}-${areas}${layerKey}`;
+    return `overpass-combined-${queryArea.geocodeArea}-${areas}${layerKey}`;
   }
 
   private getFullDataCacheKey(queryArea: { geocodeArea: string; areas: string[] }): string {
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-v2-${queryArea.geocodeArea}-${areas}`;
+    return `overpass-combined-${queryArea.geocodeArea}-${areas}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -131,16 +136,27 @@ export class LoadOsmFromOverpassApiUseCase {
     queryArea: { geocodeArea: string; areas: string[] },
     layers: string[] | undefined,
     onProgress?: OnLoadingProgress,
+    forceRefresh: boolean = false,
   ): Promise<OverpassApiResponse> {
     const cacheKey = this.getCacheKey(queryArea, layers);
-    const cachedData = await this.cache.get(cacheKey);
-    if (cachedData) return cachedData;
+    if (!forceRefresh) {
+      const cachedData = await this.cache.get(cacheKey);
+      if (cachedData) {
+        console.log(`[autk-db] Using cached Overpass data: ${cacheKey}`);
+        return cachedData;
+      }
 
-    // A full-data cache entry (no layer filter) is a valid superset — reuse it.
-    const fullDataCacheKey = this.getFullDataCacheKey(queryArea);
-    if (fullDataCacheKey !== cacheKey) {
-      const fullData = await this.cache.get(fullDataCacheKey);
-      if (fullData) return fullData;
+      // A full-data cache entry (no layer filter) is a valid superset — reuse it.
+      const fullDataCacheKey = this.getFullDataCacheKey(queryArea);
+      if (fullDataCacheKey !== cacheKey) {
+        const fullData = await this.cache.get(fullDataCacheKey);
+        if (fullData) {
+          console.log(`[autk-db] Using cached Overpass full-data superset: ${fullDataCacheKey}`);
+          return fullData;
+        }
+      }
+    } else {
+      console.log(`[autk-db] forceRefresh enabled — bypassing Overpass cache for: ${cacheKey}`);
     }
 
     const requestedLayers = layers && layers.length > 0 ? layers : ['roads', 'buildings', 'parks', 'water'];

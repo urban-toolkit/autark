@@ -59,6 +59,8 @@ export type LoadOsmParams = {
   };
   /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
   pbfFileUrl?: string;
+  /** When true, bypasses the cached Overpass response and fetches fresh data. */
+  forceRefresh?: boolean;
   workspace?: string;
   onProgress?: OnLoadingProgress;
 };
