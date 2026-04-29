@@ -20,27 +20,27 @@ export class TriangulatorPolylines {
 
     /** OSM road half-widths, in local planar units, keyed by normalized `highway` tag value. */
     static readonly ROAD_HALF_WIDTH_BY_HIGHWAY: Record<string, number> = {
-        motorway: 12,
-        motorway_link: 4,
-        trunk: 9,
-        trunk_link: 4,
-        primary: 7,
-        primary_link: 3.5,
-        secondary: 6,
-        secondary_link: 3,
-        tertiary: 5,
-        tertiary_link: 2.5,
-        unclassified: 4,
-        residential: 4,
-        service: 3,
-        living_street: 3,
-        road: 4,
-        track: 2,
-        path: 1,
+        motorway: 10,
+        motorway_link: 3.5,
+        trunk: 8,
+        trunk_link: 3.5,
+        primary: 6,
+        primary_link: 3,
+        secondary: 5,
+        secondary_link: 2.5,
+        tertiary: 4,
+        tertiary_link: 2,
+        unclassified: 3.5,
+        residential: 3.5,
+        service: 2.5,
+        living_street: 2.5,
+        road: 3.5,
+        track: 1.5,
+        path: 0.75,
     };
 
     /** Default road half-width used when no known `highway` tag value is available. */
-    static readonly DEFAULT_ROAD_HALF_WIDTH: number = 4;
+    static readonly DEFAULT_ROAD_HALF_WIDTH: number = 3.5;
 
     /** Optional callback used to resolve a per-feature polyline half-width. */
     static readonly defaultOffsetResolver = (_feature: Feature, _featureIndex: number): number => TriangulatorPolylines.offset;
