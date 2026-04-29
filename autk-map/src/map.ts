@@ -17,6 +17,7 @@
 /// <reference types="@webgpu/types" />
 
 import {
+    Feature,
     FeatureCollection,
     Geometry,
 } from 'geojson';
@@ -73,6 +74,28 @@ import { Triangles3DLayer } from './layer-triangles3D';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 
 import { AutkMapUi } from './map-ui';
+
+const ROAD_HALF_WIDTH_BY_HIGHWAY: Record<string, number> = {
+    motorway: 12,
+    motorway_link: 4,
+    trunk: 9,
+    trunk_link: 4,
+    primary: 7,
+    primary_link: 3.5,
+    secondary: 6,
+    secondary_link: 3,
+    tertiary: 5,
+    tertiary_link: 2.5,
+    unclassified: 4,
+    residential: 4,
+    service: 3,
+    living_street: 3,
+    road: 4,
+    track: 2,
+    path: 1,
+};
+
+const DEFAULT_ROAD_HALF_WIDTH = 4;
 
 /**
  * Main map controller for rendering, interaction, and layer lifecycle.
@@ -969,8 +992,14 @@ export class AutkMap {
             isSkip: false,
         };
 
-        TriangulatorPolylines.offset = typeLayer === 'roads' ? 5 : 8.5;
-        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
+        TriangulatorPolylines.offset = typeLayer === 'roads' ? DEFAULT_ROAD_HALF_WIDTH : 8.5;
+        const layerMesh = typeLayer === 'roads'
+            ? TriangulatorPolylines.buildMesh(
+                geojson,
+                this.layerManager.origin,
+                (feature) => this.resolveRoadHalfWidth(feature)
+            )
+            : TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer.');
             return;
@@ -992,6 +1021,50 @@ export class AutkMap {
         if (property) {
             this.updateThematic(layerName, { collection: geojson, property  });
         }
+    }
+
+    /**
+     * Resolves a road polyline half-width from OSM highway semantics.
+     *
+     * The returned value is expressed as a half-width because polyline
+     * triangulation buffers around the source centerline.
+     *
+     * @param feature Source road feature.
+     * @returns Polyline half-width in local planar units.
+     */
+    private resolveRoadHalfWidth(feature: Feature): number {
+        const highway = this.normalizeRoadHighwayValue(feature.properties?.highway);
+        return highway ? (ROAD_HALF_WIDTH_BY_HIGHWAY[highway] ?? DEFAULT_ROAD_HALF_WIDTH) : DEFAULT_ROAD_HALF_WIDTH;
+    }
+
+    /**
+     * Normalizes an OSM `highway` tag value for road-width lookup.
+     *
+     * Supports plain strings, semicolon-delimited strings, and arrays. Only the
+     * first non-empty normalized token is used.
+     *
+     * @param highway Raw `highway` property value.
+     * @returns Normalized highway token, or `null` when unavailable.
+     */
+    private normalizeRoadHighwayValue(highway: unknown): string | null {
+        const values = Array.isArray(highway)
+            ? highway
+            : typeof highway === 'string'
+                ? highway.split(';')
+                : [];
+
+        for (const value of values) {
+            if (typeof value !== 'string') {
+                continue;
+            }
+
+            const normalized = value.trim().toLowerCase();
+            if (normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return null;
     }
 
     /**

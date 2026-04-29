@@ -18,6 +18,9 @@ export class TriangulatorPolylines {
     /** Default half-width, in local planar units, used when buffering source polylines. */
     static offset: number = 5;
 
+    /** Optional callback used to resolve a per-feature polyline half-width. */
+    static readonly defaultOffsetResolver = (_feature: Feature, _featureIndex: number): number => TriangulatorPolylines.offset;
+
     /**
      * Builds triangulated polyline geometry for a GeoJSON feature collection.
      *
@@ -33,7 +36,11 @@ export class TriangulatorPolylines {
      * @returns A tuple containing triangulated geometry chunks and their
      * per-feature component metadata.
      */
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
+    static buildMesh(
+        geojson: FeatureCollection,
+        origin: number[],
+        resolveOffset: (feature: Feature, featureIndex: number) => number = TriangulatorPolylines.defaultOffsetResolver,
+    ): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];
 
@@ -47,12 +54,17 @@ export class TriangulatorPolylines {
                 continue;
             }
 
+            const resolvedOffset = resolveOffset(feature, fId);
+            const offset = Number.isFinite(resolvedOffset) && resolvedOffset > 0
+                ? resolvedOffset
+                : TriangulatorPolylines.offset;
+
             if (feature.geometry.type === 'LineString') {
-                meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
+                meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, offset);
             } else if (feature.geometry.type === 'MultiLineString') {
-                meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
+                meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, offset);
             } else if (feature.geometry.type === 'GeometryCollection') {
-                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, TriangulatorPolylines.offset, fId);
+                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, offset, fId);
             } else {
                 TriangulatorPolylines.warnSkippedFeature(fId, feature.geometry.type);
                 continue;
