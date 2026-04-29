@@ -9,8 +9,9 @@ import {
   PARKS_LANDUSE_VALUES,
   PARKS_NATURAL_VALUES,
   WATER_NATURAL_VALUES,
-  WATER_WATER_VALUES,
-  EXCLUDED_ROAD_HIGHWAY_VALUES,
+  WATER_FEATURE_VALUES,
+  EXCLUDED_BUILDING_VALUES,
+  EXCLUDED_HIGHWAY_VALUES,
 } from '../../../shared/osm-tag-definitions';
 
 import { OsmProcessingPipeline } from '../osm-processing-pipeline/OsmProcessingPipeline';
@@ -473,14 +474,14 @@ export class LoadOsmFromOverpassApiUseCase {
     for (const layer of layers) {
       switch (layer) {
         case 'roads':
-          wayFilters.add(`"highway"]["area"!="yes"]["highway"!~"^(${EXCLUDED_ROAD_HIGHWAY_VALUES.join('|')})$"`);
+          wayFilters.add(`"highway"]["area"!="yes"]["highway"!~"^(${EXCLUDED_HIGHWAY_VALUES.join('|')})$"`);
           break;
         case 'buildings':
-          wayFilters.add(`"building"]["building"!="roof"`);
-          wayFilters.add(`"building:part"]["building:part"!="roof"`);
+          wayFilters.add(`"building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}]`);
+          wayFilters.add(`"building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}]`);
           wayFilters.add(`"type"="building"`);
-          relationFilters.add(`"building"]["building"!~"roof"`);
-          relationFilters.add(`"building:part"]["building:part"!~"roof"`);
+          relationFilters.add(`"building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}]`);
+          relationFilters.add(`"building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}]`);
           break;
         case 'parks':
           wayFilters.add(this.buildExactValueSelector('leisure', PARKS_LEISURE_VALUES));
@@ -492,9 +493,9 @@ export class LoadOsmFromOverpassApiUseCase {
           break;
         case 'water':
           wayFilters.add(this.buildExactValueSelector('natural', WATER_NATURAL_VALUES));
-          wayFilters.add(this.buildExactValueSelector('water', WATER_WATER_VALUES));
+          wayFilters.add(this.buildExactValueSelector('water', WATER_FEATURE_VALUES));
           relationFilters.add(this.buildExactValueSelector('natural', WATER_NATURAL_VALUES));
-          relationFilters.add(this.buildExactValueSelector('water', WATER_WATER_VALUES));
+          relationFilters.add(this.buildExactValueSelector('water', WATER_FEATURE_VALUES));
           break;
         case 'surface':
           break;
@@ -509,6 +510,10 @@ export class LoadOsmFromOverpassApiUseCase {
 
   private buildExactValueSelector(key: string, values: readonly string[]): string {
     return `"${key}"~"^(${values.join('|')})$"`;
+  }
+
+  private buildExcludedValueSelector(key: string, values: readonly string[]): string {
+    return `"${key}"!~"^(${values.join('|')})$"`;
   }
 
   /**
@@ -545,14 +550,14 @@ export class LoadOsmFromOverpassApiUseCase {
           const i = idx + 1;
           areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
           areaLines.push(`(
-        way["building"]["building"!="roof"](area.area${i})(${tileBbox});
-        way["building:part"]["building:part"!="roof"](area.area${i})(${tileBbox});
+        way["building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
+        way["building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
         way["type"="building"](area.area${i})(${tileBbox});
       )->.dataWays${i};`);
           dataWaySelectors.push(`.dataWays${i};`);
           areaLines.push(`(
-        relation["building"]["building"!~"roof"](area.area${i})(${tileBbox});
-        relation["building:part"]["building:part"!~"roof"](area.area${i})(${tileBbox});
+        relation["building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
+        relation["building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
       )->.dataRelations${i};`);
           areaLines.push(`way(r.dataRelations${i})->.dataRelationWays${i};`);
           dataRelationSelectors.push(`.dataRelations${i};`);

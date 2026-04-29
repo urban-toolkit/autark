@@ -969,8 +969,14 @@ export class AutkMap {
             isSkip: false,
         };
 
-        TriangulatorPolylines.offset = typeLayer === 'roads' ? 5 : 8.5;
-        const layerMesh = TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
+        TriangulatorPolylines.offset = typeLayer === 'roads' ? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH : 8.5;
+        const layerMesh = typeLayer === 'roads'
+            ? TriangulatorPolylines.buildMesh(
+                geojson,
+                this.layerManager.origin,
+                TriangulatorPolylines.resolveRoadHalfWidth
+            )
+            : TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Roads Layer.');
             return;

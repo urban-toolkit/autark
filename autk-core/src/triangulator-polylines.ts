@@ -18,6 +18,33 @@ export class TriangulatorPolylines {
     /** Default half-width, in local planar units, used when buffering source polylines. */
     static offset: number = 5;
 
+    /** OSM road half-widths, in local planar units, keyed by normalized `highway` tag value. */
+    static readonly ROAD_HALF_WIDTH_BY_HIGHWAY: Record<string, number> = {
+        motorway: 10,
+        motorway_link: 3.5,
+        trunk: 8,
+        trunk_link: 3.5,
+        primary: 6,
+        primary_link: 3,
+        secondary: 5,
+        secondary_link: 2.5,
+        tertiary: 4,
+        tertiary_link: 2,
+        unclassified: 3.5,
+        residential: 3.5,
+        service: 2.5,
+        living_street: 2.5,
+        road: 3.5,
+        track: 1.5,
+        path: 0.75,
+    };
+
+    /** Default road half-width used when no known `highway` tag value is available. */
+    static readonly DEFAULT_ROAD_HALF_WIDTH: number = 3.5;
+
+    /** Optional callback used to resolve a per-feature polyline half-width. */
+    static readonly defaultOffsetResolver = (_feature: Feature, _featureIndex: number): number => TriangulatorPolylines.offset;
+
     /**
      * Builds triangulated polyline geometry for a GeoJSON feature collection.
      *
@@ -33,7 +60,11 @@ export class TriangulatorPolylines {
      * @returns A tuple containing triangulated geometry chunks and their
      * per-feature component metadata.
      */
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
+    static buildMesh(
+        geojson: FeatureCollection,
+        origin: number[],
+        resolveOffset: (feature: Feature, featureIndex: number) => number = TriangulatorPolylines.defaultOffsetResolver,
+    ): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];
 
@@ -47,12 +78,17 @@ export class TriangulatorPolylines {
                 continue;
             }
 
+            const resolvedOffset = resolveOffset(feature, fId);
+            const offset = Number.isFinite(resolvedOffset) && resolvedOffset > 0
+                ? resolvedOffset
+                : TriangulatorPolylines.offset;
+
             if (feature.geometry.type === 'LineString') {
-                meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
+                meshes = TriangulatorPolylines.lineStringToPolyline(feature, origin, offset);
             } else if (feature.geometry.type === 'MultiLineString') {
-                meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, TriangulatorPolylines.offset);
+                meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, offset);
             } else if (feature.geometry.type === 'GeometryCollection') {
-                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, TriangulatorPolylines.offset, fId);
+                meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, offset, fId);
             } else {
                 TriangulatorPolylines.warnSkippedFeature(fId, feature.geometry.type);
                 continue;
@@ -161,6 +197,52 @@ export class TriangulatorPolylines {
             }
         }
         return meshes;
+    }
+
+    /**
+     * Resolves a road polyline half-width from OSM highway semantics.
+     *
+     * The returned value is expressed as a half-width because polyline
+     * triangulation buffers around the source centerline.
+     *
+     * @param feature Source road feature.
+     * @returns Polyline half-width in local planar units.
+     */
+    static resolveRoadHalfWidth(feature: Feature): number {
+        const highway = TriangulatorPolylines.normalizeRoadHighwayValue(feature.properties?.highway);
+        return highway
+            ? (TriangulatorPolylines.ROAD_HALF_WIDTH_BY_HIGHWAY[highway] ?? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH)
+            : TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH;
+    }
+
+    /**
+     * Normalizes an OSM `highway` tag value for road-width lookup.
+     *
+     * Supports plain strings, semicolon-delimited strings, and arrays. Only the
+     * first non-empty normalized token is used.
+     *
+     * @param highway Raw `highway` property value.
+     * @returns Normalized highway token, or `null` when unavailable.
+     */
+    static normalizeRoadHighwayValue(highway: unknown): string | null {
+        const values = Array.isArray(highway)
+            ? highway
+            : typeof highway === 'string'
+                ? highway.split(';')
+                : [];
+
+        for (const value of values) {
+            if (typeof value !== 'string') {
+                continue;
+            }
+
+            const normalized = value.trim().toLowerCase();
+            if (normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return null;
     }
 
     /**
