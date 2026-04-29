@@ -9,9 +9,9 @@ import {
   PARKS_LANDUSE_VALUES,
   PARKS_NATURAL_VALUES,
   WATER_NATURAL_VALUES,
-  WATER_WATER_VALUES,
+  WATER_FEATURE_VALUES,
   EXCLUDED_BUILDING_VALUES,
-  EXCLUDED_ROAD_HIGHWAY_VALUES,
+  EXCLUDED_HIGHWAY_VALUES,
 } from '../../../shared/osm-tag-definitions';
 
 import { OsmProcessingPipeline } from '../osm-processing-pipeline/OsmProcessingPipeline';
@@ -474,7 +474,7 @@ export class LoadOsmFromOverpassApiUseCase {
     for (const layer of layers) {
       switch (layer) {
         case 'roads':
-          wayFilters.add(`"highway"]["area"!="yes"]["highway"!~"^(${EXCLUDED_ROAD_HIGHWAY_VALUES.join('|')})$"`);
+          wayFilters.add(`"highway"]["area"!="yes"]["highway"!~"^(${EXCLUDED_HIGHWAY_VALUES.join('|')})$"`);
           break;
         case 'buildings':
           wayFilters.add(`"building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}]`);
@@ -493,9 +493,9 @@ export class LoadOsmFromOverpassApiUseCase {
           break;
         case 'water':
           wayFilters.add(this.buildExactValueSelector('natural', WATER_NATURAL_VALUES));
-          wayFilters.add(this.buildExactValueSelector('water', WATER_WATER_VALUES));
+          wayFilters.add(this.buildExactValueSelector('water', WATER_FEATURE_VALUES));
           relationFilters.add(this.buildExactValueSelector('natural', WATER_NATURAL_VALUES));
-          relationFilters.add(this.buildExactValueSelector('water', WATER_WATER_VALUES));
+          relationFilters.add(this.buildExactValueSelector('water', WATER_FEATURE_VALUES));
           break;
         case 'surface':
           break;

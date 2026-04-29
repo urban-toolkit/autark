@@ -6,8 +6,9 @@ export {
   PARKS_LANDUSE_VALUES,
   PARKS_NATURAL_VALUES,
   WATER_NATURAL_VALUES,
-  WATER_WATER_VALUES,
-  EXCLUDED_ROAD_HIGHWAY_VALUES,
+  WATER_FEATURE_VALUES,
+  EXCLUDED_HIGHWAY_VALUES as EXCLUDED_ROAD_HIGHWAY_VALUES,
+  EXCLUDED_BUILDING_VALUES,
 } from './osm-tag-definitions';
 
 export type GridLayerTable = CommonTable & { source: 'user'; type: LayerType };

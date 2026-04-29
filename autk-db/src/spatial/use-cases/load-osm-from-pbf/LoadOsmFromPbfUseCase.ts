@@ -4,12 +4,12 @@ import { readOsmPbf } from '@osmix/pbf';
 import { OsmTable } from '../../../shared/interfaces';
 import {
   EXCLUDED_BUILDING_VALUES,
-  EXCLUDED_ROAD_HIGHWAY_VALUES,
+  EXCLUDED_HIGHWAY_VALUES,
   PARKS_LANDUSE_VALUES,
   PARKS_LEISURE_VALUES,
   PARKS_NATURAL_VALUES,
   WATER_NATURAL_VALUES,
-  WATER_WATER_VALUES,
+  WATER_FEATURE_VALUES,
 } from '../../../shared/osm-tag-definitions';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { LoadOsmParams, OsmElement } from '../load-osm-from-overpass-api/interfaces';
@@ -546,7 +546,7 @@ export class LoadOsmFromPbfUseCase {
     return (
       tags.highway !== undefined &&
       tags.area !== 'yes' &&
-      !this.hasTagValue(tags, 'highway', EXCLUDED_ROAD_HIGHWAY_VALUES)
+      !this.hasTagValue(tags, 'highway', EXCLUDED_HIGHWAY_VALUES)
     );
   }
 
@@ -571,7 +571,7 @@ export class LoadOsmFromPbfUseCase {
   private isWaterTagSet(tags: Record<string, string>): boolean {
     return (
       this.hasTagValue(tags, 'natural', WATER_NATURAL_VALUES) ||
-      this.hasTagValue(tags, 'water', WATER_WATER_VALUES)
+      this.hasTagValue(tags, 'water', WATER_FEATURE_VALUES)
     );
   }
 
