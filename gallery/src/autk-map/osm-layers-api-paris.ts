@@ -24,7 +24,6 @@ export class OsmLayersApi {
                     'Paris 9e Arrondissement'
                 ],
             },
-            outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
                 layers: [
@@ -38,6 +37,8 @@ export class OsmLayersApi {
                 >,
                 dropOsmTable: true,
             },
+            outputTableName: 'table_osm',
+            forceRefresh: false,
         });
 
         this.map = new AutkMap(canvas);

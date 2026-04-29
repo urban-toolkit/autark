@@ -1,6 +1,8 @@
 import { AutkMap, LayerType } from 'autk-map';
 import { AutkSpatialDb } from 'autk-db';
 
+const URL = (import.meta as any).env.BASE_URL;
+
 export class OsmLayersApi {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
@@ -11,8 +13,8 @@ export class OsmLayersApi {
 
         await this.db.loadOsm({
             queryArea: {
-                geocodeArea: 'Niterói',
-                areas: ['Região Praias da Baía'],
+                geocodeArea: 'Rio de Janeiro',
+                areas: ['Niterói'],
             }, outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
@@ -20,11 +22,16 @@ export class OsmLayersApi {
                     'surface',
                     'parks',
                     'water',
-                    'roads',
-                    'buildings',
+                    'roads'
                 ] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                 dropOsmTable: true,
             },
+        });
+
+        await this.db.loadCustomLayer({
+            geojsonFileUrl: `${URL}data/nit_buildings.geojson`,
+            outputTableName: 'lotes',
+            coordinateFormat: 'EPSG:3395'
         });
 
         this.map = new AutkMap(canvas);
@@ -38,7 +45,9 @@ export class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            const type = layerData.type === 'polygons' ? 'buildings' as LayerType : layerData.type as LayerType;
+
+            this.map.loadCollection(layerData.name, { collection: geojson, type: type, allowZeroHeightBuildings: true });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }

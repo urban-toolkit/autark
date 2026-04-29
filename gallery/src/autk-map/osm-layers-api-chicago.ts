@@ -12,7 +12,16 @@ export class OsmLayersApi {
         await this.db.loadOsm({
             queryArea: {
                 geocodeArea: 'Chicago',
-                areas: ['Loop', 'Near South Side'],
+                areas: [
+                    'Near North Side',
+                    'Loop',
+                    'Near South Side',
+                    'West Town',
+                    'Near West Side',
+                    'Lower West Side',
+                    'Armour Square',
+                    'Bridgeport'
+                ],
             }, outputTableName: 'table_osm',
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
@@ -38,7 +47,7 @@ export class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType, allowZeroHeightBuildings: true });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }
