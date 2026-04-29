@@ -18,6 +18,30 @@ export class TriangulatorPolylines {
     /** Default half-width, in local planar units, used when buffering source polylines. */
     static offset: number = 5;
 
+    /** OSM road half-widths, in local planar units, keyed by normalized `highway` tag value. */
+    static readonly ROAD_HALF_WIDTH_BY_HIGHWAY: Record<string, number> = {
+        motorway: 12,
+        motorway_link: 4,
+        trunk: 9,
+        trunk_link: 4,
+        primary: 7,
+        primary_link: 3.5,
+        secondary: 6,
+        secondary_link: 3,
+        tertiary: 5,
+        tertiary_link: 2.5,
+        unclassified: 4,
+        residential: 4,
+        service: 3,
+        living_street: 3,
+        road: 4,
+        track: 2,
+        path: 1,
+    };
+
+    /** Default road half-width used when no known `highway` tag value is available. */
+    static readonly DEFAULT_ROAD_HALF_WIDTH: number = 4;
+
     /** Optional callback used to resolve a per-feature polyline half-width. */
     static readonly defaultOffsetResolver = (_feature: Feature, _featureIndex: number): number => TriangulatorPolylines.offset;
 
@@ -173,6 +197,52 @@ export class TriangulatorPolylines {
             }
         }
         return meshes;
+    }
+
+    /**
+     * Resolves a road polyline half-width from OSM highway semantics.
+     *
+     * The returned value is expressed as a half-width because polyline
+     * triangulation buffers around the source centerline.
+     *
+     * @param feature Source road feature.
+     * @returns Polyline half-width in local planar units.
+     */
+    static resolveRoadHalfWidth(feature: Feature): number {
+        const highway = TriangulatorPolylines.normalizeRoadHighwayValue(feature.properties?.highway);
+        return highway
+            ? (TriangulatorPolylines.ROAD_HALF_WIDTH_BY_HIGHWAY[highway] ?? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH)
+            : TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH;
+    }
+
+    /**
+     * Normalizes an OSM `highway` tag value for road-width lookup.
+     *
+     * Supports plain strings, semicolon-delimited strings, and arrays. Only the
+     * first non-empty normalized token is used.
+     *
+     * @param highway Raw `highway` property value.
+     * @returns Normalized highway token, or `null` when unavailable.
+     */
+    static normalizeRoadHighwayValue(highway: unknown): string | null {
+        const values = Array.isArray(highway)
+            ? highway
+            : typeof highway === 'string'
+                ? highway.split(';')
+                : [];
+
+        for (const value of values) {
+            if (typeof value !== 'string') {
+                continue;
+            }
+
+            const normalized = value.trim().toLowerCase();
+            if (normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return null;
     }
 
     /**
