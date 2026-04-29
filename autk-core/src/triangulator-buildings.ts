@@ -56,7 +56,7 @@ export class TriangulatorBuildings {
      * @param origin World-space origin used to convert coordinates into local XY space.
      * @returns A tuple containing mesh chunks and per-feature component metadata.
      */
-    static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
+    static buildMesh(geojson: FeatureCollection, origin: number[], zeroHeight: boolean = false): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
         const comps: LayerComponent[] = [];
         let skippedNoHeight = 0;
@@ -81,6 +81,7 @@ export class TriangulatorBuildings {
                 let heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
                 if (!heightInfo.length) { 
                     skippedNoHeight++;
+                    if (!zeroHeight) continue; // Skip parts with no valid height when zeroHeight is false
                     heightInfo = [0, (3 + 4 * Math.random()) * 3.4]; // Fallback to a default height when no valid metadata is found
                 }
 
