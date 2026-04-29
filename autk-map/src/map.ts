@@ -210,8 +210,9 @@ export class AutkMap {
      * @param params.collection Source GeoJSON feature collection.
      * @param params.type Optional layer type override.
      * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
+     * @param params.allowZeroHeightBuildings Optional flag to treat building zero-height extrusions.
      */
-    loadCollection(id: string, { collection, type = null, property }: LoadCollectionParams): void {
+    loadCollection(id: string, { collection, type = null, property, allowZeroHeightBuildings = false }: LoadCollectionParams): void {
         if (!this.layerManager.hasOrigin) {
             this.layerManager.initializeOrigin(collection);
         }
@@ -237,7 +238,7 @@ export class AutkMap {
                 break;
 
             case 'buildings':
-                this.createBuildingsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
+                this.createBuildingsLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined, allowZeroHeightBuildings);
                 break;
 
             case 'raster':
@@ -1057,7 +1058,7 @@ export class AutkMap {
      * @param property Optional value extractor used to initialize thematic data.
      * @returns Nothing. The layer is created when triangulation succeeds.
       */
-    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
+    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string, allowZeroHeightBuildings?: boolean) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -1072,7 +1073,7 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.layerManager.origin);
+        const layerMesh = TriangulatorBuildings.buildMesh(geojson, this.layerManager.origin, allowZeroHeightBuildings);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
             console.error('Invalid Building Layer.');
             return;

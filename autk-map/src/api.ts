@@ -55,6 +55,11 @@ export interface LoadCollectionParams {
      * should not be derived automatically.
      */
     type?: LayerType | null;
+
+    /**
+     * Optional flag to treat building zero-height extrusions.
+     */
+    allowZeroHeightBuildings?: boolean;
     /**
      * Property accessor used to derive layer values.
      *
