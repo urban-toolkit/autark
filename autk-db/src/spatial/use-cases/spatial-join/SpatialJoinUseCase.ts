@@ -5,6 +5,9 @@ import { GeometryColumnNotFoundError, TableNotFoundError } from './errors';
 import { SPATIAL_JOIN_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
+/**
+ * Performs a spatial join between two tables, with optional aggregation.
+ */
 export class SpatialJoinUseCase {
   private conn: AsyncDuckDBConnection;
 

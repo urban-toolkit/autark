@@ -5,6 +5,9 @@ import { NonSelectQueryError } from './errors';
 import { Table } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe, toPlain } from '../../shared/utils';
 
+/**
+ * Executes a raw SQL query with safety validation against mutation statements.
+ */
 export class RawQueryUseCase {
   private conn: AsyncDuckDBConnection;
 

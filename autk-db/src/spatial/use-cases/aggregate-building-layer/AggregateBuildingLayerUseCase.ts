@@ -2,6 +2,9 @@ import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 const BATCH_SIZE = 100;
 
+/**
+ * Aggregates building geometries by `building_id` into union geometries.
+ */
 export class AggregateBuildingLayerUseCase {
   private conn: AsyncDuckDBConnection;
 

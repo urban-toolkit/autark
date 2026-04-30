@@ -8,6 +8,9 @@ import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
 const DEFAULT_MAX_PIXELS = 500_000;
 
+/**
+ * Loads a GeoTIFF raster file into DuckDB as a spatially-indexed table.
+ */
 export class LoadGeoTiffUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;

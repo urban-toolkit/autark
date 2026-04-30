@@ -6,6 +6,9 @@ import { LoadGridLayerUseCase } from '../load-grid-layer/LoadGridLayerUseCase';
 import { SpatialJoinUseCase } from '../spatial-join/SpatialJoinUseCase';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
+/**
+ * Builds a heatmap grid by spatially joining source data into grid cells.
+ */
 export class BuildHeatmapUseCase {
     private loadGridLayerUseCase: LoadGridLayerUseCase;
     private spatialJoinUseCase: SpatialJoinUseCase;

@@ -9,6 +9,9 @@ import { LOAD_FEATURE_COLLECTION_QUERY } from '../load-custom-layer/queries';
 import { LOAD_POLYGONIZED_LAYER_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
+/**
+ * Polygonizes a surface layer from line geometries into closed polygons.
+ */
 export class PolygonizeSurfaceLayerUseCase {
     private db: AsyncDuckDB;
     private conn: AsyncDuckDBConnection;

@@ -8,6 +8,9 @@ import { FeatureCollection } from 'geojson';
 import { BoundingBox } from '../../../shared/interfaces';
 import { mapGeometryTypeToLayerType } from 'autk-core';
 
+/**
+ * Loads a GeoJSON FeatureCollection as a spatial layer table.
+ */
 export class LoadCustomLayerUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;

@@ -6,6 +6,9 @@ import { LOAD_JSON_ON_TABLE_QUERY, LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY } f
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 
+/**
+ * Loads JSON data into DuckDB, with optional geometry column creation.
+ */
 export class LoadJsonUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;

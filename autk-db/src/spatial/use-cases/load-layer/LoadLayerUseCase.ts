@@ -40,6 +40,9 @@ type RelationAreaRecord = {
   geometry: Geometry;
 };
 
+/**
+ * Extracts a thematic layer (roads, buildings, parks, water, surface) from raw OSM data.
+ */
 export class LoadLayerUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;

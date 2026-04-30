@@ -79,6 +79,9 @@ class IdFilter {
   }
 }
 
+/**
+ * Loads OSM data from a local PBF file with multi-pass streaming.
+ */
 export class LoadOsmFromPbfUseCase {
   private readonly conn: AsyncDuckDBConnection;
   private readonly pipeline: OsmProcessingPipeline;

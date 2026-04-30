@@ -5,6 +5,13 @@ type DuckDbTableDescriptionColumn = {
   column_type: string;
 };
 
+/**
+ * Converts DuckDB `DESCRIBE` output rows into `Column` metadata objects.
+ *
+ * @param tableDescribeResponse Array of `{ column_name, column_type }` rows from DuckDB.
+ * @returns Array of `{ name, type }` column descriptors.
+ * @throws Never throws.
+ */
 export function getColumnsFromDuckDbTableDescribe(
   tableDescribeResponse: Array<DuckDbTableDescriptionColumn>,
 ): Array<Column> {

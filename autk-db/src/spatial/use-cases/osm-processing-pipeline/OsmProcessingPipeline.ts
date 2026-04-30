@@ -18,9 +18,9 @@ interface OverpassApiResponse {
 }
 
 /**
- * Shared OSM processing pipeline — consumed identically by the Overpass
- * and PBF loading paths.  All methods are pure except the DuckDB insertion
- * helpers.
+ * Shared OSM processing pipeline for splitting, tagging, and inserting OSM data.
+ *
+ * Consumed identically by both the Overpass API and PBF loading paths.
  */
 export class OsmProcessingPipeline {
   constructor(

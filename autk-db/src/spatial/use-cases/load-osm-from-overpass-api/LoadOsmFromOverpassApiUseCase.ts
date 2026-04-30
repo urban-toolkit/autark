@@ -33,6 +33,9 @@ type OverpassTagSelectors = {
   relation: string[];
 };
 
+/**
+ * Loads OSM data from the Overpass API with caching, retry, and slot polling.
+ */
 export class LoadOsmFromOverpassApiUseCase {
   private readonly conn: AsyncDuckDBConnection;
   private readonly cache: HttpCache<OverpassApiResponse>;

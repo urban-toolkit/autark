@@ -4,6 +4,9 @@ import { FeatureCollection } from 'geojson';
 import { GET_LAYER_AS_GEOJSON_QUERY } from './queries';
 import { CustomLayerTable, LayerTable } from '../../../shared/interfaces';
 
+/**
+ * Exports a layer table as a GeoJSON FeatureCollection.
+ */
 export class GetLayerGeojsonUseCase {
   private conn: AsyncDuckDBConnection;
 

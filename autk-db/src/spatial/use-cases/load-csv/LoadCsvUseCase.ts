@@ -6,6 +6,9 @@ import { LOAD_CSV_ON_TABLE_QUERY, LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY } fro
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { DEFALT_COORDINATE_FORMAT, DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
 
+/**
+ * Loads CSV data into DuckDB, with optional geometry column creation.
+ */
 export class LoadCsvUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;
