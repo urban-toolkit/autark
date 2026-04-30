@@ -11,6 +11,12 @@ const BROWSER_BUNDLES: duckdb.DuckDBBundles = {
   },
 };
 
+/**
+ * Loads and instantiates a DuckDB database, with Node.js and browser support.
+ *
+ * @returns An instantiated `AsyncDuckDB` instance ready for connections.
+ * @throws If DuckDB WebAssembly fails to load or instantiate.
+ */
 export async function loadDb() {
     if (typeof process !== 'undefined' && process.versions?.node) {
         const path = await import(/* @vite-ignore */ 'node:path');

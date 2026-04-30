@@ -44,9 +44,14 @@ interface WorkspaceData {
  *
  * It allows loading OSM data, CSV, JSON, custom layers, and grid layers,
  * as well as performing spatial joins and raw queries.
- * It also provides methods to retrieve layer data and bounding boxes.
- * 
- * Supports multiple isolated workspaces, each with its own schema and data.
+ * DuckDB-backed spatial database for OSM, CSV, JSON, and raster data.
+ *
+ * Supports multiple isolated workspaces, each with its own schema and tables.
+ *
+ * @example
+ * const db = new AutkSpatialDb();
+ * await db.init();
+ * const layer = await db.getLayer('osm_buildings');
  */
 export class AutkSpatialDb {
   private db?: AsyncDuckDB;
@@ -94,8 +99,12 @@ export class AutkSpatialDb {
   }
 
   /**
-   * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
+   * Initializes DuckDB, loads the spatial extension, and creates use-case instances.
+   *
    * @returns A promise that resolves when initialization is complete.
+   * @throws If DuckDB WebAssembly fails to load or the spatial extension cannot be installed.
+   * @example
+   * await db.init();
    */
   async init() {
     this.db = await loadDb();
@@ -135,9 +144,11 @@ export class AutkSpatialDb {
   }
 
   /**
-   * Sets the current workspace. If the workspace doesn't exist, it will be created.
-   * @param name - The name of the workspace to switch to.
+   * Switches to a workspace, creating it if it doesn't exist.
+   *
+   * @param name The name of the workspace to switch to.
    * @returns A promise that resolves when the workspace is set.
+   * @throws If the database has not been initialized.
    */
   async setWorkspace(name: string): Promise<void> {
     if (!this.conn) {
@@ -564,8 +575,10 @@ export class AutkSpatialDb {
   }
 
   /**
-   * Retrieves the bounding box of the OSM data loaded from the Overpass API for the current workspace.
-   * @returns The bounding box as a tuple [minLon, minLat, maxLon, maxLat], or null if no OSM data has been loaded.
+   * Retrieves the OSM bounding box for the current workspace.
+   *
+   * @returns The bounding box as `[minLon, minLat, maxLon, maxLat]`, or `null` if no OSM data has been loaded.
+   * @throws Never throws.
    */
   getOsmBoundingBox(): [number, number, number, number] | null {
     const workspaceData = this.getCurrentWorkspaceData();
@@ -580,9 +593,10 @@ export class AutkSpatialDb {
   }
 
   /**
-   * Returns the OSM bounding box in WGS84 (EPSG:4326) as loaded from the Overpass API.
-   * Useful for clipping raster files (e.g. GeoTIFF) that are stored in EPSG:4326.
-   * @returns The bounding box or null if no OSM data has been loaded.
+   * Returns the OSM bounding box in WGS84 (EPSG:4326) for clipping rasters.
+   *
+   * @returns The bounding box or `null` if no OSM data has been loaded.
+   * @throws Never throws.
    */
   getOsmBoundingBoxWgs84(): BoundingBox | null {
     return this.getCurrentWorkspaceData().osmBoundingBoxWgs84 ?? null;
@@ -618,8 +632,10 @@ export class AutkSpatialDb {
   }
 
   /**
-   * Retrieves all layer tables (LayerTable and CustomLayerTable) from the loaded tables.
-   * @returns An array of LayerTable and CustomLayerTable objects.
+   * Retrieves all layer tables from the loaded tables.
+   *
+   * @returns An array of `LayerTable` and `CustomLayerTable` objects.
+   * @throws Never throws.
    */
   getLayerTables(): Array<LayerTable | CustomLayerTable> {
     return this.tables.filter((table): table is LayerTable | CustomLayerTable => {
