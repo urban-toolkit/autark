@@ -72,7 +72,7 @@ export interface TransferContext {
 }
 
 /**
- * Builds a transfer-function context from valid values.
+ * Builds a transfer-function context from valid scalar values.
  *
  * The returned context caches dataset bounds and the resolved configuration so
  * repeated alpha evaluation does not need to recompute them. When `values` is
@@ -83,6 +83,10 @@ export interface TransferContext {
  * @param values - Valid scalar values used to derive dataset statistics.
  * @param config - Optional transfer-function overrides applied on top of defaults.
  * @returns Precomputed transfer-function context for repeated alpha evaluation.
+ * @throws Never throws. Empty input produces a zeroed context.
+ * @example
+ * const ctx = buildTransferContext([0.1, 0.5, 0.3, 0.9], { mode: 'linear' });
+ * // ctx.min → 0.1, ctx.max → 0.9, ctx.config.mode → 'linear'
  */
 export function buildTransferContext(
     values: number[],
@@ -125,13 +129,19 @@ export function buildTransferContext(
 /**
  * Computes alpha as an 8-bit channel value for a scalar value.
  *
- * `NaN` values are always transparent. The mapping uses the precomputed
- * context bounds and the resolved transfer-function configuration, then clamps
- * the result to the byte range `[0, 255]`.
+ * `NaN` values are always mapped to `0` (transparent). The mapping uses the
+ * precomputed context bounds and the resolved transfer-function configuration,
+ * applies gamma shaping when `config.gamma` differs from `1`, and clamps the
+ * result to the byte range `[0, 255]`.
  *
  * @param value - Scalar value to map into an alpha byte.
- * @param context - Precomputed transfer-function context.
+ * @param context - Precomputed transfer-function context from `buildTransferContext`.
  * @returns Alpha channel value in the integer range `[0, 255]`.
+ * @throws Never throws. Returns `0` for `NaN` input.
+ * @example
+ * const ctx = buildTransferContext([0, 100], { mode: 'linear' });
+ * computeAlphaByte(50, ctx);  // → 128 (midpoint)
+ * computeAlphaByte(NaN, ctx); // → 0   (transparent)
  */
 export function computeAlphaByte(value: number, context: TransferContext): number {
     if (isNaN(value)) {

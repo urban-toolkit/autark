@@ -82,19 +82,14 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Builds renderable roof and window geometry for a building collection.
      *
-     * Each input feature is processed independently. A convex hull is computed
-     * from the footprint, a roof fan is emitted at the resolved building
-     * height, and the procedural window layout is converted into quad geometry
-     * using the same source feature index and origin offset.
-     *
-     * Features without a usable footprint hull are skipped.
-     *
      * @param geojson - Source building features.
      * @param origin - World-space origin used to convert generated geometry into
      * local coordinates.
      * @param floors - Requested number of procedural floors for window layout.
-     * @returns A tuple containing geometry chunks and their per-feature
-     * component metadata.
+     * @returns A tuple of geometry chunks and per-feature component metadata.
+     * @throws Never throws. Features without a usable hull are skipped.
+     * @example
+     * const [meshes, comps] = TriangulatorBuildingWithWindows.buildMesh(buildings, origin, 5);
      */
     static buildMesh(geojson: FeatureCollection, origin: number[], floors: number): [LayerGeometry[], LayerComponent[]] {
         const geometry: LayerGeometry[] = [];
@@ -141,18 +136,12 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Generates a procedural facade-window layout for a building collection.
      *
-     * Footprints are reduced to convex hulls before layout generation. The
-     * requested floor count is clamped to at least one floor, then used to
-     * derive a per-floor height from the resolved building height. Each hull
-     * edge receives one or more windows based on target edge spacing, and the
-     * resulting centers, normals, and dimensions are returned both as GeoJSON
-     * points and as detailed layout metadata.
-     *
      * @param source - Source building features.
-     * @param floors - Requested number of procedural floors. Values below `1`
-     * are clamped to one floor.
-     * @returns Generated window metadata together with a GeoJSON point
-     * collection of window centers.
+     * @param floors - Requested number of procedural floors (clamped to ≥1).
+     * @returns Generated window metadata as GeoJSON points and detailed layout entries.
+     * @throws Never throws. Features without usable hulls are silently skipped.
+     * @example
+     * const { collection, windows } = TriangulatorBuildingWithWindows.buildWindowLayout(buildings, 5);
      */
     static buildWindowLayout(source: FeatureCollection, floors: number): BuildingWindowLayoutResult {
         const safeFloors = Math.max(1, Math.floor(floors));
@@ -237,13 +226,12 @@ export class TriangulatorBuildingWithWindows {
     /**
      * Resolves an effective building height from feature and part metadata.
      *
-     * Height tags take precedence over level counts. Part metadata, when
-     * present, is resolved independently and the tallest resolved part height is
-     * used for the building. Level counts are converted with a fixed floor
-     * height, and missing or invalid metadata falls back to a default height.
-     *
      * @param feature - Building feature whose height metadata should be parsed.
-     * @returns Resolved building height in world units.
+     * @returns Resolved building height in world units (falls back to `DEFAULT_BUILDING_HEIGHT`).
+     * @throws Never throws.
+     * @example
+     * const h = TriangulatorBuildingWithWindows.resolveHeight(feature);
+     * // h → 50 (from height tag) or 20 (default)
      */
     static resolveHeight(feature: Feature<Geometry | null, GeoJsonProperties>): number {
         const rootProps = (feature.properties ?? {}) as Record<string, unknown>;

@@ -44,16 +44,12 @@ export class TriangulatorPolygons {
     /**
      * Builds triangulated fill geometry for a feature collection.
      *
-     * Each supported feature is converted into one or more local-space mesh
-     * chunks. `LineString` and `MultiLineString` coordinates are flattened and
-     * triangulated directly, while `Polygon` and `MultiPolygon` rings are
-     * flattened with hole offsets passed to `earcut`. `GeometryCollection`
-     * features are expanded recursively and unsupported child geometries are
-     * skipped.
-     *
      * @param geojson Source feature collection.
      * @param origin World-space origin used to derive local XY coordinates.
-     * @returns A tuple containing mesh chunks and per-feature component counts.
+     * @returns A tuple of mesh chunks and per-feature component counts.
+     * @throws Never throws. Unsupported features are skipped with a console warning.
+     * @example
+     * const [meshes, comps] = TriangulatorPolygons.buildMesh(polyFC, origin);
      */
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
@@ -104,16 +100,14 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Builds border geometry for a feature collection.
-     *
-     * Borders are emitted as line-index pairs suitable for outline rendering.
-     * Open line geometries produce sequential segment indices, while polygon
-     * rings produce closed loops that reuse the first vertex when the ring is
-     * already explicitly closed.
+     * Builds border line geometry for a feature collection.
      *
      * @param geojson Source feature collection.
      * @param origin World-space origin used to derive local XY coordinates.
-     * @returns A tuple containing border chunks and per-feature border counts.
+     * @returns A tuple of border chunks and per-feature border counts.
+     * @throws Never throws. Unsupported features are skipped with a console warning.
+     * @example
+     * const [borders, borderComps] = TriangulatorPolygons.buildBorder(polyFC, origin);
      */
     static buildBorder(geojson: FeatureCollection, origin: number[]): [LayerBorder[], LayerBorderComponent[]] {
         const border: LayerBorder[] = [];
@@ -166,12 +160,12 @@ export class TriangulatorPolygons {
     /**
      * Converts a `LineString` feature into triangulated fill geometry.
      *
-     * The coordinates are translated into local XY space before being passed to
-     * `earcut`.
-     *
      * @param feature Source feature with `LineString` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Triangulated fill meshes for the feature.
+     * @throws Never throws.
+     * @example
+     * const [mesh] = TriangulatorPolygons.lineStringToMesh(lineFeature, origin);
      */
     static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
@@ -181,14 +175,14 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Converts a `LineString` feature into border line geometry.
-     *
-     * The output uses open border indices that connect each vertex to the next
-     * vertex in sequence.
+     * Converts a `LineString` feature into open border line geometry.
      *
      * @param feature Source feature with `LineString` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Border line meshes for the feature.
+     * @throws Never throws.
+     * @example
+     * const [border] = TriangulatorPolygons.lineStringToBorderMesh(lineFeature, origin);
      */
     static lineStringToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
@@ -200,11 +194,12 @@ export class TriangulatorPolygons {
     /**
      * Converts a `MultiLineString` feature into triangulated fill geometry.
      *
-     * Each constituent line string becomes its own local-space mesh chunk.
-     *
      * @param feature Source feature with `MultiLineString` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Triangulated fill meshes for each constituent line string.
+     * @throws Never throws.
+     * @example
+     * const meshes = TriangulatorPolygons.multiLineStringToMesh(mlsFeature, origin);
      */
     static multiLineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
@@ -220,11 +215,12 @@ export class TriangulatorPolygons {
     /**
      * Converts a `MultiLineString` feature into border line geometry.
      *
-     * Each constituent line string is emitted as an open border mesh.
-     *
      * @param feature Source feature with `MultiLineString` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Border line meshes for each constituent line string.
+     * @throws Never throws.
+     * @example
+     * const borders = TriangulatorPolygons.multiLineStringToBorderMesh(mlsFeature, origin);
      */
     static multiLineStringToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
@@ -238,15 +234,14 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Converts a `Polygon` feature into triangulated fill geometry.
-     *
-     * The outer ring and any hole rings are concatenated into a single vertex
-     * buffer. Hole start offsets are recorded and forwarded to `earcut` so the
-     * resulting fill mesh preserves interior cutouts.
+     * Converts a `Polygon` feature into triangulated fill geometry with hole support.
      *
      * @param feature Source feature with `Polygon` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Triangulated fill meshes for the polygon, including holes.
+     * @throws Never throws.
+     * @example
+     * const [mesh] = TriangulatorPolygons.polygonToMesh(polyFeature, origin);
      */
     static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
@@ -263,13 +258,14 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Converts a `Polygon` feature into border line geometry.
-     *
-     * One closed border mesh is produced for each ring, including holes.
+     * Converts a `Polygon` feature into closed border line geometry.
      *
      * @param feature Source feature with `Polygon` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Border line meshes for all polygon rings.
+     * @throws Never throws.
+     * @example
+     * const borders = TriangulatorPolygons.polygonToBorderMesh(polyFeature, origin);
      */
     static polygonToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
@@ -283,12 +279,12 @@ export class TriangulatorPolygons {
     /**
      * Converts a `MultiPolygon` feature into triangulated fill geometry.
      *
-     * Each polygon is triangulated independently, with per-polygon hole offsets
-     * forwarded to `earcut` before the mesh chunks are collected.
-     *
      * @param feature Source feature with `MultiPolygon` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Triangulated fill meshes for each polygon in the collection.
+     * @throws Never throws.
+     * @example
+     * const meshes = TriangulatorPolygons.multiPolygonToMesh(mpFeature, origin);
      */
     static multiPolygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const meshes = [];
@@ -311,11 +307,12 @@ export class TriangulatorPolygons {
     /**
      * Converts a `MultiPolygon` feature into border line geometry.
      *
-     * Every ring in every polygon is emitted as a separate closed border mesh.
-     *
      * @param feature Source feature with `MultiPolygon` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @returns Border line meshes for all rings in all polygons.
+     * @throws Never throws.
+     * @example
+     * const borders = TriangulatorPolygons.multiPolygonToBorderMesh(mpFeature, origin);
      */
     static multiPolygonToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const borders = [];
@@ -331,15 +328,15 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Converts supported children of a `GeometryCollection` into triangulated fill geometry.
-     *
-     * Supported children are converted with the same rules as top-level
-     * features, and unsupported child geometries are skipped with a warning.
+     * Flattens supported children of a `GeometryCollection` into fill meshes.
      *
      * @param feature Source feature with `GeometryCollection` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @param featureIndex Index of the parent feature in the source collection.
      * @returns Triangulated fill meshes for all supported child geometries.
+     * @throws Never throws. Unsupported children are skipped with a console warning.
+     * @example
+     * const meshes = TriangulatorPolygons.geometryCollectionToMesh(gcFeature, origin, 0);
      */
     static geometryCollectionToMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
@@ -356,15 +353,15 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Converts supported children of a `GeometryCollection` into border line geometry.
-     *
-     * Supported children are converted with the same rules as top-level
-     * features, and unsupported child geometries are skipped with a warning.
+     * Flattens supported children of a `GeometryCollection` into border meshes.
      *
      * @param feature Source feature with `GeometryCollection` geometry.
      * @param origin World-space origin used to derive local XY coordinates.
      * @param featureIndex Index of the parent feature in the source collection.
      * @returns Border line meshes for all supported child geometries.
+     * @throws Never throws. Unsupported children are skipped with a console warning.
+     * @example
+     * const borders = TriangulatorPolygons.geometryCollectionToBorderMesh(gcFeature, origin, 0);
      */
     static geometryCollectionToBorderMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
@@ -407,10 +404,13 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Generates line indices for an open polyline border.
+     * Generates line index pairs for an open polyline border.
      *
      * @param nCoords Number of vertices in the border polyline.
-     * @returns Sequential line index pairs connecting adjacent vertices.
+     * @returns Sequential line index pairs `[0,1, 1,2, ...]`.
+     * @throws Never throws.
+     * @example
+     * generateOpenBorderIds(3);  // [0, 1, 1, 2]
      */
     protected static generateOpenBorderIds(nCoords: number): number[] {
         const ids = [];
@@ -419,14 +419,14 @@ export class TriangulatorPolygons {
     }
 
     /**
-     * Generates line indices for a closed polygon-ring border.
-     *
-     * Explicitly closed rings reuse the first unique vertex instead of adding a
-     * duplicate closing edge vertex. The generated indices always include the
-     * closing edge from the last unique vertex back to the first.
+     * Generates line index pairs for a closed polygon-ring border.
      *
      * @param ring Polygon ring used to derive closed border connectivity.
-     * @returns Line index pairs describing a closed border loop.
+     * @returns Line index pairs including the closing edge back to the first vertex.
+     * @throws Never throws. Rings with fewer than 2 vertices return an empty array.
+     * @example
+     * generateClosedBorderIds([[0,0], [10,0], [10,10], [0,10], [0,0]]);
+     * // → [0, 1, 1, 2, 2, 3, 3, 0]
      */
     protected static generateClosedBorderIds(ring: number[][]): number[] {
         const pointCount = ring.length;

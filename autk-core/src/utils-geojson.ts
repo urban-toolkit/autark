@@ -17,15 +17,14 @@ import {
 import type { BoundingBox } from './types-layer';
 
 /**
- * Computes a collection origin from its bounding-box center.
- *
- * The origin is derived from the collection extent, which makes it suitable
- * for positioning layers in a shared local coordinate space. When the
- * collection has no valid coordinates, the origin falls back to `[0, 0]`.
+ * Computes a spatial origin from a feature collection's bounding-box center.
  *
  * @param geojson - Feature collection to summarize.
- * @returns The `[longitude, latitude]` center of the computed bounding box,
- * or `[0, 0]` when no usable geometry is present.
+ * @returns The `[longitude, latitude]` center, or `[0, 0]` when no usable geometry is present.
+ * @throws Never throws.
+ * @example
+ * const origin = computeOrigin(fc);
+ * // origin → [151.2, -33.8]
  */
 export function computeOrigin(geojson: FeatureCollection): [number, number] {
     const bbox = computeBoundingBox(geojson);
@@ -37,16 +36,15 @@ export function computeOrigin(geojson: FeatureCollection): [number, number] {
 }
 
 /**
- * Computes the bounding box of a GeoJSON feature collection or geometry.
- *
- * Null geometries inside feature collections are ignored. When the source
- * contains no coordinates, the function returns `null` instead of a degenerate
- * box.
+ * Computes the geographic bounding box of a GeoJSON collection or geometry.
  *
  * @param source - GeoJSON feature collection or geometry to inspect.
  * Pass `null` to receive a `null` result.
- * @returns A named geographic bounding box spanning all coordinates in the
- * source, or `null` when the source is empty or contains no valid geometry.
+ * @returns A named bounding box, or `null` when the source is empty or has no coordinates.
+ * @throws Never throws.
+ * @example
+ * const bbox = computeBoundingBox(fc);
+ * // bbox → { minLon: 151.0, minLat: -34.0, maxLon: 151.5, maxLat: -33.5 }
  */
 export function computeBoundingBox(source: FeatureCollection | Geometry | null): BoundingBox | null {
     if (!source) {
@@ -83,16 +81,15 @@ export function computeBoundingBox(source: FeatureCollection | Geometry | null):
 }
 
 /**
- * Computes a geometry centroid using geometry-aware weighting.
- *
- * Point and multipoint geometries use coordinate averages. Line strings and
- * multiline strings use length-weighted segment midpoints. Polygons and
- * multipolygons use area-weighted ring centroids, and geometry collections
- * combine child centroids using the same weighting rules.
+ * Computes a geometry-aware weighted centroid for any GeoJSON geometry type.
  *
  * @param geometry - GeoJSON geometry whose centroid should be computed.
  * @returns A three-component centroid tuple `[x, y, z]`, or `null` when the
  * geometry is `null` or cannot yield a meaningful centroid.
+ * @throws Never throws.
+ * @example
+ * const centroid = computeGeometryCentroid(polygonGeom);
+ * // centroid → [151.2, -33.8, 0]
  */
 export function computeGeometryCentroid(geometry: Geometry | null): [number, number, number] | null {
     if (!geometry) return null;

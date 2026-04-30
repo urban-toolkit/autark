@@ -85,13 +85,18 @@ function heightFromAngle(ring: Vec2[], angleDeg: number): number {
 /**
  * Generates vertical wall quads for a footprint between two elevations.
  *
- * `rings[0]` is treated as the outer footprint and subsequent rings are hole
- * boundaries. Each ring segment becomes one outward-facing quad strip.
+ * `rings[0]` is treated as the outer footprint (CCW) and subsequent rings are
+ * hole boundaries (CW). Each ring segment becomes one outward-facing quad
+ * strip with CCW winding for correct face normals.
  *
  * @param rings - Polygon rings in local planar coordinates.
  * @param minH - Wall base elevation.
  * @param maxH - Wall top elevation.
  * @returns Wall mesh buffers for all ring segments.
+ * @throws Never throws. Returns empty buffers for empty or degenerate rings.
+ * @example
+ * const walls = buildWalls([[[0, 0], [10, 0], [10, 5], [0, 5]]], 0, 20);
+ * // walls.flatIds.length / 3 → 8 (4 quads × 2 triangles)
  */
 export function buildWalls(rings: Vec2[][], minH: number, maxH: number): MeshData {
     const flatCoords: number[] = [];
@@ -129,12 +134,17 @@ export function buildWalls(rings: Vec2[][], minH: number, maxH: number): MeshDat
 /**
  * Builds a flat triangulated roof cap, including hole support.
  *
- * The cap follows the full footprint at a constant Z elevation and preserves
- * interior holes.
+ * The cap follows the full footprint at a constant Z elevation. The outer
+ * ring is enforced to CCW winding so earcut produces upward-facing triangles;
+ * holes are preserved via hole-start offsets.
  *
  * @param rings - Polygon rings in local planar coordinates.
  * @param height - Z elevation of the flat roof plane.
  * @returns Triangulated roof-cap mesh buffers.
+ * @throws Never throws. Degenerate rings produce empty or degenerate mesh buffers.
+ * @example
+ * const cap = flatRoof([[[0, 0], [10, 0], [10, 10], [0, 10]]], 25);
+ * // cap is a triangulated quad at z=25
  */
 export function flatRoof(rings: Vec2[][], height: number): MeshData {
     let outer = normalizeRing(rings[0]) as Vec2[];
@@ -155,12 +165,17 @@ export function flatRoof(rings: Vec2[][], height: number): MeshData {
 /**
  * Builds a flat downward-facing floor cap for floating building parts.
  *
- * The floor uses the same footprint topology as the roof cap but flips the
- * outer winding so the cap faces downward.
+ * The floor uses the same footprint topology as the roof cap but enforces CW
+ * winding on the outer ring so earcut produces downward-facing (-Z) triangles.
+ * Holes are reversed to CCW for correct punch-through.
  *
  * @param rings - Polygon rings in local planar coordinates.
  * @param height - Z elevation of the floor plane.
  * @returns Triangulated floor-cap mesh buffers.
+ * @throws Never throws. Degenerate rings produce empty or degenerate mesh buffers.
+ * @example
+ * const floor = flatFloor([[[0, 0], [10, 0], [10, 10], [0, 10]]], 5);
+ * // floor is a triangulated quad at z=5 facing downward
  */
 export function flatFloor(rings: Vec2[][], height: number): MeshData {
     let outer = normalizeRing(rings[0]) as Vec2[];
@@ -184,15 +199,19 @@ export function flatFloor(rings: Vec2[][], height: number): MeshData {
 // ─── Pyramid roof ─────────────────────────────────────────────────────────────
 
 /**
- * Builds a pyramid roof by fan-triangulating the outer footprint to an apex.
+ * Builds a pyramid (cone) roof by fan-triangulating the outer footprint to an apex.
  *
- * The footprint is used only for the outer ring; the roof height is added on
- * top of `baseH` at a single center apex.
+ * Only the outer ring is used; holes are ignored. The apex is placed at the
+ * centroid of the footprint. Each edge becomes a triangle fan segment.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
  * @param roofH - Additional height of the roof apex above `baseH`.
  * @returns Triangulated pyramid-roof mesh buffers.
+ * @throws Never throws. Rings with fewer than 3 vertices produce empty buffers.
+ * @example
+ * const roof = pyramidRoof([[0, 0], [10, 0], [10, 10], [0, 10]], 20, 5);
+ * // roof is a fan of 4 triangles meeting at the centroid at z=25
  */
 export function pyramidRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
     let open = normalizeRing(ring) as Vec2[];
@@ -224,15 +243,20 @@ export function pyramidRoof(ring: Vec2[], baseH: number, roofH: number): MeshDat
 // ─── Dome roof ────────────────────────────────────────────────────────────────
 
 /**
- * Builds a tessellated curved dome roof.
+ * Builds a tessellated curved dome roof with 4 latitude bands.
  *
- * The outer footprint is progressively shrunk toward the center, and the
- * supplied roof height sets the apex above `baseH`.
+ * The outer footprint is progressively shrunk toward the center using a
+ * cosine/sine profile, creating a hemispherical shell. The supplied roof
+ * height sets the apex above `baseH`.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
  * @param roofH - Additional dome height above `baseH`.
  * @returns Tessellated dome-roof mesh buffers.
+ * @throws Never throws. Rings with fewer than 3 vertices produce empty buffers.
+ * @example
+ * const dome = domeRoof([[0, 0], [10, 0], [10, 10], [0, 10]], 20, 8);
+ * // dome is a tessellated hemisphere cap
  */
 export function domeRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
     let open = normalizeRing(ring) as Vec2[];
@@ -370,12 +394,17 @@ function subdivideMesh(flatCoords: number[], flatIds: number[]): { flatCoords: n
  * Builds a half-cylinder (barrel vault) roof.
  *
  * The longest footprint edge defines the barrel axis; the footprint is then
- * projected into a rounded profile and capped with side skirts where needed.
+ * projected into a rounded profile using 3 levels of subdivision. Boundary
+ * edges without a neighbor are capped with vertical skirt quads.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
  * @param roofH - Additional roof height above `baseH`.
  * @returns Barrel-vault roof mesh buffers including skirt geometry.
+ * @throws Never throws. Degenerate footprints produce empty or minimal buffers.
+ * @example
+ * const barrel = roundRoof([[0, 0], [20, 0], [20, 8], [0, 8]], 15, 4);
+ * // barrel is a subdivided half-cylinder + skirt caps
  */
 export function roundRoof(ring: Vec2[], baseH: number, roofH: number): MeshData {
     let open = normalizeRing(ring) as Vec2[];
@@ -492,16 +521,22 @@ export function roundRoof(ring: Vec2[], baseH: number, roofH: number): MeshData 
 // ─── Skillion roof ────────────────────────────────────────────────────────────
 
 /**
- * Builds a single-plane sloped roof.
+ * Builds a single-plane sloped (skillion) roof.
  *
- * `directionDeg` controls the downslope bearing, and the footprint is lifted
- * into a plane whose height varies across the outer ring.
+ * `directionDeg` controls the downslope bearing (0° = N, 90° = E). The
+ * footprint is lifted into a plane where the upslope end reaches full roof
+ * height and the downslope end stays at base elevation. Vertical skirt quads
+ * fill any gaps between the base and the elevated edges.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
- * @param roofH - Additional roof height above `baseH`.
- * @param directionDeg - Compass bearing of the downslope direction.
+ * @param roofH - Additional roof height above `baseH` at the upslope end.
+ * @param directionDeg - Compass bearing of the downslope direction (0 = N, 90 = E).
  * @returns Skillion-roof mesh buffers including skirt geometry.
+ * @throws Never throws. Degenerate footprints produce empty or minimal buffers.
+ * @example
+ * const skillion = skillionRoof([[0, 0], [10, 0], [10, 10], [0, 10]], 20, 5, 180);
+ * // skillion slopes south; north edge at z=25, south edge at z=20
  */
 export function skillionRoof(ring: Vec2[], baseH: number, roofH: number, directionDeg: number): MeshData {
     let open = normalizeRing(ring) as Vec2[];
@@ -939,19 +974,28 @@ function skeletonToMesh(faces: Face3D[], baseH: number, roofH: number, maxSkH: n
 }
 
 /**
- * Builds hipped, gabled, half-hipped, mansard, and saltbox roofs.
+ * Builds hipped, gabled, half-hipped, mansard, and saltbox roofs via straight skeleton.
  *
  * These roof styles use the outer footprint and a straight-skeleton solve to
  * propagate slopes inward. Mansard roofs additionally cap the skeleton height
- * from the footprint inradius. When the solve cannot complete, the function
- * returns `null` so the caller can fall back to a flat cap.
+ * from the footprint inradius. When the solve cannot complete (concave
+ * footprint, unstable bisector, or escaped geometry), the function returns
+ * `null` so the caller can fall back to a flat cap.
  *
  * @param ring - Outer roof footprint ring in local planar coordinates.
  * @param baseH - Wall top elevation.
  * @param roofH - Desired roof height above `baseH`.
- * @param info - Parsed roof configuration.
- * @param _allRings - Full polygon rings passed through by the caller.
- * @returns Roof mesh buffers, or `null` when the skeleton cannot be resolved.
+ * @param info - Parsed roof configuration (shape controls gable/speed behavior).
+ * @param _allRings - Full polygon rings passed through by the caller (unused).
+ * @returns Roof mesh buffers, or `null` when the skeleton solve fails.
+ * @throws Never throws. Returns `null` on failure rather than raising.
+ * @example
+ * const hipped = skeletonRoof(
+ *   [[0, 0], [10, 0], [10, 10], [0, 10]],
+ *   20, 5,
+ *   { shape: 'hipped', height: 0, angle: 30, direction: 0 }
+ * );
+ * // hipped is a straight-skeleton roof cap, or null if solve fails
  */
 export function skeletonRoof(ring: Vec2[], baseH: number, roofH: number, info: RoofInfo, _allRings?: Vec2[][]): MeshData | null {
     let outer = normalizeRing(ring) as Vec2[];
@@ -978,11 +1022,17 @@ export function skeletonRoof(ring: Vec2[], baseH: number, roofH: number, info: R
  * Extracts roof-generation parameters from OSM-style building properties.
  *
  * Missing or unparseable tags fall back to `flat`, zero height, a 30° pitch,
- * and a zero direction. Numeric values are parsed from stringified property
- * values.
+ * and a zero direction. Pitch angle is clamped to [5°, 75°] to prevent
+ * degenerate geometry from extreme values. Numeric values are parsed from
+ * stringified property values.
  *
- * @param props - GeoJSON properties containing roof-related OSM tags.
- * @returns Normalized roof configuration with defaults applied.
+ * @param props - GeoJSON properties containing roof-related OSM tags
+ * (`roof:shape`, `roof:height`, `roof:angle`, `roof:direction`).
+ * @returns Normalized roof configuration with safe defaults applied.
+ * @throws Never throws. Always returns a valid `RoofInfo` with fallback values.
+ * @example
+ * const info = extractRoofInfo({ 'roof:shape': 'gabled', 'roof:angle': '45' });
+ * // info → { shape: 'gabled', height: 0, angle: 45, direction: 0 }
  */
 export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
     if (!props) return { shape: 'flat', height: 0, angle: DEFAULT_ROOF_ANGLE, direction: 0 };
@@ -999,7 +1049,7 @@ export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 /**
- * Builds the complete mesh for one building-part polygon.
+ * Builds the complete mesh for one building-part polygon (walls + floor + roof).
  *
  * The footprint first becomes wall geometry, then a floor cap is added when
  * `minH > 0`, and finally the roof style is selected from OSM tags. Flat,
@@ -1014,7 +1064,16 @@ export function extractRoofInfo(props: GeoJsonProperties): RoofInfo {
  * @param minH - Bottom of the walls (`min_height`).
  * @param maxH - Top of the walls (`height`).
  * @param props - OSM properties for this building part.
- * @returns Array of mesh chunks to be merged into one `LayerGeometry`.
+ * @returns Array of mesh chunks (walls, optional floor, roof) to be merged
+ * into one `LayerGeometry`.
+ * @throws Never throws. Degenerate inputs produce minimal or empty mesh data.
+ * @example
+ * const meshes = buildBuildingPartMesh(
+ *   [[[0, 0], [10, 0], [10, 10], [0, 10]]],
+ *   0, 20,
+ *   { 'roof:shape': 'pyramid', 'roof:height': '5' }
+ * );
+ * // meshes.length → 2 (walls + pyramid roof)
  */
 export function buildBuildingPartMesh(
     rings: Vec2[][],

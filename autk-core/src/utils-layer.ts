@@ -12,15 +12,15 @@ import type { Geometry } from 'geojson';
 import type { LayerType } from './types-layer';
 
 /**
- * Checks whether a string is a supported shared layer type.
- *
- * This guard matches the taxonomy used by the core layer-loading helpers. It
- * accepts the fixed set of public layer identifiers and rejects all other
- * strings.
+ * Type guard checking whether a string is a supported shared layer type.
  *
  * @param value Candidate layer identifier to validate.
- * @returns `true` when `value` is one of the supported shared `LayerType` values,
- * otherwise `false`.
+ * @returns `true` when `value` is a recognized `LayerType`, narrowing the type.
+ * @throws Never throws.
+ * @example
+ * if (isLayerType(userInput)) {
+ *   // userInput is now typed as LayerType
+ * }
  */
 export function isLayerType(value: string): value is LayerType {
     return value === 'surface'
@@ -37,14 +37,12 @@ export function isLayerType(value: string): value is LayerType {
 /**
  * Maps a GeoJSON geometry type to the corresponding shared layer family.
  *
- * Classification is based only on the GeoJSON `type` value. Point geometries
- * map to `points`, line geometries map to `polylines`, and polygonal as well
- * as `GeometryCollection` inputs map to `polygons`.
- *
  * @param geometryType GeoJSON geometry type to classify.
- * @returns The shared layer family used by the toolkit for that geometry type:
- * `points` for point geometries, `polylines` for line geometries, and `polygons`
- * for polygonal or collection geometries.
+ * @returns One of `points`, `polylines`, or `polygons`.
+ * @throws Never throws.
+ * @example
+ * mapGeometryTypeToLayerType('Polygon');  // 'polygons'
+ * mapGeometryTypeToLayerType('Point');    // 'points'
  */
 export function mapGeometryTypeToLayerType(
     geometryType: Geometry['type'],

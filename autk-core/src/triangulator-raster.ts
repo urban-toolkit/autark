@@ -25,12 +25,12 @@ export class TriangulatorRaster {
     /**
      * Builds a single textured quad covering the raster bounding box.
      *
-     * If `geotiff.bbox` is missing, the method logs a warning and returns empty
-     * geometry/component arrays without producing any mesh data.
-     *
-     * @param geotiff Raster feature collection whose bounding box defines the quad extent.
+     * @param geotiff Raster feature collection whose `bbox` defines the quad extent.
      * @param origin World-space origin subtracted from each corner to form local coordinates.
-     * @returns A tuple containing the quad geometry and matching component metadata.
+     * @returns A tuple of quad geometry and matching component metadata.
+     * @throws Never throws. When `bbox` is missing, returns empty arrays with a console warning.
+     * @example
+     * const [meshes, comps] = TriangulatorRaster.buildMesh(rasterFC, origin);
      */
     static buildMesh(geotiff: FeatureCollection<Geometry | null>, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];

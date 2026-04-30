@@ -10,14 +10,14 @@
 /**
  * Resolves a dot-delimited property path from an unknown value.
  *
- * Each segment is read as a property key on the current value. Traversal stops
- * as soon as an intermediate value is `null`, `undefined`, or not object-like,
- * and `undefined` is returned.
- *
  * @param item - Source value to traverse.
  * @param path - Dot-delimited property path, for example `properties.area`.
  * @returns The resolved nested value, or `undefined` when the path cannot be
  * fully resolved.
+ * @throws Never throws.
+ * @example
+ * valueAtPath({ a: { b: 42 } }, 'a.b');  // 42
+ * valueAtPath({ a: null }, 'a.b');       // undefined
  */
 export function valueAtPath(item: unknown, path: string): unknown {
     return path.split('.').reduce<unknown>((acc, key) => {
@@ -27,14 +27,16 @@ export function valueAtPath(item: unknown, path: string): unknown {
 }
 
 /**
- * Returns true when the value can be treated as a finite numeric scalar.
- *
- * Numbers are accepted only when finite. String inputs are trimmed before
- * conversion; empty strings and non-finite results are rejected.
+ * Returns `true` when the value can be treated as a finite numeric scalar.
  *
  * @param value - Value to test for numeric scalar compatibility.
- * @returns `true` when the value is a finite number or a string that can be
- * converted to one, otherwise `false`.
+ * @returns `true` when the value is a finite number or numeric string.
+ * @throws Never throws.
+ * @example
+ * isNumericLike(42);       // true
+ * isNumericLike('3.14');   // true
+ * isNumericLike('');       // false
+ * isNumericLike(NaN);      // false
  */
 export function isNumericLike(value: unknown): boolean {
     if (typeof value === 'number') {

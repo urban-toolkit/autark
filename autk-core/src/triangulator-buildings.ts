@@ -40,21 +40,13 @@ export class TriangulatorBuildings {
     /**
      * Builds extruded building geometry for an OSM-style building collection.
      *
-     * Features without a `GeometryCollection` are skipped. Building parts are
-     * processed in geometry order, paired with `feature.properties.parts` by
-     * index when available, and ignored when no valid height range can be
-     * resolved. Supported part geometries are `LineString`, `MultiLineString`,
-     * `Polygon`, and `MultiPolygon`.
-     *
-     * Coordinates are converted from world space into local planar coordinates
-     * using the provided origin before extrusion.
-     *
-     * Roof geometry is delegated to `buildBuildingPartMesh`, which receives the
-     * local rings, resolved height range, and part properties.
-     *
      * @param geojson Source building feature collection.
      * @param origin World-space origin used to convert coordinates into local XY space.
-     * @returns A tuple containing mesh chunks and per-feature component metadata.
+     * @param allowZeroHeightBuildings When `true`, parts with no height metadata get a random fallback height.
+     * @returns A tuple of mesh chunks and per-feature component metadata.
+     * @throws Never throws. Parts without height metadata are skipped (or given fallback height).
+     * @example
+     * const [meshes, comps] = TriangulatorBuildings.buildMesh(buildingsFC, origin);
      */
     static buildMesh(geojson: FeatureCollection, origin: number[], allowZeroHeightBuildings: boolean = false): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
@@ -154,14 +146,10 @@ export class TriangulatorBuildings {
     /**
      * Resolves wall base and top heights from OSM-style building properties.
      *
-     * Height tags take precedence over level-count tags. `height` and
-     * `min_height` are used directly when present; otherwise level counts are
-     * converted using a fixed floor height. Invalid, missing, or degenerate
-     * ranges return an empty array.
-     *
-     * @param props Building-part properties to inspect.
+     * @param props Building-part properties to inspect (`height`, `min_height`, `levels`, etc.).
      * @returns A two-element array `[minHeight, height]`, or an empty array when
      * no valid height range can be derived.
+     * @throws Never throws. Degenerate ranges return an empty array.
      */
     private static computeBuildingHeights(props: GeoJsonProperties): number[] {
         const FLOOR_HEIGHT = 3.4;
@@ -190,6 +178,7 @@ export class TriangulatorBuildings {
      * @param coord World-space coordinate with at least XY components.
      * @param origin World-space origin used as the local offset basis.
      * @returns Local planar coordinate `[x, y]` relative to `origin`.
+     * @throws Never throws.
      */
     private static toLocal(coord: number[], origin: number[]): [number, number] {
         return [coord[0] - origin[0], coord[1] - origin[1]];

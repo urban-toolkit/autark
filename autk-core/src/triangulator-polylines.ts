@@ -48,17 +48,13 @@ export class TriangulatorPolylines {
     /**
      * Builds triangulated polyline geometry for a GeoJSON feature collection.
      *
-     * Each feature is converted to local XY coordinates relative to the
-     * provided origin before buffering. The buffered outline is expected to be
-     * a closed polygon; invalid or degenerate buffer results are skipped.
-     * Supported geometries are `LineString`, `MultiLineString`, and
-     * `GeometryCollection` containing those geometry types.
-     *
      * @param geojson Source feature collection containing polyline geometries.
-     * @param origin World-space origin subtracted from every coordinate before
-     * converting the line to local planar space.
-     * @returns A tuple containing triangulated geometry chunks and their
-     * per-feature component metadata.
+     * @param origin World-space origin subtracted before converting to local planar space.
+     * @param resolveOffset Optional per-feature half-width resolver.
+     * @returns A tuple of triangulated geometry chunks and per-feature component metadata.
+     * @throws Never throws. Unsupported or degenerate features are skipped.
+     * @example
+     * const [meshes, comps] = TriangulatorPolylines.buildMesh(lineFC, origin);
      */
     static buildMesh(
         geojson: FeatureCollection,
@@ -114,15 +110,13 @@ export class TriangulatorPolylines {
     /**
      * Converts a single `LineString` feature into triangulated polyline mesh data.
      *
-     * The source coordinates are shifted into local planar space by subtracting
-     * the origin, then expanded with a parallel offset curve. The resulting
-     * closed polygon is flattened and triangulated with `earcut`.
-     *
      * @param feature Source feature with `LineString` geometry.
      * @param origin World-space origin subtracted before buffering.
      * @param offset Polyline half-width used for planar buffering.
-     * @returns One triangulated polygon mesh, or an empty array when buffering
-     * does not produce a valid closed polygon.
+     * @returns One triangulated polygon mesh, or an empty array when buffering fails.
+     * @throws Never throws. Degenerate buffers return an empty array.
+     * @example
+     * const [mesh] = TriangulatorPolylines.lineStringToPolyline(feature, origin, 5);
      */
     static lineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
         const base = <LineString>feature.geometry;
@@ -141,14 +135,13 @@ export class TriangulatorPolylines {
     /**
      * Converts a `MultiLineString` feature into triangulated polyline meshes.
      *
-     * Each constituent line string is processed independently: coordinates are
-     * converted to local planar space, buffered into a closed polygon, and
-     * triangulated with `earcut`. Invalid buffered lines are ignored.
-     *
      * @param feature Source feature with `MultiLineString` geometry.
      * @param origin World-space origin subtracted before buffering.
      * @param offset Polyline half-width used for planar buffering.
      * @returns Triangulated meshes for each valid buffered line string.
+     * @throws Never throws. Invalid buffered lines are silently ignored.
+     * @example
+     * const meshes = TriangulatorPolylines.multiLineStringToPolyline(feature, origin, 5);
      */
     static multiLineStringToPolyline(feature: Feature, origin: number[], offset: number): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiLineString>feature.geometry;
@@ -171,17 +164,16 @@ export class TriangulatorPolylines {
     }
 
     /**
-     * Converts supported children of a `GeometryCollection` into triangulated polyline meshes.
-     *
-     * Supported child geometries are converted using the same local-coordinate
-     * buffering and triangulation flow as top-level line features. Unsupported
-     * children are skipped with a warning.
+     * Flattens supported children of a `GeometryCollection` into polyline meshes.
      *
      * @param feature Source feature with `GeometryCollection` geometry.
      * @param origin World-space origin subtracted before buffering.
      * @param offset Polyline half-width used for planar buffering.
      * @param featureIndex Index of the parent feature in the source collection.
      * @returns Triangulated meshes for all supported child geometries.
+     * @throws Never throws. Unsupported children are skipped with a console warning.
+     * @example
+     * const meshes = TriangulatorPolylines.geometryCollectionToPolyline(feature, origin, 5, 0);
      */
     static geometryCollectionToPolyline(feature: Feature, origin: number[], offset: number, featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
@@ -200,13 +192,14 @@ export class TriangulatorPolylines {
     }
 
     /**
-     * Resolves a road polyline half-width from OSM highway semantics.
+     * Resolves a road polyline half-width from OSM `highway` tag semantics.
      *
-     * The returned value is expressed as a half-width because polyline
-     * triangulation buffers around the source centerline.
-     *
-     * @param feature Source road feature.
+     * @param feature Source road feature with `highway` property.
      * @returns Polyline half-width in local planar units.
+     * @throws Never throws. Falls back to `DEFAULT_ROAD_HALF_WIDTH`.
+     * @example
+     * const hw = TriangulatorPolylines.resolveRoadHalfWidth(roadFeature);
+     * // hw → 10 for motorway, 6 for primary, 3.5 for unknown
      */
     static resolveRoadHalfWidth(feature: Feature): number {
         const highway = TriangulatorPolylines.normalizeRoadHighwayValue(feature.properties?.highway);
@@ -218,11 +211,12 @@ export class TriangulatorPolylines {
     /**
      * Normalizes an OSM `highway` tag value for road-width lookup.
      *
-     * Supports plain strings, semicolon-delimited strings, and arrays. Only the
-     * first non-empty normalized token is used.
-     *
-     * @param highway Raw `highway` property value.
+     * @param highway Raw `highway` property value (string, semicolon-delimited, or array).
      * @returns Normalized highway token, or `null` when unavailable.
+     * @throws Never throws.
+     * @example
+     * TriangulatorPolylines.normalizeRoadHighwayValue('motorway');  // 'motorway'
+     * TriangulatorPolylines.normalizeRoadHighwayValue('primary;secondary');  // 'primary'
      */
     static normalizeRoadHighwayValue(highway: unknown): string | null {
         const values = Array.isArray(highway)

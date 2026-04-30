@@ -9,7 +9,7 @@
  */
 
 /**
- * Builds a closed polygon buffer around a polyline.
+ * Builds a closed polygon buffer around a polyline for stroke rendering.
  *
  * Input coordinates are expected to already be in a local planar system.
  * Consecutive duplicate points are skipped before the offset is computed.
@@ -21,6 +21,11 @@
  * @returns A closed polygon describing the buffered polyline footprint in
  * local planar coordinates. Returns an empty array when the input contains
  * fewer than two distinct points or when `distance` is `0`.
+ * @throws Never throws. Degenerate inputs return an empty array rather than
+ * raising an error.
+ * @example
+ * const poly = offsetPolyline([[0, 0], [10, 0], [10, 10]], 2);
+ * // poly is a closed ring e.g. [[-0, 2], [10, -2], [12, 10], …]
  */
 export function offsetPolyline(points: number[][], distance: number): [number, number][] {
     const clean = points.filter((point, index) => {
@@ -67,6 +72,10 @@ export function offsetPolyline(points: number[][], distance: number): [number, n
  *
  * @param ring - Polygon ring to normalize.
  * @returns A shallow copy of the ring without a repeated closing point.
+ * @throws Never throws. Always returns a shallow copy, even for degenerate inputs.
+ * @example
+ * const open = normalizeRing([[0, 0], [10, 0], [10, 10], [0, 0]]);
+ * // open → [[0, 0], [10, 0], [10, 10]]
  */
 export function normalizeRing(ring: number[][]): number[][] {
     if (ring.length < 2) return [...ring];
@@ -80,14 +89,18 @@ export function normalizeRing(ring: number[][]): number[][] {
 }
 
 /**
- * Computes the convex hull of a 2D point set.
+ * Computes the convex hull of a 2D point set using the monotonic chain algorithm.
  *
- * Uses the monotonic chain algorithm after removing duplicate points. Collinear
- * interior points are discarded from the outer boundary. Degenerate inputs with
+ * Duplicate points are removed before hull computation. Collinear interior
+ * points are discarded from the outer boundary. Degenerate inputs with
  * three or fewer unique points are returned as shallow copies.
  *
  * @param points - Input points to reduce to a convex hull.
- * @returns Hull points ordered around the outer boundary.
+ * @returns Hull points ordered around the outer boundary in CCW order.
+ * @throws Never throws. Degenerate inputs are returned verbatim (limited copies).
+ * @example
+ * const hull = computePointConvexHull([[0, 0], [10, 0], [10, 10], [5, 5], [0, 10]]);
+ * // hull → [[0, 0], [10, 0], [10, 10], [0, 10]] (interior point [5,5] discarded)
  */
 export function computePointConvexHull(points: number[][]): number[][] {
     const unique = Array.from(new Map(
@@ -126,11 +139,16 @@ export function computePointConvexHull(points: number[][]): number[][] {
  * Computes the signed planar area of a polygon ring.
  *
  * Positive area indicates counterclockwise winding; negative area indicates
- * clockwise winding.
+ * clockwise winding. The ring is automatically closed between the last and
+ * first vertex.
  *
  * @param ring - Ring vertices in order around the polygon.
  * @returns Signed area of the ring. Counterclockwise rings produce positive
  * area and clockwise rings produce negative area.
+ * @throws Never throws. Degenerate rings return `0`.
+ * @example
+ * const area = computeRingArea([[0, 0], [10, 0], [10, 10]]);
+ * // area → 50 (CCW triangle)
  */
 export function computeRingArea(ring: number[][]): number {
     let area = 0;
@@ -150,6 +168,10 @@ export function computeRingArea(ring: number[][]): number {
  *
  * @param ring - Ring vertices in order around the polygon.
  * @returns Sum of Euclidean edge lengths around the ring.
+ * @throws Never throws. Returns `0` for rings with fewer than 2 vertices.
+ * @example
+ * const len = polygonPerimeter([[0, 0], [10, 0], [10, 10]]);
+ * // len → 10 + 10 + 14.14…
  */
 export function polygonPerimeter(ring: number[][]): number {
     let perimeter = 0;
@@ -171,6 +193,10 @@ export function polygonPerimeter(ring: number[][]): number {
  * @param ring - Open polygon ring to test.
  * @returns `true` when all non-zero cross products share the same sign,
  * otherwise `false`.
+ * @throws Never throws. Rings with fewer than 3 vertices return `true`.
+ * @example
+ * isConvex([[0, 0], [10, 0], [10, 10], [0, 10]]); // true
+ * isConvex([[0, 0], [10, 0], [5, 5], [10, 10], [0, 10]]); // false (concave)
  */
 export function isConvex(ring: number[][]): boolean {
     const n = ring.length;
@@ -194,6 +220,10 @@ export function isConvex(ring: number[][]): boolean {
 /**
  * Computes the unit left-hand normal for a directed segment.
  *
+ * The left-hand normal is the vector perpendicular to the segment direction
+ * rotated 90° counterclockwise, used by `offsetPolyline` to push vertices
+ * outward.
+ *
  * @param a - Start point of the segment.
  * @param b - End point of the segment.
  * @returns A normalized left-hand perpendicular vector, or `null` when the
@@ -212,11 +242,11 @@ function getUnitLeftNormal(a: [number, number], b: [number, number]): [number, n
 }
 
 /**
- * Computes the offset vertex for one side of a polyline.
+ * Computes the offset vertex for one side of a polyline at a given vertex.
  *
  * Endpoints fall back to a single segment normal. Interior vertices are formed
- * by intersecting the adjacent offset segments when possible, and otherwise
- * by using the averaged normal direction.
+ * by intersecting the adjacent offset segments when possible; when segments
+ * are parallel or nearly so, the averaged normal direction is used instead.
  *
  * @param prev - Previous polyline point, or `null` when `curr` is the first point.
  * @param curr - Current polyline point being offset.
@@ -225,7 +255,8 @@ function getUnitLeftNormal(a: [number, number], b: [number, number]): [number, n
  * @param nextNormal - Unit left normal of the outgoing segment, if available.
  * @param distance - Offset distance applied away from the source polyline.
  * @param side - Offset side multiplier: `1` for the left outline, `-1` for the right outline.
- * @returns The offset point for the requested side at `curr`.
+ * @returns The offset point for the requested side at `curr`. Falls back to
+ * `curr` itself when both normals are unavailable.
  */
 function computeOffsetPoint(
     prev: [number, number] | null,
@@ -297,13 +328,15 @@ function computeOffsetPoint(
  * Computes the intersection point of two infinite 2D lines.
  *
  * The lines are defined by the point pairs `a1`-`a2` and `b1`-`b2`.
- * Parallel or nearly parallel lines return `null`.
+ * Parallel or nearly parallel lines (determinant < 1e-9) return `null`.
+ * Used by `computeOffsetPoint` to resolve mitered corners.
  *
  * @param a1 - First point on the first line.
  * @param a2 - Second point on the first line.
  * @param b1 - First point on the second line.
  * @param b2 - Second point on the second line.
- * @returns The line intersection point, or `null` when the lines are parallel.
+ * @returns The line intersection point, or `null` when the lines are parallel
+ * or nearly so.
  */
 function intersectLines(
     a1: [number, number],
@@ -335,7 +368,10 @@ function intersectLines(
 }
 
 /**
- * Computes the signed cross product of the turn from `a` -> `b` -> `c`.
+ * Computes the signed cross product of the turn from `a` → `b` → `c`.
+ *
+ * Used by `computePointConvexHull` to test point-to-line orientation during
+ * monotonic chain construction.
  *
  * @param a - First point.
  * @param b - Second point.

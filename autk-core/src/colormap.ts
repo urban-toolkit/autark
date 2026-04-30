@@ -73,17 +73,16 @@ const DIVERGING_INTERPOLATORS = new Set<ColorMapInterpolator>([
  */
 export class ColorMap {
     /**
-     * Samples a color interpolator at a normalized value.
+     * Samples a color interpolator at a normalized value, returning RGBA.
      *
-     * The interpolator is rebuilt from the requested scheme and optional domain
-     * before sampling. Categorical schemes snap to the nearest scheme entry;
-     * continuous schemes are evaluated through d3's sequential or diverging
-     * scales.
-     *
-     * @param value - Normalized sample position.
+     * @param value - Normalized sample position in `[0, 1]`.
      * @param color - Interpolator identifier to sample.
      * @param domain - Optional explicit domain used to parameterize the scale.
      * @returns Sampled color in RGBA object form.
+     * @throws Never throws.
+     * @example
+     * const c = ColorMap.getColor(0.5, ColorMapInterpolator.SEQ_VIRIDIS);
+     * // c → { r: 33, g: 144, b: 141, alpha: 1 }
      */
     public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
@@ -92,17 +91,16 @@ export class ColorMap {
     }
 
     /**
-     * Builds a flat RGBA texture array sampled from a color interpolator.
-     *
-     * The returned array is laid out as `[r, g, b, a, ...]` and is suitable for
-     * direct upload to a GPU texture buffer. A non-positive resolution returns
-     * an empty array. A resolution of `1` samples the midpoint of the scale to
-     * avoid bias toward either endpoint.
+     * Builds a flat RGBA texture array for GPU upload from a color scheme.
      *
      * @param color - Interpolator identifier to sample.
-     * @param res - Number of texels to generate.
+     * @param res - Number of texels to generate (default `256`).
      * @param domain - Optional explicit domain used to parameterize the scale.
-     * @returns Flat RGBA texture values suitable for GPU upload.
+     * @returns Flat RGBA texture values `[r, g, b, a, ...]`.
+     * @throws Never throws. Non-positive `res` returns an empty array.
+     * @example
+     * const tex = ColorMap.getColorMap(ColorMapInterpolator.SEQ_VIRIDIS, 4);
+     * // tex → [68, 1, 84, 1, 59, 82, 139, 1, 33, 144, 141, 1, 253, 231, 37, 1]
      */
     public static getColorMap(
         color: ColorMapInterpolator,
@@ -125,16 +123,16 @@ export class ColorMap {
     }
 
     /**
-     * Builds an array of sampled RGBA color objects from a color interpolator.
-     *
-     * This is the object-form counterpart to {@link getColorMap}. Empty or
-     * non-positive resolutions return an empty array, and a resolution of `1`
-     * samples the midpoint of the scale.
+     * Builds an array of sampled RGBA color objects from a color scheme.
      *
      * @param color - Interpolator identifier to sample.
-     * @param res - Number of samples to generate.
+     * @param res - Number of samples to generate (default `256`).
      * @param domain - Optional explicit domain used to parameterize the scale.
      * @returns Array of sampled RGBA color objects.
+     * @throws Never throws. Non-positive `res` returns an empty array.
+     * @example
+     * const colors = ColorMap.getColorArray(ColorMapInterpolator.CAT_SET1, 3);
+     * // colors → [{ r: 228, g: 26, b: 28, alpha: 1 }, ...]
      */
     public static getColorArray(
         color: ColorMapInterpolator,
@@ -161,6 +159,9 @@ export class ColorMap {
      *
      * @param color - RGB color to convert.
      * @returns Hexadecimal color string.
+     * @throws Never throws.
+     * @example
+     * ColorMap.rgbToHex({ r: 255, g: 128, b: 0, alpha: 1 }); // '#ff8000'
      */
     public static rgbToHex(color: ColorRGB): ColorHEX {
         const hex = d3_color.rgb(color.r, color.g, color.b, 1).formatHex();
@@ -172,6 +173,9 @@ export class ColorMap {
      *
      * @param color - Hexadecimal color string to convert.
      * @returns RGBA color object with alpha fixed to `1`.
+     * @throws Never throws.
+     * @example
+     * ColorMap.hexToRgb('#ff8000'); // { r: 255, g: 128, b: 0, alpha: 1 }
      */
     public static hexToRgb(color: ColorHEX): ColorRGB {
         const rgb = d3_color.rgb(color);
@@ -183,6 +187,9 @@ export class ColorMap {
      *
      * @param values - Numeric values to inspect.
      * @returns Two-element tuple `[min, max]`, or `[0, 0]` when the input is empty.
+     * @throws Never throws. Empty input returns `[0, 0]`.
+     * @example
+     * ColorMap.computeMinMaxRange([3, 7, 2, 9, 4]); // [2, 9]
      */
     public static computeMinMaxRange(values: number[] | TypedArray): [number, number] {
         if (values.length === 0) return [0, 0];
@@ -197,39 +204,39 @@ export class ColorMap {
     }
 
     /**
-     * Returns true when an interpolator uses a discrete categorical scheme.
-     *
-     * Categorical schemes are resolved separately from continuous domains and
-     * are sampled by index rather than by interpolation.
+     * Returns `true` when an interpolator uses a discrete categorical scheme.
      *
      * @param interpolator - Interpolator identifier to classify.
      * @returns `true` for categorical schemes, otherwise `false`.
+     * @throws Never throws.
+     * @example
+     * ColorMap.isCategorical(ColorMapInterpolator.CAT_SET1);  // true
+     * ColorMap.isCategorical(ColorMapInterpolator.SEQ_VIRIDIS);  // false
      */
     public static isCategorical(interpolator: ColorMapInterpolator): boolean {
         return CATEGORICAL_INTERPOLATORS.has(interpolator);
     }
     
     /**
-     * Returns true when an interpolator uses a diverging continuous scale.
-     *
-     * Diverging schemes resolve to three-point domains with an explicit center
-     * value; all other non-categorical schemes are treated as sequential.
+     * Returns `true` when an interpolator uses a diverging continuous scale.
      *
      * @param interpolator - Interpolator identifier to classify.
      * @returns `true` for diverging interpolators, otherwise `false`.
+     * @throws Never throws.
      */
     private static isDiverging(interpolator: ColorMapInterpolator): boolean {
         return DIVERGING_INTERPOLATORS.has(interpolator);
     }
 
     /**
-     * Returns the number of colors exposed by a categorical color scheme.
+     * Returns the number of colors in a categorical color scheme.
      *
      * @param interpolator - Interpolator identifier to inspect.
      * @returns Scheme size for categorical interpolators, or `null` otherwise.
-     *
-     * @remarks The returned size comes from the underlying d3 categorical
-     * scheme and is not inferred from any user-provided domain.
+     * @throws Never throws.
+     * @example
+     * ColorMap.getCategoricalSchemeSize(ColorMapInterpolator.CAT_SET1);  // 9
+     * ColorMap.getCategoricalSchemeSize(ColorMapInterpolator.SEQ_VIRIDIS);  // null
      */
     public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
         if (!ColorMap.isCategorical(interpolator)) return null;
@@ -334,6 +341,10 @@ export class ColorMap {
      *
      * @param domain Any supported color-scale domain.
      * @returns Ordered label strings suitable for a legend.
+     * @throws Never throws.
+     * @example
+     * ColorMap.computeLabels([0, 500000, 1000000]); // ['0', '500,000', '1M']
+     * ColorMap.computeLabels(['low', 'mid', 'high']); // ['low', 'mid', 'high']
      */
     public static computeLabels(
         domain: ResolvedDomain,
@@ -363,6 +374,14 @@ export class ColorMap {
      * @param values - Source values used to derive the domain.
      * @param config - Color-map configuration controlling the resolution mode.
      * @returns Resolved categorical or numeric domain.
+     * @throws {Error} When USER domain has invalid shape for the selected
+     * interpolator (e.g. non-numeric values for a sequential interpolator).
+     * @example
+     * const domain = ColorMap.resolveDomainFromData(
+     *   [10, 50, 30, 80, 20],
+     *   { interpolator: ColorMapInterpolator.SEQ_VIRIDIS, domainSpec: { type: ColorMapDomainStrategy.MIN_MAX } }
+     * );
+     * // domain → [10, 80]
      */
     public static resolveDomainFromData(
         values: number[] | string[] | TypedArray,

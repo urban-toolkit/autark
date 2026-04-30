@@ -42,11 +42,12 @@ export class EventEmitter<Events extends Record<string, unknown>> {
     /**
      * Registers a listener for the given event.
      *
-     * Multiple registrations of the same callback are allowed and are treated as
-     * separate listener entries.
-     *
+     * @note Multiple registrations of the same callback are allowed and treated as separate entries.
      * @param event Event name to subscribe to.
      * @param listener Callback invoked when the event fires.
+     * @throws Never throws.
+     * @example
+     * emitter.on('pick', ({ selection, layerId }) => console.log(selection));
      */
     on<K extends keyof Events>(event: K, listener: EventListener<Events[K]>): void {
         if (!this._listeners[event]) {
@@ -56,13 +57,15 @@ export class EventEmitter<Events extends Record<string, unknown>> {
     }
 
     /**
-     * Removes a previously registered listener.
-     *
-     * Only the exact function reference passed to {@link on} is removed. If the
-     * listener was not registered, the call has no effect.
+     * Removes a previously registered listener by reference.
      *
      * @param event Event name to unsubscribe from.
      * @param listener Exact listener reference to remove.
+     * @throws Never throws.
+     * @example
+     * const handler = (e) => console.log(e);
+     * emitter.on('pick', handler);
+     * emitter.off('pick', handler);
      */
     off<K extends keyof Events>(event: K, listener: EventListener<Events[K]>): void {
         const arr = this._listeners[event];
@@ -72,12 +75,13 @@ export class EventEmitter<Events extends Record<string, unknown>> {
     }
 
     /**
-     * Dispatches an event payload to all registered listeners.
-     *
-     * Listeners are invoked synchronously in registration order.
+     * Dispatches an event payload to all registered listeners synchronously.
      *
      * @param event Event name to dispatch.
      * @param payload Payload passed to each listener.
+     * @throws Never throws. Listener errors propagate to the caller.
+     * @example
+     * emitter.emit('pick', { selection: [1, 2], layerId: 'buildings' });
      */
     emit<K extends keyof Events>(event: K, payload: Events[K]): void {
         this._listeners[event]?.forEach(l => l(payload));

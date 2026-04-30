@@ -63,15 +63,14 @@ export class CameraMotion {
     private steps: CameraStep[] = [];
 
     /**
-     * Zoom out by `factor` over `durationSec` seconds.
+     * Zooms the camera out multiplicatively over a duration.
      *
-     * The factor is treated by magnitude only; the camera distance from the
-     * scene center increases multiplicatively. For example, `zoomOut(2, 5)`
-     * doubles the distance over five seconds.
-     *
-     * @param factor Multiplicative zoom-out factor.
+     * @param factor Multiplicative zoom-out factor (e.g. `2` doubles distance).
      * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
+     * @throws Never throws.
+     * @example
+     * new CameraMotion().zoomOut(4, 2.5).play(camera);
      */
     zoomOut(factor: number, durationSec: number): this {
         this.steps.push({ type: 'zoom', amount: Math.abs(factor), durationMs: durationSec * 1000 });
@@ -79,15 +78,14 @@ export class CameraMotion {
     }
 
     /**
-     * Zoom in by `factor` over `durationSec` seconds.
+     * Zooms the camera in multiplicatively over a duration.
      *
-     * The factor is treated by magnitude only; the camera distance from the
-     * scene center decreases multiplicatively. For example, `zoomIn(2, 5)`
-     * halves the distance over five seconds.
-     *
-     * @param factor Multiplicative zoom-in factor.
+     * @param factor Multiplicative zoom-in factor (e.g. `2` halves distance).
      * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
+     * @throws Never throws.
+     * @example
+     * new CameraMotion().zoomIn(1.5, 2).play(camera);
      */
     zoomIn(factor: number, durationSec: number): this {
         this.steps.push({ type: 'zoom', amount: -Math.abs(factor), durationMs: durationSec * 1000 });
@@ -95,19 +93,15 @@ export class CameraMotion {
     }
 
     /**
-     * Pitch the camera by `degrees` over `durationSec` seconds.
-     *
-     * Pitch orbits around the camera's right axis while keeping the scene
-     * center anchored. When `pan` is provided, the orbit center is translated
-     * forward in world space at the same time, which helps keep map content
-     * centered during the tilt. If the camera is nearly vertical, the pan
-     * offset is effectively skipped because the horizontal forward direction
-     * cannot be resolved.
+     * Pitches the camera around its right axis, keeping the scene center anchored.
      *
      * @param degrees Pitch angle in degrees.
      * @param durationSec Animation duration in seconds.
      * @param pan Optional forward translation of the orbit center in world units.
      * @returns The motion builder for fluent chaining.
+     * @throws Never throws.
+     * @example
+     * new CameraMotion().pitch(-45, 2.5, 2000).play(camera);
      */
     pitch(degrees: number, durationSec: number, pan: number = 0): this {
         this.steps.push({ type: 'pitch', amount: degrees * (Math.PI / 180), durationMs: durationSec * 1000, pan });
@@ -115,14 +109,14 @@ export class CameraMotion {
     }
 
     /**
-     * Yaw the camera around the world Z axis by `degrees` over `durationSec` seconds.
-     *
-     * Yaw rotates the eye and up vector together around the scene center while
-     * keeping the camera at the same distance from that center.
+     * Yaws the camera around the world Z axis, keeping distance to center.
      *
      * @param degrees Yaw angle in degrees.
      * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
+     * @throws Never throws.
+     * @example
+     * new CameraMotion().yaw(90, 3).play(camera);
      */
     yaw(degrees: number, durationSec: number): this {
         this.steps.push({ type: 'yaw', amount: degrees * (Math.PI / 180), durationMs: durationSec * 1000 });
@@ -130,14 +124,14 @@ export class CameraMotion {
     }
 
     /**
-     * Roll (bank) the camera around its forward axis by `degrees` over `durationSec` seconds.
-     *
-     * Roll changes only the camera's up vector, preserving the current eye and
-     * look-at positions.
+     * Rolls the camera around its forward axis, preserving eye and look-at.
      *
      * @param degrees Roll angle in degrees.
      * @param durationSec Animation duration in seconds.
      * @returns The motion builder for fluent chaining.
+     * @throws Never throws.
+     * @example
+     * new CameraMotion().roll(15, 1).play(camera);
      */
     roll(degrees: number, durationSec: number): this {
         this.steps.push({ type: 'roll', amount: degrees * (Math.PI / 180), durationMs: durationSec * 1000 });
@@ -145,13 +139,14 @@ export class CameraMotion {
     }
 
     /**
-     * Executes all queued motion steps sequentially.
+     * Executes all queued motion steps sequentially against a camera.
      *
-     * Steps are run one after another in the order they were queued. The motion
-     * list is not modified, so calling `play()` again replays the same sequence.
-     *
+     * @note The step queue is not cleared — calling `play()` again replays the same sequence.
      * @param camera Camera instance to animate.
      * @returns Promise that resolves when the final step completes.
+     * @throws Never throws. Step execution errors are silently absorbed.
+     * @example
+     * await new CameraMotion().zoomOut(2, 3).yaw(90, 2).play(camera);
      */
     play(camera: Camera): Promise<void> {
         return this.steps.reduce(

@@ -34,19 +34,12 @@ export class TriangulatorPoints {
     /**
      * Builds triangulated point-marker geometry for a feature collection.
      *
-     * Each supported feature is converted into one or more local-space marker
-     * meshes by subtracting the provided origin from the source coordinates and
-     * sampling a fixed-radius circle fan. Unsupported features and missing
-     * geometries are skipped.
-     *
-     * `GeometryCollection` features are flattened by child geometry type: only
-     * `Point` and `MultiPoint` children are triangulated, and all other child
-     * geometries are ignored with a warning.
-     *
      * @param geojson - Source feature collection containing point geometries.
      * @param origin - World-space origin used to convert coordinates into local XY space.
-     * @returns A tuple containing the generated mesh chunks and per-feature
-     * component metadata, both aligned to the input feature order.
+     * @returns A tuple of mesh chunks and per-feature component metadata.
+     * @throws Never throws. Unsupported features are skipped with a console warning.
+     * @example
+     * const [meshes, comps] = TriangulatorPoints.buildMesh(pointFC, origin);
      */
     static buildMesh(geojson: FeatureCollection, origin: number[]): [LayerGeometry[], LayerComponent[]] {
         const mesh: LayerGeometry[] = [];
@@ -94,12 +87,12 @@ export class TriangulatorPoints {
     /**
      * Converts a single `Point` feature into a triangle-fan marker mesh.
      *
-     * The point is translated into local space by subtracting `origin`, then
-     * sampled as a fixed-radius circle with a fixed perimeter resolution.
-     *
      * @param feature - Source feature with `Point` geometry.
      * @param origin - World-space origin used to convert coordinates into local XY space.
      * @returns A single mesh chunk for the point marker.
+     * @throws Never throws.
+     * @example
+     * const [mesh] = TriangulatorPoints.pointToMesh(pointFeature, origin);
      */
     static pointToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Point>feature.geometry;
@@ -115,12 +108,12 @@ export class TriangulatorPoints {
     /**
      * Converts a `MultiPoint` feature into triangle-fan marker meshes.
      *
-     * Each coordinate is translated into local space independently and emitted
-     * as its own marker mesh.
-     *
      * @param feature - Source feature with `MultiPoint` geometry.
      * @param origin - World-space origin used to convert coordinates into local XY space.
      * @returns One mesh chunk per point in the collection.
+     * @throws Never throws.
+     * @example
+     * const meshes = TriangulatorPoints.multiPointToMesh(multiPtFeature, origin);
      */
     static multiPointToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <MultiPoint>feature.geometry;
@@ -138,16 +131,15 @@ export class TriangulatorPoints {
     }
 
     /**
-     * Converts supported children of a `GeometryCollection` into marker meshes.
-     *
-     * Only `Point` and `MultiPoint` children are triangulated. Other child
-     * geometry types are skipped with a warning and do not contribute to the
-     * returned mesh list.
+     * Flattens supported children of a `GeometryCollection` into marker meshes.
      *
      * @param feature - Source feature with `GeometryCollection` geometry.
      * @param origin - World-space origin used to convert coordinates into local XY space.
      * @param featureIndex - Index of the parent feature in the source collection.
-     * @returns Mesh chunks for all supported child geometries in collection order.
+     * @returns Mesh chunks for all supported child geometries.
+     * @throws Never throws. Unsupported children are skipped with a console warning.
+     * @example
+     * const meshes = TriangulatorPoints.geometryCollectionToMesh(gcFeature, origin, 0);
      */
     static geometryCollectionToMesh(feature: Feature, origin: number[], featureIndex: number): { flatCoords: number[], flatIds: number[] }[] {
         const { geometries } = <GeometryCollection>feature.geometry;
@@ -190,15 +182,15 @@ export class TriangulatorPoints {
     /**
      * Samples a circle as a center point plus evenly spaced perimeter vertices.
      *
-     * The returned point order is suitable for triangle-fan index generation,
-     * with the center vertex first and the perimeter vertices ordered around
-     * the circumference.
-     *
      * @param centerX - Circle center X coordinate.
      * @param centerY - Circle center Y coordinate.
      * @param radius - Circle radius in local planar units.
      * @param numPoints - Number of perimeter sample points.
-     * @returns Ordered center/perimeter vertices describing the sampled circle.
+     * @returns Ordered `[center, ...perimeter]` vertices for triangle-fan indexing.
+     * @throws Never throws.
+     * @example
+     * const circle = TriangulatorPoints.sampleCircle(0, 0, 100, 8);
+     * // circle.length → 9 (1 center + 8 perimeter)
      */
     static sampleCircle(centerX: number, centerY: number, radius: number, numPoints: number): [number, number][] {
         const points: [number, number][] = [[centerX, centerY]];
