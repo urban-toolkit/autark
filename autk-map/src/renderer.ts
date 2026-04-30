@@ -84,11 +84,8 @@ export class Renderer {
     /**
      * Creates a renderer bound to a canvas.
      *
-     * The renderer stores the canvas reference immediately and derives initial
-     * layout and backing-store metrics from the element size and current device
-     * pixel ratio. GPU resources are created later by {@link init}.
-     *
      * @param canvas Target HTML canvas.
+     * @throws Never throws.
      */
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
@@ -181,10 +178,7 @@ export class Renderer {
     /**
      * Initializes WebGPU and creates all core render targets.
      *
-     * This performs device negotiation, configures the canvas context, and
-     * allocates the main color/depth attachments as well as the picking
-     * textures. If WebGPU is unavailable, initialization fails without
-     * creating render targets.
+     * @throws Never throws. Failures log to console and leave the renderer uninitialized.
      */
     async init(): Promise<void> {
         const api = await this.initWebGPU();
@@ -204,8 +198,8 @@ export class Renderer {
     /**
      * Initializes the WebGPU device and preferred canvas format.
      *
-     * @returns `true` when adapter and device acquisition succeed; otherwise
-     * `false`.
+     * @returns `true` when adapter and device acquisition succeed; otherwise `false`.
+     * @throws Never throws. Errors are caught and return `false`.
      */
     async initWebGPU(): Promise<boolean> {
         try {
@@ -233,13 +227,10 @@ export class Renderer {
     /**
      * Resizes the canvas and recreates size-dependent render targets.
      *
-     * CSS metrics are normalized before backing-store dimensions are derived.
-     * When the renderer has already been initialized, the canvas context and
-     * all size-dependent GPU attachments are recreated to match the new size.
-     *
      * @param cssWidth New layout width in CSS pixels.
      * @param cssHeight New layout height in CSS pixels.
      * @param devicePixelRatio Backing-store scale factor.
+     * @throws Never throws.
      */
     resize(cssWidth: number, cssHeight: number, devicePixelRatio: number = window.devicePixelRatio || 1): void {
         this._syncCanvasMetrics(cssWidth, cssHeight, devicePixelRatio);
@@ -404,8 +395,7 @@ export class Renderer {
     /**
      * Starts the main render pass by clearing configured attachments.
      *
-     * This updates the frame buffer resolve target to the current canvas
-     * texture and prepares the shared command encoder for draw submission.
+     * @throws Never throws. Silently returns when not initialized.
      */
     start(): void {
         if (!this._isInitialized) {
@@ -429,8 +419,8 @@ export class Renderer {
     /**
      * Opens the shared main render pass for the current frame.
      *
-     * @returns An encoder for the primary pass. The pass uses the current
-     * canvas texture as the resolve target and clears depth before drawing.
+     * @returns An encoder for the primary pass.
+     * @throws If the renderer has not been initialized or GPU context is null.
      */
     beginMainRenderPass(): GPURenderPassEncoder {
         if (!this._isInitialized) {
@@ -454,10 +444,9 @@ export class Renderer {
     }
 
     /**
-     * Submits the current command buffer.
+     * Submits the current command buffer and clears the active encoder.
      *
-     * After submission the active encoder is cleared so the next frame starts
-     * with a fresh command buffer.
+     * @throws Never throws. Silently returns when not initialized or no encoder exists.
      */
     finish(): void {
         if (!this._isInitialized || !this._commandEncoder) {
@@ -470,9 +459,7 @@ export class Renderer {
     /**
      * Starts the picking render pass by clearing picking attachments.
      *
-     * The picking pass uses offscreen attachments only; it does not resolve to
-     * the canvas. A fresh command encoder is created when needed before the
-     * empty pass is opened and closed.
+     * @throws Never throws. Silently returns when not initialized.
      */
     startPickingRenderPass(): void {
         if (!this._isInitialized) {
@@ -491,16 +478,11 @@ export class Renderer {
     }
 
     /**
-     * Reserves one of the double-buffered picking readback buffers for the
-     * current frame.
+     * Reserves a double-buffered picking readback slot for the current frame.
      *
-     * Existing buffers are reused when large enough; otherwise the slot is
-     * reallocated to match the requested pick count. Busy slots are skipped so
-     * readback work from the previous frame is not overwritten.
-     *
-     * @param pickCount Number of single-pixel readbacks that will be copied
-     * into the slot.
+     * @param pickCount Number of single-pixel readbacks to accommodate.
      * @returns The reserved slot index, or `null` when no slot is available.
+     * @throws Never throws.
      */
     reservePickingReadbackSlot(pickCount: number): number | null {
         if (!this._isInitialized || pickCount <= 0) {
@@ -532,16 +514,13 @@ export class Renderer {
     }
 
     /**
-     * Queues a single-pixel picking texture readback into a reserved readback
-     * slot.
-     *
-     * The supplied CSS-space coordinates are converted to backing-store pixel
-     * coordinates before copying from the picking texture.
+     * Queues a single-pixel picking texture readback into a reserved slot.
      *
      * @param slotIndex Reserved readback slot index.
      * @param pickIndex Offset within the slot for this pick.
      * @param x CSS-relative x coordinate.
      * @param y CSS-relative y coordinate.
+     * @throws If the requested slot is not reserved.
      */
     enqueuePickingReadback(slotIndex: number, pickIndex: number, x: number, y: number): void {
         const slot = this._pickReadbackBuffers[slotIndex];
@@ -566,15 +545,12 @@ export class Renderer {
     }
 
     /**
-     * Maps a reserved readback slot and decodes all picked ids copied into it.
-     *
-     * The mapped buffer is always released in a `finally` block and the slot is
-     * marked idle again after readback completes or fails.
+     * Maps a reserved readback slot and decodes all picked ids.
      *
      * @param slotIndex Reserved readback slot index.
      * @param pickCount Number of copied pick records to decode.
-     * @returns Decoded object ids in copy order, or an empty array when the
-     * slot is unavailable.
+     * @returns Decoded object ids in copy order, or an empty array when unavailable.
+     * @throws If the buffer map operation times out or the device is lost.
      */
     async readPickingResults(slotIndex: number, pickCount: number): Promise<number[]> {
         const slot = this._pickReadbackBuffers[slotIndex];
@@ -601,11 +577,9 @@ export class Renderer {
     }
 
     /**
-     * Explicitly releases GPU resources and resets renderer state.
+     * Releases GPU resources, unconfigures the canvas, and resets renderer state.
      *
-     * Destroying the renderer frees owned textures and readback buffers,
-     * unconfigures the canvas context, and marks the renderer as uninitialized
-     * so it can no longer submit frames.
+     * @throws Never throws.
      */
     destroy(): void {
         this._multisampleTexture?.destroy();
@@ -646,11 +620,12 @@ export class Renderer {
     }
 
     /**
-     * Converts CSS-relative coordinates into clamped backing-store pixel
-     * coordinates.
+     * Converts CSS-relative coordinates into clamped backing-store pixel coordinates.
      *
-     * This is used to align input coordinates with the renderer's device-pixel
-     * backing store before performing picking readback copies.
+     * @param x CSS-relative x coordinate.
+     * @param y CSS-relative y coordinate.
+     * @returns Clamped pixel coordinates `[px, py]`.
+     * @throws Never throws.
      */
     toPixelCoordinates(x: number, y: number): [number, number] {
         const scaleX = this._cssWidth > 0 ? this._pixelWidth / this._cssWidth : 1;

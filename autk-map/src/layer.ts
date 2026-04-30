@@ -40,6 +40,7 @@ export abstract class Layer {
      *
      * @param layerInfo Layer identity and z-order metadata.
      * @param layerRenderInfo Initial render configuration.
+     * @throws Never throws.
      */
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo) {
         this._layerInfo = layerInfo;
@@ -83,12 +84,9 @@ export abstract class Layer {
     /**
      * Updates layer metadata and marks geometry-dependent resources dirty.
      *
-     * The provided values are shallow-merged into the existing `layerInfo`.
-     * After the update, the layer is marked data-dirty so subclasses can rebuild
-     * any GPU resources that depend on layer metadata before the next render.
-     *
      * @param info Partial metadata patch to merge into `layerInfo`.
      * @returns Marks layer data as stale for the next render cycle.
+     * @throws Never throws.
      */
     updateLayerInfo(info: Partial<LayerInfo>): void {
         this._layerInfo = { ...this._layerInfo, ...info };
@@ -98,14 +96,9 @@ export abstract class Layer {
     /**
      * Updates render metadata and marks render uniforms dirty.
      *
-     * The provided values are shallow-merged into the existing
-     * `layerRenderInfo`. If picking is explicitly enabled on a layer that does
-     * not support both picking and highlighting, the request is ignored by
-     * forcing `isPick` back to `false` and clearing any provided
-     * `pickedComps` value.
-     *
      * @param info Partial render-state patch to merge into `layerRenderInfo`.
      * @returns Marks render-state uniforms as stale for the next render cycle.
+     * @throws Never throws.
      */
     updateLayerRenderInfo(info: Partial<LayerRenderInfo>): void {
         const canPick = this.supportsPicking && this.supportsHighlight;
@@ -124,16 +117,16 @@ export abstract class Layer {
     /**
      * Marks layer data buffers as stale for the next render pass.
      *
-     * @returns Causes subclasses to refresh geometry- or data-dependent GPU
-     * resources when they next render.
+     * @returns Causes subclasses to refresh geometry-dependent GPU resources.
+     * @throws Never throws.
      */
     makeLayerDataDirty(): void { this._dataIsDirty = true; }
 
     /**
      * Marks render uniforms and render-state as stale for the next render pass.
      *
-     * @returns Causes subclasses to refresh GPU-side render-state before the
-     * next draw.
+     * @returns Causes subclasses to refresh GPU-side render-state.
+     * @throws Never throws.
      */
     makeLayerRenderInfoDirty(): void { this._renderInfoIsDirty = true; }
 
@@ -236,10 +229,8 @@ export abstract class Layer {
     /**
      * Releases resources owned by this layer.
      *
-     * Override in subclasses that allocate GPU resources.
-     *
-     * @returns Releases any layer-owned resources. The base implementation does
-     * nothing.
+     * @returns Releases any layer-owned resources. The base implementation does nothing.
+     * @throws Never throws.
      */
     destroy(): void {}
 }

@@ -104,17 +104,16 @@ export abstract class Pipeline {
      * Creates a pipeline bound to the shared renderer.
      *
      * @param renderer Renderer used to create and update GPU resources.
+     * @throws Never throws.
      */
     constructor(renderer: Renderer) {
         this._renderer = renderer;
     }
 
     /**
-     * Creates the shared camera uniform resources.
+     * Creates the shared camera uniform resources and bind group.
      *
-     * Subclasses call this during setup before writing camera state. The bind
-     * group exposes the model-view matrix, projection matrix, and z-index
-     * uniforms to vertex shaders.
+     * @throws If GPU buffer allocation fails.
      */
     createCameraUniformBindGroup(): void {
         this._mviewBuffer = this._renderer.device.createBuffer({
@@ -178,6 +177,7 @@ export abstract class Pipeline {
      * Writes the current camera state into the shared camera uniforms.
      *
      * @param camera Camera instance whose matrices are uploaded to the GPU.
+     * @throws Never throws.
      */
     updateCameraUniforms(camera: Camera): void {
         this._mviewData.set(camera.getModelViewMatrix());
@@ -187,18 +187,21 @@ export abstract class Pipeline {
         this._renderer.device.queue.writeBuffer(this._projectionBuffer, 0, this._projectionData);
     }
 
-    /** Writes the layer z-index to the shared vertex uniform buffer. */
+    /**
+     * Writes the layer z-index to the shared vertex uniform buffer.
+     *
+     * @param value Layer z-index value.
+     * @throws Never throws.
+     */
     updateZIndex(value: number): void {
         this._zIndexData[0] = value;
         this._renderer.device.queue.writeBuffer(this._zIndexBuffer, 0, this._zIndexData);
     }
 
     /**
-     * Creates the shared render-state uniform resources.
+     * Creates the shared render-state uniform resources and bind group.
      *
-     * Subclasses call this during setup before writing layer styling state. The
-     * bind group exposes fixed colors, colormap state, opacity, and colormap
-     * domain data to fragment shaders.
+     * @throws If GPU buffer or texture allocation fails.
      */
     createColorUniformBindGroup(): void {
         this._colorBuffer = this._renderer.device.createBuffer({
@@ -354,11 +357,8 @@ export abstract class Pipeline {
     /**
      * Writes the current layer styling state into the shared render uniforms.
      *
-     * Numeric and categorical domains are encoded differently in the shared
-     * domain buffer so shader code can distinguish between fixed-color,
-     * continuous, and categorical colormap rendering.
-     *
      * @param layer Layer instance whose render configuration is uploaded.
+     * @throws Never throws.
      */
     updateColorUniforms(layer: Layer): void {
         const computedDomain = layer.layerRenderInfo.colormap.computedDomain;
@@ -431,9 +431,7 @@ export abstract class Pipeline {
     /**
      * Releases GPU resources owned by this base pipeline.
      *
-     * Missing resources are ignored, which makes the method safe after partial
-     * setup. Subclasses should override and call `super.destroy()` to release
-     * any additional GPU objects they own.
+     * @throws Never throws. Missing resources are silently ignored.
      */
     destroy(): void {
         this._mviewBuffer?.destroy();

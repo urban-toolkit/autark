@@ -60,11 +60,9 @@ export class LayerManager {
     /**
      * Computes the shared scene origin from the provided collection.
      *
-     * The origin is derived from the collection bounding box center and is used
-     * as the common local reference for subsequently loaded geometry.
-     *
      * @param collection Source feature collection.
      * @returns Nothing. Updates the manager's shared origin in place.
+     * @throws Never throws.
      */
     initializeOrigin(collection: FeatureCollection<Geometry | null>): void {
         this._origin = computeOrigin(collection as FeatureCollection);
@@ -73,17 +71,11 @@ export class LayerManager {
     /**
      * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
      *
-     * Dynamic layer z-indices are recomputed after insertion.
-     * Layer ids must be unique; duplicate ids are rejected.
-     * The created layer implementation depends on `layerInfo.typeLayer`:
-     * buildings use `Triangles3DLayer`, raster layers use `RasterLayer`, and all
-     * other layer types use `Triangles2DLayer`.
-     *
      * @param layerInfo Layer identity and type metadata.
      * @param layerRender Initial render configuration.
      * @param layerData Geometry and auxiliary layer payload.
-     * @returns The created layer, or `null` if a layer with the same id is
-     * already registered.
+     * @returns The created layer, or `null` if a layer with the same id is already registered.
+     * @throws Never throws. Duplicate ids log an error and return `null`.
      */
     addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
         if (this._layers.some((layer) => layer.layerInfo.id === layerInfo.id)) {
@@ -111,8 +103,8 @@ export class LayerManager {
      * Removes the layer matching `layerId` and recomputes dynamic z-order.
      *
      * @param layerId Layer identifier to remove.
-     * @returns Nothing. If the layer exists, it is destroyed and removed from the
-     * manager; unknown ids are ignored.
+     * @returns Nothing. Unknown ids are silently ignored.
+     * @throws Never throws.
      */
     removeLayerById(layerId: string): void {
         const layer = this.searchByLayerId(layerId);
@@ -130,23 +122,19 @@ export class LayerManager {
      * Returns the layer with the given `layerId`, or `null` if not found.
      *
      * @param layerId Layer identifier to search for.
-     * @returns The matching layer instance, or `null` when no registered layer
-     * has that id.
+     * @returns The matching layer instance, or `null`.
+     * @throws Never throws.
      */
     searchByLayerId(layerId: string): Layer | null {
         return this._layers.find(l => l.layerInfo.id === layerId) ?? null;
     }
 
     /**
-     * Returns a preliminary z-index placeholder used when constructing `LayerInfo`.
-     *
-     * The definitive value is assigned by `_recomputeZIndices` inside `addLayer`.
-     * Base OSM layers receive their fixed slot immediately; all other layer types
-     * return `0` until they are inserted and reordered.
+     * Returns a preliminary z-index placeholder for a layer type.
      *
      * @param layerType Layer type to place in the render stack.
-     * @returns The fixed OSM base-slot index for known base layers, otherwise `0`
-     * as a placeholder before insertion.
+     * @returns The fixed OSM base-slot index, or `0` as a placeholder.
+     * @throws Never throws.
      */
     computeZindex(layerType: LayerType): number {
         const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(layerType);

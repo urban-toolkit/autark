@@ -116,9 +116,10 @@ export class AutkMap {
     protected _isDestroyed: boolean = false;
 
     /**
-     * Creates an instance of the AutkMap class.
+     * Creates an AutkMap instance bound to a canvas element.
      *
      * @param canvas Canvas element used as the WebGPU drawing surface.
+     * @throws Never throws.
      */
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
@@ -174,6 +175,9 @@ export class AutkMap {
      * Initializes renderer resources, event bindings, and UI.
      *
      * @returns Promise that resolves when renderer initialization completes.
+     * @throws If WebGPU is not available or device acquisition fails.
+     * @example
+     * await map.init();
      */
     async init() {
         if (this._isDestroyed) {
@@ -211,6 +215,7 @@ export class AutkMap {
      * @param params.type Optional layer type override.
      * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
      * @param params.allowZeroHeightBuildings Optional flag to treat building zero-height extrusions.
+     * @throws Never throws. Errors are logged to the console.
      */
     loadCollection(id: string, { collection, type = null, property, allowZeroHeightBuildings = false }: LoadCollectionParams): void {
         if (!this.layerManager.hasOrigin) {
@@ -267,6 +272,7 @@ export class AutkMap {
      * @param params.thematic Optional precomputed thematic values.
      * @param params.type Optional layer type override for the mesh.
      * @returns Nothing. The mesh layer is created and registered with the map.
+     * @throws If the map origin has not been initialized.
      */
     loadMesh(id: string, { geometry, components, thematic, type = 'buildings' }: LoadMeshParams): void {
         if (!this.layerManager.hasOrigin) {
@@ -313,6 +319,7 @@ export class AutkMap {
      * @param params Update parameters.
      * @param params.collection Source feature collection.
      * @param params.property Dot-path accessor resolved from each feature.
+     * @throws Never throws. Errors are logged to the console.
      */
     updateThematic(id: string, { collection, property }: UpdateThematicParams): void {
         const layer = this._layerManager.searchByLayerId(id) as VectorLayer | null;
@@ -466,6 +473,7 @@ export class AutkMap {
      * @param params.collection GeoTIFF-derived feature collection.
      * @param params.property Dot-path accessor for each raster cell.
      * @param params.transferFunction Optional opacity transfer-function configuration.
+     * @throws Never throws. Errors are logged to the console.
      */
     updateRaster(id: string, { collection, property, transferFunction }: UpdateRasterParams): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -511,6 +519,7 @@ export class AutkMap {
      * @param id Layer identifier.
      * @param params Color-map update parameters.
      * @returns Nothing. The target layer render configuration is updated in place.
+     * @throws Never throws. Unknown layers are silently ignored.
      */
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -567,6 +576,7 @@ export class AutkMap {
      * @param params Render update parameters.
      * @param params.renderInfo Render properties to update.
      * @returns Nothing. The target layer render state is updated in place.
+     * @throws Never throws. Unknown layers are silently ignored.
      */
     updateRenderInfo(id: string, params: UpdateRenderInfoParams | Partial<LayerRenderInfo>): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -606,6 +616,7 @@ export class AutkMap {
      *
      * @param id Layer identifier.
      * @returns Nothing. Matching layers are removed from the map.
+     * @throws Never throws. Unknown ids are silently ignored.
      */
     removeLayer(id: string): void {
         this._layerManager.removeLayerById(id);
@@ -619,6 +630,7 @@ export class AutkMap {
      * @param id Layer identifier.
      * @param selection Component ids to highlight.
      * @returns Nothing. Unsupported layers are ignored.
+     * @throws Never throws.
      */
     setHighlightedIds(id: string, selection: number[]): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -634,6 +646,7 @@ export class AutkMap {
      *
      * @param id Layer identifier.
      * @returns Nothing. Unsupported layers are ignored.
+     * @throws Never throws.
      */
     clearHighlightedIds(id: string): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -650,6 +663,7 @@ export class AutkMap {
      * @param id Layer identifier.
      * @param selection Component ids to skip/unskip.
      * @returns Nothing. Non-vector layers are ignored.
+     * @throws Never throws.
      */
     setSkippedIds(id: string, selection: number[]): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -665,6 +679,7 @@ export class AutkMap {
      *
      * @param id Layer identifier.
      * @returns Nothing. Non-vector layers are ignored.
+     * @throws Never throws.
      */
     clearSkippedIds(id: string): void {
         const layer = this._layerManager.searchByLayerId(id);
@@ -676,10 +691,13 @@ export class AutkMap {
     }
 
     /**
-     * Starts the continuous render loop.
+     * Starts the continuous render loop at the target frame rate.
      *
      * @param fps Target frames per second (default `60`). Pass `0` to render as fast as possible.
      * @returns Nothing. Rendering is scheduled via `requestAnimationFrame`.
+     * @throws Never throws.
+     * @example
+     * map.draw(30);  // render at 30 fps
      */
     draw(fps: number = 60) {
         if (this._isDestroyed) {
@@ -714,10 +732,12 @@ export class AutkMap {
     }
 
     /**
-     * Tears down map resources and event bindings.
-     * Cancels the render loop, detaches DOM listeners, and releases GPU resources.
+     * Tears down map resources, event bindings, and GPU allocations.
      *
      * @returns Nothing. Repeated calls after destruction are ignored.
+     * @throws Never throws.
+     * @example
+     * map.destroy();
      */
     destroy(): void {
         if (this._isDestroyed) {

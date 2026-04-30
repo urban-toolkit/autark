@@ -115,12 +115,13 @@ export class MapStyle {
     }
 
     /**
-     * Get the feature color for a style key.
-     *
-     * Unknown keys fall back to the polygons color.
+     * Returns the feature color for a style key, falling back to polygons color.
      *
      * @param type Semantic style key to resolve.
-     * @returns RGB color for the requested key, or the active polygons color when the key is unknown.
+     * @returns RGB color for the requested key.
+     * @throws Never throws.
+     * @example
+     * const roadsColor = MapStyle.getColor('roads');
      */
     static getColor(type: string): ColorRGB {
         const style = MapStyle._current;
@@ -134,7 +135,8 @@ export class MapStyle {
     /**
      * Returns the color used for invalid thematic values.
      *
-     * @returns RGB fallback color used when thematic values are marked invalid.
+     * @returns RGB fallback color.
+     * @throws Never throws.
      */
     static getInvalidValueColor(): ColorRGB {
         return ColorMap.hexToRgb(MapStyle._invalidValue);
@@ -143,10 +145,11 @@ export class MapStyle {
     /**
      * Applies one of the built-in map style presets.
      *
-     * Unknown ids fall back to `default`.
-     *
-     * @param style Preset identifier.
-     * @returns Nothing. The active style and active style id are updated immediately.
+     * @param style Preset identifier. Unknown ids fall back to `default`.
+     * @returns Nothing.
+     * @throws Never throws.
+     * @example
+     * MapStyle.setPredefinedStyle('light');
      */
     static setPredefinedStyle(style: string): void {
         const presetId: MapStylePresetId = MapStyle._isPresetId(style) ? style : 'default';
@@ -157,12 +160,11 @@ export class MapStyle {
     /**
      * Applies a runtime custom style after validation.
      *
-     * The provided style must include every semantic key defined by
-     * `MapStyleShape`, and each value must be a supported hex color literal.
-     * Validation errors are thrown before the active style is replaced.
-     *
      * @param style Style object with all required semantic color keys.
-     * @returns Nothing. The validated style becomes the active style and the active style id becomes `custom`.
+     * @returns Nothing. The style id becomes `custom`.
+     * @throws If the style is missing required keys or has invalid hex color values.
+     * @example
+     * MapStyle.setCustomStyle({ background: '#fff', surface: '#eee', parks: '#cfc', water: '#bdf', roads: '#ddd', buildings: '#ccc', points: '#555', polylines: '#777', polygons: '#999' });
      */
     static setCustomStyle(style: MapStyleShape): void {
         MapStyle._current = MapStyle._normalizeStyle(style, 'custom');
@@ -172,33 +174,30 @@ export class MapStyle {
     /**
      * Returns the current highlight color.
      *
-     * @returns RGB highlight color used for interactive selections.
+     * @returns RGB highlight color.
+     * @throws Never throws.
      */
     static getHighlightColor(): ColorRGB {
         return ColorMap.hexToRgb(MapStyle._highlight);
     }
 
     /**
-     * Sets the highlight color.
-     *
-     * This method stores the provided hex color as-is and does not validate the
-     * value.
+     * Sets the highlight color (no validation).
      *
      * @param color New highlight color in hex format.
-     * @returns Nothing. Subsequent highlight color lookups use the new value.
+     * @returns Nothing.
+     * @throws Never throws.
      */
     static setHighlightColor(color: ColorHEX): void {
         MapStyle._highlight = color;
     }
 
     /**
-     * Sets the color used for invalid thematic values.
-     *
-     * This method stores the provided hex color as-is and does not validate the
-     * value.
+     * Sets the color used for invalid thematic values (no validation).
      *
      * @param color New fallback color for invalid thematic values.
-     * @returns Nothing. Subsequent invalid-value color lookups use the new value.
+     * @returns Nothing.
+     * @throws Never throws.
      */
     static setInvalidValueColor(color: ColorHEX): void {
         MapStyle._invalidValue = color;
