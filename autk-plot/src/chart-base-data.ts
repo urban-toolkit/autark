@@ -26,15 +26,10 @@ import type { ExecutedChartTransform } from './transforms';
 /**
  * Normalized transform payload returned by `resolveTransformResult()`.
  *
- * The shared transform runners expose preset-specific row shapes. This type
- * collapses those results into the rendered schema consumed by chart classes.
+ * Collapses preset-specific transform outputs into the rendered schema
+ * consumed by chart classes.
  */
-/**
- * Normalized transform payload returned by `resolveTransformResult()`.
- *
- * @internal
- */
-type ResolvedChartTransform = {
+export type ResolvedChartTransform = {
     /** Render rows stored on `_data` for the current draw cycle. */
     rows: AutkDatum[];
     /** Optional axis bindings exposed by the transformed row shape. */

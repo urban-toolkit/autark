@@ -25,11 +25,7 @@ export type ReducedBucket = {
 /**
  * Groups rows into keyed buckets and reduces each bucket to a single value.
  *
- * @param options Configuration object.
- * @param options.rows - Input data to aggregate.
- * @param options.bucketOf - Assigns a group key to each row. Return `null` to skip the row.
- * @param options.valueOf - Optional numeric extractor used for non-count reducers. Omit for count mode.
- * @param options.reducer - Aggregation strategy: `count`, `sum`, `avg`, `min`, or `max`.
+ * @param options Aggregation configuration with `rows`, `bucketOf`, `valueOf`, and `reducer`.
  * @returns Reduced buckets with merged `autkIds` for selection linking.
  * @throws Never throws. Rows with null keys or non-finite values are skipped.
  * @example
