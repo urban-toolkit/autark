@@ -141,7 +141,8 @@ export class CameraMotion {
     /**
      * Executes all queued motion steps sequentially against a camera.
      *
-     * @note The step queue is not cleared — calling `play()` again replays the same sequence.
+     * The step queue is not cleared — calling `play()` again replays the same sequence.
+     *
      * @param camera Camera instance to animate.
      * @returns Promise that resolves when the final step completes.
      * @throws Never throws. Step execution errors are silently absorbed.

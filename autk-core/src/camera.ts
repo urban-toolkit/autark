@@ -149,7 +149,8 @@ export class Camera {
     /**
      * Updates viewport size and recomputes matrices in one call.
      *
-     * @note Pass drawable canvas pixel size, not CSS size.
+     * Pass drawable canvas pixel size, not CSS size.
+     *
      * @param width - Viewport width in pixels.
      * @param height - Viewport height in pixels.
      * @throws Never throws.
@@ -244,7 +245,8 @@ export class Camera {
     /**
      * Rebuilds view and projection matrices from the current camera state.
      *
-     * @note Uses reversed-Z depth for improved precision at long range.
+     * Uses reversed-Z depth for improved precision at long range.
+     *
      * @throws Never throws.
      * @example
      * camera.zoom(-1, 0.5, 0.5);

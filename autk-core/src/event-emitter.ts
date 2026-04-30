@@ -42,7 +42,8 @@ export class EventEmitter<Events extends Record<string, unknown>> {
     /**
      * Registers a listener for the given event.
      *
-     * @note Multiple registrations of the same callback are allowed and treated as separate entries.
+     * Multiple registrations of the same callback are allowed and treated as separate entries.
+     *
      * @param event Event name to subscribe to.
      * @param listener Callback invoked when the event fires.
      * @throws Never throws.
