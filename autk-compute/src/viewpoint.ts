@@ -57,10 +57,12 @@ export interface ResolvedRenderViewpoints {
 /**
  * Derives view origins from feature geometry centroids.
  *
- * Features without geometry or centroid output are skipped.
- *
  * @param collection GeoJSON FeatureCollection to extract origins from.
  * @returns Array of view origins, one per feature with a valid geometry.
+ * @throws Never throws. Features without geometry are silently skipped.
+ * @example
+ * const origins = generateViewOrigins(buildingsFC);
+ * // origins → [{ collectionIndex: 0, origin: [151.2, -33.8, 0] }, ...]
  */
 export function generateViewOrigins(collection: FeatureCollection): ViewOrigin[] {
     const origins: ViewOrigin[] = [];
@@ -78,14 +80,15 @@ export function generateViewOrigins(collection: FeatureCollection): ViewOrigin[]
 }
 
 /**
- * Expands view origins into camera samples.
- *
- * Each origin is sampled around a horizontal ring. The direction count is
- * clamped to at least `1`.
+ * Expands view origins into camera samples around a horizontal ring.
  *
  * @param origins View origins from {@link generateViewOrigins}.
  * @param viewSampling Sampling controls for direction count, azimuth offset, and pitch.
  * @returns Array of camera samples, one per direction per origin.
+ * @throws Never throws.
+ * @example
+ * const samples = expandCameraSamples(origins, { directions: 4, pitchDeg: 30 });
+ * // samples.length → origins.length * 4
  */
 export function expandCameraSamples(
     origins: ViewOrigin[],
@@ -123,11 +126,15 @@ export function expandCameraSamples(
 /**
  * Resolves a viewpoints configuration into a collection and camera samples.
  *
- * The default strategy samples feature centroids. The building-window strategy
- * derives a window layout first and returns that layout's collection.
- *
  * @param viewpoints Viewpoints collection, strategy, and sampling controls.
  * @returns Resolved collection, samples, and optional building-window layout.
+ * @throws Never throws.
+ * @example
+ * const resolved = resolveRenderViewpoints({
+ *   collection: fc,
+ *   strategy: { type: 'centroid' },
+ *   sampling: { directions: 8 },
+ * });
  */
 export function resolveRenderViewpoints(
     viewpoints: RenderViewpoints,
@@ -153,17 +160,18 @@ export function resolveRenderViewpoints(
 }
 
 /**
- * Builds view-projection matrices for sampled viewpoints.
- *
- * Matrices are emitted in sample order. X and Y are shifted by the provided
- * origin before building each camera.
+ * Builds view-projection matrices for sampled viewpoints, shifted by origin.
  *
  * @param samples Camera samples from {@link expandCameraSamples}.
  * @param origin Reference origin used to shift sample positions into local coordinates.
  * @param fovDeg Horizontal field of view in degrees.
  * @param near Near clipping plane distance.
  * @param far Far clipping plane distance.
- * @returns Float32Array of 16-element view-projection matrices.
+ * @returns `Float32Array` of packed 16-element view-projection matrices in sample order.
+ * @throws Never throws.
+ * @example
+ * const matrices = buildCameraMatrices(samples, [151.2, -33.8], 90, 1, 5000);
+ * // matrices.length → samples.length * 16
  */
 export function buildCameraMatrices(
     samples: CameraSample[],

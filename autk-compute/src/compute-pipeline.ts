@@ -20,7 +20,8 @@ export abstract class GpuPipeline {
     /**
      * Returns the shared GPU device used by compute pipelines.
      *
-     * @returns Promise resolving to the shared GPUDevice instance.
+     * @returns Promise resolving to the shared `GPUDevice` instance.
+     * @throws If WebGPU is not supported or no adapter can be obtained.
      * @protected
      */
     protected async getDevice(): Promise<GPUDevice> {
@@ -35,6 +36,9 @@ export abstract class GpuPipeline {
      * @param usage Buffer usage flags.
      * @param data Optional initial contents.
      * @returns Created GPU buffer.
+     * @throws If the device cannot allocate a buffer of the requested size.
+     * @example
+     * const buf = this.createBuffer(device, 1024, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
      */
     protected createBuffer(
         device: GPUDevice,
@@ -60,6 +64,9 @@ export abstract class GpuPipeline {
      * @param device GPU device used to create the buffer.
      * @param size Buffer size in bytes.
      * @returns Readback buffer configured for `COPY_DST | MAP_READ`.
+     * @throws If the device cannot allocate the staging buffer.
+     * @example
+     * const staging = this.createStagingBuffer(device, 4096);
      */
     protected createStagingBuffer(device: GPUDevice, size: number): GPUBuffer {
         return device.createBuffer({
@@ -74,6 +81,9 @@ export abstract class GpuPipeline {
      * @param staging Mapped readback buffer populated by a copy command.
      * @param Ctor Typed array constructor used for the returned copy.
      * @returns Promise resolving to the copied typed array.
+     * @throws If the buffer map operation times out or the device is lost.
+     * @example
+     * const data = await this.mapReadBuffer(stagingBuf, Float32Array);
      */
     protected async mapReadBuffer<T extends ArrayBufferView>(
         staging: GPUBuffer,
@@ -91,6 +101,10 @@ export abstract class GpuPipeline {
      * @param value Value to align.
      * @param alignment Alignment boundary.
      * @returns Aligned value.
+     * @throws Never throws.
+     * @example
+     * alignTo(63, 16);  // 64
+     * alignTo(64, 16);  // 64
      */
     protected alignTo(value: number, alignment: number): number {
         const r = value % alignment;

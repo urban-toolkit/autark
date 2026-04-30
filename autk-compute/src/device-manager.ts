@@ -10,15 +10,13 @@
 let sharedDevicePromise: Promise<GPUDevice> | null = null;
 
 /**
- * Returns the shared GPU device, initializing it on first use.
- *
- * If the adapter is temporarily unavailable, the request is retried once after
- * a short delay. The cache is cleared when device acquisition fails or when
- * the device is lost.
+ * Returns the shared GPU device, initializing it on first use with retry.
  *
  * @returns Promise resolving to the shared `GPUDevice` instance.
  * @throws If WebGPU is not supported in the current browser.
- * @throws If no GPU adapter can be obtained.
+ * @throws If no GPU adapter can be obtained after retry.
+ * @example
+ * const device = await getSharedGpuDevice();
  */
 export async function getSharedGpuDevice(): Promise<GPUDevice> {
     if (!sharedDevicePromise) {

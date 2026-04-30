@@ -48,12 +48,16 @@ export class AutkComputeEngine {
      * Runs the GPGPU pipeline and writes results to `feature.properties.compute`.
      *
      * @param params Pipeline parameters.
-     * @param params.collection Source GeoJSON feature collection.
-     * @param params.variableMapping WGSL variable-to-property mapping.
-     * @param params.wgslBody WGSL function body.
-     * @param params.resultField Output field name for single-value results.
-     * @param params.outputColumns Output field names for multi-value results.
      * @returns Promise resolving to the input collection with computed values attached.
+     * @throws If `resultField` or `outputColumns` is missing, or WGSL identifiers are invalid.
+     * @example
+     * const engine = new AutkComputeEngine();
+     * const result = await engine.gpgpuPipeline({
+     *   collection: fc,
+     *   variableMapping: { pop: 'properties.population' },
+     *   wgslBody: 'return pop * 1.5;',
+     *   resultField: 'scaledPop',
+     * });
      */
     async gpgpuPipeline(params: GpgpuPipelineParams): Promise<FeatureCollection> {
         return this._gpgpu.run(params);
@@ -63,12 +67,15 @@ export class AutkComputeEngine {
      * Runs the render pipeline and writes metrics to `feature.properties.compute.render`.
      *
      * @param params Pipeline parameters.
-     * @param params.layers Geometry layers rendered for each sampled camera.
-     * @param params.viewpoints Viewpoint collection and sampling strategy.
-     * @param params.aggregation Reduction strategy applied after rendering.
-     * @param params.camera Optional camera controls.
-     * @param params.tileSize Tile size in pixels.
      * @returns Promise resolving to the viewpoints collection with aggregated render metrics.
+     * @throws If no layers are provided or `tileSize` is invalid.
+     * @example
+     * const engine = new AutkComputeEngine();
+     * const result = await engine.renderPipeline({
+     *   layers: [{ id: 'b', collection: fc, type: 'buildings' }],
+     *   viewpoints: { collection: vpFC },
+     *   aggregation: { type: 'classes' },
+     * });
      */
     async renderPipeline(params: RenderPipelineParams): Promise<FeatureCollection> {
         return this._render.run(params);

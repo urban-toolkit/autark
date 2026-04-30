@@ -51,13 +51,17 @@ export class ComputeGpgpu extends GpuPipeline {
      * Executes a WGSL compute shader over a feature collection.
      *
      * @param params Compute parameters.
-     * @param params.collection Source GeoJSON feature collection.
-     * @param params.variableMapping WGSL variable-to-property mapping.
-     * @param params.wgslBody WGSL function body.
-     * @param params.resultField Output field name for single-value results.
-     * @param params.outputColumns Output field names for multi-value results.
      * @returns Promise resolving to a copied collection with results in `feature.properties.compute`.
      * @throws If neither `resultField` nor `outputColumns` is provided.
+     * @throws If WGSL identifiers are invalid or collide with reserved words.
+     * @example
+     * const gpgpu = new ComputeGpgpu();
+     * const result = await gpgpu.run({
+     *   collection: fc,
+     *   variableMapping: { area: 'properties.area' },
+     *   wgslBody: 'return area * 2.0;',
+     *   resultField: 'doubledArea',
+     * });
      */
     async run(params: GpgpuPipelineParams): Promise<FeatureCollection> {
         const { collection, variableMapping, attributeArrays = {}, attributeMatrices = {}, wgslBody } = params;
@@ -98,12 +102,15 @@ export class ComputeGpgpu extends GpuPipeline {
      * Runs a prepared compute configuration and reads back typed output buffers.
      *
      * @param config Compute configuration.
-     * @param config.shader WGSL shader source code.
-     * @param config.entryPoint Shader entry point.
-     * @param config.dispatchSize Workgroup dispatch dimensions.
-     * @param config.inputs Named input buffers.
-     * @param config.outputs Named output buffers.
      * @returns Output names mapped to readback typed arrays.
+     * @throws If WebGPU device creation or shader compilation fails.
+     * @example
+     * const result = await pipeline.runCompute({
+     *   shader: wgslCode,
+     *   dispatchSize: [64, 1, 1],
+     *   inputs: { data: { type: 'storage', data: new Float32Array(100), binding: 0 } },
+     *   outputs: { out0: { size: 400, binding: 1, arrayType: Float32Array } },
+     * });
      * @protected
      */
     protected async runCompute(config: ComputeConfig): Promise<{ [outputName: string]: TypedArray }> {

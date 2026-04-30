@@ -72,23 +72,18 @@ export class ComputeRender extends GpuPipeline {
     private countPipelineCache = new WeakMap<GPUDevice, CachedCountPipeline>();
 
     /**
-     * Samples each resolved viewpoint, aggregates the render results, and writes
-     * the metrics back into the collection.
-     *
-     * The render pass is executed in batches sized to the current WebGPU device
-     * limits. Each batch renders all eligible layers into a tiled texture,
-     * counts visible classes and objects, and accumulates the raw counts before
-     * a final aggregation step updates `feature.properties.compute.render`.
-     *
-     * @returns A copied collection with per-feature render metrics attached.
+     * Samples viewpoints, renders layers via GPU, and aggregates visibility metrics.
      *
      * @param params Render pipeline parameters.
-     * @param params.layers Geometry layers to render.
-     * @param params.viewpoints Viewpoint collection and sampling strategy.
-     * @param params.aggregation Reduction strategy applied to sampled renders.
-     * @param params.camera Optional camera controls.
-     * @param params.tileSize Tile resolution in pixels; must be a multiple of 8.
-     * @throws If no layers are provided or tileSize is not a multiple of 8.
+     * @returns A copied collection with per-feature render metrics at `feature.properties.compute.render`.
+     * @throws If no layers are provided, `tileSize` is not a multiple of 8, or layer/object limits are exceeded.
+     * @example
+     * const render = new ComputeRender();
+     * const result = await render.run({
+     *   layers: [{ id: 'buildings', collection: fc, type: 'buildings' }],
+     *   viewpoints: { collection: vpFC, strategy: { type: 'centroid' } },
+     *   aggregation: { type: 'classes' },
+     * });
      */
     async run(params: RenderPipelineParams): Promise<FeatureCollection> {
         const {
