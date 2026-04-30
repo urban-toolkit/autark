@@ -24,6 +24,7 @@ export class LoadCustomLayerUseCase {
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
     boundingBox,
     workspace = 'main',
+    layerType,
   }: LoadCustomLayerParams): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
@@ -58,7 +59,7 @@ export class LoadCustomLayerUseCase {
       throw new Error('First feature has no geometry or geometry type');
     }
 
-    const geometryType = mapGeometryTypeToLayerType(firstFeature.geometry.type);
+    const geometryType = layerType ?? mapGeometryTypeToLayerType(firstFeature.geometry.type);
 
     const describeTableResponse = await this.createTableFromFeatureCollection(
       geojson,

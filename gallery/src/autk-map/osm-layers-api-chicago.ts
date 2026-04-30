@@ -22,7 +22,9 @@ export class OsmLayersApi {
                     'Armour Square',
                     'Bridgeport'
                 ],
-            }, outputTableName: 'table_osm',
+            }, 
+            outputTableName: 'table_osm',
+            // forceRefresh: true,
             autoLoadLayers: {
                 coordinateFormat: 'EPSG:3395',
                 layers: [

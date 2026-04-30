@@ -63,13 +63,26 @@ export class TriangulatorBuildings {
 
         for (let fId = 0; fId < geojson.features.length; fId++) {
             const feature = geojson.features[fId];
-            if (feature.geometry?.type !== 'GeometryCollection') {
-                console.warn('Expected GeometryCollection for building feature, got:', feature.geometry?.type);
+
+            // Normalize top-level geometry into a GeometryCollection-like array
+            let geometries: GeometryCollection['geometries'];
+            let parts: GeoJsonProperties[];
+
+            if (feature.geometry?.type === 'GeometryCollection') {
+                geometries = (feature.geometry as GeometryCollection).geometries;
+                parts = (feature.properties?.parts ?? []) as GeoJsonProperties[];
+            } else if (
+                feature.geometry?.type === 'Polygon' ||
+                feature.geometry?.type === 'MultiPolygon' ||
+                feature.geometry?.type === 'LineString' ||
+                feature.geometry?.type === 'MultiLineString'
+            ) {
+                geometries = [feature.geometry as Polygon | MultiPolygon | LineString | MultiLineString];
+                parts = [feature.properties ?? {}] as GeoJsonProperties[];
+            } else {
+                console.warn('Unexpected building geometry, got:', feature.geometry?.type);
                 continue;
             }
-
-            const geometries = (feature.geometry as GeometryCollection).geometries;
-            const parts = (feature.properties?.parts ?? []) as GeoJsonProperties[];
 
             let nPoints = 0;
             let nTriangles = 0;

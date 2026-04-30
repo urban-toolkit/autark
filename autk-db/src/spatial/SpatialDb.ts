@@ -10,6 +10,7 @@ import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
 import { isLayerType } from 'autk-core';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
+import { AssignBuildingIdsUseCase } from './use-cases/assign-building-ids/AssignBuildingIdsUseCase';
 import { SpatialQueryParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
 import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase';
@@ -63,6 +64,7 @@ export class AutkSpatialDb {
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
+  private assignBuildingIdsUseCase?: AssignBuildingIdsUseCase;
   private loadJsonUseCase?: LoadJsonUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
@@ -116,6 +118,7 @@ export class AutkSpatialDb {
     this.loadJsonUseCase = new LoadJsonUseCase(this.db, this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.db, this.conn);
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.db, this.conn);
+    this.assignBuildingIdsUseCase = new AssignBuildingIdsUseCase(this.db, this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.getBoundingBoxFromLayerUseCase = new GetBoundingBoxFromLayerUseCase(this.conn);
@@ -387,7 +390,7 @@ export class AutkSpatialDb {
    * @throws Error if the database or connection is not initialized.
    */
   async loadCustomLayer(params: LoadCustomLayerParams): Promise<CustomLayerTable> {
-    if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
+    if (!this.db || !this.conn || !this.loadCustomLayerUseCase || !this.assignBuildingIdsUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
     const workspaceData = this.getCurrentWorkspaceData();
@@ -397,6 +400,15 @@ export class AutkSpatialDb {
       workspace: this.currentWorkspace 
     });
     this._registerTable(table);
+
+    // When loading as buildings, compute building_id by clustering overlapping geometries
+    if (params.layerType === 'buildings') {
+      const columns = await this.assignBuildingIdsUseCase.exec({
+        tableName: table.name,
+        workspace: this.currentWorkspace,
+      });
+      table.columns = columns;
+    }
 
     return table;
   }
