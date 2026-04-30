@@ -50,13 +50,13 @@ export type ExecutedChartTransform =
 /**
  * Runs a chart transform config through the preset pipeline.
  *
- * Dispatches to the appropriate transform runner based on the `preset` field
- * in the config.
- *
  * @param rows Input rows to transform.
  * @param config Transform configuration selecting the preset runner.
  * @param columns Ordered source columns passed to the chosen preset.
  * @returns Executed transform payload tagged with its preset discriminator.
+ * @throws Never throws. Falls through to the last preset when unrecognized.
+ * @example
+ * const result = run(data, { preset: 'binning-1d', options: { bins: 10 } }, ['area']);
  */
 export function run(rows: AutkDatum[], config: ChartTransformConfig, columns: string[]): ExecutedChartTransform {
     if (config.preset === 'binning-1d') return runBinning1d(rows, config, columns);

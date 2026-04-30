@@ -61,6 +61,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      * Initializes interactive chart state on top of the shared data lifecycle.
      *
      * @param config Plot configuration including optional interaction events.
+     * @throws If configured bindings are missing or invalid (delegated to `ChartBaseData`).
      */
     constructor(config: ChartConfig) {
         super(config);
@@ -87,6 +88,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      * Replaces the source collection, clears interaction state, and redraws.
      *
      * @param collection New GeoJSON collection to render.
+     * @throws Never throws.
      */
     updateCollection(collection: import('geojson').FeatureCollection<Geometry, GeoJsonProperties>): void {
         this._sourceFeatures = collection.features;
@@ -103,6 +105,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      * Applies an externally authored selection to the chart.
      *
      * @param selection Source feature ids to highlight.
+     * @throws Never throws.
      */
     setSelection(selection: number[]): void {
         this._selectedFeatureIds = new Set(selection);
@@ -123,7 +126,9 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     }
 
     /**
-     * Attaches only the interaction handlers requested by the chart configuration.
+     * Attaches interaction handlers requested by the chart configuration.
+     *
+     * @throws Never throws.
      */
     public configureSignalListeners(): void {
         for (const event of this._enabledEvents) {

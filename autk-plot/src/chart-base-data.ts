@@ -93,9 +93,9 @@ export abstract class ChartBaseData {
     /**
      * Initializes shared chart data state from a plot configuration.
      *
-     * @param config Plot configuration containing source data, bindings, and
-     * transform/display options.
-     * @throws If configured bindings are missing or invalid for the input data.
+     * @param config Plot configuration containing source data, bindings, and transform/display options.
+     * @throws If `attributes.axis` is empty or configured bindings are missing/invalid.
+     * @throws If `@transform` placeholder is used without a transform config.
      */
     constructor(config: ChartConfig) {
         this._div = config.div;
@@ -145,8 +145,9 @@ export abstract class ChartBaseData {
     }
 
     /**
-     * Rebuilds source rows, applies any configured transform, validates active
-     * render bindings, computes the color domain, and delegates DOM rendering.
+     * Rebuilds source rows, applies transforms, validates bindings, and delegates rendering.
+     *
+     * @throws If active render bindings do not resolve on the rendered data.
      */
     public draw(): void {
         this._data = this.buildSourceRows();

@@ -33,7 +33,11 @@ export class ChartStyle {
 
     /**
      * Updates the global highlight color used by selection styling.
+     *
      * @param color Hex color string to apply as the highlight color.
+     * @throws Never throws.
+     * @example
+     * ChartStyle.setHighlightColor('#ff6600');
      */
     public static setHighlightColor(color: ColorHEX): void {
         ChartStyle._highlight = color;
@@ -41,7 +45,11 @@ export class ChartStyle {
 
     /**
      * Updates the global default color used for non-selected marks.
+     *
      * @param color Hex color string to apply as the default mark color.
+     * @throws Never throws.
+     * @example
+     * ChartStyle.setDefaultColor('#cccccc');
      */
     public static setDefaultColor(color: ColorHEX): void {
         ChartStyle._default = color;

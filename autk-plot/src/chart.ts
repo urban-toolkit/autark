@@ -47,12 +47,11 @@ export class AutkChart {
     /**
      * Creates a chart wrapper for the requested chart type.
      *
-     * The concrete implementation is selected using the discriminated
-     * `config.type` field and instantiated immediately.
-     *
      * @param div Host HTML element where the chart should render.
      * @param config Discriminated chart configuration with a `type` field.
      * @throws If `config.type` is not supported.
+     * @example
+     * const plot = new AutkChart(plotDiv, { type: 'scatterplot', collection, attributes: { axis: ['x', 'y'] } });
      */
     constructor(div: HTMLElement, config: UnifiedChartConfig) {
         this._type = config.type;
@@ -96,12 +95,12 @@ export class AutkChart {
     }
 
     /**
-     * Applies a new selection to the chart.
-     *
-     * The selection is interpreted as source feature ids and forwarded to the
-     * concrete chart instance.
+     * Applies a new selection to the chart as source feature ids.
      *
      * @param selection Source feature ids to highlight/select.
+     * @throws Never throws.
+     * @example
+     * plot.setSelection([0, 3, 7]);
      */
     public setSelection(selection: number[]): void {
         this._plot.setSelection(selection);
@@ -110,18 +109,21 @@ export class AutkChart {
     /**
      * Replaces the chart's data collection and redraws in place.
      *
-     * Resets all selection state without recreating the chart instance.
-     *
      * @param collection New GeoJSON feature collection to render.
+     * @throws Never throws.
+     * @example
+     * plot.updateCollection(newCollection);
      */
     public updateCollection(collection: import('geojson').FeatureCollection): void {
         this._plot.updateCollection(collection);
     }
 
     /**
-     * Triggers a redraw of the underlying chart implementation.
+     * Triggers a synchronous redraw of the underlying chart implementation.
      *
-     * Redraws synchronously using the current chart state.
+     * @throws Never throws.
+     * @example
+     * plot.draw();
      */
     public draw(): void {
         this._plot.draw();
