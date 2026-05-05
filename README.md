@@ -114,9 +114,9 @@ The `Makefile` provides several commands to help with the development process:
 | Command | Description |
 | :--- | :--- |
 | `make lint` | Runs ESLint. |
-| `make typecheck` | Typechecks all workspaces. |
+| `make typecheck` | Builds package outputs, then typechecks all workspaces. |
 | `make build` | Builds the publishable packages and the `autk` umbrella package. |
-| `make verify` | Runs lint, typecheck, and build. |
+| `make verify` | Runs lint and typecheck (including the build required for type resolution). |
 | `make docs` | Generates TypeDoc documentation for the core libraries. |
 | `make test` | Runs the stable Playwright test used by CI. |
 | `make test-update` | Updates local Playwright screenshots and/or HAR files for a selected test. |

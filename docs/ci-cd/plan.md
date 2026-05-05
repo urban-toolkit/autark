@@ -10,7 +10,7 @@
    npm version major --workspace autk-map --no-git-tag-version
    ```
 3. Open a PR to `main`.
-4. CI runs lint, typecheck, build, and the stable Playwright subset.
+4. CI runs lint, build+typecheck, and the stable Playwright subset.
 5. After the PR is merged, the publish workflow runs only after CI succeeds on `main`.
 6. The publish workflow publishes package versions that do not already exist on npm and creates tags like `autk-map@1.3.1`.
 

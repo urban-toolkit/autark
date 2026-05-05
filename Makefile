@@ -10,7 +10,7 @@ UPDATE ?= cache images
 lint:
 	npm run lint
 
-typecheck:
+typecheck: build
 	$(CONCURRENTLY) \
 		"cd autk-core && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-map && npx tsc --noEmit --skipLibCheck" \
@@ -36,7 +36,7 @@ docs:
 		"cd autk-plot && npm run doc" \
 		"cd autk-compute && npm run doc"
 
-verify: lint typecheck build
+verify: lint typecheck
 
 test:
 	APP=$(APP) npx playwright test $(TEST)

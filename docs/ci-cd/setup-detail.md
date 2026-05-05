@@ -9,9 +9,8 @@ Steps:
 1. Install dependencies with `npm install` because `package-lock.json` is ignored in this repo.
 2. Install Playwright Chromium with `npx playwright install chromium`.
 3. Run `make lint`.
-4. Run `make typecheck`.
-5. Run `make build`.
-6. Run `make test`.
+4. Run `make typecheck` (this builds package outputs first so workspace package types resolve on fresh CI runners).
+5. Run `make test`.
 7. Upload Playwright reports/results as artifacts.
 
 `make test` intentionally runs only one test by default:
