@@ -8,8 +8,9 @@
 
 It provides a client-side platform for the complete implementation of urban visual analytics systems. It supports loading, storing, querying, joining, and exporting both physical and thematic urban data using standard formats like OpenStreetMap, GeoJSON, and GeoTIFF. Employing GPU acceleration, it allows for fast implementations of urban analysis algorithms. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
 
-Autark is composed of four modules:
+Autark is available as an umbrella package plus individual modules:
 
+* `autk`: Umbrella package that re-exports the toolkit modules.
 * `autk-db`: A spatial database that handles physical and thematic urban datasets.
 * `autk-compute`: a WebGPU based general-purpose computation engine to implement general-purpose algorithms using physical and thematic data.
 * `autk-map`: A map visualization library that allows the exploration of 2D and 3D physical and thematical layers.
@@ -19,20 +20,19 @@ For demonstration purposes and to facilitate the adoption of Autark, we created 
 
 ## Installation
 
-Autark modules are available on NPM. The modules must be installed individually and can be used independently. To install each module, run:
+Autark packages are available on NPM. Install the umbrella package when you want the full toolkit:
 
 ```bash
-# autk-bd
-npm install -save autk-db
+npm install autk
+```
 
-# autk-compute
-npm install -save autk-compute
+Or install individual modules when you only need part of the toolkit:
 
-# autk-plot
-npm install -save autk-plot
-
-# autk-map
-npm install -save autk-map
+```bash
+npm install autk-db
+npm install autk-compute
+npm install autk-plot
+npm install autk-map
 ```
 
 ## Development
@@ -56,10 +56,10 @@ sudo apt-get install build-essential
 
 ### Building and Running
 
-After installing Node.js and GNU Make, in the root folder of the project, run the following command to install required packages:
+After installing Node.js and GNU Make, in the root folder of the project, install dependencies:
 
 ```bash
-make install
+npm install
 ```
 
 To start the development server for the default `gallery` application:
@@ -80,32 +80,31 @@ make dev APP=usecases OPEN=/src/urbane/main.html
 
 ### Testing
 
-Autark uses [Playwright](https://playwright.dev/) for end-to-end visual regression testing. Tests are organized under `tests/<app>/` and capture screenshots of the canvas output, which are compared against saved reference images.
+Autark uses [Playwright](https://playwright.dev/) for end-to-end visual regression testing. Tests are organized under `tests/<app>/` and compare screenshots against committed reference images.
 
-All test commands accept two parameters: `APP` (the application workspace, e.g. `gallery` or `usecases`) and `OPEN` (the path to the example within the app).
+CI currently runs one stable Playwright test by default:
 
 ```bash
-# Run tests and compare against saved reference screenshots
-make test APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
-
-# Update both HAR cache and reference screenshots
-make test-update APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
-
-# Update cached Overpass API responses (HAR files) only
-make test-update cache APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
-
-# Update reference screenshots only
-make test-update images APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
-
-# Open the Playwright UI for interactive test debugging
-make test-ui APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
-
-# Record a new test by interacting with an example in the browser
-# Interactions are saved as a test file under tests/<app>/
-make test-codegen APP=gallery OPEN=/src/autk-map/standalone-geojson-vis.html
+make test
 ```
 
-Tests that load OpenStreetMap data use HAR files under `tests/data/` to replay Overpass API responses without hitting the network. Run `make test-update cache` to re-record them when the query or area changes.
+Run a specific test locally:
+
+```bash
+make test TEST=tests/gallery/autk-map/standalone-geojson-vis.test.ts
+```
+
+Update committed visual baselines locally:
+
+```bash
+# Update screenshots only
+make test-update TEST=tests/gallery/autk-map/colormap-categorical.test.ts UPDATE=images
+
+# Update HAR cache and screenshots
+make test-update TEST=tests/gallery/autk-map/osm-layers-api.test.ts UPDATE="cache images"
+```
+
+Tests that load OpenStreetMap data use HAR files under `tests/data/` to replay Overpass API responses without hitting the network. Include `cache` in `UPDATE` to re-record them when the query or area changes.
 
 
 ### Development Workflow
@@ -114,20 +113,14 @@ The `Makefile` provides several commands to help with the development process:
 
 | Command | Description |
 | :--- | :--- |
-| `make install` | Installs all dependencies for the workspace. |
-| `make build` | Builds the core libraries (`autk-map`, `autk-db`, etc.). |
-| `make verify` | Runs the full CI suite: lint, typecheck, build-all, docs, and tests. |
+| `make lint` | Runs ESLint. |
+| `make typecheck` | Typechecks all workspaces. |
+| `make build` | Builds the publishable packages and the `autk` umbrella package. |
+| `make verify` | Runs lint, typecheck, and build. |
 | `make docs` | Generates TypeDoc documentation for the core libraries. |
-| `make clean` | Removes `node_modules` and all build artifacts. |
-
-#### Component-Specific Builds
-If you are working on a specific module, you can rebuild it individually:
-```bash
-make map      # Build autk-map
-make db       # Build autk-db
-make plot     # Build autk-plot
-make compute  # Build autk-compute
-```
+| `make test` | Runs the stable Playwright test used by CI. |
+| `make test-update` | Updates local Playwright screenshots and/or HAR files for a selected test. |
+| `make clean` | Removes `node_modules` and build artifacts. |
 
 ## Notes
 

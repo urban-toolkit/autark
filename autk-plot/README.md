@@ -13,6 +13,23 @@
 - [Examples](https://autarkjs.org/gallery/)
 - [Use Cases](https://autarkjs.org/usecases/)
 
+## Usage
+
+```ts
+import { AutkPlot, PlotEvent } from 'autk-plot';
+
+const plot = new AutkPlot(container, {
+  type: 'scatterplot',
+  collection,
+  attributes: { axis: ['x', 'y'] },
+  events: [PlotEvent.CLICK],
+});
+
+plot.events.on(PlotEvent.CLICK, ({ selection }) => {
+  console.log(selection);
+});
+```
+
 ## Transformation Architecture
 
 `autk-plot` exposes a shared transformation layer under `src/transforms/`:
