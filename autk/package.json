@@ -7,6 +7,11 @@
     "analytics",
     "WebGPU"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/urban-toolkit/autark",
+    "directory": "autk"
+  },
   "type": "module",
   "files": [
     "dist",

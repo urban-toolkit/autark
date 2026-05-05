@@ -5,6 +5,11 @@
     "urban",
     "data management"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/urban-toolkit/autark",
+    "directory": "autk-db"
+  },
   "type": "module",
   "files": [
     "dist"

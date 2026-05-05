@@ -6,6 +6,11 @@
     "urban",
     "3D"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/urban-toolkit/autark",
+    "directory": "autk-map"
+  },
   "type": "module",
   "files": [
     "dist"

@@ -6,6 +6,11 @@
     "data management",
     "WebGPU"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/urban-toolkit/autark",
+    "directory": "autk-compute"
+  },
   "type": "module",
   "files": [
     "dist"
