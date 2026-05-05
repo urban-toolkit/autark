@@ -1,7 +1,7 @@
 .PHONY: install lint typecheck build build-all docs verify test test-update test-ui test-codegen dev map db plot compute clean publish
 
 CONCURRENTLY := npx concurrently
-RIMRAF := npx rimraf
+RIMRAF := rm -rf
 
 APP ?= gallery
 

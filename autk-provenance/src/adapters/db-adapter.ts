@@ -1,17 +1,14 @@
 import type { AutarkProvenanceState } from '../types';
-import { ProvenanceAction } from '../types';
+import {
+  createDbRecorderSet,
+  inferName,
+  isFn,
+  type DbRecordCallback,
+  type DbTableLike,
+} from './db-adapter-shared';
+export { createDbProvenanceWrapper } from './db-provenance-wrapper';
 
-export type DbRecordCallback = (
-  actionType: ProvenanceAction | string,
-  actionLabel: string,
-  stateDelta: Partial<AutarkProvenanceState>
-) => void;
-
-type DbTableLike = {
-  name: string;
-  source?: string;
-  type?: string;
-};
+export type { DbRecordCallback };
 
 export interface IDbForProvenance {
   getCurrentWorkspace(): string;
@@ -53,167 +50,15 @@ export interface DbAdapterApi {
   applyState(state: AutarkProvenanceState): Promise<void>;
 }
 
-function inferName(result: unknown, fallback = 'table'): string {
-  if (result && typeof result === 'object' && 'name' in result) {
-    const maybeName = (result as { name?: unknown }).name;
-    if (typeof maybeName === 'string' && maybeName.trim().length > 0) return maybeName;
-  }
-  return fallback;
-}
-
-function isFn(value: unknown): value is (...args: unknown[]) => unknown {
-  return typeof value === 'function';
-}
-
 export function createDbAdapter(
   db: IDbForProvenance,
   onRecord: DbRecordCallback
 ): DbAdapterApi {
   const dbObj = db as unknown as Record<string, unknown>;
+  const recorder = createDbRecorderSet(db, onRecord);
   const originalMethods = new Map<string, unknown>();
   let isRecording = false;
   let isApplyingState = false;
-  let didBootstrap = false;
-
-  function getCurrentLayerNames(): string[] {
-    return (db.tables || []).map((t) => t.name);
-  }
-
-  function getWorkspaceSafe(): string {
-    try {
-      return db.getCurrentWorkspace();
-    } catch {
-      return 'main';
-    }
-  }
-
-  function record(
-    actionType: ProvenanceAction | string,
-    actionLabel: string,
-    layerTableNames: string[] = getCurrentLayerNames()
-  ): void {
-    onRecord(actionType, actionLabel, {
-      data: {
-        workspace: getWorkspaceSafe(),
-        layerTableNames,
-      },
-    });
-  }
-
-  function recordInit(): void {
-    record(ProvenanceAction.DB_INIT, 'Database initialized');
-  }
-
-  function recordWorkspace(name: string): void {
-    onRecord(ProvenanceAction.DB_WORKSPACE, `Workspace: ${name}`, {
-      data: {
-        workspace: name,
-        layerTableNames: getCurrentLayerNames(),
-      },
-    });
-  }
-
-  function recordLoadOsm(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_LOAD_OSM, `Load OSM: ${outputTableName}`, names);
-  }
-
-  function recordLoadCsv(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_LOAD_CSV, `Load CSV: ${outputTableName}`, names);
-  }
-
-  function recordLoadJson(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_LOAD_JSON, `Load JSON: ${outputTableName}`, names);
-  }
-
-  function recordLoadLayer(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_LOAD_LAYER, `Load layer: ${outputTableName}`, names);
-  }
-
-  function recordLoadCustomLayer(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_LOAD_CUSTOM_LAYER, `Load custom layer: ${outputTableName}`, names);
-  }
-
-  function recordLoadGridLayer(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_LOAD_GRID_LAYER, `Load grid layer: ${outputTableName}`, names);
-  }
-
-  function recordGetLayer(outputTableName: string): void {
-    record(ProvenanceAction.DB_GET_LAYER, `Get layer: ${outputTableName}`);
-  }
-
-  function recordSpatialJoin(params: { tableRootName?: string; tableJoinName?: string }): void {
-    const label = `Spatial join: ${params.tableRootName ?? '?'} + ${params.tableJoinName ?? '?'}`;
-    record(ProvenanceAction.DB_SPATIAL_JOIN, label);
-  }
-
-  function recordUpdateTable(tableName: string): void {
-    record(ProvenanceAction.DB_UPDATE_TABLE, `Update table: ${tableName}`);
-  }
-
-  function recordDropTable(tableName: string): void {
-    const names = getCurrentLayerNames().filter((n) => n !== tableName);
-    record(ProvenanceAction.DB_DROP_TABLE, `Drop table: ${tableName}`, names);
-  }
-
-  function recordRawQuery(label = 'Raw query executed'): void {
-    record(ProvenanceAction.DB_RAW_QUERY, label);
-  }
-
-  function recordBuildHeatmap(outputTableName: string): void {
-    const names = getCurrentLayerNames();
-    if (!names.includes(outputTableName)) names.push(outputTableName);
-    record(ProvenanceAction.DB_BUILD_HEATMAP, `Build heatmap: ${outputTableName}`, names);
-  }
-
-  function recordTableBySource(table: DbTableLike): void {
-    switch (table.source) {
-      case 'csv':
-        recordLoadCsv(table.name);
-        return;
-      case 'json':
-        recordLoadJson(table.name);
-        return;
-      case 'osm':
-        if (table.type === 'pointset') recordLoadOsm(table.name);
-        else recordLoadLayer(table.name);
-        return;
-      case 'geojson':
-        recordLoadCustomLayer(table.name);
-        return;
-      case 'user':
-        if (table.type === 'pointset') {
-          record(ProvenanceAction.DB_OTHER, `User table: ${table.name}`);
-        } else {
-          recordLoadGridLayer(table.name);
-        }
-        return;
-      default:
-        record(ProvenanceAction.DB_OTHER, `Table available: ${table.name}`);
-    }
-  }
-
-  function bootstrapFromCurrentState(): void {
-    if (didBootstrap) return;
-    didBootstrap = true;
-
-    recordInit();
-    recordWorkspace(getWorkspaceSafe());
-    for (const table of db.tables || []) {
-      recordTableBySource(table);
-    }
-  }
 
   function wrapAsyncMethod(
     methodName: string,
@@ -244,61 +89,61 @@ export function createDbAdapter(
     if (isRecording) return;
     isRecording = true;
 
-    bootstrapFromCurrentState();
+    recorder.bootstrapFromCurrentState();
 
     wrapAsyncMethod('init', () => {
-      recordInit();
+      recorder.recordInit();
     });
     wrapAsyncMethod('setWorkspace', (args) => {
       const [name] = args;
-      recordWorkspace(typeof name === 'string' ? name : getWorkspaceSafe());
+      recorder.recordWorkspace(typeof name === 'string' ? name : recorder.getWorkspaceSafe());
     });
     wrapAsyncMethod('loadOsmFromOverpassApi', (args) => {
       const params = (args[0] ?? {}) as { outputTableName?: string };
-      recordLoadOsm(params.outputTableName ?? 'osm');
+      recorder.recordLoadOsm(params.outputTableName ?? 'osm');
     });
     wrapAsyncMethod('loadCsv', (args, result) => {
       const params = (args[0] ?? {}) as { outputTableName?: string };
-      recordLoadCsv(params.outputTableName ?? inferName(result, 'csv'));
+      recorder.recordLoadCsv(params.outputTableName ?? inferName(result, 'csv'));
     });
     wrapAsyncMethod('loadJson', (args, result) => {
       const params = (args[0] ?? {}) as { outputTableName?: string };
-      recordLoadJson(params.outputTableName ?? inferName(result, 'json'));
+      recorder.recordLoadJson(params.outputTableName ?? inferName(result, 'json'));
     });
     wrapAsyncMethod('loadLayer', (args, result) => {
       const params = (args[0] ?? {}) as { layer?: string; outputTableName?: string };
-      recordLoadLayer(params.outputTableName ?? params.layer ?? inferName(result, 'layer'));
+      recorder.recordLoadLayer(params.outputTableName ?? params.layer ?? inferName(result, 'layer'));
     });
     wrapAsyncMethod('loadCustomLayer', (args, result) => {
       const params = (args[0] ?? {}) as { outputTableName?: string };
-      recordLoadCustomLayer(params.outputTableName ?? inferName(result, 'custom-layer'));
+      recorder.recordLoadCustomLayer(params.outputTableName ?? inferName(result, 'custom-layer'));
     });
     wrapAsyncMethod('loadGridLayer', (args, result) => {
       const params = (args[0] ?? {}) as { outputTableName?: string };
-      recordLoadGridLayer(params.outputTableName ?? inferName(result, 'grid-layer'));
+      recorder.recordLoadGridLayer(params.outputTableName ?? inferName(result, 'grid-layer'));
     });
     wrapAsyncMethod('getLayer', (args) => {
       const [tableName] = args;
-      recordGetLayer(typeof tableName === 'string' ? tableName : 'layer');
+      recorder.recordGetLayer(typeof tableName === 'string' ? tableName : 'layer');
     });
     wrapAsyncMethod('spatialJoin', (args) => {
       const params = (args[0] ?? {}) as { tableRootName?: string; tableJoinName?: string };
-      recordSpatialJoin(params);
+      recorder.recordSpatialJoin(params);
     });
     wrapAsyncMethod('updateTable', (args, result) => {
       const params = (args[0] ?? {}) as { tableName?: string };
-      recordUpdateTable(params.tableName ?? inferName(result, 'table'));
+      recorder.recordUpdateTable(params.tableName ?? inferName(result, 'table'));
     });
     wrapAsyncMethod('rawQuery', (args) => {
       const params = (args[0] ?? {}) as { output?: { type?: string } };
       const label = params.output?.type === 'CREATE_TABLE'
         ? 'Raw query created table'
         : 'Raw query executed';
-      recordRawQuery(label);
+      recorder.recordRawQuery(label);
     });
     wrapAsyncMethod('buildHeatmap', (args, result) => {
       const params = (args[0] ?? {}) as { outputTableName?: string };
-      recordBuildHeatmap(params.outputTableName ?? inferName(result, 'heatmap'));
+      recorder.recordBuildHeatmap(params.outputTableName ?? inferName(result, 'heatmap'));
     });
   }
 
@@ -311,7 +156,7 @@ export function createDbAdapter(
   async function applyState(state: AutarkProvenanceState): Promise<void> {
     const data = state.data;
     if (!data?.workspace) return;
-    const current = getWorkspaceSafe();
+    const current = recorder.getWorkspaceSafe();
     if (current !== data.workspace) {
       isApplyingState = true;
       try {
@@ -325,34 +170,21 @@ export function createDbAdapter(
   return {
     startRecording,
     stopRecording,
-    bootstrapFromCurrentState,
-    recordInit,
-    recordWorkspace,
-    recordLoadOsm,
-    recordLoadCsv,
-    recordLoadJson,
-    recordLoadLayer,
-    recordLoadCustomLayer,
-    recordLoadGridLayer,
-    recordGetLayer,
-    recordSpatialJoin,
-    recordUpdateTable,
-    recordDropTable,
-    recordRawQuery,
-    recordBuildHeatmap,
+    bootstrapFromCurrentState: recorder.bootstrapFromCurrentState,
+    recordInit: recorder.recordInit,
+    recordWorkspace: recorder.recordWorkspace,
+    recordLoadOsm: recorder.recordLoadOsm,
+    recordLoadCsv: recorder.recordLoadCsv,
+    recordLoadJson: recorder.recordLoadJson,
+    recordLoadLayer: recorder.recordLoadLayer,
+    recordLoadCustomLayer: recorder.recordLoadCustomLayer,
+    recordLoadGridLayer: recorder.recordLoadGridLayer,
+    recordGetLayer: recorder.recordGetLayer,
+    recordSpatialJoin: recorder.recordSpatialJoin,
+    recordUpdateTable: recorder.recordUpdateTable,
+    recordDropTable: recorder.recordDropTable,
+    recordRawQuery: recorder.recordRawQuery,
+    recordBuildHeatmap: recorder.recordBuildHeatmap,
     applyState,
   };
-}
-
-/**
- * Starts automatic provenance tracking for a SpatialDb-like instance.
- * The same db instance is returned for convenience.
- */
-export function createDbProvenanceWrapper<T extends IDbForProvenance>(
-  db: T,
-  onRecord: DbRecordCallback
-): T {
-  const adapter = createDbAdapter(db, onRecord);
-  adapter.startRecording();
-  return db;
 }

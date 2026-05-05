@@ -23,10 +23,10 @@
     }
   },
   "scripts": {
-    "dev": "vite",
-    "dev-build": "tsc && vite build --watch",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "dev": "node ./node_modules/vite/bin/vite.js",
+    "dev-build": "tsc && node ./node_modules/vite/bin/vite.js build --watch",
+    "build": "tsc && node ./node_modules/vite/bin/vite.js build",
+    "preview": "node ./node_modules/vite/bin/vite.js preview",
     "format": "prettier --write .",
     "doc": "typedoc --options typedoc.json"
   },
