@@ -1,29 +1,41 @@
 import type { AutarkProvenanceState, ProvenanceGraph } from '../types';
-import type { GraphMetrics, StrategyLabel } from './types';
+
+export type StrategyLabel = 'Confirmatory' | 'Exploratory' | 'Iterative Refinement';
+
+export interface GraphMetrics {
+  totalNodes: number;
+  branchPoints: number;
+  backtracks: number;
+  maxDepth: number;
+  sessionDurationMs: number;
+  avgTimePerStateMs: number;
+  branchRatio: number;
+  strategyLabel: StrategyLabel;
+  insightCount: number;
+}
 
 function computeMaxDepth(graph: ProvenanceGraph<AutarkProvenanceState>): number {
-  let max = 0;
+  let maxDepth = 0;
   const visited = new Set<string>();
-  const dfs = (id: string, depth: number): void => {
-    if (visited.has(id)) return;
-    visited.add(id);
-    max = Math.max(max, depth);
-    const node = graph.nodes.get(id);
-    if (!node) return;
-    for (const child of node.childrenIds) dfs(child, depth + 1);
-  };
-  dfs(graph.rootId, 0);
-  return max;
+
+  function visit(nodeId: string, depth: number): void {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+    maxDepth = Math.max(maxDepth, depth);
+    graph.nodes.get(nodeId)?.childrenIds.forEach((childId) => visit(childId, depth + 1));
+  }
+
+  visit(graph.rootId, 0);
+  return maxDepth;
 }
 
 export function computeGraphMetrics(
   graph: ProvenanceGraph<AutarkProvenanceState>
 ): GraphMetrics {
   const nodes = Array.from(graph.nodes.values());
-  const total = nodes.length;
-  if (total <= 1) {
+  if (nodes.length <= 1) {
     return {
-      totalNodes: total,
+      totalNodes: nodes.length,
       branchPoints: 0,
       backtracks: 0,
       maxDepth: 0,
@@ -35,29 +47,27 @@ export function computeGraphMetrics(
     };
   }
 
-  const branchPoints = nodes.filter((n) => n.childrenIds.length > 1).length;
-  const backtracks = nodes.reduce((acc, n) => acc + Math.max(0, n.childrenIds.length - 1), 0);
-  const branchRatio = branchPoints / total;
-  const timestamps = nodes.map((n) => n.timestamp).sort((a, b) => a - b);
+  const branchPoints = nodes.filter((node) => node.childrenIds.length > 1).length;
+  const backtracks = nodes.reduce((count, node) => count + Math.max(0, node.childrenIds.length - 1), 0);
+  const timestamps = nodes.map((node) => node.timestamp).sort((a, b) => a - b);
   const sessionDurationMs = timestamps[timestamps.length - 1] - timestamps[0];
-  const strategyLabel: StrategyLabel =
-    backtracks >= 3 && branchRatio >= 0.15
-      ? 'Iterative Refinement'
-      : branchRatio >= 0.15 || backtracks >= 2
-        ? 'Exploratory'
-        : 'Confirmatory';
+  const branchRatio = branchPoints / nodes.length;
+  const insightCount = nodes.filter((node) => typeof node.metadata?.insight === 'string' && `${node.metadata.insight}`.trim().length > 0).length;
 
   return {
-    totalNodes: total,
+    totalNodes: nodes.length,
     branchPoints,
     backtracks,
     maxDepth: computeMaxDepth(graph),
     sessionDurationMs,
-    avgTimePerStateMs: total > 1 ? Math.round(sessionDurationMs / (total - 1)) : 0,
+    avgTimePerStateMs: Math.round(sessionDurationMs / (nodes.length - 1)),
     branchRatio,
-    strategyLabel,
-    insightCount: nodes.filter(
-      (n) => typeof n.metadata?.insight === 'string' && (n.metadata.insight as string).trim().length > 0
-    ).length,
+    strategyLabel:
+      backtracks >= 3 && branchRatio >= 0.15
+        ? 'Iterative Refinement'
+        : branchRatio >= 0.15 || backtracks >= 2
+          ? 'Exploratory'
+          : 'Confirmatory',
+    insightCount,
   };
 }

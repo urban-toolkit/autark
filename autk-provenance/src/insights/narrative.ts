@@ -1,59 +1,59 @@
 import type { AutarkProvenanceState, ProvenanceGraph } from '../types';
+import type { InsightAnnotation } from './annotations';
 import { computeSelectionFrequency } from './selection-frequency';
-import type { GraphMetrics, InsightAnnotation, StrategyLabel } from './types';
-import { formatDuration } from './utils';
+import type { GraphMetrics, StrategyLabel } from './graph-metrics';
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
 
 export function generateSessionNarrative(
   graph: ProvenanceGraph<AutarkProvenanceState>,
   metrics: GraphMetrics,
   annotations: InsightAnnotation[]
 ): string {
-  const lines: string[] = [];
-  const root = graph.nodes.get(graph.rootId);
-  const startTime = root ? new Date(root.timestamp).toLocaleTimeString() : '—';
-  const strategyDesc: Record<StrategyLabel, string> = {
-    Confirmatory: 'A focused, linear exploration — the analyst appeared to know what they were looking for.',
-    Exploratory: 'A broad, open-ended investigation with multiple diverging paths.',
-    'Iterative Refinement': 'A hypothesis-driven approach with repeated backtracking and revision.',
-  };
-
-  lines.push(`Session started at ${startTime}.`);
-  lines.push(
-    `Duration: ${formatDuration(metrics.sessionDurationMs)} across ${metrics.totalNodes} states ` +
-      `(avg ${formatDuration(metrics.avgTimePerStateMs)} per state).`
-  );
-  lines.push(`\nAnalysis strategy: ${metrics.strategyLabel}`);
-  lines.push(strategyDesc[metrics.strategyLabel]);
+  const lines = [
+    `Session started at ${graph.nodes.get(graph.rootId) ? new Date(graph.nodes.get(graph.rootId)!.timestamp).toLocaleTimeString() : '—'}.`,
+    `Duration: ${formatDuration(metrics.sessionDurationMs)} across ${metrics.totalNodes} states (avg ${formatDuration(metrics.avgTimePerStateMs)} per state).`,
+    '',
+    `Analysis strategy: ${metrics.strategyLabel}`,
+    strategyDescription[metrics.strategyLabel],
+  ];
 
   if (metrics.branchPoints > 0) {
     lines.push(
-      `The analysis diverged at ${metrics.branchPoints} branch point${metrics.branchPoints > 1 ? 's' : ''}, ` +
-        `with ${metrics.backtracks} backtrack${metrics.backtracks !== 1 ? 's' : ''} before settling on the current path.`
+      `The analysis diverged at ${metrics.branchPoints} branch point${metrics.branchPoints > 1 ? 's' : ''}, with ${metrics.backtracks} backtrack${metrics.backtracks !== 1 ? 's' : ''} before settling on the current path.`
     );
   }
 
-  const freq = computeSelectionFrequency(graph);
-  const topMap = [...freq.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const selectionFrequency = computeSelectionFrequency(graph);
+  const topMap = [...selectionFrequency.map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (topMap.length > 0) {
-    lines.push(
-      `\nMost revisited map features across all branches: ` +
-        topMap.map(([id, c]) => `feature #${id} (${c} state${c !== 1 ? 's' : ''})`).join(', ') +
-        '.'
-    );
+    lines.push('', `Most revisited map features across all branches: ${topMap.map(([id, count]) => `feature #${id} (${count} state${count !== 1 ? 's' : ''})`).join(', ')}.`);
   }
-  for (const [plotId, plotFreq] of freq.plots.entries()) {
-    const top = [...plotFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-    if (top.length > 0 && top[0][1] > 1) {
-      lines.push(`Most revisited features in plot "${plotId}": ${top.map(([id, c]) => `#${id} (${c}×)`).join(', ')}.`);
+
+  for (const [plotId, plotFreq] of selectionFrequency.plots.entries()) {
+    const topPlot = [...plotFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (topPlot.length > 0 && topPlot[0][1] > 1) {
+      lines.push(`Most revisited features in plot "${plotId}": ${topPlot.map(([id, count]) => `#${id} (${count}×)`).join(', ')}.`);
     }
   }
 
   if (annotations.length > 0) {
-    lines.push(`\nRecorded insights (${annotations.length}):`);
-    for (const a of annotations) lines.push(`  • [${a.actionLabel}] ${a.text}`);
+    lines.push('', `Recorded insights (${annotations.length}):`);
+    annotations.forEach((annotation) => lines.push(`  • [${annotation.actionLabel}] ${annotation.text}`));
   } else {
-    lines.push('\nNo insight annotations were recorded during this session.');
+    lines.push('', 'No insight annotations were recorded during this session.');
   }
 
   return lines.join('\n');
 }
+
+const strategyDescription: Record<StrategyLabel, string> = {
+  Confirmatory: 'A focused, linear exploration — the analyst appeared to know what they were looking for.',
+  Exploratory: 'A broad, open-ended investigation with multiple diverging paths.',
+  'Iterative Refinement': 'A hypothesis-driven approach with repeated backtracking and revision.',
+};

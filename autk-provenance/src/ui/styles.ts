@@ -1,12 +1,11 @@
 export function ensureProvenanceTrailStyles(): void {
   if (typeof document === 'undefined' || !document.head) return;
-
   const styleId = 'autk-provenance-trail-styles';
   if (document.getElementById(styleId)) return;
 
-  const el = document.createElement('style');
-  el.id = styleId;
-  el.textContent = [
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = [
     '.autk-provenance-root{display:flex;flex-direction:column;height:100%;font-family:system-ui,sans-serif;font-size:13px;gap:10px;min-height:0}',
     '.autk-provenance-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}',
     '.autk-provenance-toolbar-main{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
@@ -74,5 +73,5 @@ export function ensureProvenanceTrailStyles(): void {
     '.autk-prov-copy-btn{align-self:flex-start;padding:5px 10px;border:1px solid #c3cfdb;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;color:#1f344b}',
     '.autk-prov-copy-btn:hover{background:#edf5ff}',
   ].join('');
-  document.head.appendChild(el);
+  document.head.appendChild(style);
 }

@@ -1,10 +1,5 @@
 import type { AutarkProvenanceApi } from '../create-autark-provenance';
-import {
-  computeGraphMetrics,
-  generateSessionNarrative,
-  getInsightAnnotations,
-  type StrategyLabel,
-} from '../insight-engine';
+import { computeGraphMetrics, generateSessionNarrative, getInsightAnnotations, type StrategyLabel } from '../insight-engine';
 import { formatDurationShort, truncate } from './utils';
 
 const STRATEGY_COLORS: Record<StrategyLabel, string> = {
@@ -13,138 +8,111 @@ const STRATEGY_COLORS: Record<StrategyLabel, string> = {
   'Iterative Refinement': '#6a1b9a',
 };
 
-export function renderInsightsPanel(
-  container: HTMLElement,
-  provenance: AutarkProvenanceApi
-): void {
-  container.innerHTML = '';
-
+export function renderInsightsPanel(container: HTMLElement, provenance: AutarkProvenanceApi): void {
   const graph = provenance.getGraph();
   const currentNode = provenance.getCurrentNode();
   const metrics = computeGraphMetrics(graph);
   const annotations = getInsightAnnotations(graph);
+  const narrative = generateSessionNarrative(graph, metrics, annotations);
+  container.innerHTML = '';
 
   const metricsRow = document.createElement('div');
   metricsRow.className = 'autk-prov-insights-metrics';
-
   const badge = document.createElement('span');
   badge.className = 'autk-prov-strategy-badge';
   badge.textContent = metrics.strategyLabel;
   badge.style.background = STRATEGY_COLORS[metrics.strategyLabel];
+  const meta = document.createElement('span');
+  meta.className = 'autk-prov-metrics-meta';
+  meta.textContent = [
+    metrics.sessionDurationMs > 0 ? formatDurationShort(metrics.sessionDurationMs) : null,
+    `${metrics.totalNodes} state${metrics.totalNodes !== 1 ? 's' : ''}`,
+    metrics.branchPoints > 0 ? `${metrics.branchPoints} branch${metrics.branchPoints !== 1 ? 'es' : ''}` : null,
+    metrics.backtracks > 0 ? `${metrics.backtracks} backtrack${metrics.backtracks !== 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join('  •  ');
   metricsRow.appendChild(badge);
-
-  const metaItems: string[] = [];
-  if (metrics.sessionDurationMs > 0) {
-    metaItems.push(formatDurationShort(metrics.sessionDurationMs));
-  }
-  metaItems.push(`${metrics.totalNodes} state${metrics.totalNodes !== 1 ? 's' : ''}`);
-  if (metrics.branchPoints > 0) {
-    metaItems.push(`${metrics.branchPoints} branch${metrics.branchPoints !== 1 ? 'es' : ''}`);
-  }
-  if (metrics.backtracks > 0) {
-    metaItems.push(`${metrics.backtracks} backtrack${metrics.backtracks !== 1 ? 's' : ''}`);
-  }
-
-  const metaSpan = document.createElement('span');
-  metaSpan.className = 'autk-prov-metrics-meta';
-  metaSpan.textContent = metaItems.join('  •  ');
-  metricsRow.appendChild(metaSpan);
-
+  metricsRow.appendChild(meta);
   container.appendChild(metricsRow);
 
-  const annotateSection = document.createElement('div');
-  annotateSection.className = 'autk-prov-insights-section';
+  container.appendChild(createAnnotationEditor(provenance, container, currentNode?.id ?? null, typeof currentNode?.metadata?.insight === 'string' ? currentNode.metadata.insight : ''));
+  if (annotations.length > 0) container.appendChild(createAnnotationsList(provenance, annotations));
+  container.appendChild(createSummarySection(narrative));
+}
 
-  const annotateLabel = document.createElement('div');
-  annotateLabel.className = 'autk-prov-insights-section-title';
-  annotateLabel.textContent = 'Insight at this step';
-  annotateSection.appendChild(annotateLabel);
-
+function createAnnotationEditor(
+  provenance: AutarkProvenanceApi,
+  container: HTMLElement,
+  nodeId: string | null,
+  existingInsight: string
+): HTMLElement {
+  const section = createSection('Insight at this step');
   const textarea = document.createElement('textarea');
+  const save = document.createElement('button');
   textarea.className = 'autk-prov-annotation-textarea';
   textarea.placeholder = 'What did you notice or conclude here?';
   textarea.rows = 3;
-  if (currentNode) {
-    const existing = currentNode.metadata?.insight;
-    textarea.value = typeof existing === 'string' ? existing : '';
-  } else {
-    textarea.disabled = true;
-  }
-  annotateSection.appendChild(textarea);
-
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'autk-prov-annotation-save';
-  saveBtn.textContent = 'Save Insight';
-  saveBtn.disabled = !currentNode;
-  saveBtn.addEventListener('click', () => {
-    if (!currentNode) return;
-    provenance.annotateNode(currentNode.id, textarea.value);
+  textarea.value = existingInsight;
+  textarea.disabled = !nodeId;
+  save.className = 'autk-prov-annotation-save';
+  save.textContent = 'Save Insight';
+  save.disabled = !nodeId;
+  save.addEventListener('click', () => {
+    if (!nodeId) return;
+    provenance.annotateNode(nodeId, textarea.value);
     renderInsightsPanel(container, provenance);
   });
-  annotateSection.appendChild(saveBtn);
+  section.appendChild(textarea);
+  section.appendChild(save);
+  return section;
+}
 
-  container.appendChild(annotateSection);
+function createAnnotationsList(
+  provenance: AutarkProvenanceApi,
+  annotations: ReturnType<typeof getInsightAnnotations>
+): HTMLElement {
+  const section = createSection(`Recorded insights (${annotations.length})`);
+  annotations.forEach((annotation) => {
+    const item = document.createElement('div');
+    const step = document.createElement('div');
+    const text = document.createElement('div');
+    item.className = 'autk-prov-anno-item';
+    step.className = 'autk-prov-anno-step';
+    text.className = 'autk-prov-anno-text';
+    step.textContent = truncate(annotation.actionLabel, 24);
+    text.textContent = annotation.text;
+    item.appendChild(step);
+    item.appendChild(text);
+    item.addEventListener('click', () => provenance.goToNode(annotation.nodeId));
+    section.appendChild(item);
+  });
+  return section;
+}
 
-  if (annotations.length > 0) {
-    const annoSection = document.createElement('div');
-    annoSection.className = 'autk-prov-insights-section';
-
-    const annoTitle = document.createElement('div');
-    annoTitle.className = 'autk-prov-insights-section-title';
-    annoTitle.textContent = `Recorded insights (${annotations.length})`;
-    annoSection.appendChild(annoTitle);
-
-    for (const a of annotations) {
-      const item = document.createElement('div');
-      item.className = 'autk-prov-anno-item';
-
-      const step = document.createElement('div');
-      step.className = 'autk-prov-anno-step';
-      step.textContent = truncate(a.actionLabel, 24);
-      item.appendChild(step);
-
-      const text = document.createElement('div');
-      text.className = 'autk-prov-anno-text';
-      text.textContent = a.text;
-      item.appendChild(text);
-
-      item.addEventListener('click', () => {
-        provenance.goToNode(a.nodeId);
-      });
-
-      annoSection.appendChild(item);
-    }
-
-    container.appendChild(annoSection);
-  }
-
-  const summarySection = document.createElement('div');
-  summarySection.className = 'autk-prov-insights-section';
-
-  const summaryTitle = document.createElement('div');
-  summaryTitle.className = 'autk-prov-insights-section-title';
-  summaryTitle.textContent = 'Analysis summary';
-  summarySection.appendChild(summaryTitle);
-
-  const narrative = generateSessionNarrative(graph, metrics, annotations);
-
-  const summaryPre = document.createElement('pre');
-  summaryPre.className = 'autk-prov-summary-text';
-  summaryPre.textContent = narrative;
-  summarySection.appendChild(summaryPre);
-
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'autk-prov-copy-btn';
-  copyBtn.textContent = 'Copy to clipboard';
-  copyBtn.addEventListener('click', () => {
+function createSummarySection(narrative: string): HTMLElement {
+  const section = createSection('Analysis summary');
+  const summary = document.createElement('pre');
+  const copyButton = document.createElement('button');
+  summary.className = 'autk-prov-summary-text';
+  summary.textContent = narrative;
+  copyButton.className = 'autk-prov-copy-btn';
+  copyButton.textContent = 'Copy to clipboard';
+  copyButton.addEventListener('click', () => {
     navigator.clipboard.writeText(narrative).then(() => {
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => {
-        copyBtn.textContent = 'Copy to clipboard';
-      }, 1800);
+      copyButton.textContent = 'Copied!';
+      setTimeout(() => { copyButton.textContent = 'Copy to clipboard'; }, 1800);
     });
   });
-  summarySection.appendChild(copyBtn);
+  section.appendChild(summary);
+  section.appendChild(copyButton);
+  return section;
+}
 
-  container.appendChild(summarySection);
+function createSection(titleText: string): HTMLDivElement {
+  const section = document.createElement('div');
+  const title = document.createElement('div');
+  section.className = 'autk-prov-insights-section';
+  title.className = 'autk-prov-insights-section-title';
+  title.textContent = titleText;
+  section.appendChild(title);
+  return section;
 }

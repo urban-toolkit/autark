@@ -28,86 +28,47 @@ export function buildGraphLayout(
   const row = new Map<string, number>();
   const visited = new Set<string>();
   const edges: LayoutEdge[] = [];
-
-  function assignDepth(nodeId: string, d: number): void {
-    if (visited.has(nodeId)) {
-      const prev = depth.get(nodeId);
-      if (prev === undefined || d < prev) depth.set(nodeId, d);
-      return;
-    }
-    visited.add(nodeId);
-    depth.set(nodeId, d);
-    const node = nodesMap.get(nodeId);
-    if (!node) return;
-    for (const childId of node.childrenIds) {
-      if (!nodesMap.has(childId)) continue;
-      edges.push({ from: nodeId, to: childId });
-      assignDepth(childId, d + 1);
-    }
-  }
-
-  assignDepth(rootId, 0);
-
   let nextLeafRow = 0;
-  function assignRow(nodeId: string): number {
+
+  const assignDepth = (nodeId: string, level: number): void => {
+    if (visited.has(nodeId)) return void depth.set(nodeId, Math.min(depth.get(nodeId) ?? level, level));
+    visited.add(nodeId);
+    depth.set(nodeId, level);
+    nodesMap.get(nodeId)?.childrenIds.forEach((childId) => {
+      if (!nodesMap.has(childId)) return;
+      edges.push({ from: nodeId, to: childId });
+      assignDepth(childId, level + 1);
+    });
+  };
+  const assignRow = (nodeId: string): number => {
     if (row.has(nodeId)) return row.get(nodeId) ?? 0;
-    const node = nodesMap.get(nodeId);
-    if (!node) {
-      row.set(nodeId, nextLeafRow);
-      nextLeafRow += 1;
-      return row.get(nodeId) ?? 0;
-    }
-
-    const validChildren = node.childrenIds.filter((id) => nodesMap.has(id));
-    if (validChildren.length === 0) {
-      row.set(nodeId, nextLeafRow);
-      nextLeafRow += 1;
-      return row.get(nodeId) ?? 0;
-    }
-
-    const childRows = validChildren.map(assignRow);
-    const avg = childRows.reduce((acc, n) => acc + n, 0) / childRows.length;
+    const validChildren = nodesMap.get(nodeId)?.childrenIds.filter((id) => nodesMap.has(id)) ?? [];
+    if (validChildren.length === 0) return row.set(nodeId, nextLeafRow++).get(nodeId) ?? 0;
+    const avg = validChildren.map(assignRow).reduce((sum, value) => sum + value, 0) / validChildren.length;
     row.set(nodeId, avg);
     return avg;
-  }
+  };
 
+  assignDepth(rootId, 0);
   assignRow(rootId);
-
-  for (const nodeId of nodesMap.keys()) {
+  nodesMap.forEach((_, nodeId) => {
     if (!depth.has(nodeId)) depth.set(nodeId, 0);
-    if (!row.has(nodeId)) {
-      row.set(nodeId, nextLeafRow);
-      nextLeafRow += 1;
-    }
-  }
+    if (!row.has(nodeId)) row.set(nodeId, nextLeafRow++);
+  });
 
-  const xGap = 160;
-  const yGap = 64;
-  const marginX = 28;
-  const marginY = 24;
-
-  const layoutNodes: LayoutNode[] = [];
-  let maxDepth = 0;
-  let maxRow = 0;
-
-  for (const [id, node] of nodesMap.entries()) {
-    const d = depth.get(id) ?? 0;
-    const r = row.get(id) ?? 0;
-    maxDepth = Math.max(maxDepth, d);
-    maxRow = Math.max(maxRow, r);
-    layoutNodes.push({
-      node,
-      depth: d,
-      row: r,
-      x: marginX + d * xGap,
-      y: marginY + r * yGap,
-    });
-  }
-
+  const layoutNodes = Array.from(nodesMap.entries()).map(([id, node]) => ({
+    node,
+    depth: depth.get(id) ?? 0,
+    row: row.get(id) ?? 0,
+    x: 28 + (depth.get(id) ?? 0) * 160,
+    y: 24 + (row.get(id) ?? 0) * 64,
+  }));
   layoutNodes.sort((a, b) => (a.depth === b.depth ? a.row - b.row : a.depth - b.depth));
 
-  const width = marginX * 2 + maxDepth * xGap + 280;
-  const height = marginY * 2 + Math.max(1, maxRow) * yGap + 44;
-
-  return { nodes: layoutNodes, edges, width, height };
+  return {
+    nodes: layoutNodes,
+    edges,
+    width: 56 + Math.max(...layoutNodes.map((node) => node.depth), 0) * 160 + 280,
+    height: 48 + Math.max(1, ...layoutNodes.map((node) => node.row)) * 64 + 44,
+  };
 }

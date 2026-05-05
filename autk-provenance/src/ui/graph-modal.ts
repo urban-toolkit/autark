@@ -1,109 +1,80 @@
 import type { AutarkProvenanceApi } from '../create-autark-provenance';
-import { buildGraphLayout, type GraphLayout } from './graph-layout';
-import { ensureGraphModalDom } from './graph-modal-dom';
-import {
-  applySceneTransform,
-  createGraphModalState,
-  fitGraphToView,
-  resetGraphModalState,
-  zoomGraph,
-  type GraphModalState,
-} from './graph-modal-utils';
+import { clamp } from './utils';
+import type { GraphLayout } from './graph-layout';
+import { createGraphModalShell, type GraphModalShell } from './graph-modal-shell';
 import { createGraphScene, createSvgElement } from './graph-scene';
 
-export interface GraphModalController {
-  isOpen(): boolean;
-  open(): void;
-  close(): void;
-  render(): void;
-  destroy(): void;
-}
-
-interface CreateGraphModalControllerOptions {
+export function createGraphModalController(options: {
   provenance: AutarkProvenanceApi;
   showTimestamps: boolean;
-  getEnabled(): boolean;
-  onRefresh(): void;
-}
+  buildLayout: () => GraphLayout | null;
+  onRefresh: () => void;
+}): { isOpen(): boolean; open(): void; close(): void; render(): void } {
+  const { provenance, showTimestamps, buildLayout, onRefresh } = options;
+  let open = false;
+  let shell: GraphModalShell | null = null;
+  let scene: SVGGElement | null = null;
+  let layout: GraphLayout | null = null;
+  let scale = 1;
+  let translateX = 0;
+  let translateY = 0;
+  let transformInitialized = false;
 
-export function createGraphModalController(
-  options: CreateGraphModalControllerOptions
-): GraphModalController {
-  const { provenance, showTimestamps, getEnabled, onRefresh } = options;
-  const state: GraphModalState = createGraphModalState();
-
-  function close(): void {
-    state.open = false;
-    resetGraphModalState(state);
-  }
-
-  function ensureModal(): void {
-    ensureGraphModalDom({
-      state,
-      onClose: () => {
-        close();
-        onRefresh();
-      },
-      onZoomIn: () => zoomGraph(state, 1.2),
-      onZoomOut: () => zoomGraph(state, 0.84),
-      onFit: () => fitGraphToView(state),
-      onWheelZoom: (event) => {
-        event.preventDefault();
-        zoomGraph(state, event.deltaY < 0 ? 1.12 : 0.89, event.clientX, event.clientY);
-      },
-      onPanMove: (dx, dy) => {
-        state.tx += dx;
-        state.ty += dy;
-        state.initialized = true;
-        applySceneTransform(state);
-      },
-    });
-  }
-
-  function render(): void {
-    if (!state.open || !getEnabled()) return;
-    ensureModal();
-    if (!state.canvas) return;
-
-    state.canvas.innerHTML = '';
-    const graph = provenance.getGraph();
-    if (!graph.nodes.get(graph.rootId)) return;
-
-    const currentId = provenance.getCurrentNode()?.id ?? null;
-    state.layout = buildGraphLayout(graph.nodes, graph.rootId);
-
-    const viewportWidth = Math.max(320, Math.floor(state.canvas.clientWidth));
-    const viewportHeight = Math.max(260, Math.floor(state.canvas.clientHeight));
-
-    const svg = createSvgElement('svg');
-    svg.classList.add('autk-provenance-modal-svg');
-    svg.setAttribute('viewBox', `0 0 ${viewportWidth} ${viewportHeight}`);
-    svg.setAttribute('width', String(viewportWidth));
-    svg.setAttribute('height', String(viewportHeight));
-
-    state.scene = createGraphScene(state.layout, currentId, showTimestamps, (nodeId) => {
-      provenance.goToNode(nodeId);
-    });
-    svg.appendChild(state.scene);
-    state.canvas.appendChild(svg);
-
-    if (!state.initialized) {
-      fitGraphToView(state);
-    } else {
-      applySceneTransform(state);
-    }
-  }
-
-  return {
-    isOpen: () => state.open,
-    open: () => {
-      if (!getEnabled()) return;
-      state.open = true;
-      state.initialized = false;
-      render();
-    },
-    close,
-    render,
-    destroy: () => resetGraphModalState(state),
+  const applyTransform = () => scene?.setAttribute('transform', `translate(${translateX} ${translateY}) scale(${scale})`);
+  const fitView = () => {
+    if (!shell || !layout || !scene) return;
+    const width = Math.max(1, shell.canvas.clientWidth);
+    const height = Math.max(1, shell.canvas.clientHeight);
+    scale = clamp(Math.min((width - 104) / Math.max(1, layout.width), (height - 104) / Math.max(1, layout.height)), 0.25, 6);
+    translateX = (width - layout.width * scale) / 2;
+    translateY = (height - layout.height * scale) / 2;
+    transformInitialized = true;
+    applyTransform();
   };
+  const zoom = (factor: number, clientX?: number, clientY?: number) => {
+    if (!shell || !scene) return;
+    const rect = shell.canvas.getBoundingClientRect();
+    const x = clientX ?? rect.left + rect.width / 2;
+    const y = clientY ?? rect.top + rect.height / 2;
+    const nextScale = clamp(scale * factor, 0.25, 6);
+    const localX = x - rect.left;
+    const localY = y - rect.top;
+    const ratio = nextScale / scale;
+    translateX = localX - (localX - translateX) * ratio;
+    translateY = localY - (localY - translateY) * ratio;
+    scale = nextScale;
+    transformInitialized = true;
+    applyTransform();
+  };
+  const ensureShell = () => shell ?? (shell = createGraphModalShell({
+    onClose: () => { controller.close(); onRefresh(); },
+    onFit: fitView,
+    onZoom: zoom,
+    onPan: (deltaX, deltaY) => { translateX += deltaX; translateY += deltaY; transformInitialized = true; applyTransform(); },
+  }));
+
+  const controller = {
+    isOpen: () => open,
+    open: () => { open = true; transformInitialized = false; controller.render(); },
+    close: () => { open = false; scene = null; layout = null; transformInitialized = false; shell?.destroy(); shell = null; },
+    render: () => {
+      if (!open) return;
+      const modalShell = ensureShell();
+      modalShell.canvas.innerHTML = '';
+      layout = buildLayout();
+      if (!layout) return;
+
+      const svg = createSvgElement('svg');
+      svg.classList.add('autk-provenance-modal-svg');
+      svg.setAttribute('viewBox', `0 0 ${Math.max(320, Math.floor(modalShell.canvas.clientWidth))} ${Math.max(260, Math.floor(modalShell.canvas.clientHeight))}`);
+      svg.setAttribute('width', String(Math.max(320, Math.floor(modalShell.canvas.clientWidth))));
+      svg.setAttribute('height', String(Math.max(260, Math.floor(modalShell.canvas.clientHeight))));
+      scene = createGraphScene(layout, provenance.getCurrentNode()?.id ?? null, showTimestamps, (nodeId) => provenance.goToNode(nodeId));
+      svg.appendChild(scene);
+      modalShell.canvas.appendChild(svg);
+      transformInitialized ? applyTransform() : fitView();
+    },
+  };
+
+  return controller;
 }
