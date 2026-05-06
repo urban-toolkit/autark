@@ -51,6 +51,7 @@ The library can be used standalone (with any custom state shape) or as a drop-in
 ### Provenance Graph
 
 Every interaction creates a **node** in a directed acyclic graph. Each node stores:
+
 - A full snapshot of the application state at that moment
 - The action type and human-readable label that created it
 - A timestamp
@@ -65,6 +66,7 @@ Navigating to any node in the graph (via the trail UI, the graph modal, or progr
 ### Adapters
 
 Each Autark module is connected through an **adapter** that:
+
 1. **Records** interactions by listening to module events (DOM clicks, method calls, event emitters) and writing nodes to the graph.
 2. **Applies state** from any node back onto the module when the analyst navigates the graph.
 
@@ -101,7 +103,7 @@ const root = document.getElementById('app') as HTMLElement;
 renderInsightsWorkspace({
   container: root,
   map,
-  collection,       // GeoJSON FeatureCollection with numeric feature properties
+  collection, // GeoJSON FeatureCollection with numeric feature properties
   layerId: 'neighborhoods',
   title: 'NYC Neighborhood Analysis',
   description: 'Cross-view exploration of neighborhood indicators',
@@ -109,9 +111,13 @@ renderInsightsWorkspace({
 ```
 
 The workspace renders:
-- A **Map tab** with the 3D map and a thematic-color dropdown
-- An **Insights tab** with four coordinated charts (scatter, bar, parallel coordinates, histogram)
-- A **Provenance tab** with the interactive graph, the step trail, and back/forward navigation
+
+The workspace renders:
+
+- A persistent **Map panel** (left side) with the 3D map and a "Color by" thematic dropdown
+- A **Charts tab** (right side) with four coordinated charts (scatter, bar, parallel coordinates, histogram)
+- A **Provenance Trail tab** (right side) with the interactive graph, the step trail, and back/forward navigation
+- A **Session Insights section** always visible below the tabs, updating as you interact
 
 All interactions across map and charts are automatically tracked. Chart axes and groupings are inferred from the GeoJSON properties.
 
@@ -155,7 +161,7 @@ import { createAutarkProvenance, renderProvenanceTrailUI } from 'autk-provenance
 import { PlotType } from 'autk-provenance';
 
 const provenance = createAutarkProvenance({
-  map: mapForProvenance,   // IMapForProvenance adapter object
+  map: mapForProvenance, // IMapForProvenance adapter object
   plots: [
     Object.assign(scatter, {
       plotId: 'Scatterplot',
@@ -164,6 +170,7 @@ const provenance = createAutarkProvenance({
         addEventListener: (event, fn) => scatter.events.on(event, ({ selection }) => fn(selection)),
         removeEventListener: (event, fn) => scatter.events.off(event, fn),
       },
+      setOwnedSelection: (ids) => scatter.setOwnedSelection(ids),
       setHighlightedIds: (ids) => scatter.setSelection(ids),
     }),
   ],
@@ -283,7 +290,7 @@ interface ProvenanceNode<T> {
   actionLabel: string;
   actionType: ProvenanceAction | string;
   timestamp: number;
-  metadata?: Record<string, unknown>;  // used for analyst annotations
+  metadata?: Record<string, unknown>; // used for analyst annotations
 }
 ```
 
@@ -300,40 +307,40 @@ The graph is a **directed tree** rooted at the `ROOT` node created on initializa
 Creates a provenance instance wired to all provided Autark modules.
 
 ```ts
-function createAutarkProvenance(options: CreateAutarkProvenanceOptions): AutarkProvenanceApi
+function createAutarkProvenance(options: CreateAutarkProvenanceOptions): AutarkProvenanceApi;
 ```
 
 **Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `map` | `IMapForProvenance` | Map adapter object (see [Map Adapter](#map-adapter)) |
-| `plots` | `IPlotForProvenance[]` | Plot instances to track. Each must have `plotId`, `plotType`, `plotEvents`, `setHighlightedIds`. |
-| `db` | `IDbForProvenance` | autk-db instance to track |
-| `compute` | `IComputeForProvenance` | autk-compute instance to track |
-| `mapConfig` | `MapSelectorConfig` | Override default map UI selectors and register custom controls |
-| `initialState` | `Partial<AutarkProvenanceState>` | Override the initial state of the root node |
+| Option         | Type                             | Description                                                                                      |
+| -------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `map`          | `IMapForProvenance`              | Map adapter object (see [Map Adapter](#map-adapter))                                             |
+| `plots`        | `IPlotForProvenance[]`           | Plot instances to track. Each must have `plotId`, `plotType`, `plotEvents`, `setHighlightedIds`. |
+| `db`           | `IDbForProvenance`               | autk-db instance to track                                                                        |
+| `compute`      | `IComputeForProvenance`          | autk-compute instance to track                                                                   |
+| `mapConfig`    | `MapSelectorConfig`              | Override default map UI selectors and register custom controls                                   |
+| `initialState` | `Partial<AutarkProvenanceState>` | Override the initial state of the root node                                                      |
 
 **Returns `AutarkProvenanceApi`:**
 
-| Method | Description |
-|--------|-------------|
-| `goToNode(nodeId)` | Navigate to any node in the graph by ID. Returns `true` if successful. |
-| `goBackOneStep()` | Move to the parent of the current node. Returns `true` if possible. |
-| `goForwardOneStep()` | Move to the most-recently-visited child. Returns `true` if possible. |
-| `canGoBack()` | Returns `true` if the current node has a parent. |
-| `canGoForward()` | Returns `true` if the current node has children. |
-| `getPathFromRoot()` | Returns the ordered list of nodes from root to current. |
-| `getGraph()` | Returns the full `ProvenanceGraph` (all nodes, root ID, current ID). |
-| `getCurrentNode()` | Returns the current `ProvenanceNode` or `null`. |
-| `getCurrentState()` | Returns the current `AutarkProvenanceState` or `null`. |
-| `exportGraph()` | Serializes the full graph to a JSON string. |
-| `importGraph(json)` | Replaces the graph from a previously exported JSON string. |
-| `addObserver(cb)` | Registers a callback fired on every graph change. Returns an unsubscribe function. |
-| `annotateNode(nodeId, text)` | Attaches a text annotation to any node without creating a new provenance step. |
-| `startRecording()` | Resume recording after a `stopRecording()` call. |
-| `stopRecording()` | Pause all recording (interactions are ignored until `startRecording()`). |
-| `db` | Exposes the `DbAdapterApi` for manual DB recording operations. |
+| Method                       | Description                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `goToNode(nodeId)`           | Navigate to any node in the graph by ID. Returns `true` if successful.             |
+| `goBackOneStep()`            | Move to the parent of the current node. Returns `true` if possible.                |
+| `goForwardOneStep()`         | Move to the most-recently-visited child. Returns `true` if possible.               |
+| `canGoBack()`                | Returns `true` if the current node has a parent.                                   |
+| `canGoForward()`             | Returns `true` if the current node has children.                                   |
+| `getPathFromRoot()`          | Returns the ordered list of nodes from root to current.                            |
+| `getGraph()`                 | Returns the full `ProvenanceGraph` (all nodes, root ID, current ID).               |
+| `getCurrentNode()`           | Returns the current `ProvenanceNode` or `null`.                                    |
+| `getCurrentState()`          | Returns the current `AutarkProvenanceState` or `null`.                             |
+| `exportGraph()`              | Serializes the full graph to a JSON string.                                        |
+| `importGraph(json)`          | Replaces the graph from a previously exported JSON string.                         |
+| `addObserver(cb)`            | Registers a callback fired on every graph change. Returns an unsubscribe function. |
+| `annotateNode(nodeId, text)` | Attaches a text annotation to any node without creating a new provenance step.     |
+| `startRecording()`           | Resume recording after a `stopRecording()` call.                                   |
+| `stopRecording()`            | Pause all recording (interactions are ignored until `startRecording()`).           |
+| `db`                         | Exposes the `DbAdapterApi` for manual DB recording operations.                     |
 
 ---
 
@@ -342,33 +349,32 @@ function createAutarkProvenance(options: CreateAutarkProvenanceOptions): AutarkP
 Renders a fully wired analytics workspace (map + 4 charts + provenance trail + insights) into a container element.
 
 ```ts
-function renderInsightsWorkspace(
-  options: RenderInsightsWorkspaceOptions
-): RenderInsightsWorkspaceResult
+function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions): RenderInsightsWorkspaceResult;
 ```
 
 **Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `container` | `HTMLElement` | Root element to render the workspace into |
-| `map` | `AutkMap` | Map instance from autk-map |
-| `collection` | `FeatureCollection` | GeoJSON collection — source for all charts |
-| `layerId` | `string` | Layer ID already registered in the map |
-| `db` | `IDbForProvenance` | Optional database instance for DB provenance |
-| `title` | `string` | Workspace header title |
-| `description` | `string` | Workspace header description |
-| `mapConfig` | `MapSelectorConfig` | Optional map selector / custom control overrides |
+| Option        | Type                | Description                                      |
+| ------------- | ------------------- | ------------------------------------------------ |
+| `container`   | `HTMLElement`       | Root element to render the workspace into        |
+| `map`         | `AutkMap`           | Map instance from autk-map                       |
+| `collection`  | `FeatureCollection` | GeoJSON collection — source for all charts       |
+| `layerId`     | `string`            | Layer ID already registered in the map           |
+| `db`          | `IDbForProvenance`  | Optional database instance for DB provenance     |
+| `title`       | `string`            | Workspace header title                           |
+| `description` | `string`            | Workspace header description                     |
+| `mapConfig`   | `MapSelectorConfig` | Optional map selector / custom control overrides |
 
 **Returns:**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `provenance` | `AutarkProvenanceApi` | The live provenance API for the workspace |
-| `schema` | `InsightsChartSchema` | Resolved chart configuration (fields, titles, collections) |
-| `destroy()` | `() => void` | Tears down all listeners, empties the container |
+| Property     | Type                  | Description                                                |
+| ------------ | --------------------- | ---------------------------------------------------------- |
+| `provenance` | `AutarkProvenanceApi` | The live provenance API for the workspace                  |
+| `schema`     | `InsightsChartSchema` | Resolved chart configuration (fields, titles, collections) |
+| `destroy()`  | `() => void`          | Tears down all listeners, empties the container            |
 
 The workspace infers chart axes automatically from the GeoJSON feature properties:
+
 - **Scatter plot**: two highest-variance numeric fields
 - **Bar chart**: most distinct categorical field vs count
 - **Parallel coordinates**: up to six numeric fields
@@ -381,21 +387,21 @@ The workspace infers chart axes automatically from the GeoJSON feature propertie
 Renders the provenance trail panel — graph preview, step list, navigation buttons, and optional insights — into any container element.
 
 ```ts
-function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () => void
+function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () => void;
 ```
 
 **Options:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `provenance` | `AutarkProvenanceApi` | required | The provenance instance to display |
-| `container` | `HTMLElement` | required | Element to render into |
-| `insightsContainer` | `HTMLElement` | — | Separate container for the insights panel (defaults to `container`) |
-| `showInsights` | `boolean` | `true` | Show the collapsible insights panel |
-| `showBackForward` | `boolean` | `true` | Show back/forward navigation buttons |
-| `showTimestamps` | `boolean` | `true` | Show timestamps on trail steps |
-| `showGraph` | `boolean` | `true` | Show the mini graph preview |
-| `showPathList` | `boolean` | `true` | Show the linear step trail list |
+| Option              | Type                  | Default  | Description                                                         |
+| ------------------- | --------------------- | -------- | ------------------------------------------------------------------- |
+| `provenance`        | `AutarkProvenanceApi` | required | The provenance instance to display                                  |
+| `container`         | `HTMLElement`         | required | Element to render into                                              |
+| `insightsContainer` | `HTMLElement`         | —        | Separate container for the insights panel (defaults to `container`) |
+| `showInsights`      | `boolean`             | `true`   | Show the collapsible insights panel                                 |
+| `showBackForward`   | `boolean`             | `true`   | Show back/forward navigation buttons                                |
+| `showTimestamps`    | `boolean`             | `true`   | Show timestamps on trail steps                                      |
+| `showGraph`         | `boolean`             | `true`   | Show the mini graph preview                                         |
+| `showPathList`      | `boolean`             | `true`   | Show the linear step trail list                                     |
 
 Returns a **cleanup function** — call it to remove all event listeners and clear the container.
 
@@ -408,18 +414,16 @@ The graph preview is interactive: clicking it opens a full **graph modal** with 
 Generic provenance factory for custom state shapes not tied to Autark modules.
 
 ```ts
-function createProvenance<T extends Record<string, unknown>>(
-  options: CreateProvenanceOptions<T>
-): ProvenanceApi<T>
+function createProvenance<T extends Record<string, unknown>>(options: CreateProvenanceOptions<T>): ProvenanceApi<T>;
 ```
 
 **Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `initialState` | `T` | The initial state for the root node |
-| `adapter` | `ProvenanceAdapter<T>` | Object implementing `applyState(state: T): void` |
-| `mergeState` | `(base: T, delta: Partial<T>) => T` | Optional custom merge strategy (defaults to shallow spread) |
+| Option         | Type                                | Description                                                 |
+| -------------- | ----------------------------------- | ----------------------------------------------------------- |
+| `initialState` | `T`                                 | The initial state for the root node                         |
+| `adapter`      | `ProvenanceAdapter<T>`              | Object implementing `applyState(state: T): void`            |
+| `mergeState`   | `(base: T, delta: Partial<T>) => T` | Optional custom merge strategy (defaults to shallow spread) |
 
 **Returns `ProvenanceApi<T>`** — the same navigation, graph, export/import, and observer API as `AutarkProvenanceApi`, plus `applyAction(actionType, label, delta)` for manually recording interactions.
 
@@ -466,6 +470,7 @@ const metrics = computeGraphMetrics(graph);
 ```
 
 **Strategy classification:**
+
 - **Confirmatory** — linear, focused analysis; the analyst knew what they were looking for
 - **Exploratory** — multiple diverging branches; broad, open-ended investigation
 - **Iterative Refinement** — high backtrack rate and branch ratio; hypothesis-driven revision
@@ -500,6 +505,7 @@ const narrative = generateSessionNarrative(graph, metrics, annotations);
 The map adapter connects an `AutkMap` (or any object implementing `IMapForProvenance`) to the provenance system.
 
 **What it records:**
+
 - Map initialization (`MAP_INIT`) and layer loads (`MAP_LAYER_LOAD`)
 - Feature picks / selections (`MAP_PICK`) via the `picking` event
 - Camera viewport changes (`MAP_VIEW`) — debounced at 180 ms
@@ -509,6 +515,7 @@ The map adapter connects an `AutkMap` (or any object implementing `IMapForProven
 - Thematic colormap toggles (`MAP_UI_THEMATIC_TOGGLE`) — palette icon
 
 **What it restores on node navigation:**
+
 - Layer visibility (`isSkip` render flag on each layer)
 - Active layer (`map.ui.changeActiveLayer`)
 - Thematic state (`isColorMap` render flag on each layer)
@@ -553,6 +560,7 @@ When using `renderInsightsWorkspace` or `createAutarkProvenance` with a real `Au
 The plot adapter connects one or more interactive plots to the provenance system.
 
 **What it records:**
+
 - Click-based selections (`PLOT_CLICK`) — individual point or bar clicks
 - 2D brush selections (`PLOT_BRUSH`) — rectangular lasso in scatter plots
 - 1D horizontal brush (`PLOT_BRUSH_X`)
@@ -565,13 +573,14 @@ The plot adapter connects one or more interactive plots to the provenance system
 
 ```ts
 interface IPlotForProvenance {
-  plotId: string;        // Stable unique identifier, used as the state key
-  plotType: PlotType;    // SCATTERPLOT | BARCHART | PARALLEL_COORDINATES | HISTOGRAM
+  plotId: string; // Stable unique identifier, used as the state key
+  plotType: PlotType; // SCATTERPLOT | BARCHART | PARALLEL_COORDINATES | HISTOGRAM
   plotEvents: {
     addEventListener(event: string, listener: (selection: number[]) => void): void;
     removeEventListener?(event: string, listener: (selection: number[]) => void): void;
   };
-  setHighlightedIds(ids: number[]): void;  // Apply coordinated highlight
+  setOwnedSelection(ids: number[]): void;
+  setHighlightedIds(ids: number[]): void; // Apply coordinated highlight
 }
 ```
 
@@ -585,18 +594,18 @@ The DB adapter connects an `autk-db` database instance to provenance. It records
 
 **What it records:**
 
-| Action | Trigger |
-|--------|---------|
-| `DB_INIT` | Database initialization |
-| `DB_WORKSPACE` | Workspace open |
-| `DB_LOAD_OSM` | OpenStreetMap data load |
-| `DB_LOAD_CSV` / `DB_LOAD_JSON` | CSV or JSON file import |
-| `DB_LOAD_LAYER` / `DB_LOAD_CUSTOM_LAYER` / `DB_LOAD_GRID_LAYER` | Layer loads |
-| `DB_GET_LAYER` | Layer retrieval |
-| `DB_SPATIAL_JOIN` | Spatial join operation |
-| `DB_UPDATE_TABLE` / `DB_DROP_TABLE` | Table mutations |
-| `DB_RAW_QUERY` | Arbitrary SQL execution |
-| `DB_BUILD_HEATMAP` | Heatmap construction |
+| Action                                                          | Trigger                 |
+| --------------------------------------------------------------- | ----------------------- |
+| `DB_INIT`                                                       | Database initialization |
+| `DB_WORKSPACE`                                                  | Workspace open          |
+| `DB_LOAD_OSM`                                                   | OpenStreetMap data load |
+| `DB_LOAD_CSV` / `DB_LOAD_JSON`                                  | CSV or JSON file import |
+| `DB_LOAD_LAYER` / `DB_LOAD_CUSTOM_LAYER` / `DB_LOAD_GRID_LAYER` | Layer loads             |
+| `DB_GET_LAYER`                                                  | Layer retrieval         |
+| `DB_SPATIAL_JOIN`                                               | Spatial join operation  |
+| `DB_UPDATE_TABLE` / `DB_DROP_TABLE`                             | Table mutations         |
+| `DB_RAW_QUERY`                                                  | Arbitrary SQL execution |
+| `DB_BUILD_HEATMAP`                                              | Heatmap construction    |
 
 The DB adapter also exposes a `db` property on `AutarkProvenanceApi` for manual recording calls when automatic wrapping is insufficient.
 
@@ -607,6 +616,7 @@ The DB adapter also exposes a `db` property on `AutarkProvenanceApi` for manual 
 The compute adapter wraps `autk-compute`'s `GeojsonCompute` instance and records GPU computation runs.
 
 **What it records:**
+
 - `COMPUTE_RUN` — fires after `computeFunctionIntoProperties` resolves, storing the output column name, feature count, and timestamp in `state.filters.lastCompute`.
 
 ---
@@ -644,6 +654,7 @@ const provenance = createAutarkProvenance({ map, plots, mapConfig });
 ```
 
 Each custom control config:
+
 - `selector` — CSS selector to match the control element
 - `event` — `'click'` or `'change'`
 - `actionType` — the provenance action label stored on the node
@@ -657,44 +668,42 @@ Each custom control config:
 
 The following actions are defined in `ProvenanceAction` and each creates one node in the provenance graph:
 
-| Action | Description |
-|--------|-------------|
-| `ROOT` | Initial state node, created automatically on startup |
-| `MAP_INIT` | Map canvas initialized |
-| `MAP_LAYER_LOAD` | A GeoJSON or raster layer was loaded |
-| `MAP_PICK` | User picked features on the map |
-| `MAP_VIEW` | Camera viewport changed (debounced) |
-| `MAP_UI_MENU_TOGGLE` | Hamburger menu opened or closed |
-| `MAP_UI_VISIBLE_LAYER_TOGGLE` | Eye icon toggled a layer's visibility |
-| `MAP_UI_ACTIVE_LAYER_CHANGE` | Cursor icon changed the active picking layer |
-| `MAP_UI_THEMATIC_TOGGLE` | Palette icon toggled thematic colormap |
-| `MAP_UI_CUSTOM_CONTROL` | A registered custom control was interacted with |
-| `PLOT_CLICK` | User clicked a mark in a plot |
-| `PLOT_BRUSH` | 2D brush selection in scatter plot |
-| `PLOT_BRUSH_X` | Horizontal brush selection |
-| `PLOT_BRUSH_Y` | Vertical brush (parallel coordinates) |
-| `PLOT_DATA` | A plot's data collection was replaced |
-| `PLOT_ADD` / `PLOT_REMOVE` | Plot added or removed dynamically |
-| `COMPUTE_RUN` | GPU computation completed |
-| `DB_INIT` | Database initialized |
-| `DB_WORKSPACE` | Workspace opened |
-| `DB_LOAD_OSM` | OSM data loaded |
-| `DB_LOAD_CSV` / `DB_LOAD_JSON` | CSV or JSON imported |
-| `DB_LOAD_LAYER` / `DB_LOAD_CUSTOM_LAYER` / `DB_LOAD_GRID_LAYER` | Layer loaded |
-| `DB_GET_LAYER` | Layer retrieved from DB |
-| `DB_SPATIAL_JOIN` | Spatial join performed |
-| `DB_UPDATE_TABLE` / `DB_DROP_TABLE` | Table modified or dropped |
-| `DB_RAW_QUERY` | Raw SQL query executed |
-| `DB_BUILD_HEATMAP` | Heatmap built |
+| Action                                                          | Description                                          |
+| --------------------------------------------------------------- | ---------------------------------------------------- |
+| `ROOT`                                                          | Initial state node, created automatically on startup |
+| `MAP_INIT`                                                      | Map canvas initialized                               |
+| `MAP_LAYER_LOAD`                                                | A GeoJSON or raster layer was loaded                 |
+| `MAP_PICK`                                                      | User picked features on the map                      |
+| `MAP_VIEW`                                                      | Camera viewport changed (debounced)                  |
+| `MAP_UI_MENU_TOGGLE`                                            | Hamburger menu opened or closed                      |
+| `MAP_UI_VISIBLE_LAYER_TOGGLE`                                   | Eye icon toggled a layer's visibility                |
+| `MAP_UI_ACTIVE_LAYER_CHANGE`                                    | Cursor icon changed the active picking layer         |
+| `MAP_UI_THEMATIC_TOGGLE`                                        | Palette icon toggled thematic colormap               |
+| `MAP_UI_CUSTOM_CONTROL`                                         | A registered custom control was interacted with      |
+| `PLOT_CLICK`                                                    | User clicked a mark in a plot                        |
+| `PLOT_BRUSH`                                                    | 2D brush selection in scatter plot                   |
+| `PLOT_BRUSH_X`                                                  | Horizontal brush selection                           |
+| `PLOT_BRUSH_Y`                                                  | Vertical brush (parallel coordinates)                |
+| `PLOT_DATA`                                                     | A plot's data collection was replaced                |
+| `PLOT_ADD` / `PLOT_REMOVE`                                      | Plot added or removed dynamically                    |
+| `COMPUTE_RUN`                                                   | GPU computation completed                            |
+| `DB_INIT`                                                       | Database initialized                                 |
+| `DB_WORKSPACE`                                                  | Workspace opened                                     |
+| `DB_LOAD_OSM`                                                   | OSM data loaded                                      |
+| `DB_LOAD_CSV` / `DB_LOAD_JSON`                                  | CSV or JSON imported                                 |
+| `DB_LOAD_LAYER` / `DB_LOAD_CUSTOM_LAYER` / `DB_LOAD_GRID_LAYER` | Layer loaded                                         |
+| `DB_GET_LAYER`                                                  | Layer retrieved from DB                              |
+| `DB_SPATIAL_JOIN`                                               | Spatial join performed                               |
+| `DB_UPDATE_TABLE` / `DB_DROP_TABLE`                             | Table modified or dropped                            |
+| `DB_RAW_QUERY`                                                  | Raw SQL query executed                               |
+| `DB_BUILD_HEATMAP`                                              | Heatmap built                                        |
 
 ---
 
 ## Session Insights
 
-The workspace and the provenance trail both include a **session insights panel** that surfaces:
+The workspace includes a **session insights panel** that surfaces:
 
-- **Analysis Strategy** — Confirmatory, Exploratory, or Iterative Refinement, based on branch ratio and backtrack count
-- **Selection Focus** — the most revisited map features and plot data points across all graph branches
 - **Annotate This Step** — a free-text input to attach a note to the current node
 - **Analysis Summary** — a generated narrative describing the session, strategy, top selections, and all annotations
 
@@ -771,10 +780,12 @@ __provenance.exportGraph();
 ### Manual test checklist
 
 **Startup and data load:**
+
 - Reload the page — confirm early trail entries for map initialization and layer loading
 - Confirm the root `Start` node appears in the graph
 
 **Branch navigation:**
+
 1. Pick a map feature → confirm a `MAP_PICK` node appears
 2. Navigate back to the root
 3. Brush the scatter plot → confirm a `PLOT_BRUSH` node appears on a new branch
@@ -782,6 +793,7 @@ __provenance.exportGraph();
 5. Click nodes from both branches — confirm state replay for each
 
 **Hamburger menu tracking:**
+
 1. Open the menu (confirm `MAP_UI_MENU_TOGGLE`)
 2. Click the eye icon to hide a layer (confirm `MAP_UI_VISIBLE_LAYER_TOGGLE`)
 3. Click the palette icon to enable thematic (confirm `MAP_UI_THEMATIC_TOGGLE`)
@@ -789,15 +801,18 @@ __provenance.exportGraph();
 5. Navigate back to before the toggles — confirm layers restore correctly
 
 **Cross-view consistency:**
+
 1. Pick a map feature → all chart highlights update
 2. Click a scatter plot dot → map and other charts highlight
 3. Navigate back → all views revert
 
 **Deduplication:**
+
 - Clear a selection, then immediately clear again — only one clear node should be created
 - Pan the map slowly — view should debounce and produce a single `MAP_VIEW` node per gesture
 
 **Annotations:**
+
 1. Navigate to a node of interest
 2. Enter text in the "Annotate This Step" field
 3. Confirm the annotation appears in the Analysis Summary
