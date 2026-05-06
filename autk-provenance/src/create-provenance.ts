@@ -22,6 +22,7 @@ export interface ProvenanceApi<T> {
   exportGraph(): string;
   importGraph(json: string): void;
   addObserver(callback: (node: ProvenanceNode<T>) => void): () => void;
+  annotateNode(nodeId: string, text: string): boolean;
 }
 
 function defaultMerge<T>(base: T, delta: Partial<T>): T {
@@ -56,5 +57,6 @@ export function createProvenance<T extends Record<string, unknown>>(
     exportGraph: core.exportGraph.bind(core),
     importGraph: core.importGraph.bind(core),
     addObserver: core.addObserver.bind(core),
+    annotateNode: core.annotateNode.bind(core),
   };
 }

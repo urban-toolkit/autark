@@ -1,13 +1,7 @@
-import type { AutarkProvenanceState, ProvenanceGraph } from '../types';
+import type { ProvenanceGraph } from '../types';
+import type { InsightSelectionState, SelectionFrequency } from './types';
 
-export interface SelectionFrequency {
-  map: Map<number, number>;
-  plots: Map<string, Map<number, number>>;
-}
-
-export function computeSelectionFrequency(
-  graph: ProvenanceGraph<AutarkProvenanceState>
-): SelectionFrequency {
+export function computeSelectionFrequency<T extends InsightSelectionState>(graph: ProvenanceGraph<T>): SelectionFrequency {
   const mapFreq = new Map<number, number>();
   const plotsFreq = new Map<string, Map<number, number>>();
 

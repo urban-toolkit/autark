@@ -174,6 +174,7 @@ export function createGraphEngine<T>(options: GraphEngineOptions<T>): GraphEngin
     const node = nodes.get(nodeId);
     if (!node) return false;
     node.metadata = { ...(node.metadata ?? {}), insight: text };
+    notify();
     return true;
   }
 

@@ -1,20 +1,7 @@
-import type { AutarkProvenanceState, ProvenanceGraph } from '../types';
+import type { ProvenanceGraph } from '../types';
+import type { GraphMetrics } from './types';
 
-export type StrategyLabel = 'Confirmatory' | 'Exploratory' | 'Iterative Refinement';
-
-export interface GraphMetrics {
-  totalNodes: number;
-  branchPoints: number;
-  backtracks: number;
-  maxDepth: number;
-  sessionDurationMs: number;
-  avgTimePerStateMs: number;
-  branchRatio: number;
-  strategyLabel: StrategyLabel;
-  insightCount: number;
-}
-
-function computeMaxDepth(graph: ProvenanceGraph<AutarkProvenanceState>): number {
+function computeMaxDepth<T>(graph: ProvenanceGraph<T>): number {
   let maxDepth = 0;
   const visited = new Set<string>();
 
@@ -29,10 +16,10 @@ function computeMaxDepth(graph: ProvenanceGraph<AutarkProvenanceState>): number 
   return maxDepth;
 }
 
-export function computeGraphMetrics(
-  graph: ProvenanceGraph<AutarkProvenanceState>
-): GraphMetrics {
+export function computeGraphMetrics<T>(graph: ProvenanceGraph<T>): GraphMetrics {
   const nodes = Array.from(graph.nodes.values());
+  const insightCount = nodes.filter((node) => typeof node.metadata?.insight === 'string' && `${node.metadata.insight}`.trim().length > 0).length;
+
   if (nodes.length <= 1) {
     return {
       totalNodes: nodes.length,
@@ -43,7 +30,7 @@ export function computeGraphMetrics(
       avgTimePerStateMs: 0,
       branchRatio: 0,
       strategyLabel: 'Confirmatory',
-      insightCount: 0,
+      insightCount,
     };
   }
 
@@ -52,7 +39,6 @@ export function computeGraphMetrics(
   const timestamps = nodes.map((node) => node.timestamp).sort((a, b) => a - b);
   const sessionDurationMs = timestamps[timestamps.length - 1] - timestamps[0];
   const branchRatio = branchPoints / nodes.length;
-  const insightCount = nodes.filter((node) => typeof node.metadata?.insight === 'string' && `${node.metadata.insight}`.trim().length > 0).length;
 
   return {
     totalNodes: nodes.length,

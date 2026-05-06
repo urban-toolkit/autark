@@ -129,6 +129,7 @@ export function createProvenanceCoreStore<T>(
       const node = nodes.get(nodeId);
       if (!node) return false;
       node.metadata = { ...(node.metadata ?? {}), insight: text };
+      notifyObservers();
       return true;
     },
   };

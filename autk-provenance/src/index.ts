@@ -7,6 +7,7 @@ export { createProvenance } from './create-provenance';
 export type { ProvenanceApi, CreateProvenanceOptions } from './create-provenance';
 export { renderProvenanceTrailUI } from './provenance-trail-ui';
 export type { ProvenanceTrailUIOptions } from './provenance-trail-ui';
+export { renderInsightsPanel } from './ui/insights-panel';
 export * from './adapters';
 export {
   computeSelectionFrequency,
@@ -19,4 +20,6 @@ export type {
   GraphMetrics,
   StrategyLabel,
   InsightAnnotation,
+  InsightsProvenanceApi,
+  InsightSelectionState,
 } from './insight-engine';

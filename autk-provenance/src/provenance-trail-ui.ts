@@ -29,6 +29,9 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
   const navigation = showBackForward ? createNavigationButtons() : null;
   const insights = createInsightsShell(insightsContainer ?? container);
   const modal = createGraphModalController({ provenance, showTimestamps, buildLayout: () => buildLayoutFromProvenance(provenance), onRefresh: refresh });
+  insights.onToggle((open) => {
+    if (open) renderInsightsPanel(insights.body, provenance);
+  });
 
   if (toolbar && graphWrap) {
     graphWrap.className = 'autk-provenance-graph-wrap';

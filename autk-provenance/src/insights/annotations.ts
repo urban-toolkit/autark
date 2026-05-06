@@ -1,15 +1,7 @@
-import type { AutarkProvenanceState, ProvenanceGraph } from '../types';
+import type { ProvenanceGraph } from '../types';
+import type { InsightAnnotation } from './types';
 
-export interface InsightAnnotation {
-  nodeId: string;
-  actionLabel: string;
-  text: string;
-  timestamp: number;
-}
-
-export function getInsightAnnotations(
-  graph: ProvenanceGraph<AutarkProvenanceState>
-): InsightAnnotation[] {
+export function getInsightAnnotations<T>(graph: ProvenanceGraph<T>): InsightAnnotation[] {
   const annotations: InsightAnnotation[] = [];
 
   for (const node of graph.nodes.values()) {

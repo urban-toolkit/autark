@@ -1,5 +1,4 @@
-import type { AutarkProvenanceApi } from '../create-autark-provenance';
-import { computeGraphMetrics, generateSessionNarrative, getInsightAnnotations, type StrategyLabel } from '../insight-engine';
+import { computeGraphMetrics, generateSessionNarrative, getInsightAnnotations, type InsightsProvenanceApi, type InsightSelectionState, type StrategyLabel } from '../insight-engine';
 import { formatDurationShort, truncate } from './utils';
 
 const STRATEGY_COLORS: Record<StrategyLabel, string> = {
@@ -8,7 +7,10 @@ const STRATEGY_COLORS: Record<StrategyLabel, string> = {
   'Iterative Refinement': '#6a1b9a',
 };
 
-export function renderInsightsPanel(container: HTMLElement, provenance: AutarkProvenanceApi): void {
+export function renderInsightsPanel<T extends InsightSelectionState>(
+  container: HTMLElement,
+  provenance: InsightsProvenanceApi<T>
+): void {
   const graph = provenance.getGraph();
   const currentNode = provenance.getCurrentNode();
   const metrics = computeGraphMetrics(graph);
@@ -40,7 +42,7 @@ export function renderInsightsPanel(container: HTMLElement, provenance: AutarkPr
 }
 
 function createAnnotationEditor(
-  provenance: AutarkProvenanceApi,
+  provenance: InsightsProvenanceApi,
   container: HTMLElement,
   nodeId: string | null,
   existingInsight: string
@@ -67,7 +69,7 @@ function createAnnotationEditor(
 }
 
 function createAnnotationsList(
-  provenance: AutarkProvenanceApi,
+  provenance: InsightsProvenanceApi,
   annotations: ReturnType<typeof getInsightAnnotations>
 ): HTMLElement {
   const section = createSection(`Recorded insights (${annotations.length})`);

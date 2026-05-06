@@ -50,6 +50,7 @@ export function createInsightsShell(parent: HTMLElement): {
   body: HTMLDivElement;
   setOpen(open: boolean): void;
   isOpen(): boolean;
+  onToggle(callback: (open: boolean) => void): void;
 } {
   const wrap = document.createElement('div');
   const header = document.createElement('div');
@@ -57,6 +58,7 @@ export function createInsightsShell(parent: HTMLElement): {
   const chevron = document.createElement('span');
   const body = document.createElement('div');
   let open = true;
+  let toggleCallback: ((open: boolean) => void) | null = null;
 
   wrap.className = 'autk-prov-insights-wrap';
   header.className = 'autk-prov-insights-header';
@@ -75,6 +77,7 @@ export function createInsightsShell(parent: HTMLElement): {
     open = !open;
     body.style.display = open ? 'flex' : 'none';
     chevron.textContent = open ? '\u25b4' : '\u25be';
+    toggleCallback?.(open);
   });
 
   return {
@@ -83,7 +86,11 @@ export function createInsightsShell(parent: HTMLElement): {
       open = value;
       body.style.display = open ? 'flex' : 'none';
       chevron.textContent = open ? '\u25b4' : '\u25be';
+      toggleCallback?.(open);
     },
     isOpen: () => open,
+    onToggle: (callback) => {
+      toggleCallback = callback;
+    },
   };
 }
