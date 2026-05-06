@@ -4,7 +4,11 @@ import { isTargetInMapContainer } from './dom';
 import type { CustomControlConfig, MapRecordCallback, ResolvedMapSelectors } from './types';
 import { getActiveLayerId, getMenuOpen, getVisibleLayerIds, isElement } from './utils';
 
-const MAP_PICK_EVENT = 'pick';
+const MAP_PICK_EVENT = 'picking';
+
+function selectionSignature(selection: number[]): string {
+  return selection.join(',');
+}
 
 export function createMapRecordingController(options: {
   map: IMapForProvenance;
@@ -57,6 +61,14 @@ export function createMapRecordingController(options: {
       const pickListener = (selection: number[], layerId: string) => {
         const activePlotIds = new Set(Object.values(getCurrentState().selection.plots ?? {}).flatMap((plot) => plot.ids));
         const mapOwnedSelection = selection.filter((id) => !activePlotIds.has(id));
+        const previousMapSelection = getCurrentState().selection.map?.ids ?? [];
+        const previousLayerId = getCurrentState().selection.map?.layerId ?? null;
+        if (
+          selectionSignature(mapOwnedSelection) === selectionSignature(previousMapSelection) &&
+          (mapOwnedSelection.length > 0 ? previousLayerId === layerId : previousMapSelection.length === 0)
+        ) {
+          return;
+        }
         const label = mapOwnedSelection.length === 0 ? `Cleared selection on ${layerId}` : `Picked ${mapOwnedSelection.length} feature(s) on ${layerId}`;
         onRecord(ProvenanceAction.MAP_PICK, label, { selection: { map: { layerId, ids: mapOwnedSelection }, plots: {} } });
       };

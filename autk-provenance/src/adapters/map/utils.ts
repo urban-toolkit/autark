@@ -17,7 +17,7 @@ export function isElement(value: unknown): value is Element {
 }
 
 export function getAllLayers(map: IMapForProvenance): LayerLike[] {
-  return [...(map.layerManager.vectorLayers ?? []), ...(map.layerManager.rasterLayers ?? [])] as LayerLike[];
+  return map.layerManager.layers as LayerLike[];
 }
 
 export function getLayerIds(map: IMapForProvenance): string[] {

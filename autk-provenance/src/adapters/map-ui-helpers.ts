@@ -8,7 +8,7 @@ export function createMapUiHelpers(
   customControls: CustomControlConfig[]
 ) {
   const getAllLayers = (): LayerLike[] =>
-    [...(map.layerManager.vectorLayers ?? []), ...(map.layerManager.rasterLayers ?? [])] as LayerLike[];
+    map.layerManager.layers as LayerLike[];
 
   const getVisibleLayerIds = (): string[] =>
     getAllLayers()
@@ -32,7 +32,7 @@ export function createMapUiHelpers(
       .filter((id): id is string => typeof id === 'string');
     return {
       mapMenuOpen: ui?.mapMenuOpen ?? false,
-      activeLayerId: ui?.activeLayerId ?? getActiveLayerId() ?? map.layerManager.vectorLayers?.[0]?.layerInfo?.id ?? null,
+      activeLayerId: ui?.activeLayerId ?? getActiveLayerId() ?? getAllLayers()[0]?.layerInfo?.id ?? null,
       visibleLayerIds: Array.isArray(ui?.visibleLayerIds) ? ui.visibleLayerIds : allLayerIds,
       thematicEnabled: ui?.thematicEnabled ?? false,
     };

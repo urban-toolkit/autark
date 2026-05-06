@@ -54,7 +54,7 @@ export function applyMapProvenanceState(
   const fallbackPlotIds = [...new Set(allPlotIds)];
   const fallbackLayerId = resolvedUi.activeLayerId;
 
-  for (const layer of map.layerManager.vectorLayers ?? []) {
+  for (const layer of ui.getAllLayers()) {
     const layerId = layer.layerInfo?.id;
     if (!layerId) continue;
     const combinedIds = new Set<number>();

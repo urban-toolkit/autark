@@ -75,3 +75,8 @@ export { PlotStyle } from './plot-style';
 
 /** Shared data transformation engine and ready-to-use transform presets. */
 export * from './transforms';
+
+// ─── Individual plot classes ─────────────────────────────────────────────────
+
+export { Scatterplot, Barchart, ParallelCoordinates, Linechart, TableVis, Heatmatrix } from './plots';
+export { Histogram } from './plot-types/histogram';

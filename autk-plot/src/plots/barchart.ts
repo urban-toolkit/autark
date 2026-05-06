@@ -41,6 +41,7 @@ import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 
+import { PlotStyle } from '../plot-style';
 import { PlotEvent } from '../types-events';
 
 /**
@@ -232,6 +233,46 @@ export class Barchart extends PlotBaseInteractive {
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
+    }
+
+    protected override renderSelection(): void {
+        const selectedSet = new Set(this.selection);
+        d3.select(this._div)
+            .selectAll<SVGRectElement, unknown>('.autkMark')
+            .style('fill', (datum: unknown) => {
+                const ids = Array.isArray((datum as { autkIds?: number[] })?.autkIds)
+                    ? ((datum as { autkIds?: number[] }).autkIds ?? [])
+                    : [];
+                const fullySelected = ids.length > 0 && ids.every((id) => selectedSet.has(id));
+                return fullySelected ? PlotStyle.highlight : PlotStyle.default;
+            });
+    }
+
+    protected override clickEvent(): void {
+        const bars = d3.select(this._div).selectAll<SVGRectElement, unknown>('.autkMark');
+        const clearLayer = d3.select(this._div).selectAll<SVGRectElement, unknown>('.autkClear');
+        const plot = this;
+
+        bars.each(function (datum: unknown) {
+            d3.select(this).on('click', function () {
+                const featureIds = Array.isArray((datum as { autkIds?: number[] })?.autkIds)
+                    ? [...new Set((datum as { autkIds?: number[] }).autkIds ?? [])]
+                    : [];
+                const current = plot.selection;
+                const allSelected = featureIds.length > 0 && featureIds.every((id) => current.includes(id));
+                const next = allSelected
+                    ? current.filter((id) => !featureIds.includes(id))
+                    : [...new Set([...current, ...featureIds])];
+
+                plot.setSelection(next);
+                plot.events.emit(PlotEvent.CLICK, { selection: plot.selection });
+            });
+        });
+
+        clearLayer.on('click', function () {
+            plot.setSelection([]);
+            plot.events.emit(PlotEvent.CLICK, { selection: [] });
+        });
     }
 
 }

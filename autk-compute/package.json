@@ -26,10 +26,10 @@
     }
   },
   "scripts": {
-    "dev": "vite",
-    "dev-build": "tsc && vite build --watch",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "dev": "ulimit -n 65536 && vite",
+    "dev-build": "ulimit -n 65536 && tsc && vite build --watch",
+    "build": "ulimit -n 65536 && tsc && vite build",
+    "preview": "ulimit -n 65536 && vite preview",
     "format": "prettier --write .",
     "doc": "typedoc --options typedoc.json"
   },

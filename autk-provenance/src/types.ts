@@ -148,14 +148,11 @@ export interface IMapForProvenance {
       layerInfo?: { id: string };
       layerRenderInfo?: { isSkip?: boolean; isColorMap?: boolean };
     } | null;
-    vectorLayers?: Array<{
+    /** All registered layers in render order (vector + raster). */
+    layers: Array<{
       layerInfo?: { id: string };
       setHighlightedIds?(ids: number[]): void;
       clearHighlightedIds?(): void;
-      layerRenderInfo?: { isSkip?: boolean; isColorMap?: boolean };
-    }>;
-    rasterLayers?: Array<{
-      layerInfo?: { id: string };
       layerRenderInfo?: { isSkip?: boolean; isColorMap?: boolean };
     }>;
   };

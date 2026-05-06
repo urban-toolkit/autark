@@ -42,7 +42,7 @@ export function applyMapState(options: {
     const fallbackLayerId = ui.activeLayerId;
     const fallbackPlotIds = [...new Set(Object.values(state.selection.plots ?? {}).flatMap((plot) => plot.ids))];
 
-    (map.layerManager.vectorLayers ?? []).forEach((layer) => {
+    getAllLayers(map).forEach((layer) => {
       const layerId = layer.layerInfo?.id;
       if (!layerId) return;
       const combinedIds = new Set<number>();

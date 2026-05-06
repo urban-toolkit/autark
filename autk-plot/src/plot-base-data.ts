@@ -249,10 +249,16 @@ export abstract class PlotBaseData {
      * @returns One `AutkDatum` per source feature with stable `autkIds` provenance.
      */
     private buildSourceRows(): AutkDatum[] {
-        return this._sourceFeatures.map((feature, idx) => ({
-            ...(feature.properties ?? {}),
-            autkIds: [idx],
-        })) as AutkDatum[];
+        return this._sourceFeatures.map((feature, idx) => {
+            const explicitAutkIds = Array.isArray(feature.properties?.autkIds)
+                ? feature.properties.autkIds.filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
+                : null;
+
+            return {
+                ...(feature.properties ?? {}),
+                autkIds: explicitAutkIds && explicitAutkIds.length > 0 ? explicitAutkIds : [idx],
+            };
+        }) as AutkDatum[];
     }
 
     /**

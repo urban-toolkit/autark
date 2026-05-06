@@ -8,6 +8,8 @@ export type { ProvenanceApi, CreateProvenanceOptions } from './create-provenance
 export { renderProvenanceTrailUI } from './provenance-trail-ui';
 export type { ProvenanceTrailUIOptions } from './provenance-trail-ui';
 export { renderInsightsPanel } from './ui/insights-panel';
+export { renderInsightsWorkspace } from './insights-workspace';
+export type { RenderInsightsWorkspaceOptions, RenderInsightsWorkspaceResult } from './insights-workspace';
 export * from './adapters';
 export {
   computeSelectionFrequency,

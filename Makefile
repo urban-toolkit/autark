@@ -13,7 +13,7 @@ lint:
 
 
 install:
-	$(CONCURRENTLY) $(foreach package,$(LIB_PACKAGES),cd $(package) && npm install)
+	npm install
 
 typecheck:
 	$(CONCURRENTLY) \
@@ -88,9 +88,9 @@ test-codegen:
 
 
 dev:
-	npm install
+	make install
 	make build
-	$(CONCURRENTLY) \
+	ulimit -n 65536; $(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
@@ -118,6 +118,7 @@ clean:
 		"cd autk-db && $(RIMRAF) dist build" \
 		"cd autk-plot && $(RIMRAF) dist build" \
 		"cd autk-compute && $(RIMRAF) dist build" \
+		"cd autk-provenance && $(RIMRAF) dist build" \
 		"cd gallery && $(RIMRAF) dist build" \
 		"cd usecases && $(RIMRAF) dist build"
 

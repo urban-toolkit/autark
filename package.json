@@ -14,6 +14,7 @@
         "autk-map",
         "autk-compute",
         "autk-plot",
+        "autk-provenance",
         "gallery",
         "usecases"
     ],

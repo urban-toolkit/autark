@@ -42,7 +42,8 @@ interface PlotEntry {
 
 export function createPlotAdapter(
   plots: IPlotForProvenance[],
-  onRecord: PlotRecordCallback
+  onRecord: PlotRecordCallback,
+  getCurrentState: () => AutarkProvenanceState
 ): PlotAdapterApi {
   let isApplyingState = false;
 
@@ -59,20 +60,31 @@ export function createPlotAdapter(
 
     for (const [event, actionType] of Object.entries(EVENT_ACTION_MAP)) {
       const fn = (selection: number[]) => {
-        const sig = selectionSignature(selection);
+        const currentState = getCurrentState();
+        const previousOwnedSelection = currentState.selection.plots?.[plot.plotId]?.ids ?? [];
+        const previousOwnedSet = new Set(previousOwnedSelection);
+        const mapOwnedSet = new Set(currentState.selection.map?.ids ?? []);
+        const borrowedPlotIds = new Set(
+          Object.entries(currentState.selection.plots ?? {})
+            .filter(([plotId]) => plotId !== plot.plotId)
+            .flatMap(([, plotState]) => plotState.ids)
+            .filter((id) => !previousOwnedSet.has(id))
+        );
+        const ownedSelection = [...new Set(selection.filter((id) => !mapOwnedSet.has(id) && !borrowedPlotIds.has(id)))];
+        const sig = selectionSignature(ownedSelection);
         if (sig === entry.lastSelectionSig) return;
         entry.lastSelectionSig = sig;
 
         const typeLabel = plotTypeLabel(plot.plotType);
         const label =
-          selection.length === 0
+          ownedSelection.length === 0
             ? `Cleared selection on ${typeLabel} (${plot.plotId})`
-            : `${event}: ${selection.length} point(s) on ${typeLabel} (${plot.plotId})`;
+            : `${event}: ${ownedSelection.length} point(s) on ${typeLabel} (${plot.plotId})`;
 
         onRecord(actionType, label, {
           selection: {
             plots: {
-              [plot.plotId]: { ids: selection, plotType: plot.plotType },
+              [plot.plotId]: { ids: ownedSelection, plotType: plot.plotType },
             },
           } as unknown as AutarkProvenanceState['selection'],
         });
@@ -159,7 +171,7 @@ export function createPlotAdapter(
       ])];
 
       for (const entry of entries) {
-        entry.lastSelectionSig = selectionSignature(coordinatedIds);
+        entry.lastSelectionSig = selectionSignature(state.selection?.plots?.[entry.plot.plotId]?.ids ?? []);
         entry.plot.setHighlightedIds(coordinatedIds);
       }
     } finally {
