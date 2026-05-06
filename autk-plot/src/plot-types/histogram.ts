@@ -156,7 +156,7 @@ export class Histogram extends PlotBaseInteractive {
 
     // Highlight a bin only when every feature mapped to that bin is selected.
     protected override renderSelection(): void {
-        const selectedSet = new Set(this.selection);
+        const selectedSet = new Set(this.highlightedSelection);
         const plot = this;
         d3.select(this._div).selectAll('.autkMark').style('fill', function (_d: unknown, binIdx: number) {
             const bin = plot.binData[binIdx];
@@ -179,13 +179,13 @@ export class Histogram extends PlotBaseInteractive {
                 const next = allSelected
                     ? current.filter((id) => !binFeatureIds.includes(id))
                     : [...new Set([...current, ...binFeatureIds])];
-                plot.setSelection(next);
+                plot.setLocalSelection(next);
                 plot.events.emit(PlotEvent.CLICK, { selection: plot.selection });
             });
         });
 
         cls.on('click', function () {
-            plot.setSelection([]);
+            plot.setLocalSelection([]);
             plot.events.emit(PlotEvent.CLICK, { selection: [] });
         });
     }
@@ -213,9 +213,9 @@ export class Histogram extends PlotBaseInteractive {
                                     brushedBins.add(binIdx);
                                 }
                             });
-                        plot.setSelection(plot.binIndicesToFeatureIds(brushedBins));
+                        plot.setLocalSelection(plot.binIndicesToFeatureIds(brushedBins));
                     } else {
-                        plot.setSelection([]);
+                        plot.setLocalSelection([]);
                     }
                     plot.events.emit(PlotEvent.BRUSH, { selection: plot.selection });
                 });
@@ -247,9 +247,9 @@ export class Histogram extends PlotBaseInteractive {
                                     brushedBins.add(binIdx);
                                 }
                             });
-                        plot.setSelection(plot.binIndicesToFeatureIds(brushedBins));
+                        plot.setLocalSelection(plot.binIndicesToFeatureIds(brushedBins));
                     } else {
-                        plot.setSelection([]);
+                        plot.setLocalSelection([]);
                     }
                     plot.events.emit(PlotEvent.BRUSH_X, { selection: plot.selection });
                 });
@@ -281,9 +281,9 @@ export class Histogram extends PlotBaseInteractive {
                                     brushedBins.add(binIdx);
                                 }
                             });
-                        plot.setSelection(plot.binIndicesToFeatureIds(brushedBins));
+                        plot.setLocalSelection(plot.binIndicesToFeatureIds(brushedBins));
                     } else {
-                        plot.setSelection([]);
+                        plot.setLocalSelection([]);
                     }
                     plot.events.emit(PlotEvent.BRUSH_Y, { selection: plot.selection });
                 });

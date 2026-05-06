@@ -175,6 +175,7 @@ export interface IPlotForProvenance {
     addEventListener(event: string, listener: (selection: number[]) => void): void;
     removeEventListener?(event: string, listener: (selection: number[]) => void): void;
   };
+  setOwnedSelection(selection: number[]): void;
   setHighlightedIds(selection: number[]): void;
 }
 

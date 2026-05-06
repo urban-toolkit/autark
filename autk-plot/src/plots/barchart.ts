@@ -236,7 +236,7 @@ export class Barchart extends PlotBaseInteractive {
     }
 
     protected override renderSelection(): void {
-        const selectedSet = new Set(this.selection);
+        const selectedSet = new Set(this.highlightedSelection);
         d3.select(this._div)
             .selectAll<SVGRectElement, unknown>('.autkMark')
             .style('fill', (datum: unknown) => {
@@ -264,13 +264,13 @@ export class Barchart extends PlotBaseInteractive {
                     ? current.filter((id) => !featureIds.includes(id))
                     : [...new Set([...current, ...featureIds])];
 
-                plot.setSelection(next);
+                plot.setLocalSelection(next);
                 plot.events.emit(PlotEvent.CLICK, { selection: plot.selection });
             });
         });
 
         clearLayer.on('click', function () {
-            plot.setSelection([]);
+            plot.setLocalSelection([]);
             plot.events.emit(PlotEvent.CLICK, { selection: [] });
         });
     }

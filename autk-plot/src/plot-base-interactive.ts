@@ -6,7 +6,7 @@ import type {
 } from 'geojson';
 
 import type { AutkDatum } from './types-plot';
-import type { PlotConfig, PlotTransformConfig } from './api';
+import type { PlotConfig } from './api';
 
 import {
     ColorMapInterpolator,
@@ -31,15 +31,15 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     protected _enabledEvents: PlotEvent[] = [];
     /** CSS property used when applying colors to marks. */
     protected _colorProperty: 'fill' | 'stroke' = 'fill';
+    /** When false, clicking the plot background does not clear the selection. */
+    protected _backgroundClickClearsSelection = true;
 
     /** Datums corresponding to marks currently selected by local interaction. */
     private _selectedMarkDatums: Set<object> = new Set();
-    /** Source feature ids derived from mark selection or provided externally. */
+    /** Source feature ids owned by local interaction on this plot. */
     private _selectedFeatureIds: Set<number> = new Set();
-    /** Tracks whether the current selection came from local or external input. */
-    private _selectionOrigin: 'local' | 'external' | null = null;
-    /** Controls how source ids map back onto rendered marks. */
-    private _selectionProjection: 'bijective' | 'aggregated' = 'bijective';
+    /** Source feature ids highlighted from other coordinated views. */
+    private _externalSelectedFeatureIds: Set<number> = new Set();
     /** Typed event emitter exposed to plot consumers. */
     private _plotEvents!: EventEmitter<PlotEventRecord>;
     /** Active brush rectangles keyed by brush host id. */
@@ -67,14 +67,20 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         super(config);
         this._plotEvents = new EventEmitter();
         this._enabledEvents = config.events ?? [];
-        this._selectionProjection = this.resolveSelectionProjection(config.transform);
     }
 
     /**
-     * Returns the active selection as source feature ids.
+     * Returns the locally owned selection as source feature ids.
      */
     get selection(): number[] {
         return Array.from(this._selectedFeatureIds);
+    }
+
+    /**
+     * Returns the full highlighted feature set visible in this view.
+     */
+    get highlightedSelection(): number[] {
+        return Array.from(this.getCombinedSelectedFeatureIds());
     }
 
     /**
@@ -94,7 +100,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         this._sourceFeatures = collection.features;
         this._selectedMarkDatums = new Set();
         this._selectedFeatureIds = new Set();
-        this._selectionOrigin = null;
+        this._externalSelectedFeatureIds = new Set();
         this._activeBrushes.clear();
         this.clearBrushVisuals();
         this._brushBehaviors.clear();
@@ -102,15 +108,25 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     }
 
     /**
-     * Applies an externally authored selection to the plot.
+     * Applies an externally authored highlight set to the plot.
      *
      * @param selection Source feature ids to highlight.
      * @throws Never throws.
      */
     setSelection(selection: number[]): void {
+        this._externalSelectedFeatureIds = new Set(selection);
+        this.renderSelection();
+    }
+
+    /**
+     * Replaces the locally owned selection for this plot only.
+     *
+     * @param selection Source feature ids owned by this plot.
+     * @throws Never throws.
+     */
+    setLocalSelection(selection: number[]): void {
         this._selectedFeatureIds = new Set(selection);
-        this._selectionOrigin = selection.length > 0 ? 'external' : null;
-        this.syncSelectedMarksFromFeatures();
+        this.syncSelectedMarksFromLocalFeatures();
         if (selection.length === 0) {
             this._activeBrushes.clear();
             this.clearBrushVisuals();
@@ -206,23 +222,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
 
         const datum = d as AutkDatum;
 
-        if (this._selectionProjection === 'aggregated') {
-            if (this._selectionOrigin === 'local') {
-                return this._selectedMarkDatums.has(d as object);
-            }
-            if (this._selectionOrigin === 'external') {
-                return (datum.autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
-            }
-            return false;
-        }
-
-        if (this._selectedMarkDatums.has(d as object)) return true;
-
-        if (this._selectedFeatureIds.size > 0) {
-            return (datum.autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
-        }
-
-        return false;
+        const combinedIds = this.getCombinedSelectedFeatureIds();
+        return combinedIds.size > 0 && (datum.autkIds ?? []).some(fid => combinedIds.has(fid));
     }
 
     /**
@@ -242,19 +243,17 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                     plot._selectedMarkDatums.add(d as object);
                 }
                 plot.syncSelectedFeaturesFromMarks();
-                plot._selectionOrigin = plot._selectedFeatureIds.size > 0 ? 'local' : null;
                 plot.renderSelection();
                 plot.events.emit(PlotEvent.CLICK, { selection: plot.selection });
             });
         });
 
-        cls.on('click', function () {
-            plot._selectedMarkDatums = new Set();
-            plot._selectedFeatureIds = new Set();
-            plot._selectionOrigin = null;
-            plot.renderSelection();
-            plot.events.emit(PlotEvent.CLICK, { selection: [] });
-        });
+        if (this._backgroundClickClearsSelection) {
+            cls.on('click', function () {
+                plot.setLocalSelection([]);
+                plot.events.emit(PlotEvent.CLICK, { selection: [] });
+            });
+        }
     }
 
     /**
@@ -439,7 +438,6 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             });
 
         this.syncSelectedFeaturesFromMarks();
-        this._selectionOrigin = this._selectedFeatureIds.size > 0 ? 'local' : null;
         return this.selection;
     }
 
@@ -511,18 +509,10 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * Restores locally selected aggregated marks after transformed rows are recreated.
      */
     private restoreLocalSelectionAfterDraw(): void {
-        if (this._selectionProjection !== 'aggregated' || this._selectionOrigin !== 'local') {
+        if (this._selectedFeatureIds.size === 0) {
             return;
         }
-
-        const selectedMarks = new Set<object>();
-        for (const datum of this._data) {
-            const ids = datum.autkIds ?? [];
-            if (ids.some(fid => this._selectedFeatureIds.has(fid))) {
-                selectedMarks.add(datum as object);
-            }
-        }
-        this._selectedMarkDatums = selectedMarks;
+        this.syncSelectedMarksFromLocalFeatures();
     }
 
     /**
@@ -736,31 +726,11 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         if (activeBrushes.size === 0) {
             this._selectedMarkDatums = new Set();
             this._selectedFeatureIds = new Set();
-            this._selectionOrigin = null;
         } else {
             this.resolveSelectionFromRects(activeBrushes);
         }
         this.renderSelection();
         this.events.emit(event, { selection: this.selection });
-    }
-
-    /**
-     * Resolves whether this plot should use bijective or aggregated selection projection.
-     *
-     * @param transform Optional transform configuration for the plot.
-     * @returns Selection projection mode used by interaction logic.
-     */
-    private resolveSelectionProjection(transform: PlotTransformConfig | undefined): 'bijective' | 'aggregated' {
-        const preset = transform?.preset;
-        if (
-            preset === 'binning-1d' ||
-            preset === 'binning-2d' ||
-            preset === 'binning-events' ||
-            preset === 'reduce-series'
-        ) {
-            return 'aggregated';
-        }
-        return 'bijective';
     }
 
     /**
@@ -776,9 +746,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     }
 
     /**
-     * Rebuilds the selected mark set from the current selected source feature ids.
+     * Rebuilds the locally selected mark set from the current selected source feature ids.
      */
-    private syncSelectedMarksFromFeatures(): void {
+    private syncSelectedMarksFromLocalFeatures(): void {
         const selectedMarks = new Set<object>();
 
         if (this._selectedFeatureIds.size === 0) {
@@ -797,5 +767,12 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             });
 
         this._selectedMarkDatums = selectedMarks;
+    }
+
+    /**
+     * Returns the union of local and externally provided feature ids.
+     */
+    private getCombinedSelectedFeatureIds(): Set<number> {
+        return new Set([...this._selectedFeatureIds, ...this._externalSelectedFeatureIds]);
     }
 }

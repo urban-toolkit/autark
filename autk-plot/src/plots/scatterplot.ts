@@ -49,6 +49,8 @@ export class Scatterplot extends PlotBaseInteractive {
     protected mapX!: d3.ScaleLinear<number, number>;
     /** Linear scale mapping the y-attribute domain to pixel coordinates. */
     protected mapY!: d3.ScaleLinear<number, number>;
+    /** Clicking the plot background should not clear the selection. */
+    protected override _backgroundClickClearsSelection = false;
 
     /**
      * Creates a scatter plot instance and performs the initial draw.

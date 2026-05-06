@@ -55,7 +55,9 @@ export function createChartModalController(descriptors: ChartModalDescriptor[]):
   }
 
   function syncSelection(): void {
-    if (active && modalPlot) modalPlot.setSelection([...active.originalPlot.selection]);
+    if (!active || !modalPlot) return;
+    modalPlot.setLocalSelection([...active.originalPlot.selection]);
+    modalPlot.setSelection([...active.originalPlot.highlightedSelection]);
   }
 
   function clearModalPlot(): void {
@@ -96,7 +98,7 @@ export function createChartModalController(descriptors: ChartModalDescriptor[]):
     active.events.forEach((eventName) => {
       const listener = ({ selection }: { selection: number[] }) => {
         if (!active) return;
-        active.originalPlot.setSelection([...selection]);
+        active.originalPlot.setLocalSelection([...selection]);
         active.originalPlot.events.emit(eventName as never, { selection: [...selection] } as never);
         requestAnimationFrame(syncSelection);
       };

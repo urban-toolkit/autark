@@ -83,7 +83,7 @@ export function createAutarkProvenance(options: CreateAutarkProvenanceOptions): 
   const plotAdapter = plots && plots.length > 0
     ? createPlotAdapter(plots, (actionType, label, delta) => {
         core.applyAction(actionType, label, delta);
-      }, () => core.getCurrentState() ?? initialState)
+      })
     : null;
 
   const dbAdapter = db

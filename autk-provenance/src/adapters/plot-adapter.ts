@@ -26,7 +26,11 @@ const EVENT_ACTION_MAP: Record<string, ProvenanceAction> = {
 };
 
 function selectionSignature(selection: number[]): string {
-  return selection.join(',');
+  return normalizeSelection(selection).join(',');
+}
+
+function normalizeSelection(selection: number[]): number[] {
+  return [...new Set(selection)].sort((a, b) => a - b);
 }
 
 function plotTypeLabel(plotType: string): string {
@@ -42,8 +46,7 @@ interface PlotEntry {
 
 export function createPlotAdapter(
   plots: IPlotForProvenance[],
-  onRecord: PlotRecordCallback,
-  getCurrentState: () => AutarkProvenanceState
+  onRecord: PlotRecordCallback
 ): PlotAdapterApi {
   let isApplyingState = false;
 
@@ -60,17 +63,7 @@ export function createPlotAdapter(
 
     for (const [event, actionType] of Object.entries(EVENT_ACTION_MAP)) {
       const fn = (selection: number[]) => {
-        const currentState = getCurrentState();
-        const previousOwnedSelection = currentState.selection.plots?.[plot.plotId]?.ids ?? [];
-        const previousOwnedSet = new Set(previousOwnedSelection);
-        const mapOwnedSet = new Set(currentState.selection.map?.ids ?? []);
-        const borrowedPlotIds = new Set(
-          Object.entries(currentState.selection.plots ?? {})
-            .filter(([plotId]) => plotId !== plot.plotId)
-            .flatMap(([, plotState]) => plotState.ids)
-            .filter((id) => !previousOwnedSet.has(id))
-        );
-        const ownedSelection = [...new Set(selection.filter((id) => !mapOwnedSet.has(id) && !borrowedPlotIds.has(id)))];
+        const ownedSelection = normalizeSelection(selection);
         const sig = selectionSignature(ownedSelection);
         if (sig === entry.lastSelectionSig) return;
         entry.lastSelectionSig = sig;
@@ -171,7 +164,9 @@ export function createPlotAdapter(
       ])];
 
       for (const entry of entries) {
-        entry.lastSelectionSig = selectionSignature(state.selection?.plots?.[entry.plot.plotId]?.ids ?? []);
+        const ownedIds = state.selection?.plots?.[entry.plot.plotId]?.ids ?? [];
+        entry.lastSelectionSig = selectionSignature(ownedIds);
+        entry.plot.setOwnedSelection(ownedIds);
         entry.plot.setHighlightedIds(coordinatedIds);
       }
     } finally {
