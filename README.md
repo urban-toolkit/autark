@@ -4,23 +4,23 @@
 </div>
 <br>
 
-**Autark** is a modular and serverless toolkit built in TypeScript to streamline the implementation and deployment of urban visual analytics systems. 
+**Autark** is a serverless, modular toolkit built in TypeScript to streamline the prototyping of urban visual analytics systems.
 
-It provides a client-side platform for the complete implementation of urban visual analytics systems. It supports loading, storing, querying, joining, and exporting both physical and thematic urban data using standard formats like OpenStreetMap, GeoJSON, and GeoTIFF. Employing GPU acceleration, it allows for fast implementations of urban analysis algorithms. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
+It provides a client-side platform for implementing urban visual analytics software. It supports loading, storing, querying, joining, and exporting physical and thematic urban data using standard formats such as OpenStreetMap, GeoJSON, and GeoTIFF. By using GPU acceleration, Autark enables the implementation of algorithms for sophisticated urban analyses, such as shadow and visibility analysis, as well as classic machine learning algorithms such as regression and clustering. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
 
-Autark is available as an umbrella package plus individual modules:
+Autark is available as a single package or as individual modules:
 
-* `@urban-toolkit/autk`: Umbrella package that re-exports the toolkit modules.
+* `@urban-toolkit/autk`: Complete package that re-exports the toolkit modules.
 * `@urban-toolkit/autk-db`: A spatial database that handles physical and thematic urban datasets.
-* `@urban-toolkit/autk-compute`: a WebGPU based general-purpose computation engine to implement general-purpose algorithms using physical and thematic data.
-* `@urban-toolkit/autk-map`: A map visualization library that allows the exploration of 2D and 3D physical and thematical layers.
-* `@urban-toolkit/autk-plot`: A d3.js based plot library designed to consume urban data in standard formats and create linked views.
+* `@urban-toolkit/autk-compute`: A WebGPU-based computation engine for implementing general-purpose algorithms using physical and thematic data.
+* `@urban-toolkit/autk-map`: A WebGPU-based vector map visualization library for exploring 2D and 3D physical and thematic layers.
+* `@urban-toolkit/autk-plot`: A D3.js-based plot library designed to consume urban data in standard formats and facilitate linked views.
 
-For demonstration purposes and to facilitate the adoption of Autark, we created a large collection of simple examples illustrating the core functionalities of each module. We also provide several examples on how to combine several modules to build complex applications. All examples are organized in the `example/` directory.
+For demonstration and documentation purposes, we created a large collection of examples illustrating the core functionality of each module in the `example/` directory. We also provide more complex examples in the `usecases/` folder.
 
 ## Installation
 
-Autark packages are available on NPM. Install the umbrella package when you want the full toolkit:
+Autark packages are available on NPM. Install the complete package when you want the full toolkit:
 
 ```bash
 npm install @urban-toolkit/autk
@@ -39,9 +39,9 @@ npm install @urban-toolkit/autk-map
 
 ### Dependencies
 
-You'll need Node.js installed to build and run this project for development purposes. Please check the [Node.js website](https://nodejs.org/) for instructions.
+You need Node.js installed to build and run this project for development purposes. Please check the [Node.js website](https://nodejs.org/) for instructions.
 
-Also, we use GNU Make to automate the building process. To install it, please use one of the following commands (we recommend using the package manager [Chocolatey](https://chocolatey.org/) on Windows):
+We also use GNU Make to automate the build process. To install it, please use one of the following commands (we recommend using the package manager [Chocolatey](https://chocolatey.org/) on Windows):
 
 ```bash
 # Windows
@@ -56,19 +56,12 @@ sudo apt-get install build-essential
 
 ### Building and Running
 
-After installing Node.js and GNU Make, in the root folder of the project, install dependencies:
-
-```bash
-npm install
-```
-
-To start the development server for the default `gallery` application:
+After installing Node.js and GNU Make, run the following command from the project's root folder:
 
 ```bash
 make dev
 ```
-
-You can specify a different application workspace using the `APP` variable and a specific file using `OPEN`:
+This command starts a development server for the default `gallery` examples folder. You can specify a different examples folder using the `APP` variable and a specific file using `OPEN`:
 
 ```bash
 # Run the gallery with a specific example
@@ -82,30 +75,31 @@ make dev APP=usecases OPEN=/src/urbane/main.html
 
 Autark uses [Playwright](https://playwright.dev/) for end-to-end visual regression testing. Tests are organized under `tests/<app>/` and compare screenshots against committed reference images.
 
-CI currently runs one stable Playwright test by default:
+To run the stable test suite:
 
 ```bash
 make test
 ```
 
-Run a specific test locally:
+To run a specific test:
 
 ```bash
 make test TEST=tests/gallery/autk-map/standalone-geojson-vis.test.ts
 ```
 
-Update committed visual baselines locally:
+To update the visual baselines:
 
 ```bash
 # Update screenshots only
-make test-update TEST=tests/gallery/autk-map/colormap-categorical.test.ts UPDATE=images
-
-# Update HAR cache and screenshots
-make test-update TEST=tests/gallery/autk-map/osm-layers-api.test.ts UPDATE="cache images"
+make test-update TEST=tests/gallery/autk-map/colormap-categorical.test.ts UPDATE="images"
 ```
 
 Tests that load OpenStreetMap data use HAR files under `tests/data/` to replay Overpass API responses without hitting the network. Include `cache` in `UPDATE` to re-record them when the query or area changes.
 
+```bash
+# Update HAR cache and screenshots
+make test-update TEST=tests/gallery/autk-map/osm-layers-api.test.ts UPDATE="cache images"
+```
 
 ### Development Workflow
 
@@ -118,13 +112,13 @@ The `Makefile` provides several commands to help with the development process:
 | `make build` | Builds the publishable packages and the `autk` umbrella package. |
 | `make verify` | Runs lint and typecheck (including the build required for type resolution). |
 | `make docs` | Generates TypeDoc documentation for the core libraries. |
-| `make test` | Runs the stable Playwright test used by CI. |
+| `make test` | Runs the stable Playwright tests used by CI. |
 | `make test-update` | Updates local Playwright screenshots and/or HAR files for a selected test. |
 | `make clean` | Removes `node_modules` and build artifacts. |
 
 ## Notes
 
-Autark requires WebGPU. Please make sure to have it enabled in your browser. In Chrome or Edge (v113+), it's enabled by default. In Firefox, WebGPU is only available in Nightly builds and must be explicitly enabled:
+Autark requires WebGPU. Please make sure it is enabled in your browser. In Chrome or Edge (v113+), it is enabled by default. In Firefox, WebGPU is only available in Nightly builds and must be explicitly enabled:
 
   1. Download and install [Firefox Nightly](https://www.mozilla.org/en-US/firefox/channel/desktop/#nightly).
   2. Visit `about:config`.

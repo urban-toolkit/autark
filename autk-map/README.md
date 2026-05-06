@@ -1,25 +1,70 @@
-# Autark: A Serverless Toolkit for Prototyping Urban Visual Analytics Systems
+# @urban-toolkit/autk-map
+
 <div align="center">
   <img src="../logo.png" alt="Autark Logo" height="200"/></br>
 </div>
 <br>
 
-**Autark** is a modular and serverless toolkit built in TypeScript to streamline the implementation and deployment of urban visual analytics systems. 
+## Autark toolkit
 
-It provides a client-side platform for the complete implementation of urban visual analytics systems. It supports loading, storing, querying, joining, and exporting both physical and thematic urban data using standard formats like OpenStreetMap, GeoJSON, and GeoTIFF. Employing GPU acceleration, it allows for fast implementations of urban analysis algorithms. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
+**Autark** is a serverless, modular TypeScript toolkit for prototyping urban visual analytics systems entirely in the browser. It supports client-side workflows for loading, storing, querying, joining, computing, and visualizing physical and thematic urban data using standard formats such as OpenStreetMap, GeoJSON, GeoTIFF, and CSV.
 
-Autark is composed of four modules:
+The toolkit is available as the umbrella package `@urban-toolkit/autk` or as individual modules:
 
-* `@urban-toolkit/autk-db`: A spatial database that handles physical and thematic urban datasets.
-* `@urban-toolkit/autk-compute`: a WebGPU based general-purpose computation engine to implement general-purpose algorithms using physical and thematic data.
-* `@urban-toolkit/autk-map`: A map visualization library that allows the exploration of 2D and 3D physical and thematical layers.
-* `@urban-toolkit/autk-plot`: A d3.js based plot library designed to consume urban data in standard formats and create linked views.
+* `@urban-toolkit/autk-db`: In-browser spatial database for urban datasets.
+* `@urban-toolkit/autk-compute`: WebGPU computation engine for analytical and render-based pipelines.
+* `@urban-toolkit/autk-map`: WebGPU 2D/3D map visualization library.
+* `@urban-toolkit/autk-plot`: D3.js-based plotting library for linked urban data views.
 
-For demonstration purposes and to facilitate the adoption of Autark, we created a large collection of simple examples illustrating the core functionalities of each module. We also provide several examples on how to combine several modules to build complex applications. All examples are organized in the `example/` directory.
+## Map visualization
 
-# @urban-toolkit/autk-map
+`@urban-toolkit/autk-map` is a WebGPU-based map visualization library for rendering urban vector and raster layers. It can display GeoJSON-derived points, polylines, polygons, buildings, parks, water, roads, and GeoTIFF-derived raster data, with support for thematic color mapping, picking, highlighting, layer visibility, and map UI controls.
 
-**@urban-toolkit/autk-map** is a 3D map visualization library, part of the Autark ecosystem, built using [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API). The library currently loads GeoJSON-derived vector layers and GeoTIFF-derived raster layers. The library can be used standalone or in conjunction with other Autark modules. To facilitate adoption, we provide a large collection of examples in the [Autark website](https://autarkjs.org/gallery/), demonstrating its functionalities both as an independent library and as part of the larger ecosystem of tools for urban data analytics.
+### Basic usage
+
+```ts
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
+
+const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
+const map = new AutkMap(canvas);
+
+await map.init();
+
+map.loadCollection('buildings', {
+  collection: buildingsGeojson,
+  type: 'buildings',
+  property: 'properties.height',
+});
+
+map.updateRenderInfo('buildings', {
+  renderInfo: { isColorMap: true, isPick: true },
+});
+
+map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+  console.log(layerId, selection);
+});
+
+map.draw();
+```
+
+### API summary
+
+* `new AutkMap(canvas)`: Creates a map controller bound to an HTML canvas.
+* `init()`: Initializes WebGPU resources, event handlers, the camera, and UI controls.
+* `camera`, `renderer`, `layerManager`, `canvas`, `ui`: Expose core map subsystems.
+* `events`: Typed event bus for interactions such as picking.
+* `activePickingLayer`: Returns the layer currently configured for picking.
+* `loadCollection(id, params)`: Loads a GeoJSON or raster-derived collection as a map layer.
+* `loadMesh(id, params)`: Loads prebuilt mesh geometry directly.
+* `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
+* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions.
+* `updateColorMap(id, params)`: Patches the layer colormap configuration.
+* `updateRenderInfo(id, params)`: Updates render state such as visibility, opacity, picking, and colormap activation.
+* `removeLayer(id)`: Removes a layer from the map.
+* `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
+* `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
+* `draw(fps?)`: Starts a continuous render loop.
+* `destroy()`: Releases event handlers and GPU resources.
 
 ## Resources
 

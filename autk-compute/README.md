@@ -1,104 +1,63 @@
 # @urban-toolkit/autk-compute
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/urban-toolkit/utk-serverless/main/logo.png" alt="Autark Logo" height="200"/></br>
+  <img src="../logo.png" alt="Autark Logo" height="200"/></br>
 </div>
 <br>
 
-`@urban-toolkit/autk-compute` is the WebGPU computation package in the Autark ecosystem. It provides two GPU pipelines over GeoJSON data:
+## Autark toolkit
 
-1. `gpgpuPipeline`
-   Executes WGSL compute code over feature properties and writes results into `feature.properties.compute`.
-2. `renderPipeline`
-   Samples rendered views from a viewpoints collection and writes class or object visibility metrics into `feature.properties.compute.render`.
+**Autark** is a serverless, modular TypeScript toolkit for prototyping urban visual analytics systems entirely in the browser. It supports client-side workflows for loading, storing, querying, joining, computing, and visualizing physical and thematic urban data using standard formats such as OpenStreetMap, GeoJSON, GeoTIFF, and CSV.
 
-## Render pipeline
+The toolkit is available as the umbrella package `@urban-toolkit/autk` or as individual modules:
 
-The render pipeline now supports only two aggregation modes:
+* `@urban-toolkit/autk-db`: In-browser spatial database for urban datasets.
+* `@urban-toolkit/autk-compute`: WebGPU computation engine for analytical and render-based pipelines.
+* `@urban-toolkit/autk-map`: WebGPU 2D/3D map visualization library.
+* `@urban-toolkit/autk-plot`: D3.js-based plotting library for linked urban data views.
 
-1. `classes`
-   Computes visible share per semantic layer type.
-2. `objects`
-   Computes visibility per individual rendered object.
+## Compute engine
 
-Background can be counted as an extra class bucket when using `classes`:
+`@urban-toolkit/autk-compute` provides WebGPU pipelines for running analysis over GeoJSON feature collections. It includes a GPGPU pipeline for custom WGSL expressions over feature attributes and a render pipeline for visibility-style metrics from sampled viewpoints. Results are written back to `feature.properties.compute` on the returned collection.
 
-```ts
-const result = await compute.renderPipeline({
-  layers: [
-    { id: 'buildings', collection: buildings, type: 'buildings' },
-    { id: 'parks', collection: parks, type: 'parks' },
-    { id: 'water', collection: water, type: 'water' },
-  ],
-  viewpoints: {
-    collection: roads,
-    sampling: { directions: 1 },
-  },
-  aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
-  tileSize: 64,
-});
-
-result.features.forEach((feature) => {
-  const classes = feature.properties?.compute?.render?.classes ?? {};
-  const sky = Number(classes.sky ?? 0);
-  const water = Number(classes.water ?? 0);
-  const parks = Number(classes.parks ?? 0);
-  console.log({ sky, water, parks });
-});
-```
-
-Render-layer inputs:
-
-- `id`: unique per rendered layer in the request; used to scope object keys
-- `type`: semantic aggregation bucket for class-share results
-- `objectIdProperty`: optional stable feature property used for object aggregation keys; when omitted, the feature index is used
-
-Viewpoint inputs:
-
-- `collection`: collection used to derive camera origins and receive aggregated results
-- `strategy`: optional origin-generation strategy, such as `centroid` or `building-windows`
-- `sampling`: optional direction sampling controls per derived origin
-
-Sampling inputs:
-
-- `directions`: number of azimuth samples per collection feature
-- `azimuthOffsetDeg`: rotates the first sampled view direction
-- `pitchDeg`: applies a shared vertical pitch to every sampled direction
-
-Use `objects` only when you really need per-feature visibility. It is materially heavier than `classes`.
-
-Object aggregation returns keys scoped by `id`, not `type`, so two layers can share the same semantic `type` without colliding in `render.objects`.
-
-## GPGPU pipeline
-
-The GPGPU pipeline maps feature properties to columnar GPU buffers, runs a WGSL kernel, and writes outputs back into `properties.compute`.
+### Basic usage
 
 ```ts
+import { AutkComputeEngine } from '@urban-toolkit/autk-compute';
+
+const compute = new AutkComputeEngine();
+
 const result = await compute.gpgpuPipeline({
-  collection: buildings,
-  variableMapping: { height: 'height', footprint: 'area' },
+  collection: buildingsGeojson,
+  variableMapping: {
+    height: 'properties.height',
+    footprint: 'properties.area',
+  },
   wgslBody: 'return height * footprint;',
   resultField: 'volumeProxy',
 });
+
+console.log(result.features[0].properties?.compute?.volumeProxy);
 ```
 
-Besides `variableMapping`, the high-level API also supports:
+### API summary
 
-- `attributeArrays`: fixed-length per-feature arrays
-- `attributeMatrices`: per-feature matrices with fixed dimensions or `rows: 'auto'`
-- `uniforms`: global scalar constants for one dispatch
-- `uniformArrays`: global fixed-length arrays for one dispatch
-- `uniformMatrices`: global matrices for one dispatch
+* `new AutkComputeEngine()`: Creates the unified compute engine.
+* `gpgpuPipeline(params)`: Runs a WGSL compute pass over feature properties and writes scalar or columnar results into `properties.compute`.
+* `renderPipeline(params)`: Renders layer views from sampled viewpoints and writes visibility metrics into `properties.compute.render`.
+* `ComputeGpgpu`: Lower-level GPGPU pipeline class used by the engine.
+* `ComputeRender`: Lower-level render-analysis pipeline class used by the engine.
+* `generateViewOrigins(...)`: Builds camera origins from viewpoint collections.
+* `expandCameraSamples(...)`: Expands origins into directional camera samples.
+* `buildCameraMatrices(...)`: Builds camera matrices for render sampling.
+* `TriangulatorBuildingWithWindows`: Helper for building-window viewpoint generation.
 
-With `attributeMatrices`, using `rows: 'auto'` tells the pipeline to infer the row count per feature at runtime while still packing each matrix into a fixed GPU stride based on the maximum observed row count.
+### Pipeline capabilities
 
-## Limits
-
-1. `renderPipeline` class aggregation is limited by `maxStorageBufferBindingSize` for `collectionCount * layerTypeCount`.
-2. `classes` aggregation supports at most `255` encoded `type` buckets, including the optional background bucket.
-3. `objects` aggregation supports at most `65535` rendered objects.
-4. `objects` aggregation also has a CPU-side accumulation limit for the final `collectionCount * objectCount` visibility buffer.
-5. Large render workloads should still prefer modest `tileSize` and direction counts.
+* GPGPU inputs can use `variableMapping`, `attributeArrays`, `attributeMatrices`, `uniforms`, `uniformArrays`, and `uniformMatrices`.
+* Render aggregation supports `classes` for semantic layer shares and `objects` for per-object visibility.
+* Render layers use `id`, `collection`, `type`, and optional `objectIdProperty` values.
+* Viewpoints can be derived using strategies such as centroids or building windows, with configurable direction sampling.
 
 ## Resources
 
