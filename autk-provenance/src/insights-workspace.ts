@@ -31,6 +31,20 @@ export interface RenderInsightsWorkspaceResult {
   destroy(): void;
 }
 
+const CARD_CHART_MARGINS = {
+  scatter: { left: 60, right: 16, top: 48, bottom: 48 },
+  bar: { left: 55, right: 16, top: 48, bottom: 72 },
+  parallel: { left: 28, right: 28, top: 50, bottom: 36 },
+  histogram: { left: 55, right: 16, top: 48, bottom: 48 },
+} as const;
+
+const MODAL_CHART_MARGINS = {
+  scatter: { left: 62, right: 16, top: 42, bottom: 48 },
+  bar: { left: 55, right: 16, top: 42, bottom: 72 },
+  parallel: { left: 28, right: 28, top: 44, bottom: 36 },
+  histogram: { left: 55, right: 16, top: 42, bottom: 48 },
+} as const;
+
 function plotSize(element: HTMLElement, fallbackWidth: number, fallbackHeight: number): { width: number; height: number } {
   const rect = element.getBoundingClientRect();
   return {
@@ -45,7 +59,7 @@ function createPlotAdapter(plot: PlotBaseInteractive, plotId: string, plotType: 
     plotType,
     plotEvents: {
       addEventListener(event: string, fn: (selection: number[]) => void) {
-        plot.events.on(event as PlotEvent, ({ selection }) => fn(selection));
+        plot.events.on(event as PlotEvent, ({ selection }: { selection: number[] }) => fn(selection));
       },
       removeEventListener(event: string, fn: (selection: number[]) => void) {
         plot.events.off(event as PlotEvent, fn as never);
@@ -57,19 +71,39 @@ function createPlotAdapter(plot: PlotBaseInteractive, plotId: string, plotType: 
   });
 }
 
-function mountMapInWorkspace(map: AutkMap, body: HTMLElement): void {
+function mountMapInWorkspace(map: AutkMap, body: HTMLElement): () => void {
   const internals = map as AutkMap & {
     _resizeEvents?: { resize?: () => void };
+  };
+  let frame = 0;
+  let observer: ResizeObserver | null = null;
+
+  const syncSize = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      internals._resizeEvents?.resize?.();
+      map.ui.handleResize();
+      map.draw();
+    });
   };
 
   map.ui.destroy();
   body.replaceChildren(map.canvas);
   map.canvas.style.width = '100%';
   map.canvas.style.height = '100%';
-  internals._resizeEvents?.resize?.();
   map.ui.buildUi();
-  map.ui.handleResize();
-  map.draw();
+  syncSize();
+
+  if (typeof ResizeObserver !== 'undefined') {
+    observer = new ResizeObserver(() => syncSize());
+    observer.observe(body);
+  }
+
+  return () => {
+    if (frame) cancelAnimationFrame(frame);
+    observer?.disconnect();
+  };
 }
 
 function applyThematic(map: AutkMap, collection: FeatureCollection, layerId: string, property: string): void {
@@ -98,7 +132,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
   shell.plotPanels.parallel.hint.textContent = schema.parallel.subtitle;
   shell.plotPanels.histogram.title.textContent = schema.histogram.title;
   shell.plotPanels.histogram.hint.textContent = schema.histogram.subtitle;
-  mountMapInWorkspace(map, shell.mapBody);
+  const unmountMap = mountMapInWorkspace(map, shell.mapBody);
 
   const scatterDims = plotSize(shell.plotPanels.scatter.body, 360, 280);
   const barDims = plotSize(shell.plotPanels.bar.body, 360, 280);
@@ -112,7 +146,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
     labels: { axis: [schema.scatter.x.label, schema.scatter.y.label], title: schema.scatter.title },
     width: scatterDims.width,
     height: scatterDims.height,
-    margins: { left: 62, right: 16, top: 36, bottom: 48 },
+    margins: CARD_CHART_MARGINS.scatter,
     events: [PlotEvent.CLICK, PlotEvent.BRUSH],
   });
   const bar = new Barchart({
@@ -122,7 +156,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
     labels: { axis: [schema.bar.groupFieldLabel, 'Count'], title: schema.bar.title },
     width: barDims.width,
     height: barDims.height,
-    margins: { left: 55, right: 16, top: 36, bottom: 72 },
+    margins: CARD_CHART_MARGINS.bar,
     events: [PlotEvent.CLICK],
   });
   const parallel = new ParallelCoordinates({
@@ -132,7 +166,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
     labels: { axis: schema.parallel.fields.map((field) => field.label), title: schema.parallel.title },
     width: parallelDims.width,
     height: parallelDims.height,
-    margins: { left: 28, right: 28, top: 36, bottom: 36 },
+    margins: CARD_CHART_MARGINS.parallel,
     events: [PlotEvent.BRUSH_Y],
   });
   const histogram = new Histogram({
@@ -142,7 +176,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
     labels: { axis: [schema.histogram.field.label, 'Count'], title: schema.histogram.title },
     width: histogramDims.width,
     height: histogramDims.height,
-    margins: { left: 55, right: 16, top: 36, bottom: 48 },
+    margins: CARD_CHART_MARGINS.histogram,
     events: [PlotEvent.CLICK],
   });
 
@@ -162,7 +196,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
         labels: { axis: [schema.scatter.x.label, schema.scatter.y.label], title: schema.scatter.title },
         width,
         height,
-        margins: { left: 62, right: 16, top: 36, bottom: 48 },
+        margins: MODAL_CHART_MARGINS.scatter,
         events: [PlotEvent.CLICK, PlotEvent.BRUSH],
       }),
     },
@@ -181,7 +215,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
         labels: { axis: [schema.bar.groupFieldLabel, 'Count'], title: schema.bar.title },
         width,
         height,
-        margins: { left: 55, right: 16, top: 36, bottom: 72 },
+        margins: MODAL_CHART_MARGINS.bar,
         events: [PlotEvent.CLICK],
       }),
     },
@@ -200,7 +234,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
         labels: { axis: schema.parallel.fields.map((field) => field.label), title: schema.parallel.title },
         width,
         height,
-        margins: { left: 28, right: 28, top: 36, bottom: 36 },
+        margins: MODAL_CHART_MARGINS.parallel,
         events: [PlotEvent.BRUSH_Y],
       }),
     },
@@ -219,7 +253,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
         labels: { axis: [schema.histogram.field.label, 'Count'], title: schema.histogram.title },
         width,
         height,
-        margins: { left: 55, right: 16, top: 36, bottom: 48 },
+        margins: MODAL_CHART_MARGINS.histogram,
         events: [PlotEvent.CLICK],
       }),
     },
@@ -251,6 +285,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
     removeViewListener?: (callback: (state: MapViewState) => void) => void;
     setViewState?: (state: MapViewState) => void;
     updateRenderInfoProperty?: (layerName: string, property: string, value: unknown) => void;
+    updateRenderInfo?: (layerName: string, params: unknown) => void;
   };
   const mapForProvenance: NonNullable<Parameters<typeof createAutarkProvenance>[0]['map']> = {
     mapEvents: {
@@ -267,6 +302,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
     canvas: map.canvas,
     ui: map.ui,
     updateRenderInfoProperty: mapViewApi.updateRenderInfoProperty?.bind(map),
+    updateRenderInfo: mapViewApi.updateRenderInfo?.bind(map),
     layerManager: map.layerManager,
   };
   const provenance = createAutarkProvenance({
@@ -284,7 +320,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
   const destroyTrail = renderProvenanceTrailUI({
     provenance,
     container: shell.provenanceTrail,
-    insightsContainer: shell.provenanceInsights,
+    showInsights: false,
     showTimestamps: true,
     showGraph: true,
     showPathList: true,
@@ -308,6 +344,7 @@ export function renderInsightsWorkspace(options: RenderInsightsWorkspaceOptions)
       destroyTrail();
       detachTabs();
       chartModal.destroy();
+      unmountMap();
       container.innerHTML = '';
     },
   };

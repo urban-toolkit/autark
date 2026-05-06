@@ -543,10 +543,14 @@ export class AutkMapUi {
         const eyeBtn = this.makeIconButton(EYE_SVG, !layer.layerRenderInfo.isSkip, () => {
             this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isSkip: !layer.layerRenderInfo.isSkip } });
         });
+        eyeBtn.dataset.autkMapControl = 'visibility';
+        eyeBtn.dataset.layerId = layer.layerInfo.id;
 
         const paletteBtn = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
             this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
         });
+        paletteBtn.dataset.autkMapControl = 'thematic';
+        paletteBtn.dataset.layerId = layer.layerInfo.id;
 
         const isRaster = layer.layerInfo.typeLayer === 'raster';
         const cursorBtn = isRaster
@@ -554,6 +558,10 @@ export class AutkMapUi {
             : this.makeIconButton(CURSOR_SVG, layer.layerRenderInfo.isPick ?? false, () => {
                 this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
             });
+        if (cursorBtn instanceof HTMLButtonElement) {
+            cursorBtn.dataset.autkMapControl = 'active-layer';
+            cursorBtn.dataset.layerId = layer.layerInfo.id;
+        }
 
         const nameEl = document.createElement('span');
         nameEl.textContent = layer.layerInfo.id;

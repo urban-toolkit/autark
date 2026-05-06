@@ -9,7 +9,7 @@ export type ComputeRecordCallback = (
 
 /**
  * Minimal interface for a compute object compatible with autk-compute's GeojsonCompute.
- * Only the methods that exist on the instance are wrapped — missing methods are ignored.
+ * Only the methods that exist on the instance are wrapped - missing methods are ignored.
  */
 export interface IComputeForProvenance {
   computeFunctionIntoProperties?(...args: unknown[]): Promise<unknown>;

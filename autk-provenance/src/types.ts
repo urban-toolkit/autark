@@ -135,11 +135,16 @@ export interface IMapForProvenance {
   ui?: {
     activeLayer?: { layerInfo?: { id: string }; layerRenderInfo?: { isColorMap?: boolean } } | null;
     changeActiveLayer?(layer: unknown): void;
+    refreshLayerList?(): void;
   };
   updateRenderInfoProperty?(
     layerName: string,
     property: string,
     value: unknown
+  ): void;
+  updateRenderInfo?(
+    layerName: string,
+    params: unknown
   ): void;
   layerManager: {
     searchByLayerId(layerId: string): {

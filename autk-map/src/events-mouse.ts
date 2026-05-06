@@ -179,6 +179,8 @@ export class MouseEvents {
             this._map.camera.translate(dx / cssWidth, dy / cssHeight);
         }
 
+        this._map.notifyViewChange();
+
         this._lastPoint = point;
     }
 
@@ -216,6 +218,7 @@ export class MouseEvents {
         const y = 1.0 - (event.clientY - rect.top) / this._map.renderer.cssHeight;
 
         this._map.camera.zoom(event.deltaY * 0.01, x, y);
+        this._map.notifyViewChange();
     }
 
     /**

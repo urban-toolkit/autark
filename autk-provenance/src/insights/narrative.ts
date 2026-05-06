@@ -25,7 +25,7 @@ export function generateSessionNarrative<T extends InsightSelectionState>(
     }))
     .filter((plot) => plot.entries.length > 0);
   const lines = [
-    `Session started at ${typeof sessionStart === 'number' ? new Date(sessionStart).toLocaleTimeString() : '—'}.`,
+    `Session started at ${typeof sessionStart === 'number' ? new Date(sessionStart).toLocaleTimeString() : '-'}.`,
     `Duration: ${formatDuration(metrics.sessionDurationMs)} across ${metrics.totalNodes} states (avg ${formatDuration(metrics.avgTimePerStateMs)} per state).`,
     '',
     `Analysis strategy: ${metrics.strategyLabel}`,
@@ -58,7 +58,7 @@ export function generateSessionNarrative<T extends InsightSelectionState>(
 }
 
 const strategyDescription: Record<StrategyLabel, string> = {
-  Confirmatory: 'A focused, linear exploration — the analyst appeared to know what they were looking for.',
+  Confirmatory: 'A focused, linear exploration - the analyst appeared to know what they were looking for.',
   Exploratory: 'A broad, open-ended investigation with multiple diverging paths.',
   'Iterative Refinement': 'A hypothesis-driven approach with repeated backtracking and revision.',
 };

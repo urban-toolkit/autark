@@ -33,7 +33,7 @@ export function ensureProvenanceTrailStyles(): void {
     '.autk-provenance-modal-canvas{position:relative;flex:1;min-height:0;border:1px solid #dbe5f0;border-radius:8px;background:#fff;overflow:hidden;cursor:grab;touch-action:none}',
     '.autk-provenance-modal-canvas.autk-provenance-panning{cursor:grabbing}',
     '.autk-provenance-modal-svg{display:block;width:100%;height:100%;min-width:0}',
-    '.autk-provenance-path{display:flex;flex-direction:column;gap:2px;border:1px solid #dbe5f0;border-radius:8px;background:#fbfdff;max-height:200px;overflow-y:auto}',
+    '.autk-provenance-path{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:2px;border:1px solid #dbe5f0;border-radius:8px;background:#fbfdff;overflow-y:auto}',
     '.autk-provenance-path-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #e7eef6;cursor:pointer}',
     '.autk-provenance-path-item:last-child{border-bottom:0}',
     '.autk-provenance-path-item:hover{background:#f1f7ff}',

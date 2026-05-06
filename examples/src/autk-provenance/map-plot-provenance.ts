@@ -36,7 +36,7 @@ async function main(): Promise<void> {
     layerId: 'neighborhoods',
     db,
     title: 'Autark Provenance',
-    description: 'Manhattan neighborhoods · Scatterplot · Bar Chart · Parallel Coordinates · Histogram — every interaction captured in one shared provenance graph',
+    description: 'Manhattan neighborhoods · Scatterplot · Bar Chart · Parallel Coordinates · Histogram - every interaction captured in one shared provenance graph',
   });
 }
 

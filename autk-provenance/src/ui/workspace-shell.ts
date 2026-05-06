@@ -6,7 +6,6 @@ export interface WorkspaceShell {
   chartsTab: HTMLElement;
   provenanceTab: HTMLElement;
   provenanceTrail: HTMLElement;
-  provenanceInsights: HTMLElement;
   chartsInsights: HTMLElement;
   plotPanels: Record<'scatter' | 'bar' | 'parallel' | 'histogram', {
     title: HTMLElement;
@@ -72,12 +71,11 @@ export function createInsightsWorkspaceShell(container: HTMLElement, title?: str
           <div class="autk-workspace-tab-content autk-workspace-hidden" data-panel="provenance">
             <div class="autk-workspace-provenance-grid">
               <div class="autk-workspace-provenance-main"><div class="autk-workspace-trail"></div></div>
-              <div class="autk-workspace-provenance-side"><div class="autk-workspace-insights-slot"></div></div>
             </div>
           </div>
         </section>
       </div>
-      <section class="autk-workspace-panel autk-workspace-session-insights" data-charts-only="true">
+      <section class="autk-workspace-panel autk-workspace-session-insights">
         <div class="autk-workspace-panel-header">
           <span class="autk-workspace-panel-title">Session Insights</span>
           <span class="autk-workspace-panel-hint">Updates as you interact with any visualization</span>
@@ -95,7 +93,6 @@ export function createInsightsWorkspaceShell(container: HTMLElement, title?: str
     chartsTab: container.querySelector('[data-panel="charts"]') as HTMLElement,
     provenanceTab: container.querySelector('[data-panel="provenance"]') as HTMLElement,
     provenanceTrail: container.querySelector('.autk-workspace-trail') as HTMLElement,
-    provenanceInsights: container.querySelector('.autk-workspace-insights-slot') as HTMLElement,
     chartsInsights: container.querySelector('.autk-workspace-session-insights-body') as HTMLElement,
     plotPanels: {
       scatter: getPlotPanel(container, 'scatter'),

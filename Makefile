@@ -31,16 +31,16 @@ build:
 		"cd autk-map && npm run build" \
 		"cd autk-db && npm run build" \
 		"cd autk-plot && npm run build" \
-		"cd autk-provenance && npm run build" \
 		"cd autk-compute && npm run build"
+	cd autk-provenance && npm run build
 
 build-all:
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run build" \
 		"cd autk-db && npm run build" \
 		"cd autk-plot && npm run build" \
-		"cd autk-provenance && npm run build" \
 		"cd autk-compute && npm run build"
+	cd autk-provenance && npm run build
 
 docs:
 	$(CONCURRENTLY) \

@@ -253,7 +253,7 @@ svg {
   align-items: center;
 }
 
-/* Card 1 – Strategy */
+/* Card 1 - Strategy */
 .strategy-badge {
   display: inline-block;
   padding: 4px 12px;
@@ -290,7 +290,7 @@ svg {
   color: var(--text);
 }
 
-/* Card 2 – Annotate */
+/* Card 2 - Annotate */
 .annotation-label {
   font-size: 12px;
   color: var(--text-muted);
@@ -339,7 +339,7 @@ svg {
   cursor: not-allowed;
 }
 
-/* Card 3 – Selection frequency */
+/* Card 3 - Selection frequency */
 .freq-empty {
   font-size: 12px;
   color: var(--text-muted);
@@ -391,7 +391,7 @@ svg {
   flex-shrink: 0;
 }
 
-/* Card 4 – Summary */
+/* Card 4 - Summary */
 .summary-pre {
   flex: 1;
   margin: 0;

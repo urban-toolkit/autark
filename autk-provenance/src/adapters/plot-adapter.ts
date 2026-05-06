@@ -121,7 +121,7 @@ export function createPlotAdapter(
         if (!isApplyingState) {
           const dataLen = Array.isArray(value) ? value.length : 0;
           const label = `Data updated: ${dataLen} row(s) on ${plotTypeLabel(plot.plotType)} (${plot.plotId})`;
-          // Reset selection for this plot — indices are no longer valid after a data swap.
+          // Reset selection for this plot - indices are no longer valid after a data swap.
           onRecord(ProvenanceAction.PLOT_DATA, label, {
             selection: {
               plots: { [plot.plotId]: { ids: [], plotType: plot.plotType } },
@@ -138,7 +138,7 @@ export function createPlotAdapter(
       try {
         delete (plotObj as Record<string, unknown>)['data'];
       } catch {
-        // non-configurable — leave it
+        // non-configurable - leave it
       }
     };
   }

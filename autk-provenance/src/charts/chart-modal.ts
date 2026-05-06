@@ -118,7 +118,7 @@ export function createChartModalController(descriptors: ChartModalDescriptor[]):
             <div class="autk-chart-modal-subtitle"></div>
           </div>
           <div class="autk-chart-modal-controls">
-            <button type="button" data-action="zoom-out">−</button>
+            <button type="button" data-action="zoom-out">-</button>
             <button type="button" data-action="zoom-in">+</button>
             <button type="button" data-action="fit">Fit</button>
             <button type="button" data-action="reset">100%</button>

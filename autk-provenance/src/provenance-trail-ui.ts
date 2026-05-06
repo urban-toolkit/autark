@@ -10,6 +10,7 @@ export interface ProvenanceTrailUIOptions {
   provenance: AutarkProvenanceApi;
   container: HTMLElement;
   insightsContainer?: HTMLElement;
+  showInsights?: boolean;
   showBackForward?: boolean;
   showTimestamps?: boolean;
   showGraph?: boolean;
@@ -17,7 +18,7 @@ export interface ProvenanceTrailUIOptions {
 }
 
 export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () => void {
-  const { provenance, container, insightsContainer, showBackForward = true, showTimestamps = true, showGraph = true, showPathList = true } = options;
+  const { provenance, container, insightsContainer, showInsights = true, showBackForward = true, showTimestamps = true, showGraph = true, showPathList = true } = options;
   ensureProvenanceTrailStyles();
   container.innerHTML = '';
   container.classList.add('autk-provenance-root');
@@ -27,9 +28,9 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
   const graphWrap = showGraph ? document.createElement('div') : null;
   const pathContainer = showPathList ? document.createElement('div') : null;
   const navigation = showBackForward ? createNavigationButtons() : null;
-  const insights = createInsightsShell(insightsContainer ?? container);
+  const insights = showInsights ? createInsightsShell(insightsContainer ?? container) : null;
   const modal = createGraphModalController({ provenance, showTimestamps, buildLayout: () => buildLayoutFromProvenance(provenance), onRefresh: refresh });
-  insights.onToggle((open) => {
+  insights?.onToggle((open) => {
     if (open) renderInsightsPanel(insights.body, provenance);
   });
 
@@ -70,7 +71,7 @@ export function renderProvenanceTrailUI(options: ProvenanceTrailUIOptions): () =
       navigation.backButton.disabled = !provenance.canGoBack();
       navigation.forwardButton.disabled = !provenance.canGoForward();
     }
-    if (insights.isOpen()) renderInsightsPanel(insights.body, provenance);
+    if (insights?.isOpen()) renderInsightsPanel(insights.body, provenance);
     if (modal.isOpen()) modal.render();
   }
 

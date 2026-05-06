@@ -74,6 +74,8 @@ import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 
 import { AutkMapUi } from './map-ui';
 
+type ViewListener = (state: { eye: [number, number, number]; lookAt: [number, number, number]; up: [number, number, number] }) => void;
+
 /**
  * Main map controller for rendering, interaction, and layer lifecycle.
  *
@@ -105,6 +107,8 @@ export class AutkMap {
     protected _resizeEvents!: ResizeEvents;
     /** Public event bus for map events. */
     protected _mapEvents!: EventEmitter<MapEventRecord>;
+    /** Subscribers notified when the camera view changes due to interaction or replay. */
+    protected _viewListeners: Set<ViewListener> = new Set();
 
     /** Map UI controller. */
     protected _ui!: AutkMapUi;
@@ -166,6 +170,47 @@ export class AutkMap {
         return this._mapEvents;
     }
 
+    /**
+     * Registers a callback for camera view changes.
+     *
+     * @param callback Listener receiving a serialisable camera snapshot.
+     */
+    addViewListener(callback: ViewListener): void {
+        this._viewListeners.add(callback);
+    }
+
+    /**
+     * Removes a previously registered camera view listener.
+     *
+     * @param callback Listener to remove.
+     */
+    removeViewListener(callback: ViewListener): void {
+        this._viewListeners.delete(callback);
+    }
+
+    /**
+     * Returns the current serialisable camera state.
+     */
+    getViewState(): { eye: [number, number, number]; lookAt: [number, number, number]; up: [number, number, number] } {
+        const state = this._camera.getCameraData();
+        return {
+            eye: [state.eye[0], state.eye[1], state.eye[2]],
+            lookAt: [state.lookAt[0], state.lookAt[1], state.lookAt[2]],
+            up: [state.up[0], state.up[1], state.up[2]],
+        };
+    }
+
+    /**
+     * Restores the camera to a serialised view state and notifies listeners.
+     *
+     * @param state View snapshot to restore.
+     */
+    setViewState(state: { eye: [number, number, number]; lookAt: [number, number, number]; up: [number, number, number] }): void {
+        this._camera.resetCamera(state.up, state.lookAt, state.eye);
+        this._camera.update();
+        this.notifyViewChange();
+    }
+
     /** Currently active pick-enabled layer, if any. */
     get activePickingLayer(): Layer | null {
         return this._layerManager.layers.find((layer) => layer.layerRenderInfo.isPick) ?? null;
@@ -195,6 +240,14 @@ export class AutkMap {
         this.render();
 
         this._ui.buildUi();
+    }
+
+    /**
+     * Notifies registered listeners of the latest camera view.
+     */
+    notifyViewChange(): void {
+        const snapshot = this.getViewState();
+        this._viewListeners.forEach((listener) => listener(snapshot));
     }
 
     /**

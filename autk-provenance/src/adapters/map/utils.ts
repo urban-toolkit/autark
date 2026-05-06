@@ -3,7 +3,7 @@ import type { LayerLike, MapSelectorConfig, ResolvedMapSelectors, ResolvedUiStat
 
 export function resolveMapSelectors(config?: MapSelectorConfig): ResolvedMapSelectors {
   return {
-    menuIcon: config?.menuIcon ?? '#menuIcon',
+    menuIcon: config?.menuIcon ?? '#autkMapUi',
     subMenu: config?.subMenu ?? '#autkMapSubMenu',
     thematicCheckbox: config?.thematicCheckbox ?? '#showThematicCheckbox',
     legend: config?.legend ?? '#autkMapLegend',
@@ -65,6 +65,7 @@ export function setLayerRenderFlag(
   value: boolean
 ): void {
   if (map.updateRenderInfoProperty) return void map.updateRenderInfoProperty(layerId, property, value);
+  if (map.updateRenderInfo) return void map.updateRenderInfo(layerId, { renderInfo: { [property]: value } });
   const layer = map.layerManager.searchByLayerId(layerId);
   if (layer?.layerRenderInfo) layer.layerRenderInfo[property] = value;
 }

@@ -20,7 +20,7 @@ export function resolveMapSelectors(selectorConfig?: MapSelectorConfig): {
 } {
   return {
     selectors: {
-      menuIcon: selectorConfig?.menuIcon ?? '#menuIcon',
+      menuIcon: selectorConfig?.menuIcon ?? '#autkMapUi',
       subMenu: selectorConfig?.subMenu ?? '#autkMapSubMenu',
       thematicCheckbox: selectorConfig?.thematicCheckbox ?? '#showThematicCheckbox',
       legend: selectorConfig?.legend ?? '#autkMapLegend',

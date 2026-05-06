@@ -11,6 +11,7 @@ export function syncUiDom(
 
   const submenu = parent.querySelector(selectors.subMenu) as HTMLElement | null;
   if (submenu) submenu.style.visibility = ui.mapMenuOpen ? 'visible' : 'hidden';
+  if (ui.mapMenuOpen) map.ui?.refreshLayerList?.();
 
   const thematic = parent.querySelector(selectors.thematicCheckbox) as HTMLInputElement | null;
   if (thematic) thematic.checked = ui.thematicEnabled;

@@ -147,6 +147,20 @@ export class Camera {
     }
 
     /**
+     * Returns a serialisable snapshot of the current camera state.
+     *
+     * @returns Plain arrays for `up`, `lookAt`, and `eye`.
+     * @throws Never throws.
+     */
+    public getCameraData(): CameraData {
+        return {
+            up: [this.wUp[0], this.wUp[1], this.wUp[2]],
+            eye: [this.wEye[0], this.wEye[1], this.wEye[2]],
+            lookAt: [this.wLookAt[0], this.wLookAt[1], this.wLookAt[2]],
+        };
+    }
+
+    /**
      * Updates viewport size and recomputes matrices in one call.
      *
      * Pass drawable canvas pixel size, not CSS size.
