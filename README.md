@@ -4,7 +4,7 @@
   <h1>Autark</h1>
 
   <br>
-  <p><strong>A serverless, modular toolkit built in TypeScript to streamline the prototyping of urban visual analytics systems.</strong></p>
+  <p><strong>A serverless, modular toolkit to streamline the prototyping of urban visual analytics systems.</strong></p>
 
   <p>
     <a href="https://arxiv.org/abs/2604.20759">Paper</a> ·
