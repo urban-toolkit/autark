@@ -139,7 +139,7 @@ export function resolveBuildingHeight(feature: Feature): number {
  * The merge is index-based and bounded by the shortest collection length.
  * Existing non-compute properties are preserved.
  *
- * @param baseRoads Mutable roads collection used by map/chart thematic updates.
+ * @param baseRoads Mutable roads collection used by map/plot thematic updates.
  * @param computedRoads Analytical output collection.
  */
 export function mergeComputedRoads(baseRoads: FeatureCollection, computedRoads: FeatureCollection): void {

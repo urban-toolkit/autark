@@ -1,8 +1,8 @@
 // Common interface for all examples
-import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, LayerType, MapStyle } from 'autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkMap, LayerType, MapStyle } from '@urban-toolkit/autk-map';
 import { CameraMotion, ColorMapDomainStrategy, ColorMapInterpolator } from 'autk-core';
-import { ComputeGpgpu } from 'autk-compute';
+import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 import { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 const URL = (import.meta as any).env.BASE_URL;

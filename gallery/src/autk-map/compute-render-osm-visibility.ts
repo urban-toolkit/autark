@@ -1,8 +1,8 @@
 import { Feature, FeatureCollection, GeoJsonProperties, Point } from 'geojson';
 
-import { AutkSpatialDb } from 'autk-db';
-import { ComputeRender } from 'autk-compute';
-import { AutkMap, LayerType, MapEvent } from 'autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { ComputeRender } from '@urban-toolkit/autk-compute';
+import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
 export class ComputeRenderOsmVisibility {

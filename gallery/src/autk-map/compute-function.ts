@@ -1,7 +1,7 @@
-import { AutkSpatialDb } from 'autk-db';
-import { ComputeGpgpu } from 'autk-compute';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 
-import { AutkMap, LayerType } from 'autk-map';
+import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
 
 import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 

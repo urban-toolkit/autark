@@ -7,7 +7,7 @@ import type {
 import type { ColorMapDomainSpec } from './types-core';
 import type { ColorMapInterpolator } from './types-core';
 
-import type { ChartEvent } from './types-events';
+import type { PlotEvent } from './types-events';
 
 
 // ---------------------------------------------------------------------------
@@ -15,14 +15,14 @@ import type { ChartEvent } from './types-events';
 // ---------------------------------------------------------------------------
 
 /**
- * Supported chart variants in the unified autk-plot API.
+ * Supported plot variants in the unified autk-plot API.
  */
-export type ChartType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart' | 'heatmatrix';
+export type PlotType = 'scatterplot' | 'barchart' | 'parallel-coordinates' | 'table' | 'linechart' | 'heatmatrix';
 
 /**
  * Margin values in pixels around the plot drawing area.
  */
-export type ChartMargins = {
+export type PlotMargins = {
     /** Left margin in pixels. */
     left: number;
     /** Right margin in pixels. */
@@ -34,24 +34,24 @@ export type ChartMargins = {
 };
 
 /**
- * Base configuration accepted by all chart implementations.
+ * Base configuration accepted by all plot implementations.
  */
-export type ChartConfig = {
-    /** Host HTML element where the chart renders. */
+export type PlotConfig = {
+    /** Host HTML element where the plot renders. */
     div: HTMLElement;
-    /** GeoJSON feature collection used as the chart data source. */
+    /** GeoJSON feature collection used as the plot data source. */
     collection: FeatureCollection<Geometry, GeoJsonProperties>;
-    /** Interaction events the chart should emit (click, brush, etc). */
-    events?: ChartEvent[];
+    /** Interaction events the plot should emit (click, brush, etc). */
+    events?: PlotEvent[];
     /** Pixel margins around the plot drawing area. */
-    margins?: ChartMargins;
-    /** Chart width in pixels. Defaults to `800`. */
+    margins?: PlotMargins;
+    /** Plot width in pixels. Defaults to `800`. */
     width?: number;
-    /** Chart height in pixels. Defaults to `500`. */
+    /** Plot height in pixels. Defaults to `500`. */
     height?: number;
     /** Display labels for axes, title, and color legend. */
     labels?: {
-        /** Chart title. */
+        /** Plot title. */
         title?: string;
         /** Labels for each axis. */
         axis?: string[];
@@ -66,7 +66,7 @@ export type ChartConfig = {
         color?: string;
     };
     /** Optional data transform applied before rendering. */
-    transform?: ChartTransformConfig;
+    transform?: PlotTransformConfig;
     /** D3 format strings for each axis tick. */
     tickFormats?: string[];
     /** Domain specification controlling how the colormap range is derived. */
@@ -78,13 +78,13 @@ export type ChartConfig = {
 };
 
 /**
- * Configuration passed to `AutkChart`. Identical to `ChartConfig` minus `div`,
+ * Configuration passed to `AutkPlot`. Identical to `PlotConfig` minus `div`,
  * which is supplied as a separate constructor argument, plus a `type` discriminant
- * that selects the chart implementation.
+ * that selects the plot implementation.
  */
-export type UnifiedChartConfig = Omit<ChartConfig, 'div'> & {
-    /** Selects which chart implementation to instantiate. */
-    type: ChartType;
+export type UnifiedPlotConfig = Omit<PlotConfig, 'div'> & {
+    /** Selects which plot implementation to instantiate. */
+    type: PlotType;
 };
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ export type TransformResolution = 'hour' | 'day' | 'weekday' | 'monthday' | 'mon
 /**
  * Binning-1d preset config.
  *
- * The column to bin is read from `ChartConfig.attributes.axis[0]`.
+ * The column to bin is read from `PlotConfig.attributes.axis[0]`.
  * Use `'@transform'` in `axis[1]` to mark the output slot.
  */
 export type Binning1dTransformConfig = {
@@ -118,8 +118,8 @@ export type Binning1dTransformConfig = {
 /**
  * Binning-2d preset config.
  *
- * The x and y columns are read from `ChartConfig.attributes.axis[0]` and `axis[1]`.
- * Use `'@transform'` in `ChartConfig.attributes.color` to mark the output slot.
+ * The x and y columns are read from `PlotConfig.attributes.axis[0]` and `axis[1]`.
+ * Use `'@transform'` in `PlotConfig.attributes.color` to mark the output slot.
  */
 export type Binning2dTransformConfig = {
     preset: 'binning-2d';
@@ -138,7 +138,7 @@ export type Binning2dTransformConfig = {
 /**
  * Binning-events preset config.
  *
- * The events array column is read from `ChartConfig.attributes.axis[0]`.
+ * The events array column is read from `PlotConfig.attributes.axis[0]`.
  * Use `'@transform'` in `axis[1]` to mark the output slot.
  * `timestamp` and `value` are sub-fields within each event object.
  */
@@ -159,7 +159,7 @@ export type BinningEventsTransformConfig = {
 /**
  * Reduce-series preset config.
  *
- * The series array column is read from `ChartConfig.attributes.axis[0]`.
+ * The series array column is read from `PlotConfig.attributes.axis[0]`.
  * Use `'@transform'` in `axis[1]` to mark the output slot.
  * `timestamp` and `value` are sub-fields within each series point.
  * Unlike `binning-events`, timestamps are used as-is with no resolution bucketing.
@@ -181,20 +181,20 @@ export type ReduceSeriesTransformConfig = {
  *
  * Reorders rows by a single column without aggregating them.
  * Preserves `autkIds` on every output row.
- * Using `'@transform'` in `ChartConfig.attributes` with sort throws an error.
+ * Using `'@transform'` in `PlotConfig.attributes` with sort throws an error.
  */
 export type SortTransformConfig = {
     preset: 'sort';
     options?: {
-        /** Column to sort by. Defaults to `ChartConfig.attributes.axis[0]`. */
+        /** Column to sort by. Defaults to `PlotConfig.attributes.axis[0]`. */
         column?: string;
         /** Sort direction. Defaults to `'asc'`. */
         direction?: 'asc' | 'desc';
     };
 };
 
-/** Transform preset config accepted by `AutkChart`. */
-export type ChartTransformConfig =
+/** Transform preset config accepted by `AutkPlot`. */
+export type PlotTransformConfig =
     | Binning1dTransformConfig
     | Binning2dTransformConfig
     | BinningEventsTransformConfig

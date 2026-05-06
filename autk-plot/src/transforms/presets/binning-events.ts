@@ -9,7 +9,7 @@
 
 import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum } from '../../types-chart';
+import type { AutkDatum } from '../../types-plot';
 import type { BinningEventsTransformConfig, TransformResolution } from '../../api';
 
 import { reduceBuckets } from '../kernel';
@@ -22,12 +22,12 @@ import { reduceBuckets } from '../kernel';
 export type ExecutedBinningEventsTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-events';
-    /** Event bucket rows ready for downstream chart rendering. */
+    /** Event bucket rows ready for downstream plot rendering. */
     rows: BinningEventsBucketRow[];
 };
 
 /**
- * A single event bucket row ready for chart rendering.
+ * A single event bucket row ready for plot rendering.
  *
  * `bucket` is a formatted string key (e.g. `"2024-03"` for monthly resolution).
  */
@@ -45,7 +45,7 @@ export type BinningEventsBucketRow = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a binning-events transform and returns chart-ready rows.
+ * Runs a binning-events transform and returns plot-ready rows.
  *
  * @param rows Input feature rows containing nested event arrays.
  * @param config Transform configuration controlling timestamp parsing and reduction.
@@ -119,7 +119,7 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
  *
  * @param date UTC date to encode into a bucket key.
  * @param resolution Temporal resolution used to derive the key.
- * @returns Bucket label consumed by downstream chart rendering.
+ * @returns Bucket label consumed by downstream plot rendering.
  */
 function formatEventBucket(date: Date, resolution: TransformResolution): string {
     /** Left-pads a numeric component to two digits. */

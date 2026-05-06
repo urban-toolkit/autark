@@ -1,0 +1,61 @@
+{
+  "name": "@urban-toolkit/autk",
+  "version": "2.0.0",
+  "keywords": [
+    "urban",
+    "visualization",
+    "analytics",
+    "WebGPU"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/urban-toolkit/autark",
+    "directory": "autk"
+  },
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "module": "./dist/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./map": {
+      "types": "./dist/src/map.d.ts",
+      "import": "./dist/map.js"
+    },
+    "./db": {
+      "types": "./dist/src/db.d.ts",
+      "import": "./dist/db.js"
+    },
+    "./compute": {
+      "types": "./dist/src/compute.d.ts",
+      "import": "./dist/compute.js"
+    },
+    "./plot": {
+      "types": "./dist/src/plot.d.ts",
+      "import": "./dist/plot.js"
+    }
+  },
+  "scripts": {
+    "dev-build": "tsc && vite build --watch",
+    "build": "tsc && vite build",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@urban-toolkit/autk-map": "2.0.0",
+    "@urban-toolkit/autk-db": "2.0.0",
+    "@urban-toolkit/autk-compute": "2.0.0",
+    "@urban-toolkit/autk-plot": "2.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}

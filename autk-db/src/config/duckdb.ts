@@ -35,7 +35,7 @@ export async function loadDb() {
             `require(${JSON.stringify(workerPath)});`;
         const nodeWorker = new NodeWorker(stub, { eval: true });
 
-        const listeners = new Map<Function, [string, (...args: any[]) => void]>();
+        const listeners = new Map<(event: any) => void, [string, (...args: any[]) => void]>();
         const adapter = {
             addEventListener(event: string, handler: (e: any) => void) {
                 const wrapped =

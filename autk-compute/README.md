@@ -1,11 +1,11 @@
-# autk-compute
+# @urban-toolkit/autk-compute
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/urban-toolkit/utk-serverless/main/logo.png" alt="Autark Logo" height="200"/></br>
 </div>
 <br>
 
-`autk-compute` is the WebGPU computation package in the Autark ecosystem. It provides two GPU pipelines over GeoJSON data:
+`@urban-toolkit/autk-compute` is the WebGPU computation package in the Autark ecosystem. It provides two GPU pipelines over GeoJSON data:
 
 1. `gpgpuPipeline`
    Executes WGSL compute code over feature properties and writes results into `feature.properties.compute`.

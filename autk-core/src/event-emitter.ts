@@ -14,7 +14,7 @@ export type EventListener<T> = (event: T) => void;
 /**
  * Base payload shared by selection-driven visualization events.
  *
- * Packages such as `autk-map` and `autk-plot` extend or alias this shape so
+ * Packages such as `@urban-toolkit/autk-map` and `@urban-toolkit/autk-plot` extend or alias this shape so
  * selection interactions follow a consistent contract across the toolkit.
  */
 export interface SelectionData {

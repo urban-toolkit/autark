@@ -1,6 +1,6 @@
 /**
  * @module Renderer
- * WebGPU renderer and render-target manager for `autk-map`.
+ * WebGPU renderer and render-target manager for `@urban-toolkit/autk-map`.
  *
  * This module provides the `Renderer` class, which configures the canvas
  * context, allocates the main and picking render targets, manages command

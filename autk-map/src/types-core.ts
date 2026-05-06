@@ -1,6 +1,6 @@
 /**
  * @module AutkMapCoreTypes
- * Shared `autk-core` definitions used by `autk-map`.
+ * Shared `autk-core` definitions used by `@urban-toolkit/autk-map`.
  *
  * This module centralizes the core type, class, constant, and helper
  * re-exports that the map renderer, layer pipeline, and interaction code rely

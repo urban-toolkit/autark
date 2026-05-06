@@ -1,13 +1,13 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap, MapEvent } from 'autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3Timeseries {
     protected map!: AutkMap;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
     protected plotDiv!: HTMLElement;
 
     protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
@@ -46,7 +46,7 @@ export class MapD3Timeseries {
     }
 
     protected initPlot(): void {
-        this.plot = new AutkChart(this.plotDiv, {
+        this.plot = new AutkPlot(this.plotDiv, {
             type: 'barchart',
             collection: this.geojson,
             attributes: { axis: ['series', '@transform'] },
@@ -57,10 +57,10 @@ export class MapD3Timeseries {
             },
             margins: { left: 60, right: 20, top: 50, bottom: 140 },
             width: 790,
-            events: [ChartEvent.CLICK],
+            events: [PlotEvent.CLICK],
         });
 
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
+        this.plot.events.on(PlotEvent.CLICK, ({ selection }) => {
             this.map.setHighlightedIds('neighborhoods', selection);
         });
     }

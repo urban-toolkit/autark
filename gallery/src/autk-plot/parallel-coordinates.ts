@@ -1,15 +1,15 @@
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap } from 'autk-map';
-import { MapEvent } from 'autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+import { AutkMap } from '@urban-toolkit/autk-map';
+import { MapEvent } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapParallelCoordinates {
     protected map!: AutkMap;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
 
     protected geojson!: FeatureCollection;
 
@@ -34,7 +34,7 @@ export class MapParallelCoordinates {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new AutkChart(plotDiv, {
+        this.plot = new AutkPlot(plotDiv, {
             type: 'parallel-coordinates',
             collection: this.geojson,
             attributes: { axis: ['shape_area', 'shape_leng', 'cdta2020'] },
@@ -43,7 +43,7 @@ export class MapParallelCoordinates {
                 title: 'Neighborhood Characteristics' 
             },
             width: 790,
-            events: [ChartEvent.BRUSH_Y]
+            events: [PlotEvent.BRUSH_Y]
         });
     }
 
@@ -58,7 +58,7 @@ export class MapParallelCoordinates {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.BRUSH_Y, ({ selection }) => {
+        this.plot.events.on(PlotEvent.BRUSH_Y, ({ selection }) => {
             this.map.setHighlightedIds(layerId, selection);
         });
     }

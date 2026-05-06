@@ -1,5 +1,5 @@
-import { AutkMap, LayerType } from 'autk-map';
-import { AutkSpatialDb } from 'autk-db';
+import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
 
 export class OsmLayersApi {
     protected map01!: AutkMap;

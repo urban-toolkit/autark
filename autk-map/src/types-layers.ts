@@ -1,6 +1,6 @@
 /**
  * @module AutkMapLayerTypes
- * Shared layer metadata and render payload types for `autk-map`.
+ * Shared layer metadata and render payload types for `@urban-toolkit/autk-map`.
  *
  * This module groups the data shapes passed between layer loaders, render
  * controllers, and GPU-backed layer implementations. It describes the static

@@ -1,5 +1,5 @@
 /**
- * Single aggregation point for all `autk-core` re-exports used within `autk-plot`.
+ * Single aggregation point for all `autk-core` re-exports used within `@urban-toolkit/autk-plot`.
  *
  * Internal modules import from here instead of directly from `autk-core`,
  * keeping the dependency edge explicit and centralized.
@@ -12,19 +12,19 @@ export { ColorMapDomainStrategy, ColorMapInterpolator } from 'autk-core';
 /** Colormap utility with conversions and data-to-color sampling helpers. */
 export { ColorMap } from 'autk-core';
 
-/** Core color and colormap type re-exports consumed by `autk-plot`. */
+/** Core color and colormap type re-exports consumed by `@urban-toolkit/autk-plot`. */
 export type { ColorHEX, ColorRGB, ColorTEX } from 'autk-core';
-/** Core color-domain type re-exports consumed by `autk-plot`. */
+/** Core color-domain type re-exports consumed by `@urban-toolkit/autk-plot`. */
 export type { ColorMapConfig, ColorMapDomainSpec, ResolvedDomain } from 'autk-core';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
-/** Typed event emitter re-export used by chart event APIs. */
+/** Typed event emitter re-export used by plot event APIs. */
 export { EventEmitter } from 'autk-core';
 /** Event helper type re-exports used throughout the package. */
 export type { EventListener, SelectionData } from 'autk-core';
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
-/** Dot-path accessor re-export used for chart and transform data lookup. */
+/** Dot-path accessor re-export used for plot and transform data lookup. */
 export { valueAtPath } from 'autk-core';

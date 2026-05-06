@@ -4,7 +4,7 @@
  * exchange across the toolkit.
  *
  * This module defines the contracts used by the shared color-mapping API in
- * `autk-core` and `autk-map`. It describes how a domain is requested and
+ * `autk-core` and `@urban-toolkit/autk-map`. It describes how a domain is requested and
  * resolved, which d3-backed interpolators can be selected, and how colors are
  * represented when exchanged as hex strings, RGBA objects, or flat texture
  * buffers.
@@ -155,7 +155,7 @@ export enum ColorMapInterpolator {
  * Unified color-map configuration used by map rendering and legend generation.
  *
  * This config couples the selected interpolator with the domain strategy so
- * both `autk-core` and `autk-map` resolve and display the same scale.
+ * both `autk-core` and `@urban-toolkit/autk-map` resolve and display the same scale.
  */
 export type ColorMapConfig = {
   /** Selected interpolator or color scheme. */

@@ -1,6 +1,6 @@
 /**
  * @module AutkDb
- * Public entry point for the `autk-db` package.
+ * Public entry point for the `@urban-toolkit/autk-db` package.
  *
  * Re-exports the spatial database class, table types, and OSM tag definitions.
  */

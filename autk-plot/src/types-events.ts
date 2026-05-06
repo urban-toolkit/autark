@@ -1,12 +1,12 @@
 import type { SelectionData } from './types-core';
 
 /**
- * Interaction events emitted by chart instances.
+ * Interaction events emitted by plot instances.
  *
  * Each event carries a payload with `selection`, where values are source
  * feature ids represented by currently selected marks.
  */
-export enum ChartEvent {
+export enum PlotEvent {
     /**
      * Emitted after click-based selection updates.
      */
@@ -26,15 +26,15 @@ export enum ChartEvent {
 }
 
 /**
- * Payload emitted by all chart interaction events.
+ * Payload emitted by all plot interaction events.
  *
  * Reuses the shared `SelectionData` shape from `autk-core`.
  */
-export type ChartEventData = SelectionData;
+export type PlotEventData = SelectionData;
 
 /**
- * Event map consumed by the typed chart event emitter.
+ * Event map consumed by the typed plot event emitter.
  *
- * Each chart interaction event resolves to a `ChartEventData` payload.
+ * Each plot interaction event resolves to a `PlotEventData` payload.
  */
-export type ChartEventRecord = Record<ChartEvent, ChartEventData>;
+export type PlotEventRecord = Record<PlotEvent, PlotEventData>;

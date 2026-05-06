@@ -1,15 +1,15 @@
 import { FeatureCollection } from 'geojson';
 
-import { AutkChart, ChartEvent } from 'autk-plot';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
-import { AutkMap } from 'autk-map';
-import { MapEvent } from 'autk-map';
+import { AutkMap } from '@urban-toolkit/autk-map';
+import { MapEvent } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3 {
     protected map!: AutkMap;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
 
     protected geojson!: FeatureCollection;
 
@@ -34,18 +34,18 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new AutkChart(plotDiv, {
+        this.plot = new AutkPlot(plotDiv, {
             type: 'scatterplot',
             collection: this.geojson,
             attributes: { axis: ['shape_area', 'shape_leng'] },
             labels: { axis: ['shape_area', 'shape_leng'], title: 'Scatterplot example' },
             width: 790,
-            events: [ChartEvent.BRUSH]
+            events: [PlotEvent.BRUSH]
         });
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.BRUSH, ({ selection }) => {
+        this.plot.events.on(PlotEvent.BRUSH, ({ selection }) => {
             this.map.setHighlightedIds(layerId, selection);
         });
     }

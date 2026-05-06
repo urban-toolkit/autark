@@ -1,6 +1,6 @@
 /**
  * @module AutkMap
- * Public entry point for the `autk-map` package.
+ * Public entry point for the `@urban-toolkit/autk-map` package.
  *
  * This module re-exports the main `AutkMap` controller together with the
  * supporting map, color, geometry, style, event, and API types needed to load

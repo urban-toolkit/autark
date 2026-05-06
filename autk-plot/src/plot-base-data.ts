@@ -4,12 +4,12 @@ import type {
     Geometry,
 } from 'geojson';
 
-import type { AutkDatum } from './types-chart';
+import type { AutkDatum } from './types-plot';
 
 import type {
-    ChartConfig,
-    ChartMargins,
-    ChartTransformConfig,
+    PlotConfig,
+    PlotMargins,
+    PlotTransformConfig,
 } from './api';
 
 import {
@@ -21,15 +21,15 @@ import {
 import type { ColorMapDomainSpec, ResolvedDomain } from './types-core';
 
 import { run } from './transforms';
-import type { ExecutedChartTransform } from './transforms';
+import type { ExecutedPlotTransform } from './transforms';
 
 /**
  * Normalized transform payload returned by `resolveTransformResult()`.
  *
  * Collapses preset-specific transform outputs into the rendered schema
- * consumed by chart classes.
+ * consumed by plot classes.
  */
-export type ResolvedChartTransform = {
+export type ResolvedPlotTransform = {
     /** Render rows stored on `_data` for the current draw cycle. */
     rows: AutkDatum[];
     /** Optional axis bindings exposed by the transformed row shape. */
@@ -39,13 +39,13 @@ export type ResolvedChartTransform = {
 };
 
 /**
- * Base class for shared chart data lifecycle.
+ * Base class for shared plot data lifecycle.
  *
  * Normalizes input rows, validates configured bindings, runs transforms, and
  * resolves the active rendered schema used by subclasses during drawing.
  */
-export abstract class ChartBaseData {
-    /** Host element where the chart is rendered. */
+export abstract class PlotBaseData {
+    /** Host element where the plot is rendered. */
     protected _div!: HTMLElement;
 
     /** Original source features from the input collection, indexed by source feature id. */
@@ -70,18 +70,18 @@ export abstract class ChartBaseData {
     /** D3 tick-format specifiers used by axis renderers. */
     protected _tickFormats!: string[];
 
-    /** Outer chart width in pixels. */
+    /** Outer plot width in pixels. */
     protected _width: number = 800;
-    /** Outer chart height in pixels. */
+    /** Outer plot height in pixels. */
     protected _height: number = 500;
     /** Plot margins in pixels. */
-    protected _margins!: ChartMargins;
+    protected _margins!: PlotMargins;
 
     /** Resolved color domain, computed from data after each transform. */
     protected _resolvedDomain: ResolvedDomain | undefined = undefined;
 
-    /** Optional transform config shared by chart implementations that support transformed views. */
-    protected _transformConfig?: ChartTransformConfig;
+    /** Optional transform config shared by plot implementations that support transformed views. */
+    protected _transformConfig?: PlotTransformConfig;
 
     /** Domain specification for color encoding (from config). */
     protected _domainSpec: ColorMapDomainSpec | undefined = undefined;
@@ -91,13 +91,13 @@ export abstract class ChartBaseData {
     protected _categoricalColorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.CAT_OBSERVABLE10;
 
     /**
-     * Initializes shared chart data state from a plot configuration.
+     * Initializes shared plot data state from a plot configuration.
      *
      * @param config Plot configuration containing source data, bindings, and transform/display options.
      * @throws If `attributes.axis` is empty or configured bindings are missing/invalid.
      * @throws If `@transform` placeholder is used without a transform config.
      */
-    constructor(config: ChartConfig) {
+    constructor(config: PlotConfig) {
         this._div = config.div;
 
         this._sourceFeatures = config.collection.features;
@@ -112,12 +112,12 @@ export abstract class ChartBaseData {
         ].includes('@transform');
 
         if (config.transform?.preset === 'sort' && hasTransformPlaceholder) {
-            throw new Error("ChartBaseData: '@transform' cannot be used with the 'sort' preset.");
+            throw new Error("PlotBaseData: '@transform' cannot be used with the 'sort' preset.");
         }
 
         const axisAttributes = config.attributes?.axis;
         if (!axisAttributes || axisAttributes.length === 0) {
-            throw new Error('ChartBaseData: attributes.axis must contain at least one attribute.');
+            throw new Error('PlotBaseData: attributes.axis must contain at least one attribute.');
         }
 
         const axisLabels = config.labels?.axis ?? [];
@@ -181,15 +181,15 @@ export abstract class ChartBaseData {
     /**
      * Validates configured source bindings against the original input rows.
      *
-     * @param axisAttributes Source attributes bound to chart axes.
+     * @param axisAttributes Source attributes bound to plot axes.
      * @param colorAttribute Optional source attribute bound to color.
-     * @param transform Optional transform configuration associated with the chart.
+     * @param transform Optional transform configuration associated with the plot.
      * @throws If a configured binding does not resolve on the source data.
      */
     private validateSourceAttributeBindings(
         axisAttributes: string[],
         colorAttribute: string | undefined,
-        transform: ChartTransformConfig | undefined,
+        transform: PlotTransformConfig | undefined,
     ): void {
         const bindings = [
             ...axisAttributes.map((attribute, index) => ({ attribute, channel: `attributes.axis[${index}]` })),
@@ -199,13 +199,13 @@ export abstract class ChartBaseData {
         for (const { attribute, channel } of bindings) {
             if (attribute === '@transform') {
                 if (!transform) {
-                    throw new Error(`ChartBaseData: ${channel} cannot be "@transform" without a transform configuration.`);
+                    throw new Error(`PlotBaseData: ${channel} cannot be "@transform" without a transform configuration.`);
                 }
                 continue;
             }
 
             if (!this.hasAttribute(this._data, attribute)) {
-                throw new Error(`ChartBaseData: ${channel} "${attribute}" does not exist in the source data.`);
+                throw new Error(`PlotBaseData: ${channel} "${attribute}" does not exist in the source data.`);
             }
         }
     }
@@ -218,13 +218,13 @@ export abstract class ChartBaseData {
     private validateRenderedAttributeBindings(): void {
         for (const [index, attribute] of this.renderAxisAttributes.entries()) {
             if (!this.hasAttribute(this._data, attribute)) {
-                throw new Error(`ChartBaseData: attributes.axis[${index}] "${attribute}" does not exist in the rendered data.`);
+                throw new Error(`PlotBaseData: attributes.axis[${index}] "${attribute}" does not exist in the rendered data.`);
             }
         }
 
         const colorAttribute = this.renderColorAttribute;
         if (colorAttribute && !this.hasAttribute(this._data, colorAttribute)) {
-            throw new Error(`ChartBaseData: attributes.color "${colorAttribute}" does not exist in the rendered data.`);
+            throw new Error(`PlotBaseData: attributes.color "${colorAttribute}" does not exist in the rendered data.`);
         }
     }
 
@@ -262,18 +262,18 @@ export abstract class ChartBaseData {
     protected afterDataRefresh(): void {}
 
     /**
-     * Renders chart DOM, SVG, or HTML nodes for the current internal state.
+     * Renders plot DOM, SVG, or HTML nodes for the current internal state.
      */
     abstract render(): void;
 
     /**
      * Maps a preset-specific executed transform into the rendered row schema
-     * expected by chart implementations.
+     * expected by plot implementations.
      *
      * @param result Executed transform payload returned by the shared dispatcher.
      * @returns Normalized rendered rows plus any transformed binding metadata.
      */
-    protected resolveTransformResult(result: ExecutedChartTransform): ResolvedChartTransform {
+    protected resolveTransformResult(result: ExecutedPlotTransform): ResolvedPlotTransform {
         switch (result.preset) {
             case 'binning-1d':
                 return { rows: result.rows as AutkDatum[], axisAttributes: ['label', 'value'] };

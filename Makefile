@@ -1,23 +1,23 @@
-.PHONY: install lint typecheck build build-all docs verify test test-update test-ui test-codegen dev map db plot compute clean publish
+.PHONY: lint typecheck build docs verify test test-update dev clean
 
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
 APP ?= gallery
-
-LIB_PACKAGES := autk-map autk-db autk-plot autk-compute
-DOC_PACKAGES := $(LIB_PACKAGES)
+TEST ?= tests/gallery/autk-map/colormap-categorical.test.ts
+UPDATE ?= cache images
 
 lint:
 	npm run lint
 
-typecheck:
+typecheck: build
 	$(CONCURRENTLY) \
 		"cd autk-core && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-map && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-db && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-plot && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
+		"cd autk && npx tsc --noEmit --skipLibCheck" \
 		"cd gallery && npx tsc --noEmit --skipLibCheck" \
 		"cd usecases && npx tsc --noEmit --skipLibCheck"
 
@@ -27,13 +27,7 @@ build:
 		"cd autk-db && npm run build" \
 		"cd autk-plot && npm run build" \
 		"cd autk-compute && npm run build"
-
-build-all:
-	$(CONCURRENTLY) \
-		"cd autk-map && npm run build" \
-		"cd autk-db && npm run build" \
-		"cd autk-plot && npm run build" \
-		"cd autk-compute && npm run build"
+	cd autk && npm run build
 
 docs:
 	$(CONCURRENTLY) \
@@ -42,42 +36,20 @@ docs:
 		"cd autk-plot && npm run doc" \
 		"cd autk-compute && npm run doc"
 
-verify: lint typecheck build-all docs
-
-ifdef OPEN
-TEST_TARGET = tests/$(APP)/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||')
-else
-TEST_TARGET = tests/$(APP)
-endif
-
-CODEGEN_TARGET = src/$(shell echo '$(OPEN)' | sed 's|^/||' | sed 's|^src/||' | sed 's|/$$||' | sed 's|\.[^./]*$$||')
+verify: lint typecheck
 
 test:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET))
+	APP=$(APP) npx playwright test $(TEST)
 
-# make test-update          → update both cache (HAR) and images (snapshots)
-# make test-update cache    → update HAR files only
-# make test-update images   → update snapshots only
-# make test-update cache images → update both explicitly
-_CACHE  := $(filter cache,$(MAKECMDGOALS))
-_IMAGES := $(filter images,$(MAKECMDGOALS))
-_BOTH   := $(if $(or $(_CACHE),$(_IMAGES)),,1)
-
+# Update committed test baselines locally.
+# Examples:
+#   make test-update TEST=tests/gallery/autk-map/colormap-categorical.test.ts UPDATE=images
+#   make test-update TEST=tests/gallery/autk-map/osm-layers-api.test.ts UPDATE="cache images"
 test-update:
-	APP=$(APP) OPEN=$(OPEN) \
-	$(if $(or $(_CACHE),$(_BOTH)),HAR_UPDATE=1) \
-	npx playwright test $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET)) \
-	$(if $(or $(_IMAGES),$(_BOTH)),--update-snapshots)
-
-cache images:
-	@true
-
-test-ui:
-	APP=$(APP) OPEN=$(OPEN) npx playwright test --ui $(if $(OPEN),$(TEST_TARGET).test.ts,$(TEST_TARGET))
-
-test-codegen:
-	node playwright.codegen.mjs http://localhost:5173$(OPEN) $(if $(OPEN),$(TEST_TARGET).test.ts)
-
+	APP=$(APP) \
+	$(if $(findstring cache,$(UPDATE)),HAR_UPDATE=1) \
+	npx playwright test $(TEST) \
+	$(if $(findstring images,$(UPDATE)),--update-snapshots)
 
 dev:
 	npm install
@@ -87,20 +59,8 @@ dev:
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
 		"cd autk-compute && npm run dev-build" \
+		"cd autk && npm run dev-build" \
 		"cd $(APP) && VITE_OPEN=\"$(OPEN)\" npm run dev"
-
-map:
-	cd autk-map && npm run build
-
-db:
-	cd autk-db && npm run build
-
-plot:
-	cd autk-plot && npm run build
-
-compute:
-	cd autk-compute && npm run build
-
 
 clean:
 	$(RIMRAF) node_modules
@@ -109,17 +69,6 @@ clean:
 		"cd autk-db && $(RIMRAF) dist build" \
 		"cd autk-plot && $(RIMRAF) dist build" \
 		"cd autk-compute && $(RIMRAF) dist build" \
+		"cd autk && $(RIMRAF) dist build" \
 		"cd gallery && $(RIMRAF) dist build" \
 		"cd usecases && $(RIMRAF) dist build"
-
-publish:
-	@if [ -z "$(LIB)" ]; then \
-		echo "Error: Please specify a library to publish using LIB=<library>"; \
-		echo "Usage: make publish LIB=autk-map|autk-db|autk-plot|autk-compute"; \
-		exit 1; \
-	fi
-	@if [ "$(LIB)" != "autk-map" ] && [ "$(LIB)" != "autk-db" ] && [ "$(LIB)" != "autk-plot" ] && [ "$(LIB)" != "autk-compute" ]; then \
-		echo "Error: LIB must be one of: autk-map, autk-db, autk-plot, autk-compute"; \
-		exit 1; \
-	fi
-	cd $(LIB) && npm pack && npm publish *.tgz

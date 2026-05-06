@@ -15,7 +15,7 @@
 
 import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum } from '../../types-chart';
+import type { AutkDatum } from '../../types-plot';
 import type { ReduceSeriesTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
@@ -28,12 +28,12 @@ import { reduceBuckets } from '../kernel';
 export type ExecutedReduceSeriesTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'reduce-series';
-    /** Reduced series rows ready for downstream chart rendering. */
+    /** Reduced series rows ready for downstream plot rendering. */
     rows: ReduceSeriesBucketRow[];
 };
 
 /**
- * A single reduce-series bucket row ready for chart rendering.
+ * A single reduce-series bucket row ready for plot rendering.
  *
  * `bucket` is either the array index (plain-number series) or the normalised
  * timestamp string for object-based series.
@@ -52,7 +52,7 @@ export type ReduceSeriesBucketRow = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a reduce-series transform and returns chart-ready rows.
+ * Runs a reduce-series transform and returns plot-ready rows.
  *
  * @param rows Input feature rows containing series arrays.
  * @param config Transform configuration controlling timestamp/value extraction and reduction.

@@ -1,6 +1,6 @@
 import {
     ComputeRender,
-} from 'autk-compute';
+} from '@urban-toolkit/autk-compute';
 
 import {
     ColorMapDomainStrategy,
@@ -11,11 +11,11 @@ import {
     AutkMap,
     LayerType,
     MapEvent,
-} from 'autk-map';
+} from '@urban-toolkit/autk-map';
 
-import { AutkSpatialDb } from 'autk-db';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
 
-import type { LayerThematic } from 'autk-map';
+import type { LayerThematic } from '@urban-toolkit/autk-map';
 
 import { Feature, FeatureCollection, Point } from 'geojson';
 

@@ -12,7 +12,7 @@
 
 import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum } from '../../types-chart';
+import type { AutkDatum } from '../../types-plot';
 import type { Binning2dTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
@@ -34,7 +34,7 @@ export type ExecutedBinning2dTransform = {
 };
 
 /**
- * A single aggregated cell ready for chart rendering.
+ * A single aggregated cell ready for plot rendering.
  *
  * `x` and `y` are the bin labels for this cell — either a category string or a
  * formatted numeric range such as `"1k-2k"`.
@@ -59,7 +59,7 @@ export type Binning2dCellRow = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a heat matrix transform and returns chart-ready cell rows.
+ * Runs a heat matrix transform and returns plot-ready cell rows.
  *
  * Detects whether each axis attribute is categorical or quantitative, builds a
  * bin-label mapper for each axis, then groups rows by the resulting (x, y) label

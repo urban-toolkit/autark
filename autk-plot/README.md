@@ -1,11 +1,11 @@
-# autk-plot: Data Visualization Library
+# @urban-toolkit/autk-plot: Data Visualization Library
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/urban-toolkit/utk-serverless/main/logo.png" alt="Autark Logo" height="200"/></br>
 </div>
 <br>
 
-**autk-plot** is a data visualization library, part of the Autark ecosystem, built on top of D3. The library can be used standalone or in conjunction with other Autark modules. To facilitate adoption, we provide a large collection of examples in the [Autark website](https://autarkjs.org/gallery/), demonstrating its functionality both as an independent library and as part of the larger ecosystem of tools for urban data analytics.
+**@urban-toolkit/autk-plot** is a data visualization library, part of the Autark ecosystem, built on top of D3. The library can be used standalone or in conjunction with other Autark modules. To facilitate adoption, we provide a large collection of examples in the [Autark website](https://autarkjs.org/gallery/), demonstrating its functionality both as an independent library and as part of the larger ecosystem of tools for urban data analytics.
 
 ## Resources
 
@@ -13,12 +13,29 @@
 - [Examples](https://autarkjs.org/gallery/)
 - [Use Cases](https://autarkjs.org/usecases/)
 
+## Usage
+
+```ts
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+
+const plot = new AutkPlot(container, {
+  type: 'scatterplot',
+  collection,
+  attributes: { axis: ['x', 'y'] },
+  events: [PlotEvent.CLICK],
+});
+
+plot.events.on(PlotEvent.CLICK, ({ selection }) => {
+  console.log(selection);
+});
+```
+
 ## Transformation Architecture
 
-`autk-plot` exposes a shared transformation layer under `src/transforms/`:
+`@urban-toolkit/autk-plot` exposes a shared transformation layer under `src/transforms/`:
 
 - `kernel.ts`: low-level primitives such as bucket reduction and provenance-safe `autkIds` merging.
-- `presets/*.ts`: preset runners for the supported chart workflows.
+- `presets/*.ts`: preset runners for the supported plot workflows.
 - `index.ts`: the public transform entrypoint that re-exports helpers and the top-level `run(...)` dispatcher.
 
 The invariant is:
@@ -31,10 +48,10 @@ The invariant is:
 import {
   run,
   reduceBuckets,
-  type ChartTransformConfig,
+  type PlotTransformConfig,
   type TransformResolution,
   type TransformReducer,
-} from 'autk-plot';
+} from '@urban-toolkit/autk-plot';
 ```
 
 Supported built-in presets:
@@ -53,7 +70,7 @@ const rows = collection.features.map((f, idx) => ({
   autkIds: [idx],
 }));
 
-const config: ChartTransformConfig = {
+const config: PlotTransformConfig = {
   preset: 'binning-events',
   options: {
     resolution: 'month',

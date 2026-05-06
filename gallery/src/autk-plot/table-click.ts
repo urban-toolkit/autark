@@ -1,14 +1,14 @@
 import { FeatureCollection } from 'geojson';
 
-import { AutkChart, ChartEvent } from 'autk-plot';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
-import { AutkMap, MapEvent } from 'autk-map';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3 {
     protected map!: AutkMap;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
 
     protected collection!: FeatureCollection;
 
@@ -34,14 +34,14 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new AutkChart(plotDiv, {
+        this.plot = new AutkPlot(plotDiv, {
             type: 'table',
             collection: this.collection,
             attributes: { axis: ['ntaname', 'shape_area', 'shape_leng'] },
             labels: { title: 'Table Visualization' },
             transform: { preset: 'sort', options: { direction: 'asc' } },
             width: 790,
-            events: [ChartEvent.CLICK]
+            events: [PlotEvent.CLICK]
         });
     }
 
@@ -52,7 +52,7 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
+        this.plot.events.on(PlotEvent.CLICK, ({ selection }) => {
             this.map.setHighlightedIds(layerId, selection);
         });
     }

@@ -1,15 +1,15 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkSpatialDb, LayerType } from 'autk-db';
-import { AutkMap, MapEvent, MapStyle } from 'autk-map';
-import { AutkChart, ChartEvent } from 'autk-plot';
+import { AutkSpatialDb, LayerType } from '@urban-toolkit/autk-db';
+import { AutkMap, MapEvent, MapStyle } from '@urban-toolkit/autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3TemporalEvents {
     protected map!: AutkMap;
     protected db!: AutkSpatialDb;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
 
     protected canvas!: HTMLCanvasElement;
     protected plotDiv!: HTMLElement;
@@ -93,7 +93,7 @@ export class MapD3TemporalEvents {
     }
 
     protected loadPlot() {
-        this.plot = new AutkChart(this.plotDiv, {
+        this.plot = new AutkPlot(this.plotDiv, {
             type: 'linechart',
             collection: this.roads,
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
@@ -108,10 +108,10 @@ export class MapD3TemporalEvents {
             },
             margins: { left: 60, right: 20, top: 50, bottom: 140 },
             width: 790,
-            events: [ChartEvent.BRUSH_X],
+            events: [PlotEvent.BRUSH_X],
         });
 
-        this.plot.events.on(ChartEvent.BRUSH_X, ({ selection }) => {
+        this.plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
             if (this.selectionSource === 'map') return;
 
             this.selectionSource = 'plot';

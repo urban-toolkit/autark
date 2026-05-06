@@ -14,9 +14,23 @@ export function pluginWatchNodeModules(modules: string[]) {
 }
 
 export default defineConfig({
-  plugins: [pluginWatchNodeModules(['autk-core', 'autk-map', 'autk-db', 'autk-plot', 'autk-compute'])],
+  plugins: [
+    pluginWatchNodeModules([
+      'autk-core',
+      '@urban-toolkit/autk-map',
+      '@urban-toolkit/autk-db',
+      '@urban-toolkit/autk-plot',
+      '@urban-toolkit/autk-compute',
+    ]),
+  ],
   optimizeDeps: {
-    exclude: ['autk-core', 'autk-map', 'autk-db', 'autk-plot', 'autk-compute'],
+    exclude: [
+      'autk-core',
+      '@urban-toolkit/autk-map',
+      '@urban-toolkit/autk-db',
+      '@urban-toolkit/autk-plot',
+      '@urban-toolkit/autk-compute',
+    ],
   },
 
   server: {

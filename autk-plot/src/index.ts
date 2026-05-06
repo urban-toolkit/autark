@@ -1,7 +1,7 @@
 // ─── Plot entry point ───────────────────────────────────────────────────────
 
-/** Unified chart wrapper used to instantiate and interact with plot types. */
-export { AutkChart } from './chart';
+/** Unified plot wrapper used to instantiate and interact with plot types. */
+export { AutkPlot } from './plot';
 
 // ─── Core re-exports (from autk-core via types-core) ───────────────────────
 
@@ -27,21 +27,21 @@ export type {
 
 // ─── API and config types ───────────────────────────────────────────────────
 
-export type { AutkDatum } from './types-chart';
+export type { AutkDatum } from './types-plot';
 
 export type {
-	ChartMargins,
+	PlotMargins,
 	TransformReducer,
 	TransformResolution,
 	Binning1dTransformConfig,
 	Binning2dTransformConfig,
 	BinningEventsTransformConfig,
 	ReduceSeriesTransformConfig,
-	ChartTransformConfig,
+	PlotTransformConfig,
 	SortTransformConfig,
-	ChartConfig,
-	ChartType,
-	UnifiedChartConfig,
+	PlotConfig,
+	PlotType,
+	UnifiedPlotConfig,
 } from './api';
 
 // ─── Events ─────────────────────────────────────────────────────────────────
@@ -56,20 +56,20 @@ export type {
     SelectionData
 } from './types-core';
 
-/** Supported chart interaction events emitted by plot instances. */
-export { ChartEvent } from './types-events';
-export type { ChartEventData, ChartEventRecord } from './types-events';
+/** Supported plot interaction events emitted by plot instances. */
+export { PlotEvent } from './types-events';
+export type { PlotEventData, PlotEventRecord } from './types-events';
 
-/** Shared chart base classes for data/transform and interactive behavior. */
-export { ChartBaseData } from './chart-base-data';
-export { ChartBaseInteractive } from './chart-base-interactive';
-/** Normalized transform payload consumed by chart implementations. */
-export type { ResolvedChartTransform } from './chart-base-data';
+/** Shared plot base classes for data/transform and interactive behavior. */
+export { PlotBaseData } from './plot-base-data';
+export { PlotBaseInteractive } from './plot-base-interactive';
+/** Normalized transform payload consumed by plot implementations. */
+export type { ResolvedPlotTransform } from './plot-base-data';
 
 // ─── Shared style helpers ───────────────────────────────────────────────────
 
-/** Global default/highlight style helpers shared by chart implementations. */
-export { ChartStyle } from './chart-style';
+/** Global default/highlight style helpers shared by plot implementations. */
+export { PlotStyle } from './plot-style';
 
 // ─── Transform helpers ─────────────────────────────────────────────────────
 

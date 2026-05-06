@@ -1,17 +1,17 @@
 /**
- * @fileoverview Bar chart visualization supporting both categorical and binned modes.
+ * @fileoverview Bar plot visualization supporting both categorical and binned modes.
  *
- * Provides a D3-based bar chart implementation with the following features:
+ * Provides a D3-based bar plot implementation with the following features:
  * - **Dual rendering modes**: Categorical bars and one-dimensional binned output from transformed data
  * - **Two-axis mapping**: Category/bin labels on x and numeric values on y
  * - **Selection and linked views**: Uses source feature ids for click/brush interactions across components
  *
- * The chart maintains a stable mapping between rendered bins and original source features,
+ * The plot maintains a stable mapping between rendered bins and original source features,
  * allowing selections to remain consistent across transformations.
  *
  * @example
  * // Binned mode with map-plot linking
- * const plot = new AutkChart(plotDiv, {
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'barchart',
  *   collection: geojson,
  *   attributes: { axis: ['shape_area', '@transform'] },
@@ -20,12 +20,12 @@
  *     options: { bins: 8 }
  *   },
  *   labels: { axis: ['area range', 'count'], title: 'Distribution' },
- *   events: [ChartEvent.CLICK]
+ *   events: [PlotEvent.CLICK]
  * });
  *
  * @example
  * // Categorical mode
- * const plot = new AutkChart(plotDiv, {
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'barchart',
  *   collection: features,
  *   attributes: { axis: ['category', 'value'] },
@@ -37,19 +37,19 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../types-core';
 
-import type { ChartConfig } from '../api';
+import type { PlotConfig } from '../api';
 
-import { ChartBaseInteractive } from '../chart-base-interactive';
+import { PlotBaseInteractive } from '../plot-base-interactive';
 
-import { ChartEvent } from '../types-events';
+import { PlotEvent } from '../types-events';
 
 /**
- * Bar chart implementation supporting categorical values and binned mode.
+ * Bar plot implementation supporting categorical values and binned mode.
  *
  * In binned mode, rendered bins are mapped back to original source feature
  * indices so interaction payloads remain stable across transformations.
  */
-export class Barchart extends ChartBaseInteractive {
+export class Barchart extends PlotBaseInteractive {
 
     /** Band scale mapping category/bin labels to pixel positions. */
     protected mapX!: d3.ScaleBand<string>;
@@ -57,13 +57,13 @@ export class Barchart extends ChartBaseInteractive {
     protected mapY!: d3.ScaleLinear<number, number>;
 
     /**
-     * Creates a bar chart instance and performs the initial draw.
+     * Creates a bar plot instance and performs the initial draw.
      *
      * @param config Plot configuration with categorical axes or binning settings.
      * @throws If a transform is configured with a preset other than `binning-1d`.
      */
-    constructor(config: ChartConfig) {
-        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+    constructor(config: PlotConfig) {
+        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
         if (config.tickFormats === undefined) { 
             config.tickFormats = ['~s', '~s']; 
         }
@@ -82,7 +82,7 @@ export class Barchart extends ChartBaseInteractive {
     }
 
     /**
-     * Renders chart scaffolding, axes, and bar marks.
+     * Renders plot scaffolding, axes, and bar marks.
      *
      * @throws If the root SVG element cannot be created.
      */
@@ -105,7 +105,7 @@ export class Barchart extends ChartBaseInteractive {
 
         svg.attr('width', this._width).attr('height', this._height);
 
-        // ---- Chart size
+        // ---- Plot size
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
 

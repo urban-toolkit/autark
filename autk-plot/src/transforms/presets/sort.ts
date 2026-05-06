@@ -8,7 +8,7 @@
 
 import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum } from '../../types-chart';
+import type { AutkDatum } from '../../types-plot';
 import type { SortTransformConfig } from '../../api';
 
 // ---- Executed transform -------------------------------------------------
@@ -29,7 +29,7 @@ export type ExecutedSortTransform = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a sort transform and returns chart-ready rows.
+ * Runs a sort transform and returns plot-ready rows.
  *
  * Sorts the input rows by the specified column and direction (asc/desc).
  *

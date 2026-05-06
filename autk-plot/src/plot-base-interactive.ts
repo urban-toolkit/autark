@@ -5,8 +5,8 @@ import type {
     Geometry,
 } from 'geojson';
 
-import type { AutkDatum } from './types-chart';
-import type { ChartConfig, ChartTransformConfig } from './api';
+import type { AutkDatum } from './types-plot';
+import type { PlotConfig, PlotTransformConfig } from './api';
 
 import {
     ColorMapInterpolator,
@@ -14,21 +14,21 @@ import {
     EventEmitter,
     valueAtPath,
 } from './types-core';
-import type { ChartEventRecord } from './types-events';
+import type { PlotEventRecord } from './types-events';
 
-import { ChartStyle } from './chart-style';
-import { ChartEvent } from './types-events';
-import { ChartBaseData } from './chart-base-data';
+import { PlotStyle } from './plot-style';
+import { PlotEvent } from './types-events';
+import { PlotBaseData } from './plot-base-data';
 
 /**
- * Interactive chart base class.
+ * Interactive plot base class.
  *
- * Extends `ChartBaseData` with selection state, click/brush wiring, and mark
- * highlighting behavior shared by interactive charts.
+ * Extends `PlotBaseData` with selection state, click/brush wiring, and mark
+ * highlighting behavior shared by interactive plots.
  */
-export abstract class ChartBaseInteractive extends ChartBaseData {
-    /** Interaction events explicitly enabled for the chart instance. */
-    protected _enabledEvents: ChartEvent[] = [];
+export abstract class PlotBaseInteractive extends PlotBaseData {
+    /** Interaction events explicitly enabled for the plot instance. */
+    protected _enabledEvents: PlotEvent[] = [];
     /** CSS property used when applying colors to marks. */
     protected _colorProperty: 'fill' | 'stroke' = 'fill';
 
@@ -40,8 +40,8 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     private _selectionOrigin: 'local' | 'external' | null = null;
     /** Controls how source ids map back onto rendered marks. */
     private _selectionProjection: 'bijective' | 'aggregated' = 'bijective';
-    /** Typed event emitter exposed to chart consumers. */
-    private _chartEvents!: EventEmitter<ChartEventRecord>;
+    /** Typed event emitter exposed to plot consumers. */
+    private _plotEvents!: EventEmitter<PlotEventRecord>;
     /** Active brush rectangles keyed by brush host id. */
     private _activeBrushes: Map<string, [number, number, number, number]> = new Map();
     /** Cached brush behaviors used to clear visuals programmatically. */
@@ -58,14 +58,14 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     protected _MODE: 'and' | 'or' = 'and';
 
     /**
-     * Initializes interactive chart state on top of the shared data lifecycle.
+     * Initializes interactive plot state on top of the shared data lifecycle.
      *
      * @param config Plot configuration including optional interaction events.
-     * @throws If configured bindings are missing or invalid (delegated to `ChartBaseData`).
+     * @throws If configured bindings are missing or invalid (delegated to `PlotBaseData`).
      */
-    constructor(config: ChartConfig) {
+    constructor(config: PlotConfig) {
         super(config);
-        this._chartEvents = new EventEmitter();
+        this._plotEvents = new EventEmitter();
         this._enabledEvents = config.events ?? [];
         this._selectionProjection = this.resolveSelectionProjection(config.transform);
     }
@@ -78,10 +78,10 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     }
 
     /**
-     * Returns the typed event emitter used by this chart instance.
+     * Returns the typed event emitter used by this plot instance.
      */
-    get events(): EventEmitter<ChartEventRecord> {
-        return this._chartEvents;
+    get events(): EventEmitter<PlotEventRecord> {
+        return this._plotEvents;
     }
 
     /**
@@ -102,7 +102,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     }
 
     /**
-     * Applies an externally authored selection to the chart.
+     * Applies an externally authored selection to the plot.
      *
      * @param selection Source feature ids to highlight.
      * @throws Never throws.
@@ -126,19 +126,19 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     }
 
     /**
-     * Attaches interaction handlers requested by the chart configuration.
+     * Attaches interaction handlers requested by the plot configuration.
      *
      * @throws Never throws.
      */
     public configureSignalListeners(): void {
         for (const event of this._enabledEvents) {
-            if (event === ChartEvent.CLICK) {
+            if (event === PlotEvent.CLICK) {
                 this.clickEvent();
-            } else if (event === ChartEvent.BRUSH) {
+            } else if (event === PlotEvent.BRUSH) {
                 this.brushEvent();
-            } else if (event === ChartEvent.BRUSH_X) {
+            } else if (event === PlotEvent.BRUSH_X) {
                 this.brushXEvent();
-            } else if (event === ChartEvent.BRUSH_Y) {
+            } else if (event === PlotEvent.BRUSH_Y) {
                 this.brushYEvent();
             }
         }
@@ -156,25 +156,25 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
         const datum = d as AutkDatum;
 
         if (this.isMarkHighlighted(d)) {
-            return ChartStyle.highlight;
+            return PlotStyle.highlight;
         }
 
         const colorAttribute = this.renderColorAttribute;
         if (!colorAttribute || !this._resolvedDomain) {
-            return ChartStyle.default;
+            return PlotStyle.default;
         }
 
         if (typeof this._resolvedDomain[0] === 'string') {
             const categories = this._resolvedDomain as string[];
             const rawValue = valueAtPath(datum, colorAttribute);
             if (rawValue === null || rawValue === undefined) {
-                return ChartStyle.default;
+                return PlotStyle.default;
             }
 
             const rawVal = String(rawValue);
             const idx = categories.indexOf(rawVal);
             if (idx < 0) {
-                return ChartStyle.default;
+                return PlotStyle.default;
             }
 
             const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
@@ -186,7 +186,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
         const rawValue = valueAtPath(datum, colorAttribute);
         const rawVal = Number(rawValue);
         if (rawValue === null || rawValue === undefined || !Number.isFinite(rawVal)) {
-            return ChartStyle.default;
+            return PlotStyle.default;
         }
 
         const numDomain = this._resolvedDomain as [number, number] | [number, number, number];
@@ -231,29 +231,29 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     protected clickEvent(): void {
         const svgs = d3.select(this._div).selectAll('.autkMark');
         const cls = d3.select(this._div).selectAll('.autkClear');
-        const chart = this;
+        const plot = this;
 
         svgs.each(function (d) {
             d3.select(this).on('click', function () {
                 if (d == null || typeof d !== 'object') return;
-                if (chart._selectedMarkDatums.has(d as object)) {
-                    chart._selectedMarkDatums.delete(d as object);
+                if (plot._selectedMarkDatums.has(d as object)) {
+                    plot._selectedMarkDatums.delete(d as object);
                 } else {
-                    chart._selectedMarkDatums.add(d as object);
+                    plot._selectedMarkDatums.add(d as object);
                 }
-                chart.syncSelectedFeaturesFromMarks();
-                chart._selectionOrigin = chart._selectedFeatureIds.size > 0 ? 'local' : null;
-                chart.renderSelection();
-                chart.events.emit(ChartEvent.CLICK, { selection: chart.selection });
+                plot.syncSelectedFeaturesFromMarks();
+                plot._selectionOrigin = plot._selectedFeatureIds.size > 0 ? 'local' : null;
+                plot.renderSelection();
+                plot.events.emit(PlotEvent.CLICK, { selection: plot.selection });
             });
         });
 
         cls.on('click', function () {
-            chart._selectedMarkDatums = new Set();
-            chart._selectedFeatureIds = new Set();
-            chart._selectionOrigin = null;
-            chart.renderSelection();
-            chart.events.emit(ChartEvent.CLICK, { selection: [] });
+            plot._selectedMarkDatums = new Set();
+            plot._selectedFeatureIds = new Set();
+            plot._selectionOrigin = null;
+            plot.renderSelection();
+            plot.events.emit(PlotEvent.CLICK, { selection: [] });
         });
     }
 
@@ -262,7 +262,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      */
     protected brushEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrush');
-        const chart = this;
+        const plot = this;
 
         brushable
             .each(function (_d, i) {
@@ -271,22 +271,22 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
                 const brushKey = dim && dim.length > 0 ? dim : String(i);
 
                 const brush = d3.brush()
-                    .extent([[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]])
+                    .extent([[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]])
                     .on('start brush end', function (event: any) {
-                        if (chart._suppressBrushEvents) return;
+                        if (plot._suppressBrushEvents) return;
                         if (event.selection) {
                             const [x0, y0] = event.selection[0];
                             const [x1, y1] = event.selection[1];
-                            chart._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
-                            chart.resolveSelectionFromRects(chart._activeBrushes);
-                            chart.renderSelection();
-                            chart.events.emit(ChartEvent.BRUSH, { selection: chart.selection });
+                            plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
+                            plot.resolveSelectionFromRects(plot._activeBrushes);
+                            plot.renderSelection();
+                            plot.events.emit(PlotEvent.BRUSH, { selection: plot.selection });
                         } else {
-                            chart._activeBrushes.delete(brushKey);
-                            chart.commitBrushSelection(ChartEvent.BRUSH, chart._activeBrushes);
+                            plot._activeBrushes.delete(brushKey);
+                            plot.commitBrushSelection(PlotEvent.BRUSH, plot._activeBrushes);
                         }
                     });
-                chart._brushBehaviors.set(brushKey, brush);
+                plot._brushBehaviors.set(brushKey, brush);
                 cBrush.call(brush);
             });
     }
@@ -296,12 +296,12 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      */
     protected brushXEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrush');
-        const chart = this;
+        const plot = this;
 
         const nBrush = brushable.size();
         const extent: [[number, number], [number, number]] = (nBrush > 1)
-            ? [[-10, 0], [10, chart._height - chart._margins.top - chart._margins.bottom]]
-            : [[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]];
+            ? [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]]
+            : [[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]];
 
         brushable
             .each(function (_d, i) {
@@ -312,23 +312,23 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
                 const brush = d3.brushX()
                     .extent(extent)
                     .on('start brush end', function (event: any) {
-                        if (chart._suppressBrushEvents) return;
+                        if (plot._suppressBrushEvents) return;
                         if (event.selection) {
                             const x0 = event.selection[0];
                             const y0 = -10;
                             const x1 = event.selection[1];
-                            const y1 = chart._height;
+                            const y1 = plot._height;
 
-                            chart._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
-                            chart.resolveSelectionFromRects(chart._activeBrushes);
-                            chart.renderSelection();
-                            chart.events.emit(ChartEvent.BRUSH_X, { selection: chart.selection });
+                            plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
+                            plot.resolveSelectionFromRects(plot._activeBrushes);
+                            plot.renderSelection();
+                            plot.events.emit(PlotEvent.BRUSH_X, { selection: plot.selection });
                         } else {
-                            chart._activeBrushes.delete(brushKey);
-                            chart.commitBrushSelection(ChartEvent.BRUSH_X, chart._activeBrushes);
+                            plot._activeBrushes.delete(brushKey);
+                            plot.commitBrushSelection(PlotEvent.BRUSH_X, plot._activeBrushes);
                         }
                     });
-                chart._brushBehaviors.set(brushKey, brush);
+                plot._brushBehaviors.set(brushKey, brush);
                 cBrush.call(brush);
             });
     }
@@ -339,12 +339,12 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     protected brushYEvent(): void {
         const brushable = d3.select(this._div).selectAll<SVGGElement, unknown>('.autkBrush');
         const marksGroup = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
-        const chart = this;
+        const plot = this;
 
         const nBrush = brushable.size();
         const extent: [[number, number], [number, number]] = (nBrush > 1)
-            ? [[-10, 0], [10, chart._height - chart._margins.top - chart._margins.bottom]]
-            : [[0, 0], [chart._width - chart._margins.left - chart._margins.right, chart._height - chart._margins.top - chart._margins.bottom]];
+            ? [[-10, 0], [10, plot._height - plot._margins.top - plot._margins.bottom]]
+            : [[0, 0], [plot._width - plot._margins.left - plot._margins.right, plot._height - plot._margins.top - plot._margins.bottom]];
 
         brushable
             .each(function (_d, i) {
@@ -355,7 +355,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
                 const brush = d3.brushY()
                     .extent(extent)
                     .on('start brush end', function (event: any) {
-                        if (chart._suppressBrushEvents) return;
+                        if (plot._suppressBrushEvents) return;
                         if (event.selection) {
                             const cTransform = cBrush.attr('transform');
                             const mTransform = marksGroup.attr('transform');
@@ -375,16 +375,16 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
                             const x1 = shiftX + extWidth;
                             const y1 = event.selection[1] + shiftY;
 
-                            chart._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
-                            chart.resolveSelectionFromRects(chart._activeBrushes);
-                            chart.renderSelection();
-                            chart.events.emit(ChartEvent.BRUSH_Y, { selection: chart.selection });
+                            plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
+                            plot.resolveSelectionFromRects(plot._activeBrushes);
+                            plot.renderSelection();
+                            plot.events.emit(PlotEvent.BRUSH_Y, { selection: plot.selection });
                         } else {
-                            chart._activeBrushes.delete(brushKey);
-                            chart.commitBrushSelection(ChartEvent.BRUSH_Y, chart._activeBrushes);
+                            plot._activeBrushes.delete(brushKey);
+                            plot.commitBrushSelection(PlotEvent.BRUSH_Y, plot._activeBrushes);
                         }
                     });
-                chart._brushBehaviors.set(brushKey, brush);
+                plot._brushBehaviors.set(brushKey, brush);
                 cBrush.call(brush);
             });
     }
@@ -711,14 +711,14 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      */
     private clearBrushVisuals(): void {
         this._suppressBrushEvents = true;
-        const chart = this;
+        const plot = this;
         d3.select(this._div)
             .selectAll<SVGGElement, unknown>('.autkBrush')
             .each(function (_d, i) {
                 const el = d3.select<SVGGElement, unknown>(this);
                 const dim = el.attr('autkBrushId');
                 const brushKey = dim && dim.length > 0 ? dim : String(i);
-                const brush = chart._brushBehaviors.get(brushKey);
+                const brush = plot._brushBehaviors.get(brushKey);
                 if (brush) {
                     brush.move(el, null);
                 }
@@ -732,7 +732,7 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
      * @param event Interaction event emitted after the brush commit.
      * @param activeBrushes Currently active brush rectangles.
      */
-    private commitBrushSelection(event: ChartEvent, activeBrushes: Map<string, [number, number, number, number]>): void {
+    private commitBrushSelection(event: PlotEvent, activeBrushes: Map<string, [number, number, number, number]>): void {
         if (activeBrushes.size === 0) {
             this._selectedMarkDatums = new Set();
             this._selectedFeatureIds = new Set();
@@ -745,12 +745,12 @@ export abstract class ChartBaseInteractive extends ChartBaseData {
     }
 
     /**
-     * Resolves whether this chart should use bijective or aggregated selection projection.
+     * Resolves whether this plot should use bijective or aggregated selection projection.
      *
-     * @param transform Optional transform configuration for the chart.
+     * @param transform Optional transform configuration for the plot.
      * @returns Selection projection mode used by interaction logic.
      */
-    private resolveSelectionProjection(transform: ChartTransformConfig | undefined): 'bijective' | 'aggregated' {
+    private resolveSelectionProjection(transform: PlotTransformConfig | undefined): 'bijective' | 'aggregated' {
         const preset = transform?.preset;
         if (
             preset === 'binning-1d' ||

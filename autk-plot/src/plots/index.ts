@@ -1,15 +1,15 @@
 /**
- * Chart implementation re-exports.
+ * Plot implementation re-exports.
  *
- * Aggregates all concrete chart classes so internal modules and the public API
+ * Aggregates all concrete plot classes so internal modules and the public API
  * can import from a single location instead of from individual implementation files.
  */
 
-/** Bar chart supporting categorical values and one-dimensional bins. */
+/** Bar plot supporting categorical values and one-dimensional bins. */
 export { Barchart } from './barchart';
-/** Line chart for temporal event and reduced series data. */
+/** Line plot for temporal event and reduced series data. */
 export { Linechart } from './linechart';
-/** Parallel coordinates chart for multivariate feature exploration. */
+/** Parallel coordinates plot for multivariate feature exploration. */
 export { ParallelCoordinates } from './pcoordinates';
 /** Two-dimensional scatter plot with click and brush interactions. */
 export { Scatterplot } from './scatterplot';

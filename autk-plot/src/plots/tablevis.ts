@@ -9,7 +9,7 @@
  *
  * @example
  * // Basic table visualization
- * const plot = new AutkChart(plotDiv, {
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'table',
  *   collection: geojson,
  *   attributes: { axis: ['name', 'population', 'area'] },
@@ -18,10 +18,10 @@
  *
  * @example
  * // Table with selection and sorting
- * const plot = new AutkChart(plotDiv, {
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'table',
  *   collection: geojson,
- *   events: [ChartEvent.CLICK],
+ *   events: [PlotEvent.CLICK],
  *   attributes: { axis: ['id', 'value'] },
  *   labels: { axis: ['ID', 'Value'], title: 'Data Table' }
  * });
@@ -30,19 +30,19 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../types-core';
 
-import type { AutkDatum } from '../types-chart';
-import type { SortTransformConfig, ChartConfig } from '../api';
+import type { AutkDatum } from '../types-plot';
+import type { SortTransformConfig, PlotConfig } from '../api';
 
-import { ChartBaseInteractive } from '../chart-base-interactive';
-import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../types-events';
+import { PlotBaseInteractive } from '../plot-base-interactive';
+import { PlotStyle } from '../plot-style';
+import { PlotEvent } from '../types-events';
 
 /**
  * Table-based visualization with sorting and row selection interactions.
  *
  * Selected rows are pinned to the top and keep stable source index mapping.
  */
-export class TableVis extends ChartBaseInteractive {
+export class TableVis extends PlotBaseInteractive {
 
     /**
      * Creates a table visualization and performs the initial draw.
@@ -50,8 +50,8 @@ export class TableVis extends ChartBaseInteractive {
      * @param config Plot configuration for table rendering.
      * @throws If a transform is configured with a preset other than `sort`.
      */
-    constructor(config: ChartConfig) {
-        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+    constructor(config: PlotConfig) {
+        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
 
         if (config.transform && config.transform.preset !== 'sort') {
             throw new Error('TableVis only supports the sort transform preset.');
@@ -167,7 +167,7 @@ export class TableVis extends ChartBaseInteractive {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => this.isMarkHighlighted(d) ? ChartStyle.highlight : 'transparent')
+            .style('background-color', (d) => this.isMarkHighlighted(d) ? PlotStyle.highlight : 'transparent')
             .style('color', (d) => this.isMarkHighlighted(d) ? '#ffffff' : '#000000');
 
         rows

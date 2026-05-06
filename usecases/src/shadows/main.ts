@@ -4,10 +4,10 @@ declare function showError(message: string, note?: string): void;
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkSpatialDb } from 'autk-db';
-import { ComputeGpgpu } from 'autk-compute';
-import { AutkMap, LayerType, MapEvent } from 'autk-map';
-import { AutkChart, ChartEvent } from 'autk-plot';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
+import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
 import shadowShader from './shadow.wgsl?raw';
@@ -30,7 +30,7 @@ const URL = (import.meta as any).env.BASE_URL;
  * End-to-end urban shadows case study.
  *
  * This class orchestrates data loading, compute execution, map rendering,
- * picking interactions, and linked chart filtering in one runnable example.
+ * picking interactions, and linked plot filtering in one runnable example.
  *
  * Data flow overview:
  * 1) load and derive data in the spatial DB,
@@ -43,8 +43,8 @@ export class Shadows {
     protected map!: AutkMap;
     /** Spatial DB facade used for OSM loading and SQL/spatial transformations. */
     protected db!: AutkSpatialDb;
-    /** Histogram chart instance linked to roads selection/highlighting. */
-    protected histogram!: AutkChart;
+    /** Histogram plot instance linked to roads selection/highlighting. */
+    protected histogram!: AutkPlot;
 
     /** Logical identifier of the segmented roads layer used in this workflow. */
     protected readonly ROADS_LAYER = 'table_roads_20m';
@@ -66,7 +66,7 @@ export class Shadows {
     /** Active roads thematic mode. */
     protected displayMode: 'heatmap' | 'compute' | 'contribution' = 'heatmap';
 
-    /** DOM host where the histogram chart is rendered. */
+    /** DOM host where the histogram plot is rendered. */
     protected histogramDiv!: HTMLElement;
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ export class Shadows {
      * Handles month dropdown changes.
      *
      * Recomputes analytical values when a building is selected; otherwise
-     * resets compute attributes to zero. Then refreshes chart listeners and map
+     * resets compute attributes to zero. Then refreshes plot listeners and map
      * thematic state.
      *
      * @param month Raw month code from UI.
@@ -378,19 +378,19 @@ export class Shadows {
     // ── Histogram (protected) ──────────────────────────────────────────────────
 
     /**
-     * Recreates the monthly histogram chart from current roads data.
+     * Recreates the monthly histogram plot from current roads data.
      */
     protected reloadHistogram(): void {
         this.histogramDiv.innerHTML = '';
 
-        this.histogram = new AutkChart(this.histogramDiv, {
+        this.histogram = new AutkPlot(this.histogramDiv, {
             type: 'barchart',
             collection: this.roads,
             attributes: { axis: [`sjoin.avg.${this.currentMonth}`, '@transform'] },
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,
             height: 380,
-            events: [ChartEvent.BRUSH_X],
+            events: [PlotEvent.BRUSH_X],
             transform: {
                 preset: 'binning-1d',
                 options: { bins: 13 },
@@ -402,7 +402,7 @@ export class Shadows {
      * Connects histogram brushing to roads-layer highlighting.
      */
     protected updateHistogramListeners(): void {
-        this.histogram.events.on(ChartEvent.BRUSH_X, ({ selection: roadIds }) => {
+        this.histogram.events.on(PlotEvent.BRUSH_X, ({ selection: roadIds }) => {
             this.map.setHighlightedIds(this.ROADS_LAYER, roadIds);
             this.map.draw();
         });

@@ -1,4 +1,4 @@
-import { AutkMap } from 'autk-map';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 

@@ -1,15 +1,15 @@
 import type { ColorHEX } from './types-core';
 
 /**
- * Global style helpers shared by all chart implementations.
+ * Global style helpers shared by all plot implementations.
  *
- * `ChartStyle` centralizes the base and highlighted colors applied to marks
+ * `PlotStyle` centralizes the base and highlighted colors applied to marks
  * during selection updates.
  *
  * Values are static and process-wide for the package runtime. Updating them
- * affects all charts that read style values after the update.
+ * affects all plots that read style values after the update.
  */
-export class ChartStyle {
+export class PlotStyle {
     /** Default fill/stroke color used for non-selected marks. */
     protected static _default: ColorHEX = '#bfbfbf';
     /** Highlight color used for selected marks. */
@@ -20,7 +20,7 @@ export class ChartStyle {
      * @returns Hex color used for non-selected marks.
      */
     public static get default(): ColorHEX {
-        return ChartStyle._default;
+        return PlotStyle._default;
     }
 
     /**
@@ -28,7 +28,7 @@ export class ChartStyle {
      * @returns Hex color used for selected marks.
      */
     public static get highlight(): ColorHEX {
-        return ChartStyle._highlight;
+        return PlotStyle._highlight;
     }
 
     /**
@@ -37,10 +37,10 @@ export class ChartStyle {
      * @param color Hex color string to apply as the highlight color.
      * @throws Never throws.
      * @example
-     * ChartStyle.setHighlightColor('#ff6600');
+     * PlotStyle.setHighlightColor('#ff6600');
      */
     public static setHighlightColor(color: ColorHEX): void {
-        ChartStyle._highlight = color;
+        PlotStyle._highlight = color;
     }
 
     /**
@@ -49,9 +49,9 @@ export class ChartStyle {
      * @param color Hex color string to apply as the default mark color.
      * @throws Never throws.
      * @example
-     * ChartStyle.setDefaultColor('#cccccc');
+     * PlotStyle.setDefaultColor('#cccccc');
      */
     public static setDefaultColor(color: ColorHEX): void {
-        ChartStyle._default = color;
+        PlotStyle._default = color;
     }
 }

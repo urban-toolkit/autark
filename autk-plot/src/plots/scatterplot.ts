@@ -21,7 +21,7 @@
  *   div: plotDiv,
  *   collection: geojson,
  *   attributes: { axis: ['x', 'y'] },
- *   events: [ChartEvent.CLICK, ChartEvent.BRUSH]
+ *   events: [PlotEvent.CLICK, PlotEvent.BRUSH]
  * });
  */
 
@@ -29,21 +29,21 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../types-core';
 
-import type { ChartConfig } from '../api';
+import type { PlotConfig } from '../api';
 
-import { ChartBaseInteractive } from '../chart-base-interactive';
-import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../types-events';
+import { PlotBaseInteractive } from '../plot-base-interactive';
+import { PlotStyle } from '../plot-style';
+import { PlotEvent } from '../types-events';
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
  *
  * Expects exactly two numeric attributes, interpreted as x and y dimensions.
  *
- * The chart delegates interaction mechanics (click/brush selection, highlight
- * styling, and selection event emission) to the shared ChartD3 base class.
+ * The plot delegates interaction mechanics (click/brush selection, highlight
+ * styling, and selection event emission) to the shared PlotD3 base class.
  */
-export class Scatterplot extends ChartBaseInteractive {
+export class Scatterplot extends PlotBaseInteractive {
 
     /** Linear scale mapping the x-attribute domain to pixel coordinates. */
     protected mapX!: d3.ScaleLinear<number, number>;
@@ -56,8 +56,8 @@ export class Scatterplot extends ChartBaseInteractive {
      * @param config Plot configuration containing two attributes and optional events.
      * @throws If fewer than two active axis bindings are available.
      */
-    constructor(config: ChartConfig) {
-        if(config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+    constructor(config: PlotConfig) {
+        if(config.events === undefined) { config.events = [PlotEvent.CLICK]; }
         if (config.tickFormats === undefined) {
             config.tickFormats = ['~s', '~s'];
         }
@@ -71,7 +71,7 @@ export class Scatterplot extends ChartBaseInteractive {
     }
 
     /**
-     * Renders chart scaffolding, axes, and point marks.
+     * Renders plot scaffolding, axes, and point marks.
      *
      * @throws If the root SVG element cannot be created.
      */
@@ -96,7 +96,7 @@ export class Scatterplot extends ChartBaseInteractive {
 
         svg.attr('width', this._width).attr('height', this._height);
 
-        // ---- Chart size
+        // ---- Plot size
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
 
@@ -197,7 +197,7 @@ export class Scatterplot extends ChartBaseInteractive {
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, xAttribute)) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, yAttribute)) || 0 : 0))
             .attr('r', 5)
-            .style('fill', ChartStyle.default)
+            .style('fill', PlotStyle.default)
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();

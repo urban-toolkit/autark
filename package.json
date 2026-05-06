@@ -8,6 +8,7 @@
         "test:ui": "playwright test --ui"
     },
     "workspaces": [
+        "autk",
         "autk-core",
         "autk-db",
         "autk-map",

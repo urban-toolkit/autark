@@ -1,6 +1,6 @@
 /**
  * @module AutkCompute
- * Public entry point for the `autk-compute` package.
+ * Public entry point for the `@urban-toolkit/autk-compute` package.
  *
  * This module re-exports the compute engine, pipeline helpers, viewpoint
  * utilities, and shared types used by package consumers.

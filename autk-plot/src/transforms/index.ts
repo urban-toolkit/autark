@@ -6,8 +6,8 @@
  * instead of from individual preset files.
  */
 
-import type { AutkDatum } from '../types-chart';
-import type { ChartTransformConfig } from '../api';
+import type { AutkDatum } from '../types-plot';
+import type { PlotTransformConfig } from '../api';
 import type { ExecutedBinning1dTransform } from './presets/binning-1d';
 import type { ExecutedBinning2dTransform } from './presets/binning-2d';
 import type { ExecutedSortTransform } from './presets/sort';
@@ -38,7 +38,7 @@ export type { ReducedBucket, Row } from './kernel';
 /**
  * Discriminated union of all executed transform result types.
  */
-export type ExecutedChartTransform =
+export type ExecutedPlotTransform =
     | ExecutedBinning1dTransform
     | ExecutedBinning2dTransform
     | ExecutedSortTransform
@@ -48,7 +48,7 @@ export type ExecutedChartTransform =
 // ---- Top-level dispatcher -----------------------------------------------
 
 /**
- * Runs a chart transform config through the preset pipeline.
+ * Runs a plot transform config through the preset pipeline.
  *
  * @param rows Input rows to transform.
  * @param config Transform configuration selecting the preset runner.
@@ -58,7 +58,7 @@ export type ExecutedChartTransform =
  * @example
  * const result = run(data, { preset: 'binning-1d', options: { bins: 10 } }, ['area']);
  */
-export function run(rows: AutkDatum[], config: ChartTransformConfig, columns: string[]): ExecutedChartTransform {
+export function run(rows: AutkDatum[], config: PlotTransformConfig, columns: string[]): ExecutedPlotTransform {
     if (config.preset === 'binning-1d') return runBinning1d(rows, config, columns);
     if (config.preset === 'binning-2d') return runBinning2d(rows, config, columns);
     if (config.preset === 'sort') return runSort(rows, config, columns);

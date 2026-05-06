@@ -1,5 +1,5 @@
 /**
- * @fileoverview Heat matrix chart for visualizing a numeric dimension across two categorical axes.
+ * @fileoverview Heat matrix plot for visualizing a numeric dimension across two categorical axes.
  *
  * Provides a D3-based heat matrix implementation with the following features:
  * - **Grid rendering**: Each unique (x, y) category pair maps to a filled rectangle
@@ -8,7 +8,7 @@
  * - **Transform required**: Data must be aggregated via the `binning-2d` transform preset before rendering
  *
  * @example
- * const plot = new AutkChart(plotDiv, {
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'heatmatrix',
  *   collection: geojson,
  *   attributes: { axis: ['day', 'hour'], color: '@transform' },
@@ -25,21 +25,21 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../types-core';
 
-import type { ChartConfig } from '../api';
+import type { PlotConfig } from '../api';
 
-import { ChartBaseInteractive } from '../chart-base-interactive';
-import { ChartEvent } from '../types-events';
+import { PlotBaseInteractive } from '../plot-base-interactive';
+import { PlotEvent } from '../types-events';
 
 import type { Binning2dCellRow } from '../transforms';
 
 /**
- * Heat matrix chart mapping two categorical dimensions to a grid of colored rectangles.
+ * Heat matrix plot mapping two categorical dimensions to a grid of colored rectangles.
  *
- * Requires the `binning-2d` transform preset. `ChartBaseData` resolves that transform
+ * Requires the `binning-2d` transform preset. `PlotBaseData` resolves that transform
  * into rendered rows with `x`/`y` axis bindings and a `value` color binding,
  * producing one row per unique (x, y) cell.
  */
-export class Heatmatrix extends ChartBaseInteractive {
+export class Heatmatrix extends PlotBaseInteractive {
 
     /**
      * Creates a heat matrix instance and performs the initial draw.
@@ -47,8 +47,8 @@ export class Heatmatrix extends ChartBaseInteractive {
      * @param config Plot configuration. Must include a `binning-2d` transform preset.
      * @throws If the transform preset is missing or not `'binning-2d'`.
      */
-    constructor(config: ChartConfig) {
-        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+    constructor(config: PlotConfig) {
+        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
         if (config.tickFormats === undefined) { config.tickFormats = ['', '']; }
 
         if (!config.transform || config.transform.preset !== 'binning-2d') {
@@ -60,7 +60,7 @@ export class Heatmatrix extends ChartBaseInteractive {
     }
 
     /**
-     * Renders chart scaffolding, axes, and cell marks.
+     * Renders plot scaffolding, axes, and cell marks.
      *
      * @throws If the root SVG element cannot be created.
      */
@@ -75,7 +75,7 @@ export class Heatmatrix extends ChartBaseInteractive {
         const node = svg.node();
         if (!svg || !node) throw new Error('SVG element could not be created.');
 
-        // ---- Chart size
+        // ---- Plot size
         const width  = this._width  - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top  - this._margins.bottom;
 

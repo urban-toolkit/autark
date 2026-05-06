@@ -1,7 +1,7 @@
-import { ComputeRender } from 'autk-compute';
+import { ComputeRender } from '@urban-toolkit/autk-compute';
 import { ColorMapDomainStrategy } from 'autk-core';
-import { AutkSpatialDb } from 'autk-db';
-import { AutkMap, LayerType } from 'autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
 import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 export class ComputeRenderOsmSkyExposure {

@@ -1,13 +1,13 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap, MapEvent } from 'autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3Histogram {
     protected map!: AutkMap;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
 
     protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
 
@@ -32,7 +32,7 @@ export class MapD3Histogram {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement): Promise<void> {
-        this.plot = new AutkChart(plotDiv, {
+        this.plot = new AutkPlot(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
             attributes: { axis: ['shape_area', '@transform'] },
@@ -43,12 +43,12 @@ export class MapD3Histogram {
             },
             margins: { left: 60, right: 20, top: 50, bottom: 80 },
             width: 790,
-            events: [ChartEvent.BRUSH_X],
+            events: [PlotEvent.BRUSH_X],
         });
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.BRUSH_X, ({ selection }) => {
+        this.plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
             this.map.setHighlightedIds(layerId, selection);
         });
 

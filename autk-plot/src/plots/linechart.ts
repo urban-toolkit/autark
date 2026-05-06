@@ -1,15 +1,15 @@
 /**
- * @fileoverview Line chart visualization for event-based and series data.
+ * @fileoverview Line plot visualization for event-based and series data.
  *
- * Provides a D3-based line chart implementation with the following features:
+ * Provides a D3-based line plot implementation with the following features:
  * - **Single-series rendering**: Aggregates feature-level series points or event buckets into a unified line
  * - **Flexible bucket labeling**: Supports numeric, date, and custom bucket labels
  * - **Selection and linked views**: Uses source feature ids for brush interactions and linked selection across components
  * - **Transform support**: Accepts `binning-events` or `reduce-series` transform presets for flexible aggregation
  *
  * @example
- * // Basic line chart with reduce-series transform
- * const plot = new AutkChart(plotDiv, {
+ * // Basic line plot with reduce-series transform
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'linechart',
  *   collection: geojson,
  *   attributes: { axis: ['populationSeries', '@transform'] },
@@ -21,8 +21,8 @@
  * });
  *
  * @example
- * // Line chart with event binning and brush interaction
- * const plot = new AutkChart(plotDiv, {
+ * // Line plot with event binning and brush interaction
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'linechart',
  *   collection: geojson,
  *   attributes: { axis: ['events', '@transform'] },
@@ -30,33 +30,33 @@
  *     preset: 'binning-events',
  *     options: { value: 'cases', timestamp: 'date', resolution: 'month', reducer: 'sum' }
  *   },
- *   events: [ChartEvent.BRUSH_Y],
+ *   events: [PlotEvent.BRUSH_Y],
  *   labels: { axis: ['month', 'cases'], title: 'Monthly Cases' }
  * });
  */
 import * as d3 from 'd3';
 
-import type { ChartConfig } from '../api';
+import type { PlotConfig } from '../api';
 
-import { ChartBaseInteractive } from '../chart-base-interactive';
-import { ChartStyle } from '../chart-style';
+import { PlotBaseInteractive } from '../plot-base-interactive';
+import { PlotStyle } from '../plot-style';
 
-import type { ExecutedChartTransform } from '../transforms';
+import type { ExecutedPlotTransform } from '../transforms';
 
 /**
- * Line chart that aggregates feature-level series data into a single line.
+ * Line plot that aggregates feature-level series data into a single line.
  *
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
  */
-export class Linechart extends ChartBaseInteractive {
+export class Linechart extends PlotBaseInteractive {
     /**
-     * Creates a line chart instance and renders the initial state.
+     * Creates a line plot instance and renders the initial state.
      *
      * @param config Linechart configuration.
      * @throws If no transform is configured or if the preset is unsupported.
      */
-    constructor(config: ChartConfig) {
+    constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
         if (config.tickFormats === undefined) { 
             config.tickFormats = ['~s', '~s']; 
@@ -85,7 +85,7 @@ export class Linechart extends ChartBaseInteractive {
      * @param result Executed transform payload from the shared dispatcher.
      * @returns Render rows shaped as `{ x, label, y, autkIds }` for line rendering.
      */
-    protected override resolveTransformResult(result: ExecutedChartTransform) {
+    protected override resolveTransformResult(result: ExecutedPlotTransform) {
         const resolved = super.resolveTransformResult(result);
         if (result.preset !== 'binning-events' && result.preset !== 'reduce-series') {
             return resolved;
@@ -107,7 +107,7 @@ export class Linechart extends ChartBaseInteractive {
     }
 
     /**
-     * Renders the line chart, including axes, line path, dot marks, and empty state message.
+     * Renders the line plot, including axes, line path, dot marks, and empty state message.
      *
      * Synchronizes the SVG DOM with the current series data and attaches interaction listeners.
      *
@@ -262,7 +262,7 @@ export class Linechart extends ChartBaseInteractive {
             .attr('cx', (d) => xScale(d.x))
             .attr('cy', (d) => yScale(d.y))
             .attr('r', 5)
-            .style('fill', ChartStyle.default)
+            .style('fill', PlotStyle.default)
             .style('visibility', 'inherit');
 
         // ---- Empty state

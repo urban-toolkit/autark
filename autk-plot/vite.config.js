@@ -12,7 +12,7 @@ export default defineConfig({
       name: 'autk-plot',
     },
     copyPublicDir: false,
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true
   },
 });

@@ -9,7 +9,7 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../../types-core';
 
-import type { AutkDatum } from '../../types-chart';
+import type { AutkDatum } from '../../types-plot';
 import type { Binning1dTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
@@ -20,17 +20,17 @@ import { reduceBuckets } from '../kernel';
  * Result produced by `runBinning1d`.
  *
  * Carries the fixed attribute tuple `['label', 'value']` and the binned rows
- * ready for bar-chart rendering.
+ * ready for bar-plot rendering.
  */
 export type ExecutedBinning1dTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-1d';
-    /** Binned rows ready for downstream chart rendering. */
+    /** Binned rows ready for downstream plot rendering. */
     rows: Binning1dBinRow[];
 };
 
 /**
- * A single bin row ready for chart rendering.
+ * A single bin row ready for plot rendering.
  *
  * `label` is either a category string or a formatted numeric range such as `"1k-2k"`.
  * `order` is the numeric sort key for the bin (bin index for quantitative, insertion order for categorical).
@@ -51,7 +51,7 @@ export type Binning1dBinRow = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a binning-1d transform and returns chart-ready rows.
+ * Runs a binning-1d transform and returns plot-ready rows.
  *
  * Detects whether the value attribute is categorical or quantitative, builds a
  * bin-label mapper, then groups rows by bin label and reduces using the specified reducer.

@@ -1,15 +1,15 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkChart, ChartEvent } from 'autk-plot';
-import { AutkMap } from 'autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
-import { MapEvent } from 'autk-map';
+import { MapEvent } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3 {
     protected map!: AutkMap;
-    protected plot!: AutkChart;
+    protected plot!: AutkPlot;
 
     protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
 
@@ -34,7 +34,7 @@ export class MapD3 {
     }
 
     protected async loadAutkPlot(plotDiv: HTMLElement) {
-        this.plot = new AutkChart(plotDiv, {
+        this.plot = new AutkPlot(plotDiv, {
             type: 'barchart',
             collection: this.geojson,
             attributes: { axis: ['shape_area', '@transform'] },
@@ -48,7 +48,7 @@ export class MapD3 {
             },
             margins: { left: 60, right: 20, top: 50, bottom: 100 },
             width: 790,
-            events: [ChartEvent.CLICK]
+            events: [PlotEvent.CLICK]
         });
 
         // Rebuild with a fresh collection instance to exercise the redraw path that
@@ -75,7 +75,7 @@ export class MapD3 {
     }
 
     protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(ChartEvent.CLICK, ({ selection }) => {
+        this.plot.events.on(PlotEvent.CLICK, ({ selection }) => {
             this.map.setHighlightedIds(layerId, selection);
         });
     }

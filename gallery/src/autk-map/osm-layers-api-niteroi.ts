@@ -1,5 +1,5 @@
-import { AutkMap } from 'autk-map';
-import { AutkSpatialDb } from 'autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
 
 const URL = (import.meta as any).env.BASE_URL;
 

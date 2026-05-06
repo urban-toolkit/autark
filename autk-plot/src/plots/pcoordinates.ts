@@ -1,5 +1,5 @@
 /**
- * @fileoverview Parallel coordinates chart for multivariate feature exploration.
+ * @fileoverview Parallel coordinates plot for multivariate feature exploration.
  *
  * Provides a D3-based parallel coordinates implementation with the following features:
  * - **Multidimensional rendering**: Visualizes each feature as a polyline across multiple axes
@@ -9,8 +9,8 @@
  * - **Customizable axes and labels**: Axis/attribute mapping for flexible dimension selection and labeling
  *
  * @example
- * // Basic parallel coordinates chart
- * const plot = new AutkChart(plotDiv, {
+ * // Basic parallel coordinates plot
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'parallel-coordinates',
  *   collection: geojson,
  *   attributes: { axis: ['attr1', 'attr2', 'attr3'] },
@@ -19,10 +19,10 @@
  *
  * @example
  * // Parallel coordinates with color-by-dimension and brushing
- * const plot = new AutkChart(plotDiv, {
+ * const plot = new AutkPlot(plotDiv, {
  *   type: 'parallel-coordinates',
  *   collection: geojson,
- *   events: [ChartEvent.BRUSH_X, ChartEvent.BRUSH_Y],
+ *   events: [PlotEvent.BRUSH_X, PlotEvent.BRUSH_Y],
  *   attributes: { axis: ['height', 'type', 'value'] },
  *   labels: { axis: ['Height', 'Type', 'Value'], title: 'Multivariate Exploration' }
  * });
@@ -31,18 +31,18 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '../types-core';
 
-import type { ChartConfig } from '../api';
+import type { PlotConfig } from '../api';
 
-import { ChartBaseInteractive } from '../chart-base-interactive';
-import { ChartStyle } from '../chart-style';
-import { ChartEvent } from '../types-events';
+import { PlotBaseInteractive } from '../plot-base-interactive';
+import { PlotStyle } from '../plot-style';
+import { PlotEvent } from '../types-events';
 
 /**
- * Parallel coordinates chart for multivariate feature exploration.
+ * Parallel coordinates plot for multivariate feature exploration.
  *
  * Supports mixed numeric/categorical dimensions and multi-axis brushing.
  */
-export class ParallelCoordinates extends ChartBaseInteractive {
+export class ParallelCoordinates extends PlotBaseInteractive {
 
     /** Per-dimension scales: linear for numerical dimensions, point for categorical ones. */
     protected scales: Map<string, d3.ScaleLinear<number, number> | d3.ScalePoint<string>> = new Map();
@@ -51,12 +51,12 @@ export class ParallelCoordinates extends ChartBaseInteractive {
     /** Detected type for each dimension: `'numerical'` or `'categorical'`. */
     protected dimensionTypes: Map<string, 'categorical' | 'numerical'> = new Map();
     /**
-     * Creates a parallel coordinates chart and performs the initial draw.
+     * Creates a parallel coordinates plot and performs the initial draw.
      *
      * @param config Plot configuration for parallel coordinates rendering.
      */
-    constructor(config: ChartConfig) {
-        if (config.events === undefined) { config.events = [ChartEvent.CLICK]; }
+    constructor(config: PlotConfig) {
+        if (config.events === undefined) { config.events = [PlotEvent.CLICK]; }
         if (config.tickFormats === undefined) {
             config.tickFormats = ['~s', '~s'];
         }
@@ -94,7 +94,7 @@ export class ParallelCoordinates extends ChartBaseInteractive {
 
         svg.attr('width', this._width).attr('height', this._height);
 
-        // ---- Chart size
+        // ---- Plot size
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
 
@@ -170,7 +170,7 @@ export class ParallelCoordinates extends ChartBaseInteractive {
             .attr('data-idx', (_d, i) => i)
             .attr('d', (d) => this.path(d))
             .style('fill', 'none')
-            .style('stroke', ChartStyle.default)
+            .style('stroke', PlotStyle.default)
             .style('stroke-width', 2)
             .style('opacity', 0.7)
             .style('visibility', 'inherit');

@@ -1,6 +1,6 @@
 /**
  * @module AutkMapEvents
- * Typed event definitions for `autk-map` interaction and picking signals.
+ * Typed event definitions for `@urban-toolkit/autk-map` interaction and picking signals.
  *
  * This module defines the event names, payload shapes, and event-bus record
  * used by the map's public interaction API. It covers pointer-driven picking
