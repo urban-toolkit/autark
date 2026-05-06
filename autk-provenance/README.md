@@ -180,7 +180,7 @@ const provenance = createAutarkProvenance({
 // Render the trail UI into a sidebar container
 const destroyTrail = renderProvenanceTrailUI({
   provenance,
-  container: document.getElementById('provenance-sidebar'),
+  container: document.getElementById('provenance-sidebar')!,
   showGraph: true,
   showPathList: true,
   showBackForward: true,
@@ -193,7 +193,8 @@ provenance.goForwardOneStep();
 provenance.goToNode(nodeId);
 
 // Annotate a key finding
-provenance.annotateNode(provenance.getCurrentNode().id, 'High density cluster in Brooklyn');
+const currentNode = provenance.getCurrentNode();
+if (currentNode) provenance.annotateNode(currentNode.id, 'High density cluster in Brooklyn');
 
 // Export for sharing
 const json = provenance.exportGraph();
@@ -208,11 +209,11 @@ Use `createProvenance` to track any custom state shape with your own adapter, wi
 ```ts
 import { createProvenance } from 'autk-provenance';
 
-interface AppState {
+type AppState = {
   selectedRegion: string | null;
   year: number;
   showGrid: boolean;
-}
+};
 
 const provenance = createProvenance<AppState>({
   initialState: { selectedRegion: null, year: 2024, showGrid: false },
