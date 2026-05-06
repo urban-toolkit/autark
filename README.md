@@ -1,12 +1,19 @@
-# Autark: A Serverless Toolkit for Prototyping Urban Visual Analytics Systems
 <div align="center">
-  <img src="./logo.png" alt="Autark Logo" height="200"/></br>
+  <img src="./logo.png" alt="Autark Logo" height="150"/></br>
+
+  <h1>Autark</h1>
+
+  <br>
+  <p><strong>A serverless, modular toolkit built in TypeScript to streamline the prototyping of urban visual analytics systems.</strong></p>
+
+  <p>
+    <a href="https://arxiv.org/abs/2604.20759">Paper</a> ·
+    <a href="https://autarkjs.org/">Website</a>
+  </p>  
 </div>
 <br>
 
-**Autark** is a serverless, modular toolkit built in TypeScript to streamline the prototyping of urban visual analytics systems.
-
-It provides a client-side platform for implementing urban visual analytics software. It supports loading, storing, querying, joining, and exporting physical and thematic urban data using standard formats such as OpenStreetMap, GeoJSON, and GeoTIFF. By using GPU acceleration, Autark enables the implementation of algorithms for sophisticated urban analyses, such as shadow and visibility analysis, as well as classic machine learning algorithms such as regression and clustering. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
+Autark provides a client-side platform for implementing urban visual analytics software. It supports loading, storing, querying, joining, and exporting physical and thematic urban data using standard formats such as OpenStreetMap, GeoJSON, and GeoTIFF. By using GPU acceleration, Autark enables the implementation of algorithms for sophisticated urban analyses, such as shadow and visibility analysis, as well as classic machine learning algorithms such as regression and clustering. Finally, it provides a collection of interactive plots and a 3D map for visualizing urban data.
 
 Autark is available as a single package or as individual modules:
 
