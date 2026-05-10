@@ -395,7 +395,9 @@ export class Renderer {
     /**
      * Starts the main render pass by clearing configured attachments.
      *
-     * @throws Never throws. Silently returns when not initialized.
+     * @throws Never throws. Silently returns when not initialized or when the
+     * canvas context has been transiently unconfigured (e.g. by a sibling
+     * renderer's destroy/recreate cycle in a multi-instance setup).
      */
     start(): void {
         if (!this._isInitialized) {
@@ -407,9 +409,16 @@ export class Renderer {
             return;
         }
 
+        let currentTextureView: GPUTextureView;
+        try {
+            currentTextureView = this._context.getCurrentTexture().createView();
+        } catch {
+            return;
+        }
+
         // Configure the frame buffer
         this._frameBuffer.loadOp = 'clear';
-        this._frameBuffer.resolveTarget = this._context.getCurrentTexture().createView();
+        this._frameBuffer.resolveTarget = currentTextureView;
         const sky = MapStyle.getColor('background');
         this._frameBuffer.clearValue = { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 };
 
