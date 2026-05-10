@@ -25,6 +25,7 @@ import { MapStyle } from './map-style';
 export class Renderer {
     private static readonly PICK_READBACK_BYTES_PER_ROW = 256;
     private static readonly PICK_READBACK_BUFFER_COUNT = 2;
+    private static _sharedDevicePromise: Promise<GPUDevice | null> | null = null;
     /** HTML canvas used as the backing render surface. */
     protected _canvas: HTMLCanvasElement;
 
@@ -210,12 +211,21 @@ export class Renderer {
 
             this._canvasFormat = entry.getPreferredCanvasFormat();
 
-            const adapter = await entry.requestAdapter();
-            if (adapter === null) {
+            if (!Renderer._sharedDevicePromise) {
+                Renderer._sharedDevicePromise = (async () => {
+                    const adapter = await entry.requestAdapter();
+                    if (adapter === null) return null;
+                    return adapter.requestDevice();
+                })();
+            }
+
+            const device = await Renderer._sharedDevicePromise;
+            if (device === null) {
+                Renderer._sharedDevicePromise = null;
                 return false;
             }
 
-            this._device = await adapter.requestDevice();
+            this._device = device;
         } catch (e) {
             console.error(e);
             return false;
