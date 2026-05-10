@@ -114,6 +114,8 @@ export class AutkMap {
     protected _animationFrameId: number | null = null;
     /** Indicates whether this map instance has been destroyed. */
     protected _isDestroyed: boolean = false;
+    /** Set after the first render-loop error to deduplicate repeated frame failures. */
+    protected _renderErrorLogged: boolean = false;
 
     /**
      * Creates an AutkMap instance bound to a canvas element.
@@ -817,6 +819,17 @@ export class AutkMap {
      * @returns Nothing. Rendering commands are recorded and submitted to the GPU.
      */
     private render() {
+        try {
+            this._renderFrame();
+        } catch (error) {
+            if (!this._renderErrorLogged) {
+                console.warn('AutkMap render skipped:', error);
+                this._renderErrorLogged = true;
+            }
+        }
+    }
+
+    private _renderFrame() {
         this._camera.update();
         const activePickingLayer = this.activePickingLayer;
         const pendingPick = activePickingLayer

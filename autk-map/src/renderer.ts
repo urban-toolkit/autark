@@ -25,6 +25,7 @@ import { MapStyle } from './map-style';
 export class Renderer {
     private static readonly PICK_READBACK_BYTES_PER_ROW = 256;
     private static readonly PICK_READBACK_BUFFER_COUNT = 2;
+    private static _sharedDevicePromise: Promise<GPUDevice | null> | null = null;
     /** HTML canvas used as the backing render surface. */
     protected _canvas: HTMLCanvasElement;
 
@@ -210,12 +211,21 @@ export class Renderer {
 
             this._canvasFormat = entry.getPreferredCanvasFormat();
 
-            const adapter = await entry.requestAdapter();
-            if (adapter === null) {
+            if (!Renderer._sharedDevicePromise) {
+                Renderer._sharedDevicePromise = (async () => {
+                    const adapter = await entry.requestAdapter();
+                    if (adapter === null) return null;
+                    return adapter.requestDevice();
+                })();
+            }
+
+            const device = await Renderer._sharedDevicePromise;
+            if (device === null) {
+                Renderer._sharedDevicePromise = null;
                 return false;
             }
 
-            this._device = await adapter.requestDevice();
+            this._device = device;
         } catch (e) {
             console.error(e);
             return false;
@@ -335,10 +345,14 @@ export class Renderer {
             return;
         }
 
-        this._multisampleTexture?.destroy();
+        let colorTextureView: GPUTextureView;
+        try {
+            colorTextureView = this._context.getCurrentTexture().createView();
+        } catch {
+            return;
+        }
 
-        const colorTexture = this._context.getCurrentTexture();
-        const colorTextureView = colorTexture.createView();
+        this._multisampleTexture?.destroy();
 
         const multiSampleDesc: GPUTextureDescriptor = {
             size: [this._pixelWidth, this._pixelHeight],
@@ -395,7 +409,9 @@ export class Renderer {
     /**
      * Starts the main render pass by clearing configured attachments.
      *
-     * @throws Never throws. Silently returns when not initialized.
+     * @throws Never throws. Silently returns when not initialized or when the
+     * canvas context has been transiently unconfigured (e.g. by a sibling
+     * renderer's destroy/recreate cycle in a multi-instance setup).
      */
     start(): void {
         if (!this._isInitialized) {
@@ -407,9 +423,16 @@ export class Renderer {
             return;
         }
 
+        let currentTextureView: GPUTextureView;
+        try {
+            currentTextureView = this._context.getCurrentTexture().createView();
+        } catch {
+            return;
+        }
+
         // Configure the frame buffer
         this._frameBuffer.loadOp = 'clear';
-        this._frameBuffer.resolveTarget = this._context.getCurrentTexture().createView();
+        this._frameBuffer.resolveTarget = currentTextureView;
         const sky = MapStyle.getColor('background');
         this._frameBuffer.clearValue = { r: sky.r / 255, g: sky.g / 255, b: sky.b / 255, a: 1 };
 
@@ -582,6 +605,13 @@ export class Renderer {
      * @throws Never throws.
      */
     destroy(): void {
+        // Mark uninitialized first so that any tick that races with destroy()
+        // (e.g. an in-flight animation frame from a sibling renderer that
+        // shares the canvas's GPUCanvasContext) sees `_isInitialized === false`
+        // and bails out of `start()` / `beginMainRenderPass()` before touching
+        // the resources we are about to release below.
+        this._isInitialized = false;
+
         this._multisampleTexture?.destroy();
         this._depthTexture?.destroy();
         this._pickingTexture?.destroy();
@@ -590,7 +620,6 @@ export class Renderer {
         this._context?.unconfigure();
 
         this._commandEncoder = null;
-        this._isInitialized = false;
     }
 
     /** Ensures a command encoder exists for the current frame. */
