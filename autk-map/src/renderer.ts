@@ -335,10 +335,14 @@ export class Renderer {
             return;
         }
 
-        this._multisampleTexture?.destroy();
+        let colorTextureView: GPUTextureView;
+        try {
+            colorTextureView = this._context.getCurrentTexture().createView();
+        } catch {
+            return;
+        }
 
-        const colorTexture = this._context.getCurrentTexture();
-        const colorTextureView = colorTexture.createView();
+        this._multisampleTexture?.destroy();
 
         const multiSampleDesc: GPUTextureDescriptor = {
             size: [this._pixelWidth, this._pixelHeight],
