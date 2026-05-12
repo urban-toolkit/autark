@@ -579,7 +579,7 @@ export class AutkSpatialDb {
     const osmBoundingBox = this.getOsmBoundingBox();
     if (osmBoundingBox) {
       featureCollection.bbox = osmBoundingBox;
-    } else if (layerTable.type === 'raster' && workspaceData.workspaceBoundingBox) {
+    } else if (workspaceData.workspaceBoundingBox) {
       featureCollection.bbox = [
         workspaceData.workspaceBoundingBox.minLon,
         workspaceData.workspaceBoundingBox.minLat,
