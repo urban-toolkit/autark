@@ -1,6 +1,6 @@
 {
   "name": "@urban-toolkit/autk",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "keywords": [
     "urban",
     "visualization",
@@ -48,9 +48,9 @@
   },
   "dependencies": {
     "@urban-toolkit/autk-map": "2.0.2",
-    "@urban-toolkit/autk-db": "2.0.0",
-    "@urban-toolkit/autk-compute": "2.0.0",
-    "@urban-toolkit/autk-plot": "2.0.0"
+    "@urban-toolkit/autk-db": "2.0.2",
+    "@urban-toolkit/autk-compute": "2.0.1",
+    "@urban-toolkit/autk-plot": "2.0.1"
   },
   "devDependencies": {
     "prettier": "^3.8.2",
