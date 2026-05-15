@@ -1,0 +1,12 @@
+{
+  "lastChangelogVersion": "0.74.0",
+  "defaultProvider": "github-copilot",
+  "defaultModel": "gpt-5.4",
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    "npm:pi-powerline",
+    "npm:pi-token-speed"
+  ],
+  "powerline": true,
+  "breadcrumb": "top"
+}

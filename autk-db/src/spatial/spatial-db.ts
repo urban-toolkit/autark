@@ -525,9 +525,9 @@ export class AutkSpatialDb {
     /**
      * Loads a GeoTIFF raster as a spatially-indexed table with per-pixel geometry and band properties.
      *
-     * @param params - File URL or ArrayBuffer, table name, and optional clipping bounding box.
+     * @param params - File URL or ArrayBuffer, table name, and optional CRS override.
      * @returns The created GeoTIFF table metadata.
-     * @throws If the database is not initialized, both sources are provided, or the decoded region exceeds `maxPixels`.
+     * @throws If the database is not initialized, both sources are provided, or the raster exceeds `maxPixels`.
      * @example
      * const raster = await db.loadGeoTiff({
      *   geotiffFileUrl: '/data/lst.tif',

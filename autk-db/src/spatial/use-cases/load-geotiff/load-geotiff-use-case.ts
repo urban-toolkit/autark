@@ -28,7 +28,6 @@ export class LoadGeoTiffUseCase {
       coordinateFormat,
       workspace = 'main',
       workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
-      boundingBox,
       maxPixels = DEFAULT_MAX_PIXELS,
     } = params;
 
@@ -70,52 +69,17 @@ export class LoadGeoTiffUseCase {
     const fullHeight = Number(image.getHeight());
     const bandCount = Number(image.getSamplesPerPixel());
 
-    // 3. Compute pixel window from optional bounding box
-    const rasterMaxX = originX + fullWidth * resX;
-    const is0To360 = originX >= 0 && rasterMaxX > 180;
-
-    let window: [number, number, number, number] | undefined;
-    if (boundingBox) {
-      let minLon = boundingBox.minLon;
-      let maxLon = boundingBox.maxLon;
-
-      if (is0To360) {
-        if (minLon < 0) minLon += 360;
-        if (maxLon < 0) maxLon += 360;
-      }
-
-      const xMin = Math.max(0, Math.floor((minLon - originX) / resX));
-      const xMax = Math.min(fullWidth, Math.ceil((maxLon - originX) / resX));
-      const yMin = Math.max(0, Math.floor((boundingBox.maxLat - originY) / resY));
-      const yMax = Math.min(fullHeight, Math.ceil((boundingBox.minLat - originY) / resY));
-      if (xMin >= xMax || yMin >= yMax) {
-        console.warn(
-          `[LoadGeoTiff] Bounding box does not overlap with raster extent — loading full raster. ` +
-          `Computed window [${xMin}, ${yMin}, ${xMax}, ${yMax}] is invalid. ` +
-          `Raster uses ${is0To360 ? '0–360' : '-180–180'} longitude convention, ` +
-          `origin: (${originX}, ${originY}), size: ${fullWidth}×${fullHeight}.`
-        );
-      } else {
-        window = [xMin, yMin, xMax, yMax];
-      }
-    }
-
-    const windowWidth  = window ? window[2] - window[0] : fullWidth;
-    const windowHeight = window ? window[3] - window[1] : fullHeight;
-    const pixelCount   = windowWidth * windowHeight;
-
+    // 3. Validate full raster pixel count
+    const pixelCount = fullWidth * fullHeight;
     if (pixelCount > maxPixels) {
       throw new Error(
-        `GeoTIFF region is ${pixelCount.toLocaleString()} pixels, which exceeds the limit of ` +
-        `${maxPixels.toLocaleString()}. Supply a 'boundingBox' to clip to a smaller area, ` +
-        `or increase 'maxPixels' if your environment can handle it.`
+        `GeoTIFF is ${pixelCount.toLocaleString()} pixels, which exceeds the limit of ` +
+        `${maxPixels.toLocaleString()}. Increase 'maxPixels' if your environment can handle it.`
       );
     }
 
-    // 4. Decode pixel data (optionally windowed)
-    const rasters = await image.readRasters({ window });
-    const colOffset = window ? window[0] : 0;
-    const rowOffset = window ? window[1] : 0;
+    // 4. Decode full raster
+    const rasters = await image.readRasters();
 
     // 5. Collect band arrays
     const bandNames: string[] = [];
@@ -128,11 +92,11 @@ export class LoadGeoTiffUseCase {
     // 6. Build CSV: header + one row per pixel
     const header = ['lon', 'lat', ...bandNames].join(',');
     const lines: string[] = [header];
-    for (let row = 0; row < windowHeight; row++) {
-      for (let col = 0; col < windowWidth; col++) {
-        const idx = row * windowWidth + col;
-        const lon = originX + (colOffset + col + 0.5) * resX;
-        const lat = originY + (rowOffset + row + 0.5) * resY;
+    for (let row = 0; row < fullHeight; row++) {
+      for (let col = 0; col < fullWidth; col++) {
+        const idx = row * fullWidth + col;
+        const lon = originX + (col + 0.5) * resX;
+        const lat = originY + (row + 0.5) * resY;
         const bands = bandData.map((b) => { const v = b[idx]; return isNaN(v) ? '' : v; }).join(',');
         lines.push(`${lon},${lat},${bands}`);
       }
