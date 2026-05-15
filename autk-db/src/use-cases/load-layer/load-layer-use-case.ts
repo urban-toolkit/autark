@@ -1,9 +1,10 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import type { Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 
-import { LoadLayerParams, LayerType } from './interfaces';
+import { LoadLayerParams } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
-import { BoundingBox, OsmLayerTable } from '../../interfaces';
+import type { BoundingBox, LayerType } from '../../types-core';
+import { OsmLayerTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
 import { AssignBuildingIdsUseCase } from '../../internal/assign-building-ids/assign-building-ids-use-case';

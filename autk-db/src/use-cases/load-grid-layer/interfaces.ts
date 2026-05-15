@@ -1,4 +1,4 @@
-import { BoundingBox } from '../../interfaces';
+import type { BoundingBox } from '../../types-core';
 
 export interface LoadGridLayerParams {
   boundingBox?: BoundingBox;

@@ -1,5 +1,10 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
 
+/**
+ * Browser-specific DuckDB-Wasm bundle definitions used for runtime selection.
+ *
+ * Maps the supported WebAssembly variants to the worker and module assets emitted with the package.
+ */
 const BROWSER_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
     mainModule: new URL(/* @vite-ignore */ './duckdb-mvp.wasm', import.meta.url).href,
@@ -12,10 +17,17 @@ const BROWSER_BUNDLES: duckdb.DuckDBBundles = {
 };
 
 /**
- * Loads and instantiates a DuckDB database, with Node.js and browser support.
+ * Loads and instantiates a DuckDB-Wasm database for the current runtime.
  *
- * @returns An instantiated `AsyncDuckDB` instance ready for connections.
- * @throws If DuckDB WebAssembly fails to load or instantiate.
+ * Selects the Node.js worker bridge or browser bundle automatically so callers can create connections without handling environment-specific setup.
+ *
+ * @param None.
+ * @returns An initialized `AsyncDuckDB` instance ready to open connections.
+ * @throws If DuckDB assets cannot be resolved, the worker fails to start, or database instantiation fails.
+ * @example
+ * const db = await loadDb();
+ * const conn = await db.connect();
+ * console.log(typeof conn.query); // 'function'
  */
 export async function loadDb() {
     if (typeof process !== 'undefined' && process.versions?.node) {

@@ -1,4 +1,4 @@
-import { BoundingBox } from '../../interfaces';
+import type { BoundingBox } from '../../types-core';
 
 export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCollectionTableName: string, workspace: string) => {
   const qualifiedTableName = `${workspace}.${featureCollectionTableName}`;

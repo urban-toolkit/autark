@@ -1,5 +1,4 @@
-import { LayerType } from './interfaces';
-import { BoundingBox } from '../../interfaces';
+import type { BoundingBox, LayerType } from '../../types-core';
 import { DEFAULT_WORKSPACE_NAME } from '../../consts';
 
 type Params = {

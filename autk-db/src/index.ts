@@ -1,10 +1,17 @@
 /**
- * @module AutkDb
  * Public entry point for the `@urban-toolkit/autk-db` package.
  *
- * Re-exports the spatial database class, table types, and OSM tag definitions.
+ * Re-exports the database class, shared table metadata types, loading parameter types, and OSM-related constants from a single module.
+ *
+ * @module AutkDb
+ * @example
+ * import { AutkDb, isVectorTable, DEFAULT_WORKSPACE_NAME } from '@urban-toolkit/autk-db';
+ *
+ * const db = new AutkDb();
+ * console.log(DEFAULT_WORKSPACE_NAME); // 'autk'
+ * console.log(isVectorTable({ source: 'geojson', name: 'roads', columns: [], type: 'line' })); // true
  */
-export type { LayerType, BoundingBox } from 'autk-core';
+export type { LayerType, BoundingBox } from './types-core';
 
 export {
   DEFAULT_WORKSPACE_NAME,

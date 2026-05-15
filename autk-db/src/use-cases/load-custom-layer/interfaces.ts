@@ -1,6 +1,5 @@
 import { FeatureCollection } from 'geojson';
-import { LayerType } from 'autk-core';
-import { BoundingBox } from '../../interfaces';
+import type { BoundingBox, LayerType } from '../../types-core';
 
 export interface LoadCustomLayerParams {
   geojsonFileUrl?: string;

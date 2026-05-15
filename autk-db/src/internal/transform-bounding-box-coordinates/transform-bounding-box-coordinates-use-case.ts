@@ -1,6 +1,6 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { TransformBoundingBoxCoordinatesParams } from './interfaces';
-import { BoundingBox } from '../../interfaces';
+import type { BoundingBox } from '../../types-core';
 import { TRANSFORM_BOUNDING_BOX_COORDINATES_QUERY } from './queries';
 
 /**

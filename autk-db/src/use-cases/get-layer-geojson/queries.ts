@@ -1,6 +1,7 @@
 import { Table } from '../../interfaces';
+import type { LayerType } from '../../types-core';
 
-export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: Table & { type: import('autk-core').LayerType }, workspace: string) => {
+export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: Table & { type: LayerType }, workspace: string) => {
   const hasBuildingIdColumn = !!layerTable.columns?.some((c) => c.name === 'building_id');
   const qualifiedTableName = `${workspace}.${layerTable.name}`;
 

@@ -1,16 +1,30 @@
 import { Column } from './interfaces';
 
+/**
+ * Internal shape of one row returned by DuckDB `DESCRIBE` queries.
+ *
+ * Mirrors DuckDB column metadata before it is normalized to the public `Column` format.
+ */
 type DuckDbTableDescriptionColumn = {
+  /** Raw DuckDB column name field. */
   column_name: string;
+  /** Raw DuckDB column type field. */
   column_type: string;
 };
 
 /**
- * Converts DuckDB `DESCRIBE` output rows into `Column` metadata objects.
+ * Converts DuckDB `DESCRIBE` rows into public `Column` metadata.
  *
- * @param tableDescribeResponse Array of `{ column_name, column_type }` rows from DuckDB.
- * @returns Array of `{ name, type }` column descriptors.
+ * Keeps the schema shape stable for callers that consume table definitions.
+ *
+ * @param tableDescribeResponse - Array of `{ column_name, column_type }` rows from DuckDB.
+ * @returns Array of normalized `{ name, type }` column descriptors.
  * @throws Never throws.
+ * @example
+ * const columns = getColumnsFromDuckDbTableDescribe([
+ *   { column_name: 'height', column_type: 'DOUBLE' },
+ * ]);
+ * console.log(columns[0]); // { name: 'height', type: 'DOUBLE' }
  */
 export function getColumnsFromDuckDbTableDescribe(
   tableDescribeResponse: Array<DuckDbTableDescriptionColumn>,
@@ -24,16 +38,21 @@ export function getColumnsFromDuckDbTableDescribe(
 }
 
 /**
- * Recursively converts values returned by DuckDB-Wasm / Apache Arrow into
- * plain JavaScript values so they can be safely logged or serialised. It
- * handles nested arrays, structs and any object exposing a `toJSON()` method.
+ * Converts DuckDB-Wasm and Arrow values into plain JavaScript data.
+ *
+ * Recurses through arrays, objects, and `toJSON()` wrappers so results can be safely logged or serialized.
+ *
+ * @param value - Value returned by DuckDB-Wasm or Apache Arrow.
+ * @returns A plain JavaScript representation of `value` with nested wrappers removed.
+ * @throws Never throws. Invalid JSON-like strings are returned unchanged.
+ * @example
+ * const value = toPlain({
+ *   toJSON: () => ({ tags: ['"secondary"', 2] }),
+ * });
+ * console.log(value); // { tags: ['secondary', 2] }
  */
 export function toPlain<T = unknown>(value: T): T {
-  // Primitives (string, number, boolean, undefined, null, bigint, symbol)
   if (value === null || typeof value !== 'object') {
-    // Arrow sometimes encodes primitive strings as a JSON string literal, e.g.
-    //   value === '"secondary"'
-    // Detect that pattern and decode it.
     if (typeof value === 'string') {
       const trimmed = value.trim();
       if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
@@ -47,19 +66,15 @@ export function toPlain<T = unknown>(value: T): T {
     return value;
   }
 
-  // Arrow/DuckDB objects usually implement toJSON() to expose their contents.
   const maybeJsonifiable = value as unknown as { toJSON?: () => unknown };
   if (typeof maybeJsonifiable.toJSON === 'function') {
-    // Recurse after conversion to remove any nested wrappers.
     return toPlain(maybeJsonifiable.toJSON()) as T;
   }
 
-  // Arrays – normalise every element.
   if (Array.isArray(value)) {
     return value.map((v) => toPlain(v)) as unknown as T;
   }
 
-  // Generic object – normalise each property.
   const plainObj = Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, toPlain(v)]),
   );

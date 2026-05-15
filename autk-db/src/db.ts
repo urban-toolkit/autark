@@ -4,7 +4,6 @@ import { FeatureCollection } from 'geojson';
 import { loadDb } from './duckdb';
 
 import {
-    BoundingBox,
     CsvTable,
     GeotiffTable,
     GeojsonTable,
@@ -14,6 +13,8 @@ import {
     Table,
     UserTable,
 } from './interfaces';
+import type { WorkspaceData } from './interfaces';
+import type { BoundingBox, LayerType } from './types-core';
 
 import {
     DEFAULT_WORKSPACE_NAME,
@@ -46,18 +47,12 @@ import { RawQueryParams, RawQueryUseCase, RawQueryOutput } from './use-cases/raw
 import { SpatialJoinUseCase, SpatialQueryParams } from './use-cases/spatial-join';
 import { UpdateTableParams, UpdateTableUseCase } from './use-cases/update-table';
 
-interface WorkspaceData {
-    tables: Array<Table>;
-    coordinateFormat: string;
-    workspaceBoundingBox?: BoundingBox;
-    osmBoundingBox?: BoundingBox;
-}
-
 /**
  * DuckDB-backed spatial database for loading, querying, and managing urban datasets.
  *
- * Supports multiple isolated workspaces, each with its own schema and tables.
+ * Supports multiple isolated workspaces, each with its own schema, registered tables, and cached spatial metadata.
  *
+ * @throws Never throws. Initialization happens later via `init()`.
  * @example
  * const db = new AutkDb();
  * await db.init();
@@ -67,50 +62,108 @@ interface WorkspaceData {
  * });
  */
 export class AutkDb {
+    /** DuckDB database instance created during initialization. */
     private db?: AsyncDuckDB;
+
+    /** Active DuckDB connection used by all queries and loaders. */
     private conn?: AsyncDuckDBConnection;
+
+    /** Name of the workspace schema currently selected for operations. */
     private currentWorkspace: string = DEFAULT_WORKSPACE_NAME;
+
+    /** In-memory registry of workspace metadata keyed by schema name. */
     private workspaces: Map<string, WorkspaceData> = new Map();
+
+    /** Shared OSM processing pipeline used by OSM loading use cases. */
     private osmProcessingPipeline?: OsmProcessingPipeline;
+
+    /** Overpass-based OSM loader initialized after the database connection is ready. */
     private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
+
+    /** PBF-based OSM loader initialized after the database connection is ready. */
     private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
+
+    /** CSV loading use case bound to the active database connection. */
     private loadCsvUseCase?: LoadCsvUseCase;
+
+    /** OSM layer extraction use case bound to the active database connection. */
     private loadLayerUseCase?: LoadLayerUseCase;
+
+    /** Custom GeoJSON layer loading use case bound to the active database connection. */
     private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
+
+    /** Building identifier assignment use case for grouped building outputs. */
     private assignBuildingIdsUseCase?: AssignBuildingIdsUseCase;
+
+    /** JSON loading use case bound to the active database connection. */
     private loadJsonUseCase?: LoadJsonUseCase;
+
+    /** GeoJSON export use case for renderable layer tables. */
     private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
+
+    /** Spatial join use case used by higher-level query operations. */
     private spatialJoinUseCase?: SpatialJoinUseCase;
+
+    /** Geometry extent query use case for renderable layers. */
     private getBoundingBoxFromLayerUseCase?: GetBoundingBoxFromLayerUseCase;
+
+    /** Table drop use case used for cleanup and overwrite flows. */
     private dropTableUseCase?: DropTableUseCase;
+
+    /** Coordinate transformation use case for workspace extent conversion. */
     private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
+
+    /** Grid generation use case used by manual grids and heatmaps. */
     private loadGridLayerUseCase?: LoadGridLayerUseCase;
+
+    /** GeoTIFF raster loading use case bound to the active database connection. */
     private loadGeoTiffUseCase?: LoadGeoTiffUseCase;
+
+    /** Arbitrary SQL execution use case bound to the active database connection. */
     private rawQueryUseCase?: RawQueryUseCase;
+
+    /** OSM extent extraction use case for newly loaded OSM datasets. */
     private getBoundingBoxFromOsmUseCase?: GetBoundingBoxFromOsmUseCase;
+
+    /** Surface polygonization use case for converting surface lines into polygons. */
     private polygonizeSurfaceLayerUseCase?: PolygonizeSurfaceLayerUseCase;
+
+    /** Heatmap construction use case that aggregates source values into grid cells. */
     private buildHeatmapUseCase?: BuildHeatmapUseCase;
+
+    /** Table data reader use case for paginated plain-object row output. */
     private getTableDataUseCase?: GetTableDataUseCase;
+
+    /** Table update use case for replace and keyed update strategies. */
     private updateTableUseCase?: UpdateTableUseCase;
 
     /**
      * Returns metadata for all tables in the current workspace.
-     * @returns Array of table metadata objects.
+     *
+     * Exposes the live table registry for the active workspace without querying DuckDB again.
+     *
+     * @returns Array of table metadata objects for the current workspace.
+     * @throws If the active workspace is missing from the internal registry.
+     * @example
+     * const tables = db.tables;
+     * console.log(tables.map((table) => table.name));
      */
     get tables(): Array<Table> {
         return this.getCurrentWorkspaceData().tables;
     }
 
     /**
-     * Initializes DuckDB and the spatial extension, creating the default workspace.
+     * Initializes DuckDB and the spatial extension for use by the database wrapper.
      *
-     * @note Must be called before any other method.
-     * @throws If DuckDB WebAssembly fails to load or the spatial extension cannot be installed.
+     * Must be called before any other database operation so workspaces, use cases, and the shared connection are ready.
+     *
+     * @returns Resolves when DuckDB, the spatial extension, and the default workspace have been initialized.
+     * @throws If DuckDB WebAssembly fails to load, the connection cannot be opened, or the spatial extension cannot be installed.
      * @example
      * const db = new AutkDb();
      * await db.init();
      */
-    async init() {
+    async init(): Promise<void> {
         this.db = await loadDb();
         this.conn = await this.db.connect();
 
@@ -156,9 +209,12 @@ export class AutkDb {
     }
 
     /**
-     * Switches to a workspace, creating it with a new schema if it doesn't exist.
+     * Switches to a workspace, creating its schema and cache entry if needed.
+     *
+     * Updates both the active DuckDB schema and the in-memory workspace registry used by this instance.
      *
      * @param name - The name of the workspace to activate.
+     * @returns Resolves when the workspace has been created if necessary and set as active.
      * @throws If the database has not been initialized.
      * @example
      * await db.setWorkspace('my-analysis');
@@ -184,20 +240,12 @@ export class AutkDb {
     }
 
     /**
-     * Sets the target CRS for all geometries stored in the current workspace.
+     * Returns the names of all workspaces known to this instance.
      *
-     * @param format - EPSG code for the target coordinate reference system.
-     * @example
-     * db.setWorkspaceCoordinateFormat('EPSG:3395');
-     */
-    setWorkspaceCoordinateFormat(format: string): void {
-        this.getCurrentWorkspaceData().coordinateFormat = format;
-    }
-
-    /**
-     * Returns all registered workspace names.
+     * Uses the in-memory workspace registry rather than discovering schemas from DuckDB.
      *
-     * @returns Array of workspace names.
+     * @returns Array of registered workspace names.
+     * @throws Never throws.
      * @example
      * const names = db.getWorkspaces();
      * console.log(names); // ['autk', 'analysis-a']
@@ -207,29 +255,18 @@ export class AutkDb {
     }
 
     /**
-     * Returns the name of the currently active workspace.
+     * Returns the name of the workspace currently selected for operations.
+     *
+     * This value changes when `setWorkspace()` succeeds.
      *
      * @returns Current workspace name.
+     * @throws Never throws.
      * @example
      * console.log(db.getCurrentWorkspace()); // 'autk'
      */
     getCurrentWorkspace(): string {
         return this.currentWorkspace;
     }
-
-    /**
-     * Returns the target CRS used for storing geometries in the current workspace.
-     *
-     * @returns The workspace coordinate format EPSG string.
-     * @example
-     * const format = db.getWorkspaceCoordinateFormat();
-     * console.log(format); // 'EPSG:3395'
-     */
-    getWorkspaceCoordinateFormat(): string {
-        return this.getCurrentWorkspaceData().coordinateFormat;
-    }
-
-    // ---- LOAD's methods
 
     /**
      * Loads OpenStreetMap data from the Overpass API or a PBF file, optionally extracting thematic layers.
@@ -665,9 +702,12 @@ export class AutkDb {
     }
 
     /**
-     * Returns the OSM bounding box for the current workspace, transformed to the workspace CRS.
+     * Returns the cached OSM bounding box for the active workspace.
      *
-     * @returns `[minLon, minLat, maxLon, maxLat]` in the workspace CRS, or `null` if no OSM data is loaded.
+     * The values are already transformed into the workspace CRS when OSM loading has populated the extent cache.
+     *
+     * @returns `[minLon, minLat, maxLon, maxLat]` in the workspace CRS, or `null` if no OSM extent is available.
+     * @throws If the active workspace is missing from the internal registry.
      * @example
      * const bbox = db.getOsmBoundingBox();
      * if (bbox) console.log(`Bounds: ${bbox[0]} to ${bbox[2]}`);
@@ -715,15 +755,18 @@ export class AutkDb {
     }
 
     /**
-     * Returns all tables that represent renderable spatial layers.
+     * Returns all registered tables that can be rendered as map layers.
      *
-     * @returns Filtered array of OSM, GeoJSON, and user layer tables.
+     * Filters the current workspace registry to tables with a defined renderable `type`.
+     *
+     * @returns Filtered array of OSM, GeoJSON, GeoTIFF, and user layer tables.
+     * @throws If the active workspace is missing from the internal registry.
      * @example
      * const layers = db.getLayerTables();
      * for (const l of layers) await map.loadCollection(l.name, { collection: await db.getLayer(l.name), type: l.type });
      */
-    getLayerTables(): Array<Table & { type: import('autk-core').LayerType }> {
-        return this.tables.filter((table): table is Table & { type: import('autk-core').LayerType } => {
+    getLayerTables(): Array<Table & { type: LayerType }> {
+        return this.tables.filter((table): table is Table & { type: LayerType } => {
             return isRenderableTable(table);
         });
     }
@@ -835,9 +878,12 @@ export class AutkDb {
     }
 
     /**
-     * Drops a table from the database and removes it from the current workspace registry.
+     * Drops a table from DuckDB and unregisters it from the active workspace.
+     *
+     * Keeps the in-memory workspace registry aligned with the physical schema after a table is removed.
      *
      * @param tableName - Name of the table to remove.
+     * @returns Resolves when the table has been dropped and unregistered.
      * @throws If the database is not initialized.
      * @example
      * await db.removeLayer('osm_raw');
@@ -853,11 +899,13 @@ export class AutkDb {
     }
 
     /**
-     * Builds a heatmap by creating a grid over a bounding box and aggregating source table values into each cell.
+     * Builds a heatmap table by aggregating source values into a generated grid.
+     *
+     * Uses the cached workspace bounding box as the grid extent and registers the resulting table in the active workspace.
      *
      * @param params - Source table, grid configuration, and aggregation method.
-     * @returns The resulting GridLayerTable containing aggregated heatmap data.
-     * @throws If the database is not initialized.
+     * @returns The resulting heatmap table metadata.
+     * @throws If the database is not initialized, or no workspace bounding box is available for the heatmap extent.
      * @example
      * const heatmap = await db.buildHeatmap({
      *   sourceTable: 'incidents',
@@ -881,10 +929,15 @@ export class AutkDb {
     // ---- Private methods
 
     /**
-     * Retrieves the workspace data for the current workspace.
+     * Retrieves the cached metadata for the active workspace.
      *
-     * @returns The workspace data object.
+     * Centralizes access to workspace-local tables, CRS settings, and cached extents.
+     *
+     * @returns The workspace data object for `currentWorkspace`.
      * @throws If the current workspace does not exist in the internal map.
+     * @example
+     * const data = this.getCurrentWorkspaceData();
+     * console.log(data.coordinateFormat);
      */
     private getCurrentWorkspaceData(): WorkspaceData {
         const data = this.workspaces.get(this.currentWorkspace);
@@ -895,10 +948,15 @@ export class AutkDb {
     }
 
     /**
-     * Registers a table in the current workspace, replacing any existing table with the same name.
+     * Registers table metadata in the active workspace.
+     *
+     * Replaces any existing entry with the same name and logs a warning when an overwrite occurs.
      *
      * @param table - The table metadata to register.
-     * @note Logs a warning if a table with the same name is being overwritten.
+     * @returns Nothing.
+     * @throws If the active workspace is missing from the internal registry.
+     * @example
+     * this.registerTable(table);
      */
     private registerTable(table: Table): void {
         const workspaceData = this.getCurrentWorkspaceData();
@@ -913,12 +971,18 @@ export class AutkDb {
     }
 
     /**
-     * Clips thematic layer geometries to the surface layer polygon using `ST_Intersection`.
+     * Clips a layer table to the unioned geometry of a surface table.
+     *
+     * Rewrites the layer table in place and can either crop geometries with `ST_Intersection` or only filter intersecting rows.
      *
      * @param layerTableName - The layer table to clip.
      * @param surfaceTableName - The surface table used as the clipping boundary.
      * @param workspace - The workspace schema containing both tables.
      * @param cropGeometry - When true, replaces geometries with their clipped version; otherwise filters rows only.
+     * @returns Resolves when the clipped replacement table has been written.
+     * @throws If the layer rewrite query fails.
+     * @example
+     * await this.clipLayerToSurface('roads', 'surface', this.currentWorkspace, false);
      */
     private async clipLayerToSurface(
         layerTableName: string,

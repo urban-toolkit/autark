@@ -1,4 +1,4 @@
-import { LayerType } from 'autk-core';
+import type { LayerType } from '../../types-core';
 
 export interface OsmElement {
   type: 'node' | 'way' | 'relation';

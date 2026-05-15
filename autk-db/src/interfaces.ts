@@ -1,6 +1,4 @@
-import { LayerType, BoundingBox } from 'autk-core';
-
-export type { BoundingBox };
+import type { BoundingBox, LayerType } from './types-core';
 
 export {
   PARKS_LEISURE_VALUES,
@@ -12,10 +10,18 @@ export {
   EXCLUDED_BUILDING_VALUES,
 } from './consts';
 
-/** Supported origins for tables registered in the database workspace. */
+/**
+ * Supported origins for tables registered in the database workspace.
+ *
+ * Distinguishes built-in loaders from user-provided tables so callers can branch on import behavior.
+ */
 export type TableSource = 'osm' | 'geojson' | 'csv' | 'json' | 'geotiff' | 'user';
 
-/** Describes a single table column as reported by DuckDB. */
+/**
+ * Describes a single table column as reported by DuckDB.
+ *
+ * Keeps schema metadata small and stable for UI rendering and query planning.
+ */
 export interface Column {
   /** Stable column name used in queries and result objects. */
   name: string;
@@ -23,7 +29,11 @@ export interface Column {
   type: string;
 }
 
-/** Metadata for one raster band exposed by a GeoTIFF-backed table. */
+/**
+ * Metadata for one raster band exposed by a GeoTIFF-backed table.
+ *
+ * Used by raster-aware consumers to present labels and target individual bands.
+ */
 export interface RasterBandMetadata {
   /** Internal band identifier used by raster operations. */
   id: string;
@@ -31,7 +41,11 @@ export interface RasterBandMetadata {
   label: string;
 }
 
-/** Shared metadata stored for every table tracked by the workspace. */
+/**
+ * Shared metadata stored for every table tracked by the workspace.
+ *
+ * Provides the common contract used by all table variants regardless of source or geometry support.
+ */
 export interface BaseTable {
   /** Declares how the table entered the database. */
   source: TableSource;
@@ -43,50 +57,112 @@ export interface BaseTable {
   bands?: RasterBandMetadata[];
 }
 
-/** Raw OSM import that has not yet been materialized as a renderable layer. */
+/**
+ * Raw OSM import that has not yet been materialized as a renderable layer.
+ *
+ * Represents the unclassified OSM staging table created before layer extraction.
+ */
 export interface OsmTable extends BaseTable {
+  /** Marks the table as originating from the OSM loader. */
   source: 'osm';
+  /** Stays undefined until the raw import is converted into a layer table. */
   type?: undefined;
 }
 
-/** OSM-derived layer with an explicit geometry type for rendering and queries. */
+/**
+ * OSM-derived layer with an explicit geometry type for rendering and queries.
+ *
+ * Used after OSM data has been classified into a concrete map layer.
+ */
 export interface OsmLayerTable extends BaseTable {
+  /** Marks the table as originating from the OSM loader. */
   source: 'osm';
+  /** Geometry category used for rendering, styling, and spatial operations. */
   type: LayerType;
 }
 
-/** GeoJSON import with a known layer type inferred during loading. */
+/**
+ * GeoJSON import with a known layer type inferred during loading.
+ *
+ * Allows downstream code to treat loaded GeoJSON as a renderable layer immediately.
+ */
 export interface GeojsonTable extends BaseTable {
+  /** Marks the table as originating from the GeoJSON loader. */
   source: 'geojson';
+  /** Geometry category inferred from the imported GeoJSON features. */
   type: LayerType;
 }
 
-/** CSV table without geometry metadata. */
+/**
+ * CSV table without geometry metadata.
+ *
+ * Represents plain tabular data loaded from comma-separated values.
+ */
 export interface CsvTable extends BaseTable {
+  /** Marks the table as originating from the CSV loader. */
   source: 'csv';
+  /** Remains undefined because CSV imports are not renderable by default. */
   type?: undefined;
 }
 
-/** JSON table without renderable geometry metadata. */
+/**
+ * JSON table without renderable geometry metadata.
+ *
+ * Represents generic JSON records that are queryable but not map-renderable by default.
+ */
 export interface JsonTable extends BaseTable {
+  /** Marks the table as originating from the JSON loader. */
   source: 'json';
+  /** Remains undefined because generic JSON imports do not imply a layer type. */
   type?: undefined;
 }
 
-/** GeoTIFF-backed raster table. */
+/**
+ * GeoTIFF-backed raster table.
+ *
+ * Identifies tables whose data should be treated as raster imagery rather than vector geometry.
+ */
 export interface GeotiffTable extends BaseTable {
+  /** Marks the table as originating from the GeoTIFF loader. */
   source: 'geotiff';
+  /** Fixed raster layer kind used by raster-specific rendering paths. */
   type: 'raster';
 }
 
-/** User-provided table that may be plain tabular data or an explicit layer. */
+/**
+ * User-provided table that may be plain tabular data or an explicit layer.
+ *
+ * Supports custom tables that can optionally declare their own renderable layer type.
+ */
 export interface UserTable extends BaseTable {
+  /** Marks the table as supplied directly by user code. */
   source: 'user';
+  /** Optional layer kind when the user table should participate in rendering. */
   type?: LayerType;
 }
 
-/** All table metadata variants that can be stored in an `AutkDb` workspace. */
+/**
+ * All table metadata variants that can be stored in an `AutkDb` workspace.
+ *
+ * Serves as the main discriminated union for branching on table source and renderability.
+ */
 export type Table = OsmTable | OsmLayerTable | CsvTable | JsonTable | GeojsonTable | GeotiffTable | UserTable;
+
+/**
+ * Workspace-local state cached by `AutkDb` for one schema.
+ *
+ * Groups the registered tables, target CRS, and cached extents associated with a workspace.
+ */
+export interface WorkspaceData {
+  /** Table metadata currently registered for the workspace schema. */
+  tables: Array<Table>;
+  /** Target coordinate reference system used for stored geometries. */
+  coordinateFormat: string;
+  /** Cached bounding box covering all known workspace layer geometries. */
+  workspaceBoundingBox?: BoundingBox;
+  /** Cached OSM query extent for the workspace when OSM data has been loaded. */
+  osmBoundingBox?: BoundingBox;
+}
 
 /**
  * Narrows a table to metadata that can be rendered on a map.

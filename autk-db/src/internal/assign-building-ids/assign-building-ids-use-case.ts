@@ -1,4 +1,4 @@
-import { computeIntersectingClusterIds } from 'autk-core';
+import { computeIntersectingClusterIds } from '../../types-core';
 
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { Column } from '../../interfaces';

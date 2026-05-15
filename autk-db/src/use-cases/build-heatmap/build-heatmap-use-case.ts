@@ -1,7 +1,8 @@
  
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { BuildHeatmapParams } from './interfaces';
-import { BoundingBox, RasterBandMetadata, Table } from '../../interfaces';
+import type { BoundingBox } from '../../types-core';
+import { RasterBandMetadata, Table } from '../../interfaces';
 import { LoadGridLayerUseCase } from '../load-grid-layer/load-grid-layer-use-case';
 import { SpatialJoinUseCase } from '../spatial-join/spatial-join-use-case';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
