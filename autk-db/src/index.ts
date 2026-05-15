@@ -20,7 +20,13 @@ export {
 } from './consts';
 
 export type {
+  TableSource,
   Table,
+  BaseTable,
+  DataTable,
+  LayerTable,
+  CollectionLayerTable,
+  UserLayerTable,
   OsmTable,
   OsmLayerTable,
   GeojsonTable,
@@ -30,6 +36,14 @@ export type {
   GridTable,
   GeotiffTable,
   Column,
+} from './interfaces';
+
+export {
+  isLayerTable,
+  isCollectionLayerTable,
+  isOsmTable,
+  isGeotiffTable,
+  isVectorLayerTable,
 } from './interfaces';
 
 export type { Layer, LoadLayerParams } from './use-cases/load-layer';

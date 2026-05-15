@@ -59,7 +59,6 @@ export class LoadJsonUseCase {
 
     return {
       source: 'json',
-      type: 'pointset',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
     };

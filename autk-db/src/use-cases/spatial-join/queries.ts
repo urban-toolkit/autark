@@ -1,5 +1,4 @@
-import { Table } from '../../interfaces';
-import { isLayerType } from 'autk-core';
+import { isLayerTable, Table } from '../../interfaces';
 
 type InternalColumn = { table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string; normalize?: boolean };
 
@@ -235,7 +234,7 @@ function buildCollectExpression(column: { table: Table; column: string; aggregat
 
 function buildCollectColumnExpression(table: Table, columnName: string): string {
   if (table.source === 'geotiff') return `${table.name}.properties.${columnName}`;
-  if (isLayerType(table.type)) return buildJsonExtract(table.name, columnName);
+  if (isLayerTable(table)) return buildJsonExtract(table.name, columnName);
   return `${table.name}."${columnName}"`;
 }
 
@@ -267,7 +266,7 @@ function buildNonAggregateColumns(
     .map((column) => {
       const valueExpression = column.table.source === 'geotiff'
         ? `${column.table.name}.properties.${column.column}`
-        : isLayerType(column.table.type)
+        : isLayerTable(column.table)
           ? buildJsonExtract(column.table.name, column.column)
           : `${column.table.name}."${column.column}"`;
       const columnName = column.aggregateFnResultColumnName || column.column;
@@ -281,7 +280,7 @@ function generateValueExpression(table: Table, columnName: string, aggregateFunc
     // '*' collects the entire properties object of the join row; otherwise collects a specific column.
     if (columnName === '*') {
       if (table.source === 'geotiff') return `json_group_array(${table.name}.properties)`;
-      if (isLayerType(table.type)) return `json_group_array(CAST(${table.name}.properties AS JSON))`;
+      if (isLayerTable(table)) return `json_group_array(CAST(${table.name}.properties AS JSON))`;
       // CSV/JSON tables: build a json_object from all non-geometry columns
       const cols = table.columns
         .filter(c => c.name !== 'geometry')
@@ -296,7 +295,7 @@ function generateValueExpression(table: Table, columnName: string, aggregateFunc
   if (table.source === 'geotiff') {
     return `${aggregateFunction}(${table.name}.properties.${columnName})`;
   }
-  if (isLayerType(table.type)) {
+  if (isLayerTable(table)) {
     const extract = buildJsonExtract(table.name, columnName);
     const castExpr = aggregateFunction === 'COUNT' ? extract : `CAST(${extract} AS DOUBLE)`;
     return `${aggregateFunction}(${castExpr})`;
@@ -367,7 +366,7 @@ function buildSimpleJoinSelect(tableRoot: Table, tableJoin: Table, geometricColu
   // When the join table is a layer type (OSM / GeoJSON), its data lives in a 'properties'
   // JSON column. Using json_object(tableJoin.properties) would fail because json_object()
   // requires an even number of key-value pair arguments. Instead, merge the JSON blob directly.
-  const joinPropertiesExpr = isLayerType(tableJoin.type)
+  const joinPropertiesExpr = isLayerTable(tableJoin)
     ? `COALESCE(CAST(${tableJoin.name}.properties AS JSON), '{}'::JSON)`
     : `json_object(${tableJoin.columns
         .filter((column) => column.name !== geometricColumnJoin)

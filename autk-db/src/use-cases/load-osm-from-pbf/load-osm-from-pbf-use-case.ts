@@ -154,8 +154,8 @@ export class LoadOsmFromPbfUseCase {
 
     return {
       tables: [
-        { source: 'osm', type: 'pointset', name: params.outputTableName, columns },
-        { source: 'osm', type: 'pointset', name: `${params.outputTableName}_boundaries`, columns },
+        { source: 'osm', name: params.outputTableName, columns },
+        { source: 'osm', name: `${params.outputTableName}_boundaries`, columns },
       ],
       osmElementCount: osmData.elements.length,
       boundaryElementCount: boundariesData.elements.length,

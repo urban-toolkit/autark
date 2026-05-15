@@ -66,7 +66,6 @@ export class LoadCsvUseCase {
 
     return {
       source: 'csv',
-      type: 'pointset',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
     };

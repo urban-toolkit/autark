@@ -1,16 +1,18 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
-
 import { FeatureCollection } from 'geojson';
-import { isLayerType } from 'autk-core';
 
 import { loadDb } from './duckdb';
 
 import {
     BoundingBox,
+    CollectionLayerTable,
     CsvTable,
     GeotiffTable,
     GeojsonTable,
     GridTable,
+    isCollectionLayerTable,
+    isGeotiffTable,
+    isOsmTable,
     JsonTable,
     OsmLayerTable,
     Table,
@@ -414,7 +416,7 @@ export class AutkDb {
      *
      * @param params - OSM table name, layer type, and optional bounding box for cropping.
      * @returns The created layer table metadata.
-     * @throws If the database is not initialized, the OSM table is missing, or the table is not an OSM pointset.
+     * @throws If the database is not initialized, the OSM table is missing, or the table is not a raw OSM table.
      * @example
      * const buildings = await db.loadLayer({
      *   osmInputTableName: 'manhattan',
@@ -427,8 +429,8 @@ export class AutkDb {
 
         const osmTable = this.tables.find((t) => t.name === params.osmInputTableName);
         if (!osmTable) throw new Error(`Table ${params.osmInputTableName} not found.`);
-        if (!(osmTable.source === 'osm' && osmTable.type === 'pointset'))
-            throw new Error(`Table ${params.osmInputTableName} is not an OSM table.`);
+        if (!isOsmTable(osmTable))
+            throw new Error(`Table ${params.osmInputTableName} is not a raw OSM table.`);
 
         const workspaceData = this.getCurrentWorkspaceData();
         const table = await this.loadLayerUseCase.exec({
@@ -568,7 +570,7 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const table = this.tables.find((t) => t.name === tableName);
-        if (!table || table.source !== 'geotiff')
+        if (!table || !isGeotiffTable(table))
             throw new Error(`Table ${tableName} is not a GeoTiff table.`);
 
         const qualifiedName = `${this.currentWorkspace}.${tableName}`;
@@ -637,9 +639,9 @@ export class AutkDb {
 
         const layerTable = this.tables.find((t) => t.name === layerTableName);
         if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
-        if (!isLayerType(layerTable.type)) throw new Error(`Table ${layerTableName} is not a Layer table.`);
+        if (!isCollectionLayerTable(layerTable)) throw new Error(`Table ${layerTableName} is not a layer table.`);
 
-        const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as OsmLayerTable | GeojsonTable, this.currentWorkspace);
+        const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable, this.currentWorkspace);
 
         const workspaceData = this.getCurrentWorkspaceData();
         const osmBoundingBox = this.getOsmBoundingBox();
@@ -723,13 +725,9 @@ export class AutkDb {
      * const layers = db.getLayerTables();
      * for (const l of layers) await map.loadCollection(l.name, { collection: await db.getLayer(l.name), type: l.type });
      */
-    getLayerTables(): Array<OsmLayerTable | GeojsonTable> {
-        return this.tables.filter((table): table is OsmLayerTable | GeojsonTable => {
-            return (
-                (table.source === 'osm' && isLayerType(table.type)) ||
-                (table.source === 'geojson' && isLayerType(table.type)) ||
-                (table.source === 'user' && isLayerType(table.type))
-            );
+    getLayerTables(): Array<CollectionLayerTable> {
+        return this.tables.filter((table): table is CollectionLayerTable => {
+            return isCollectionLayerTable(table);
         });
     }
 

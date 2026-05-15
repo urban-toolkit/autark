@@ -1,4 +1,5 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
+
 import { BoundingBox } from '../../interfaces';
 import { DEFAULT_WORKSPACE_NAME } from '../../consts';
 import { GetBoundingBoxFromOsmParams } from './interfaces';

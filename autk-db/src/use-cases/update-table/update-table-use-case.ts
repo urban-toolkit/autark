@@ -1,7 +1,7 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { FeatureCollection } from 'geojson';
 
-import { Table } from '../../interfaces';
+import { isVectorLayerTable, Table } from '../../interfaces';
 import { DEFAULT_WORKSPACE_NAME } from '../../consts';
 import { UpdateTableParams, UpdateTableResult, parseIdColumn } from './interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
@@ -49,7 +49,7 @@ export class UpdateTableUseCase {
    * Determines if a table is a layer table (has geometry) based on its source.
    */
   private isLayerTable(table: Table): boolean {
-    return table.source === 'osm' || table.source === 'geojson';
+    return isVectorLayerTable(table);
   }
 
   /**

@@ -33,10 +33,10 @@ export class RawQueryUseCase {
 
       const table = {
         source: params.output.source || 'user',
-        type: params.output.tableType || 'pointset',
+        ...(params.output.tableType ? { type: params.output.tableType } : {}),
         name: tableName,
         columns: getColumnsFromDuckDbTableDescribe(describeResult.toArray()),
-      } as unknown as Table;
+      } as Table;
 
       return table;
     }
