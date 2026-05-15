@@ -1,3 +1,5 @@
+/** Default workspace/schema name used when one is not provided explicitly. */
+export const DEFAULT_WORKSPACE_NAME = 'autk';
 /** Default source/input CRS for loaded datasets (WGS84 lat/lng). */
 export const DEFAULT_INPUT_COORDINATE_FORMAT = 'EPSG:4326';
 /** Default target/workspace CRS for stored geometries (World Mercator). */

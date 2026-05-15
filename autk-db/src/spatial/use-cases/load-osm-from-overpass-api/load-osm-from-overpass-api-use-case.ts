@@ -12,6 +12,7 @@ import {
   WATER_FEATURE_VALUES,
   EXCLUDED_BUILDING_VALUES,
   EXCLUDED_ROADS_VALUES,
+  DEFAULT_WORKSPACE_NAME,
 } from '../../../shared/consts';
 
 import { OsmProcessingPipeline } from '../osm-processing-pipeline/osm-processing-pipeline';
@@ -52,7 +53,7 @@ export class LoadOsmFromOverpassApiUseCase {
   // ---------------------------------------------------------------------------
 
   async exec(params: LoadOsmParams): Promise<OsmExecResult> {
-    const workspace = params.workspace || 'main';
+    const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
     const onProgress = params.onProgress;
 
     const combined = await this.fetchCombinedOsmData(

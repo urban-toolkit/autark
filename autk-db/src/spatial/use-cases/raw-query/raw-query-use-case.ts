@@ -15,8 +15,9 @@ export class RawQueryUseCase {
     this.conn = conn;
   }
 
-  async exec(params: RawQueryParams): Promise<Table | RawQueryOutput> {
+  async exec(params: RawQueryParams, workspace: string): Promise<Table | RawQueryOutput> {
     this.validateQuery(params.query);
+    await this.conn.query(`USE ${workspace}`);
 
     if (params.output.type === 'CREATE_TABLE') {
       if (!params.output.tableName) {

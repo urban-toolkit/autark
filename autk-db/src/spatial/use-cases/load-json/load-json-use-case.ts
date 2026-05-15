@@ -4,7 +4,7 @@ import { LoadJsonParams } from './interfaces';
 import { JsonTable } from '../../../shared/interfaces';
 import { LOAD_JSON_ON_TABLE_QUERY, LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
-import { DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
 
 /**
  * Loads JSON data into DuckDB, with optional geometry column creation.
@@ -18,7 +18,7 @@ export class LoadJsonUseCase {
     this.conn = conn;
   }
 
-  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = 'main', workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT }: LoadJsonParams & { workspaceCoordinateFormat?: string }): Promise<JsonTable> {
+  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = DEFAULT_WORKSPACE_NAME, workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT }: LoadJsonParams & { workspaceCoordinateFormat?: string }): Promise<JsonTable> {
     if (!jsonFileUrl && !jsonObject) {
       throw new Error('Either jsonFileUrl or jsonObject must be provided');
     }

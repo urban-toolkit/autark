@@ -3,7 +3,7 @@ import { fromArrayBuffer } from 'geotiff';
 
 import { GeotiffTable } from '../../../shared/interfaces';
 import { LoadGeoTiffParams } from './interfaces';
-import { DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
 const DEFAULT_MAX_PIXELS = 500_000;
@@ -26,7 +26,7 @@ export class LoadGeoTiffUseCase {
       geotiffArrayBuffer,
       outputTableName,
       coordinateFormat,
-      workspace = 'main',
+      workspace = DEFAULT_WORKSPACE_NAME,
       workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
       maxPixels = DEFAULT_MAX_PIXELS,
     } = params;

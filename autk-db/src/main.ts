@@ -7,6 +7,7 @@
 export type { LayerType, BoundingBox } from 'autk-core';
 
 export {
+  DEFAULT_WORKSPACE_NAME,
   DEFAULT_INPUT_COORDINATE_FORMAT,
   DEFAULT_WORKSPACE_COORDINATE_FORMAT,
   PARKS_LEISURE_VALUES,

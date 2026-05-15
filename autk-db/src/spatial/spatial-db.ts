@@ -17,6 +17,7 @@ import {
 } from '../shared/interfaces';
 
 import {
+    DEFAULT_WORKSPACE_NAME,
     DEFAULT_INPUT_COORDINATE_FORMAT,
     DEFAULT_WORKSPACE_COORDINATE_FORMAT
 } from '../shared/consts';
@@ -73,7 +74,7 @@ interface WorkspaceData {
 export class AutkSpatialDb {
     private db?: AsyncDuckDB;
     private conn?: AsyncDuckDBConnection;
-    private currentWorkspace: string = 'main';
+    private currentWorkspace: string = DEFAULT_WORKSPACE_NAME;
     private workspaces: Map<string, WorkspaceData> = new Map();
     private osmProcessingPipeline?: OsmProcessingPipeline;
     private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
@@ -119,9 +120,10 @@ export class AutkSpatialDb {
         this.conn = await this.db.connect();
 
         await this.conn.query('INSTALL spatial; LOAD spatial;');
-        await this.conn.query('CREATE SCHEMA IF NOT EXISTS main');
+        await this.conn.query(`CREATE SCHEMA IF NOT EXISTS ${DEFAULT_WORKSPACE_NAME}`);
+        await this.conn.query(`USE ${DEFAULT_WORKSPACE_NAME}`);
 
-        this.workspaces.set('main', {
+        this.workspaces.set(DEFAULT_WORKSPACE_NAME, {
             tables: [],
             coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
             workspaceBoundingBox: undefined,
@@ -182,6 +184,7 @@ export class AutkSpatialDb {
             });
         }
 
+        await this.conn.query(`USE ${name}`);
         this.currentWorkspace = name;
     }
 
@@ -202,7 +205,7 @@ export class AutkSpatialDb {
      * @returns Array of workspace names.
      * @example
      * const names = db.getWorkspaces();
-     * console.log(names); // ['main', 'analysis-a']
+     * console.log(names); // ['autk', 'analysis-a']
      */
     getWorkspaces(): string[] {
         return Array.from(this.workspaces.keys());
@@ -213,7 +216,7 @@ export class AutkSpatialDb {
      *
      * @returns Current workspace name.
      * @example
-     * console.log(db.getCurrentWorkspace()); // 'main'
+     * console.log(db.getCurrentWorkspace()); // 'autk'
      */
     getCurrentWorkspace(): string {
         return this.currentWorkspace;
@@ -808,7 +811,7 @@ export class AutkSpatialDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const workspaceData = this.getCurrentWorkspaceData();
-        const { created, table } = await this.spatialJoinUseCase.exec(params, workspaceData.tables);
+        const { created, table } = await this.spatialJoinUseCase.exec(params, workspaceData.tables, this.currentWorkspace);
         if (created) this.registerTable(table);
         else workspaceData.tables = workspaceData.tables.map((t) => (t.name === table.name ? table : t));
 
@@ -830,7 +833,7 @@ export class AutkSpatialDb {
         if (!this.db || !this.conn || !this.rawQueryUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
-        const result = await this.rawQueryUseCase.exec(params);
+        const result = await this.rawQueryUseCase.exec(params, this.currentWorkspace);
 
         if (params.output.type === 'CREATE_TABLE') {
             this.registerTable(result as Table);
@@ -878,7 +881,7 @@ export class AutkSpatialDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const workspaceData = this.getCurrentWorkspaceData();
-        const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox);
+        const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox, this.currentWorkspace);
         this.registerTable(table);
 
         return table;

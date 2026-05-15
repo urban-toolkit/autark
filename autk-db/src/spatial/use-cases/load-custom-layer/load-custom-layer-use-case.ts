@@ -1,7 +1,7 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { GeojsonTable } from '../../../shared/interfaces';
 import { LoadCustomLayerParams } from './interfaces';
-import { DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
 import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { FeatureCollection } from 'geojson';
@@ -26,7 +26,7 @@ export class LoadCustomLayerUseCase {
     outputTableName,
     coordinateFormat,
     boundingBox,
-    workspace = 'main',
+    workspace = DEFAULT_WORKSPACE_NAME,
     layerType,
     workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
   }: LoadCustomLayerParams & { workspaceCoordinateFormat?: string }): Promise<GeojsonTable> {

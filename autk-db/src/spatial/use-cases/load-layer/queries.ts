@@ -1,5 +1,6 @@
 import { LayerType } from './interfaces';
 import { BoundingBox } from '../../../shared/interfaces';
+import { DEFAULT_WORKSPACE_NAME } from '../../../shared/consts';
 
 type Params = {
   tableName: string;
@@ -13,7 +14,7 @@ type Params = {
 
 const AREA_LAYERS: LayerType[] = ['buildings', 'parks', 'water'];
 
-export const LOAD_LAYER_QUERY = ({ tableName, layer, sourceCrs, targetCrs, outputTableName, boundingBox, workspace = 'main' }: Params) => {
+export const LOAD_LAYER_QUERY = ({ tableName, layer, sourceCrs, targetCrs, outputTableName, boundingBox, workspace = DEFAULT_WORKSPACE_NAME }: Params) => {
   const query = getLayerQuery(layer);
 
   const qualifiedInputTableName = `${workspace}.${tableName}`;

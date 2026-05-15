@@ -2,6 +2,7 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { FeatureCollection } from 'geojson';
 
 import { Table } from '../../../shared/interfaces';
+import { DEFAULT_WORKSPACE_NAME } from '../../../shared/consts';
 import { UpdateTableParams, UpdateTableResult, parseIdColumn } from './interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import {
@@ -29,7 +30,7 @@ export class UpdateTableUseCase {
   }
 
   async exec(params: UpdateTableParams, existingTable: Table): Promise<UpdateTableResult> {
-    const { strategy, workspace = 'main' } = params;
+    const { strategy, workspace = DEFAULT_WORKSPACE_NAME } = params;
 
     if (strategy === 'update' && !params.idColumn) {
       throw new Error('idColumn is required when using the update strategy');

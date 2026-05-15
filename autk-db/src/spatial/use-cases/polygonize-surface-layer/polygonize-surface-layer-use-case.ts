@@ -8,6 +8,7 @@ import { GetLayerGeojsonUseCase } from '../get-layer-geojson';
 import { LOAD_FEATURE_COLLECTION_QUERY } from '../load-custom-layer/queries';
 import { LOAD_POLYGONIZED_LAYER_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
+import { DEFAULT_WORKSPACE_NAME } from '../../../shared/consts';
 
 /**
  * Polygonizes a surface layer from line geometries into closed polygons.
@@ -24,7 +25,7 @@ export class PolygonizeSurfaceLayerUseCase {
     }
 
     async exec(params: PolygonizeSurfaceLayerParams, surfaceTable: OsmLayerTable): Promise<OsmLayerTable> {
-        const { surfaceTableName, workspace = 'main' } = params;
+        const { surfaceTableName, workspace = DEFAULT_WORKSPACE_NAME } = params;
         const qualifiedSurfaceTableName = `${workspace}.${surfaceTableName}`;
         const qualifiedFeatureCollectionTableName = `${workspace}.${surfaceTableName}_feature_collection`;
 

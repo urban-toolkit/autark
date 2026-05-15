@@ -21,7 +21,8 @@ export class BuildHeatmapUseCase {
     async exec(
         params: BuildHeatmapParams,
         tables: Array<Table>,
-        boundingBox?: BoundingBox,
+        boundingBox: BoundingBox | undefined,
+        workspace: string,
     ): Promise<Table> {
         if (!boundingBox) {
             throw new Error('Bounding box is required to build a heatmap.');
@@ -38,6 +39,7 @@ export class BuildHeatmapUseCase {
             rows: params.grid.rows,
             columns: params.grid.columns,
             outputTableName: gridTableName,
+            workspace,
         });
 
         const joinResult = await this.spatialJoinUseCase.exec(
@@ -53,16 +55,18 @@ export class BuildHeatmapUseCase {
                 },
             },
             [...tables, gridTable],
+            workspace,
         );
 
         await this.transformToRasterFormat(
             gridTableName,
             params.grid.rows,
-            params.grid.columns
+            params.grid.columns,
+            workspace,
         );
 
         // Get updated columns after transformation
-        const describeTableResponse = await this.conn.query(`DESCRIBE ${gridTableName}`);
+        const describeTableResponse = await this.conn.query(`DESCRIBE ${workspace}.${gridTableName}`);
         const updatedColumns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
 
         return {
@@ -74,10 +78,12 @@ export class BuildHeatmapUseCase {
     private async transformToRasterFormat(
         tableName: string,
         rows: number,
-        columns: number
+        columns: number,
+        workspace: string,
     ): Promise<void> {
+        const qualifiedTableName = `${workspace}.${tableName}`;
         const transformQuery = `
-            CREATE OR REPLACE TABLE ${tableName} AS
+            CREATE OR REPLACE TABLE ${qualifiedTableName} AS
             SELECT 
                 ST_Point(0, 0) AS geometry,
                 {
@@ -85,7 +91,7 @@ export class BuildHeatmapUseCase {
                     'rasterResX': ${columns},
                     'rasterResY': ${rows}
                 } AS properties
-            FROM ${tableName};
+            FROM ${qualifiedTableName};
         `;
 
         await this.conn.query(transformQuery);

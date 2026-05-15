@@ -1,5 +1,6 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { Column } from '../../../shared/interfaces';
+import { DEFAULT_WORKSPACE_NAME } from '../../../shared/consts';
 import { computeIntersectingClusterIds } from 'autk-core';
 
 /**
@@ -20,7 +21,7 @@ export class AssignBuildingIdsUseCase {
    * returns the updated column list for the table.
    */
   async exec(params: { tableName: string; workspace?: string }): Promise<Column[]> {
-    const { tableName, workspace = 'main' } = params;
+    const { tableName, workspace = DEFAULT_WORKSPACE_NAME } = params;
     const qualifiedTableName = `${workspace}.${tableName}`;
 
     // Read id and geometry as GeoJSON for JS processing

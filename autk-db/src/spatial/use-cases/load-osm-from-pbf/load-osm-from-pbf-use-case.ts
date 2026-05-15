@@ -10,6 +10,7 @@ import {
   PARKS_NATURAL_VALUES,
   WATER_NATURAL_VALUES,
   WATER_FEATURE_VALUES,
+  DEFAULT_WORKSPACE_NAME,
 } from '../../../shared/consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { LoadOsmParams, OsmElement } from '../load-osm-from-overpass-api/interfaces';
@@ -94,7 +95,7 @@ export class LoadOsmFromPbfUseCase {
   async exec(params: LoadOsmParams): Promise<OsmExecResult> {
     const pbfFileUrl = params.pbfFileUrl;
     if (!pbfFileUrl) throw new Error('pbfFileUrl must be provided for PBF loading');
-    const workspace = params.workspace || 'main';
+    const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
     const onProgress = params.onProgress;
     const requestedLayers = this.getRequestedLayers(params);
 

@@ -1,6 +1,7 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { GetTableDataParams, GetTableDataOutput } from './interfaces';
+import { DEFAULT_WORKSPACE_NAME } from '../../../shared/consts';
 import { toPlain } from '../../shared/utils';
 
 /**
@@ -14,7 +15,7 @@ export class GetTableDataUseCase {
   }
 
   async exec(params: GetTableDataParams): Promise<GetTableDataOutput> {
-    const workspace = params.workspace || 'main';
+    const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
     const qualifiedTableName = `${workspace}.${params.tableName}`;
     let query = `SELECT * FROM ${qualifiedTableName}`;
 

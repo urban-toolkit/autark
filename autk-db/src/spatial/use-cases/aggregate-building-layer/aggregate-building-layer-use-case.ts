@@ -1,5 +1,7 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
+import { DEFAULT_WORKSPACE_NAME } from '../../../shared/consts';
+
 const BATCH_SIZE = 100;
 
 /**
@@ -13,7 +15,7 @@ export class AggregateBuildingLayerUseCase {
   }
 
   async exec(params: { inputTableName: string; workspace?: string }): Promise<void> {
-    const { inputTableName, workspace = 'main' } = params;
+    const { inputTableName, workspace = DEFAULT_WORKSPACE_NAME } = params;
     const qualifiedTableName = `${workspace}.${inputTableName}`;
     const tempTableName = `${inputTableName}_temp_agg`;
 

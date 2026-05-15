@@ -5,7 +5,7 @@ import { LoadLayerParams, LayerType } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
 import { BoundingBox, OsmLayerTable } from '../../../shared/interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
-import { DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../../shared/consts';
 import { AssignBuildingIdsUseCase } from '../assign-building-ids/assign-building-ids-use-case';
 import { AggregateBuildingLayerUseCase } from '../aggregate-building-layer/aggregate-building-layer-use-case';
 import { getOsmProcessingConfig } from './osm-processing-config';
@@ -59,7 +59,7 @@ export class LoadLayerUseCase {
   async exec(params: LoadLayerParams & { workspaceCoordinateFormat?: string }): Promise<OsmLayerTable> {
     const sourceCrs = params.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
     const targetCrs = params.workspaceCoordinateFormat || DEFAULT_WORKSPACE_COORDINATE_FORMAT;
-    const workspace = params.workspace || 'main';
+    const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
 
     const layerOutputTableName = params.outputTableName || `${params.osmInputTableName}_${params.layer}`;
     const qualifiedOutputTableName = `${workspace}.${layerOutputTableName}`;
