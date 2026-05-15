@@ -1,6 +1,7 @@
 import { LayerType, BoundingBox } from 'autk-core';
 
 export type { BoundingBox };
+
 export {
   PARKS_LEISURE_VALUES,
   PARKS_LANDUSE_VALUES,

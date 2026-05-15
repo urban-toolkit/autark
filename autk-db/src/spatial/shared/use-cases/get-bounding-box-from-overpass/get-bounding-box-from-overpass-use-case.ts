@@ -1,5 +1,5 @@
 import { BoundingBox } from '../../../../shared/interfaces';
-import { GetBoundingBoxFromAreaParams } from './interfaces';
+import { GetBoundingBoxFromOverpassParams } from './interfaces';
 
 interface OverpassBoundingBox {
   minlat: number;
@@ -11,7 +11,7 @@ interface OverpassBoundingBox {
 /**
  * Fetches bounding boxes for named areas from the Overpass API.
  */
-export class GetBoundingBoxFromAreaUseCase {
+export class GetBoundingBoxFromOverpassUseCase {
   /**
    * Fetches and merges bounding boxes for multiple named areas.
    *
@@ -19,7 +19,7 @@ export class GetBoundingBoxFromAreaUseCase {
    * @returns Combined bounding box spanning all areas.
    * @throws If no bounding box can be determined.
    */
-  async exec(params: GetBoundingBoxFromAreaParams): Promise<BoundingBox> {
+  async exec(params: GetBoundingBoxFromOverpassParams): Promise<BoundingBox> {
     const { geocodeArea, areas } = params.queryArea;
 
     let globalMinLat: number | undefined;

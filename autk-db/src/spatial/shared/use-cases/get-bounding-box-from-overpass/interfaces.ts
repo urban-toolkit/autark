@@ -1,4 +1,4 @@
-export interface GetBoundingBoxFromAreaParams {
+export interface GetBoundingBoxFromOverpassParams {
   queryArea: {
     geocodeArea: string;
     areas: string[];
