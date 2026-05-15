@@ -16,8 +16,6 @@ export class SpatialJoinUseCase {
   }
 
   async exec(params: SpatialQueryParams, tables: Table[], workspace: string): Promise<{ created: boolean; table: Table }> {
-    await this.conn.query(`USE ${workspace}`);
-
     const tableRoot = tables.find((table) => table.name === params.tableRootName);
     if (!tableRoot) throw new TableNotFoundError(params.tableRootName);
 
