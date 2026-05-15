@@ -149,7 +149,7 @@ export type {
 } from './types-buffer';
 
 /** Computes connected components of intersecting GeoJSON geometries. */
-export { computeIntersectingClusterIds } from './cluster-features';
+export { computeIntersectingClusterIds } from './utils-geojson';
 
 /** General-purpose GeoJSON, layer, and path utilities. */
 // ─── Utilities ───────────────────────────────────────────────────────────────
