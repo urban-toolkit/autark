@@ -9,13 +9,13 @@ import {
     CsvTable,
     GeotiffTable,
     GeojsonTable,
-    GridTable,
     isCollectionLayerTable,
     isGeotiffTable,
     isOsmTable,
     JsonTable,
     OsmLayerTable,
     Table,
+    UserTable,
 } from './interfaces';
 
 import {
@@ -508,7 +508,7 @@ export class AutkDb {
      *   columns: 100,
      * });
      */
-    async loadGridLayer(params: LoadGridLayerParams): Promise<GridTable> {
+    async loadGridLayer(params: LoadGridLayerParams): Promise<UserTable> {
         if (!this.db || !this.conn || !this.loadGridLayerUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 

@@ -1,6 +1,6 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { GridTable } from '../../interfaces';
+import { UserTable } from '../../interfaces';
 import { DEFAULT_WORKSPACE_NAME } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { LoadGridLayerParams } from './interfaces';
@@ -15,7 +15,7 @@ export class LoadGridLayerUseCase {
     this.conn = conn;
   }
 
-  async exec(params: LoadGridLayerParams): Promise<GridTable> {
+  async exec(params: LoadGridLayerParams): Promise<UserTable> {
     const { boundingBox, rows, columns, outputTableName, workspace = DEFAULT_WORKSPACE_NAME } = params;
     const qualifiedTableName = `${workspace}.${outputTableName}`;
 
@@ -29,10 +29,10 @@ export class LoadGridLayerUseCase {
 
     const { minLon, minLat, maxLon, maxLat } = boundingBox;
 
-    // 1. Create (or replace) empty table
+    // 1. Create (or replace) empty raster table
     const createTableSql = `CREATE OR REPLACE TABLE ${qualifiedTableName} (
       geometry GEOMETRY,
-      properties STRUCT(row INTEGER, "column" INTEGER)
+      properties STRUCT(band_1 DOUBLE)
     );`;
 
     await this.conn.query(createTableSql);
@@ -48,7 +48,7 @@ export class LoadGridLayerUseCase {
         const centerLon = minLon + (c + 0.5) * lonStep;
         const centerLat = minLat + (r + 0.5) * latStep;
 
-        values.push(`(ST_Point(${centerLon}, ${centerLat}), {'row': ${r}, 'column': ${c}})`);
+        values.push(`(ST_Point(${centerLon}, ${centerLat}), {'band_1': 0::DOUBLE})`);
       }
     }
 
@@ -67,6 +67,7 @@ export class LoadGridLayerUseCase {
       type: 'raster',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
+      bands: [{ id: 'band_1', label: 'band_1' }],
     };
   }
 }

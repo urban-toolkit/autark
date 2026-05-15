@@ -4,6 +4,26 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: CollectionLayerTable, wor
   const hasBuildingIdColumn = !!layerTable.columns?.some((c) => c.name === 'building_id');
   const qualifiedTableName = `${workspace}.${layerTable.name}`;
 
+  if (layerTable.source === 'user' && layerTable.type === 'raster') {
+    return `
+      SELECT json_object(
+           'type', 'FeatureCollection',
+           'features', json_array(
+             json_object(
+               'type', 'Feature',
+               'geometry', NULL,
+               'properties', json_object(
+                 'rasterResX', COUNT(DISTINCT ROUND(ST_X(geometry), 8))::INTEGER,
+                 'rasterResY', COUNT(DISTINCT ROUND(ST_Y(geometry), 8))::INTEGER,
+                 'raster', list(properties ORDER BY ST_Y(geometry) ASC, ST_X(geometry) ASC)
+               )
+             )
+           )
+         ) AS geojson
+      FROM ${qualifiedTableName};
+    `;
+  }
+
   if (layerTable.type === 'buildings' && hasBuildingIdColumn) {
     // Aggregate building parts into one feature per building.
     // Geometry becomes a GeometryCollection of all part polygons (one per part).

@@ -66,6 +66,7 @@ export class SpatialJoinUseCase {
         type: tableRoot.type,
         name: outputTableName,
         columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
+        bands: tableRoot.bands,
       } as Table,
       created: params.output.type === 'CREATE_NEW',
     };

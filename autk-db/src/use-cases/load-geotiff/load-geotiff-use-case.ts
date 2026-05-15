@@ -136,6 +136,7 @@ export class LoadGeoTiffUseCase {
         type: 'raster',
         name: outputTableName,
         columns: getColumnsFromDuckDbTableDescribe(describeResult.toArray()),
+        bands: bandNames.map((bandName) => ({ id: bandName, label: bandName })),
       };
     } finally {
       await this.db.dropFile(csvFile);

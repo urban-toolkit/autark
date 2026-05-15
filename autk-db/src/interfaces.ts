@@ -19,10 +19,16 @@ export interface Column {
   type: string;
 }
 
+export interface RasterBandMetadata {
+  id: string;
+  label: string;
+}
+
 export interface BaseTable {
   source: TableSource;
   name: string;
   columns: Column[];
+  bands?: RasterBandMetadata[];
 }
 
 export interface OsmTable extends BaseTable {
@@ -55,22 +61,15 @@ export interface GeotiffTable extends BaseTable {
   type: 'raster';
 }
 
-export interface UserLayerTable extends BaseTable {
+export interface UserTable extends BaseTable {
   source: 'user';
-  type: LayerType;
+  type?: LayerType;
 }
 
-export type GridTable = UserLayerTable & { type: 'raster' };
-
-export interface SqlTable extends BaseTable {
-  source: 'user';
-  type?: undefined;
-}
-
-export type DataTable = OsmTable | CsvTable | JsonTable | SqlTable;
-export type LayerTable = OsmLayerTable | GeojsonTable | GeotiffTable | UserLayerTable;
-export type CollectionLayerTable = OsmLayerTable | GeojsonTable | UserLayerTable;
-export type Table = DataTable | LayerTable;
+export type DataTable = OsmTable | CsvTable | JsonTable | (UserTable & { type?: undefined });
+export type LayerTable = OsmLayerTable | GeojsonTable | GeotiffTable | (UserTable & { type: LayerType });
+export type CollectionLayerTable = OsmLayerTable | GeojsonTable | (UserTable & { type: LayerType });
+export type Table = OsmTable | OsmLayerTable | CsvTable | JsonTable | GeojsonTable | GeotiffTable | UserTable;
 
 export function isLayerTable(table: Table): table is LayerTable {
   return table.type !== undefined;
@@ -88,6 +87,6 @@ export function isGeotiffTable(table: Table): table is GeotiffTable {
   return table.source === 'geotiff';
 }
 
-export function isVectorLayerTable(table: Table): table is Exclude<CollectionLayerTable, GridTable> {
+export function isVectorLayerTable(table: Table): table is Exclude<LayerTable, GeotiffTable | (UserTable & { type: 'raster' })> {
   return table.type !== undefined && table.type !== 'raster';
 }

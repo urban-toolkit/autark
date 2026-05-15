@@ -1,7 +1,7 @@
  
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { BuildHeatmapParams } from './interfaces';
-import { BoundingBox, Table } from '../../interfaces';
+import { BoundingBox, RasterBandMetadata, Table } from '../../interfaces';
 import { LoadGridLayerUseCase } from '../load-grid-layer/load-grid-layer-use-case';
 import { SpatialJoinUseCase } from '../spatial-join/spatial-join-use-case';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
@@ -58,10 +58,10 @@ export class BuildHeatmapUseCase {
             workspace,
         );
 
+        const rasterBands = this.getRasterBands(params);
         await this.transformToRasterFormat(
             gridTableName,
-            params.grid.rows,
-            params.grid.columns,
+            rasterBands,
             workspace,
         );
 
@@ -72,28 +72,45 @@ export class BuildHeatmapUseCase {
         return {
             ...joinResult.table,
             columns: updatedColumns,
+            bands: rasterBands.map(({ id, label }) => ({ id, label })),
         };
     }
 
     private async transformToRasterFormat(
         tableName: string,
-        rows: number,
-        columns: number,
+        bands: Array<RasterBandMetadata & { jsonPath: string }>,
         workspace: string,
     ): Promise<void> {
         const qualifiedTableName = `${workspace}.${tableName}`;
+        const bandAssignments = bands
+            .map((band) => `                    '${band.id}': COALESCE(json_extract(properties, '${band.jsonPath}')::DOUBLE, 0)`)
+            .join(',\n');
+
         const transformQuery = `
             CREATE OR REPLACE TABLE ${qualifiedTableName} AS
             SELECT 
-                ST_Point(0, 0) AS geometry,
+                geometry,
                 {
-                    'raster': list(properties.sjoin ORDER BY CAST(properties->>'row' AS INTEGER), CAST(properties->>'column' AS INTEGER)),
-                    'rasterResX': ${columns},
-                    'rasterResY': ${rows}
+${bandAssignments}
                 } AS properties
             FROM ${qualifiedTableName};
         `;
 
         await this.conn.query(transformQuery);
+    }
+
+    private getRasterBands(params: BuildHeatmapParams): Array<RasterBandMetadata & { jsonPath: string }> {
+        return (params.groupBy?.selectColumns ?? []).map((column, index) => {
+            const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
+            const sourceKey = aggregateFn === 'count'
+                ? (column.aggregateFnResultColumnName ?? column.tableName)
+                : (column.aggregateFnResultColumnName ?? `${column.tableName}.${column.column}`);
+
+            return {
+                id: `band_${index + 1}`,
+                label: column.aggregateFnResultColumnName ?? `${aggregateFn}_${column.tableName}`,
+                jsonPath: `$.sjoin.${aggregateFn}.${sourceKey}`,
+            };
+        });
     }
 }
