@@ -10,7 +10,7 @@ import {
   PARKS_NATURAL_VALUES,
   WATER_NATURAL_VALUES,
   WATER_FEATURE_VALUES,
-} from '../../../shared/osm-tags';
+} from '../../../shared/consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { LoadOsmParams, OsmElement } from '../load-osm-from-overpass-api/interfaces';
 import { OsmProcessingPipeline } from '../osm-processing-pipeline/osm-processing-pipeline';

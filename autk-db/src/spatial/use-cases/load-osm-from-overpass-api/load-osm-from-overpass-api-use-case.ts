@@ -12,7 +12,7 @@ import {
   WATER_FEATURE_VALUES,
   EXCLUDED_BUILDING_VALUES,
   EXCLUDED_ROADS_VALUES,
-} from '../../../shared/osm-tags';
+} from '../../../shared/consts';
 
 import { OsmProcessingPipeline } from '../osm-processing-pipeline/osm-processing-pipeline';
 

@@ -9,7 +9,7 @@ import {
   WATER_FEATURE_VALUES,
   EXCLUDED_ROADS_VALUES,
   EXCLUDED_BUILDING_VALUES,
-} from '../../../shared/osm-tags';
+} from '../../../shared/consts';
 
 import { CREATE_OSM_TABLE_QUERY, INSERT_OSM_DATA_QUERY } from '../load-osm-from-overpass-api/queries';
 

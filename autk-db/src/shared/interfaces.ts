@@ -9,7 +9,7 @@ export {
   WATER_FEATURE_VALUES,
   EXCLUDED_ROADS_VALUES,
   EXCLUDED_BUILDING_VALUES,
-} from './osm-tags';
+} from './consts';
 
 export type Table = OsmTable | OsmLayerTable | CsvTable | JsonTable | GeojsonTable | GridTable | GeotiffTable | SqlTable;
 
