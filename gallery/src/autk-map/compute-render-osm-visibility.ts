@@ -1,13 +1,13 @@
 import { Feature, FeatureCollection, GeoJsonProperties, Point } from 'geojson';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeRender } from '@urban-toolkit/autk-compute';
 import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
 export class ComputeRenderOsmVisibility {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     protected buildings!: FeatureCollection;
     protected buildingsForCompute!: FeatureCollection;
@@ -21,7 +21,7 @@ export class ComputeRenderOsmVisibility {
     }
 
     protected async loadDb(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({

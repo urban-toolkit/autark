@@ -13,7 +13,7 @@ import {
     MapEvent,
 } from '@urban-toolkit/autk-map';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
 import type { LayerThematic } from '@urban-toolkit/autk-map';
 
@@ -23,14 +23,14 @@ const GENERATED_LAYER_ID = 'selected_building_windows';
 
 export class ComputeRenderOsmViewScore {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected buildings!: FeatureCollection;
 
     private readonly analysisFloors = 10;
     private analysisVersion = 0;
 
     public async loadDb(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({

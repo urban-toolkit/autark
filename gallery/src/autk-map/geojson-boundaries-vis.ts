@@ -1,14 +1,14 @@
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class GeojsonPolygonsVis {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         const response = await fetch(`${URL}data/mnt_neighs.geojson`);

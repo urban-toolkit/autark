@@ -15,10 +15,10 @@
     "dist"
   ],
   "module": "./dist/autk-db.js",
-  "types": "./dist/src/main.d.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/main.d.ts",
+      "types": "./dist/src/index.d.ts",
       "import": "./dist/autk-db.js"
     }
   },

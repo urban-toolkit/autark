@@ -1,5 +1,5 @@
 import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
 const OSM_LAYERS = ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
@@ -11,10 +11,10 @@ const FINANCIAL_DISTRICT_WORKSPACE = 'financial_district';
 export class OsmLayersApi {
     protected map01!: AutkMap;
     protected map02!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(canvas01: HTMLCanvasElement, canvas02: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.loadWorkspaceOsm(BATTERY_PARK_CITY_WORKSPACE, 'Battery Park City');

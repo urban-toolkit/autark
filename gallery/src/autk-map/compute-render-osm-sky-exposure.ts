@@ -1,17 +1,17 @@
 import { ComputeRender } from '@urban-toolkit/autk-compute';
 import { ColorMapDomainStrategy } from 'autk-core';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
 import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 export class ComputeRenderOsmSkyExposure {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     protected roadsWithSky!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async loadDb(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({

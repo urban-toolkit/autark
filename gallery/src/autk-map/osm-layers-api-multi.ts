@@ -1,16 +1,16 @@
 import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
 export class OsmLayersApi {
     protected map01!: AutkMap;
-    protected db01!: AutkSpatialDb;
+    protected db01!: AutkDb;
 
     protected map02!: AutkMap;
-    protected db02!: AutkSpatialDb;
+    protected db02!: AutkDb;
 
     public async run(canvas01: HTMLCanvasElement, canvas02: HTMLCanvasElement): Promise<void> {
-        this.db01 = new AutkSpatialDb();
-        this.db02 = new AutkSpatialDb();
+        this.db01 = new AutkDb();
+        this.db02 = new AutkDb();
 
         await this.db01.init();
         await this.db02.init();
@@ -56,7 +56,7 @@ export class OsmLayersApi {
         await this.loadLayers(this.db02, this.map02);
     }
     
-    protected async loadLayers(db: AutkSpatialDb, map: AutkMap): Promise<void> {
+    protected async loadLayers(db: AutkDb, map: AutkMap): Promise<void> {
         for (const layerData of db.getLayerTables()) {
             const geojson = await db.getLayer(layerData.name);
             map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });

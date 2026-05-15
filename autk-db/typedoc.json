@@ -3,7 +3,7 @@
   "readme": "../README.md",
   "plugin": ["typedoc-plugin-markdown"],
   "out": "docs",
-  "entryPoints": ["src/main.ts"],
+  "entryPoints": ["src/index.ts"],
   "navigationLinks": {
     "Github": "https://github.com/urban-toolkit/autark"
   }

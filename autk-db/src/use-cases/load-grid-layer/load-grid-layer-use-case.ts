@@ -1,0 +1,72 @@
+import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
+
+import { GridTable } from '../../interfaces';
+import { DEFAULT_WORKSPACE_NAME } from '../../consts';
+import { getColumnsFromDuckDbTableDescribe } from '../../utils';
+import { LoadGridLayerParams } from './interfaces';
+
+/**
+ * Creates a grid layer table with evenly spaced cell centroids.
+ */
+export class LoadGridLayerUseCase {
+  private conn: AsyncDuckDBConnection;
+
+  constructor(conn: AsyncDuckDBConnection) {
+    this.conn = conn;
+  }
+
+  async exec(params: LoadGridLayerParams): Promise<GridTable> {
+    const { boundingBox, rows, columns, outputTableName, workspace = DEFAULT_WORKSPACE_NAME } = params;
+    const qualifiedTableName = `${workspace}.${outputTableName}`;
+
+    if (!boundingBox) {
+      throw new Error('Bounding box is required to load a grid layer.');
+    }
+
+    if (rows <= 0 || columns <= 0) {
+      throw new Error('Rows and columns must be positive integers.');
+    }
+
+    const { minLon, minLat, maxLon, maxLat } = boundingBox;
+
+    // 1. Create (or replace) empty table
+    const createTableSql = `CREATE OR REPLACE TABLE ${qualifiedTableName} (
+      geometry GEOMETRY,
+      properties STRUCT(row INTEGER, "column" INTEGER)
+    );`;
+
+    await this.conn.query(createTableSql);
+
+    // 2. Generate grid cell centroids in JS and bulk-insert
+    const lonStep = (maxLon - minLon) / columns;
+    const latStep = (maxLat - minLat) / rows;
+
+    const values: string[] = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        // Calculate the center point of each grid cell
+        const centerLon = minLon + (c + 0.5) * lonStep;
+        const centerLat = minLat + (r + 0.5) * latStep;
+
+        values.push(`(ST_Point(${centerLon}, ${centerLat}), {'row': ${r}, 'column': ${c}})`);
+      }
+    }
+
+    const insertSql = `INSERT INTO ${qualifiedTableName} VALUES ${values.join(',')};`;
+
+    await this.conn.query(insertSql);
+
+    // 3. Create spatial index on geometry column
+    const createIndexSql = `CREATE INDEX idx_${outputTableName}_geometry ON ${qualifiedTableName} USING RTREE (geometry);`;
+    await this.conn.query(createIndexSql);
+
+    const describeTableResponse = await this.conn.query(`DESCRIBE ${qualifiedTableName}`);
+
+    return {
+      source: 'user',
+      type: 'raster',
+      name: outputTableName,
+      columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
+    };
+  }
+}

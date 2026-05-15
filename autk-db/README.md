@@ -31,9 +31,9 @@ The toolkit is available as the umbrella package `@urban-toolkit/autk` or as ind
 ### Basic usage
 
 ```ts
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
-const db = new AutkSpatialDb();
+const db = new AutkDb();
 await db.init();
 
 await db.loadCustomLayer({
@@ -48,7 +48,7 @@ console.log(db.tables, buildings);
 
 ### API summary
 
-* `new AutkSpatialDb()`: Creates an isolated database controller.
+* `new AutkDb()`: Creates an isolated database controller.
 * `init()`: Initializes DuckDB-Wasm and loads the spatial extension.
 * `tables`: Lists tables registered in the current workspace.
 * `setWorkspace(name)`, `getWorkspaces()`, `getCurrentWorkspace()`: Manage isolated database schemas.

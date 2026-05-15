@@ -4,7 +4,7 @@ declare function showError(message: string, note?: string): void;
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
@@ -42,7 +42,7 @@ export class Shadows {
     /** Main map facade used for rendering, picking and thematic updates. */
     protected map!: AutkMap;
     /** Spatial DB facade used for OSM loading and SQL/spatial transformations. */
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     /** Histogram plot instance linked to roads selection/highlighting. */
     protected histogram!: AutkPlot;
 
@@ -183,7 +183,7 @@ export class Shadows {
      */
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Chicago Loop from Overpass API.');

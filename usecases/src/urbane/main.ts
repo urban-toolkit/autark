@@ -1,7 +1,7 @@
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu, ComputeRender } from '@urban-toolkit/autk-compute';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
@@ -20,7 +20,7 @@ declare function setLoadingState(message: string, note?: string): void;
  */
 export class Urbane {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected table!: AutkPlot;
     protected parallel!: AutkPlot;
 
@@ -73,7 +73,7 @@ export class Urbane {
      */
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Manhattan from Overpass API.');

@@ -1,6 +1,6 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkSpatialDb, LayerType } from '@urban-toolkit/autk-db';
+import { AutkDb, LayerType } from '@urban-toolkit/autk-db';
 import { AutkMap, MapEvent, MapStyle } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
@@ -8,7 +8,7 @@ const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3TemporalEvents {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected plot!: AutkPlot;
 
     protected canvas!: HTMLCanvasElement;
@@ -27,7 +27,7 @@ export class MapD3TemporalEvents {
     }
 
     protected async loadData(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadCustomLayer({

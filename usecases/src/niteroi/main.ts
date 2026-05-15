@@ -1,6 +1,6 @@
 import type { FeatureCollection, Feature, Geometry, GeoJsonProperties } from 'geojson';
 import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, MapStyle, MapEvent } from '@urban-toolkit/autk-map';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 import { AutkPlot, PlotEvent, PlotStyle } from '@urban-toolkit/autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
@@ -17,7 +17,7 @@ const HIGHLIGHT_COLOR = '#1a7a2e';
 
 export class OsmLayersApi {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected plot!: AutkPlot;
     protected linechart!: AutkPlot;
     protected geotiffData: any;
@@ -27,7 +27,7 @@ export class OsmLayersApi {
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Niterói area from Overpass API.');

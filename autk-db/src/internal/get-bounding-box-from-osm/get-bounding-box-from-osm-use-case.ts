@@ -1,0 +1,43 @@
+import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
+import { BoundingBox } from '../../interfaces';
+import { DEFAULT_WORKSPACE_NAME } from '../../consts';
+import { GetBoundingBoxFromOsmParams } from './interfaces';
+import { GET_BOUNDING_BOX_FROM_OSM_QUERY } from './queries';
+
+/**
+ * Computes the geographic bounding box of an OSM boundary table.
+ */
+export class GetBoundingBoxFromOsmUseCase {
+  constructor(private conn: AsyncDuckDBConnection) {}
+
+  /**
+   * Queries the spatial extent of boundary way geometries in an OSM table.
+   *
+   * @param params.osmTableName Name of the OSM boundaries table.
+   * @param params.workspace Optional workspace name (defaults to `autk`).
+   * @returns Named bounding box.
+   * @throws If the table has no coordinates or invalid values.
+   */
+  async exec(params: GetBoundingBoxFromOsmParams): Promise<BoundingBox> {
+    const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
+    const result = await this.conn.query(GET_BOUNDING_BOX_FROM_OSM_QUERY(params.osmTableName, workspace));
+    const rows = result.toArray();
+
+    if (rows.length === 0) {
+      throw new Error(`Could not calculate bounding box - no coordinates found in table ${params.osmTableName}`);
+    }
+
+    const row = rows[0];
+
+    if (row.minLon == null || row.minLat == null || row.maxLon == null || row.maxLat == null) {
+      throw new Error(`Could not calculate bounding box - invalid coordinates found in table ${params.osmTableName}`);
+    }
+
+    return {
+      minLon: row.minLon,
+      minLat: row.minLat,
+      maxLon: row.maxLon,
+      maxLat: row.maxLat,
+    };
+  }
+}
