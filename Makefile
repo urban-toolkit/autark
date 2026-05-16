@@ -65,10 +65,11 @@ dev:
 clean:
 	$(RIMRAF) node_modules
 	$(CONCURRENTLY) \
-		"cd autk-map && $(RIMRAF) dist build" \
-		"cd autk-db && $(RIMRAF) dist build" \
-		"cd autk-plot && $(RIMRAF) dist build" \
-		"cd autk-compute && $(RIMRAF) dist build" \
-		"cd autk && $(RIMRAF) dist build" \
-		"cd gallery && $(RIMRAF) dist build" \
-		"cd usecases && $(RIMRAF) dist build"
+		"cd autk-core && $(RIMRAF) dist build node_modules" \
+		"cd autk-map && $(RIMRAF) dist build node_modules" \
+		"cd autk-db && $(RIMRAF) dist build node_modules" \
+		"cd autk-plot && $(RIMRAF) dist build node_modules" \
+		"cd autk-compute && $(RIMRAF) dist build node_modules" \
+		"cd autk && $(RIMRAF) dist build node_modules" \
+		"cd gallery && $(RIMRAF) dist build node_modules" \
+		"cd usecases && $(RIMRAF) dist build node_modules"
