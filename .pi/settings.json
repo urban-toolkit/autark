@@ -4,8 +4,7 @@
   "defaultModel": "gpt-5.4",
   "defaultThinkingLevel": "medium",
   "packages": [
-    "npm:pi-powerline",
-    "npm:pi-token-speed"
+    "npm:pi-powerline"
   ],
   "powerline": true,
   "breadcrumb": "top"
