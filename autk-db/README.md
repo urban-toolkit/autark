@@ -46,6 +46,26 @@ const buildings = await db.getLayer('buildings');
 console.log(db.tables, buildings);
 ```
 
+### JSON geometry loading
+
+`loadJson` can import plain JSON records or materialize geometry during load using the same geometry options supported by `loadCsv`:
+
+- `geometryColumns: true` → reads default `Latitude` / `Longitude` fields as points
+- `{ latColumnName, longColumnName, coordinateFormat? }` → reads explicit coordinate fields as points
+- `{ wktColumnName, coordinateFormat? }` → parses WKT geometry and infers the returned layer family
+
+```ts
+const parcels = await db.loadJson({
+  outputTableName: 'parcels',
+  jsonObject: [
+    { id: 1, wkt: 'POLYGON((-43.3 -22.9, -43.2 -22.9, -43.2 -22.8, -43.3 -22.8, -43.3 -22.9))' },
+  ],
+  geometryColumns: { wktColumnName: 'wkt' },
+});
+
+console.log(parcels.type); // 'polygons'
+```
+
 ### API summary
 
 * `new AutkDb()`: Creates an isolated database controller.
