@@ -1,21 +1,18 @@
- 
+
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { BuildHeatmapParams } from './interfaces';
 import type { BoundingBox } from '../../types-core';
-import { RasterBandMetadata, Table } from '../../interfaces';
-import { LoadGridLayerUseCase } from '../load-grid-layer/load-grid-layer-use-case';
+import { RasterBandMetadata, Table, UserTable } from '../../interfaces';
 import { SpatialJoinUseCase } from '../spatial-join/spatial-join-use-case';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 
 /**
- * Builds a heatmap grid by spatially joining source data into grid cells.
+ * Builds a heatmap table by creating a grid, aggregating source values into it, and converting the result to raster bands.
  */
 export class BuildHeatmapUseCase {
-    private loadGridLayerUseCase: LoadGridLayerUseCase;
     private spatialJoinUseCase: SpatialJoinUseCase;
 
     constructor(private conn: AsyncDuckDBConnection) {
-        this.loadGridLayerUseCase = new LoadGridLayerUseCase(conn);
         this.spatialJoinUseCase = new SpatialJoinUseCase(conn);
     }
 
@@ -35,7 +32,7 @@ export class BuildHeatmapUseCase {
         }
 
         const gridTableName = params.outputTableName;
-        const gridTable = await this.loadGridLayerUseCase.exec({
+        const gridTable = await this.createGridTable({
             boundingBox,
             rows: params.grid.rows,
             columns: params.grid.columns,
@@ -61,7 +58,6 @@ export class BuildHeatmapUseCase {
             workspace,
         );
 
-        // Get updated columns after transformation
         const describeTableResponse = await this.conn.query(`DESCRIBE ${workspace}.${gridTableName}`);
         const updatedColumns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
 
@@ -69,6 +65,53 @@ export class BuildHeatmapUseCase {
             ...joinResult,
             columns: updatedColumns,
             bands: rasterBands.map(({ id, label }) => ({ id, label })),
+        };
+    }
+
+    private async createGridTable(params: {
+        boundingBox: BoundingBox;
+        rows: number;
+        columns: number;
+        outputTableName: string;
+        workspace: string;
+    }): Promise<UserTable> {
+        const { boundingBox, rows, columns, outputTableName, workspace } = params;
+        const qualifiedTableName = `${workspace}.${outputTableName}`;
+
+        if (rows <= 0 || columns <= 0) {
+            throw new Error('Rows and columns must be positive integers.');
+        }
+
+        const { minLon, minLat, maxLon, maxLat } = boundingBox;
+
+        await this.conn.query(`CREATE OR REPLACE TABLE ${qualifiedTableName} (
+            geometry GEOMETRY,
+            properties STRUCT(band_1 DOUBLE)
+        );`);
+
+        const lonStep = (maxLon - minLon) / columns;
+        const latStep = (maxLat - minLat) / rows;
+
+        const values: string[] = [];
+        for (let row = 0; row < rows; row++) {
+            for (let column = 0; column < columns; column++) {
+                const centerLon = minLon + (column + 0.5) * lonStep;
+                const centerLat = minLat + (row + 0.5) * latStep;
+                values.push(`(ST_Point(${centerLon}, ${centerLat}), {'band_1': 0::DOUBLE})`);
+            }
+        }
+
+        await this.conn.query(`INSERT INTO ${qualifiedTableName} VALUES ${values.join(',')};`);
+        await this.conn.query(`CREATE INDEX idx_${outputTableName}_geometry ON ${qualifiedTableName} USING RTREE (geometry);`);
+
+        const describeTableResponse = await this.conn.query(`DESCRIBE ${qualifiedTableName}`);
+
+        return {
+            source: 'user',
+            type: 'raster',
+            name: outputTableName,
+            columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
+            bands: [{ id: 'band_1', label: 'band_1' }],
         };
     }
 

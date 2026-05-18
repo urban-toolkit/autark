@@ -75,7 +75,7 @@ console.log(parcels.type); // 'polygons'
 * `loadOsm(params)`: Loads OpenStreetMap data from Overpass API or PBF-backed workflows.
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
 * `loadOsmLayer(params)`: Extracts standard urban layers from loaded OSM data.
-* `loadGeojson(params)`, `loadGridLayer(params)`: Imports custom GeoJSON and generated grid layers.
+* `loadGeojson(params)`: Imports custom GeoJSON layers.
 * `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers.
 * `getLayer(layerTableName)`: Exports a layer table as a GeoJSON `FeatureCollection`.
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
@@ -83,7 +83,7 @@ console.log(parcels.type); // 'polygons'
 * `updateTable(params)`: Updates a table using the supported update strategies.
 * `spatialQuery(params)`: Runs spatial joins and aggregations between layers.
 * `rawQuery(params)`: Executes custom SQL against the current workspace.
-* `buildHeatmap(params)`: Builds aggregated heatmap/grid outputs.
+* `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs.
 * `removeLayer(tableName)`: Drops a table from the current workspace.
 
 ## Resources

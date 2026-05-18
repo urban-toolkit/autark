@@ -11,7 +11,6 @@ import {
     JsonTable,
     OsmLayerTable,
     Table,
-    UserTable,
 } from './interfaces';
 import type { WorkspaceData } from './interfaces';
 import type { BoundingBox, LayerType } from './types-core';
@@ -36,7 +35,6 @@ import { GetTableDataParams, GetTableDataOutput, GetTableDataUseCase } from './u
 import { LoadCsvParams, LoadCsvUseCase } from './use-cases/load-csv';
 import { LoadGeojsonParams, LoadGeojsonUseCase } from './use-cases/load-geojson';
 import { LoadGeoTiffParams, LoadGeoTiffUseCase } from './use-cases/load-geotiff';
-import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer';
 import { LoadJsonParams, LoadJsonUseCase } from './use-cases/load-json';
 import { LoadOsmLayerParams, LoadOsmLayerUseCase } from './use-cases/load-osm-layer';
 import { LoadOsmFromOverpassApiUseCase, LoadOsmParams, OsmLoadTimings } from './use-cases/load-osm-from-overpass-api';
@@ -113,9 +111,6 @@ export class AutkDb {
     /** Coordinate transformation use case for workspace extent conversion. */
     private transformBoundingBoxCoordinatesUseCase?: TransformBoundingBoxCoordinatesUseCase;
 
-    /** Grid generation use case used by manual grids and heatmaps. */
-    private loadGridLayerUseCase?: LoadGridLayerUseCase;
-
     /** GeoTIFF raster loading use case bound to the active database connection. */
     private loadGeoTiffUseCase?: LoadGeoTiffUseCase;
 
@@ -186,7 +181,6 @@ export class AutkDb {
         this.loadJsonUseCase = new LoadJsonUseCase(this.db, this.conn);
         this.loadOsmLayerUseCase = new LoadOsmLayerUseCase(this.db, this.conn);
         this.loadGeojsonUseCase = new LoadGeojsonUseCase(this.db, this.conn);
-        this.loadGridLayerUseCase = new LoadGridLayerUseCase(this.conn);
         this.loadGeoTiffUseCase = new LoadGeoTiffUseCase(this.db, this.conn);
 
         this.assignBuildingIdsUseCase = new AssignBuildingIdsUseCase(this.db, this.conn);
@@ -535,34 +529,6 @@ export class AutkDb {
     }
 
     /**
-     * Creates a grid of evenly-spaced cell centroids within a bounding box.
-     *
-     * @param params - Grid dimensions, output table name, and optional bounding box (falls back to OSM bounds).
-     * @returns The created grid layer table metadata.
-     * @throws If the database is not initialized, or no bounding box is available and none is provided.
-     * @example
-     * const grid = await db.loadGridLayer({
-     *   outputTableName: 'heatmap_grid',
-     *   rows: 100,
-     *   columns: 100,
-     * });
-     */
-    async loadGridLayer(params: LoadGridLayerParams): Promise<UserTable> {
-        if (!this.db || !this.conn || !this.loadGridLayerUseCase)
-            throw new Error('Database not initialized. Please call init() first.');
-
-        const workspaceData = this.getCurrentWorkspaceData();
-        const table = await this.loadGridLayerUseCase.exec({
-            ...params,
-            boundingBox: params.boundingBox || workspaceData.osmBoundingBox,
-            workspace: this.currentWorkspace
-        });
-        this.registerTable(table);
-
-        return table;
-    }
-
-    /**
      * Loads a GeoTIFF raster as a spatially-indexed table with per-pixel geometry and band properties.
      *
      * @param params - File URL or ArrayBuffer, table name, and optional CRS override.
@@ -903,20 +869,20 @@ export class AutkDb {
     }
 
     /**
-     * Builds a heatmap table by aggregating source values into a generated grid.
+     * Builds a heatmap table by creating a grid internally and aggregating source values into its cells.
      *
-     * Uses the cached workspace bounding box as the grid extent and registers the resulting table in the active workspace.
+     * Uses the cached workspace bounding box as the grid extent, runs a NEAR spatial aggregation into the generated grid, then rewrites the result as raster-band properties.
      *
-     * @param params - Source table, grid configuration, and aggregation method.
+     * @param params - Source table, NEAR settings, grid configuration, and aggregation method.
      * @returns The resulting heatmap table metadata.
-     * @throws If the database is not initialized, or no workspace bounding box is available for the heatmap extent.
+     * @throws If the database is not initialized, if the workspace has no bounding box, or if the source table is missing.
      * @example
      * const heatmap = await db.buildHeatmap({
-     *   sourceTable: 'incidents',
+     *   tableJoinName: 'incidents',
+     *   near: { distance: 500 },
      *   outputTableName: 'heatmap_result',
-     *   rows: 50,
-     *   columns: 50,
-     *   aggregateFunction: 'count',
+     *   grid: { rows: 50, columns: 50 },
+     *   groupBy: [{ column: '*', aggregateFn: 'count' }],
      * });
      */
     async buildHeatmap(params: BuildHeatmapParams): Promise<Table> {

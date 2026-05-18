@@ -68,7 +68,6 @@ export type {
   LoadCsvParams,
 } from './use-cases/load-csv';
 export type { LoadGeojsonParams } from './use-cases/load-geojson';
-export type { LoadGridLayerParams } from './use-cases/load-grid-layer';
 export type {
   JsonDefaultLatLngGeometryColumns,
   JsonLatLngGeometryColumns,
