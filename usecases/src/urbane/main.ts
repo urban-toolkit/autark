@@ -97,8 +97,6 @@ export class Urbane {
             tableRootName: 'table_osm_buildings',
             tableJoinName: 'neighborhoods',
             spatialPredicate: 'INTERSECT',
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
         });
 
         setLoadingState('Loading urban datasets...', 'Importing arrests, schools, restaurants, and other datasets.');
@@ -116,11 +114,8 @@ export class Urbane {
                 tableRootName: 'neighborhoods',
                 tableJoinName: dataset,
                 spatialPredicate: 'INTERSECT',
-                output: { type: 'MODIFY_ROOT' },
-                joinType: 'LEFT',
                 groupBy: {
                     selectColumns: [{
-                        tableName: dataset,
                         column: 'key',
                         aggregateFn: 'count',
                         normalize: true,
@@ -170,14 +165,10 @@ export class Urbane {
             tableRootName: 'neighborhoods',
             tableJoinName: 'table_osm_roads',
             spatialPredicate: 'INTERSECT',
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
             groupBy: {
                 selectColumns: [{
-                    tableName: 'table_osm_roads',
                     column: 'compute.skyViewFactor',
                     aggregateFn: 'avg',
-                    aggregateFnResultColumnName: 'skyExposure',
                     normalize: true,
                 }],
             },
@@ -205,7 +196,7 @@ export class Urbane {
                 const v: number = p?.sjoin?.count?.[`${d}_norm`] ?? 0;
                 return invertedDatasets.has(d) ? 1 - v : v;
             });
-            vals.push(p?.sjoin?.avg?.skyExposure_norm ?? 0);
+            vals.push(p?.sjoin?.avg?.['table_osm_roads.compute.skyViewFactor_norm'] ?? 0);
             p.scoreInputs = vals;
         }
 
@@ -275,7 +266,7 @@ export class Urbane {
         }
 
         this.map.updateColorMap(layerId, { colorMap: {
-                domainSpec: column.includes('skyExposure')
+                domainSpec: column.includes('skyViewFactor')
                     ? { type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
             }, });
@@ -294,7 +285,7 @@ export class Urbane {
 
         const attributes = [
             ...this.datasets.map(d => `sjoin.count.${d}`),
-            'sjoin.avg.skyExposure',
+            'sjoin.avg.table_osm_roads.compute.skyViewFactor',
             'compute.score',
         ];
         const axisLabels = [...this.datasets, 'sky exposure', 'score'];
@@ -409,11 +400,8 @@ export class Urbane {
                 spatialPredicate: 'NEAR',
                 nearDistance: this.distance,
                 nearUseCentroid: true,
-                output: { type: 'MODIFY_ROOT' },
-                joinType: 'LEFT',
                 groupBy: {
                     selectColumns: [{
-                        tableName: dataset,
                         column: 'key',
                         aggregateFn: 'count',
                         normalize: true,
@@ -428,14 +416,10 @@ export class Urbane {
             spatialPredicate: 'NEAR',
             nearDistance: 300,
             nearUseCentroid: true,
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
             groupBy: {
                 selectColumns: [{
-                    tableName: 'table_osm_roads',
                     column: 'compute.skyViewFactor',
                     aggregateFn: 'avg',
-                    aggregateFnResultColumnName: 'skyExposure',
                     normalize: true,
                 }],
             },

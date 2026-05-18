@@ -7,6 +7,8 @@ import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 
 /**
  * Performs a spatial join between two tables, with optional aggregation.
+ *
+ * The join always modifies the root table in place using a LEFT join.
  */
 export class SpatialJoinUseCase {
   private conn: AsyncDuckDBConnection;
@@ -15,7 +17,7 @@ export class SpatialJoinUseCase {
     this.conn = conn;
   }
 
-  async exec(params: SpatialQueryParams, tables: Table[], workspace: string): Promise<{ created: boolean; table: Table }> {
+  async exec(params: SpatialQueryParams, tables: Table[], workspace: string): Promise<Table> {
     const tableRoot = tables.find((table) => table.name === params.tableRootName);
     if (!tableRoot) throw new TableNotFoundError(params.tableRootName);
 
@@ -28,7 +30,6 @@ export class SpatialJoinUseCase {
     const geometricColumnJoin = this.getGeometryColumnName(tableJoin);
     if (!geometricColumnJoin) throw new GeometryColumnNotFoundError(tableJoin.name);
 
-    const joinType = params.joinType || 'INNER';
     const spatialPredicate = params.spatialPredicate || 'INTERSECT';
 
     let nearUseCentroid = params.nearUseCentroid;
@@ -36,23 +37,19 @@ export class SpatialJoinUseCase {
       nearUseCentroid = await this.isPolygonTable(tableRoot.name, geometricColumnRoot, workspace);
     }
 
-    const outputTableName = (params.output.type === 'CREATE_NEW' ? params.output.tableName : tableRoot.name) as string;
-    const qualifiedOutputTableName = `${workspace}.${outputTableName}`;
+    const qualifiedOutputTableName = `${workspace}.${tableRoot.name}`;
     const query = SPATIAL_JOIN_QUERY({
       workspace,
       tableRoot,
       tableJoin,
       geometricColumnRoot,
       geometricColumnJoin,
-      joinType,
       spatialPredicate,
-      groupBy: this.addTablesToGroupBy(params.groupBy, tables),
+      groupBy: params.groupBy ? { selectColumns: params.groupBy.selectColumns } : null,
       nearDistance: params.nearDistance,
       nearUseCentroid,
-      outputTableName,
     });
 
-    // console.log({ query });
     const tableDescribeResponse = await this.conn.query(`
         CREATE OR REPLACE TABLE ${qualifiedOutputTableName} AS
         ${query}
@@ -61,21 +58,21 @@ export class SpatialJoinUseCase {
       `);
 
     return {
-      table: {
-        source: tableRoot.source,
-        type: tableRoot.type,
-        name: outputTableName,
-        columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
-        bands: tableRoot.bands,
-      } as Table,
-      created: params.output.type === 'CREATE_NEW',
-    };
+      source: tableRoot.source,
+      type: tableRoot.type,
+      name: tableRoot.name,
+      columns: getColumnsFromDuckDbTableDescribe(tableDescribeResponse.toArray()),
+      bands: tableRoot.bands,
+    } as Table;
   }
 
   /**
-   * Gets the appropriate geometry column name for a table.
-   * For building tables, prioritizes 'agg_geometry' if available, otherwise falls back to 'geometry'.
-   * For other tables, returns the first geometry column found.
+   * Determines whether the table stores polygon geometries.
+   *
+   * @param tableName - name of the table to inspect.
+   * @param geomColumn - name of the geometry column.
+   * @param workspace - workspace namespace qualifying the table name.
+   * @returns `true` if the table contains polygon or multipolygon geometry.
    */
   private async isPolygonTable(tableName: string, geomColumn: string, workspace: string): Promise<boolean> {
     const qualifiedTableName = `${workspace}.${tableName}`;
@@ -88,6 +85,14 @@ export class SpatialJoinUseCase {
     return geomType === 'POLYGON' || geomType === 'MULTIPOLYGON';
   }
 
+  /**
+   * Returns the geometry column name for a table.
+   *
+   * For building tables, prioritizes `agg_geometry` if available, otherwise falls back to `geometry`.
+   *
+   * @param table - table metadata to inspect.
+   * @returns the geometry column name, or `undefined` if none found.
+   */
   private getGeometryColumnName(table: Table): string | undefined {
     if (table.source === 'osm' && table.type === 'buildings') {
       const aggGeometryColumn = table.columns.find(
@@ -97,31 +102,6 @@ export class SpatialJoinUseCase {
       if (aggGeometryColumn) return aggGeometryColumn.name;
     }
 
-    // Default behavior: return first geometry column found
     return table.columns.find((column) => column.type === 'GEOMETRY')?.name;
-  }
-
-  private addTablesToGroupBy(
-    groupBy: SpatialQueryParams['groupBy'],
-    tables: Table[],
-  ): {
-    selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string; normalize?: boolean }>;
-  } | null {
-    if (!groupBy) return null;
-
-    return {
-      selectColumns: groupBy.selectColumns.map((column) => {
-        const table = tables.find((table) => table.name === column.tableName);
-        if (!table) throw new TableNotFoundError(column.tableName);
-
-        return {
-          table,
-          column: column.column,
-          aggregateFn: column.aggregateFn,
-          aggregateFnResultColumnName: column.aggregateFnResultColumnName,
-          normalize: column.normalize,
-        };
-      }),
-    };
   }
 }

@@ -51,19 +51,13 @@ export class MapD3TemporalEvents {
             tableJoinName: 'noise',
             spatialPredicate: 'NEAR',
             nearDistance: 200,
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
                         column: 'key',
                         aggregateFn: 'count',
                     },
                     {
-                        tableName: 'noise',
                         column: 'date',
                         aggregateFn: 'collect',
                     }

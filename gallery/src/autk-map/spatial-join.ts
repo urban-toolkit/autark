@@ -27,14 +27,9 @@ export class SpatialJoin {
             tableRootName: 'neighborhoods',
             tableJoinName: 'noise',
             spatialPredicate: 'INTERSECT',
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
                         column: 'Unique Key',
                         aggregateFn: 'count',
                     },

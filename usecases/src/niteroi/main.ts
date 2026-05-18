@@ -55,14 +55,10 @@ export class OsmLayersApi {
             tableJoinName: 'lst',
             spatialPredicate: 'NEAR',
             nearDistance: 1000,
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
             groupBy: {
                 selectColumns: Array.from({ length: BAND_COUNT }, (_, i) => ({
-                    tableName: 'lst',
                     column: `band_${i + 1}`,
                     aggregateFn: 'avg',
-                    aggregateFnResultColumnName: `band_${i + 1}`,
                 })),
             },
         });
@@ -99,7 +95,7 @@ export class OsmLayersApi {
     protected async applyLstCompute(): Promise<void> {
         setLoadingState('Merging temperature bands...', 'Building per-road LST timeseries.');
         const bandSelects = Array.from({ length: BAND_COUNT }, (_, i) =>
-            `COALESCE(json_extract(properties, '$.sjoin.avg.band_${i + 1}')::DOUBLE, 0)`
+            `COALESCE(json_extract(properties, '$.sjoin.avg.lst.band_${i + 1}')::DOUBLE, 0)`
         ).join(', ');
 
         await this.db.rawQuery({

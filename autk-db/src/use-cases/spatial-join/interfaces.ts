@@ -1,23 +1,31 @@
 export type AggregateFunction ='sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted' | 'collect';
 
+/**
+ * Parameters for a spatial join between two tables.
+ *
+ * The join always modifies the root table in place using a LEFT join.
+ * Aggregated results are stored under `properties.sjoin.<aggregateFn>.<key>` in the root table.
+ */
 export interface SpatialQueryParams {
+  /** Name of the root table that will be modified in place. */
   tableRootName: string;
+  /** Name of the table to join against the root. */
   tableJoinName: string;
-  output: {
-    type: 'MODIFY_ROOT' | 'CREATE_NEW';
-    tableName?: string; // Required if type is 'CREATE_NEW'
-  };
+  /** Spatial predicate to use. Defaults to `'INTERSECT'`. */
   spatialPredicate?: 'INTERSECT' | 'NEAR';
-  joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+  /** Maximum distance for the `'NEAR'` predicate. */
   nearDistance?: number;
-  nearUseCentroid?: boolean; // When true, centroid-to-centroid distance is used. Defaults to true when root table contains polygons.
+  /** When `true`, uses centroid-to-centroid distance. Defaults to `true` when the root table contains polygons. */
+  nearUseCentroid?: boolean;
+  /** Optional aggregation applied to join-side data. Keys are derived from `tableJoinName` and the aggregate function. */
   groupBy?: {
     selectColumns: Array<{
-      tableName: string;
+      /** Column name to aggregate. Use `'*'` for row-level aggregations like `count`. */
       column: string;
+      /** Aggregation function. Omit to pass the column through without aggregation. */
       aggregateFn?: AggregateFunction;
-      aggregateFnResultColumnName?: string; // Optional custom name for the aggregation result
-      normalize?: boolean; // When true, normalizes the aggregated value between 0 and 1
+      /** When `true`, normalizes the aggregated value between 0 and 1. */
+      normalize?: boolean;
     }>;
   };
 }

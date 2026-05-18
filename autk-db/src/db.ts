@@ -831,10 +831,12 @@ export class AutkDb {
     }
 
     /**
-     * Performs a spatial join between two tables using predicates like INTERSECT, NEAR, or CONTAINS.
+     * Performs a spatial join between two tables using predicates like INTERSECT or NEAR.
      *
-     * @param params - Root and join table names, spatial predicate, output configuration, and optional grouping.
-     * @returns The resulting joined table, newly created or updated.
+     * The join always modifies the root table in place using a LEFT join.
+     *
+     * @param params - Root and join table names, spatial predicate, optional near distance, and optional grouping.
+     * @returns The updated root table.
      * @throws If the database is not initialized.
      * @example
      * await db.spatialQuery({
@@ -842,7 +844,6 @@ export class AutkDb {
      *   tableJoinName: 'lst',
      *   spatialPredicate: 'NEAR',
      *   nearDistance: 1000,
-     *   output: { type: 'MODIFY_ROOT' },
      * });
      */
     async spatialQuery(params: SpatialQueryParams): Promise<Table> {
@@ -850,9 +851,8 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const workspaceData = this.getCurrentWorkspaceData();
-        const { created, table } = await this.spatialJoinUseCase.exec(params, workspaceData.tables, this.currentWorkspace);
-        if (created) this.registerTable(table);
-        else workspaceData.tables = workspaceData.tables.map((t) => (t.name === table.name ? table : t));
+        const table = await this.spatialJoinUseCase.exec(params, workspaceData.tables, this.currentWorkspace);
+        workspaceData.tables = workspaceData.tables.map((t) => (t.name === table.name ? table : t));
 
         return table;
     }

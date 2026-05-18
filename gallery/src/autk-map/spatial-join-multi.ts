@@ -30,14 +30,9 @@ export class SpatialJoin {
                 tableRootName: 'neighborhoods',
                 tableJoinName: csv,
                 spatialPredicate: 'INTERSECT',
-                output: {
-                    type: 'MODIFY_ROOT',
-                },
-                joinType: 'LEFT',
                 groupBy: {
                     selectColumns: [
                         {
-                            tableName: csv,
                             column: 'Unique Key',
                             aggregateFn: 'count',
                         },

@@ -39,14 +39,9 @@ export class SpatialJoinNear {
             tableJoinName: 'noise',
             spatialPredicate: 'NEAR',
             nearDistance: 1000,
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
                         column: 'Unique Key',
                         aggregateFn: 'count',
                     },

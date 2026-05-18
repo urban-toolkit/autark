@@ -47,13 +47,9 @@ export class BuildHeatmapUseCase {
             {
                 tableRootName: gridTableName,
                 tableJoinName: params.tableJoinName,
-                joinType: 'LEFT',
                 spatialPredicate: 'NEAR',
                 nearDistance: params.nearDistance,
                 groupBy: params.groupBy,
-                output: {
-                    type: 'MODIFY_ROOT',
-                },
             },
             [...tables, gridTable],
             workspace,
@@ -71,7 +67,7 @@ export class BuildHeatmapUseCase {
         const updatedColumns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
 
         return {
-            ...joinResult.table,
+            ...joinResult,
             columns: updatedColumns,
             bands: rasterBands.map(({ id, label }) => ({ id, label })),
         };
@@ -103,13 +99,13 @@ ${bandAssignments}
     private getRasterBands(params: BuildHeatmapParams): Array<RasterBandMetadata & { jsonPath: string }> {
         return (params.groupBy?.selectColumns ?? []).map((column, index) => {
             const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
-            const sourceKey = aggregateFn === 'count'
-                ? (column.aggregateFnResultColumnName ?? column.tableName)
-                : (column.aggregateFnResultColumnName ?? `${column.tableName}.${column.column}`);
+            const sourceKey = aggregateFn === 'count' || aggregateFn === 'weighted' || aggregateFn === 'collect'
+                ? params.tableJoinName
+                : `${params.tableJoinName}.${column.column}`;
 
             return {
                 id: `band_${index + 1}`,
-                label: column.aggregateFnResultColumnName ?? `${aggregateFn}_${column.tableName}`,
+                label: `${aggregateFn}_${params.tableJoinName}`,
                 jsonPath: `$.sjoin.${aggregateFn}.${sourceKey}`,
             };
         });

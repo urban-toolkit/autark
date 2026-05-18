@@ -110,7 +110,7 @@ export class Shadows {
             collection: this.roads,
             variableMapping: {
                 seg:       'geometry.coordinates',
-                sjoin_avg: `sjoin.avg.${month}`,
+                sjoin_avg: `sjoin.avg.shadows.${month}`,
             },
             attributeMatrices: {
                 seg: { rows: 'auto', cols: 2 },
@@ -177,7 +177,7 @@ export class Shadows {
      * Loads and derives all data required by this example.
      *
      * It performs OSM loading, CSV ingestion, road segmentation, and monthly
-     * baseline aggregation (`sjoin.avg.<month>`), then caches roads/buildings.
+     * baseline aggregation (`sjoin.avg.shadows.<month>`), then caches roads/buildings.
      * Finally it initializes compute attributes to zeros to keep compute and
      * contribution thematic modes always defined.
      */
@@ -229,14 +229,10 @@ export class Shadows {
                 tableJoinName: 'shadows',
                 spatialPredicate: 'NEAR',
                 nearDistance: 200,
-                output: { type: 'MODIFY_ROOT' },
-                joinType: 'LEFT',
                 groupBy: {
                     selectColumns: [{
-                        tableName: 'shadows',
                         column: month,
                         aggregateFn: 'avg',
-                        aggregateFnResultColumnName: month,
                     }],
                 },
             });
@@ -358,7 +354,7 @@ export class Shadows {
     protected updateThematicData(): void {
         if (this.displayMode === 'heatmap') {
             this.map.updateThematic(this.ROADS_LAYER, { collection: this.roads,
-                property: `properties.sjoin.avg.${this.currentMonth}`, });
+                property: `properties.sjoin.avg.shadows.${this.currentMonth}`, });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isPick: true });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
             this.map.draw();
@@ -384,7 +380,7 @@ export class Shadows {
         this.histogram = new AutkPlot(this.histogramDiv, {
             type: 'barchart',
             collection: this.roads,
-            attributes: { axis: [`sjoin.avg.${this.currentMonth}`, '@transform'] },
+            attributes: { axis: [`sjoin.avg.shadows.${this.currentMonth}`, '@transform'] },
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,
             height: 380,

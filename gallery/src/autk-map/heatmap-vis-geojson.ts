@@ -38,7 +38,6 @@ export class Heatmap {
             groupBy: {
                 selectColumns: [
                     {
-                        tableName: 'noise',
                         column: 'Unique Key',
                         aggregateFn: 'count'
                     },

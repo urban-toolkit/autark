@@ -6,10 +6,10 @@ export interface BuildHeatmapParams {
     outputTableName: string;
     groupBy?: {
         selectColumns: Array<{
-            tableName: string;
+            /** Column name to aggregate. Use `'*'` for row-level aggregations like `count`. */
             column: string;
+            /** Aggregation function. */
             aggregateFn?: HeatmapAggregateFunction;
-            aggregateFnResultColumnName?: string;
         }>;
     };
     grid: {
