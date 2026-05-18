@@ -19,6 +19,16 @@ interface LoadJsonOnTableWithCoordinatesParams {
   targetCrs: string;
   workspace: string;
 }
+
+interface LoadJsonOnTableWithWktParams {
+  jsonFileUrl: string;
+  tableName: string;
+  wktColumnName: string;
+  sourceCrs: string;
+  targetCrs: string;
+  workspace: string;
+}
+
 export const LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY = ({
   jsonFileUrl,
   tableName,
@@ -35,6 +45,31 @@ export const LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY = ({
           *,
           ST_Transform(
               ST_Point(CAST(${longColumnName} AS DOUBLE), CAST(${latColumnName} AS DOUBLE)),
+              '${sourceCrs}',
+              '${targetCrs}',
+              always_xy := true
+          ) AS ${DEFAULT_GEO_COLUMN_NAME}
+      FROM read_json_auto('${jsonFileUrl}');
+
+    DESCRIBE ${qualifiedTableName};
+  `;
+};
+
+export const LOAD_JSON_ON_TABLE_WITH_WKT_QUERY = ({
+  jsonFileUrl,
+  tableName,
+  wktColumnName,
+  sourceCrs,
+  targetCrs,
+  workspace,
+}: LoadJsonOnTableWithWktParams) => {
+  const qualifiedTableName = `${workspace}.${tableName}`;
+  return `
+    CREATE TABLE ${qualifiedTableName} AS
+      SELECT
+          *,
+          ST_Transform(
+              ST_GeomFromText(CAST(${wktColumnName} AS VARCHAR)),
               '${sourceCrs}',
               '${targetCrs}',
               always_xy := true

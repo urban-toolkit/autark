@@ -1,10 +1,10 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { LoadJsonParams } from './interfaces';
+import { JsonGeometryLayerType, LoadJsonParams } from './interfaces';
 import { JsonTable } from '../../interfaces';
-import { LOAD_JSON_ON_TABLE_QUERY, LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
+import { LOAD_JSON_ON_TABLE_QUERY, LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY, LOAD_JSON_ON_TABLE_WITH_WKT_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+import { DEFAULT_GEO_COLUMN_NAME, DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
 
 /**
  * Loads JSON data into DuckDB, with optional geometry column creation.
@@ -36,6 +36,9 @@ export class LoadJsonUseCase {
       tempFileCreated = true;
     }
 
+    const qualifiedTableName = `${workspace}.${outputTableName}`;
+    let tableCreated = false;
+    let tableType: JsonTable['type'];
     const normalizedGeometryColumns = geometryColumns === true
       ? {
           mode: 'lat-lng' as const,
@@ -58,10 +61,16 @@ export class LoadJsonUseCase {
             }
           : null;
 
-    let loadJsonQuery: string;
-    if (normalizedGeometryColumns?.mode === 'wkt') {
-      throw new Error('JSON WKT geometry columns are not implemented yet.');
+    if (normalizedGeometryColumns?.mode === 'lat-lng') {
+      if (!normalizedGeometryColumns.latColumnName.trim() || !normalizedGeometryColumns.longColumnName.trim()) {
+        throw new Error('Both latColumnName and longColumnName must be provided when using JSON latitude/longitude geometry columns.');
+      }
     }
+    if (normalizedGeometryColumns?.mode === 'wkt' && !normalizedGeometryColumns.wktColumnName.trim()) {
+      throw new Error('wktColumnName must be provided when using JSON WKT geometry columns.');
+    }
+
+    let loadJsonQuery: string;
     if (normalizedGeometryColumns?.mode === 'lat-lng') {
       loadJsonQuery = LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY({
         jsonFileUrl: jsonPath,
@@ -72,20 +81,117 @@ export class LoadJsonUseCase {
         targetCrs: workspaceCoordinateFormat,
         workspace,
       });
+      tableType = 'points';
+    } else if (normalizedGeometryColumns?.mode === 'wkt') {
+      loadJsonQuery = LOAD_JSON_ON_TABLE_WITH_WKT_QUERY({
+        jsonFileUrl: jsonPath,
+        tableName: outputTableName,
+        wktColumnName: normalizedGeometryColumns.wktColumnName,
+        sourceCrs: normalizedGeometryColumns.coordinateFormat,
+        targetCrs: workspaceCoordinateFormat,
+        workspace,
+      });
     } else {
       loadJsonQuery = LOAD_JSON_ON_TABLE_QUERY(jsonPath, outputTableName, workspace);
     }
 
-    const describeTableResponse = await this.conn.query(loadJsonQuery);
+    try {
+      const describeTableResponse = await this.conn.query(loadJsonQuery);
+      tableCreated = true;
+      const columns = getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray());
 
-    if (tempFileCreated) {
-      await this.db.dropFile(jsonPath);
+      if (normalizedGeometryColumns) {
+        await this.ensureAllRowsHaveGeometry(qualifiedTableName);
+
+        if (normalizedGeometryColumns.mode === 'wkt') {
+          tableType = await this.inferWktLayerType(qualifiedTableName, normalizedGeometryColumns.wktColumnName);
+        }
+
+        const indexName = `idx_${outputTableName}_geometry`;
+        await this.conn.query(`CREATE INDEX ${indexName} ON ${qualifiedTableName} USING RTREE (${DEFAULT_GEO_COLUMN_NAME});`);
+      }
+
+      return {
+        source: 'json',
+        name: outputTableName,
+        columns,
+        type: tableType,
+      };
+    } catch (error) {
+      if (tableCreated) {
+        await this.conn.query(`DROP TABLE IF EXISTS ${qualifiedTableName}`);
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      if (normalizedGeometryColumns?.mode === 'wkt') {
+        const wrappedError = new Error(`Failed to load JSON geometry from WKT column '${normalizedGeometryColumns.wktColumnName}': ${message}`) as Error & { cause?: unknown };
+        wrappedError.cause = error;
+        throw wrappedError;
+      }
+      if (normalizedGeometryColumns?.mode === 'lat-lng') {
+        const wrappedError = new Error(`Failed to load JSON geometry from latitude/longitude columns '${normalizedGeometryColumns.latColumnName}' and '${normalizedGeometryColumns.longColumnName}': ${message}`) as Error & { cause?: unknown };
+        wrappedError.cause = error;
+        throw wrappedError;
+      }
+      throw error;
+    } finally {
+      if (tempFileCreated) {
+        await this.db.dropFile(jsonPath);
+      }
+    }
+  }
+
+  private async ensureAllRowsHaveGeometry(qualifiedTableName: string): Promise<void> {
+    const response = await this.conn.query(`
+      SELECT COUNT(*) AS total_rows, COUNT(${DEFAULT_GEO_COLUMN_NAME}) AS geometry_rows
+      FROM ${qualifiedTableName}
+    `);
+    const row = response.toArray()[0] as { total_rows?: number | bigint; geometry_rows?: number | bigint } | undefined;
+    const totalRows = Number(row?.total_rows ?? 0);
+    const geometryRows = Number(row?.geometry_rows ?? 0);
+
+    if (totalRows !== geometryRows) {
+      throw new Error(`Geometry creation produced ${totalRows - geometryRows} null geometries.`);
+    }
+  }
+
+  private async inferWktLayerType(qualifiedTableName: string, wktColumnName: string): Promise<JsonGeometryLayerType> {
+    const response = await this.conn.query(`
+      SELECT DISTINCT CAST(ST_GeometryType(${DEFAULT_GEO_COLUMN_NAME}) AS VARCHAR) AS geometry_type
+      FROM ${qualifiedTableName}
+      WHERE ${DEFAULT_GEO_COLUMN_NAME} IS NOT NULL
+      ORDER BY geometry_type
+    `);
+
+    const rawGeometryTypes = response.toArray().map((row: { geometry_type?: unknown }) => String(row.geometry_type ?? '').toUpperCase());
+    if (rawGeometryTypes.length === 0) {
+      throw new Error(`Could not infer a layer type from WKT column '${wktColumnName}' because no non-null geometries were created.`);
     }
 
-    return {
-      source: 'json',
-      name: outputTableName,
-      columns: getColumnsFromDuckDbTableDescribe(describeTableResponse.toArray()),
-    };
+    const inferredLayerTypes = new Set<JsonGeometryLayerType>();
+    for (const rawGeometryType of rawGeometryTypes) {
+      switch (rawGeometryType) {
+        case 'POINT':
+        case 'MULTIPOINT':
+          inferredLayerTypes.add('points');
+          break;
+        case 'LINESTRING':
+        case 'MULTILINESTRING':
+          inferredLayerTypes.add('polylines');
+          break;
+        case 'POLYGON':
+        case 'MULTIPOLYGON':
+          inferredLayerTypes.add('polygons');
+          break;
+        default:
+          throw new Error(`Unsupported WKT geometry type '${rawGeometryType}' in column '${wktColumnName}'.`);
+      }
+    }
+
+    if (inferredLayerTypes.size !== 1) {
+      throw new Error(`WKT column '${wktColumnName}' contains mixed geometry families: ${rawGeometryTypes.join(', ')}.`);
+    }
+
+    return Array.from(inferredLayerTypes)[0];
   }
 }
