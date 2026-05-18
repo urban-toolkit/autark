@@ -19,10 +19,7 @@ export interface SpatialQueryParams {
   tableRootName: string;
   /** Name of the table to join against the root. */
   tableJoinName: string;
-  /**
-   * NEAR predicate configuration. When present, the join uses `'NEAR'`;
-   * otherwise it defaults to `'INTERSECT'`.
-   */
+  /** NEAR predicate configuration. When present, the join searches for features within a specified distance. */
   near?: NearConfig;
   /** Optional aggregation applied to join-side data. Keys are derived from `tableJoinName` and the aggregate function. */
   groupBy?: Array<{
