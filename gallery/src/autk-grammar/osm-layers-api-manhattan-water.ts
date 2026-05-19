@@ -12,7 +12,6 @@ export class OsmLayersApiManhattanWater {
                 queryArea: { geocodeArea: 'New York', areas: ['Manhattan Island'] },
                 outputTableName: 'table_osm',
                 autoLoadLayers: {
-                    coordinateFormat: 'EPSG:3395',
                     layers: ['water'] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                     dropOsmTable: true,
                 },

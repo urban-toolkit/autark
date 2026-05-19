@@ -18,7 +18,6 @@ export class LoadGeojson {
                     },
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
-                        coordinateFormat: 'EPSG:3395',
                         layers: ['buildings'] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                         dropOsmTable: true,
                     },

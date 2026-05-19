@@ -18,7 +18,6 @@ export class HeatmapVis {
                     },
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
-                        coordinateFormat: 'EPSG:3395',
                         layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
                         dropOsmTable: true,
                     }
@@ -30,27 +29,19 @@ export class HeatmapVis {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 },
                 {
                     type: 'heatmap',
                     tableJoinName: 'noise',
-                    nearDistance: 1000,
+                    near: { distance: 1000 },
                     outputTableName: 'heatmap',
                     grid: {
                         rows: 20,
                         columns: 20,
                     },
-                    groupBy: {
-                        selectColumns: [
-                            {
-                                tableName: 'noise',
-                                column: 'Unique Key',
-                                aggregateFn: 'count',
-                            },
-                        ],
-                    },
+                    groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
                 }
             ],
             map: {

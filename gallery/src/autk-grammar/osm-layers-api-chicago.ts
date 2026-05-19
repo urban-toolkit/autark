@@ -18,7 +18,6 @@ export class OsmLayersApiChicago {
                     }, 
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
-                        coordinateFormat: 'EPSG:3395',
                         layers: [
                             'surface',
                             'parks',

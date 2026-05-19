@@ -14,7 +14,7 @@ export class ColormapDiverging {
                     type: 'geojson',
                     geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
                     outputTableName: 'neighborhoods',
-                    coordinateFormat: 'EPSG:3395'
+                    coordinateFormat: 'EPSG:4326'
                 }
             ],
             map: {

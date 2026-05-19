@@ -20,37 +20,24 @@ export type TableSourceSpec = {
     outputTableName: string
 }
 
-export type JoinSourceSpec = Omit<TableSourceSpec, 'outputTableName'> & { 
+export type JoinSourceSpec = Omit<TableSourceSpec, 'outputTableName'> & {
     tableRootName: string;
     tableJoinName: string;
-    output: {
-        type: 'MODIFY_ROOT' | 'CREATE_NEW';
-        tableName?: string; // Required if type is 'CREATE_NEW'
-    };
-    spatialPredicate?: 'INTERSECT' | 'NEAR';
-    joinType?: 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
-    nearDistance?: number;
-    groupBy?: {
-        selectColumns: Array<{
-        tableName: string;
+    near?: { distance: number; useCentroid?: boolean };
+    groupBy?: Array<{
         column: string;
         aggregateFn?: AggregateFunction;
-        aggregateFnResultColumnName?: string; // Optional custom name for the aggregation result
-        }>;
-    };
+        normalize?: boolean;
+    }>;
 }
 
-export type HeatmapSourceSpec = TableSourceSpec & { 
+export type HeatmapSourceSpec = TableSourceSpec & {
     tableJoinName: string;
-    nearDistance: number;
-    groupBy?: {
-        selectColumns: Array<{
-            tableName: string;
-            column: string;
-            aggregateFn?: AggregateFunction;
-            aggregateFnResultColumnName?: string;
-        }>;
-    };
+    near: { distance: number };
+    groupBy?: Array<{
+        column: string;
+        aggregateFn?: AggregateFunction;
+    }>;
     grid: {
         rows: number;
         columns: number;
@@ -60,7 +47,6 @@ export type HeatmapSourceSpec = TableSourceSpec & {
 export type OsmDataSourceSpec = TableSourceSpec & {
     pbfFileUrl?: string;
     autoLoadLayers?: {
-        coordinateFormat: string;
         dropOsmTable: boolean;
         layers: Array<LayerType>;
     };

@@ -14,7 +14,7 @@ export class SpatialJoinMulti {
                     type: "geojson",
                     geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
                     outputTableName: 'neighborhoods',
-                    coordinateFormat: 'EPSG:3395'
+                    coordinateFormat: 'EPSG:4326'
                 },
                 {
                     type: "csv",
@@ -23,7 +23,7 @@ export class SpatialJoinMulti {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 },
                 {
@@ -33,53 +33,27 @@ export class SpatialJoinMulti {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 },
                 {
                     type: 'join',
                     tableRootName: 'neighborhoods',
                     tableJoinName: 'noise',
-                    spatialPredicate: 'INTERSECT',
-                    output: {
-                        type: 'MODIFY_ROOT',
-                    },
-                    joinType: 'LEFT',
-                    groupBy: {
-                        selectColumns: [
-                            {
-                                tableName: 'noise',
-                                column: 'Unique Key',
-                                aggregateFn: 'count',
-                            },
-                        ],
-                    },
+                    groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
                 },
                 {
                     type: 'join',
                     tableRootName: 'neighborhoods',
                     tableJoinName: 'parking',
-                    spatialPredicate: 'INTERSECT',
-                    output: {
-                        type: 'MODIFY_ROOT',
-                    },
-                    joinType: 'LEFT',
-                    groupBy: {
-                        selectColumns: [
-                            {
-                                tableName: 'parking',
-                                column: 'Unique Key',
-                                aggregateFn: 'count',
-                            },
-                        ],
-                    },
+                    groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
                 }
             ],
             map: {
                 layerRefs: [
                     {
                         dataRef: 'neighborhoods',
-                        getFnv: 'count_noise',
+                        getFnv: 'sjoin.count.noise',
                         defaultFnv: 0
                     }
                 ]

@@ -17,7 +17,6 @@ export class OsmLayersAPINiteroi {
                         areas: ['Região Praias da Baía'],
                     }, outputTableName: 'table_osm',
                     autoLoadLayers: {
-                        coordinateFormat: 'EPSG:3395',
                         layers: [
                             'surface',
                             'parks',

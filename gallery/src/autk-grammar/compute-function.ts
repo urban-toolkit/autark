@@ -14,7 +14,7 @@ export class ComputeFunction {
                     type: 'geojson',
                     geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
                     outputTableName: 'neighborhoods',
-                    coordinateFormat: 'EPSG:3395'
+                    coordinateFormat: 'EPSG:4326'
                 },
                 {
                     type: 'csv',
@@ -23,7 +23,7 @@ export class ComputeFunction {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 }
             ],

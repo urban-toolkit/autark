@@ -17,7 +17,7 @@ export class LoadCsv {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 }
             ]

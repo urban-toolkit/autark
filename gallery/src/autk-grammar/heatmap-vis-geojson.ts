@@ -12,7 +12,7 @@ export class HeatmapVisGeojson {
                     type: 'geojson',
                     geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
                     outputTableName: 'neighborhoods',
-                    coordinateFormat: 'EPSG:3395',
+                    coordinateFormat: 'EPSG:4326',
                 },
                 {
                     type: 'csv',
@@ -21,22 +21,16 @@ export class HeatmapVisGeojson {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 },
                 {
                     type: 'heatmap',
                     tableJoinName: 'noise',
-                    nearDistance: 1000,
+                    near: { distance: 1000 },
                     outputTableName: 'heatmap',
                     grid: { rows: 30, columns: 30 },
-                    groupBy: {
-                        selectColumns: [{
-                            tableName: 'noise',
-                            column: 'Unique Key',
-                            aggregateFn: 'count',
-                        }],
-                    },
+                    groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
                 },
             ],
             map: {

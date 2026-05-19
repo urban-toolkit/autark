@@ -1,5 +1,5 @@
 import { ComputeAdapter, ComputeSpec } from 'urban-grammar';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkComputeEngine } from '@urban-toolkit/autk-compute';
 import { FeatureCollection } from 'geojson';
 import { ComputeCache } from '../types';
@@ -7,7 +7,7 @@ import { ComputeCache } from '../types';
 export function createComputeAdapter(cache?: ComputeCache): ComputeAdapter {
 
     return {
-        async resolveCompute(context: AutkSpatialDb | undefined, spec: ComputeSpec): Promise<AutkSpatialDb | undefined> {
+        async resolveCompute(context: AutkDb | undefined, spec: ComputeSpec): Promise<AutkDb | undefined> {
             if(context){
                 const geojson: FeatureCollection = await context.getLayer(spec.dataRef);
                 const engine = new AutkComputeEngine();

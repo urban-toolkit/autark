@@ -18,7 +18,6 @@ export class SpatialJoinBuildings {
                     },
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
-                        coordinateFormat: 'EPSG:3395',
                         layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                             'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                         >,
@@ -32,28 +31,15 @@ export class SpatialJoinBuildings {
                     geometryColumns: {
                         latColumnName: 'Latitude',
                         longColumnName: 'Longitude',
-                        coordinateFormat: 'EPSG:3395',
+                        coordinateFormat: 'EPSG:4326',
                     },
                 },
                 {
                     type: "join",
                     tableRootName: 'table_osm_buildings',
                     tableJoinName: 'noise',
-                    spatialPredicate: 'NEAR',
-                    nearDistance: 1000,
-                    output: {
-                        type: 'MODIFY_ROOT',
-                    },
-                    joinType: 'LEFT',
-                    groupBy: {
-                        selectColumns: [
-                            {
-                                tableName: 'noise',
-                                column: 'Unique Key',
-                                aggregateFn: 'count',
-                            },
-                        ],
-                    },
+                    near: { distance: 1000 },
+                    groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
                 }
             ],
             map: {
@@ -72,7 +58,7 @@ export class SpatialJoinBuildings {
                     },
                     {
                         dataRef: 'table_osm_buildings',
-                        getFnv: 'count_noise'
+                        getFnv: 'sjoin.count.noise'
                     }
                 ]
             },

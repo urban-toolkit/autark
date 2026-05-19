@@ -18,7 +18,6 @@ export class LayerOpacity {
                     },
                     outputTableName: 'table_osm',
                     autoLoadLayers: {
-                        coordinateFormat: 'EPSG:3395',
                         layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                             'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                         >,
@@ -29,7 +28,7 @@ export class LayerOpacity {
                     type: 'geojson',
                     geojsonFileUrl: 'http://localhost:5173/data/mnt_neighs.geojson',
                     outputTableName: 'neighborhoods',
-                    coordinateFormat: 'EPSG:3395'
+                    coordinateFormat: 'EPSG:4326'
                 }
             ],
             map: {

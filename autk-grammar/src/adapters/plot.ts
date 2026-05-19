@@ -1,8 +1,8 @@
 import { PlotAdapter, PlotSpec, PlotMark } from 'urban-grammar';
 import { Targets, MapRegistry, GeoJsonCache } from '../types';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkPlot, PlotEvent as AutkPlotEvent } from '@urban-toolkit/autk-plot';
-import type { PlotEventData, PlotType } from '@urban-toolkit/autk-plot';
+import type { PlotEventData, PlotType, PlotTransformConfig } from '@urban-toolkit/autk-plot';
 import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import type { MapEventData } from '@urban-toolkit/autk-map';
 import { FeatureCollection } from 'geojson';
@@ -27,7 +27,7 @@ export function createPlotAdapter(targets?: Targets, registry?: MapRegistry, cac
             const div = document.getElementById(targets.plot);
             if(!div) throw new Error(`Could not find plot target: ${targets.plot}`);
 
-            const db = context as AutkSpatialDb | undefined;
+            const db = context as AutkDb | undefined;
             if(!db) throw new Error('No data context available for plot.');
 
             const geojson: FeatureCollection = cache?.get(spec.dataRef) ?? await db.getLayer(spec.dataRef);
@@ -43,7 +43,7 @@ export function createPlotAdapter(targets?: Targets, registry?: MapRegistry, cac
                 ...(spec.width     && { width: spec.width }),
                 ...(spec.height    && { height: spec.height }),
                 ...(spec.margins   && { margins: spec.margins }),
-                ...(spec.transform && { transform: spec.transform }),
+                ...(spec.transform && { transform: spec.transform as PlotTransformConfig }),
             });
 
             // Wire map ↔ plot events if a mapRef is specified

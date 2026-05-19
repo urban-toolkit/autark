@@ -1,10 +1,10 @@
 import { CsvDataSourceSpec, CustomDataSourceSpec, DataAdapter, DataSourceSpec, HeatmapSourceSpec, JoinSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { Targets, GeoJsonCache } from '../types';
 
 export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): DataAdapter {
 
-    function print(db: AutkSpatialDb, targets?: Targets): void {
+    function print(db: AutkDb, targets?: Targets): void {
         if(!targets || !targets.db)
             return
 
@@ -23,12 +23,12 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
     }
 
     return {
-        async resolveSource(context: AutkSpatialDb | undefined, spec: DataSourceSpec): Promise<AutkSpatialDb | undefined> {
+        async resolveSource(context: AutkDb | undefined, spec: DataSourceSpec): Promise<AutkDb | undefined> {
 
             let db = context;
 
             if(!db){
-                db = new AutkSpatialDb();
+                db = new AutkDb();
                 await db.init();
             }
 
@@ -59,18 +59,33 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
                         }
                         if(geojson) cache.set(geojsonSpec.outputTableName, geojson);
                     }
-                    await db.loadCustomLayer(geojsonSpec);
+                    await db.loadGeojson(geojsonSpec);
                     print(db, targets);
                     return db;
                 }
-                case 'heatmap':
-                    await db.buildHeatmap(rest_spec as HeatmapSourceSpec);
+                case 'heatmap': {
+                    const hm = rest_spec as HeatmapSourceSpec;
+                    await db.buildHeatmap({
+                        tableJoinName: hm.tableJoinName,
+                        near: { distance: hm.near.distance },
+                        outputTableName: hm.outputTableName,
+                        grid: hm.grid,
+                        ...(hm.groupBy && { groupBy: hm.groupBy }),
+                    });
                     print(db, targets);
                     return db;
-                case 'join':
-                    await db.spatialQuery(rest_spec as JoinSourceSpec);
+                }
+                case 'join': {
+                    const jn = rest_spec as JoinSourceSpec;
+                    await db.spatialQuery({
+                        tableRootName: jn.tableRootName,
+                        tableJoinName: jn.tableJoinName,
+                        ...(jn.near && { near: jn.near }),
+                        ...(jn.groupBy && { groupBy: jn.groupBy }),
+                    });
                     print(db, targets);
                     return db;
+                }
                 default:
                     return
             }

@@ -3,7 +3,7 @@ import { Targets, MapRegistry, ComputeCache } from '../types';
 import { AutkMap, MapStyle } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy } from '@urban-toolkit/autk-map';
 import type { ColorMapConfig, ColorMapDomainSpec, LayerType } from '@urban-toolkit/autk-map';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
 function buildDomainSpec(
     normalization: MapSpec['layerRefs'][number]['normalization'],
@@ -45,10 +45,10 @@ function setValueAtPath(obj: Record<string, unknown>, path: string, value: unkno
 
 export function createMapAdapter(targets?: Targets, registry?: MapRegistry, computeCache?: ComputeCache): MapAdapter {
 
-    async function loadLayers(map: AutkMap, context: AutkSpatialDb, spec: MapSpec): Promise<void> {
+    async function loadLayers(map: AutkMap, context: AutkDb, spec: MapSpec): Promise<void> {
         let tableToTypeMap: {[tableName: string]: string} = {};
         for(const table of context.tables) {
-            tableToTypeMap[table.name] = table.type;
+            if(table.type !== undefined) tableToTypeMap[table.name] = table.type;
         }
 
         for(const layerRef of spec.layerRefs){
@@ -56,7 +56,11 @@ export function createMapAdapter(targets?: Targets, registry?: MapRegistry, comp
             const type     = tableToTypeMap[name] as LayerType;
             const getFnv   = layerRef.getFnv;
 
-            const data = computeCache?.get(name) ?? await context.getLayer(name);
+            const rawData = computeCache?.get(name) ?? await context.getLayer(name);
+            const data = {
+                ...rawData,
+                features: (rawData.features ?? []).filter((f: any) => f.geometry != null),
+            };
 
             if(type === 'raster') {
                 map.loadCollection(name, { collection: data, type: 'raster', property: getFnv ?? '' });
@@ -118,7 +122,7 @@ export function createMapAdapter(targets?: Targets, registry?: MapRegistry, comp
     }
 
     return {
-        async resolveMap(context: AutkSpatialDb | undefined, spec: MapSpec, index: number = 0): Promise<void> {
+        async resolveMap(context: AutkDb | undefined, spec: MapSpec, index: number = 0): Promise<void> {
             if(targets && targets.map && context){
 
                 let canvas;

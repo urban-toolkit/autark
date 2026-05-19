@@ -14,7 +14,7 @@ export class GeoJSONLinesVis {
                     type: 'geojson',
                     geojsonFileUrl: 'http://localhost:5173/data/mnt_roads.geojson',
                     outputTableName: 'roads',
-                    coordinateFormat: 'EPSG:3395'
+                    coordinateFormat: 'EPSG:4326'
                 }
             ],
             map: {
