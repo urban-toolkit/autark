@@ -1,17 +1,24 @@
-import { ThematicAggregationLevel } from './constants';
+/**
+ * @module VectorLayer
+ * Base implementation for renderable vector layers.
+ *
+ * This module defines `VectorLayer`, an abstract `Layer` subclass that stores
+ * flattened vector geometry, per-feature thematic values, and interaction state
+ * used for highlighting, skipping, and picking. It also owns the shared GPU
+ * pipeline setup used by triangle-based vector rendering passes.
+ */
 
-import { 
-    ILayerComponent, 
-    ILayerData, 
-    ILayerGeometry, 
-    ILayerInfo, 
-    ILayerRenderInfo, 
-    ILayerThematic 
-} from './interfaces';
+import { Camera, LayerComponent, LayerGeometry } from './types-core';
+
+import {
+    LayerData, 
+    LayerInfo, 
+    LayerRenderInfo, 
+    LayerThematic 
+} from './types-layers';
 
 import { Layer } from './layer';
 
-import { Camera } from './camera';
 import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
@@ -19,224 +26,186 @@ import { PipelineTriangleFlat } from './pipeline-triangle-flat';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
 
 /**
- * Vector layer class extends Layer to handle vector data.
- * It manages the positions, thematic data, indices, and components of the layer, as well as the rendering pipelines.
+ * Abstract base class for vector-backed map layers.
+ *
+ * `VectorLayer` stores merged geometry buffers, cumulative component metadata,
+ * per-vertex thematic values, and interaction masks used by rendering and
+ * picking pipelines. Concrete subclasses supply layer-specific semantics while
+ * reusing the shared logic for loading flattened geometry, maintaining
+ * highlight/skip state, and issuing draw passes.
  */
 export abstract class VectorLayer extends Layer {
-    /**
-     * Dimension of the layer.
-     * @type {number}
-     */
+    /** Vertex dimension used by the position buffer. */
     protected _dimension: number;
 
+    /** Flattened vertex position buffer. */
+    protected _position!: Float32Array;
 
+    /** Per-vertex thematic values used for color mapping. */
+    protected _thematic!: Float32Array;
 
-    /**
-     * Positions of the triangles.
-     * @type {number[]}
-     */
-    protected _position!: number[];
+    /** Per-vertex validity mask for thematic values. */
+    protected _thematicValidity!: Float32Array;
 
-    /**
-     * Thematic data for the layer.
-     * @type {number[]}
-     */
-    protected _thematic!: number[];
+    /** Triangle index buffer into {@link _position}. */
+    protected _indices!: Uint32Array;
 
-    /**
-     * Indices of the triangles.
-     * @type {number[]}
-     */
-    protected _indices!: number[];
+    /** Cumulative component ranges aligned with source features. */
+    protected _components: LayerComponent[] = [];
 
-    /**
-     * Components of the layer.
-     * @type {ILayerComponent[]}
-     */
-    protected _components: ILayerComponent[] = [];
-
-
-
-    /**
-     * Highlighted IDs of the layer.
-     * This is a set to ensure uniqueness of highlighted IDs.
-     * @type {Set<number>}
-     */
+    /** Component ids currently marked as highlighted. */
     protected _highlightedIds!: Set<number>;
 
-    /**
-     * Highlighted vertices of the layer.
-     * @type {number[]}
-     */
-    protected _highlightedVertices!: number[];
+    /** Per-vertex highlight mask. */
+    protected _highlightedVertices!: Float32Array;
 
-    /**
-     * Skipped IDs of the layer.
-     * This is a set to ensure uniqueness of skipped IDs.
-     * @type {Set<number>}
-     */
+    /** Component ids currently marked as skipped. */
     protected _skippedIds!: Set<number>;
 
-    /**
-     * Skipped vertices of the layer.
-     * @type {number[]}
-     */
-    protected _skippedVertices!: number[];
+    /** Per-vertex skip mask. */
+    protected _skippedVertices!: Float32Array;
 
-
-
-    /**
-     * Rendering pipeline for the layer.
-     * @type {Pipeline}
-     */
+    /** Primary triangle-rendering pipeline. */
     protected _pipeline!: Pipeline;
 
-    /**
-     * Pipeline for picking triangles.
-     * @type {PipelineTrianglePicking}
-     */
+    /** Off-screen triangle-picking pipeline. */
     protected _pipelinePicking!: PipelineTrianglePicking;
 
-
-
+    /** Number of vertices in the position buffer. */
+    protected get _vertexCount(): number {
+        return this._position.length / this._dimension;
+    }
 
     /**
-     * Constructor for Triangles2DLayer
-     * @param {ILayerInfo} layerInfo - The layer information.
-     * @param {ILayerRenderInfo} layerRenderInfo - The layer render information.
-     * @param {ILayerData} layerData - The layer data.
-     * @param {number} dimension - The dimension of the layer (2 or 3).
+     * Creates a vector layer and loads its initial buffers.
+     *
+     * Construction immediately flattens the provided geometry and component
+     * metadata into layer-local buffers and resets any interaction state. The
+     * optional thematic payload is loaded only when entries are present.
+     *
+     * @param layerInfo Static layer metadata such as id, type, and z-index.
+     * @param layerRenderInfo Render configuration used by shared layer pipelines.
+     * @param layerData Initial geometry, component, and optional thematic data.
+     * @param dimension Number of coordinates stored per vertex. Use `2` for planar layers and `3` for layers with explicit elevation.
      */
-    constructor(layerInfo: ILayerInfo, layerRenderInfo: ILayerRenderInfo, layerData: ILayerData, dimension: number = 2) {
+    constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData, dimension: number = 2) {
         super(layerInfo, layerRenderInfo);
 
         this._dimension = dimension;
         this.loadLayerData(layerData);
     }
 
+    /** Indicates that vector layers participate in picking passes. */
+    get supportsPicking(): boolean { return true; }
 
+    /** Indicates that vector layers support per-feature highlighting. */
+    get supportsHighlight(): boolean { return true; }
 
-
-    /**
-     * Get the positions of the triangles.
-     * @returns {number[]} - The positions of the triangles.
-     */
-    get position(): number[] {
+    /** Flattened vertex position buffer. */
+    get position(): Float32Array {
         return this._position;
     }
 
-    /**
-     * Get the thematic data of the layer.
-     * @returns {number[]} - The thematic data.
-     */
-    get thematic(): number[] {
+    /** Per-vertex thematic values aligned with {@link position}. */
+    get thematic(): Float32Array {
         return this._thematic;
     }
 
-    /**
-     * Get the indices of the triangles.
-     * @returns {number[]} - The indices of the triangles.
-     */
-    get indices(): number[] {
+    /** Per-vertex thematic validity mask aligned with {@link thematic}. */
+    get thematicValidity(): Float32Array {
+        return this._thematicValidity;
+    }
+
+    /** Triangle index buffer referencing vertices in {@link position}. */
+    get indices(): Uint32Array {
         return this._indices;
     }
 
-    /**
-     * Get the components of the layer.
-     * @returns {ILayerComponent[]} - The components of the layer.
-     */
-    get components(): ILayerComponent[] {
+    /** Cumulative component ranges aligned with the source feature order. */
+    get components(): LayerComponent[] {
         return this._components;
     }
 
-    /**
-     * Gets the IDs of the highlighted components in the layer.
-     * @returns {number[]} The highlighted IDs.
-     */
+    /** Highlighted component ids as an array snapshot. */
     get highlightedIds(): number[] {
         return Array.from(this._highlightedIds);
     }
 
-    /**
-     * Gets the highlighted vertices of the layer.
-     * @returns {number[]} The highlighted vertices.
-     */
-    get highlightedVertices(): number[] {
+    /** Per-vertex highlight mask uploaded to rendering pipelines. */
+    get highlightedVertices(): Float32Array {
         return this._highlightedVertices;
     }
 
-    /**
-     * Gets the IDs of the skipped components in the layer.
-     * @returns {number[]} The skipped IDs.
-     */
+    /** Skipped component ids as an array snapshot. */
     get skippedIds(): number[] {
         return Array.from(this._skippedIds);
     }
 
-    /**
-     * Gets the skipped vertices of the layer.
-     * @returns {number[]} The skipped vertices.
-     */
-    get skippedVertices(): number[] {
+    /** Per-vertex skip mask uploaded to rendering pipelines. */
+    get skippedVertices(): Float32Array {
         return this._skippedVertices;
     }
 
-
-
-
     /**
-     * Load the layer data, including geometry and components.
-     * @param {ILayerData} layerData - The data associated with the layer.
+     * Replaces the layer's geometry, component metadata, and optional thematic data.
+     *
+     * Geometry and components are always reloaded together and reset highlight
+     * and skip state, because component-to-vertex alignment may change. Thematic
+     * data is loaded only when a non-empty thematic array is provided.
+     *
+     * @param layerData Layer payload containing geometry, components, and optional thematic values.
+     * @returns Updates the layer's in-memory buffers and interaction masks.
      */
-    public loadLayerData(layerData: ILayerData): void {
+    loadLayerData(layerData: LayerData): void {
         this.loadGeometry(layerData.geometry);
         this.loadComponent(layerData.components);
+        this._resetInteractionState();
 
         if (layerData.thematic && layerData.thematic.length) {
             this.loadThematic(layerData.thematic);
         }
-
-        this._highlightedVertices = new Array(this._position.length / 3).fill(0);
-        this._highlightedIds = new Set<number>();
-
-        this._skippedVertices = new Array(this._position.length / 3).fill(0);
-        this._skippedIds = new Set<number>();
     }
 
     /**
-     * Load the geometry data for the layer.
-     * @param {ILayerGeometry[]} layerGeometry - The geometry data to load.
+     * Flattens component geometry into shared position and index buffers.
+     *
+     * Positions from all geometries are concatenated in input order. When an
+     * individual geometry provides indices, they are re-based to the current
+     * accumulated vertex offset before being appended to the shared index buffer.
+     *
+     * @param layerGeometry Geometry records to merge into contiguous buffers.
+     * @returns Updates {@link position} and {@link indices} in place for subsequent rendering.
      */
-    public loadGeometry(layerGeometry: ILayerGeometry[]): void {
-        const position: number[] = [];
-        const indices: number[] = [];
+    loadGeometry(layerGeometry: LayerGeometry[]): void {
+        let totalVerts = 0;
+        let totalIndices = 0;
+        for (const g of layerGeometry) {
+            totalVerts += g.position.length;
+            totalIndices += (g.indices?.length ?? 0);
+        }
+
+        const position = new Float32Array(totalVerts);
+        const indices = new Uint32Array(totalIndices);
+
+        let vOffset = 0;
+        let iOffset = 0;
+        let vertexCount = 0;
 
         for (let id = 0; id < layerGeometry.length; id++) {
-            // fix the index count
-            layerGeometry[id].indices?.forEach((a) => {
-                const b = a + position.length / 3;
-                indices.push(b);
-            });
+            const g = layerGeometry[id];
+            
+            position.set(g.position, vOffset);
 
-            // merges the position data
-            layerGeometry[id].position.forEach((d, id) => {
-                if (this._dimension === 2) {
-                    position.push(d);
-
-                    if (id % 2 === 1) {
-                        const z = this._layerInfo.zIndex;
-                        position.push(z);
-                    }
+            if (g.indices) {
+                for (let i = 0; i < g.indices.length; i++) {
+                    indices[iOffset + i] = g.indices[i] + vertexCount;
                 }
+                iOffset += g.indices.length;
+            }
 
-                if (this._dimension === 3) {
-                    if (id % 3 === 2) {
-                        d += this._layerInfo.zIndex;
-                    }
-
-                    position.push(d);
-                }
-            });
+            const vertsAdded = g.position.length / this._dimension;
+            vOffset += g.position.length;
+            vertexCount += vertsAdded;
         }
 
         this._position = position;
@@ -244,10 +213,16 @@ export abstract class VectorLayer extends Layer {
     }
 
     /**
-     * Load the components of the layer.
-     * @param {ILayerComponent[]} layerComponents - The components to load.
+     * Loads cumulative component ranges for feature-level addressing.
+     *
+     * Input components are converted into cumulative point and triangle counts.
+     * This lets the layer resolve feature-local ranges when applying thematic
+     * values or interaction masks by component id.
+     *
+     * @param layerComponents Per-feature component metadata in source order.
+     * @returns Replaces the component table used for thematic aggregation and interaction updates.
      */
-    public loadComponent(layerComponents: ILayerComponent[]): void {
+    loadComponent(layerComponents: LayerComponent[]): void {
         this._components = [];
 
         const accum = { nPoints: 0, nTriangles: 0 };
@@ -259,65 +234,86 @@ export abstract class VectorLayer extends Layer {
 
             this._components.push({
                 nPoints: accum.nPoints,
-                nTriangles: accum.nTriangles
+                nTriangles: accum.nTriangles,
+                featureIndex: comp.featureIndex,
+                featureId: comp.featureId,
             });
         }
     }
 
     /**
-     * Load the thematic data for the layer.
-     * @param {ILayerThematic[]} layerThematic - The thematic data to load.
+     * Expands per-component thematic values into per-vertex buffers.
+     *
+     * Thematic input must contain exactly one entry per loaded component. Each
+     * component value is repeated across all vertices belonging to that
+     * component, and a parallel validity mask is generated from
+     * `LayerThematic.valid`. On mismatch or incomplete filling, the method logs
+     * an error and leaves the existing thematic buffers unchanged.
+     *
+     * @param layerThematic Thematic entries aligned one-to-one with {@link components}.
+     * @returns `true` when both thematic buffers were rebuilt successfully; otherwise `false`.
      */
-    public loadThematic(layerThematic: ILayerThematic[]): void {
-        const thematic: number[] = [];
-
-        for (let compId = 0; compId < layerThematic.length; compId++) {
-            let aggr: number[] = [];
-
-            switch (layerThematic[compId].level) {
-                case ThematicAggregationLevel.AGGREGATION_POINT:
-                    aggr = this.aggregateThematicPoint(layerThematic[compId]);
-                    break;
-                case ThematicAggregationLevel.AGGREGATION_PRIMITIVE:
-                    aggr = this.aggregateThematicPrimitive(compId, layerThematic[compId]);
-                    break;
-                case ThematicAggregationLevel.AGGREGATION_COMPONENT:
-                    aggr = this.aggregateThematicComponenet(compId, layerThematic[compId]);
-                    break;
-                default:
-                    console.error(`Unknown thematic layer aggregation type: ${layerThematic[compId].level}.`);
-                    break;
-            }
-
-            for (let aId = 0; aId < aggr.length; aId++) {
-                thematic.push(aggr[aId]);
-            }
+    loadThematic(layerThematic: LayerThematic[]): boolean {
+        if (layerThematic.length !== this._components.length) {
+            console.error(
+                `VectorLayer.loadThematic: expected ${this._components.length} thematic entries, got ${layerThematic.length}.`
+            );
+            return false;
         }
 
-        console.assert(thematic.length === this._position.length / 3);
+        const thematic = new Float32Array(this._vertexCount);
+        const thematicValidity = new Float32Array(this._vertexCount);
+
+        let offset = 0;
+        for (let compId = 0; compId < layerThematic.length; compId++) {
+            const aggr = this.aggregateThematicComponent(compId, layerThematic[compId]);
+            thematic.set(aggr.value, offset);
+            thematicValidity.set(aggr.valid, offset);
+            offset += aggr.value.length;
+        }
+
+        if (offset !== this._vertexCount) {
+            console.error(
+                `VectorLayer.loadThematic: filled ${offset} thematic values for ${this._vertexCount} vertices.`
+            );
+            return false;
+        }
+
         this._thematic = thematic;
+        this._thematicValidity = thematicValidity;
+        return true;
     }
 
-
-
-
     /**
-     * Create the rendering pipeline for the layer.
-     * @param {Renderer} renderer - The renderer instance.
+     * Builds the render and picking pipelines for this layer.
+     *
+     * The primary pipeline renders the visible vector pass, and the picking
+     * pipeline renders the same geometry into the off-screen picking target.
+     * Both pipelines are built against the layer's current buffers.
+     *
+     * @param renderer Renderer used to create GPU resources and pipeline state.
+     * @returns Initializes GPU pipelines required for normal rendering and picking.
      */
-    public createPipeline(renderer: Renderer): void {
+    createPipeline(renderer: Renderer): void {
         this._pipeline = new PipelineTriangleFlat(renderer);
         this._pipeline.build(this);
 
-        this._pipelinePicking = new PipelineTrianglePicking(renderer);
+        this._pipelinePicking = new PipelineTrianglePicking(renderer, this._dimension);
         this._pipelinePicking.build(this);
     }
 
     /**
-     * Render the layer for the current pass.
-     * @param {Camera} camera - The camera instance.
+     * Renders the layer into the active color pass.
+     *
+     * Pending render-info updates refresh color uniforms before drawing. Pending
+     * data updates refresh vertex buffers for both the visible and picking
+     * pipelines so the two passes stay aligned.
+     *
+     * @param camera Camera providing the current view and projection state.
+     * @param passEncoder Active render-pass encoder for the current frame.
+     * @returns Issues draw commands for the layer's visible triangle pass.
      */
-    public renderPass(camera: Camera): void {
+    renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         if (this._renderInfoIsDirty) {
             this._pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
@@ -325,39 +321,39 @@ export abstract class VectorLayer extends Layer {
 
         if (this._dataIsDirty) {
             this._pipeline.updateVertexBuffers(this);
+            this._pipelinePicking.updateVertexBuffers(this);
             this._dataIsDirty = false;
         }
 
-        this._pipeline.renderPass(camera);
+        this._pipeline.updateZIndex(this._layerInfo.zIndex);
+        this._pipeline.renderPass(camera, passEncoder);
     }
 
     /**
-     * Render the picking pass for the layer.
-     * @param {Camera} camera - The camera instance.
+     * Renders the layer into the picking target.
+     *
+     * This pass uses the dedicated picking pipeline and updates its z-index to
+     * match the visible pass before rendering.
+     *
+     * @param camera Camera providing the current view and projection state.
+     * @returns Issues draw commands for the off-screen picking pass.
      */
-    public renderPickingPass(camera: Camera): void {
+    renderPickingPass(camera: Camera): void {
+        this._pipelinePicking.updateZIndex(this._layerInfo.zIndex);
         this._pipelinePicking.renderPass(camera);
     }
 
-
-
-
     /**
-     * Get the picked ID at the specified screen coordinates.
-     * @param x - The x-coordinate of the screen position.
-     * @param y - The y-coordinate of the screen position.
-     * @returns {Promise<number>} - A promise that resolves to the picked ID.
+     * Toggles highlight state for the specified component ids.
+     *
+     * Each id is toggled independently. The corresponding vertex mask is also
+     * toggled once per unique vertex referenced by the affected components. Ids
+     * outside the current component range are ignored by the vertex update step.
+     *
+     * @param ids Component ids to toggle.
+     * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    public getPickedId(x: number, y: number): Promise<number> {
-        return this._pipelinePicking.readPickedId(x, y);
-    }
-
-    /**
-     * Toggle highlighted IDs for the layer.
-     * @param {number[]} ids - The IDs to highlight.
-     */
-    public toggleHighlightedIds(ids: number[]): void {
-        // If id is already in highlightedIds, remove it (i.e., toggle it off)
+    toggleHighlightedIds(ids: number[]): void {
         ids.forEach(id => {
             if (this._highlightedIds.has(id)) {
                 this._highlightedIds.delete(id);
@@ -367,59 +363,48 @@ export abstract class VectorLayer extends Layer {
             }
         });
 
-        const toggled = new Set<number>();
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
-                const vertexIndex = this._indices[i];
-
-                if (!toggled.has(vertexIndex)) {
-                    this._highlightedVertices[vertexIndex] = 1 - this._highlightedVertices[vertexIndex];
-                    toggled.add(vertexIndex);
-                }
-            }
-        }
+        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
+            this._highlightedVertices[vertexIndex] = 1 - this._highlightedVertices[vertexIndex];
+        });
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }
 
     /**
-     * Set highlighted IDs for the layer.
-     * @param {number[]} ids - The IDs to highlight.
+     * Replaces the current highlight selection.
+     *
+     * Existing highlight state is cleared before the new ids are applied. The
+     * highlight mask is then set to `1` for each unique vertex referenced by the
+     * provided component ids.
+     *
+     * @param ids Component ids that should remain highlighted.
+     * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    public setHighlightedIds(ids: number[]): void {
+    setHighlightedIds(ids: number[]): void {
         this.clearHighlightedIds();
         
         this._highlightedIds = new Set(ids);
 
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
-                const vertexIndex = this._indices[i];
-                this._highlightedVertices[vertexIndex] = 1;
-            }
-        }
+        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
+            this._highlightedVertices[vertexIndex] = 1;
+        });
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }    
 
-
     /**
-     * Set skipped IDs for the layer.
-     * @param {number[]} ids - The IDs to skip.
+     * Toggles skip state for the specified component ids.
+     *
+     * Each id is toggled independently, and the per-vertex skip mask is updated
+     * once per unique vertex referenced by the affected components. This method
+     * does not clear previously skipped ids before applying the toggle.
+     *
+     * @param ids Component ids to toggle in the skip set.
+     * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    public setSkippedIds(ids: number[]): void {
-        // If id is already in skippedIds, remove it (i.e., toggle it off)
+    setSkippedIds(ids: number[]): void {
         ids.forEach(id => {
             if (this._skippedIds.has(id)) {
                 this._skippedIds.delete(id);
@@ -429,33 +414,20 @@ export abstract class VectorLayer extends Layer {
             }
         });
 
-        const toggled = new Set<number>();
-        for (const id of ids) {
-            if (id < 0) continue;
-
-            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
-            const eTriangle = this._components[id].nTriangles;
-
-            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
-                const vertexIndex = this._indices[i];
-
-                if (!toggled.has(vertexIndex)) {
-                    this._skippedVertices[vertexIndex] = 1 - this._skippedVertices[vertexIndex];
-                    toggled.add(vertexIndex);
-                }
-            }
-        }
+        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
+            this._skippedVertices[vertexIndex] = 1 - this._skippedVertices[vertexIndex];
+        });
 
         this.makeLayerRenderInfoDirty();
         this.makeLayerDataDirty();
     }
 
-
-
     /**
-     * Clears the highlighted components of the layer.
+     * Clears all highlighted component ids and vertex flags.
+     *
+     * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    public clearHighlightedIds() {
+    clearHighlightedIds(): void {
         this._highlightedVertices.fill(0);
         this._highlightedIds.clear();
 
@@ -464,9 +436,11 @@ export abstract class VectorLayer extends Layer {
     }
 
     /**
-     * Clears the skipped components of the layer.
+     * Clears all skipped component ids and vertex flags.
+     *
+     * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    public clearSkippedIds() {
+    clearSkippedIds(): void {
         this._skippedVertices.fill(0);
         this._skippedIds.clear();
 
@@ -474,63 +448,77 @@ export abstract class VectorLayer extends Layer {
         this.makeLayerDataDirty();
     }
 
-
-
-
     /**
-     * Aggregate thematic data for point level.
-     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
-     * @returns {number[]} - The aggregated thematic data.
+     * Releases GPU resources owned by this layer's pipelines.
+     *
+     * @returns Destroys the visible and picking pipelines when they have been created.
      */
-    private aggregateThematicPoint(layerThematic: ILayerThematic): number[] {
-        return layerThematic.values;
+    override destroy(): void {
+        this._pipeline?.destroy();
+        this._pipelinePicking?.destroy();
     }
 
     /**
-     * Aggregate thematic data for primitive level.
-     * @param {number} component - The component index.
-     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
-     * @returns {number[]} - The aggregated thematic data.
+     * Expands one component's thematic payload to the component's vertex range.
+     *
+     * Missing thematic values default to `0`, and missing validity flags also
+     * default to `0`.
+     *
+     * @param component Index of the component in the cumulative component table.
+     * @param layerThematic Thematic payload associated with that component.
+     * @returns Object containing per-vertex thematic values and validity flags for the component.
      */
-    private aggregateThematicPrimitive(component: number, layerThematic: ILayerThematic): number[] {
-        // component points: start/end indices and number of points
+    private aggregateThematicComponent(component: number, layerThematic: LayerThematic): { value: Float32Array; valid: Float32Array } {
         const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
         const ePoint = this._components[component].nPoints;
         const nPoint = ePoint - sPoint;
 
-        // component triangles: start/end indices
-        const sTriangle = component > 0 ? this._components[component - 1].nTriangles : 0;
-        const eTriangle = this._components[component].nTriangles;
+        const thematic = new Float32Array(nPoint);
+        const thematicValidity = new Float32Array(nPoint);
+        const value = layerThematic.value ?? 0;
+        thematic.fill(value);
+        thematicValidity.fill(layerThematic.valid ?? 0);
 
-        const thematic = new Array(nPoint);
-
-        for (let id = 3 * sTriangle; id < 3 * eTriangle; id++) {
-            const vid = this._indices[id] - sPoint;
-            const tid = Math.floor(id / 3) - sTriangle;
-
-            thematic[vid] = layerThematic.values[tid];
-        }
-
-        return thematic;
+        return { value: thematic, valid: thematicValidity };
     }
 
     /**
-     * Aggregate thematic data for component level.
-     * @param {number} component - The component index.
-     * @param {ILayerThematic} layerThematic - The thematic data to aggregate.
-     * @returns {number[]} - The aggregated thematic data.
+     * Resets all interaction masks after geometry or component data changes.
+     *
+     * The interaction buffers are rebuilt to match the current vertex count, and
+     * both highlight and skip id sets are cleared.
      */
-    private aggregateThematicComponenet(component: number, layerThematic: ILayerThematic): number[] {
-        const sPoint = component > 0 ? this._components[component - 1].nPoints : 0;
-        const ePoint = this._components[component].nPoints;
-        const nPoint = ePoint - sPoint;
+    private _resetInteractionState(): void {
+        this._highlightedVertices = new Float32Array(this._vertexCount).fill(0);
+        this._highlightedIds = new Set<number>();
+        this._skippedVertices = new Float32Array(this._vertexCount).fill(0);
+        this._skippedIds = new Set<number>();
+    }
 
-        const thematic = new Array(nPoint);
+    /**
+     * Visits each unique indexed vertex referenced by the given components.
+     *
+     * Invalid component ids are ignored. Vertices shared by multiple triangles
+     * or component ids are visited only once.
+     *
+     * @param ids Component ids whose indexed vertices should be traversed.
+     * @param fn Callback invoked once for each unique vertex index.
+     */
+    private _forEachUniqueVertexInComponents(ids: number[], fn: (vertexIndex: number) => void): void {
+        const visited = new Set<number>();
 
-        for (let vId = 0; vId < nPoint; vId++) {
-            thematic[vId] = layerThematic.values[0];
+        for (const id of ids) {
+            if (id < 0 || id >= this._components.length) { continue; }
+
+            const sTriangle = id > 0 ? this._components[id - 1].nTriangles : 0;
+            const eTriangle = this._components[id].nTriangles;
+
+            for (let i = 3 * sTriangle; i < 3 * eTriangle; i++) {
+                const vertexIndex = this._indices[i];
+                if (visited.has(vertexIndex)) { continue; }
+                visited.add(vertexIndex);
+                fn(vertexIndex);
+            }
         }
-
-        return thematic;
     }
 }

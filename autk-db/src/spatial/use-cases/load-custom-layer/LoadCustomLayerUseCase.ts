@@ -1,13 +1,16 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { CustomLayerTable } from '../../../shared/interfaces';
-import { Params } from './interfaces';
+import { LoadCustomLayerParams } from './interfaces';
 import { DEFALT_COORDINATE_FORMAT } from '../../../shared/consts';
 import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { FeatureCollection } from 'geojson';
 import { BoundingBox } from '../../../shared/interfaces';
-import { mapGeojsonGeometryTypeToLayerType } from '../load-layer/interfaces';
+import { mapGeometryTypeToLayerType } from 'autk-core';
 
+/**
+ * Loads a GeoJSON FeatureCollection as a spatial layer table.
+ */
 export class LoadCustomLayerUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;
@@ -24,7 +27,8 @@ export class LoadCustomLayerUseCase {
     coordinateFormat = DEFALT_COORDINATE_FORMAT,
     boundingBox,
     workspace = 'main',
-  }: Params): Promise<CustomLayerTable> {
+    layerType,
+  }: LoadCustomLayerParams): Promise<CustomLayerTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
     }
@@ -58,7 +62,7 @@ export class LoadCustomLayerUseCase {
       throw new Error('First feature has no geometry or geometry type');
     }
 
-    const geometryType = mapGeojsonGeometryTypeToLayerType(firstFeature.geometry.type);
+    const geometryType = layerType ?? mapGeometryTypeToLayerType(firstFeature.geometry.type);
 
     const describeTableResponse = await this.createTableFromFeatureCollection(
       geojson,

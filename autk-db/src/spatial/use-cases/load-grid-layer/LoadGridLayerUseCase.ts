@@ -11,6 +11,9 @@ export interface LoadGridLayerParams {
   workspace?: string;
 }
 
+/**
+ * Creates a grid layer table with evenly spaced cell centroids.
+ */
 export class LoadGridLayerUseCase {
   private conn: AsyncDuckDBConnection;
 

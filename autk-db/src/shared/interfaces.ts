@@ -1,4 +1,15 @@
-import { LayerType } from '../spatial/use-cases/load-layer/interfaces';
+import { LayerType, BoundingBox } from 'autk-core';
+
+export type { BoundingBox };
+export {
+  PARKS_LEISURE_VALUES,
+  PARKS_LANDUSE_VALUES,
+  PARKS_NATURAL_VALUES,
+  WATER_NATURAL_VALUES,
+  WATER_FEATURE_VALUES,
+  EXCLUDED_HIGHWAY_VALUES as EXCLUDED_ROAD_HIGHWAY_VALUES,
+  EXCLUDED_BUILDING_VALUES,
+} from './osm-tag-definitions';
 
 export type GridLayerTable = CommonTable & { source: 'user'; type: LayerType };
 export type GeoTiffTable   = CommonTable & { source: 'geotiff'; type: 'raster' };
@@ -12,7 +23,7 @@ export type CsvTable = CommonTable & { source: 'csv'; type: 'pointset' }; // TOD
 export type JsonTable = CommonTable & { source: 'json'; type: 'pointset' };
 export type AnyTable = CommonTable & { source: 'user'; type: 'pointset' };
 
-interface CommonTable {
+export interface CommonTable {
   name: string;
   columns: Column[];
 }
@@ -20,11 +31,4 @@ interface CommonTable {
 export interface Column {
   name: string;
   type: string;
-}
-
-export interface BoundingBox {
-  minLon: number;
-  minLat: number;
-  maxLon: number;
-  maxLat: number;
 }

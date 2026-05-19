@@ -1,11 +1,14 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { Params } from './interfaces';
+import { LoadCsvParams } from './interfaces';
 import { CsvTable } from '../../../shared/interfaces';
 import { LOAD_CSV_ON_TABLE_QUERY, LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 import { DEFALT_COORDINATE_FORMAT, DEFAULT_GEO_COLUMN_NAME } from '../../../shared/consts';
 
+/**
+ * Loads CSV data into DuckDB, with optional geometry column creation.
+ */
 export class LoadCsvUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;
@@ -15,7 +18,7 @@ export class LoadCsvUseCase {
     this.conn = conn;
   }
 
-  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = 'main' }: Params): Promise<CsvTable> {
+  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = 'main' }: LoadCsvParams): Promise<CsvTable> {
     if (!csvFileUrl && !csvObject) {
       throw new Error('Either csvFileUrl or csvObject must be provided');
     }
@@ -23,16 +26,15 @@ export class LoadCsvUseCase {
       throw new Error('Cannot provide both csvFileUrl and csvObject. Please provide only one.');
     }
 
-    let csvPath = csvFileUrl as string;
-    let tempFileCreated = false;
+    const csvString = csvFileUrl
+      ? await fetch(csvFileUrl).then((r) => {
+          if (!r.ok) throw new Error(`HTTP error! Error to load ${csvFileUrl}! Status: ${r.status}`);
+          return r.text();
+        })
+      : this.buildCsvString(csvObject!, delimiter);
 
-    if (csvObject) {
-      const csvString = this.buildCsvString(csvObject, delimiter);
-
-      csvPath = `temp_csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.csv`;
-      await this.db.registerFileText(csvPath, csvString);
-      tempFileCreated = true;
-    }
+    const csvPath = `temp_csv_${Date.now()}_${Math.random().toString(36).slice(2, 11)}.csv`;
+    await this.db.registerFileText(csvPath, csvString);
 
     const qualifiedTableName = `${workspace}.${outputTableName}`;
     
@@ -59,9 +61,7 @@ export class LoadCsvUseCase {
       await this.conn.query(`CREATE INDEX ${indexName} ON ${qualifiedTableName} USING RTREE (${DEFAULT_GEO_COLUMN_NAME});`);
     }
 
-    if (tempFileCreated) {
-      await this.db.dropFile(csvPath);
-    }
+    await this.db.dropFile(csvPath);
 
     return {
       source: 'csv',

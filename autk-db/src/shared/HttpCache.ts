@@ -7,8 +7,11 @@ export class HttpCache<T = any> {
     private readonly ttl: number;
 
     /**
-     * @param cacheName - Name of the cache storage
-     * @param ttl - Time to live in milliseconds (default: 24 hours)
+     * Creates an HTTP cache with the given name and TTL.
+     *
+     * @param cacheName Name of the cache storage.
+     * @param ttl Time to live in milliseconds (default: 24 hours).
+     * @throws Never throws.
      */
     constructor(cacheName: string, ttl: number = 24 * 60 * 60 * 1000) {
         this.cacheName = cacheName;
@@ -16,27 +19,33 @@ export class HttpCache<T = any> {
     }
 
     /**
-     * Initialize cache if available
+     * Initializes the Cache API storage if available.
+     *
+     * @throws Never throws. Failures leave the cache as `null`.
      */
     private async init(): Promise<void> {
         if ('caches' in self && !this.cache) {
             try {
                 this.cache = await caches.open(this.cacheName);
-            } catch (e) {
+            } catch {
                 this.cache = null;
             }
         }
     }
 
     /**
-     * Get data from cache if available and not expired
+     * Returns cached data for a key, or `null` if missing or expired.
+     *
+     * @param key Cache key to look up.
+     * @returns Cached data or `null`.
+     * @throws Never throws. Errors are caught and return `null`.
      */
     async get(key: string): Promise<T | null> {
         await this.init();
         if (!this.cache) return null;
 
         try {
-            const response = await this.cache.match(key);
+            const response = await this.cache.match(this.toRequest(key));
             if (!response) return null;
 
             const cached = await response.json();
@@ -44,18 +53,27 @@ export class HttpCache<T = any> {
 
             // Check if expired
             if (now - cached.timestamp > this.ttl) {
-                await this.cache.delete(key);
+                await this.cache.delete(this.toRequest(key));
                 return null;
             }
 
             return cached.data as T;
-        } catch (e) {
+        } catch {
             return null;
         }
     }
 
+    private toRequest(key: string): Request {
+        return new Request(`https://cache.local/${encodeURIComponent(key)}`);
+    }
+
     /**
-     * Store data in cache with current timestamp
+     * Stores data in the cache with a current timestamp.
+     *
+     * @param key Cache key to store under.
+     * @param data Value to cache.
+     * @returns Nothing.
+     * @throws Never throws. Errors are silently caught.
      */
     async set(key: string, data: T): Promise<void> {
         await this.init();
@@ -71,28 +89,35 @@ export class HttpCache<T = any> {
                 headers: { 'Content-Type': 'application/json' },
             });
 
-            await this.cache.put(key, response);
-        } catch (e) {
+            await this.cache.put(this.toRequest(key), response);
+        } catch {
             // Ignore cache errors
         }
     }
 
     /**
-     * Delete a specific key from cache
+     * Deletes a specific key from the cache.
+     *
+     * @param key Cache key to remove.
+     * @returns Nothing.
+     * @throws Never throws. Errors are silently caught.
      */
     async delete(key: string): Promise<void> {
         await this.init();
         if (!this.cache) return;
 
         try {
-            await this.cache.delete(key);
-        } catch (e) {
+            await this.cache.delete(this.toRequest(key));
+        } catch {
             // Ignore errors
         }
     }
 
     /**
-     * Clear all items from this cache
+     * Clears all items from this cache.
+     *
+     * @returns Nothing.
+     * @throws Never throws. Errors are silently caught.
      */
     async clear(): Promise<void> {
         await this.init();
@@ -101,7 +126,7 @@ export class HttpCache<T = any> {
         try {
             const keys = await this.cache.keys();
             await Promise.all(keys.map((request) => this.cache!.delete(request)));
-        } catch (e) {
+        } catch {
             // Ignore errors
         }
     }

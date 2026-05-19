@@ -1,5 +1,3 @@
-// TODO: 1. falta layer de ROADS
-
 import { LayerType } from './interfaces';
 import { BoundingBox } from '../../../shared/interfaces';
 
@@ -12,11 +10,7 @@ type Params = {
   workspace?: string;
 };
 
-/**
- * Creates geometries based on OSM way structure:
- * - Closed ways (first node = last node, >3 nodes): Polygon (for areas like buildings, parks, water)
- * - Open ways: LineString (for linear features like roads)
- */
+const AREA_LAYERS: LayerType[] = ['buildings', 'parks', 'water'];
 
 export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableName, boundingBox, workspace = 'main' }: Params) => {
   const query = getLayerQuery(layer);
@@ -26,7 +20,6 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
   
   let actualTableName = qualifiedInputTableName;
   if (layer === 'surface') {
-    // For surface layer, we need to reference the boundaries table
     const baseTableName = tableName.replace(new RegExp(`^${workspace}\\.`), '');
     actualTableName = `${workspace}.${baseTableName}_boundaries`;
   }
@@ -64,23 +57,10 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, outputFormat, outputTableNa
   `;
 };
 
-function buildGeometrySelect({
-  outputFormat,
-  boundingBox,
-  layer,
-}: {
-  outputFormat: string;
-  boundingBox?: BoundingBox;
-  layer: LayerType;
-}) {
-  // Define which layers should create polygons for closed ways
-  const areaLayers = ['buildings', 'parks', 'water'];
-
-  const baseGeometry = areaLayers.includes(layer)
-    ? `
+function buildAreaGeometryExpression(outputFormat: string, boundingBox?: BoundingBox) {
+  const baseGeometry = `
     CASE 
       WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
-        -- Closed way with more than 3 nodes: create polygon
         ST_Transform(
           ST_MakePolygon(
             ST_MakeLine(
@@ -92,7 +72,6 @@ function buildGeometrySelect({
           always_xy := true
         )
       ELSE
-        -- Open way: create linestring
         ST_Transform(
           ST_MakeLine(
             list(nodes.geometry ORDER BY ref_idx ASC)
@@ -101,22 +80,33 @@ function buildGeometrySelect({
           '${outputFormat}',
           always_xy := true
         )
-    END`
-    : `
-    -- Always create linestring for linear features
-    ST_Transform(
-      ST_MakeLine(
-        list(nodes.geometry ORDER BY ref_idx ASC)
-      ),
-      'EPSG:4326',
-      '${outputFormat}',
-      always_xy := true
-    )`;
+    END`;
 
   if (!boundingBox) return baseGeometry;
 
   const clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
   return `ST_Intersection(${baseGeometry}, ${clippingGeometry})`;
+}
+
+function buildGeometrySelect({
+  outputFormat,
+  boundingBox,
+  layer,
+}: {
+  outputFormat: string;
+  boundingBox?: BoundingBox;
+  layer: LayerType;
+}) {
+  return AREA_LAYERS.includes(layer)
+    ? buildAreaGeometryExpression(outputFormat, boundingBox)
+    : `ST_Transform(
+        ST_MakeLine(
+          list(nodes.geometry ORDER BY ref_idx ASC)
+        ),
+        'EPSG:4326',
+        '${outputFormat}',
+        always_xy := true
+      )`;
 }
 
 function buildHavingClause({
@@ -128,50 +118,11 @@ function buildHavingClause({
   boundingBox?: BoundingBox;
   layer: LayerType;
 }) {
-  if (!boundingBox) return '';
+  if (!boundingBox || !AREA_LAYERS.includes(layer)) return '';
 
-  // Define which layers should create polygons for closed ways
-  const areaLayers = ['buildings', 'parks', 'water'];
-
-  const baseGeometry = areaLayers.includes(layer)
-    ? `
-    CASE 
-      WHEN refs[1] = refs[array_length(refs)] AND array_length(refs) > 3 THEN
-        -- Closed way with more than 3 nodes: create polygon
-        ST_Transform(
-          ST_MakePolygon(
-            ST_MakeLine(
-              list(nodes.geometry ORDER BY ref_idx ASC)
-            )
-          ),
-          'EPSG:4326',
-          '${outputFormat}',
-          always_xy := true
-        )
-      ELSE
-        -- Open way: create linestring
-        ST_Transform(
-          ST_MakeLine(
-            list(nodes.geometry ORDER BY ref_idx ASC)
-          ),
-          'EPSG:4326',
-          '${outputFormat}',
-          always_xy := true
-        )
-    END`
-    : `
-    -- Always create linestring for linear features
-    ST_Transform(
-      ST_MakeLine(
-        list(nodes.geometry ORDER BY ref_idx ASC)
-      ),
-      'EPSG:4326',
-      '${outputFormat}',
-      always_xy := true
-    )`;
-
+  const geometry = buildAreaGeometryExpression(outputFormat, boundingBox);
   const clippingGeometry = `ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})`;
-  return `HAVING ST_Intersects(${baseGeometry}, ${clippingGeometry})`;
+  return `HAVING ST_Intersects(${geometry}, ${clippingGeometry})`;
 }
 
 function getLayerQuery(layer: string): (t: string) => string {
@@ -194,72 +145,27 @@ function getLayerQuery(layer: string): (t: string) => string {
 const GET_PARKS = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE parks AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way', 'relation') AND
-      (
-        map_extract(tags, 'leisure')[1] IN ('dog_park', 'park', 'playground', 'recreation_ground') OR
-        map_extract(tags, 'landuse')[1] IN ('wood', 'grass', 'forest', 'orchad', 'village_green', 'vineyard', 'cemetery', 'meadow', 'village_green') OR
-        map_extract(tags, 'natural')[1] IN ('wood', 'grass')
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'parks';
 `;
 
 const GET_WATER = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE water AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way', 'relation') AND
-      (
-        map_extract(tags, 'natural')[1] IN ('water', 'wetland', 'bay', 'strait', 'spring') OR
-        map_extract(tags, 'water')[1] IN ('pond', 'reservoir', 'lagoon', 'stream_pool', 'lake', 'pool', 'canal', 'river')
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'water';
 `;
 
 const GET_BUILDINGS = (tableName: string) => `
-   CREATE OR REPLACE TEMP TABLE buildings AS
+  CREATE OR REPLACE TEMP TABLE buildings AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way') AND
-      (
-        map_extract(tags, 'building')[1] IS NOT NULL OR
-        map_extract(tags, 'building:part')[1] IS NOT NULL OR
-        map_extract(tags, 'type')[1] IN ('building')
-      ) AND
-      -- Filter out roof parts (from removeInvalidBuildingParts logic)
-      map_extract(tags, 'building')[1] IS DISTINCT FROM 'roof' AND
-      map_extract(tags, 'building:part')[1] IS DISTINCT FROM 'roof' AND
-      -- Filter out buildings without height information
-      (
-        map_extract(tags, 'height')[1] IS NOT NULL OR
-        map_extract(tags, 'levels')[1] IS NOT NULL OR
-        map_extract(tags, 'building:levels')[1] IS NOT NULL
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
 `;
-
-/*
-const GET_COASTLINE = (tableName: string) => `
-  CREATE TEMP TABLE coastline AS
-    SELECT id, tags, refs FROM ${tableName}
-      WHERE kind IN ('way') AND
-      (
-        map_extract(tags, 'natural')[1] IN ('coastline')
-      );
-`;
-*/
 
 const GET_ROADS = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE roads AS
     SELECT id, tags, refs FROM ${tableName}
-      WHERE kind = 'way' AND
-      -- ensure the way has at least two distinct nodes so ST_MakeLine can build a geometry
-      array_length(refs) > 1 AND
-      (
-        map_extract(tags, 'highway')[1] IS NOT NULL AND
-        map_extract(tags, 'area')[1] IS DISTINCT FROM 'yes' AND
-        map_extract(tags, 'highway')[1] NOT IN (
-          'cycleway', 'elevator', 'footway', 'steps', 'pedestrian',
-          'proposed', 'construction', 'abandoned', 'platform', 'raceway'
-        )
-      );
+      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'roads' AND array_length(refs) > 1;
 `;
 
-// Get all ways
 const GET_SURFACE = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE surface AS
     SELECT id, tags, refs FROM ${tableName}

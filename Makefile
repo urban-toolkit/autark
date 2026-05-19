@@ -1,17 +1,27 @@
-.PHONY: dev
+.PHONY: lint typecheck build docs verify test test-update dev clean
 
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
 
-APP ?= examples
+APP ?= gallery
+TEST ?= tests/gallery/autk-map/colormap-categorical.test.ts
+UPDATE ?= cache images
 
-install:
-	$(CONCURRENTLY) "cd autk-map && npm install" "cd autk-db && npm install" "cd autk-plot && npm install" "cd autk-compute && npm install"  "cd urban-grammar && npm install" "cd autk-grammar && npm install"
+lint:
+	npm run lint
 
-install-app:
-	cd $(APP) && npm install
-
-
+typecheck: build
+	$(CONCURRENTLY) \
+		"cd autk-core && npx tsc --noEmit --skipLibCheck" \
+		"cd autk-map && npx tsc --noEmit --skipLibCheck" \
+		"cd autk-db && npx tsc --noEmit --skipLibCheck" \
+		"cd autk-plot && npx tsc --noEmit --skipLibCheck" \
+		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
+		"cd autk && npx tsc --noEmit --skipLibCheck" \
+		"cd urban-grammar && npx tsc --noEmit --skipLibCheck" \
+		"cd autk-grammar && npx tsc --noEmit --skipLibCheck" \
+		"cd gallery && npx tsc --noEmit --skipLibCheck" \
+		"cd usecases && npx tsc --noEmit --skipLibCheck"
 
 build:
 	$(CONCURRENTLY) \
@@ -21,10 +31,32 @@ build:
 		"cd autk-compute && npm run build" \
 		"cd urban-grammar && npm run build"
 	cd autk-grammar && npm run build
+	cd autk && npm run build
+
+docs:
+	$(CONCURRENTLY) \
+		"cd autk-map && npm run doc" \
+		"cd autk-db && npm run doc" \
+		"cd autk-plot && npm run doc" \
+		"cd autk-compute && npm run doc"
+
+verify: lint typecheck
+
+test:
+	APP=$(APP) npx playwright test $(TEST)
+
+# Update committed test baselines locally.
+# Examples:
+#   make test-update TEST=tests/gallery/autk-map/colormap-categorical.test.ts UPDATE=images
+#   make test-update TEST=tests/gallery/autk-map/osm-layers-api.test.ts UPDATE="cache images"
+test-update:
+	APP=$(APP) \
+	$(if $(findstring cache,$(UPDATE)),HAR_UPDATE=1) \
+	npx playwright test $(TEST) \
+	$(if $(findstring images,$(UPDATE)),--update-snapshots)
 
 dev:
-	make install
-	make install-app
+	npm install
 	make build
 	$(CONCURRENTLY) \
 		"cd autk-map && npm run dev-build" \
@@ -33,45 +65,18 @@ dev:
 		"cd autk-compute && npm run dev-build" \
 		"cd urban-grammar && npm run dev-build" \
 		"cd autk-grammar && npm run dev-build" \
-		"cd $(APP) && npm run dev"
-
-map:
-	$(CONCURRENTLY) "cd autk-map && npm run build"
-
-db:
-	$(CONCURRENTLY) "cd autk-db && npm run build"
-
-plot:
-	$(CONCURRENTLY) "cd autk-plot && npm run build"
-
-compute:
-	$(CONCURRENTLY) "cd autk-compute && npm run build"
-
-grammar:
-	$(CONCURRENTLY) "cd urban-grammar && npm run build"
-
-grammardb:
-	$(CONCURRENTLY) "cd autk-grammar && npm run build"
+		"cd autk && npm run dev-build" \
+		"cd $(APP) && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 clean:
+	$(RIMRAF) node_modules
 	$(CONCURRENTLY) \
-		"cd autk-map && $(RIMRAF) dist build node_modules" \
-		"cd autk-db && $(RIMRAF) dist build node_modules" \
-		"cd autk-plot && $(RIMRAF) dist build node_modules" \
-		"cd autk-compute && $(RIMRAF) dist build node_modules" \
-		"cd urban-grammar && $(RIMRAF) dist build node_modules" \
-		"cd autk-grammar && $(RIMRAF) dist build node_modules" \
-		"cd examples && $(RIMRAF) dist build node_modules" \
-		"cd case-studies && $(RIMRAF) dist build node_modules"
-
-publish:
-	@if [ -z "$(LIB)" ]; then \
-		echo "Error: Please specify a library to publish using LIB=<library>"; \
-		echo "Usage: make publish LIB=autk-map|autk-db|autk-plot|autk-compute|urban-grammar|autk-grammar"; \
-		exit 1; \
-	fi
-	@if [ "$(LIB)" != "autk-map" ] && [ "$(LIB)" != "autk-db" ] && [ "$(LIB)" != "autk-plot" ] && [ "$(LIB)" != "autk-compute" ] && [ "$(LIB)" != "urban-grammar" ] && [ "$(LIB)" != "autk-grammar" ]; then \
-		echo "Error: LIB must be one of: autk-map, autk-db, autk-plot, autk-compute, urban-grammar, autk-grammar"; \
-		exit 1; \
-	fi
-	cd $(LIB) && npm pack && npm publish *.tgz
+		"cd autk-map && $(RIMRAF) dist build" \
+		"cd autk-db && $(RIMRAF) dist build" \
+		"cd autk-plot && $(RIMRAF) dist build" \
+		"cd autk-compute && $(RIMRAF) dist build" \
+		"cd urban-grammar && $(RIMRAF) dist build" \
+		"cd autk-grammar && $(RIMRAF) dist build" \
+		"cd autk && $(RIMRAF) dist build" \
+		"cd gallery && $(RIMRAF) dist build" \
+		"cd usecases && $(RIMRAF) dist build"

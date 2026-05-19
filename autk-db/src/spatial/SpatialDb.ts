@@ -1,22 +1,25 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 import { CsvTable, CustomLayerTable, LayerTable, JsonTable, Table } from '../shared/interfaces';
 import { loadDb } from '../config/duckdb';
-import { LoadLayerUseCase, GetLayerParams } from './use-cases/load-layer';
+import { LoadLayerUseCase, LoadLayerParams } from './use-cases/load-layer';
 import { LoadCsvUseCase, LoadCsvParams } from './use-cases/load-csv';
 import { LoadJsonUseCase, LoadJsonParams } from './use-cases/load-json';
 import { GetLayerGeojsonUseCase } from './use-cases/get-layer-geojson';
 import { FeatureCollection } from 'geojson';
+import { isLayerType } from 'autk-core';
 import { LoadCustomLayerParams, LoadCustomLayerUseCase } from './use-cases/load-custom-layer';
-import { SpatialJoinParams } from './use-cases/spatial-join/interfaces';
+import { AssignBuildingIdsUseCase } from './use-cases/assign-building-ids/AssignBuildingIdsUseCase';
+import { SpatialQueryParams } from './use-cases/spatial-join/interfaces';
 import { SpatialJoinUseCase } from './use-cases/spatial-join/SpatialJoinUseCase';
 import { DropTableUseCase } from './shared/use-cases/drop-table/DropTableUseCase';
 import { BoundingBox } from '../shared/interfaces';
 import { TransformBoundingBoxCoordinatesUseCase } from './shared/use-cases/transform-bounding-box-coordinates/TransformBoundingBoxCoordinatesUseCase';
 import { GetBoundingBoxFromLayerUseCase } from './shared/use-cases/get-bounding-box-from-layer/GetBoundingBoxFromLayerUseCase';
-import { isLayerType } from './use-cases/load-layer/interfaces';
-import { LoadOsmFromOverpassApiParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
+import { LoadOsmParams, LoadOsmFromOverpassApiUseCase } from './use-cases/load-osm-from-overpass-api';
+import { LoadOsmFromPbfUseCase } from './use-cases/load-osm-from-pbf';
+import { OsmProcessingPipeline } from './use-cases/osm-processing-pipeline/OsmProcessingPipeline';
 import type { OsmLoadTimings } from './use-cases/load-osm-from-overpass-api/interfaces';
 import { LoadGridLayerParams, LoadGridLayerUseCase } from './use-cases/load-grid-layer/LoadGridLayerUseCase';
 import { GridLayerTable, GeoTiffTable } from '../shared/interfaces';
@@ -32,8 +35,9 @@ import { toPlain } from './shared/utils';
 
 interface WorkspaceData {
   tables: Array<Table>;
-  osmBoudingBox?: BoundingBox;
-  osmBoudingBoxWgs84?: BoundingBox;
+  workspaceBoundingBox?: BoundingBox;
+  osmBoundingBox?: BoundingBox;
+  osmBoundingBoxWgs84?: BoundingBox;
 }
 
 /**
@@ -41,11 +45,16 @@ interface WorkspaceData {
  *
  * It allows loading OSM data, CSV, JSON, custom layers, and grid layers,
  * as well as performing spatial joins and raw queries.
- * It also provides methods to retrieve layer data and bounding boxes.
- * 
- * Supports multiple isolated workspaces, each with its own schema and data.
+ * DuckDB-backed spatial database for OSM, CSV, JSON, and raster data.
+ *
+ * Supports multiple isolated workspaces, each with its own schema and tables.
+ *
+ * @example
+ * const db = new AutkSpatialDb();
+ * await db.init();
+ * const layer = await db.getLayer('osm_buildings');
  */
-export class SpatialDb {
+export class AutkSpatialDb {
   private db?: AsyncDuckDB;
   private conn?: AsyncDuckDBConnection;
   private currentWorkspace: string = 'main';
@@ -55,10 +64,13 @@ export class SpatialDb {
     return this.getCurrentWorkspaceData().tables;
   }
   
+  private osmProcessingPipeline?: OsmProcessingPipeline;
   private loadOsmFromOverpassApiUseCase?: LoadOsmFromOverpassApiUseCase;
+  private loadOsmFromPbfUseCase?: LoadOsmFromPbfUseCase;
   private loadCsvUseCase?: LoadCsvUseCase;
   private loadLayerUseCase?: LoadLayerUseCase;
   private loadCustomLayerUseCase?: LoadCustomLayerUseCase;
+  private assignBuildingIdsUseCase?: AssignBuildingIdsUseCase;
   private loadJsonUseCase?: LoadJsonUseCase;
   private getLayerGeojsonUseCase?: GetLayerGeojsonUseCase;
   private spatialJoinUseCase?: SpatialJoinUseCase;
@@ -88,8 +100,12 @@ export class SpatialDb {
   }
 
   /**
-   * Initializes the SpatialDb instance by loading the DuckDB database and setting up use cases.
+   * Initializes DuckDB, loads the spatial extension, and creates use-case instances.
+   *
    * @returns A promise that resolves when initialization is complete.
+   * @throws If DuckDB WebAssembly fails to load or the spatial extension cannot be installed.
+   * @example
+   * await db.init();
    */
   async init() {
     this.db = await loadDb();
@@ -102,14 +118,18 @@ export class SpatialDb {
     await this.conn.query('CREATE SCHEMA IF NOT EXISTS main');
     this.workspaces.set('main', {
       tables: [],
-      osmBoudingBox: undefined,
+      workspaceBoundingBox: undefined,
+      osmBoundingBox: undefined,
     });
 
-    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.db, this.conn);
+    this.osmProcessingPipeline = new OsmProcessingPipeline(this.db, this.conn);
+    this.loadOsmFromOverpassApiUseCase = new LoadOsmFromOverpassApiUseCase(this.conn, this.osmProcessingPipeline);
+    this.loadOsmFromPbfUseCase = new LoadOsmFromPbfUseCase(this.conn, this.osmProcessingPipeline);
     this.loadCsvUseCase = new LoadCsvUseCase(this.db, this.conn);
     this.loadJsonUseCase = new LoadJsonUseCase(this.db, this.conn);
     this.loadLayerUseCase = new LoadLayerUseCase(this.db, this.conn);
     this.loadCustomLayerUseCase = new LoadCustomLayerUseCase(this.db, this.conn);
+    this.assignBuildingIdsUseCase = new AssignBuildingIdsUseCase(this.db, this.conn);
     this.getLayerGeojsonUseCase = new GetLayerGeojsonUseCase(this.conn);
     this.spatialJoinUseCase = new SpatialJoinUseCase(this.conn);
     this.getBoundingBoxFromLayerUseCase = new GetBoundingBoxFromLayerUseCase(this.conn);
@@ -126,9 +146,11 @@ export class SpatialDb {
   }
 
   /**
-   * Sets the current workspace. If the workspace doesn't exist, it will be created.
-   * @param name - The name of the workspace to switch to.
+   * Switches to a workspace, creating it if it doesn't exist.
+   *
+   * @param name The name of the workspace to switch to.
    * @returns A promise that resolves when the workspace is set.
+   * @throws If the database has not been initialized.
    */
   async setWorkspace(name: string): Promise<void> {
     if (!this.conn) {
@@ -139,7 +161,8 @@ export class SpatialDb {
       await this.conn.query(`CREATE SCHEMA IF NOT EXISTS ${name}`);
       this.workspaces.set(name, {
         tables: [],
-        osmBoudingBox: undefined,
+        workspaceBoundingBox: undefined,
+        osmBoundingBox: undefined,
       });
     }
 
@@ -181,6 +204,33 @@ export class SpatialDb {
 
   // ---- LOAD's methods
 
+  private async clipLayerToSurface(
+    layerTableName: string,
+    surfaceTableName: string,
+    workspace: string,
+    cropGeometry: boolean = true,
+  ): Promise<void> {
+    const qualifiedLayer = `${workspace}.${layerTableName}`;
+    const qualifiedSurface = `${workspace}.${surfaceTableName}`;
+    const geometrySelect = cropGeometry ? 'ST_Intersection(l.geometry, surf.geom)' : 'l.geometry';
+    const emptyFilter = cropGeometry ? 'WHERE NOT ST_IsEmpty(geometry)' : '';
+
+    await this.conn!.query(`
+      CREATE OR REPLACE TABLE ${qualifiedLayer} AS
+      WITH surf AS (
+        SELECT ST_Union_Agg(geometry) AS geom FROM ${qualifiedSurface}
+      ),
+      clipped AS (
+        SELECT l.* EXCLUDE (geometry),
+          ${geometrySelect} AS geometry
+        FROM ${qualifiedLayer} l, surf
+        WHERE ST_Intersects(l.geometry, surf.geom)
+      )
+      SELECT * FROM clipped
+      ${emptyFilter};
+    `);
+  }
+
   /**
    * Loads OSM data from the Overpass API and optionally loads layers based on the provided parameters.
    * When autoLoadLayers is enabled, this method will automatically extract and process specific layers
@@ -190,11 +240,12 @@ export class SpatialDb {
    * @returns A promise that resolves when the OSM data and layers are fully loaded.
    * @throws Error if the database or connection is not initialized.
    */
-  async loadOsmFromOverpassApi(params: LoadOsmFromOverpassApiParams): Promise<OsmLoadTimings> {
+  async loadOsm(params: LoadOsmParams): Promise<OsmLoadTimings> {
     if (
       !this.db ||
       !this.conn ||
       !this.loadOsmFromOverpassApiUseCase ||
+      !this.loadOsmFromPbfUseCase ||
       !this.dropTableUseCase ||
       !this.getBoundingBoxFromOsmUseCase ||
       !this.transformBoundingBoxCoordinatesUseCase ||
@@ -202,7 +253,9 @@ export class SpatialDb {
     )
       throw new Error('Database not initialized. Please call init() first.');
 
-    const execResult = await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
+    const execResult = params.pbfFileUrl
+      ? await this.loadOsmFromPbfUseCase.exec({ ...params, workspace: this.currentWorkspace })
+      : await this.loadOsmFromOverpassApiUseCase.exec({ ...params, workspace: this.currentWorkspace });
     for (const table of execResult.tables) {
       this._registerTable(table);
     }
@@ -223,22 +276,26 @@ export class SpatialDb {
       });
 
       const workspaceData = this.getCurrentWorkspaceData();
-      workspaceData.osmBoudingBoxWgs84 = rawBoundingBox;
-      workspaceData.osmBoudingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
+      workspaceData.osmBoundingBoxWgs84 = rawBoundingBox;
+      workspaceData.osmBoundingBox = await this.transformBoundingBoxCoordinatesUseCase.exec({
         boundingBox: rawBoundingBox,
         coordinateFormat: params.autoLoadLayers.coordinateFormat,
       });
+      workspaceData.workspaceBoundingBox = workspaceData.osmBoundingBox;
+
+      let surfaceLayerName: string | null = null;
+      const clippableLayerNames: string[] = [];
 
       for (const layer of params.autoLoadLayers.layers) {
-        const shouldCrop = layer !== 'buildings'; // avoid crop buildings layer
+        const shouldCropToBbox = layer !== 'buildings';
 
-        const layerParams: GetLayerParams = {
+        const layerParams: LoadLayerParams = {
           osmInputTableName: params.outputTableName,
           coordinateFormat: params.autoLoadLayers.coordinateFormat,
           layer,
         };
 
-        layerParams.boundingBox = shouldCrop ? workspaceData.osmBoudingBox : undefined;
+        layerParams.boundingBox = shouldCropToBbox ? workspaceData.osmBoundingBox : undefined;
 
         const t0 = performance.now();
         const layerTable = await this.loadLayer(layerParams);
@@ -259,6 +316,17 @@ export class SpatialDb {
           );
           const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
           if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
+          surfaceLayerName = layerTable.name;
+        } else {
+          clippableLayerNames.push(layerTable.name);
+        }
+      }
+
+      // Clip thematic layers to the surface polygon. Buildings are only filtered by overlap.
+      if (surfaceLayerName && clippableLayerNames.length > 0) {
+        for (const layerName of clippableLayerNames) {
+          const cropGeometry = !layerName.endsWith('_buildings');
+          await this.clipLayerToSurface(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
         }
       }
 
@@ -314,7 +382,7 @@ export class SpatialDb {
    * @throws Error if the database or connection is not initialized.
    * @throws Error if the OSM input table is not found or is not of the correct type.
    */
-  async loadLayer(params: GetLayerParams): Promise<LayerTable> {
+  async loadLayer(params: LoadLayerParams): Promise<LayerTable> {
     if (!this.db || !this.conn || !this.loadLayerUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
@@ -337,16 +405,38 @@ export class SpatialDb {
    * @throws Error if the database or connection is not initialized.
    */
   async loadCustomLayer(params: LoadCustomLayerParams): Promise<CustomLayerTable> {
-    if (!this.db || !this.conn || !this.loadCustomLayerUseCase)
+    if (
+      !this.db ||
+      !this.conn ||
+      !this.loadCustomLayerUseCase ||
+      !this.assignBuildingIdsUseCase ||
+      !this.getBoundingBoxFromLayerUseCase
+    )
       throw new Error('Database not initialized. Please call init() first.');
 
     const workspaceData = this.getCurrentWorkspaceData();
     const table = await this.loadCustomLayerUseCase.exec({ 
       ...params, 
-      boundingBox: workspaceData.osmBoudingBox,
+      boundingBox: workspaceData.osmBoundingBox,
       workspace: this.currentWorkspace 
     });
     this._registerTable(table);
+
+    if (!workspaceData.workspaceBoundingBox) {
+      workspaceData.workspaceBoundingBox = await this.getBoundingBoxFromLayerUseCase.exec({
+        layerTableName: table.name,
+        workspace: this.currentWorkspace,
+      });
+    }
+
+    // When loading as buildings, compute building_id by clustering overlapping geometries
+    if (params.layerType === 'buildings') {
+      const columns = await this.assignBuildingIdsUseCase.exec({
+        tableName: table.name,
+        workspace: this.currentWorkspace,
+      });
+      table.columns = columns;
+    }
 
     return table;
   }
@@ -365,7 +455,7 @@ export class SpatialDb {
     const workspaceData = this.getCurrentWorkspaceData();
     const table = await this.loadGridLayerUseCase.exec({
       ...params,
-      boundingBox: params.boundingBox || workspaceData.osmBoudingBox,
+      boundingBox: params.boundingBox || workspaceData.osmBoundingBox,
       workspace: this.currentWorkspace
     });
     this._registerTable(table);
@@ -402,7 +492,7 @@ export class SpatialDb {
    * property objects (one per cell, in row-major top-to-bottom order), plus `rasterResX` / `rasterResY`
    * dimensions and a `bbox`.
    *
-   * Pass the result directly to `AutkMap.loadGeoTiffLayer()` and supply a `getFnv` callback that
+   * Pass the result directly to `AutkMap.loadRasterCollection()` and supply a `property` callback that
    * extracts the numeric band value you want to visualise, e.g. `(cell) => cell.band_1 ?? 0`.
    *
    * @param tableName - The name of the GeoTiff table (as given to `loadGeoTiff`).
@@ -485,9 +575,17 @@ export class SpatialDb {
 
     const featureCollection = await this.getLayerGeojsonUseCase.exec(layerTable as LayerTable | CustomLayerTable, this.currentWorkspace);
 
+    const workspaceData = this.getCurrentWorkspaceData();
     const osmBoundingBox = this.getOsmBoundingBox();
     if (osmBoundingBox) {
       featureCollection.bbox = osmBoundingBox;
+    } else if (workspaceData.workspaceBoundingBox) {
+      featureCollection.bbox = [
+        workspaceData.workspaceBoundingBox.minLon,
+        workspaceData.workspaceBoundingBox.minLat,
+        workspaceData.workspaceBoundingBox.maxLon,
+        workspaceData.workspaceBoundingBox.maxLat,
+      ];
     } else {
       const layerBoundingBox = await this.getBoundingBoxFromLayer(layerTableName);
       featureCollection.bbox = [
@@ -502,28 +600,31 @@ export class SpatialDb {
   }
 
   /**
-   * Retrieves the bounding box of the OSM data loaded from the Overpass API for the current workspace.
-   * @returns The bounding box as a tuple [minLon, minLat, maxLon, maxLat], or null if no OSM data has been loaded.
+   * Retrieves the OSM bounding box for the current workspace.
+   *
+   * @returns The bounding box as `[minLon, minLat, maxLon, maxLat]`, or `null` if no OSM data has been loaded.
+   * @throws Never throws.
    */
   getOsmBoundingBox(): [number, number, number, number] | null {
     const workspaceData = this.getCurrentWorkspaceData();
-    if (!workspaceData.osmBoudingBox) return null;
+    if (!workspaceData.osmBoundingBox) return null;
 
     return [
-      workspaceData.osmBoudingBox.minLon,
-      workspaceData.osmBoudingBox.minLat,
-      workspaceData.osmBoudingBox.maxLon,
-      workspaceData.osmBoudingBox.maxLat,
+      workspaceData.osmBoundingBox.minLon,
+      workspaceData.osmBoundingBox.minLat,
+      workspaceData.osmBoundingBox.maxLon,
+      workspaceData.osmBoundingBox.maxLat,
     ]
   }
 
   /**
-   * Returns the OSM bounding box in WGS84 (EPSG:4326) as loaded from the Overpass API.
-   * Useful for clipping raster files (e.g. GeoTIFF) that are stored in EPSG:4326.
-   * @returns The bounding box or null if no OSM data has been loaded.
+   * Returns the OSM bounding box in WGS84 (EPSG:4326) for clipping rasters.
+   *
+   * @returns The bounding box or `null` if no OSM data has been loaded.
+   * @throws Never throws.
    */
   getOsmBoundingBoxWgs84(): BoundingBox | null {
-    return this.getCurrentWorkspaceData().osmBoudingBoxWgs84 ?? null;
+    return this.getCurrentWorkspaceData().osmBoundingBoxWgs84 ?? null;
   }
 
   /**
@@ -556,8 +657,10 @@ export class SpatialDb {
   }
 
   /**
-   * Retrieves all layer tables (LayerTable and CustomLayerTable) from the loaded tables.
-   * @returns An array of LayerTable and CustomLayerTable objects.
+   * Retrieves all layer tables from the loaded tables.
+   *
+   * @returns An array of `LayerTable` and `CustomLayerTable` objects.
+   * @throws Never throws.
    */
   getLayerTables(): Array<LayerTable | CustomLayerTable> {
     return this.tables.filter((table): table is LayerTable | CustomLayerTable => {
@@ -636,7 +739,7 @@ export class SpatialDb {
    * @returns A promise that resolves to the resulting table after the spatial join.
    * @throws Error if the database or connection is not initialized.
    */
-  async spatialJoin(params: SpatialJoinParams): Promise<Table> {
+  async spatialQuery(params: SpatialQueryParams): Promise<Table> {
     if (!this.db || !this.conn || !this.spatialJoinUseCase)
       throw new Error('Database not initialized. Please call init() first.');
 
@@ -696,7 +799,7 @@ export class SpatialDb {
       throw new Error('Database not initialized. Please call init() first.');
 
     const workspaceData = this.getCurrentWorkspaceData();
-    const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.osmBoudingBox);
+    const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox);
     this._registerTable(table);
 
     return table;

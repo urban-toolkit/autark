@@ -1,3 +1,15 @@
+/**
+ * @module PipelineBuildingSSAO
+ * WebGPU pipeline for rendering building geometry with a shared SSAO pass.
+ *
+ * This module defines the `PipelineBuildingSSAO` class, which builds the
+ * geometry pass for indexed 3D building meshes and the renderer-scoped shared
+ * resources used by the SSAO composite pass. It owns the per-instance vertex
+ * and index buffers, uploads mesh data into those buffers, and coordinates the
+ * two-pass render flow through shared offscreen textures and a fullscreen
+ * composite pipeline.
+ */
+
 /// <reference types="@webgpu/types" />
 
 import buildingsVS01 from './shaders/buildings-01.vert.wgsl';
@@ -6,600 +18,517 @@ import buildingsFS01 from './shaders/buildings-01.frag.wgsl';
 import buildingsVS02 from './shaders/buildings-02.vert.wgsl';
 import buildingsFS02 from './shaders/buildings-02.frag.wgsl';
 
-import { Camera } from './camera';
+import { Camera } from './types-core';
 import { Renderer } from './renderer';
 
 import { Pipeline } from './pipeline';
 import { Triangles3DLayer } from './layer-triangles3D';
 
+type SharedSsaoState = {
+    colorsSharedBuffer: GPURenderPassColorAttachment;
+    normalsSharedBuffer: GPURenderPassColorAttachment;
+    depthBufferPass01: GPURenderPassDepthStencilAttachment;
+    colorsSharedTexture: GPUTexture;
+    normalsSharedTexture: GPUTexture;
+    depthTexturePass01: GPUTexture;
+    texturesPass02BindGroup: GPUBindGroup;
+    texturesPass02BindGroupLayout: GPUBindGroupLayout;
+    pipeline02: GPURenderPipeline;
+    width: number;
+    height: number;
+};
+
 /**
- * PipelineBuildingSSAO is a rendering pipeline for drawing 3D buildings with SSAO (Screen Space Ambient Occlusion).
- * It uses WebGPU to render the buildings in two passes: one for normal and color maps, and another for SSAO computation.
+ * Geometry pipeline for 3D building layers and shared SSAO composite helpers.
+ *
+ * `PipelineBuildingSSAO` renders indexed building meshes in an offscreen
+ * geometry pass, stores color and normal outputs in renderer-scoped shared
+ * textures, and exposes helpers for the fullscreen SSAO composite pass. The
+ * class manages mesh-specific GPU buffers and shader state, while shared
+ * textures, sampler state, and the composite pipeline are cached per renderer.
+ *
+ * @example
+ * const pipeline = new PipelineBuildingSSAO(renderer);
+ * pipeline.build(buildingMesh);
  */
 export class PipelineBuildingSSAO extends Pipeline {
-    /**
-     * Position buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** Renderer-scoped shared SSAO state cache. */
+    private static _sharedState = new WeakMap<Renderer, SharedSsaoState>();
+
+    /** GPU vertex buffer containing building positions. */
     protected _positionBuffer!: GPUBuffer;
-
-    /**
-     * Normal buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing building normals. */
     protected _normalBuffer!: GPUBuffer;
-
-    /**
-     * Thematic buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing thematic values. */
     protected _thematicBuffer!: GPUBuffer;
-
-    /**
-     * Highlighted buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing thematic validity flags. */
+    protected _thematicValidityBuffer!: GPUBuffer;
+    /** GPU vertex buffer containing highlighted-vertex flags. */
     protected _highlightedBuffer!: GPUBuffer;
-
-    /**
-     * Highlighted buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing skipped-vertex flags. */
     protected _skippedBuffer!: GPUBuffer;
-
-    /**
-     * Indices buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU index buffer defining building triangles. */
     protected _indicesBuffer!: GPUBuffer;
 
-    /**
-     * Vertex shader module for the first pass.
-     * @type {GPUShaderModule}
-     */
+    /** Compiled vertex shader module for the geometry pass. */
     protected _vertModule01!: GPUShaderModule;
-
-    /**
-     * Fragment shader module for the first pass.
-     * @type {GPUShaderModule}
-     */
+    /** Compiled fragment shader module for the geometry pass. */
     protected _fragModule01!: GPUShaderModule;
-
-    /**
-     * Vertex shader module for the second pass.
-     * @type {GPUShaderModule}
-     */
-    protected _vertModule02!: GPUShaderModule;
-
-    /**
-     * Fragment shader module for the second pass.
-     * @type {GPUShaderModule}
-     */
-    protected _fragModule02!: GPUShaderModule;
-
-    /**
-     * Render pipeline for the first pass.
-     * @type {GPURenderPipeline}
-     */
+    /** Render pipeline used for the geometry pass. */
     protected _pipeline01!: GPURenderPipeline;
 
-    /**
-     * Render pipeline for the second pass.
-     * @type {GPURenderPipeline}
-     */
-    protected _pipeline02!: GPURenderPipeline;
+    /** Reused CPU-side upload buffer for positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for normals. */
+    private _normalData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for thematic values. */
+    private _thematicData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for thematic validity flags. */
+    private _thematicValidityData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for highlight flags. */
+    private _highlightedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for skip flags. */
+    private _skippedData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for triangle indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
 
     /**
-     * Shared color buffer for the first pass.
-     * @type {GPURenderPassColorAttachment}
-     */
-    protected _colorsSharedBuffer!: GPURenderPassColorAttachment;
-
-    /**
-     * Shared normal buffer for the first pass.
-     * @type {GPURenderPassColorAttachment}
-     */
-    protected _normalsSharedBuffer!: GPURenderPassColorAttachment;
-
-    /**
-     * Depth buffer for the first pass.
-     * @type {GPURenderPassDepthStencilAttachment}
-     */
-    protected _depthBufferPass01!: GPURenderPassDepthStencilAttachment;
-
-    /**
-     * Bind group for colors.
-     * @type {GPUBindGroup}
-     */
-    protected _texturesPass02BindGroup!: GPUBindGroup;
-    
-    /**
-     * Bind group layout for textures in the second pass.
-     * @type {GPUBindGroupLayout}
-     */
-    protected _texturesPass02BindGroupLayout!: GPUBindGroupLayout;
-
-    /**
-     * Constructor for PipelineBuildingSSAO
-     * @param {Renderer} renderer The renderer instance
+     * Creates a building SSAO pipeline bound to a renderer.
+     *
+     * The renderer provides the WebGPU device, canvas format, multisampling
+     * configuration, and shared state used to build the geometry and composite
+     * passes.
+     *
+     * @param renderer Renderer that owns the WebGPU device and canvas state.
      */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
     /**
-     * Builds the pipeline with the provided mesh data.
-     * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
+     * Releases GPU resources owned by this pipeline.
+     *
+     * This destroys the geometry buffers created by the pipeline and then
+     * delegates to the base pipeline for shared cleanup.
+     *
+     * @returns Releases this pipeline's GPU allocations in place.
      */
-    build(mesh: Triangles3DLayer) {
-        this.createShaders();
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._normalBuffer?.destroy();
+        this._thematicBuffer?.destroy();
+        this._thematicValidityBuffer?.destroy();
+        this._highlightedBuffer?.destroy();
+        this._skippedBuffer?.destroy();
+        this._indicesBuffer?.destroy();
+        super.destroy();
+    }
 
+    /**
+     * Begins the shared geometry pass for all SSAO-enabled building layers.
+     *
+     * The pass writes color, normals, and depth into renderer-scoped offscreen
+     * textures. Those attachments are cleared before each use so callers can
+     * record one or more geometry draw calls into the returned encoder.
+     *
+     * @param renderer Renderer that owns the shared SSAO targets.
+     * @returns Render pass encoder targeting the shared geometry buffers.
+     */
+    static beginSharedGeometryPass(renderer: Renderer): GPURenderPassEncoder {
+        const shared = this._ensureSharedState(renderer);
+        shared.colorsSharedBuffer.loadOp = 'clear';
+        shared.normalsSharedBuffer.loadOp = 'clear';
+        shared.depthBufferPass01.depthLoadOp = 'clear';
+
+        return renderer.commandEncoder.beginRenderPass({
+            colorAttachments: [shared.colorsSharedBuffer, shared.normalsSharedBuffer],
+            depthStencilAttachment: shared.depthBufferPass01,
+        });
+    }
+
+    /**
+     * Draws the shared fullscreen SSAO composite pass.
+     *
+     * The pass samples the shared color and normal textures generated by the
+     * geometry pass and renders the composited result into the caller-provided
+     * pass encoder.
+     *
+     * @param renderer Renderer that owns the shared SSAO textures and pipeline.
+     * @param passEncoder Active render pass encoder for the final composite.
+     * @returns Records a fullscreen draw into the provided render pass.
+     */
+    static compositeSharedPass(renderer: Renderer, passEncoder: GPURenderPassEncoder): void {
+        const shared = this._ensureSharedState(renderer);
+        passEncoder.setPipeline(shared.pipeline02);
+        passEncoder.setBindGroup(0, shared.texturesPass02BindGroup);
+        passEncoder.draw(6);
+    }
+
+    /**
+     * Builds the SSAO geometry and shared composite resources for a mesh.
+     *
+     * This creates shader modules, allocates and uploads per-mesh buffers,
+     * prepares the base pipeline bind groups, initializes the geometry render
+     * pipeline, and ensures that the renderer-scoped shared SSAO state exists.
+     *
+     * @param mesh Building mesh whose typed arrays provide geometry and render
+     * state for the pass.
+     * @returns Initializes this pipeline for subsequent render passes.
+     */
+    build(mesh: Triangles3DLayer): void {
+        this.createShaders();
         this.createVertexBuffers(mesh);
         this.createColorUniformBindGroup();
         this.createCameraUniformBindGroup();
-
-        this.createSharedTextures();
-        this.createDepthBufferPass01();
-        this.createTexturesBindGroupPass02();
-
         this.updateVertexBuffers(mesh);
         this.updateColorUniforms(mesh);
-
         this.createPipeline01();
-        this.createPipeline02();
+        PipelineBuildingSSAO._ensureSharedState(this._renderer);
     }
 
     /**
-     * Creates the vertex and fragment shaders for the pipeline.
+     * Creates the shader modules used by the geometry pass.
+     *
+     * The modules are compiled from the WGSL sources imported for the building
+     * SSAO geometry stage.
+     *
+     * @returns Creates and stores the compiled shader modules on the pipeline.
      */
     createShaders(): void {
-        // Vertex shader
-        const vsDesc01 = {
-            label: 'Buidlings ssao: vertex shader pass 01',
+        this._vertModule01 = this._renderer.device.createShaderModule({
+            label: 'Buildings ssao: vertex shader pass 01',
             code: buildingsVS01,
-        };
-        this._vertModule01 = this._renderer.device.createShaderModule(vsDesc01);
-
-        // Fragment shader
-        const fsDesc01 = {
-            label: 'Buidlings ssao: fragment shader pass 01',
+        });
+        this._fragModule01 = this._renderer.device.createShaderModule({
+            label: 'Buildings ssao: fragment shader pass 01',
             code: buildingsFS01,
-        };
-        this._fragModule01 = this._renderer.device.createShaderModule(fsDesc01);
-
-        // Vertex shader
-        const vsDesc02 = {
-            label: 'Buidlings ssao: vertex shader pass 02',
-            code: buildingsVS02,
-        };
-        this._vertModule02 = this._renderer.device.createShaderModule(vsDesc02);
-
-        // Fragment shader
-        const fsDesc02 = {
-            label: 'Buidlings ssao: fragment shader pass 02',
-            code: buildingsFS02,
-        };
-        this._fragModule02 = this._renderer.device.createShaderModule(fsDesc02);
+        });
     }
 
     /**
-     * Creates the vertex buffers for the mesh data.
-     * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
+     * Allocates GPU buffers sized for the current building mesh.
+     *
+     * Buffer sizes are derived from the current typed-array lengths on the mesh.
+     * This method allocates buffers only; data upload happens in
+     * {@link updateVertexBuffers}.
+     *
+     * @param mesh Building mesh whose typed-array lengths determine buffer sizes.
+     * @returns Creates GPU buffers for all geometry attributes and indices.
      */
     createVertexBuffers(mesh: Triangles3DLayer): void {
-        // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
             size: mesh.position.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-
-        // vertex data
         this._normalBuffer = this._renderer.device.createBuffer({
             label: 'Normal buffer',
             size: mesh.normal.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-
-        // vertex data
         this._thematicBuffer = this._renderer.device.createBuffer({
             label: 'Thematic data buffer',
             size: mesh.thematic.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-
-        // vertex data
+        this._thematicValidityBuffer = this._renderer.device.createBuffer({
+            label: 'Thematic validity buffer',
+            size: mesh.thematicValidity.length * 4,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
         this._highlightedBuffer = this._renderer.device.createBuffer({
             label: 'Highlighted data buffer',
             size: mesh.highlightedVertices.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-
-        // vertex data
         this._skippedBuffer = this._renderer.device.createBuffer({
             label: 'Skipped data buffer',
             size: mesh.skippedVertices.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-
-        // vertex data
         this._indicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
             size: mesh.indices.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
-
-        this.updateVertexBuffers(mesh);
     }
 
     /**
-     * Updates the vertex buffers with the provided mesh data.
-     * @param {Triangles3DLayer} mesh The mesh data containing positions, normals, thematic, and indices
+     * Uploads the current mesh data into the pipeline's GPU buffers.
+     *
+     * The method reuses cached CPU-side typed arrays when possible and writes
+     * the synchronized data into the corresponding GPU buffers.
+     *
+     * @param mesh Building mesh providing the latest position, normal,
+     * thematic, highlight, skip, and index arrays.
+     * @returns Updates the GPU buffer contents in place.
      */
     updateVertexBuffers(mesh: Triangles3DLayer): void {
-        this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, new Float32Array(mesh.normal));
-        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, new Float32Array(mesh.thematic));
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, new Float32Array(mesh.highlightedVertices));
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(mesh.skippedVertices));
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(mesh.position));
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, new Uint32Array(mesh.indices));
+        this._normalData = this._syncFloatData(this._normalData, mesh.normal);
+        this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
+        this._thematicValidityData = this._syncFloatData(this._thematicValidityData, mesh.thematicValidity);
+        this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
+        this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);
+        this._positionData = this._syncFloatData(this._positionData, mesh.position);
+        this._indicesData = this._syncUintData(this._indicesData, mesh.indices);
+
+        this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, this._normalData);
+        this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, this._thematicData);
+        this._renderer.device.queue.writeBuffer(this._thematicValidityBuffer, 0, this._thematicValidityData);
+        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
     }
 
     /**
-     * Creates the shared textures for the pipeline.
-     */
-    createSharedTextures() {
-        const colorTextureDesc: GPUTextureDescriptor = {
-            label: 'Shared colors texture',
-            size: [2 * this._renderer.canvas.width, 2 * this._renderer.canvas.height],
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-            format: 'rgba16float',
-        };
-        const colorTexture = this._renderer.device.createTexture(colorTextureDesc);
-        const colorTextureView = colorTexture.createView();
-
-        this._colorsSharedBuffer = {
-            view: colorTextureView,
-            clearValue: [0.0, 0.0, 0.0, 0.0],
-            loadOp: 'clear',
-            storeOp: 'store',
-        };
-
-        const normalsTextureDesc: GPUTextureDescriptor = {
-            label: 'Shared normals texture',
-            size: [2 * this._renderer.canvas.width, 2 * this._renderer.canvas.height],
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-            format: 'rgba16float',
-        };
-        // GBuffer texture render targets
-        const normalsTexture = this._renderer.device.createTexture(normalsTextureDesc);
-        const normalsTextureView = normalsTexture.createView();
-
-        this._normalsSharedBuffer = {
-            view: normalsTextureView,
-            clearValue: [0.0, 0.0, 0.0, 0.0],
-            loadOp: 'clear',
-            storeOp: 'store',
-        };
-    }
-
-    /**
-     * Creates the depth buffer for the first pass.
-     */
-    createDepthBufferPass01() {
-        // Depth texture
-        const depthTextureDesc: GPUTextureDescriptor = {
-            label: 'Pass 01 depth texture',
-            size: [2 * this._renderer.canvas.width, 2 * this._renderer.canvas.height],
-            format: 'depth32float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-        };
-        const depthTexture = this._renderer.device.createTexture(depthTextureDesc);
-        const depthTextureView = depthTexture.createView();
-
-        this._depthBufferPass01 = {
-            view: depthTextureView,
-            depthClearValue: 1.0,
-            depthLoadOp: 'clear',
-            depthStoreOp: 'store',
-        };
-    }
-
-    createTexturesBindGroupPass02() {
-        const texSampler = this._renderer.device.createSampler({
-            label: 'Pass 02 sampler',
-            magFilter: 'linear',
-            minFilter: 'linear',
-            addressModeU: 'clamp-to-edge',
-            addressModeV: 'clamp-to-edge',
-        });
-
-        this._texturesPass02BindGroupLayout = this._renderer.device.createBindGroupLayout({
-            entries: [
-                {
-                    binding: 0,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-                {
-                    binding: 1,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {},
-                },
-                {
-                    binding: 2,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {},
-                },
-            ],
-        });
-
-        this._texturesPass02BindGroup = this._renderer.device.createBindGroup({
-            layout: this._texturesPass02BindGroupLayout,
-            entries: [
-                {
-                    binding: 0,
-                    resource: texSampler,
-                },
-                {
-                    binding: 1,
-                    resource: this._colorsSharedBuffer.view,
-                },
-                {
-                    binding: 2,
-                    resource: this._normalsSharedBuffer.view,
-                },
-            ],
-        });
-    }
-
-    /**
-     * Creates the first render pipeline for the SSAO pass.
+     * Creates the geometry render pipeline for the building SSAO pass.
+     *
+     * The pipeline writes color and normal outputs to the shared offscreen
+     * textures used by the SSAO composite stage, and uses the base pipeline's
+     * render-info and camera bind group layouts.
+     *
+     * @returns Creates and stores the geometry render pipeline on the instance.
      */
     createPipeline01(): void {
-        // Vertex data
-        const positionAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 0,
-            offset: 0,
-            format: 'float32x3',
-        };
-        const normalAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 1,
-            offset: 0,
-            format: 'float32x3',
-        };
-        const thematicAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 2,
-            offset: 0,
-            format: 'float32',
-        };
-        const highlightedAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 3,
-            offset: 0,
-            format: 'float32',
-        };
-        const skippedAttribDesc: GPUVertexAttribute = {
-            shaderLocation: 4,
-            offset: 0,
-            format: 'float32',
-        };
+        const positionAttribDesc: GPUVertexAttribute = { shaderLocation: 0, offset: 0, format: 'float32x3' };
+        const normalAttribDesc: GPUVertexAttribute = { shaderLocation: 1, offset: 0, format: 'float32x3' };
+        const thematicAttribDesc: GPUVertexAttribute = { shaderLocation: 2, offset: 0, format: 'float32' };
+        const highlightedAttribDesc: GPUVertexAttribute = { shaderLocation: 3, offset: 0, format: 'float32' };
+        const thematicValidityAttribDesc: GPUVertexAttribute = { shaderLocation: 4, offset: 0, format: 'float32' };
+        const skippedAttribDesc: GPUVertexAttribute = { shaderLocation: 5, offset: 0, format: 'float32' };
 
-        const positionBufferDesc: GPUVertexBufferLayout = {
-            attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-        const normalBufferDesc: GPUVertexBufferLayout = {
-            attributes: [normalAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-        const thematicBufferDesc: GPUVertexBufferLayout = {
-            attributes: [thematicAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-        const highlightedBufferDesc: GPUVertexBufferLayout = {
-            attributes: [highlightedAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-        const skippedBufferDesc: GPUVertexBufferLayout = {
-            attributes: [skippedAttribDesc],
-            arrayStride: 4 * 1, // sizeof(float) * 3
-            stepMode: 'vertex',
-        };
-
-        // Vertex Shader
         const vertex: GPUVertexState = {
             module: this._vertModule01,
             entryPoint: 'main',
-            buffers: [positionBufferDesc, normalBufferDesc, thematicBufferDesc, highlightedBufferDesc, skippedBufferDesc],
+            buffers: [
+                { attributes: [positionAttribDesc], arrayStride: 4 * 3, stepMode: 'vertex' },
+                { attributes: [normalAttribDesc], arrayStride: 4 * 3, stepMode: 'vertex' },
+                { attributes: [thematicAttribDesc], arrayStride: 4, stepMode: 'vertex' },
+                { attributes: [highlightedAttribDesc], arrayStride: 4, stepMode: 'vertex' },
+                { attributes: [thematicValidityAttribDesc], arrayStride: 4, stepMode: 'vertex' },
+                { attributes: [skippedAttribDesc], arrayStride: 4, stepMode: 'vertex' },
+            ],
         };
-
-        // Fragment Shader
         const fragment: GPUFragmentState = {
             module: this._fragModule01,
             entryPoint: 'main',
             targets: [{ format: 'rgba16float' }, { format: 'rgba16float' }],
         };
-
-        // Rasterization
         const primitive: GPUPrimitiveState = {
             frontFace: 'cw',
             cullMode: 'none',
             topology: 'triangle-list',
         };
-
-        // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: true,
-            depthCompare: 'less-equal',
+            depthCompare: 'greater-equal',
             format: 'depth32float',
         };
-
-        // Uniform Data
-        const pipelineLayoutDesc = {
+        const layout = this._renderer.device.createPipelineLayout({
             bindGroupLayouts: [this._renderInfoBindGroupLayout, this._cameraBindGroupLayout],
-        };
+        });
 
-        // Pipeline
-        const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
-        const pipelineDesc: GPURenderPipelineDescriptor = {
+        this._pipeline01 = this._renderer.device.createRenderPipeline({
             layout,
             vertex,
             fragment,
             primitive,
             depthStencil,
-            label: "Pipeline triangle ssao 01"
-        };
-        this._pipeline01 = this._renderer.device.createRenderPipeline(pipelineDesc);
+            label: 'Pipeline triangle ssao 01',
+        });
     }
 
     /**
-     * Creates the second render pipeline for the SSAO pass.
+     * Records the indexed geometry draw calls for the building pass.
+     *
+     * This binds the geometry pipeline, uploads the latest camera uniforms,
+     * binds the vertex and index buffers, and skips the draw when the mesh has
+     * no indices.
+     *
+     * @param camera Camera used to update the shared camera uniforms.
+     * @param passEncoder Active render pass encoder for the geometry pass.
+     * @returns Records indexed geometry draws into the provided render pass.
      */
-    createPipeline02(): void {
-        // Vertex Shader
-        const vertex: GPUVertexState = {
-            module: this._vertModule02,
-            entryPoint: 'main',
-        };
-
-        // Fragment Shader
-        const fragment: GPUFragmentState = {
-            module: this._fragModule02,
-            entryPoint: 'main',
-            targets: [
-                {
-                    format: 'bgra8unorm',
-                    blend: {
-                        color: {
-                            srcFactor: 'one',
-                            dstFactor: 'one-minus-src-alpha',
-                        },
-                        alpha: {
-                            srcFactor: 'one',
-                            dstFactor: 'one-minus-src-alpha'
-                        },
-                    },
-                },
-            ],
-        };
-
-        // Rasterization
-        const primitive: GPUPrimitiveState = {
-            topology: 'triangle-strip',
-            stripIndexFormat: 'uint32',
-        };
-
-        // Antialising
-        const multisample: GPUMultisampleState = {
-            count: this._renderer.sampleCount,
-        };
-
-        // Depth test
-        const depthStencil: GPUDepthStencilState = {
-            depthWriteEnabled: true,
-            depthCompare: 'less-equal',
-            format: 'depth32float',
-        };
-
-        // Uniform Data
-        const pipelineLayoutDesc = {
-            bindGroupLayouts: [this._renderInfoBindGroupLayout, this._texturesPass02BindGroupLayout],
-        };
-
-        // Pipeline
-        const layout = this._renderer.device.createPipelineLayout(pipelineLayoutDesc);
-        const pipelineDesc: GPURenderPipelineDescriptor = {
-            layout,
-            vertex,
-            fragment,
-            primitive,
-            depthStencil,
-            multisample,
-            label: "Pipeline triangle ssao 02"
-        };
-        this._pipeline02 = this._renderer.device.createRenderPipeline(pipelineDesc);
-    }
-
-    /**
-     * Renders the first pass of the SSAO pipeline.
-     * @param {Camera} camera The camera instance
-     */
-    pass01(camera: Camera) {
-        // Create a new command encoder
-        const commandEncoder = this._renderer.commandEncoder;
-
-        // Pass 01 descriptor
-        const passDescriptor: GPURenderPassDescriptor = {
-            colorAttachments: [this._colorsSharedBuffer, this._normalsSharedBuffer],
-            depthStencilAttachment: this._depthBufferPass01,
-        };
-
-        // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(passDescriptor);
-
-        // sets the current pipeline
+    renderGeometryPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         passEncoder.setPipeline(this._pipeline01);
-
-        // updates camera
         this.updateCameraUniforms(camera);
-
-        // sets the vertex buffers
         passEncoder.setVertexBuffer(0, this._positionBuffer);
         passEncoder.setVertexBuffer(1, this._normalBuffer);
         passEncoder.setVertexBuffer(2, this._thematicBuffer);
         passEncoder.setVertexBuffer(3, this._highlightedBuffer);
-        passEncoder.setVertexBuffer(4, this._skippedBuffer);
-
-        // sets primitive indices buffer
+        passEncoder.setVertexBuffer(4, this._thematicValidityBuffer);
+        passEncoder.setVertexBuffer(5, this._skippedBuffer);
         passEncoder.setIndexBuffer(this._indicesBuffer, 'uint32');
-
-        // sets the uniform buffers
         passEncoder.setBindGroup(0, this._renderInfoBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
 
-        // draw command
         const indexCount = this._indicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT;
-        if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
-        passEncoder.end();
+        if (indexCount > 0) {
+            passEncoder.drawIndexed(indexCount);
+        }
     }
 
     /**
-     * Renders the second pass of the SSAO pipeline.
+     * No-op preparation hook for this pipeline's render flow.
+     *
+     * The SSAO pipeline is driven through the shared geometry and composite
+     * helpers instead of the base pipeline's per-layer render preparation.
+     *
+     * @returns Intentionally performs no per-frame preparation.
      */
-    pass02() {
-        // Create a new command encoder
-        const commandEncoder = this._renderer.commandEncoder;
+    override prepareRender(_camera: Camera): void {}
 
-        // changes buffer behaviour
-        this._renderer.frameBuffer.loadOp = 'load';
+    /**
+     * No-op render hook for this pipeline's render flow.
+     *
+     * The SSAO pipeline records work through {@link renderGeometryPass} and the
+     * static shared pass helpers rather than this base render entry point.
+     *
+     * @returns Intentionally performs no draw work.
+     */
+    renderPass(_camera: Camera, _passEncoder: GPURenderPassEncoder): void {}
 
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
+    /**
+     * Returns the renderer-scoped shared SSAO resources, recreating them when
+     * the render target size changes.
+     *
+     * Shared textures are sized at twice the renderer's pixel dimensions and
+     * cached per renderer. When the size changes, the previous textures are
+     * destroyed and a new geometry/composite state bundle is created.
+     *
+     * @param renderer Renderer that owns the shared SSAO state.
+     * @returns Shared SSAO attachments, bind groups, and composite pipeline.
+     */
+    private static _ensureSharedState(renderer: Renderer): SharedSsaoState {
+        const width = 2 * renderer.pixelWidth;
+        const height = 2 * renderer.pixelHeight;
+        const existing = this._sharedState.get(renderer);
+        if (existing && existing.width === width && existing.height === height) {
+            return existing;
+        }
+
+        existing?.colorsSharedTexture.destroy();
+        existing?.normalsSharedTexture.destroy();
+        existing?.depthTexturePass01.destroy();
+
+        const colorsSharedTexture = renderer.device.createTexture({
+            label: 'Shared colors texture',
+            size: [width, height],
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            format: 'rgba16float',
+        });
+        const normalsSharedTexture = renderer.device.createTexture({
+            label: 'Shared normals texture',
+            size: [width, height],
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            format: 'rgba16float',
+        });
+        const depthTexturePass01 = renderer.device.createTexture({
+            label: 'Shared building depth texture',
+            size: [width, height],
+            format: 'depth32float',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        });
+
+        const colorsSharedBuffer: GPURenderPassColorAttachment = {
+            view: colorsSharedTexture.createView(),
+            clearValue: [0.0, 0.0, 0.0, 0.0],
+            loadOp: 'clear',
+            storeOp: 'store',
+        };
+        const normalsSharedBuffer: GPURenderPassColorAttachment = {
+            view: normalsSharedTexture.createView(),
+            clearValue: [0.0, 0.0, 0.0, 0.0],
+            loadOp: 'clear',
+            storeOp: 'store',
+        };
+        const depthBufferPass01: GPURenderPassDepthStencilAttachment = {
+            view: depthTexturePass01.createView(),
+            depthClearValue: 0.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
         };
 
-        // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
+        const texSampler = renderer.device.createSampler({
+            label: 'Shared building pass 02 sampler',
+            magFilter: 'linear',
+            minFilter: 'linear',
+            addressModeU: 'clamp-to-edge',
+            addressModeV: 'clamp-to-edge',
+        });
+        const texturesPass02BindGroupLayout = renderer.device.createBindGroupLayout({
+            entries: [
+                { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+                { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+                { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+            ],
+        });
+        const texturesPass02BindGroup = renderer.device.createBindGroup({
+            layout: texturesPass02BindGroupLayout,
+            entries: [
+                { binding: 0, resource: texSampler },
+                { binding: 1, resource: colorsSharedBuffer.view },
+                { binding: 2, resource: normalsSharedBuffer.view },
+            ],
+        });
 
-        // sets the current pipeline
-        passEncoder.setPipeline(this._pipeline02);
+        const vertModule02 = renderer.device.createShaderModule({
+            label: 'Buildings ssao: vertex shader pass 02',
+            code: buildingsVS02,
+        });
+        const fragModule02 = renderer.device.createShaderModule({
+            label: 'Buildings ssao: fragment shader pass 02',
+            code: buildingsFS02,
+        });
+        const pipeline02 = renderer.device.createRenderPipeline({
+            layout: renderer.device.createPipelineLayout({
+                bindGroupLayouts: [texturesPass02BindGroupLayout],
+            }),
+            vertex: {
+                module: vertModule02,
+                entryPoint: 'main',
+            },
+            fragment: {
+                module: fragModule02,
+                entryPoint: 'main',
+                targets: [{
+                    format: renderer.canvasFormat,
+                    blend: {
+                        color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                    },
+                }],
+            },
+            primitive: {
+                topology: 'triangle-strip',
+                stripIndexFormat: 'uint32',
+            },
+            depthStencil: {
+                depthWriteEnabled: false,
+                depthCompare: 'greater-equal',
+                format: 'depth32float',
+            },
+            multisample: {
+                count: renderer.sampleCount,
+            },
+            label: 'Pipeline triangle ssao 02 shared',
+        });
 
-        // sets the uniform buffers
-        passEncoder.setBindGroup(0, this._renderInfoBindGroup);
-        passEncoder.setBindGroup(1, this._texturesPass02BindGroup);
-
-        // draw command
-        passEncoder.draw(6);
-        passEncoder.end();
-    }
-
-    renderPass(camera: Camera): void {
-        this.pass01(camera);
-        this.pass02();
+        const state: SharedSsaoState = {
+            colorsSharedBuffer,
+            normalsSharedBuffer,
+            depthBufferPass01,
+            colorsSharedTexture,
+            normalsSharedTexture,
+            depthTexturePass01,
+            texturesPass02BindGroup,
+            texturesPass02BindGroupLayout,
+            pipeline02,
+            width,
+            height,
+        };
+        this._sharedState.set(renderer, state);
+        return state;
     }
 }

@@ -1,4 +1,4 @@
-export interface Params {
+export interface LoadJsonParams {
   jsonFileUrl?: string;
   jsonObject?: unknown[];
   outputTableName: string;

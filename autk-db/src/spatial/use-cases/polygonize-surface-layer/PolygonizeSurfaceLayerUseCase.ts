@@ -9,6 +9,9 @@ import { LOAD_FEATURE_COLLECTION_QUERY } from '../load-custom-layer/queries';
 import { LOAD_POLYGONIZED_LAYER_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
+/**
+ * Polygonizes a surface layer from line geometries into closed polygons.
+ */
 export class PolygonizeSurfaceLayerUseCase {
     private db: AsyncDuckDB;
     private conn: AsyncDuckDBConnection;
@@ -24,7 +27,7 @@ export class PolygonizeSurfaceLayerUseCase {
         const { surfaceTableName, workspace = 'main' } = params;
         const qualifiedSurfaceTableName = `${workspace}.${surfaceTableName}`;
         const qualifiedFeatureCollectionTableName = `${workspace}.${surfaceTableName}_feature_collection`;
-        
+
         const geojson = await this.getLayerGeojsonUseCase.exec(surfaceTable, workspace) as FeatureCollection<LineString>;
         const polygonizedGeojson = polygonize(geojson) as FeatureCollection<Polygon>;
 
@@ -47,7 +50,7 @@ export class PolygonizeSurfaceLayerUseCase {
         const describeTableResponse = await this.conn.query(queryLayer);
         await this.db.dropFile(fileName);
 
-        console.log('Loaded polygonized layer!')
+        console.log('Loaded polygonized layer!');
 
         return {
             source: 'osm',
@@ -57,4 +60,3 @@ export class PolygonizeSurfaceLayerUseCase {
         };
     }
 }
-

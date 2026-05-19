@@ -8,7 +8,17 @@ interface OverpassBoundingBox {
   maxlon: number;
 }
 
+/**
+ * Fetches bounding boxes for named areas from the Overpass API.
+ */
 export class GetBoundingBoxFromAreaUseCase {
+  /**
+   * Fetches and merges bounding boxes for multiple named areas.
+   *
+   * @param params.queryArea Geocode scope and area names.
+   * @returns Combined bounding box spanning all areas.
+   * @throws If no bounding box can be determined.
+   */
   async exec(params: GetBoundingBoxFromAreaParams): Promise<BoundingBox> {
     const { geocodeArea, areas } = params.queryArea;
 

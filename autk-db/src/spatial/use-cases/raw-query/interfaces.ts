@@ -1,4 +1,4 @@
-import { LayerType } from '../load-layer/interfaces';
+import { LayerType } from 'autk-core';
 
 export type RawQueryOutput = Record<string, unknown>[];
 

@@ -1,252 +1,170 @@
-import { 
-    BBox
-} from 'geojson';
+/**
+ * @module LayerManager
+ * Layer ordering and shared-origin management for map layers.
+ *
+ * This module defines the `LayerManager` class, which owns the registered layer
+ * list, computes the shared scene origin used by geometry loaders, and enforces
+ * the render-stack ordering rules for base OSM layers, dynamic layers, and
+ * buildings. It also creates the concrete layer implementation that matches each
+ * layer type and handles layer insertion and removal lifecycle.
+ */
+
+import { FeatureCollection, Geometry } from 'geojson';
+
+import { computeOrigin, OSM_BASE_LAYER_ORDER } from './types-core';
+import type { LayerType } from './types-core';
 
 import { 
-    ILayerData,
-    ILayerInfo,
-    ILayerRenderInfo
-} from './interfaces';
+    LayerData, 
+    LayerInfo, 
+    LayerRenderInfo
+} from './types-layers';
 
-import { LayerType } from './constants';
+import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';
-import { VectorLayer } from './layer-vector';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
 
 /**
- * Manages the layers of the map.
- * 
- * This class provides methods to add, remove, and search for layers,
- * as well as to manage the bounding box of the map.
+ * Manages all map layers as a single ordered list.
+ *
+ * `LayerManager` stores every registered layer in render order, computes the
+ * shared local origin from the first loaded collection, and assigns z-indices
+ * according to the map's layering rules. Base OSM layers occupy fixed slots,
+ * dynamic layers are ordered by insertion, and buildings are always rendered
+ * last.
  */
 export class LayerManager {
-    /**
-     * List of vector layers in the map.
-     * @type {VectorLayer[]}
-     */
-    protected _vectorLayers: VectorLayer[] = [];
+    /** Registered layers sorted by render order. */
+    protected _layers: Layer[] = [];
+    /** World-space origin derived from the bounding box center. */
+    protected _origin?: number[];
 
-    /**
-     * List of raster layers in the map.
-     * @type {RasterLayer[]}
-     */
-    protected _rasterLayers: RasterLayer[] = [];
+    /** Layer ids of non-OSM, non-buildings layers in insertion order. */
+    private _dynamicOrder: string[] = [];
 
-    /**
-     * Bounding box of the map.
-     * @type {BBox}
-     */
-    protected _bbox!: BBox;
+    /** Registered layers sorted by render z-index. */
+    get layers(): Layer[] { return this._layers; }
 
-    /**
-     * Origin of the map.
-     * @type {number[]}
-     */
-    protected _origin!: number[];
-
-    /**
-     * Constructor for LayerManager
-     */
-    constructor() {
-        this._vectorLayers = [];
-        this._rasterLayers = [];
-    }
-
-    /**
-     * Get the vetor layers of the map.
-     * @returns {Layer[]} - The list of layers.
-     */
-    get vectorLayers(): VectorLayer[] {
-        return this._vectorLayers;
-    }
-
-    /**
-     * Get the raster layers of the map.
-     * @returns {Layer[]} - The list of layers.
-     */
-    get rasterLayers(): RasterLayer[] {
-        return this._rasterLayers;
-    }
-
-    /**
-     * Get the origin of the map.
-     * @returns {number[]} - The origin coordinates in meters.
-     */
+    /** World-space origin derived from the current bounding box center. */
     get origin(): number[] {
-        return this._origin
+        if (!this._origin) {
+            throw new Error('Layer origin has not been initialized');
+        }
+        return this._origin;
+    }
+
+    /** Indicates whether the shared scene origin has been initialized. */
+    get hasOrigin(): boolean { return this._origin !== undefined; }
+
+    /**
+     * Computes the shared scene origin from the provided collection.
+     *
+     * @param collection Source feature collection.
+     * @returns Nothing. Updates the manager's shared origin in place.
+     * @throws Never throws.
+     */
+    initializeOrigin(collection: FeatureCollection<Geometry | null>): void {
+        this._origin = computeOrigin(collection as FeatureCollection);
     }
 
     /**
-     * Get the bounding box of the map.
-     * @returns {BBox} - The bounding box as a GeoJSON polygon.
+     * Creates, registers, and reorders a layer based on `layerInfo.typeLayer`.
+     *
+     * @param layerInfo Layer identity and type metadata.
+     * @param layerRender Initial render configuration.
+     * @param layerData Geometry and auxiliary layer payload.
+     * @returns The created layer, or `null` if a layer with the same id is already registered.
+     * @throws Never throws. Duplicate ids log an error and return `null`.
      */
-    get bboxAndOrigin(): BBox {
-        return this._bbox;
-    }
-
-    /**
-     * Set the origin and the bounding box of the map.
-     * @param {BBox} bbox - The bounding box to set.
-     */
-    set bboxAndOrigin(bbox: BBox) {
-        this._bbox = bbox;
-        this._origin = [
-            (bbox[2] + bbox[0]) * 0.5,
-            (bbox[3] + bbox[1]) * 0.5
-        ];
-    }
-
-    /**
-     * Adds a layer to the map.
-     * @param {ILayerInfo} layerInfo - The information about the layer.
-     * @param {ILayerRenderInfo} layerRender - The rendering information for the layer.
-     * @param {ILayerData} layerData - The data associated with the layer.
-     * @returns {Layer | null} - The created layer or null if the type is unknown.
-     */
-    public addVectorLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): VectorLayer | null {
-        let layer = null;
-
-        switch (layerInfo.typeLayer) {
-            case LayerType.AUTK_OSM_BUILDINGS:
-                layer = new Triangles3DLayer(layerInfo, layerRender, layerData);
-                break;
-            default:
-                layer = new Triangles2DLayer(layerInfo, layerRender, layerData);
-                break;
+    addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
+        if (this._layers.some((layer) => layer.layerInfo.id === layerInfo.id)) {
+            console.error(`LayerManager: layer id '${layerInfo.id}' already exists.`);
+            return null;
         }
 
-        if (layer) {
-            this._vectorLayers.push(layer);
-            this._vectorLayers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+        const layer: Layer = layerInfo.typeLayer === 'buildings'
+            ? new Triangles3DLayer(layerInfo, layerRender, layerData)
+            : layerInfo.typeLayer === 'raster'
+                ? new RasterLayer(layerInfo, layerRender, layerData)
+                : new Triangles2DLayer(layerInfo, layerRender, layerData);
 
-            return layer;
+        if (!OSM_BASE_LAYER_ORDER.includes(layerInfo.typeLayer) && layerInfo.typeLayer !== 'buildings') {
+            this._dynamicOrder.push(layerInfo.id);
         }
-        return null;
-    }
-
-    /**
-     * Adds a raster layer to the map.
-     * @param {ILayerInfo} layerInfo - The information about the layer.
-     * @param {ILayerRenderInfo} layerRender - The rendering information for the layer.
-     * @param {ILayerData} layerData - The data associated with the layer.
-     * @returns {Layer | null} - The created layer or null if the type is unknown.
-     */
-    public addRasterLayer(layerInfo: ILayerInfo, layerRender: ILayerRenderInfo, layerData: ILayerData): RasterLayer | null {
-        let layer = null;
-
-        switch (layerInfo.typeLayer) {
-            case LayerType.AUTK_RASTER:
-                layer = new RasterLayer(layerInfo, layerRender, layerData);
-                break;
-        }
-
-        if (layer) {
-            this._rasterLayers.push(layer);
-            this._rasterLayers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
-
-            return layer;
-        }
-        return null;
-    }
-
-    /**
-     * Removes a layer from the map.
-     * @param {string} layerId - The ID of the layer to remove.
-     */
-    delLayer(layerId: string): void {
-        // searches the layer
-        for (let lId = 0; lId < this._vectorLayers.length; lId++) {
-            const lay = this._vectorLayers[lId];
-            if (lay.layerInfo.id === layerId) {
-                this.vectorLayers.splice(lId, 1);
-                return;
-            }
-        }
-
-        // searches the layer
-        for (let lId = 0; lId < this._rasterLayers.length; lId++) {
-            const lay = this._rasterLayers[lId];
-            if (lay.layerInfo.id === layerId) {
-                this._rasterLayers.splice(lId, 1);
-                return;
-            }
-        }
-    }
-
-    /**
-     * Removes a layer by its ID.
-     * @param {string} layerId - The ID of the layer to remove.
-     */
-    public removeLayerById(layerId: string): void {
-        this._vectorLayers = this._vectorLayers.filter(l => l.layerInfo.id !== layerId);
-        this._rasterLayers = this._rasterLayers.filter(l => l.layerInfo.id !== layerId);
-    }
-
-    /**
-     * Searches for a layer by its ID.
-     * @param {string} layerId - The ID of the layer to search for.
-     * @returns {Layer | null} - The found layer or null if not found.
-     */
-    public searchByLayerId(layerId: string): VectorLayer | RasterLayer | null {
-        // searches the layer
-        let layer = null;
-
-        for (const lay of this.vectorLayers) {
-            if (lay.layerInfo.id === layerId) {
-                layer = lay;
-                break;
-            }
-        }
-
-        for (const lay of this.rasterLayers) {
-            if (lay.layerInfo.id === layerId) {
-                layer = lay;
-                break;
-            }
-        }
+        this._layers.push(layer);
+        this._recomputeZIndices();
+        this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
 
         return layer;
     }
 
     /**
-     * Computes the Z-index for a given layer type.
-     * @param {LayerType} layerType - The type of the layer.
-     * @returns {number} - The computed Z-index.
+     * Removes the layer matching `layerId` and recomputes dynamic z-order.
+     *
+     * @param layerId Layer identifier to remove.
+     * @returns Nothing. Unknown ids are silently ignored.
+     * @throws Never throws.
      */
-    public computeZindex(layerType: LayerType): number {
-        let zIndex = 0;
-        
-        switch (layerType) {
-            case LayerType.AUTK_OSM_SURFACE:
-                zIndex = 0;
-                break;
-            case LayerType.AUTK_OSM_PARKS:
-                zIndex = 0.1;
-                break;
-            case LayerType.AUTK_OSM_WATER:
-                zIndex = 0.2;
-                break;
-            case LayerType.AUTK_OSM_ROADS:
-                zIndex = 0.3;
-                break;
-            case LayerType.AUTK_OSM_BUILDINGS:
-                zIndex = 1.0;
-                break;
-            case LayerType.AUTK_RASTER:
-                zIndex = 0.4;
-                break;
-            case LayerType.AUTK_GEO_POLYGONS:
-                zIndex = 0.5;
-                break;
-            case LayerType.AUTK_GEO_POLYLINES:
-                zIndex = 0.6;
-                break;
-            case LayerType.AUTK_GEO_POINTS:
-                zIndex = 0.7;
-                break;
+    removeLayerById(layerId: string): void {
+        const layer = this.searchByLayerId(layerId);
+        if (!layer) {
+            return;
         }
 
-        return zIndex;
+        layer.destroy();
+        this._layers = this._layers.filter((candidate) => candidate.layerInfo.id !== layerId);
+        this._dynamicOrder = this._dynamicOrder.filter((id) => id !== layerId);
+        this._recomputeZIndices();
+    }
+
+    /**
+     * Returns the layer with the given `layerId`, or `null` if not found.
+     *
+     * @param layerId Layer identifier to search for.
+     * @returns The matching layer instance, or `null`.
+     * @throws Never throws.
+     */
+    searchByLayerId(layerId: string): Layer | null {
+        return this._layers.find(l => l.layerInfo.id === layerId) ?? null;
+    }
+
+    /**
+     * Returns a preliminary z-index placeholder for a layer type.
+     *
+     * @param layerType Layer type to place in the render stack.
+     * @returns The fixed OSM base-slot index, or `0` as a placeholder.
+     * @throws Never throws.
+     */
+    computeZindex(layerType: LayerType): number {
+        const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(layerType);
+        return osmIdx !== -1 ? osmIdx : 0;
+    }
+
+    /**
+     * Reassigns z-indices across all registered layers:
+     *
+     * - OSM base types: fixed slots 0…N-1 (by `OSM_BASE` order)
+     * - Dynamic layers: slots N, N+1, … in load-insertion order
+     * - Buildings: always last (N + dynamic count)
+     *
+     * @returns Nothing. Updates each registered layer's `layerInfo.zIndex` in
+     * place.
+     */
+    private _recomputeZIndices(): void {
+        const buildingsZ = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.length;
+
+        for (const layer of this._layers) {
+            const { typeLayer, id } = layer.layerInfo;
+            const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(typeLayer);
+
+            if (osmIdx !== -1) {
+                layer.layerInfo.zIndex = osmIdx;
+            } else if (typeLayer === 'buildings') {
+                layer.layerInfo.zIndex = buildingsZ;
+            } else {
+                layer.layerInfo.zIndex = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.indexOf(id);
+            }
+        }
     }
 }

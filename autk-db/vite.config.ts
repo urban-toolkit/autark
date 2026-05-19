@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
@@ -18,7 +18,7 @@ export default defineConfig({
     {
       name: 'copy-duckdb-dist',
       closeBundle() {
-        const src = resolve(__dirname, 'node_modules/@duckdb/duckdb-wasm/dist');
+        const src = resolve(require.resolve('@duckdb/duckdb-wasm'), '..');
         const dst = resolve(__dirname, 'dist');
         for (const file of duckdbFiles) {
           if (file.endsWith('.js')) {

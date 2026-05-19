@@ -1,11 +1,84 @@
-# autk-plot: Data Visualization Library
-
 <div align="center">
-  <img src="https://raw.githubusercontent.com/urban-toolkit/utk-serverless/main/logo.png" alt="Autark Logo" height="200"/></br>
+  <img src="../logo.png" alt="Autark Logo" height="150"/></br>
+
+  <h1>@urban-toolkit/autk-plot</h1>
+
+  <br>
+  <p><strong>D3.js-based plotting library for linked urban data views.</strong></p>
+
+  <p>
+    <a href="https://arxiv.org/abs/2604.20759">Paper</a> ·
+    <a href="https://autarkjs.org/">Website</a>
+  </p>  
 </div>
 <br>
 
-**autk-plot** is a data visualization library, part of the Autark ecosystem, built on top of D3 and Vega-Lite. The library can be used standalone or in conjunction with other Autark modules. To facilitate adoption, we provide a large collection of examples in the [Autark website](https://autarkjs.org/gallery/), demonstrating its functionalities both as an independent library and as part of the larger ecosystem of tools for urban data analytics.
+## Autark toolkit
+
+**Autark** is a serverless, modular TypeScript toolkit for prototyping urban visual analytics systems entirely in the browser. It supports client-side workflows for loading, storing, querying, joining, computing, and visualizing physical and thematic urban data using standard formats such as OpenStreetMap, GeoJSON, GeoTIFF, and CSV.
+
+The toolkit is available as the umbrella package `@urban-toolkit/autk` or as individual modules:
+
+* `@urban-toolkit/autk-db`: In-browser spatial database for urban datasets.
+* `@urban-toolkit/autk-compute`: WebGPU computation engine for analytical and render-based pipelines.
+* `@urban-toolkit/autk-map`: WebGPU-based 2D/3D vector map visualization library.
+* `@urban-toolkit/autk-plot`: D3.js-based plotting library for linked urban data views.
+
+## @urban-toolkit/autk-plot
+
+`@urban-toolkit/autk-plot` is a D3.js-based plotting library for visualizing GeoJSON feature properties. It provides a unified `AutkPlot` wrapper for multiple chart types, shared styling and colormap utilities, interaction events, selections, data updates, and transform presets for common aggregation workflows.
+
+### Basic usage
+
+```ts
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+
+const container = document.querySelector<HTMLElement>('#plot')!;
+
+const plot = new AutkPlot(container, {
+  type: 'scatterplot',
+  collection: pointsGeojson,
+  attributes: { axis: ['population', 'income'], color: 'zone' },
+  labels: { axis: ['Population', 'Income'], title: 'Urban indicators' },
+  events: [PlotEvent.CLICK],
+});
+
+plot.events.on(PlotEvent.CLICK, ({ selection }) => {
+  console.log(selection);
+});
+
+plot.setSelection([0, 4, 10]);
+```
+
+### API summary
+
+* `new AutkPlot(container, config)`: Creates a plot using the selected `type`.
+* `type`: Returns the active plot type.
+* `instance`: Exposes the underlying plot implementation for advanced use.
+* `selection`: Returns selected source feature ids.
+* `events`: Typed event bus for click, brush, and other supported plot events.
+* `setSelection(selection)`: Applies a selection by source feature ids.
+* `updateCollection(collection)`: Replaces the source GeoJSON collection and redraws.
+* `draw()`: Redraws the plot synchronously.
+
+### Supported plot types
+
+* `scatterplot`
+* `barchart`
+* `parallel-coordinates`
+* `table`
+* `linechart`
+* `heatmatrix`
+
+### Transform API summary
+
+`@urban-toolkit/autk-plot` also exports a shared transform layer for preparing plot data while preserving source-feature provenance through `autkIds`.
+
+* `run(rows, config, channels)`: Runs a built-in transform preset.
+* `reduceBuckets(params)`: Applies low-level bucket aggregation.
+* Transform presets: `binning-1d`, `binning-2d`, `binning-events`, `reduce-series`, and `sort`.
+* Reducers: `count`, `sum`, `avg`, `min`, and `max`.
+* Time resolutions: `hour`, `day`, `weekday`, `monthday`, `month`, and `year`.
 
 ## Resources
 

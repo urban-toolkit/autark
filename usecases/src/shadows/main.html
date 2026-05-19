@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Shadows)</title>
+    <link rel="stylesheet" href="/src/shadows/main.css">
+</head>
+
+<body>
+    <div id="app">
+        <div id="loading-overlay">
+            <div id="loading-box">
+                <div id="loading-spinner"></div>
+                <h2 id="loading-title">Loading</h2>
+                <p id="loading-text"></p>
+                <p id="loading-note"></p>
+            </div>
+        </div>
+
+        <canvas></canvas>
+
+        <div id="controls">
+            <div id="displayMode">
+                <label><input type="radio" name="mode" value="heatmap" checked onchange="shadows.changeDisplayMode(this.value)"> Shadow heatmap</label>
+                <label><input type="radio" name="mode" value="compute" onchange="shadows.changeDisplayMode(this.value)"> Building shadow (min)</label>
+                <label><input type="radio" name="mode" value="contribution" onchange="shadows.changeDisplayMode(this.value)"> Building shadow (%)</label>
+            </div>
+            <select id="monthSelect" onchange="shadows.changeMonth(this.value)"></select>
+        </div>
+
+        <div id="histogramPanel">
+            <div id="histogramBar"></div>
+            <div id="histogramBody"></div>
+        </div>
+    </div>
+</body>
+
+<script>
+    function setLoadingState(message, note) {
+        const text = document.getElementById('loading-text');
+        const noteEl = document.getElementById('loading-note');
+        if (text) text.textContent = message;
+        if (noteEl) noteEl.textContent = note ?? '';
+    }
+
+    function hideLoading() {
+        document.getElementById('loading-overlay')?.classList.add('hidden');
+    }
+
+    function showError(message, note) {
+        const overlay = document.getElementById('loading-overlay');
+        const title = document.getElementById('loading-title');
+        const text = document.getElementById('loading-text');
+        const noteEl = document.getElementById('loading-note');
+        overlay?.classList.remove('hidden');
+        overlay?.classList.add('error');
+        if (title) title.textContent = 'Loading Error';
+        if (text) text.textContent = message;
+        if (noteEl) noteEl.textContent = note ?? 'Please reload the page and try again.';
+    }
+</script>
+
+<script type="module" src="/src/shadows/main.ts"></script>
+
+<script>
+    window.addEventListener('shadows-ready', () => {
+        const select = document.querySelector('#monthSelect');
+        [
+            { value: 'jun', text: 'June 21 (summer solstice)' },
+            { value: 'sep', text: 'September 22 (autumnal equinox)' },
+            { value: 'dez', text: 'December 21 (winter solstice)' },
+        ].forEach(({ value, text }) => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = text;
+            select.appendChild(opt);
+        });
+    });
+
+    // Draggable histogram panel
+    (function () {
+        const panel = document.querySelector('#histogramPanel');
+        const bar = document.querySelector('#histogramBar');
+        let startX = 0, startY = 0;
+
+        bar.addEventListener('pointerdown', e => {
+            startX = e.clientX;
+            startY = e.clientY;
+            bar.setPointerCapture(e.pointerId);
+        });
+
+        bar.addEventListener('pointermove', e => {
+            if (!bar.hasPointerCapture(e.pointerId)) return;
+            const newLeft = panel.offsetLeft + (e.clientX - startX);
+            const newTop  = panel.offsetTop  + (e.clientY - startY);
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+            panel.style.left = newLeft + 'px';
+            panel.style.top  = newTop + 'px';
+            startX = e.clientX;
+            startY = e.clientY;
+        });
+
+        bar.addEventListener('pointerup', e => bar.releasePointerCapture(e.pointerId));
+    })();
+</script>
+
+</html>

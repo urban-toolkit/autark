@@ -1,3 +1,5 @@
+/** Custom error types for spatial join operations. */
+
 export class TableNotFoundError extends Error {
   constructor(tableName: string) {
     super(`Table ${tableName} not found`);

@@ -36,6 +36,7 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   return `
     CREATE OR REPLACE TABLE ${qualifiedOutputTableName} AS
     SELECT
+      row_number() OVER () AS id,
       ${geometrySelect} AS geometry,
       feature.properties AS properties
     FROM (

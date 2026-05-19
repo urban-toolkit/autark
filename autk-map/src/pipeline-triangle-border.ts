@@ -1,3 +1,13 @@
+/**
+ * @module PipelineTriangleBorder
+ * WebGPU line pipeline for rendering 2D triangle borders.
+ *
+ * This module defines {@link PipelineTriangleBorder}, a specialized rendering
+ * pipeline used by triangle-based 2D layers to draw border edges. The pipeline
+ * manages shader creation, GPU buffer allocation and uploads, uniform bind
+ * groups inherited from the base pipeline, and indexed line-list draw calls.
+ */
+
 /// <reference types="@webgpu/types" />
 
 import linesVertexSource from './shaders/triangle-02.vert.wgsl';
@@ -6,64 +16,85 @@ import linesFragmentSource from './shaders/triangle-02.frag.wgsl';
 import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
-import { Camera } from './camera';
+import { Camera } from './types-core';
 
 import { Triangles2DLayer } from './layer-triangles2D';
 
 /**
- * PipelineBorderFlat is a rendering pipeline for drawing flat borders of triangles in 2D space.
- * It uses WebGPU to render lines based on the provided border data.
+ * Rendering pipeline for drawing 2D triangle borders as indexed lines.
+ *
+ * `PipelineTriangleBorder` uploads border vertex positions, edge indices, and
+ * per-vertex skipped flags from a {@link Triangles2DLayer}, then renders them
+ * with a dedicated WebGPU line-list pipeline. It relies on the base
+ * {@link Pipeline} implementation for shared camera and render-info uniform
+ * management.
  */
 export class PipelineTriangleBorder extends Pipeline {
-    /**
-     * Position buffer for vertex data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing border positions. */
     protected _positionBuffer!: GPUBuffer;
 
-    /**
-     * Buffer for border indices.
-     * @type {GPUBuffer}
-     */
+    /** GPU index buffer describing border line segments. */
     protected _borderIndicesBuffer!: GPUBuffer;
 
-    /**
-     * Buffer for skipped data.
-     * @type {GPUBuffer}
-     */
+    /** GPU vertex buffer containing per-vertex skipped flags. */
     protected _skippedBuffer!: GPUBuffer;
 
-    /**
-     * Vertex shader module.
-     * @type {GPUShaderModule}
-     */
+    /** Compiled vertex shader module for border rendering. */
     protected _vertModule!: GPUShaderModule;
 
-    /**
-     * Fragment shader module.
-     * @type {GPUShaderModule}
-     */
+    /** Compiled fragment shader module for border rendering. */
     protected _fragModule!: GPUShaderModule;
 
-    /**
-     * Render pipeline for drawing borders.
-     * @type {GPURenderPipeline}
-     */
+    /** WebGPU render pipeline used for indexed border draw calls. */
     protected _pipeline!: GPURenderPipeline;
 
+    /** Reused CPU-side upload buffer for border positions. */
+    private _positionData: Float32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for border indices. */
+    private _indicesData: Uint32Array<ArrayBuffer> | null = null;
+    /** Reused CPU-side upload buffer for skipped flags. */
+    private _skippedData: Float32Array<ArrayBuffer> | null = null;
+
     /**
-     * Constructor for PipelineBorderFlat
-     * @param {Renderer} renderer The renderer instance
+     * Creates a triangle-border pipeline bound to a renderer.
+     *
+     * The renderer provides the GPU device, canvas format, sample count, and
+     * shared rendering state required to allocate buffers and create the render
+     * pipeline.
+     *
+     * @param renderer Renderer that owns the WebGPU device and render targets.
      */
     constructor(renderer: Renderer) {
         super(renderer);
     }
 
     /**
-     * Builds the pipeline with the provided border data.
-     * @param {Triangles2DLayer} borders The border data containing positions and indices
+     * Releases GPU resources owned by this pipeline.
+     *
+     * @returns Destroys this pipeline's buffers, then delegates to the base
+     * pipeline to release shared resources such as uniform buffers and bind
+     * groups.
      */
-    build(borders: Triangles2DLayer) {
+    override destroy(): void {
+        this._positionBuffer?.destroy();
+        this._borderIndicesBuffer?.destroy();
+        this._skippedBuffer?.destroy();
+        super.destroy();
+    }
+
+    /**
+     * Builds GPU resources and uploads layer data for border rendering.
+     *
+     * This method creates shader modules, allocates vertex and index buffers,
+     * initializes shared uniform bind groups, uploads the current layer data,
+     * and creates the WebGPU render pipeline. It is expected to be called
+     * before the first render pass for the layer.
+     *
+     * @param borders Triangle layer supplying border positions, edge indices,
+     * and skipped-vertex flags.
+     * @returns Initializes this pipeline instance for subsequent draw calls.
+     */
+    build(borders: Triangles2DLayer): void {
         this.createShaders();
 
         this.createVertexBuffers(borders);
@@ -71,14 +102,18 @@ export class PipelineTriangleBorder extends Pipeline {
         this.createCameraUniformBindGroup();
 
         this.updateVertexBuffers(borders);
+        this.updateColorUniforms(borders);
 
         this.createPipeline();
     }
 
     /**
-     * Creates the vertex and fragment shaders for the pipeline.
+     * Creates the shader modules used by the border pipeline.
+     *
+     * @returns Compiles the WGSL vertex and fragment shader sources into GPU
+     * shader modules stored on this instance.
      */
-    createShaders() {
+    createShaders(): void {
         // Vertex shader
         const vsmDesc = {
             code: linesVertexSource,
@@ -93,21 +128,28 @@ export class PipelineTriangleBorder extends Pipeline {
     }
 
     /**
-     * Creates the vertex buffers for the pipeline.
-     * @param {Triangles2DLayer} borders The border data containing positions and indices
+     * Allocates GPU buffers sized for the current border data.
+     *
+     * Buffer sizes are derived directly from the current layer arrays. If the
+     * layer data changes size later, callers must ensure buffers are recreated
+     * before uploading larger payloads.
+     *
+     * @param borders Triangle layer supplying the border arrays used to size
+     * the position, index, and skipped buffers.
+     * @returns Creates GPU buffers for subsequent uploads and draw calls.
      */
-    createVertexBuffers(borders: Triangles2DLayer) {
+    createVertexBuffers(borders: Triangles2DLayer): void {
         // vertex data
         this._positionBuffer = this._renderer.device.createBuffer({
             label: 'Position buffer',
-            size: borders.borderPos.length * 4,
+            size: borders.borderPosition.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         // vertex data
         this._borderIndicesBuffer = this._renderer.device.createBuffer({
             label: 'Primitive indices buffer',
-            size: borders.borderIds.length * 4,
+            size: borders.borderIndices.length * 4,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
 
@@ -116,32 +158,51 @@ export class PipelineTriangleBorder extends Pipeline {
             label: 'Skipped data buffer',
             size: borders.skippedVertices.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });    }
-
-    /**
-     * Updates the vertex buffers with the provided border data.
-     * @param {Triangles2DLayer} borders The border data containing positions and indices
-     */
-    updateVertexBuffers(borders: Triangles2DLayer) {
-        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, new Float32Array(borders.borderPos));
-        this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, new Uint32Array(borders.borderIds));
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, new Float32Array(borders.skippedVertices));
+        });
     }
 
     /**
-     * Creates the render pipeline for drawing borders.
+     * Uploads the current border arrays into the pipeline's GPU buffers.
+     *
+     * The method reuses cached typed arrays when possible via base-pipeline
+     * synchronization helpers, then writes the synchronized data to the GPU
+     * queue for the position, index, and skipped buffers.
+     *
+     * @param borders Triangle layer supplying border positions, edge indices,
+     * and skipped-vertex flags.
+     * @returns Updates the GPU-side buffer contents used by rendering.
      */
-    createPipeline() {
+    updateVertexBuffers(borders: Triangles2DLayer): void {
+        this._positionData = this._syncFloatData(this._positionData, borders.borderPosition);
+        this._indicesData = this._syncUintData(this._indicesData, borders.borderIndices);
+        this._skippedData = this._syncFloatData(this._skippedData, borders.skippedVertices);
+
+        this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, this._indicesData);
+        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
+    }
+
+    /**
+     * Creates the WebGPU render pipeline used to draw borders.
+     *
+     * The pipeline renders indexed `line-list` primitives, uses the renderer's
+     * multisample configuration, disables depth writes while still participating
+     * in depth testing, and binds the shared render-info and camera uniform
+     * layouts inherited from the base pipeline.
+     *
+     * @returns Stores the created render pipeline on this instance.
+     */
+    createPipeline(): void {
         // Vertex data
         const positionAttribDesc: GPUVertexAttribute = {
             shaderLocation: 0, // [[location(0)]]
             offset: 0,
-            format: 'float32x3',
+            format: 'float32x2',
         };
 
         const positionBufferDesc: GPUVertexBufferLayout = {
             attributes: [positionAttribDesc],
-            arrayStride: 4 * 3, // sizeof(float) * 3
+            arrayStride: 4 * 2, // sizeof(float) * 2
             stepMode: 'vertex',
         };
 
@@ -170,7 +231,7 @@ export class PipelineTriangleBorder extends Pipeline {
             entryPoint: 'main',
             targets: [
                 {
-                    format: 'bgra8unorm',
+                    format: this._renderer.canvasFormat,
                     blend: {
                         color: {
                             srcFactor: 'one',
@@ -198,7 +259,7 @@ export class PipelineTriangleBorder extends Pipeline {
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: false,
-            depthCompare: 'less-equal',
+            depthCompare: 'greater-equal',
             format: 'depth32float',
         };
 
@@ -216,31 +277,27 @@ export class PipelineTriangleBorder extends Pipeline {
             primitive,
             depthStencil,
             multisample,
-            label: "Pipeline border flat"
+            label: 'Pipeline border flat',
         };
         this._pipeline = this._renderer.device.createRenderPipeline(pipelineDesc);
     }
 
     /**
-     * Renders the border flat pipeline.
-     * @param {Camera} camera The camera instance
+     * Encodes a render pass for the current triangle borders.
+     *
+     * The method updates camera uniforms for the current frame, binds the
+     * pipeline, vertex buffers, index buffer, and uniform bind groups, then
+     * issues an indexed draw only when the border index buffer contains at
+     * least one index.
+     *
+     * @param camera Camera whose current view and projection state should be
+     * uploaded before drawing.
+     * @param passEncoder Active render-pass encoder that receives the draw
+     * commands.
+     * @returns Encodes draw commands into the provided render pass when border
+     * indices are available; otherwise, no draw call is issued.
      */
-    renderPass(camera: Camera) {
-        // Create a new command encoder
-        const commandEncoder = this._renderer.commandEncoder;
-
-        // changes buffer behaviour
-        this._renderer.frameBuffer.loadOp = 'load';
-
-        // Render pass description
-        const renderPassDesc = {
-            colorAttachments: [this._renderer.frameBuffer],
-            depthStencilAttachment: this._renderer.depthBuffer,
-        };
-
-        // Create a new pass commands encoder
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
-
+    renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         // sets the current pipeline
         passEncoder.setPipeline(this._pipeline);
 
@@ -258,7 +315,8 @@ export class PipelineTriangleBorder extends Pipeline {
         passEncoder.setBindGroup(0, this._renderInfoBindGroup);
         passEncoder.setBindGroup(1, this._cameraBindGroup);
 
-        passEncoder.drawIndexed(this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT);
-        passEncoder.end();
+        const indexCount = this._borderIndicesBuffer.size / Uint32Array.BYTES_PER_ELEMENT;
+        if (indexCount > 0) { passEncoder.drawIndexed(indexCount); }
     }
+
 }

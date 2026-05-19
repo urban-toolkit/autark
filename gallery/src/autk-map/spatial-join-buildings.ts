@@ -1,0 +1,95 @@
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
+
+const URL = (import.meta as any).env.BASE_URL;
+
+
+export class SpatialJoinNear {
+    protected map!: AutkMap;
+    protected db!: AutkSpatialDb;
+
+    public async run(canvas: HTMLCanvasElement): Promise<void> {
+        this.db = new AutkSpatialDb();
+        await this.db.init();
+
+        await this.db.loadOsm({
+            queryArea: {
+                geocodeArea: 'New York',
+                areas: ['Battery Park City', 'Financial District'],
+            },
+            outputTableName: 'table_osm',
+            autoLoadLayers: {
+                coordinateFormat: 'EPSG:3395',
+                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
+                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
+                >,
+                dropOsmTable: true,
+            },
+        });
+
+        await this.db.loadCsv({
+            csvFileUrl: `${URL}data/noise.csv`,
+            outputTableName: 'noise',
+            geometryColumns: {
+                latColumnName: 'Latitude',
+                longColumnName: 'Longitude',
+                coordinateFormat: 'EPSG:3395',
+            },
+        });
+
+        const layer = 'table_osm_buildings';
+
+        await this.db.spatialQuery({
+            tableRootName: layer,
+            tableJoinName: 'noise',
+            spatialPredicate: 'NEAR',
+            nearDistance: 1000,
+            output: {
+                type: 'MODIFY_ROOT',
+            },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [
+                    {
+                        tableName: 'noise',
+                        column: 'Unique Key',
+                        aggregateFn: 'count',
+                    },
+                ],
+            },
+        });
+
+        this.map = new AutkMap(canvas);
+        await this.map.init();
+
+        await this.loadLayers();
+        await this.updateThematicData(layer);
+
+        this.map.draw();
+    }
+
+    protected async loadLayers(): Promise<void> {
+        for (const layerData of this.db.getLayerTables()) {
+            const geojson = await this.db.getLayer(layerData.name);
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
+        }
+    }
+
+    protected async updateThematicData(layer: string = 'table_osm_buildings') {
+        const geojson = await this.db.getLayer(layer);
+
+        this.map.updateThematic(layer, { collection: geojson, property: 'properties.sjoin.count.noise' });
+    }
+}
+
+async function main() {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) {  
+        throw new Error('No canvas found');
+    }
+
+    const example = new SpatialJoinNear();
+    await example.run(canvas);
+}
+main();

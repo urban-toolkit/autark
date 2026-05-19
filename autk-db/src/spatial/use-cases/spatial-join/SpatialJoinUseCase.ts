@@ -1,10 +1,13 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
-import { SpatialJoinParams } from './interfaces';
+import { SpatialQueryParams } from './interfaces';
 import { Table } from '../../../shared/interfaces';
 import { GeometryColumnNotFoundError, TableNotFoundError } from './errors';
 import { SPATIAL_JOIN_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
+/**
+ * Performs a spatial join between two tables, with optional aggregation.
+ */
 export class SpatialJoinUseCase {
   private conn: AsyncDuckDBConnection;
 
@@ -12,7 +15,7 @@ export class SpatialJoinUseCase {
     this.conn = conn;
   }
 
-  async exec(params: SpatialJoinParams, tables: Table[]): Promise<{ created: boolean; table: Table }> {
+  async exec(params: SpatialQueryParams, tables: Table[]): Promise<{ created: boolean; table: Table }> {
     const tableRoot = tables.find((table) => table.name === params.tableRootName);
     if (!tableRoot) throw new TableNotFoundError(params.tableRootName);
 
@@ -95,7 +98,7 @@ export class SpatialJoinUseCase {
   }
 
   private addTablesToGroupBy(
-    groupBy: SpatialJoinParams['groupBy'],
+    groupBy: SpatialQueryParams['groupBy'],
     tables: Table[],
   ): {
     selectColumns: Array<{ table: Table; column: string; aggregateFn?: string; aggregateFnResultColumnName?: string; normalize?: boolean }>;

@@ -1,0 +1,89 @@
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkMap, ColorMapDomainStrategy, ColorMapInterpolator, LayerType } from '@urban-toolkit/autk-map';
+
+const URL = (import.meta as any).env.BASE_URL;
+
+
+export class SpatialJoin {
+    protected map!: AutkMap;
+    protected db!: AutkSpatialDb;
+
+    public async run(canvas: HTMLCanvasElement): Promise<void> {
+        this.db = new AutkSpatialDb();
+        await this.db.init();
+
+        await this.db.loadCustomLayer({
+            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
+            outputTableName: 'neighborhoods',
+            coordinateFormat: 'EPSG:3395'
+        });
+
+        await this.db.loadCsv({
+            csvFileUrl: `${URL}data/noise.csv`,
+            outputTableName: 'noise',
+            geometryColumns: {
+                latColumnName: 'Latitude',
+                longColumnName: 'Longitude',
+                coordinateFormat: 'EPSG:3395',
+            },
+        });
+
+        await this.db.spatialQuery({
+            tableRootName: 'neighborhoods',
+            tableJoinName: 'noise',
+            spatialPredicate: 'INTERSECT',
+            output: {
+                type: 'MODIFY_ROOT',
+            },
+            joinType: 'LEFT',
+            groupBy: {
+                selectColumns: [
+                    {
+                        tableName: 'noise',
+                        column: 'Unique Key',
+                        aggregateFn: 'count',
+                    },
+                ],
+            },
+        });
+
+        this.map = new AutkMap(canvas);
+        await this.map.init();
+
+        await this.loadLayers();
+        await this.updateThematicData();
+
+        this.map.draw();
+    }
+
+    protected async loadLayers(): Promise<void> {
+        for (const layerData of this.db.getLayerTables()) {
+            const geojson = await this.db.getLayer(layerData.name);
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
+        }
+    }
+
+    protected async updateThematicData() {
+        const geojson = await this.db.getLayer('neighborhoods');
+
+        this.map.updateColorMap('neighborhoods', { colorMap: {
+                domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
+                interpolator: ColorMapInterpolator.SEQ_BLUES,
+            }, });
+
+        this.map.updateThematic('neighborhoods', { collection: geojson, property: 'properties.sjoin.count.noise' });
+    }
+}
+
+async function main() {
+    const example = new SpatialJoin();
+
+    const canvas = document.querySelector('canvas');
+    if (!canvas) {
+        throw new Error('No canvas found');
+    }
+
+    await example.run(canvas);
+}
+main();

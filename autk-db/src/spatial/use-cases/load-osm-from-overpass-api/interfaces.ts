@@ -1,4 +1,4 @@
-import { LayerType } from '../load-layer/interfaces';
+import { LayerType } from 'autk-core';
 
 export interface OsmElement {
   type: 'node' | 'way' | 'relation';
@@ -12,13 +12,13 @@ export interface OsmElement {
     role?: string;
   }[];
   nodes?: number[];
+  /** Inline geometry from Overpass `out geom;` — present alongside `nodes` for ways. */
+  geometry?: Array<{ lat: number; lon: number }>;
 }
 
 export type LoadingPhase =
   | 'querying-osm-server'
   | 'downloading-osm-data'
-  | 'querying-osm-boundaries'
-  | 'downloading-boundaries'
   | 'processing-osm-data'
   | 'processing-boundaries';
 
@@ -46,7 +46,7 @@ export interface OsmLoadTimings {
   layers: LayerLoadTimings[];
 }
 
-export type Params = {
+export type LoadOsmParams = {
   outputTableName: string;
   autoLoadLayers?: {
     coordinateFormat: string;
@@ -57,6 +57,10 @@ export type Params = {
     geocodeArea: string;
     areas: string[];
   };
+  /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
+  pbfFileUrl?: string;
+  /** When true, bypasses the cached Overpass response and fetches fresh data. */
+  forceRefresh?: boolean;
   workspace?: string;
   onProgress?: OnLoadingProgress;
 };

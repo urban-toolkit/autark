@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
@@ -12,7 +12,7 @@ export default defineConfig({
       name: 'autk-plot',
     },
     copyPublicDir: false,
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true
   },
 });

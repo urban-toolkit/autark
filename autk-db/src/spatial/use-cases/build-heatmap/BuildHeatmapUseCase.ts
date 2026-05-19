@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { BuildHeatmapParams } from './interfaces';
 import { BoundingBox, Table } from '../../../shared/interfaces';
@@ -6,6 +6,9 @@ import { LoadGridLayerUseCase } from '../load-grid-layer/LoadGridLayerUseCase';
 import { SpatialJoinUseCase } from '../spatial-join/SpatialJoinUseCase';
 import { getColumnsFromDuckDbTableDescribe } from '../../shared/utils';
 
+/**
+ * Builds a heatmap grid by spatially joining source data into grid cells.
+ */
 export class BuildHeatmapUseCase {
     private loadGridLayerUseCase: LoadGridLayerUseCase;
     private spatialJoinUseCase: SpatialJoinUseCase;

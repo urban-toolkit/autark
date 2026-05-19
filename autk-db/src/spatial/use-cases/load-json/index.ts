@@ -1,4 +1,2 @@
-import { Params as LoadJsonParams } from './interfaces';
 export * from './LoadJsonUseCase';
-
-export type { LoadJsonParams };
+export type { LoadJsonParams } from './interfaces';

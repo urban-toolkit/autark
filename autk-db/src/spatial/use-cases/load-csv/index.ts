@@ -1,4 +1,2 @@
-import { Params as LoadCsvParams } from './interfaces';
 export * from './LoadCsvUseCase';
-
-export type { LoadCsvParams };
+export type { LoadCsvParams } from './interfaces';

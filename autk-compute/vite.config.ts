@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
@@ -8,11 +8,11 @@ export default defineConfig({
   plugins: [dts()],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/main.ts'),
+      entry: resolve(__dirname, 'src/index.ts'),
       name: 'autk-compute',
     },
     copyPublicDir: false,
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true
   },
 });

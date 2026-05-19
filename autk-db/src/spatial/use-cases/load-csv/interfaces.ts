@@ -1,4 +1,4 @@
-export interface Params {
+export interface LoadCsvParams {
   csvFileUrl?: string;
   csvObject?: unknown[][];
   outputTableName: string;

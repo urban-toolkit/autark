@@ -3,9 +3,20 @@ import { BoundingBox } from '../../../../shared/interfaces';
 import { GetBoundingBoxFromOsmParams } from './interfaces';
 import { GET_BOUNDING_BOX_FROM_OSM_QUERY } from './queries';
 
+/**
+ * Computes the geographic bounding box of an OSM boundary table.
+ */
 export class GetBoundingBoxFromOsmUseCase {
   constructor(private conn: AsyncDuckDBConnection) {}
 
+  /**
+   * Queries the spatial extent of boundary way geometries in an OSM table.
+   *
+   * @param params.osmTableName Name of the OSM boundaries table.
+   * @param params.workspace Optional workspace name (defaults to `main`).
+   * @returns Named bounding box.
+   * @throws If the table has no coordinates or invalid values.
+   */
   async exec(params: GetBoundingBoxFromOsmParams): Promise<BoundingBox> {
     const workspace = params.workspace || 'main';
     const result = await this.conn.query(GET_BOUNDING_BOX_FROM_OSM_QUERY(params.osmTableName, workspace));

@@ -1,0 +1,11 @@
+{
+    "background": "#b2c7cd",
+    "surface": "#e2eaed",
+    "parks": "#b8ccb0",
+    "water": "#9ec0cb",
+    "roads": "#b98c0f",
+    "buildings": "#c7d3d8",
+    "points": "#4a6570",
+    "polylines": "#d9b504",
+    "polygons": "#dce2e5"
+}

@@ -16,6 +16,9 @@ import {
   DESCRIBE_TABLE_QUERY,
 } from './queries';
 
+/**
+ * Updates an existing table with new data, supporting replace and update-by-id strategies.
+ */
 export class UpdateTableUseCase {
   private db: AsyncDuckDB;
   private conn: AsyncDuckDBConnection;

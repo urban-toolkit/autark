@@ -1,48 +1,8 @@
-import { BoundingBox } from '../../../shared/interfaces';
+import { LayerType, BoundingBox } from 'autk-core';
 
-export type LayerType =
-  | 'surface'
-  | 'water'
-  | 'parks'
-  | 'roads'
-  | 'buildings'
-  | 'points'
-  | 'polygons'
-  | 'polylines'
-  | 'raster';
+export type { LayerType };
 
-export function isLayerType(value: string): value is LayerType {
-  return ['surface', 'water', 'parks', 'roads', 'buildings', 'points', 'polygons', 'polylines', 'raster'].includes(
-    value,
-  );
-}
-
-/**
- * Maps GeoJSON geometry types to LayerType
- * - Point/MultiPoint → points
- * - LineString/MultiLineString → polylines
- * - Polygon/MultiPolygon → polygons
- * - GeometryCollection → polygons (default)
- */
-export function mapGeojsonGeometryTypeToLayerType(geojsonType: string): LayerType {
-  switch (geojsonType) {
-    case 'Point':
-    case 'MultiPoint':
-      return 'points';
-    case 'LineString':
-    case 'MultiLineString':
-      return 'polylines';
-    case 'Polygon':
-    case 'MultiPolygon':
-      return 'polygons';
-    case 'GeometryCollection':
-      return 'polygons'; // default fallback
-    default:
-      throw new Error(`Unsupported GeoJSON geometry type: ${geojsonType}`);
-  }
-}
-
-export interface Params {
+export interface LoadLayerParams {
   osmInputTableName: string;
   outputTableName?: string;
   layer: LayerType;

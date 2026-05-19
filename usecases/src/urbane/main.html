@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Urbane)</title>
+    <link rel="stylesheet" href="/src/urbane/main.css">
+</head>
+
+<body>
+    <div id="app">
+        <div id="loading-overlay">
+            <div id="loading-box">
+                <div id="loading-spinner"></div>
+                <h2 id="loading-title">Loading</h2>
+                <p id="loading-text"></p>
+                <p id="loading-note"></p>
+            </div>
+        </div>
+
+        <canvas></canvas>
+
+        <div id="controls">
+            <button id="levelBtn" title="Drill into buildings">
+                <svg id="levelBtnDown" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 40 40">
+                    <path d="M8 14 L20 26 L32 14" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+                <svg id="levelBtnUp" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 40 40" style="display:none">
+                    <path d="M8 26 L20 14 L32 26" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+            </button>
+
+            <select id="thematicSelect"></select>
+
+            <button id="plotToggle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                    <path d="M 19 21 L 19 7 A 14 14 0 1 0 33 21 Z" fill="#666" />
+                    <path d="M 22 18 L 22 4 A 14 14 0 0 1 36 18 Z" fill="#666" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="weightsPanel">
+            <div id="weightsPanelTitle">Dataset Weights</div>
+            <div id="weightsSliders"></div>
+        </div>
+
+        <div id="plot">
+            <div id="plotBar"></div>
+            <div id="plotBodyParallel"></div>
+            <div id="plotBodyTable"></div>
+        </div>
+    </div>
+</body>
+
+<script type="module" src="/src/urbane/ui.ts"></script>
+
+</html>

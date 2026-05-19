@@ -3,6 +3,9 @@ import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { GetTableDataParams, GetTableDataOutput } from './interfaces';
 import { toPlain } from '../../shared/utils';
 
+/**
+ * Reads rows from any table as plain JavaScript objects.
+ */
 export class GetTableDataUseCase {
   private conn: AsyncDuckDBConnection;
 

@@ -34,6 +34,25 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: LayerTable | CustomLayerT
     `;
   }
 
+  if (layerTable.type === 'buildings') {
+    // Fallback for buildings without building_id — wrap each row in a single-part GeometryCollection.
+    // This path should rarely be hit since building_id is auto-assigned on load.
+    return `
+      SELECT json_object(
+           'type', 'FeatureCollection',
+           'features', json_group_array(feature)
+         ) AS geojson
+      FROM (
+        SELECT json_object(
+          'type', 'Feature',
+          'geometry', json_object('type', 'GeometryCollection', 'geometries', json_array(CAST(ST_AsGeoJSON(geometry) AS JSON))),
+          'properties', properties
+        ) AS feature
+        FROM ${qualifiedTableName}
+      ) sub;
+    `;
+  }
+
   return `
     SELECT json_object(
          'type', 'FeatureCollection',
