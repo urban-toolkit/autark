@@ -1,15 +1,15 @@
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
-import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
+import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 
 export class SpatialJoinNear {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({
@@ -19,7 +19,6 @@ export class SpatialJoinNear {
             },
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
@@ -30,11 +29,7 @@ export class SpatialJoinNear {
         await this.db.loadCsv({
             csvFileUrl: `${URL}data/noise.csv`,
             outputTableName: 'noise',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
+            geometryColumns: true,
         });
 
         const layer = 'table_osm_buildings';
@@ -42,21 +37,13 @@ export class SpatialJoinNear {
         await this.db.spatialQuery({
             tableRootName: layer,
             tableJoinName: 'noise',
-            spatialPredicate: 'NEAR',
-            nearDistance: 1000,
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'noise',
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
-                    },
-                ],
-            },
+            near: { distance: 1000 },
+            groupBy: [
+                {
+                    column: 'Unique Key',
+                    aggregateFn: 'count',
+                },
+            ],
         });
 
         this.map = new AutkMap(canvas);
@@ -71,8 +58,11 @@ export class SpatialJoinNear {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
+
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
+            this.map.updateRenderInfo(layerData.name, { isSkip: layerData.source === 'csv' });
+
+            console.log(`Loading layer: ${layerData.name} from ${layerData.source} of type ${layerData.type}`);
         }
     }
 

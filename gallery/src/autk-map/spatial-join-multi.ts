@@ -1,55 +1,41 @@
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
-import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
+import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 
 export class SpatialJoin {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
-        await this.db.loadCustomLayer({
+        await this.db.loadGeojson({
             geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
-            coordinateFormat: 'EPSG:3395'
         });
 
         const CSVs = ['noise', 'parking'];
 
         for (const csv of CSVs) {
-        await this.db.loadCsv({
-            csvFileUrl: `${URL}data/${csv}.csv`,
-            outputTableName: csv,
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
+            await this.db.loadCsv({
+                csvFileUrl: `${URL}data/${csv}.csv`,
+                outputTableName: csv,
+                geometryColumns: true,
+            });
 
-        await this.db.spatialQuery({
-            tableRootName: 'neighborhoods',
-            tableJoinName: csv,
-            spatialPredicate: 'INTERSECT',
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
+            await this.db.spatialQuery({
+                tableRootName: 'neighborhoods',
+                tableJoinName: csv,
+                groupBy: [
                     {
-                        tableName: csv,
                         column: 'Unique Key',
                         aggregateFn: 'count',
                     },
                 ],
-            },
-        });
-
+            });
         }
 
         this.map = new AutkMap(canvas);
@@ -64,8 +50,11 @@ export class SpatialJoin {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const collection = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection, type: layerData.type as LayerType });
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
+
+            this.map.loadCollection(layerData.name, { collection, type: layerData.type });
+            this.map.updateRenderInfo(layerData.name, { isSkip: layerData.source === 'csv' });
+
+            console.log(`Loading layer: ${layerData.name} from ${layerData.source} of type ${layerData.type}`);
         }
     }
 

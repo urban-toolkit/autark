@@ -4,9 +4,9 @@ declare function showError(message: string, note?: string): void;
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
-import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
 import splitRoadsQuery from './split-roads.sql?raw';
@@ -42,7 +42,7 @@ export class Shadows {
     /** Main map facade used for rendering, picking and thematic updates. */
     protected map!: AutkMap;
     /** Spatial DB facade used for OSM loading and SQL/spatial transformations. */
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     /** Histogram plot instance linked to roads selection/highlighting. */
     protected histogram!: AutkPlot;
 
@@ -110,7 +110,7 @@ export class Shadows {
             collection: this.roads,
             variableMapping: {
                 seg:       'geometry.coordinates',
-                sjoin_avg: `sjoin.avg.${month}`,
+                sjoin_avg: `sjoin.avg.shadows.${month}`,
             },
             attributeMatrices: {
                 seg: { rows: 'auto', cols: 2 },
@@ -177,13 +177,13 @@ export class Shadows {
      * Loads and derives all data required by this example.
      *
      * It performs OSM loading, CSV ingestion, road segmentation, and monthly
-     * baseline aggregation (`sjoin.avg.<month>`), then caches roads/buildings.
+     * baseline aggregation (`sjoin.avg.shadows.<month>`), then caches roads/buildings.
      * Finally it initializes compute attributes to zeros to keep compute and
      * contribution thematic modes always defined.
      */
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Chicago Loop from Overpass API.');
@@ -194,7 +194,6 @@ export class Shadows {
             },
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
@@ -209,7 +208,6 @@ export class Shadows {
             geometryColumns: {
                 latColumnName: 'latitude',
                 longColumnName: 'longitude',
-                coordinateFormat: 'EPSG:3395',
             },
         });
 
@@ -229,18 +227,11 @@ export class Shadows {
             await this.db.spatialQuery({
                 tableRootName: this.ROADS_LAYER,
                 tableJoinName: 'shadows',
-                spatialPredicate: 'NEAR',
-                nearDistance: 200,
-                output: { type: 'MODIFY_ROOT' },
-                joinType: 'LEFT',
-                groupBy: {
-                    selectColumns: [{
-                        tableName: 'shadows',
-                        column: month,
-                        aggregateFn: 'avg',
-                        aggregateFnResultColumnName: month,
-                    }],
-                },
+                near: { distance: 200 },
+                groupBy: [{
+                    column: month,
+                    aggregateFn: 'avg',
+                }],
             });
         }
 
@@ -283,7 +274,7 @@ export class Shadows {
                 this.map.updateRenderInfo(layerData.name, { opacity: 0.5, isColorMap: true, isSkip: true });
             }
             else {
-                this.map.loadCollection(layerData.name, { collection: layer, type: layerData.type as LayerType });
+                this.map.loadCollection(layerData.name, { collection: layer, type: layerData.type });
             }
 
         }
@@ -360,7 +351,7 @@ export class Shadows {
     protected updateThematicData(): void {
         if (this.displayMode === 'heatmap') {
             this.map.updateThematic(this.ROADS_LAYER, { collection: this.roads,
-                property: `properties.sjoin.avg.${this.currentMonth}`, });
+                property: `properties.sjoin.avg.shadows.${this.currentMonth}`, });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isPick: true });
             this.map.updateRenderInfo(this.ROADS_LAYER, { isColorMap: true });
             this.map.draw();
@@ -386,7 +377,7 @@ export class Shadows {
         this.histogram = new AutkPlot(this.histogramDiv, {
             type: 'barchart',
             collection: this.roads,
-            attributes: { axis: [`sjoin.avg.${this.currentMonth}`, '@transform'] },
+            attributes: { axis: [`sjoin.avg.shadows.${this.currentMonth}`, '@transform'] },
             labels: { axis: ['Hours of shadow', '#Road segments'], title: 'Shadow distribution' },
             width: 600,
             height: 380,

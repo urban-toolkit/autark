@@ -1,20 +1,19 @@
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
-import { AutkMap, ColorMapDomainStrategy, ColorMapInterpolator, LayerType } from '@urban-toolkit/autk-map';
+import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap, ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class ColormapDiv {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
-        await this.db.loadCustomLayer({
+        await this.db.loadGeojson({
             geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
-            coordinateFormat: 'EPSG:3395'
         });
 
         this.map = new AutkMap(canvas);
@@ -29,7 +28,7 @@ export class ColormapDiv {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
     }

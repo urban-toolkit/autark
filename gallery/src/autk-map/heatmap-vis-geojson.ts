@@ -1,22 +1,21 @@
 // TODO: filter CSV data based on the osm data polygon.
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
-import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
+import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class Heatmap {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
-       await this.db.loadCustomLayer({
+       await this.db.loadGeojson({
             geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
-            coordinateFormat: 'EPSG:3395'
         });
 
         await this.db.loadCsv({
@@ -25,27 +24,23 @@ export class Heatmap {
             geometryColumns: {
                 latColumnName: 'Latitude',
                 longColumnName: 'Longitude',
-                coordinateFormat: 'EPSG:3395',
             },
         });
 
         await this.db.buildHeatmap({
             tableJoinName: 'noise',
-            nearDistance: 1000,
+            near: { distance: 1000 },
             outputTableName: 'heatmap',
             grid: {
                 rows: 30,
                 columns: 30,
             },
-            groupBy: {
-                selectColumns: [
+            groupBy: [
                     {
-                        tableName: 'noise',
                         column: 'Unique Key',
                         aggregateFn: 'count'
                     },
                 ],
-            },
         });
 
         const canvas = document.querySelector('canvas');
@@ -59,7 +54,7 @@ export class Heatmap {
     }
 
     protected async loadLayers(): Promise<void> {
-        const propertyPath = 'count.noise';
+        const propertyPath = 'band_1';
 
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
@@ -68,7 +63,7 @@ export class Heatmap {
                 this.map.loadCollection(layerData.name, { collection: geojson, type: 'raster', property: propertyPath });
             }
             else {
-                this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+                this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
             }
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }

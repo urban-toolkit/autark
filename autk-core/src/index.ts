@@ -148,6 +148,9 @@ export type {
     TypedArrayConstructor,
 } from './types-buffer';
 
+/** Computes connected components of intersecting GeoJSON geometries. */
+export { computeIntersectingClusterIds } from './utils-geojson';
+
 /** General-purpose GeoJSON, layer, and path utilities. */
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
@@ -161,6 +164,8 @@ export { computeOrigin } from './utils-geojson';
 export { computeGeometryCentroid } from './utils-geojson';
 /** Computes the bounding box of a GeoJSON collection or geometry. */
 export { computeBoundingBox } from './utils-geojson';
+/** Type guard that checks whether a value is a GeoJSON FeatureCollection. */
+export { isFeatureCollection } from './utils-geojson';
 /** Returns true when a string matches a shared layer type. */
 export { isLayerType } from './utils-layer';
 /** Maps a GeoJSON geometry type to the shared layer taxonomy. */

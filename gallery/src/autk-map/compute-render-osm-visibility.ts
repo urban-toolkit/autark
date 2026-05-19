@@ -1,13 +1,13 @@
 import { Feature, FeatureCollection, GeoJsonProperties, Point } from 'geojson';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeRender } from '@urban-toolkit/autk-compute';
-import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
 export class ComputeRenderOsmVisibility {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     protected buildings!: FeatureCollection;
     protected buildingsForCompute!: FeatureCollection;
@@ -21,7 +21,7 @@ export class ComputeRenderOsmVisibility {
     }
 
     protected async loadDb(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({
@@ -31,7 +31,6 @@ export class ComputeRenderOsmVisibility {
             },
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
@@ -61,7 +60,7 @@ export class ComputeRenderOsmVisibility {
             const geojson = layerData.name === 'table_osm_buildings'
                 ? this.buildingsWithVisibility
                 : await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 

@@ -1,18 +1,18 @@
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 
-import { AutkMap, LayerType } from '@urban-toolkit/autk-map';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
 import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 export class ComputeOsm {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     protected result!: FeatureCollection<Geometry, GeoJsonProperties>;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({
@@ -22,7 +22,6 @@ export class ComputeOsm {
             },
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads'>,
                 dropOsmTable: true,
             },
@@ -52,7 +51,7 @@ export class ComputeOsm {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 

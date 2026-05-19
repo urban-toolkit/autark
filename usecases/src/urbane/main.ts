@@ -1,10 +1,10 @@
 
 import { FeatureCollection } from 'geojson';
 
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu, ComputeRender } from '@urban-toolkit/autk-compute';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
-import { AutkMap, LayerType, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy } from 'autk-core';
 
 const URL = (import.meta as any).env.BASE_URL;
@@ -20,7 +20,7 @@ declare function setLoadingState(message: string, note?: string): void;
  */
 export class Urbane {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected table!: AutkPlot;
     protected parallel!: AutkPlot;
 
@@ -73,7 +73,7 @@ export class Urbane {
      */
     protected async loadDb(): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Manhattan from Overpass API.');
@@ -81,7 +81,6 @@ export class Urbane {
             queryArea: { geocodeArea: 'New York', areas: ['Manhattan Island'] },
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
                     'surface' | 'parks' | 'water' | 'roads' | 'buildings'
                 >,
@@ -90,17 +89,13 @@ export class Urbane {
         });
 
         setLoadingState('Loading neighborhood dataset...', 'Importing Manhattan neighborhood boundaries.');
-        await this.db.loadCustomLayer({
+        await this.db.loadGeojson({
             geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
             outputTableName: 'neighborhoods',
-            coordinateFormat: 'EPSG:3395',
         });
         await this.db.spatialQuery({
             tableRootName: 'table_osm_buildings',
             tableJoinName: 'neighborhoods',
-            spatialPredicate: 'INTERSECT',
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
         });
 
         setLoadingState('Loading urban datasets...', 'Importing arrests, schools, restaurants, and other datasets.');
@@ -111,24 +106,17 @@ export class Urbane {
                 geometryColumns: {
                     latColumnName: 'latitude',
                     longColumnName: 'longitude',
-                    coordinateFormat: 'EPSG:3395',
                 },
             });
 
             await this.db.spatialQuery({
                 tableRootName: 'neighborhoods',
                 tableJoinName: dataset,
-                spatialPredicate: 'INTERSECT',
-                output: { type: 'MODIFY_ROOT' },
-                joinType: 'LEFT',
-                groupBy: {
-                    selectColumns: [{
-                        tableName: dataset,
-                        column: 'key',
-                        aggregateFn: 'count',
-                        normalize: true,
-                    }],
-                },
+                groupBy: [{
+                    column: 'key',
+                    aggregateFn: 'count',
+                    normalize: true,
+                }],
             });
         }
 
@@ -172,18 +160,11 @@ export class Urbane {
         await this.db.spatialQuery({
             tableRootName: 'neighborhoods',
             tableJoinName: 'table_osm_roads',
-            spatialPredicate: 'INTERSECT',
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [{
-                    tableName: 'table_osm_roads',
-                    column: 'compute.skyViewFactor',
-                    aggregateFn: 'avg',
-                    aggregateFnResultColumnName: 'skyExposure',
-                    normalize: true,
-                }],
-            },
+            groupBy: [{
+                column: 'compute.skyViewFactor',
+                aggregateFn: 'avg',
+                normalize: true,
+            }],
         });
 
         setLoadingState('Computing score...', 'Applying weighted GPU function over neighborhood data.');
@@ -208,7 +189,7 @@ export class Urbane {
                 const v: number = p?.sjoin?.count?.[`${d}_norm`] ?? 0;
                 return invertedDatasets.has(d) ? 1 - v : v;
             });
-            vals.push(p?.sjoin?.avg?.skyExposure_norm ?? 0);
+            vals.push(p?.sjoin?.avg?.['table_osm_roads.compute.skyViewFactor_norm'] ?? 0);
             p.scoreInputs = vals;
         }
 
@@ -242,7 +223,7 @@ export class Urbane {
             const geojson = layerData.name === 'neighborhoods'
                 ? this.neighs
                 : await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
         }
 
         this.map.updateRenderInfo('table_osm_buildings', { isPick: false });
@@ -278,7 +259,7 @@ export class Urbane {
         }
 
         this.map.updateColorMap(layerId, { colorMap: {
-                domainSpec: column.includes('skyExposure')
+                domainSpec: column.includes('skyViewFactor')
                     ? { type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95] }
                     : { type: ColorMapDomainStrategy.MIN_MAX },
             }, });
@@ -297,7 +278,7 @@ export class Urbane {
 
         const attributes = [
             ...this.datasets.map(d => `sjoin.count.${d}`),
-            'sjoin.avg.skyExposure',
+            'sjoin.avg.table_osm_roads.compute.skyViewFactor',
             'compute.score',
         ];
         const axisLabels = [...this.datasets, 'sky exposure', 'score'];
@@ -409,39 +390,24 @@ export class Urbane {
             await this.db.spatialQuery({
                 tableRootName: 'active_buildings',
                 tableJoinName: dataset,
-                spatialPredicate: 'NEAR',
-                nearDistance: this.distance,
-                nearUseCentroid: true,
-                output: { type: 'MODIFY_ROOT' },
-                joinType: 'LEFT',
-                groupBy: {
-                    selectColumns: [{
-                        tableName: dataset,
-                        column: 'key',
-                        aggregateFn: 'count',
-                        normalize: true,
-                    }],
-                },
+                near: { distance: this.distance, useCentroid: true },
+                groupBy: [{
+                    column: 'key',
+                    aggregateFn: 'count',
+                    normalize: true,
+                }],
             });
         }
 
         await this.db.spatialQuery({
             tableRootName: 'active_buildings',
             tableJoinName: 'table_osm_roads',
-            spatialPredicate: 'NEAR',
-            nearDistance: 300,
-            nearUseCentroid: true,
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [{
-                    tableName: 'table_osm_roads',
-                    column: 'compute.skyViewFactor',
-                    aggregateFn: 'avg',
-                    aggregateFnResultColumnName: 'skyExposure',
-                    normalize: true,
-                }],
-            },
+            near: { distance: 300, useCentroid: true },
+            groupBy: [{
+                column: 'compute.skyViewFactor',
+                aggregateFn: 'avg',
+                normalize: true,
+            }],
         });
 
         this.activeBuildings = await this.computeScore(await this.db.getLayer('active_buildings'));

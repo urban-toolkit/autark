@@ -1,14 +1,14 @@
 import { AutkMap } from '@urban-toolkit/autk-map';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
 const URL = (import.meta as any).env.BASE_URL;
 
 export class OsmLayersApi {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         await this.db.loadOsm({
@@ -17,7 +17,6 @@ export class OsmLayersApi {
                 areas: ['Niterói'],
             }, outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: [
                     'surface',
                     'parks',
@@ -28,10 +27,9 @@ export class OsmLayersApi {
             },
         });
 
-        await this.db.loadCustomLayer({
+        await this.db.loadGeojson({
             geojsonFileUrl: `${URL}data/nit_buildings.geojson`,
             outputTableName: 'lotes',
-            coordinateFormat: 'EPSG:3395',
             layerType: 'buildings'
         });
 

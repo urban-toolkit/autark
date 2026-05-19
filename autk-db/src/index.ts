@@ -1,0 +1,82 @@
+/**
+ * Public entry point for the `@urban-toolkit/autk-db` package.
+ *
+ * Re-exports the database class, shared table metadata types, loading parameter types, and OSM-related constants from a single module.
+ *
+ * @module AutkDb
+ * @example
+ * import { AutkDb, isVectorTable, DEFAULT_WORKSPACE_NAME } from '@urban-toolkit/autk-db';
+ *
+ * const db = new AutkDb();
+ * console.log(DEFAULT_WORKSPACE_NAME); // 'autk'
+ * console.log(isVectorTable({ source: 'geojson', name: 'roads', columns: [], type: 'line' })); // true
+ */
+export type { LayerType, BoundingBox } from './types-core';
+
+export {
+  DEFAULT_WORKSPACE_NAME,
+  DEFAULT_INPUT_COORDINATE_FORMAT,
+  DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+  PARKS_LEISURE_VALUES,
+  PARKS_LANDUSE_VALUES,
+  PARKS_NATURAL_VALUES,
+  WATER_NATURAL_VALUES,
+  WATER_FEATURE_VALUES,
+  EXCLUDED_ROADS_VALUES,
+  EXCLUDED_BUILDING_VALUES,
+} from './consts';
+
+export type {
+  TableSource,
+  Table,
+  BaseTable,
+  RasterBandMetadata,
+  UserTable,
+  OsmTable,
+  OsmLayerTable,
+  GeojsonTable,
+  CsvTable,
+  JsonTable,
+  GeotiffTable,
+  Column,
+} from './interfaces';
+
+export {
+  isRenderableTable,
+  isVectorTable,
+  isRasterTable,
+} from './interfaces';
+
+export type { Layer, LoadOsmLayerParams } from './use-cases/load-osm-layer';
+export type { LoadGeoTiffParams } from './use-cases/load-geotiff';
+export type { GetTablesParams, GetTablesOutput } from './use-cases/get-tables';
+export type {
+  LoadingPhase,
+  OnLoadingProgress,
+  OsmLoadTimings,
+  LayerLoadTimings,
+  LoadOsmParams,
+} from './use-cases/load-osm-overpass';
+export type { SpatialQueryParams, AggregateFunction, NearConfig } from './use-cases/spatial-join';
+export type { BuildHeatmapParams, HeatmapAggregateFunction } from './use-cases/build-heatmap';
+export type {
+  CsvDefaultLatLngGeometryColumns,
+  CsvLatLngGeometryColumns,
+  CsvWktGeometryColumns,
+  CsvGeometryColumns,
+  CsvGeometryLayerType,
+  LoadCsvParams,
+} from './use-cases/load-csv';
+export type { LoadGeojsonParams } from './use-cases/load-geojson';
+export type {
+  JsonDefaultLatLngGeometryColumns,
+  JsonLatLngGeometryColumns,
+  JsonWktGeometryColumns,
+  JsonGeometryColumns,
+  JsonGeometryLayerType,
+  LoadJsonParams,
+} from './use-cases/load-json';
+export type { RawQueryParams, RawQueryOutput } from './use-cases/raw-query';
+export type { UpdateTableParams, UpdateStrategy } from './use-cases/update-table';
+
+export * from './db';

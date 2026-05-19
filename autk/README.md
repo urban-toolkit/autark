@@ -41,7 +41,7 @@ Use namespace imports when you want access to the full package surface:
 ```ts
 import { db, map, compute, plot } from '@urban-toolkit/autk';
 
-const spatialDb = new db.AutkSpatialDb();
+const spatialDb = new db.AutkDb();
 await spatialDb.init();
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
@@ -61,7 +61,7 @@ const scatterplot = new plot.AutkPlot(container, {
 You can also import a specific module through a subpath:
 
 ```ts
-import { AutkSpatialDb } from '@urban-toolkit/autk/db';
+import { AutkDb } from '@urban-toolkit/autk/db';
 import { AutkMap } from '@urban-toolkit/autk/map';
 import { AutkComputeEngine } from '@urban-toolkit/autk/compute';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk/plot';

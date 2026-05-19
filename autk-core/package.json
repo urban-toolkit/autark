@@ -6,17 +6,20 @@
     "main": "./src/index.ts",
     "types": "./src/index.ts",
     "dependencies": {
+        "@turf/turf": "^7.3.4",
         "d3-color": "^3.1.0",
         "d3-format": "^3.1.0",
         "d3-scale": "^4.0.2",
         "d3-scale-chromatic": "^3.1.0",
         "earcut": "^3.0.2",
-        "gl-matrix": "^3.4.4"
+        "gl-matrix": "^3.4.4",
+        "rbush": "^4.0.1"
     },
     "devDependencies": {
         "@types/d3": "^7.4.3",
         "@types/earcut": "^3.0.0",
         "@types/geojson": "^7946.0.16",
+        "@types/rbush": "^4.0.0",
         "typescript": "^6.0.2"
     }
 }

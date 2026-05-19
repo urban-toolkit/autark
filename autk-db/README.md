@@ -31,12 +31,12 @@ The toolkit is available as the umbrella package `@urban-toolkit/autk` or as ind
 ### Basic usage
 
 ```ts
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 
-const db = new AutkSpatialDb();
+const db = new AutkDb();
 await db.init();
 
-await db.loadCustomLayer({
+await db.loadGeojson({
   outputTableName: 'buildings',
   geojsonObject: buildingsGeojson,
   layerType: 'buildings',
@@ -46,16 +46,36 @@ const buildings = await db.getLayer('buildings');
 console.log(db.tables, buildings);
 ```
 
+### JSON geometry loading
+
+`loadJson` can import plain JSON records or materialize geometry during load using the same geometry options supported by `loadCsv`:
+
+- `geometryColumns: true` → reads default `Latitude` / `Longitude` fields as points
+- `{ latColumnName, longColumnName, coordinateFormat? }` → reads explicit coordinate fields as points
+- `{ wktColumnName, coordinateFormat? }` → parses WKT geometry and infers the returned layer family
+
+```ts
+const parcels = await db.loadJson({
+  outputTableName: 'parcels',
+  jsonObject: [
+    { id: 1, wkt: 'POLYGON((-43.3 -22.9, -43.2 -22.9, -43.2 -22.8, -43.3 -22.8, -43.3 -22.9))' },
+  ],
+  geometryColumns: { wktColumnName: 'wkt' },
+});
+
+console.log(parcels.type); // 'polygons'
+```
+
 ### API summary
 
-* `new AutkSpatialDb()`: Creates an isolated database controller.
+* `new AutkDb()`: Creates an isolated database controller.
 * `init()`: Initializes DuckDB-Wasm and loads the spatial extension.
 * `tables`: Lists tables registered in the current workspace.
 * `setWorkspace(name)`, `getWorkspaces()`, `getCurrentWorkspace()`: Manage isolated database schemas.
 * `loadOsm(params)`: Loads OpenStreetMap data from Overpass API or PBF-backed workflows.
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
-* `loadLayer(params)`: Extracts standard urban layers from loaded OSM data.
-* `loadCustomLayer(params)`, `loadGridLayer(params)`: Imports custom GeoJSON and generated grid layers.
+* `loadOsmLayer(params)`: Extracts standard urban layers from loaded OSM data.
+* `loadGeojson(params)`: Imports custom GeoJSON layers.
 * `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers.
 * `getLayer(layerTableName)`: Exports a layer table as a GeoJSON `FeatureCollection`.
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
@@ -63,7 +83,7 @@ console.log(db.tables, buildings);
 * `updateTable(params)`: Updates a table using the supported update strategies.
 * `spatialQuery(params)`: Runs spatial joins and aggregations between layers.
 * `rawQuery(params)`: Executes custom SQL against the current workspace.
-* `buildHeatmap(params)`: Builds aggregated heatmap/grid outputs.
+* `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs.
 * `removeLayer(tableName)`: Drops a table from the current workspace.
 
 ## Resources

@@ -31,6 +31,28 @@ import { LayerGeometry, LayerComponent } from './types-mesh';
  * const [meshes, components] = TriangulatorPoints.buildMesh(collection, origin);
  */
 export class TriangulatorPoints {
+    /** Shared point-marker radius used by point triangulation methods. */
+    private static pointSize: number = 15;
+
+    /**
+     * Sets the shared radius used for point-marker triangulation.
+     *
+     * Updates the static point size used by subsequent `Point`, `MultiPoint`, and supported `GeometryCollection` triangulation calls.
+     *
+     * @param size - Marker radius in local planar units.
+     * @returns Nothing.
+     * @throws If `size` is not a finite positive number.
+     * @example
+     * TriangulatorPoints.setPointSize(10);
+     * const [meshes] = TriangulatorPoints.buildMesh(collection, origin);
+     */
+    static setPointSize(size: number): void {
+        if (!Number.isFinite(size) || size <= 0) {
+            throw new Error(`TriangulatorPoints point size must be a finite positive number. Received: ${size}`);
+        }
+        TriangulatorPoints.pointSize = size;
+    }
+
     /**
      * Builds triangulated point-marker geometry for a feature collection.
      *
@@ -98,7 +120,7 @@ export class TriangulatorPoints {
         const { coordinates } = <Point>feature.geometry;
         const res = 40;
         const flatCoords = TriangulatorPoints.sampleCircle(
-            coordinates[0] - origin[0], coordinates[1] - origin[1], 100, res
+            coordinates[0] - origin[0], coordinates[1] - origin[1], TriangulatorPoints.pointSize, res
         ).flat();
         const flatIds = [];
         for (let i = 1; i <= res; i++) flatIds.push(0, i, i % res + 1);
@@ -121,7 +143,7 @@ export class TriangulatorPoints {
         const meshes = [];
         for (const coord of coordinates) {
             const flatCoords = TriangulatorPoints.sampleCircle(
-                coord[0] - origin[0], coord[1] - origin[1], 100, res
+                coord[0] - origin[0], coord[1] - origin[1], TriangulatorPoints.pointSize, res
             ).flat();
             const flatIds = [];
             for (let i = 1; i <= res; i++) flatIds.push(0, i, i % res + 1);

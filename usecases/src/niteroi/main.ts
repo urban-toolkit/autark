@@ -1,6 +1,6 @@
 import type { FeatureCollection, Feature, Geometry, GeoJsonProperties } from 'geojson';
-import { AutkMap, LayerType, ColorMapInterpolator, ColorMapDomainStrategy, MapStyle, MapEvent } from '@urban-toolkit/autk-map';
-import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkMap, ColorMapInterpolator, ColorMapDomainStrategy, MapStyle, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 import { AutkPlot, PlotEvent, PlotStyle } from '@urban-toolkit/autk-plot';
 import { lstRegressionShader } from './lst-regression-shader';
@@ -17,7 +17,7 @@ const HIGHLIGHT_COLOR = '#1a7a2e';
 
 export class OsmLayersApi {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected plot!: AutkPlot;
     protected linechart!: AutkPlot;
     protected geotiffData: any;
@@ -27,7 +27,7 @@ export class OsmLayersApi {
 
     public async run(canvas: HTMLCanvasElement): Promise<void> {
         setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
         setLoadingState('Loading OpenStreetMap data...', 'Fetching Niterói area from Overpass API.');
@@ -38,39 +38,26 @@ export class OsmLayersApi {
             },
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                coordinateFormat: 'EPSG:3395',
                 layers: ['surface', 'parks', 'water', 'roads'] as Array<'surface' | 'parks' | 'water' | 'roads'>,
                 dropOsmTable: true,
             },
         });
 
-        const boundingBox = this.db.getOsmBoundingBoxWgs84() ?? undefined;
-
         setLoadingState('Loading temperature dataset...', 'Importing 24-year land surface temperature raster.');
         await this.db.loadGeoTiff({
             geotiffFileUrl: `${URL}data/niteroi_lst_verao_2001_2024.tif`,
             outputTableName: 'lst',
-            sourceCrs: 'EPSG:4326',
-            coordinateFormat: 'EPSG:3395',
-            boundingBox,
         });
 
         setLoadingState('Joining LST to road segments...', 'Averaging temperature bands within 1 km of each road.');
         await this.db.spatialQuery({
             tableRootName: 'table_osm_roads',
             tableJoinName: 'lst',
-            spatialPredicate: 'NEAR',
-            nearDistance: 1000,
-            output: { type: 'MODIFY_ROOT' },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: Array.from({ length: BAND_COUNT }, (_, i) => ({
-                    tableName: 'lst',
-                    column: `band_${i + 1}`,
-                    aggregateFn: 'avg',
-                    aggregateFnResultColumnName: `band_${i + 1}`,
-                })),
-            },
+            near: { distance: 1000 },
+            groupBy: Array.from({ length: BAND_COUNT }, (_, i) => ({
+                column: `band_${i + 1}`,
+                aggregateFn: 'avg',
+            })),
         });
 
         await this.applyLstCompute();
@@ -98,14 +85,14 @@ export class OsmLayersApi {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
         }
     }
 
     protected async applyLstCompute(): Promise<void> {
         setLoadingState('Merging temperature bands...', 'Building per-road LST timeseries.');
         const bandSelects = Array.from({ length: BAND_COUNT }, (_, i) =>
-            `COALESCE(json_extract(properties, '$.sjoin.avg.band_${i + 1}')::DOUBLE, 0)`
+            `COALESCE(json_extract(properties, '$.sjoin.avg.lst.band_${i + 1}')::DOUBLE, 0)`
         ).join(', ');
 
         await this.db.rawQuery({

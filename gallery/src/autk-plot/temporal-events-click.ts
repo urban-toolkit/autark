@@ -1,6 +1,6 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-import { AutkSpatialDb, LayerType } from '@urban-toolkit/autk-db';
+import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, MapEvent, MapStyle } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
@@ -8,7 +8,7 @@ const URL = (import.meta as any).env.BASE_URL;
 
 export class MapD3TemporalEvents {
     protected map!: AutkMap;
-    protected db!: AutkSpatialDb;
+    protected db!: AutkDb;
     protected plot!: AutkPlot;
 
     protected canvas!: HTMLCanvasElement;
@@ -27,10 +27,10 @@ export class MapD3TemporalEvents {
     }
 
     protected async loadData(): Promise<void> {
-        this.db = new AutkSpatialDb();
+        this.db = new AutkDb();
         await this.db.init();
 
-        await this.db.loadCustomLayer({
+        await this.db.loadGeojson({
             geojsonFileUrl: `${URL}data/mnt_roads.geojson`,
             outputTableName: 'roads',
             coordinateFormat: 'EPSG:3395'
@@ -49,26 +49,17 @@ export class MapD3TemporalEvents {
         await this.db.spatialQuery({
             tableRootName: 'roads',
             tableJoinName: 'noise',
-            spatialPredicate: 'NEAR',
-            nearDistance: 200,
-            output: {
-                type: 'MODIFY_ROOT',
-            },
-            joinType: 'LEFT',
-            groupBy: {
-                selectColumns: [
-                    {
-                        tableName: 'noise',
-                        column: 'key',
-                        aggregateFn: 'count',
-                    },
-                    {
-                        tableName: 'noise',
-                        column: 'date',
-                        aggregateFn: 'collect',
-                    }
-                ],
-            },
+            near: { distance: 200 },
+            groupBy: [
+                {
+                    column: 'key',
+                    aggregateFn: 'count',
+                },
+                {
+                    column: 'date',
+                    aggregateFn: 'collect',
+                }
+            ],
         });
 
         this.roads = await this.db.getLayer('roads');
@@ -123,7 +114,7 @@ export class MapD3TemporalEvents {
     protected async loadLayers(): Promise<void> {
         for (const layerData of this.db.getLayerTables()) {
             const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type as LayerType });
+            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
             console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
         }
 
