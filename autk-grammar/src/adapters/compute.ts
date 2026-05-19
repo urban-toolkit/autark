@@ -1,31 +1,31 @@
 import { ComputeAdapter, ComputeSpec } from 'urban-grammar';
-import { SpatialDb } from 'autk-db';
-import { GeojsonCompute } from 'autk-compute';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkComputeEngine } from '@urban-toolkit/autk-compute';
 import { FeatureCollection } from 'geojson';
 import { ComputeCache } from '../types';
 
 export function createComputeAdapter(cache?: ComputeCache): ComputeAdapter {
 
     return {
-        async resolveCompute(context: SpatialDb | undefined, spec: ComputeSpec): Promise<SpatialDb | undefined> {
+        async resolveCompute(context: AutkSpatialDb | undefined, spec: ComputeSpec): Promise<AutkSpatialDb | undefined> {
             if(context){
-                console.log("Tables: ", context.tables);
-
                 const geojson: FeatureCollection = await context.getLayer(spec.dataRef);
-                const geojsonCompute = new GeojsonCompute();
+                const engine = new AutkComputeEngine();
 
-                let {dataRef, ...rest_spec} = spec;
-
-                let new_geojson: FeatureCollection = await geojsonCompute.computeFunctionIntoProperties({
-                    geojson,
-                    ...rest_spec
+                const result = await engine.gpgpuPipeline({
+                    collection: geojson,
+                    variableMapping: spec.attributes,
+                    wgslBody: spec.wglsFunction,
+                    ...(spec.outputColumnName && { resultField: spec.outputColumnName }),
+                    ...(spec.outputColumns   && { outputColumns: spec.outputColumns }),
+                    ...(spec.attributeArrays  && { attributeArrays: spec.attributeArrays }),
+                    ...(spec.attributeMatrices && { attributeMatrices: spec.attributeMatrices }),
+                    ...(spec.uniforms         && { uniforms: spec.uniforms }),
+                    ...(spec.uniformArrays    && { uniformArrays: spec.uniformArrays }),
+                    ...(spec.uniformMatrices  && { uniformMatrices: spec.uniformMatrices }),
                 });
 
-                console.log("Computed GeoJSON: ", new_geojson);
-
-                // Store in cache so the map adapter can access the computed data
-                // without reloading into DuckDB (which would lose the original layer type)
-                if (cache) cache.set(spec.dataRef, new_geojson);
+                if (cache) cache.set(spec.dataRef, result);
 
                 return context;
             }

@@ -25,6 +25,8 @@
     "@urban-toolkit/autk-db": "file:../autk-db",
     "@urban-toolkit/autk-map": "file:../autk-map",
     "@urban-toolkit/autk-plot": "file:../autk-plot",
-    "@urban-toolkit/autk-compute": "file:../autk-compute"
+    "@urban-toolkit/autk-compute": "file:../autk-compute",
+    "@urban-toolkit/autk-grammar": "file:../autk-grammar",
+    "urban-grammar": "file:../urban-grammar"
   }
 }

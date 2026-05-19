@@ -1,10 +1,10 @@
 import { CsvDataSourceSpec, CustomDataSourceSpec, DataAdapter, DataSourceSpec, HeatmapSourceSpec, JoinSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar';
-import { SpatialDb } from 'autk-db';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
 import { Targets, GeoJsonCache } from '../types';
 
 export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): DataAdapter {
 
-    function print(db: SpatialDb, targets?: Targets): void {
+    function print(db: AutkSpatialDb, targets?: Targets): void {
         if(!targets || !targets.db)
             return
 
@@ -23,12 +23,12 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
     }
 
     return {
-        async resolveSource(context: SpatialDb | undefined, spec: DataSourceSpec): Promise<SpatialDb | undefined> {
+        async resolveSource(context: AutkSpatialDb | undefined, spec: DataSourceSpec): Promise<AutkSpatialDb | undefined> {
 
             let db = context;
 
             if(!db){
-                db = new SpatialDb();
+                db = new AutkSpatialDb();
                 await db.init();
             }
 
@@ -36,7 +36,7 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
 
             switch (type) {
                 case 'osm':
-                    await db.loadOsmFromOverpassApi(rest_spec as OsmDataSourceSpec);
+                    await db.loadOsm(rest_spec as OsmDataSourceSpec);
                     print(db, targets);
                     return db;
                 case 'csv':
@@ -63,16 +63,16 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
                     print(db, targets);
                     return db;
                 }
-                case 'heatmap': 
+                case 'heatmap':
                     await db.buildHeatmap(rest_spec as HeatmapSourceSpec);
                     print(db, targets);
                     return db;
                 case 'join':
-                    await db.spatialJoin(rest_spec as JoinSourceSpec);
+                    await db.spatialQuery(rest_spec as JoinSourceSpec);
                     print(db, targets);
                     return db;
-                default: 
-                    return 
+                default:
+                    return
             }
         }
     }

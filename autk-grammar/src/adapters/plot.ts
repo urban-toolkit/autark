@@ -1,9 +1,22 @@
-import { PlotAdapter, PlotSpec } from 'urban-grammar';
+import { PlotAdapter, PlotSpec, PlotMark } from 'urban-grammar';
 import { Targets, MapRegistry, GeoJsonCache } from '../types';
-import { SpatialDb } from 'autk-db';
-import { Scatterplot, Barchart, ParallelCoordinates, TableVis, PlotEvent as AutkPlotEvent } from 'autk-plot';
-import { AutkMap, MapEvent, VectorLayer } from 'autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
+import { AutkPlot, PlotEvent as AutkPlotEvent } from '@urban-toolkit/autk-plot';
+import type { PlotEventData, PlotType } from '@urban-toolkit/autk-plot';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
+import type { MapEventData } from '@urban-toolkit/autk-map';
 import { FeatureCollection } from 'geojson';
+
+function grammarMarkToPlotType(mark: PlotMark): PlotType {
+    const mapping: Record<PlotMark, PlotType> = {
+        'scatter': 'scatterplot',
+        'bar': 'barchart',
+        'line': 'linechart',
+        'parallel-coordinates': 'parallel-coordinates',
+        'table': 'table',
+    };
+    return mapping[mark];
+}
 
 export function createPlotAdapter(targets?: Targets, registry?: MapRegistry, cache?: GeoJsonCache): PlotAdapter {
 
@@ -14,56 +27,39 @@ export function createPlotAdapter(targets?: Targets, registry?: MapRegistry, cac
             const div = document.getElementById(targets.plot);
             if(!div) throw new Error(`Could not find plot target: ${targets.plot}`);
 
-            const db = context as SpatialDb | undefined;
+            const db = context as AutkSpatialDb | undefined;
             if(!db) throw new Error('No data context available for plot.');
 
             const geojson: FeatureCollection = cache?.get(spec.dataRef) ?? await db.getLayer(spec.dataRef);
 
             const events = (spec.events ?? []) as unknown as AutkPlotEvent[];
-            const config = {
-                div,
-                data: geojson,
-                labels: { axis: spec.axis, title: spec.title ?? '' },
+
+            const plot = new AutkPlot(div, {
+                type: grammarMarkToPlotType(spec.mark),
+                collection: geojson,
+                attributes: { axis: spec.axis },
+                labels: { axis: spec.axis, title: spec.title },
                 events,
-                ...(spec.width && { width: spec.width }),
-                ...(spec.height && { height: spec.height }),
-                ...(spec.margins && { margins: spec.margins }),
-            };
-
-            let plot: Scatterplot | Barchart | ParallelCoordinates | TableVis;
-
-            switch(spec.mark) {
-                case 'scatter':
-                    plot = new Scatterplot(config);
-                    break;
-                case 'bar':
-                    plot = new Barchart(config);
-                    break;
-                case 'parallel-coordinates':
-                    plot = new ParallelCoordinates(config);
-                    break;
-                case 'table':
-                    plot = new TableVis(config);
-                    break;
-                default:
-                    throw new Error(`Unsupported plot mark: ${spec.mark}`);
-            }
+                ...(spec.width     && { width: spec.width }),
+                ...(spec.height    && { height: spec.height }),
+                ...(spec.margins   && { margins: spec.margins }),
+                ...(spec.transform && { transform: spec.transform }),
+            });
 
             // Wire map ↔ plot events if a mapRef is specified
             if(spec.mapRef && registry) {
                 const map: AutkMap | undefined = registry.get(spec.mapRef);
 
                 if(map) {
-                    map.updateRenderInfoProperty(spec.mapRef, 'isPick', true);
+                    map.updateRenderInfo(spec.mapRef, { isPick: true });
 
-                    map.mapEvents.addEventListener(MapEvent.PICK, (selection: number[]) => {
-                        plot.setHighlightedIds(selection);
+                    map.events.on(MapEvent.PICKING, ({ selection }: MapEventData) => {
+                        plot.setSelection(selection);
                     });
 
                     for(const event of events) {
-                        plot.plotEvents.addEventListener(event as AutkPlotEvent, (selection: number[]) => {
-                            const layer = map.layerManager.searchByLayerId(spec.mapRef!) as VectorLayer | null;
-                            if(layer) layer.setHighlightedIds(selection);
+                        plot.events.on(event, ({ selection }: PlotEventData) => {
+                            map.setHighlightedIds(spec.mapRef!, selection);
                         });
                     }
                 }

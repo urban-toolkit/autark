@@ -58,6 +58,7 @@ export type HeatmapSourceSpec = TableSourceSpec & {
 }
 
 export type OsmDataSourceSpec = TableSourceSpec & {
+    pbfFileUrl?: string;
     autoLoadLayers?: {
         coordinateFormat: string;
         dropOsmTable: boolean;
@@ -121,7 +122,7 @@ export type DataSourceSpec = OsmDataSourceSpec | CsvDataSourceSpec | JsonDataSou
     * @property {string[]} colorMapDomain Explicit set of allowed category values. Values not in this list are collapsed to 'other'. Only meaningful when getFnvType is 'categorical'.
  */
 export type MapSpec = {
-    style?: 'light' | 'dark',
+    style?: string,
     layerRefs: {
         dataRef: string,
         opacity?: number,
@@ -135,6 +136,7 @@ export type MapSpec = {
         getFnv?: string,
         getFnvType?: 'categorical' | 'quantitative',
         colorMapDomain?: string[],
+        catchAllCategory?: string,
         defaultFnv?: string | number
     }[]
 }
@@ -148,6 +150,7 @@ export type PlotSpec = {
     width?: number,
     height?: number,
     margins?: { left: number; right: number; top: number; bottom: number },
+    transform?: { preset: string; options?: Record<string, unknown> },
     mapRef?: string,
 }
 

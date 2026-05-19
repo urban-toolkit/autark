@@ -14,10 +14,10 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        'autk-db',
-        'autk-map',
-        'autk-plot',
-        'autk-compute',
+        '@urban-toolkit/autk-db',
+        '@urban-toolkit/autk-map',
+        '@urban-toolkit/autk-plot',
+        '@urban-toolkit/autk-compute',
         'urban-grammar',
       ],
     },

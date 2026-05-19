@@ -1,5 +1,5 @@
 {
-  "name": "autk-grammar",
+  "name": "@urban-toolkit/autk-grammar",
   "version": "0.0.0",
   "type": "module",
   "files": [
@@ -41,10 +41,10 @@
     "vite-plugin-glsl": "^1.5.4"
   },
   "dependencies": {
-    "autk-db": "file:../autk-db",
-    "autk-map": "file:../autk-map",
-    "autk-plot": "file:../autk-plot",
-    "autk-compute": "file:../autk-compute",
+    "@urban-toolkit/autk-db": "file:../autk-db",
+    "@urban-toolkit/autk-map": "file:../autk-map",
+    "@urban-toolkit/autk-plot": "file:../autk-plot",
+    "@urban-toolkit/autk-compute": "file:../autk-compute",
     "urban-grammar": "file:../urban-grammar"
   }
 }

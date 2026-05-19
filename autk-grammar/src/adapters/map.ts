@@ -1,90 +1,124 @@
-import { MapAdapter, MapSpec } from 'urban-grammar';
+import { MapAdapter, MapSpec, NormalizationMode } from 'urban-grammar';
 import { Targets, MapRegistry, ComputeCache } from '../types';
-import { AutkMap, MapStyle, LayerType } from 'autk-map';
-import { SpatialDb } from 'autk-db';
-import { Feature, GeoJsonProperties } from 'geojson';
+import { AutkMap, MapStyle } from '@urban-toolkit/autk-map';
+import { ColorMapDomainStrategy } from '@urban-toolkit/autk-map';
+import type { ColorMapConfig, ColorMapDomainSpec, LayerType } from '@urban-toolkit/autk-map';
+import { AutkSpatialDb } from '@urban-toolkit/autk-db';
 
-function resolveFieldPath(properties: GeoJsonProperties, path: string): unknown {
-    const parts = path.split('.');
-    let current: unknown = properties;
-    for (const part of parts) {
-        if (current == null || typeof current !== 'object') return undefined;
-        current = (current as Record<string, unknown>)[part];
+function buildDomainSpec(
+    normalization: MapSpec['layerRefs'][number]['normalization'],
+    colorMapDomain?: string[],
+): ColorMapDomainSpec {
+    if (colorMapDomain && colorMapDomain.length > 0)
+        return { type: ColorMapDomainStrategy.USER, params: colorMapDomain };
+    if (normalization?.mode === NormalizationMode.PERCENTILE) {
+        const hasExplicitBounds =
+            normalization.lowerPercentile !== undefined || normalization.upperPercentile !== undefined;
+        if (hasExplicitBounds)
+            return {
+                type: ColorMapDomainStrategy.PERCENTILE,
+                params: [normalization.lowerPercentile ?? 0, normalization.upperPercentile ?? 100],
+            };
+        return { type: ColorMapDomainStrategy.PERCENTILE };
     }
-    return current;
+    return { type: ColorMapDomainStrategy.MIN_MAX };
+}
+
+function valueAtPath(obj: unknown, path: string): unknown {
+    return path.split('.').reduce<unknown>((acc, key) => {
+        if (acc == null || typeof acc !== 'object') return undefined;
+        return (acc as Record<string, unknown>)[key];
+    }, obj);
+}
+
+function setValueAtPath(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
+    const keys = path.split('.');
+    const result = { ...obj };
+    let current = result as Record<string, unknown>;
+    for (let i = 0; i < keys.length - 1; i++) {
+        current[keys[i]] = { ...(current[keys[i]] as Record<string, unknown> ?? {}) };
+        current = current[keys[i]] as Record<string, unknown>;
+    }
+    current[keys[keys.length - 1]] = value;
+    return result;
 }
 
 export function createMapAdapter(targets?: Targets, registry?: MapRegistry, computeCache?: ComputeCache): MapAdapter {
 
-    async function loadLayers(map: AutkMap, context: SpatialDb, spec: MapSpec): Promise<void> {
-        // TODO: this information should be more easily available here. Maybe that is solved with a more solid shared context for the grammar.
-        let tableToTypeMap: {[tableName: string]: LayerType | 'pointset'} = {};
-
+    async function loadLayers(map: AutkMap, context: AutkSpatialDb, spec: MapSpec): Promise<void> {
+        let tableToTypeMap: {[tableName: string]: string} = {};
         for(const table of context.tables) {
-            tableToTypeMap[table.name] = table.type as (LayerType | 'pointset');
+            tableToTypeMap[table.name] = table.type;
         }
 
-        console.log("Table to type map", tableToTypeMap);
-        console.log("Tables", context.tables);
-
-        // Load layers
         for(const layerRef of spec.layerRefs){
-            const name = layerRef.dataRef;
-            const type = tableToTypeMap[name];
-            const getFnv = layerRef.getFnv;
-            const getFnvType = layerRef.getFnvType;
-            const colorMapDomain = layerRef.colorMapDomain;
-            const defaultFnv = layerRef.defaultFnv;
+            const name     = layerRef.dataRef;
+            const type     = tableToTypeMap[name] as LayerType;
+            const getFnv   = layerRef.getFnv;
 
             const data = computeCache?.get(name) ?? await context.getLayer(name);
 
-            if(type == LayerType.AUTK_RASTER) {
-                const cellFn = getFnv
-                    ? (cell: unknown) => {
-                        const resolved = resolveFieldPath(cell as Record<string, unknown>, getFnv);
-                        return resolved != null ? Number(resolved) : Number(defaultFnv ?? 0);
-                    }
-                    : (cell: unknown) => Number(cell);
-                map.loadGeoTiffLayer(name, data, LayerType.AUTK_RASTER, cellFn);
+            if(type === 'raster') {
+                map.loadCollection(name, { collection: data, type: 'raster', property: getFnv ?? '' });
             } else {
-                map.loadGeoJsonLayer(name, data, type as LayerType);
+                map.loadCollection(name, { collection: data, type });
             }
 
-            console.log(`Loading layer: ${name} of type ${type}`);
+            if(layerRef.opacity != null)
+                map.updateRenderInfo(name, { opacity: layerRef.opacity });
 
-            function _getFnv(feature: Feature): string | number {
-                const properties = feature.properties as GeoJsonProperties;
+            if(layerRef.isColorMap)
+                map.updateRenderInfo(name, { isColorMap: true });
 
-                if (getFnv) {
-                    const resolved = resolveFieldPath(properties, getFnv);
-                    if (resolved != null) {
-                        if (getFnvType === 'categorical') {
-                            const str = String(resolved);
-                            return colorMapDomain ? (colorMapDomain.includes(str) ? str : 'other') : str;
+            if(layerRef.isPick)
+                map.updateRenderInfo(name, { isPick: true });
+
+            if(layerRef.isSkip)
+                map.updateRenderInfo(name, { isSkip: true });
+
+            // When catchAllCategory is set, remap features whose property value is not
+            // in colorMapDomain to the catch-all label, and extend the domain to include it.
+            const { catchAllCategory, colorMapDomain } = layerRef;
+            let thematicData = data;
+            let effectiveDomain = colorMapDomain;
+
+            if(getFnv && catchAllCategory && colorMapDomain?.length) {
+                const allowed = new Set(colorMapDomain);
+                thematicData = {
+                    ...data,
+                    features: data.features.map((f: any) => {
+                        const props = f.properties as Record<string, unknown>;
+                        const val = valueAtPath(props, getFnv);
+                        if(val === undefined || val === null || !allowed.has(String(val))) {
+                            return { ...f, properties: setValueAtPath(props, getFnv, catchAllCategory) };
                         }
-                        if (getFnvType === 'quantitative') return Number(resolved);
-                        return resolved as string | number;
-                    }
-                    if (defaultFnv != undefined) return defaultFnv;
-                    throw new Error(`Cannot access value "${getFnv}" in table "${name}". Value should exist in all rows or a defaultFnv should be set.`);
-                }
+                        return f;
+                    }),
+                };
+                effectiveDomain = allowed.has(catchAllCategory)
+                    ? colorMapDomain
+                    : [...colorMapDomain, catchAllCategory];
+            }
 
-                return '';
-            };
+            if(layerRef.colorMapInterpolator) {
+                const colormapConfig: ColorMapConfig = {
+                    // urban-grammar ColorMapInterpolator values are string-compatible
+                    // with autk-core ColorMapInterpolator at runtime
+                    interpolator: layerRef.colorMapInterpolator as unknown as ColorMapConfig['interpolator'],
+                    domainSpec: buildDomainSpec(layerRef.normalization, effectiveDomain),
+                };
+                map.updateRenderInfo(name, { colormap: { config: colormapConfig }, isColorMap: true });
+            }
 
-            if(layerRef.opacity)
-                map.updateRenderInfoProperty(name, 'opacity', layerRef.opacity);
-
-            if(layerRef.colorMapInterpolator)
-                map.updateRenderInfoProperty(name, 'colorMapInterpolator', layerRef.colorMapInterpolator);
-
-            if(getFnv && type !== LayerType.AUTK_RASTER)
-                map.updateGeoJsonLayerThematic(name, data, _getFnv, layerRef.normalization);
+            if(getFnv && type !== 'raster') {
+                const property = getFnv.startsWith('properties.') ? getFnv : `properties.${getFnv}`;
+                map.updateThematic(name, { collection: thematicData, property });
+            }
         }
     }
 
     return {
-        async resolveMap(context: SpatialDb | undefined, spec: MapSpec, index: number = 0): Promise<void> {
+        async resolveMap(context: AutkSpatialDb | undefined, spec: MapSpec, index: number = 0): Promise<void> {
             if(targets && targets.map && context){
 
                 let canvas;

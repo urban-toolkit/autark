@@ -1,5 +1,5 @@
 import type { UrbanSpec } from 'urban-grammar';
-import type { AutkMap } from 'autk-map';
+import type { AutkMap } from '@urban-toolkit/autk-map';
 import type { FeatureCollection } from 'geojson';
 
 export type Targets = {

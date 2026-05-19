@@ -66,7 +66,7 @@ dev:
 		"cd urban-grammar && npm run dev-build" \
 		"cd autk-grammar && npm run dev-build" \
 		"cd autk && npm run dev-build" \
-		"cd $(APP) && VITE_OPEN=\"$(OPEN)\" npm run dev"
+		"cd $(APP) && npx cross-env VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 clean:
 	$(RIMRAF) node_modules
