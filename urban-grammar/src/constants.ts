@@ -49,11 +49,11 @@ export enum ColorMapInterpolator {
   DIV_SPECTRAL = 'interpolateSpectral',
 }
 
-export type PlotMark = 'scatter' | 'bar' | 'line' | 'parallel-coordinates' | 'table';
+export type PlotMark = 'scatter' | 'bar' | 'line' | 'linechart' | 'parallel-coordinates' | 'table' | 'heatmatrix';
 
 export type PlotEvent = 'click' | 'brush' | 'brushY' | 'brushX';
 
-export type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted';
+export type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weighted' | 'collect';
 
 export enum NormalizationMode {
     MIN_MAX = 'minMax',

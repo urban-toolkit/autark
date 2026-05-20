@@ -12,8 +12,10 @@ function grammarMarkToPlotType(mark: PlotMark): PlotType {
         'scatter': 'scatterplot',
         'bar': 'barchart',
         'line': 'linechart',
+        'linechart': 'linechart',
         'parallel-coordinates': 'parallel-coordinates',
         'table': 'table',
+        'heatmatrix': 'heatmatrix',
     };
     return mapping[mark];
 }
@@ -37,7 +39,7 @@ export function createPlotAdapter(targets?: Targets, registry?: MapRegistry, cac
             const plot = new AutkPlot(div, {
                 type: grammarMarkToPlotType(spec.mark),
                 collection: geojson,
-                attributes: { axis: spec.axis },
+                attributes: { axis: spec.axis, ...(spec.color && { color: spec.color }) },
                 labels: { axis: spec.axis, title: spec.title },
                 events,
                 ...(spec.width     && { width: spec.width }),

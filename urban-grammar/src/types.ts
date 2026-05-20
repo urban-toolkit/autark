@@ -131,6 +131,7 @@ export type PlotSpec = {
     dataRef: string,
     mark: PlotMark,
     axis: string[],
+    color?: string,
     title?: string,
     events?: PlotEvent[],
     width?: number,

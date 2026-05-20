@@ -1,5 +1,6 @@
 import { CsvDataSourceSpec, CustomDataSourceSpec, DataAdapter, DataSourceSpec, HeatmapSourceSpec, JoinSourceSpec, JsonDataSourceSpec, OsmDataSourceSpec } from 'urban-grammar';
 import { AutkDb } from '@urban-toolkit/autk-db';
+import type { FeatureCollection } from 'geojson';
 import { Targets, GeoJsonCache } from '../types';
 
 export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): DataAdapter {
@@ -49,17 +50,24 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
                     return db;
                 case 'geojson': {
                     const geojsonSpec = rest_spec as CustomDataSourceSpec;
-                    if(cache) {
-                        let geojson;
-                        if(geojsonSpec.geojsonFileUrl) {
-                            const response = await fetch(geojsonSpec.geojsonFileUrl);
-                            geojson = await response.json();
-                        } else {
-                            geojson = geojsonSpec.geojsonObject;
-                        }
-                        if(geojson) cache.set(geojsonSpec.outputTableName, geojson);
+                    let geojsonData: FeatureCollection | undefined;
+
+                    if (geojsonSpec.geojsonFileUrl) {
+                        const response = await fetch(geojsonSpec.geojsonFileUrl);
+                        geojsonData = await response.json() as FeatureCollection;
+                    } else {
+                        geojsonData = geojsonSpec.geojsonObject;
                     }
-                    await db.loadGeojson(geojsonSpec);
+
+                    if (cache && geojsonData) cache.set(geojsonSpec.outputTableName, geojsonData);
+
+                    // Pass the fetched object directly so autk-db doesn't need to re-fetch
+                    if (geojsonData) {
+                        const { geojsonFileUrl: _url, ...specWithoutUrl } = geojsonSpec;
+                        await db.loadGeojson({ ...specWithoutUrl, geojsonObject: geojsonData });
+                    } else {
+                        await db.loadGeojson(geojsonSpec);
+                    }
                     print(db, targets);
                     return db;
                 }
@@ -83,6 +91,10 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
                         ...(jn.near && { near: jn.near }),
                         ...(jn.groupBy && { groupBy: jn.groupBy }),
                     });
+                    if (cache) {
+                        const updated = await db.getLayer(jn.tableRootName);
+                        cache.set(jn.tableRootName, updated);
+                    }
                     print(db, targets);
                     return db;
                 }
