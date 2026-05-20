@@ -17,8 +17,7 @@ export default defineConfig({
         '@urban-toolkit/autk-db',
         '@urban-toolkit/autk-map',
         '@urban-toolkit/autk-plot',
-        '@urban-toolkit/autk-compute',
-        'urban-grammar',
+        '@urban-toolkit/autk-compute'
       ],
     },
     copyPublicDir: false,

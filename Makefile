@@ -18,7 +18,6 @@ typecheck: build
 		"cd autk-plot && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
 		"cd autk && npx tsc --noEmit --skipLibCheck" \
-		"cd urban-grammar && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-grammar && npx tsc --noEmit --skipLibCheck" \
 		"cd gallery && npx tsc --noEmit --skipLibCheck" \
 		"cd usecases && npx tsc --noEmit --skipLibCheck"
@@ -28,8 +27,7 @@ build:
 		"cd autk-map && npm run build" \
 		"cd autk-db && npm run build" \
 		"cd autk-plot && npm run build" \
-		"cd autk-compute && npm run build" \
-		"cd urban-grammar && npm run build"
+		"cd autk-compute && npm run build" 
 	cd autk-grammar && npm run build
 	cd autk && npm run build
 
@@ -63,7 +61,6 @@ dev:
 		"cd autk-db && npm run dev-build" \
 		"cd autk-plot && npm run dev-build" \
 		"cd autk-compute && npm run dev-build" \
-		"cd urban-grammar && npm run dev-build" \
 		"cd autk-grammar && npm run dev-build" \
 		"cd autk && npm run dev-build" \
 		"cd $(APP) && npx cross-env VITE_OPEN=\"$(OPEN)\" npm run dev"
@@ -76,7 +73,6 @@ clean:
 		"cd autk-db && $(RIMRAF) dist build node_modules" \
 		"cd autk-plot && $(RIMRAF) dist build node_modules" \
 		"cd autk-compute && $(RIMRAF) dist build node_modules" \
-		"cd urban-grammar && $(RIMRAF) dist build" \
 		"cd autk-grammar && $(RIMRAF) dist build" \
 		"cd autk && $(RIMRAF) dist build node_modules" \
 		"cd gallery && $(RIMRAF) dist build node_modules" \

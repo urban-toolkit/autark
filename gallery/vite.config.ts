@@ -21,8 +21,7 @@ export default defineConfig({
       '@urban-toolkit/autk-db',
       '@urban-toolkit/autk-plot',
       '@urban-toolkit/autk-compute',
-      '@urban-toolkit/autk-grammar',
-      'urban-grammar',
+      '@urban-toolkit/autk-grammar'
     ]),
   ],
   optimizeDeps: {
@@ -32,8 +31,7 @@ export default defineConfig({
       '@urban-toolkit/autk-db',
       '@urban-toolkit/autk-plot',
       '@urban-toolkit/autk-compute',
-      '@urban-toolkit/autk-grammar',
-      'urban-grammar',
+      '@urban-toolkit/autk-grammar'
     ],
   },
 

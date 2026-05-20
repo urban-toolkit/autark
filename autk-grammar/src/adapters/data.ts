@@ -78,7 +78,7 @@ export function createDataAdapter(targets?: Targets, cache?: GeoJsonCache): Data
                         near: { distance: hm.near.distance },
                         outputTableName: hm.outputTableName,
                         grid: hm.grid,
-                        ...(hm.groupBy && { groupBy: hm.groupBy }),
+                        ...(hm.groupBy && { groupBy: hm.groupBy as any }),
                     });
                     print(db, targets);
                     return db;
