@@ -67,3 +67,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 __MACOSX/ export-ignore
 .??* export-ignore
 ._* export-ignore
+
+.pi
