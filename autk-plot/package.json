@@ -12,10 +12,10 @@
   ],
   "main": "./dist/autk-plot.umd.cjs",
   "module": "./dist/autk-plot.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/src/index.d.ts",
       "import": "./dist/autk-plot.js",
       "require": "./dist/autk-plot.umd.cjs"
     }

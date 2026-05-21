@@ -17,10 +17,10 @@
   ],
   "main": "./dist/autk-map.umd.cjs",
   "module": "./dist/autk-map.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/src/index.d.ts",
       "import": "./dist/autk-map.js",
       "require": "./dist/autk-map.umd.cjs"
     }
