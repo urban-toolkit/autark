@@ -1,6 +1,6 @@
 {
   "name": "@urban-toolkit/autk-plot",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/urban-toolkit/autark",
@@ -12,10 +12,10 @@
   ],
   "main": "./dist/autk-plot.umd.cjs",
   "module": "./dist/autk-plot.js",
-  "types": "./dist/src/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/autk-plot.js",
       "require": "./dist/autk-plot.umd.cjs"
     }
@@ -41,7 +41,7 @@
     "typedoc": "^0.28.18",
     "typedoc-plugin-markdown": "^4.11.0",
     "typedoc-theme-oxide": "^0.2.5",
-    "typescript": "^6.0.2",
+    "typescript": "^5.9.3",
     "vite": "^8.0.8",
     "vite-plugin-dts": "^4.5.4"
   },

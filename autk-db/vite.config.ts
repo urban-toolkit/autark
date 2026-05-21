@@ -14,7 +14,10 @@ const duckdbFiles = [
 
 export default defineConfig({
   plugins: [
-    dts(),
+    dts({
+      rollupTypes: true,
+      bundledPackages: ['autk-core'],
+    }),
     {
       name: 'copy-duckdb-dist',
       closeBundle() {

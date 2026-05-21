@@ -1,6 +1,6 @@
 {
   "name": "@urban-toolkit/autk-map",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "keywords": [
     "visualization",
     "urban",
@@ -17,10 +17,10 @@
   ],
   "main": "./dist/autk-map.umd.cjs",
   "module": "./dist/autk-map.js",
-  "types": "./dist/src/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/autk-map.js",
       "require": "./dist/autk-map.umd.cjs"
     }
@@ -48,7 +48,7 @@
     "typedoc": "^0.28.18",
     "typedoc-plugin-markdown": "^4.11.0",
     "typedoc-theme-oxide": "^0.2.5",
-    "typescript": "^6.0.2",
+    "typescript": "^5.9.3",
     "vite": "^8.0.8",
     "vite-plugin-dts": "^4.5.4",
     "vite-plugin-glsl": "^1.5.6"
