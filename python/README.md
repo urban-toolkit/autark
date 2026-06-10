@@ -105,7 +105,6 @@ Two options:
   - [csv_points_map.py](examples/csv_points_map.py) - CSV points + histogram
   - [spatial_join.py](examples/spatial_join.py) - Spatial join workflow
   - [geopandas_workflow.py](examples/geopandas_workflow.py) - GeoPandas workflow
-- **[../JUPYTER_QUICKSTART.md](../JUPYTER_QUICKSTART.md)** - Jupyter integration
 - **[../PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md)** - Implementation tracker
 
 ## Design

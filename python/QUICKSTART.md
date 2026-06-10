@@ -160,7 +160,7 @@ jupyter notebook
 
 Useful during development: serves local data files and freshly built runtimes.
 
-See [../JUPYTER_QUICKSTART.md](../JUPYTER_QUICKSTART.md) for details.
+See [../PYTHON_API.md](../PYTHON_API.md) for Jupyter widget and development-server details.
 
 ## Next Steps
 

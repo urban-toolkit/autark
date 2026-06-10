@@ -315,6 +315,17 @@ For development against a local runtime bundle, evaluating `spec` in a notebook
 uses `_repr_html_()` and expects the local dev server/runtime URL configured by
 the package defaults.
 
+Development-server display is useful while changing the runtime bundle:
+
+```bash
+cd /path/to/autark
+python cors_server.py 8000
+```
+
+Then open a notebook from `python/examples` and evaluate a spec object. If the
+output is blank, check that `autk-runtime/dist/autk-runtime.js` exists and that
+the data URLs used by the spec are reachable from the browser.
+
 ## Examples
 
 Python examples:
