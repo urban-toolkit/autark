@@ -381,5 +381,3 @@ environments.
 - `python/README.md` is the package-level quick start.
 - `python/examples/README.md` documents runnable examples.
 - `PYTHON_API_IMPLEMENTATION.md` is now a compact implementation tracker.
-- `autark-spec-python-api-design.md` is a historical design note.
-- `MVP_COMPLETION_SUMMARY.md` is a superseded completion note.
