@@ -3,6 +3,7 @@
 from .data import CSV, OSM, GeoJSON, latlng, wkt
 from .display import to_html
 from .encodings import Encoding, Field, Scale, Value, field, value
+from .widget import create_widget
 from .links import Link
 from .selections import Selection, interval, multi, point
 from .spec import AutarkSpec, Metadata, Spec, Workspace
@@ -48,6 +49,7 @@ __all__ = [
     "avg",
     "collect",
     "count",
+    "create_widget",
     "field",
     "interval",
     "latlng",

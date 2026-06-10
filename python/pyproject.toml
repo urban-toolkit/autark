@@ -16,8 +16,12 @@ dependencies = []
 
 [project.optional-dependencies]
 validation = ["jsonschema>=4.0"]
+widget = ["anywidget>=0.9"]
 test = ["jsonschema>=4.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["autark*"]
+
+[tool.setuptools.package-data]
+autark = ["static/*.js"]

@@ -2,6 +2,13 @@
 
 This guide walks through testing the Autark Python API in Jupyter.
 
+> **Tip:** if you just want to display a spec without any local server, use
+> the widget instead: `pip install anywidget`, then `spec.widget()` in a cell.
+> It ships a bundled runtime inside the Python package and loads DuckDB assets
+> from the jsDelivr CDN (data must use absolute URLs or inline values). The
+> steps below cover the dev-server display path, which serves local data files
+> and freshly built runtimes.
+
 ## Prerequisites
 
 1. **Jupyter installed** (already verified: `/opt/miniconda3/bin/jupyter`)

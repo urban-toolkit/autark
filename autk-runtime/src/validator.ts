@@ -3,13 +3,16 @@
  */
 
 import Ajv from 'ajv';
+// Bundled at build time (see the @autark-schema alias in the vite configs).
+// Bundling instead of fetching keeps validation working when the runtime is
+// loaded from a blob:/data: URL (e.g. as an anywidget module) or offline.
+import schema from '@autark-schema';
 import type { AutarkSpec } from './types.js';
 import { SpecValidationError } from './types.js';
 
 export class SpecValidator {
   private ajv: Ajv;
   private validateFn: ReturnType<Ajv['compile']> | null = null;
-  private schemaPromise: Promise<void>;
 
   constructor() {
     this.ajv = new Ajv({
@@ -18,40 +21,13 @@ export class SpecValidator {
       strict: false, // Disable strict mode to allow conditional required properties
     });
 
-    // Load schema asynchronously for browser compatibility
-    this.schemaPromise = this.loadSchema();
-  }
-
-  /**
-   * Load the JSON Schema from the server.
-   * This avoids using import assertions which aren't browser-compatible.
-   */
-  private async loadSchema(): Promise<void> {
-    try {
-      // Fetch schema from the runtime server (same origin as the runtime module)
-      const runtimeUrl = new URL(import.meta.url);
-      const schemaUrl = new URL('/schema/autark-spec-v0.1.json', runtimeUrl.origin);
-      const response = await fetch(schemaUrl.toString());
-      if (!response.ok) {
-        throw new Error(`Failed to load schema: ${response.status}`);
-      }
-      const schema = await response.json();
-      this.validateFn = this.ajv.compile(schema);
-    } catch (error) {
-      console.error('Failed to load schema:', error);
-      const wrappedError = new Error(
-        'Schema loading failed. Make sure schema/autark-spec-v0.1.json is accessible.'
-      ) as Error & { cause?: unknown };
-      wrappedError.cause = error;
-      throw wrappedError;
-    }
+    this.validateFn = this.ajv.compile(schema);
   }
 
   /**
    * Ensure schema is loaded before validation.
    */
   private async ensureSchemaLoaded(): Promise<void> {
-    await this.schemaPromise;
     if (!this.validateFn) {
       throw new Error('Schema validation function not initialized');
     }

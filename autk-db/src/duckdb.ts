@@ -1,25 +1,33 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
 
-const mvpModuleUrl = new URL(/* @vite-ignore */ './duckdb-mvp.wasm', import.meta.url).href;
-const mvpWorkerUrl = new URL(/* @vite-ignore */ './duckdb-browser-mvp.worker.js', import.meta.url).href;
-const ehModuleUrl = new URL(/* @vite-ignore */ './duckdb-eh.wasm', import.meta.url).href;
-const ehWorkerUrl = new URL(/* @vite-ignore */ './duckdb-browser-eh.worker.js', import.meta.url).href;
-
 /**
- * Browser-specific DuckDB-Wasm bundle definitions used for runtime selection.
+ * Resolves the browser DuckDB-Wasm bundles for the current module location.
  *
- * Maps the supported WebAssembly variants to the worker and module assets emitted with the package.
+ * When the module is served over HTTP(S) or from disk, the worker and wasm
+ * assets emitted next to the bundle are used. When the module was loaded from
+ * a blob:/data: URL (e.g. bundled into an anywidget ESM), relative asset URLs
+ * cannot be resolved, so the official jsDelivr CDN bundles are used instead.
  */
-const BROWSER_BUNDLES: duckdb.DuckDBBundles = {
-  mvp: {
-    mainModule: mvpModuleUrl,
-    mainWorker: mvpWorkerUrl,
-  },
-  eh: {
-    mainModule: ehModuleUrl,
-    mainWorker: ehWorkerUrl,
-  },
-};
+function resolveBrowserBundles(): duckdb.DuckDBBundles {
+  try {
+    const base = import.meta.url;
+    if (base.startsWith('http:') || base.startsWith('https:') || base.startsWith('file:')) {
+      return {
+        mvp: {
+          mainModule: new URL(/* @vite-ignore */ './duckdb-mvp.wasm', base).href,
+          mainWorker: new URL(/* @vite-ignore */ './duckdb-browser-mvp.worker.js', base).href,
+        },
+        eh: {
+          mainModule: new URL(/* @vite-ignore */ './duckdb-eh.wasm', base).href,
+          mainWorker: new URL(/* @vite-ignore */ './duckdb-browser-eh.worker.js', base).href,
+        },
+      };
+    }
+  } catch {
+    // Fall through to CDN bundles.
+  }
+  return duckdb.getJsDelivrBundles();
+}
 
 const NODE_PATH_MODULE = 'node:path';
 const NODE_WORKER_THREADS_MODULE = 'node:worker_threads';
@@ -91,7 +99,7 @@ export async function loadDb() {
         return db;
     }
 
-    const bundle = await duckdb.selectBundle(BROWSER_BUNDLES);
+    const bundle = await duckdb.selectBundle(resolveBrowserBundles());
     // Browsers block `new Worker(url)` when `url` is cross-origin, even with
     // CORS headers (e.g. runtime served from :8000 inside a Jupyter page on
     // :8888). Workaround recommended by the DuckDB-WASM docs: create the

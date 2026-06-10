@@ -37,6 +37,9 @@ spec.save_html("map.html")
 
 # Validate
 spec.validate()
+
+# Display in Jupyter without any local server (requires autark[widget])
+spec.widget()
 ```
 
 ## Features
@@ -46,6 +49,7 @@ spec.validate()
 - ✅ **Spatial operations** - Spatial joins with aggregation
 - ✅ **Interactive visualizations** - Maps, histograms, linked selections
 - ✅ **Jupyter integration** - Display specs in notebooks
+- ✅ **Zero-server widget** - `spec.widget()` bundles the runtime (anywidget)
 - ✅ **Standalone HTML export** - No Python runtime required
 
 ## Installation
@@ -56,7 +60,22 @@ spec.validate()
 cd autark/python
 pip install -e .
 pip install -e ".[validation]"  # Optional: JSON Schema validation
+pip install -e ".[widget]"      # Optional: zero-server Jupyter widget (anywidget)
 ```
+
+### Displaying specs in Jupyter
+
+Two options:
+
+1. **Widget (recommended)** - `spec.widget()` renders with the runtime bundled
+   inside the Python package. No local server needed; works in Jupyter,
+   JupyterLab, VS Code, and Colab. DuckDB WebAssembly assets are fetched from
+   the jsDelivr CDN on first use, so network access is required. Data sources
+   must use absolute URLs or inline `values`.
+2. **Dev-server display** - evaluating `spec` in a cell uses `_repr_html_()`,
+   which loads the runtime from `http://localhost:8000`. Start it from the
+   repo root with `python cors_server.py 8000`. Useful during development
+   since it picks up freshly built runtimes and serves local data files.
 
 ## Documentation
 

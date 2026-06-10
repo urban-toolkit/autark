@@ -670,7 +670,14 @@ Create hand-written example specs to validate design:
 - [x] Manual test in Jupyter notebook (verified working 2026-06-10, requires `cors_server.py`)
 - [ ] Manual test in JupyterLab (pending user testing)
 - [x] Manual test in VS Code notebooks (verified working 2026-06-10, local Python kernel + `cors_server.py`)
-- [ ] Consider anywidget integration (future; also enables zero-server display)
+- [x] anywidget integration (2026-06-10): `spec.widget()` renders with a fully
+      bundled runtime (`python/autark/static/autark-widget.js`, built by
+      `autk-runtime/vite.widget.config.js`); no local server needed. DuckDB
+      assets load from jsDelivr when the module origin is not http(s)
+      (`autk-db/src/duckdb.ts`), and the spec schema is bundled inline
+      (`autk-runtime/src/validator.ts`). Covered by
+      `tests/runtime/widget-bundle.test.ts` (blob: URL import like anywidget).
+      Bidirectional JS→Python communication still future work.
 
 ### 3.9 Python Testing
 - [x] Unit tests for MVP classes

@@ -93,6 +93,17 @@ class AutarkSpec(Serializable):
     ) -> None:
         Path(path).write_text(self.to_html(runtime_url=runtime_url, height=height), encoding="utf-8")
 
+    def widget(self, *, height: str = "640px"):
+        """Render the spec as a Jupyter widget using the bundled runtime.
+
+        Requires the ``widget`` extra (``pip install autark[widget]``). Works
+        without a local server; DuckDB assets load from the jsDelivr CDN.
+        Data sources must use absolute URLs or inline values.
+        """
+        from .widget import create_widget
+
+        return create_widget(self, height=height)
+
     def _repr_html_(self) -> str:
         return self.to_html()
 

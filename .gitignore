@@ -3,6 +3,7 @@ autk*/docs/
 autk*/dist/
 autk*/src/*.js
 dist/
+python/autark/static/
 
 .vite/
 

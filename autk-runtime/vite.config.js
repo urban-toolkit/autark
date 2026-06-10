@@ -29,6 +29,7 @@ function duckdbAssets() {
 export default defineConfig({
   resolve: {
     alias: {
+      '@autark-schema': resolve(__dirname, '../schema/autark-spec-v0.1.json'),
       '@urban-toolkit/autk-core': resolve(__dirname, '../autk-core/src/index.ts'),
       '@urban-toolkit/autk-db': resolve(__dirname, '../autk-db/src/index.ts'),
       '@urban-toolkit/autk-compute': resolve(__dirname, '../autk-compute/src/index.ts'),
