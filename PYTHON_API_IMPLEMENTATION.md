@@ -118,32 +118,148 @@ b941f2a feat(python): expand spec builders and runtime support
 - `examples/specs/06-multiple-layers.json`
 - `tests/fixtures/runtime/fixture-06-scatter-table.json`
 
-## Deferred Work
+## Open Backlog
 
-### Runtime Data Sources
+These unchecked items are intentionally retained until they are implemented or
+explicitly rejected. Items that were already completed after the original plan
+were not reintroduced here.
 
-- Wire `type: "json"` into `schema/autark-spec-v0.1.json`.
-- Load JSON data sources in `autk-runtime/src/data-loader.ts` through
+### Runtime Data Sources And Schema
+
+- [ ] Wire `type: "json"` into `schema/autark-spec-v0.1.json`.
+- [ ] Load JSON data sources in `autk-runtime/src/data-loader.ts` through
   `AutkDb.loadJson()`.
-- Wire `type: "geotiff"` into `schema/autark-spec-v0.1.json`.
-- Load GeoTIFF data sources in `autk-runtime/src/data-loader.ts` through
+- [ ] Wire `type: "geotiff"` into `schema/autark-spec-v0.1.json`.
+- [ ] Load GeoTIFF data sources in `autk-runtime/src/data-loader.ts` through
   `AutkDb.loadGeoTiff()`.
-- Add map raster layer workflow tests for GeoTIFF-backed tables.
+- [ ] Add GeoTIFF map/raster workflow tests.
+- [ ] Decide whether `TableRef` belongs in AutarkSpec and add schema/runtime
+  support if accepted.
+- [ ] Handle inline CSV `values` in the runtime loader, or remove inline CSV
+  values from the schema until supported.
+- [ ] Add unit tests for TypeScript spec type definitions.
+
+### Runtime Rendering And Interaction
+
+- [ ] Apply map-level `view.style` in the map renderer.
+- [ ] Apply polygon `strokeWidth` through mesh-based outline geometry or an
+  equivalent supported rendering path.
+- [ ] Implement field-driven `encoding.opacity`.
+- [ ] Implement field-driven `encoding.size`.
+- [ ] Implement field-driven `encoding.height`.
+- [ ] Implement link `filter` action.
+- [ ] Implement link `color` action.
+- [ ] Add explicit responsive resize/reflow behavior for rendered views.
+- [ ] Add unit tests for individual runtime modules.
+- [ ] Add visual regression tests with screenshots.
 
 ### Python API Refinement
 
-- Add warnings or fallback strategies for large inline GeoJSON datasets.
-- Consider Arrow/Parquet or tiled data helpers for large data.
-- Add higher-level compute expression helpers over raw WGSL.
-- Add optional chart builders beyond MVP, such as bar chart and time series.
-- Add legend helper classes if the runtime schema exposes stable legend config.
+- [ ] Decide whether to add `spec.show()` for explicit Jupyter display, or keep
+  `_repr_html_()` / `widget()` as the only display APIs.
+- [ ] Add warnings or fallback strategies for large inline GeoJSON datasets.
+- [ ] Consider Arrow/Parquet helpers for large tabular/spatial data.
+- [ ] Consider tiled/streaming helpers for large raster/vector data.
+- [ ] Add higher-level compute expression helpers over raw WGSL, or document
+  raw WGSL as the only supported compute authoring model.
+- [ ] Add optional chart builders beyond MVP, such as bar chart and time series.
+- [ ] Add legend helper classes if the runtime schema exposes stable legend
+  configuration.
+- [ ] Add missing convenience methods where repeated user patterns emerge.
+- [ ] Improve public type hints.
+- [ ] Add docstrings to all public APIs.
+- [ ] Review naming conventions before release.
 
-### Documentation And Release
+### Jupyter And Packaging
 
-- Keep `PYTHON_API.md`, `python/README.md`, and `python/examples/README.md`
-  synchronized.
-- Add generated API reference once the Python package surface stabilizes.
-- Decide package publishing metadata and release process.
+- [ ] Bundle DuckDB WASM assets, or document CDN requirements as the supported
+  behavior for the widget path.
+- [ ] Test manually in Jupyter Notebook.
+- [ ] Test manually in JupyterLab.
+- [ ] Test manually in VS Code notebooks.
+- [ ] Test manually in Google Colab if feasible.
+
+### Examples And Documentation
+
+- [ ] Add full generated API reference documentation.
+- [ ] Add comparison guide: declarative Python API versus imperative TypeScript
+  API.
+- [ ] Add migration guide from imperative TypeScript API.
+- [ ] Add tutorial notebooks.
+- [ ] Add troubleshooting section and FAQ to the consolidated docs.
+- [ ] Add more examples after user feedback.
+- [ ] Add Example 5: Urban Heat Island Analysis.
+- [ ] Recreate the Niteroi use case from Python.
+- [ ] Compare the Python Niteroi workflow to the TypeScript version.
+- [ ] Add Python examples to the existing gallery.
+- [ ] Add side-by-side TypeScript versus Python examples.
+- [ ] Link gallery examples to generated specs.
+- [ ] Update homepage/docs site with Python examples.
+- [ ] Keep `PYTHON_API.md`, `python/README.md`, and
+  `python/examples/README.md` synchronized.
+
+### User Testing, Evaluation, And Quality
+
+- [ ] Recruit 3-5 Python users who are not Autark developers.
+- [ ] Provide a short tutorial for user testing.
+- [ ] Assign a representative building task, such as neighborhood analysis.
+- [ ] Collect feedback on API clarity.
+- [ ] Collect feedback on documentation quality.
+- [ ] Collect feedback on error messages.
+- [ ] Collect feedback on pain points and missing features.
+- [ ] Iterate based on feedback.
+- [ ] Test spec generation with Claude/GPT-style models.
+- [ ] Measure LLM success rate.
+- [ ] Measure LLM token usage.
+- [ ] Measure LLM iteration count.
+- [ ] Categorize LLM error types.
+- [ ] Compare LLM results to imperative API results.
+- [ ] Document evaluation findings.
+- [ ] Measure spec serialization overhead.
+- [ ] Test with large GeoJSON datasets over 10k features.
+- [ ] Test with large CSV datasets over 100k rows.
+- [ ] Test with large OSM areas.
+- [ ] Profile runtime execution.
+- [ ] Identify and optimize bottlenecks.
+- [ ] Test invalid specs.
+- [ ] Test missing data sources.
+- [ ] Test invalid references.
+- [ ] Test network failures.
+- [ ] Test incompatible CRS inputs.
+- [ ] Verify error messages are helpful.
+- [ ] Test on macOS.
+- [ ] Test on Linux.
+- [ ] Test on Windows.
+- [ ] Test in Chrome/Edge.
+- [ ] Test in Firefox.
+- [ ] Test in Safari.
+
+### Release And Paper
+
+- [ ] Decide package publishing metadata and release process.
+- [ ] Prepare Python package for PyPI.
+- [ ] Add Python package changelog.
+- [ ] Prepare TypeScript runtime package for npm.
+- [ ] Add TypeScript runtime changelog.
+- [ ] Publish alpha releases.
+- [ ] Announce to early users/community.
+- [ ] Update the paper with the Python API section.
+- [ ] Add Python examples to the paper.
+- [ ] Discuss declarative versus imperative tradeoffs.
+- [ ] Add Python API to evaluation if relevant.
+- [ ] Update figures with Python snippets.
+
+### Long-Term Success Criteria
+
+- [ ] Feature parity with imperative TypeScript API.
+- [ ] User study shows Python API is learnable.
+- [ ] LLM/agent evaluation shows improved generation.
+- [ ] Performance acceptable for typical datasets.
+- [ ] Error messages are helpful.
+- [ ] Published Python and runtime packages.
+- [ ] Documentation complete.
+- [ ] Gallery with 10+ examples.
+- [ ] Community adoption.
 
 ## Verification Commands
 
