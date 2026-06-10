@@ -147,6 +147,8 @@ were not reintroduced here.
 - [ ] Implement field-driven `encoding.opacity`.
 - [ ] Implement field-driven `encoding.size`.
 - [ ] Implement field-driven `encoding.height`.
+- [ ] Honor aggregation `as` aliases in runtime transform execution, or remove
+  alias examples from executable docs until supported.
 - [ ] Implement link `filter` action.
 - [ ] Implement link `color` action.
 - [ ] Add explicit responsive resize/reflow behavior for rendered views.

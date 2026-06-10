@@ -125,7 +125,7 @@ spec = ak.Spec(
                 ak.Layer(neighborhoods, type="polygons").style(
                     color="#2f6f73",
                     opacity=0.75,
-                    stroke_color="#123456",
+                    strokeColor="#123456",
                 )
             ],
         )
@@ -135,6 +135,184 @@ spec = ak.Spec(
 spec.validate("../schema/autark-spec-v0.1.json")
 spec.save_json("neighborhoods.json")
 spec.save_html("neighborhoods.html")
+```
+
+## TypeScript Versus Python Usage
+
+There are two useful comparisons:
+
+- TypeScript can execute an AutarkSpec directly with `AutarkRuntime`.
+- TypeScript can also use the lower-level imperative packages (`AutkDb`,
+  `AutkMap`, `AutkPlot`, `AutkCompute`) when building a custom application.
+- Python is the ergonomic authoring layer for notebooks, scripts, generated
+  specs, and HTML/widget export.
+
+### Same Spec, TypeScript Runtime
+
+```typescript
+import { AutarkRuntime } from '@urban-toolkit/autk-runtime';
+
+const spec = {
+  $schema: 'https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json',
+  version: '0.1',
+  data: [
+    {
+      type: 'geojson',
+      name: 'neighborhoods',
+      url: '/data/neighborhoods.geojson',
+      layerType: 'polygons',
+      coordinateFormat: 'EPSG:4326',
+    },
+  ],
+  views: [
+    {
+      type: 'map',
+      layers: [
+        {
+          source: 'neighborhoods',
+          type: 'polygons',
+          style: {
+            color: '#2f6f73',
+            opacity: 0.75,
+            strokeColor: '#123456',
+          },
+        },
+      ],
+    },
+  ],
+};
+
+await AutarkRuntime.fromSpec(spec, {
+  container: document.getElementById('app')!,
+});
+```
+
+### Same Spec, Python Builder
+
+```python
+import autark as ak
+
+neighborhoods = ak.GeoJSON(
+    "neighborhoods",
+    url="/data/neighborhoods.geojson",
+    layer_type="polygons",
+    coordinate_format="EPSG:4326",
+)
+
+spec = ak.Spec(
+    data=[neighborhoods],
+    views=[
+        ak.Map(
+            layers=[
+                ak.Layer(neighborhoods, type="polygons").style(
+                    color="#2f6f73",
+                    opacity=0.75,
+                    strokeColor="#123456",
+                )
+            ]
+        )
+    ],
+)
+
+spec.save_json("neighborhoods.json")
+spec.save_html("neighborhoods.html")
+```
+
+### Imperative TypeScript Workflow
+
+The imperative TypeScript API is lower-level and useful for custom web apps.
+The same spatial-join workflow requires explicitly loading data, running the
+query, creating the map, loading layers, applying thematic styling, and drawing.
+This mirrors examples such as `gallery/src/autk-map/spatial-join.ts`.
+
+```typescript
+import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
+import {
+  ColorMapDomainStrategy,
+  ColorMapInterpolator,
+} from '@urban-toolkit/autk-core';
+
+const db = new AutkDb();
+await db.init();
+
+await db.loadGeojson({
+  geojsonFileUrl: '/data/neighborhoods.geojson',
+  outputTableName: 'neighborhoods',
+});
+
+await db.loadCsv({
+  csvFileUrl: '/data/trees.csv',
+  outputTableName: 'trees',
+  geometryColumns: true,
+});
+
+await db.spatialQuery({
+  tableRootName: 'neighborhoods',
+  tableJoinName: 'trees',
+  groupBy: [{ column: '*', aggregateFn: 'count' }],
+});
+
+const map = new AutkMap(document.querySelector('canvas')!);
+await map.init();
+
+const neighborhoods = await db.getLayer('neighborhoods');
+map.loadCollection('neighborhoods', {
+  collection: neighborhoods,
+  type: 'polygons',
+});
+map.updateColorMap('neighborhoods', {
+  colorMap: {
+    domainSpec: { type: ColorMapDomainStrategy.MIN_MAX },
+    interpolator: ColorMapInterpolator.SEQ_GREENS,
+  },
+});
+map.updateThematic('neighborhoods', {
+  collection: neighborhoods,
+  property: 'properties.sjoin.count.trees',
+});
+
+map.draw();
+```
+
+### Equivalent Python Declarative Workflow
+
+```python
+import autark as ak
+
+neighborhoods = ak.GeoJSON(
+    "neighborhoods",
+    url="/data/neighborhoods.geojson",
+    layer_type="polygons",
+)
+trees = ak.CSV(
+    "trees",
+    url="/data/trees.csv",
+    geometry=ak.latlng("latitude", "longitude", coordinate_format="EPSG:4326"),
+)
+
+spec = ak.Spec(
+    data=[neighborhoods, trees],
+    transforms=[
+        ak.SpatialJoin(
+            root=neighborhoods,
+            join=trees,
+            group_by=[ak.count()],
+        )
+    ],
+    views=[
+        ak.Map(
+            layers=[
+                ak.Layer(neighborhoods, type="polygons").encode(
+                    color=ak.field(
+                        "properties.sjoin.count.trees",
+                        scale=ak.Scale(type="quantile", scheme="greens"),
+                    )
+                )
+            ]
+        )
+    ],
+)
 ```
 
 ## GeoPandas Workflow
@@ -231,14 +409,14 @@ spec = ak.Spec(
             root=neighborhoods,
             join=trees,
             near=ak.Near(distance=250),
-            group_by=[ak.count("*", as_="tree_count")],
+            group_by=[ak.count()],
         )
     ],
     views=[
         ak.Map(
             layers=[
                 ak.Layer(neighborhoods, type="polygons").encode(
-                    color=ak.field("tree_count")
+                    color=ak.field("properties.sjoin.count.trees")
                 )
             ]
         )
