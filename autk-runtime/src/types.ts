@@ -92,7 +92,11 @@ export interface CsvWktGeometry {
 // Transforms
 // ============================================================================
 
-export type Transform = SpatialJoinTransform;
+export type Transform =
+  | SpatialJoinTransform
+  | HeatmapTransform
+  | GpgpuComputeTransform
+  | RenderComputeTransform;
 
 export interface SpatialJoinTransform {
   type: 'spatialJoin';
@@ -112,11 +116,84 @@ export interface Aggregation {
   normalize?: boolean; // Default: false
 }
 
+export interface HeatmapTransform {
+  type: 'heatmap';
+  source: string;
+  output: string;
+  near: {
+    distance: number;
+    useCentroid?: boolean;
+  };
+  grid: {
+    rows: number;
+    columns: number;
+  };
+  groupBy?: Array<Omit<Aggregation, 'op'> & {
+    op?: Exclude<Aggregation['op'], 'collect'>;
+  }>;
+}
+
+export interface GpgpuComputeTransform {
+  type: 'gpgpuCompute';
+  source: string;
+  output: string;
+  layerType?: 'polygons' | 'polylines' | 'points' | 'buildings';
+  coordinateFormat?: string;
+  variableMapping: Record<string, string>;
+  attributeArrays?: Record<string, number>;
+  attributeMatrices?: Record<string, { rows: number | 'auto'; cols: number }>;
+  uniforms?: Record<string, number>;
+  uniformArrays?: Record<string, number[]>;
+  uniformMatrices?: Record<string, { data: number[][]; cols: number }>;
+  wgslBody: string;
+  resultField?: string;
+  outputColumns?: string[];
+}
+
+export interface RenderComputeTransform {
+  type: 'renderCompute';
+  output: string;
+  layerType?: 'polygons' | 'polylines' | 'points' | 'buildings';
+  coordinateFormat?: string;
+  layers: Array<{
+    id: string;
+    source: string;
+    type: 'buildings' | 'roads' | 'polygons' | 'polylines' | 'points';
+    objectIdProperty?: string;
+  }>;
+  viewpoints: {
+    source: string;
+    strategy?: { type: 'centroid' } | { type: 'building-windows'; floors: number };
+    sampling?: {
+      directions?: number;
+      azimuthOffsetDeg?: number;
+      pitchDeg?: number;
+    };
+  };
+  aggregation:
+    | {
+        type: 'classes';
+        includeBackground?: boolean;
+        backgroundLayerType?: string;
+      }
+    | {
+        type: 'objects';
+      };
+  camera?: {
+    fov?: number;
+    clip?: {
+      near?: number;
+      far?: number;
+    };
+  };
+  tileSize?: number;
+}
+
 // ============================================================================
 // Views
 // ============================================================================
 
-export type View = MapView | HistogramView;
+export type View = MapView | HistogramView | ScatterplotView | TableView;
 
 export interface MapView {
   type: 'map';
@@ -182,6 +259,28 @@ export interface HistogramView {
   y?: PlotAxis;
   bins?: number; // Default: 30, minimum: 1
   selection?: Selection;
+}
+
+export interface ScatterplotView {
+  type: 'scatterplot';
+  name?: string; // SQL-safe identifier
+  source: string; // Data source name
+  x: PlotAxis;
+  y: PlotAxis;
+  color?: PlotAxis;
+  selection?: Selection;
+}
+
+export interface TableView {
+  type: 'table';
+  name?: string; // SQL-safe identifier
+  source: string; // Data source name
+  columns: PlotAxis[];
+  selection?: Selection;
+  sort?: {
+    column?: string;
+    direction?: 'asc' | 'desc';
+  };
 }
 
 export interface PlotAxis {

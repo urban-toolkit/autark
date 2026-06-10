@@ -99,14 +99,21 @@ test.describe('Runtime - Example Specs', () => {
     await expect(page.locator('#metadata')).toContainText('Maps: trees_map');
     await expect(page.locator('#metadata')).toContainText('Plots: latitude_histogram');
 
-    // NOTE: highlight links targeting points layers are not yet supported by
-    // the runtime (AutkMap setHighlightedIds expects polygon picking buffers),
-    // so this example brushes the histogram without a map link.
-    const plotCount = await page.evaluate(() => {
+    const highlightedIds = await page.evaluate(() => {
       const runtime = window.__autarkRuntime;
-      return runtime.getPlots().length;
+      const plot = runtime.getPlot('latitude_histogram');
+      const map = runtime.getMap('trees_map');
+      const layer = map.layerManager.searchByLayerId('trees_layer');
+
+      // Includes an out-of-range id (99) to verify it is ignored rather than
+      // crashing the sprite layer (regression for former runtime TODO 5).
+      plot.setSelection([0, 2, 99]);
+      plot.events.emit('brushX', { selection: plot.selection });
+
+      return layer.highlightedIds;
     });
-    expect(plotCount).toBe(1);
+
+    expect(highlightedIds.sort()).toEqual([0, 2]);
     await expect(page.locator('canvas').first()).toBeVisible();
   });
 

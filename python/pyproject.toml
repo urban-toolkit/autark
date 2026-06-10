@@ -5,20 +5,38 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autark"
 version = "0.1.0a0"
-description = "Python builders for Autark declarative specifications"
+description = "Declarative Python API for urban visual analytics (maps, plots, spatial joins) rendered with WebGPU and DuckDB-WASM"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
   { name = "Urban Toolkit" }
 ]
+keywords = ["visualization", "maps", "gis", "urban", "duckdb", "webgpu", "jupyter", "declarative"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: Jupyter",
+  "Topic :: Scientific/Engineering :: Visualization",
+  "Topic :: Scientific/Engineering :: GIS",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/urban-toolkit/autark"
+Repository = "https://github.com/urban-toolkit/autark"
+Issues = "https://github.com/urban-toolkit/autark/issues"
 
 [project.optional-dependencies]
 validation = ["jsonschema>=4.0"]
 widget = ["anywidget>=0.9"]
 test = ["jsonschema>=4.0"]
-dev = ["jsonschema>=4.0", "anywidget>=0.9", "mypy>=1.8"]
+dev = ["jsonschema>=4.0", "anywidget>=0.9", "mypy>=1.8", "nbformat>=5.0", "nbclient>=0.7"]
 
 [tool.setuptools.packages.find]
 where = ["."]

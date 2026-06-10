@@ -1,0 +1,52 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Fixture Test - Scatterplot and Table",
+    "description": "Local fixture test with scatterplot and table views",
+    "created": "2026-06-10"
+  },
+  "data": [
+    {
+      "type": "geojson",
+      "name": "points",
+      "url": "/tests/fixtures/runtime/simple-points.geojson",
+      "layerType": "points",
+      "coordinateFormat": "EPSG:4326"
+    }
+  ],
+  "views": [
+    {
+      "type": "scatterplot",
+      "name": "value_scatterplot",
+      "source": "points",
+      "x": {
+        "field": "id"
+      },
+      "y": {
+        "field": "value"
+      },
+      "selection": {
+        "name": "scatter_brush",
+        "type": "interval"
+      }
+    },
+    {
+      "type": "table",
+      "name": "points_table",
+      "source": "points",
+      "columns": [
+        { "field": "id" },
+        { "field": "name" },
+        { "field": "value" }
+      ],
+      "sort": {
+        "column": "value",
+        "direction": "desc"
+      }
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

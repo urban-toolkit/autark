@@ -109,6 +109,60 @@ class Histogram(Serializable):
         return out
 
 
+@dataclass(frozen=True)
+class Scatterplot(Serializable):
+    source: object
+    x: Field | str
+    y: Field | str
+    name: str | None = None
+    color: Field | str | None = None
+    selection: Selection | None = None
+    type: Literal["scatterplot"] = "scatterplot"
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "type": self.type,
+            "source": ref_name(self.source),
+            "x": _axis(self.x),
+            "y": _axis(self.y),
+        }
+        if self.name is not None:
+            out["name"] = self.name
+        if self.color is not None:
+            out["color"] = _axis(self.color)
+        if self.selection is not None:
+            out["selection"] = self.selection.to_dict()
+        return out
+
+
+@dataclass(frozen=True)
+class Table(Serializable):
+    source: object
+    columns: list[Field | str]
+    name: str | None = None
+    selection: Selection | None = None
+    sort: dict[str, Any] | None = None
+    type: Literal["table"] = "table"
+
+    def __post_init__(self) -> None:
+        if not self.columns:
+            raise ValueError("Table requires at least one column")
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "type": self.type,
+            "source": ref_name(self.source),
+            "columns": [_axis(column) for column in self.columns],
+        }
+        if self.name is not None:
+            out["name"] = self.name
+        if self.selection is not None:
+            out["selection"] = self.selection.to_dict()
+        if self.sort is not None:
+            out["sort"] = to_plain(self.sort)
+        return out
+
+
 def _axis(axis: Field | str) -> dict[str, Any]:
     if isinstance(axis, Field):
         return axis.to_dict()

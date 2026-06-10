@@ -148,6 +148,34 @@ test.describe('Runtime - Local Fixtures (CI-safe)', () => {
     await expect(page.locator('canvas').first()).toBeVisible();
   });
 
+  test('loads scatterplot and table views successfully', async ({ page }) => {
+    page.on('console', msg => console.log(`Browser: [${msg.type()}] ${msg.text()}`));
+    page.on('pageerror', err => console.error(`Browser error: ${err.message}`));
+
+    await page.goto(`${HARNESS_URL}?spec=/tests/fixtures/runtime/fixture-06-scatter-table.json`);
+    await expect(page.locator('#status')).toHaveClass(/success/, { timeout: 30000 });
+
+    const viewState = await page.evaluate(() => {
+      const runtime = window.__autarkRuntime;
+      return {
+        tables: runtime.getDb().getTablesMetadata().map(t => t.name),
+        plots: runtime.getPlots().map(p => ({ name: p.name, type: p.plot.type })),
+        scatterMarks: document.querySelectorAll('.autark-view-scatterplot circle.autkMark').length,
+        tableRows: document.querySelectorAll('.autark-view-table tbody tr').length,
+      };
+    });
+
+    expect(viewState.tables).toContain('points');
+    expect(viewState.plots).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'value_scatterplot', type: 'scatterplot' }),
+        expect.objectContaining({ name: 'points_table', type: 'table' }),
+      ])
+    );
+    expect(viewState.scatterMarks).toBe(3);
+    expect(viewState.tableRows).toBe(3);
+  });
+
   test('applies line width style while loading polylines', async ({ page }) => {
     page.on('console', msg => console.log(`Browser: [${msg.type()}] ${msg.text()}`));
     page.on('pageerror', err => console.error(`Browser error: ${err.message}`));

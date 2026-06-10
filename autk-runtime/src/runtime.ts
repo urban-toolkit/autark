@@ -149,6 +149,26 @@ export class AutarkRuntime {
         if (!dataSources.has(transform.join)) {
           throw new Error(`Transform references unknown join data source: ${transform.join}`);
         }
+      } else if (transform.type === 'heatmap') {
+        if (!dataSources.has(transform.source)) {
+          throw new Error(`Heatmap transform references unknown source data source: ${transform.source}`);
+        }
+        dataSources.add(transform.output);
+      } else if (transform.type === 'gpgpuCompute') {
+        if (!dataSources.has(transform.source)) {
+          throw new Error(`GPGPU compute transform references unknown source data source: ${transform.source}`);
+        }
+        dataSources.add(transform.output);
+      } else if (transform.type === 'renderCompute') {
+        for (const layer of transform.layers) {
+          if (!dataSources.has(layer.source)) {
+            throw new Error(`Render compute transform references unknown layer source: ${layer.source}`);
+          }
+        }
+        if (!dataSources.has(transform.viewpoints.source)) {
+          throw new Error(`Render compute transform references unknown viewpoints source: ${transform.viewpoints.source}`);
+        }
+        dataSources.add(transform.output);
       }
     });
 
@@ -168,13 +188,24 @@ export class AutarkRuntime {
         if (!dataSources.has(view.source)) {
           throw new Error(`Histogram references unknown data source: ${view.source}`);
         }
+      } else if (view.type === 'scatterplot') {
+        if (!dataSources.has(view.source)) {
+          throw new Error(`Scatterplot references unknown data source: ${view.source}`);
+        }
+      } else if (view.type === 'table') {
+        if (!dataSources.has(view.source)) {
+          throw new Error(`Table references unknown data source: ${view.source}`);
+        }
       }
     });
 
     // Collect selection names
     const selectionNames = new Set<string>();
     this.spec.views.forEach((view) => {
-      if (view.type === 'histogram' && view.selection) {
+      if (
+        (view.type === 'histogram' || view.type === 'scatterplot' || view.type === 'table') &&
+        view.selection
+      ) {
         selectionNames.add(view.selection.name);
       }
     });
@@ -256,6 +287,18 @@ export class AutarkRuntime {
           this.plots.set(view.name, plot);
         }
         // Store by index as well for link management
+        this.plots.set(`_view_${i}`, plot);
+      } else if (view.type === 'scatterplot') {
+        const plot = await this.viewRenderer.renderScatterplot(this.db!, view, container);
+        if (view.name) {
+          this.plots.set(view.name, plot);
+        }
+        this.plots.set(`_view_${i}`, plot);
+      } else if (view.type === 'table') {
+        const plot = await this.viewRenderer.renderTable(this.db!, view, container);
+        if (view.name) {
+          this.plots.set(view.name, plot);
+        }
         this.plots.set(`_view_${i}`, plot);
       }
     }

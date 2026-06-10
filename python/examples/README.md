@@ -84,6 +84,31 @@ python spatial_join.py --output /tmp/spatial_join.json
 
 ---
 
+### 4. GeoPandas Workflow ([geopandas_workflow.py](geopandas_workflow.py))
+
+**What it demonstrates:**
+- Loading polygon data with GeoPandas
+- Loading and filtering tabular point data with pandas
+- Computing per-neighborhood tree counts with GeoPandas/pandas
+- Serializing processed GeoDataFrames with `GeoJSON.from_geopandas()`
+- Visualizing polygons and points with a map and histogram
+
+**Usage:**
+```bash
+# Requires pandas/geopandas, for example:
+conda run -n urban python geopandas_workflow.py --validate
+
+# Save to JSON file
+conda run -n urban python geopandas_workflow.py --output /tmp/geopandas_workflow.json
+
+# Save to HTML file
+conda run -n urban python geopandas_workflow.py --html /tmp/geopandas_workflow.html
+```
+
+**Generated spec:** inline GeoJSON for processed neighborhoods and tree points
+
+---
+
 ## Testing the Examples
 
 ### Option 1: Generate and Inspect JSON
@@ -92,6 +117,7 @@ python spatial_join.py --output /tmp/spatial_join.json
 # Validate that the Python API generates valid JSON
 python simple_geojson_map.py --validate
 python csv_points_map.py --validate
+conda run -n urban python geopandas_workflow.py --validate
 ```
 
 This checks that the generated spec matches the JSON Schema.
@@ -102,6 +128,7 @@ This checks that the generated spec matches the JSON Schema.
 # Generate HTML files
 python simple_geojson_map.py --html /tmp/simple_map.html
 python csv_points_map.py --html /tmp/csv_points.html
+conda run -n urban python geopandas_workflow.py --html /tmp/geopandas_workflow.html
 python spatial_join.py --output /tmp/spatial_join.json
 
 # Start a local server from the repo root
@@ -169,6 +196,12 @@ shapes = ak.CSV(
     url="/path/to/data.csv",
     geometry=ak.wkt("geom_col", coordinate_format="EPSG:4326")
 )
+
+# GeoPandas GeoDataFrame as inline GeoJSON
+neighborhoods = ak.GeoJSON.from_geopandas("neighborhoods", gdf)
+
+# pandas DataFrame with lat/lng as inline point GeoJSON
+trees = ak.GeoJSON.from_dataframe("trees", df, latitude="lat", longitude="lon")
 
 # OSM data (requires Overpass API or PBF file)
 buildings = ak.OSM(

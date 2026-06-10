@@ -178,10 +178,11 @@ Build and package setup exposed several runtime/API mismatches. These no longer 
 2. Implement field-driven `encoding.opacity`, `encoding.size`, and `encoding.height`.
 3. Add visual regression snapshots for stable browser rendering baselines.
 4. Keep live Overpass as manual validation via `RUN_REAL_OVERPASS=1`; CI should continue using HAR playback.
-5. Support highlight links targeting points layers (found 2026-06-10): `AutkMap`
-   `setHighlightedIds` throws `Cannot read properties of undefined (reading
-   'nPoints')` for points layers; only polygon layers work as link targets
-   today. Example spec 05 omits the map link for this reason.
+5. ~~Support highlight links targeting points layers~~ RESOLVED 2026-06-10:
+   `SpriteLayer` highlight/skip methods now bounds-check component ids the
+   same way `VectorLayer` does, so points layers work as link targets.
+   Example spec 05 links its histogram brush to the points layer and the
+   browser test covers an out-of-range id.
 
 ## Locked Executable Spec Conventions (2026-06-07)
 
@@ -362,7 +363,7 @@ Create hand-written example specs to validate design:
 - [x] `examples/specs/02-linked-map-histogram.json` - Map + histogram with selection
 - [x] `examples/specs/03-spatial-join.json` - Neighborhoods + trees spatial join
 - [x] `examples/specs/04-geojson-input.json` - GeoJSON layer rendering (browser-tested)
-- [x] `examples/specs/05-csv-points.json` - CSV with lat/lng geometry (browser-tested; map link omitted, see runtime TODO 5)
+- [x] `examples/specs/05-csv-points.json` - CSV with lat/lng geometry + linked histogram (browser-tested)
 - [x] `examples/specs/06-multiple-layers.json` - Buildings + roads + parks (schema-validated; execution needs Overpass)
 - [x] Document each example with comments/README
 
@@ -401,7 +402,7 @@ Create hand-written example specs to validate design:
   - [x] Map to `AutkDb.loadGeojson()` (**NOTE:** lowercase 'j', not `loadGeoJson`)
 - [x] Implement CSV data source loader
   - [x] Handle URL loading
-  - [ ] Handle inline values
+  - [ ] Handle inline values (schema accepts `values`, but runtime loader still rejects inline CSV)
   - [x] Handle lat/lng geometry
   - [x] Handle WKT geometry
   - [x] Map to `AutkDb.loadCsv()`
@@ -417,13 +418,13 @@ Create hand-written example specs to validate design:
   - [x] Parse join parameters
   - [x] Map to `AutkDb.spatialQuery()`
   - [x] Handle aggregation specs
-- [ ] Implement heatmap transform
-  - [ ] Map to `AutkDb.buildHeatmap()`
-- [ ] Implement GPGPU compute transform
-  - [ ] Map to `AutkCompute.gpgpuPipeline()`
-  - [ ] Validate WGSL body
-- [ ] Implement render compute transform (optional for MVP)
-  - [ ] Map to `AutkCompute.renderPipeline()`
+- [x] Implement heatmap transform
+  - [x] Map to `AutkDb.buildHeatmap()`
+- [x] Implement GPGPU compute transform
+  - [x] Map to `AutkCompute.gpgpuPipeline()`
+  - [x] Validate WGSL body
+- [x] Implement render compute transform (optional for MVP)
+  - [x] Map to `AutkCompute.renderPipeline()`
 - [x] Add transform error handling
 - [x] Handle transform dependencies/ordering
 
@@ -431,7 +432,7 @@ Create hand-written example specs to validate design:
 - [x] Implement map view renderer
   - [x] Create `AutkMap` instance
   - [x] Set camera parameters
-  - [ ] Set map style
+  - [ ] Set map-level style (view `style` serializes, but runtime does not apply it yet)
   - [x] Add layers from spec
 - [x] Implement map layer creation
   - [x] Resolve data sources
@@ -449,10 +450,10 @@ Create hand-written example specs to validate design:
   - [x] Map to `AutkPlot` histogram
   - [x] Apply encodings
   - [x] Configure bins
-- [ ] Implement scatterplot view
-  - [ ] Map to `AutkPlot` scatterplot
-  - [ ] Apply x/y encodings
-- [ ] Implement table view (optional for MVP)
+- [x] Implement scatterplot view
+  - [x] Map to `AutkPlot` scatterplot
+  - [x] Apply x/y encodings
+- [x] Implement table view (optional for MVP)
 - [x] Add view error handling
 
 ### 2.6 Selection and Link Handling
@@ -475,7 +476,7 @@ Create hand-written example specs to validate design:
 - [x] Implement container creation
   - [x] Auto-generate DOM structure
   - [x] Support custom container targeting
-- [ ] Handle responsive behavior
+- [ ] Handle responsive behavior (basic flex/grid layout exists; explicit resize/reflow behavior still pending)
 - [x] Add layout error handling
 
 ### 2.8 Runtime Testing
@@ -546,7 +547,7 @@ Create hand-written example specs to validate design:
     _serialise.py     # Serialization helpers
   ```
 - [x] Set up testing framework (stdlib unittest)
-- [ ] Set up type checking (mypy)
+- [x] Set up type checking (mypy; strict config in [python/pyproject.toml](python/pyproject.toml))
 
 ### 3.2 Core Spec Classes
 - [x] Implement `AutarkSpec` class
@@ -555,7 +556,7 @@ Create hand-written example specs to validate design:
   - [x] `to_json() -> str`
   - [x] `save_json(path: str)`
   - [x] `save_html(path: str)`
-  - [ ] `show()` for Jupyter display
+  - [ ] `show()` for Jupyter display (not added; use `_repr_html_()` or `widget()` today)
   - [x] `_repr_html_()` for notebook rendering scaffold
 - [x] Implement `Metadata` class
 - [x] Implement `Workspace` class
@@ -571,20 +572,22 @@ Create hand-written example specs to validate design:
 - [x] Implement `GeoJSON` class
   - [x] Support url: str
   - [x] Support values: FeatureCollection
-  - [ ] Support GeoDataFrame input (auto-serialize)
+  - [x] Support GeoDataFrame input (auto-serialize via `GeoJSON.from_geopandas()`)
   - [x] to_dict() method
 - [x] Implement `CSV` class
   - [x] Support url: str
-  - [ ] Support DataFrame input
+  - [x] Support DataFrame input for point data via `GeoJSON.from_dataframe()` (runtime inline CSV values still deferred)
   - [x] Support lat/lng geometry
   - [x] Support WKT geometry
   - [x] to_dict() method
-- [ ] Implement `JSON` class
-  - [ ] to_dict() method
-- [ ] Implement `GeoTIFF` class (optional for MVP)
-  - [ ] to_dict() method
-- [ ] Add pandas/GeoPandas serialization helpers
-  - [ ] Handle CRS conversion
+- [x] Implement `JSON` class
+  - [x] to_dict() method
+  - [ ] Wire `type: "json"` into AutarkSpec schema/runtime loader
+- [x] Implement `GeoTIFF` class (optional for MVP; Python builder only until runtime schema/loader wiring lands)
+  - [x] to_dict() method
+  - [ ] Wire `type: "geotiff"` into AutarkSpec schema/runtime loader
+- [x] Add pandas/GeoPandas serialization helpers (`GeoJSON.from_dataframe()` / `GeoJSON.from_geopandas()`)
+  - [x] Handle CRS conversion (GeoDataFrame CRS reprojects to EPSG:4326 when possible)
   - [ ] Handle large dataset warnings
   - [ ] Consider Arrow/Parquet for large data
 
@@ -602,12 +605,12 @@ Create hand-written example specs to validate design:
   - [x] `max(column, as_=None)` (`maximum` helper)
   - [x] `weighted(column, as_=None)`
   - [x] `collect(column, as_=None)`
-- [ ] Implement `Heatmap` class
-  - [ ] to_dict() method
-- [ ] Implement `Compute` class
-  - [ ] `gpgpu()` static method
-  - [ ] `render()` static method (optional for MVP)
-  - [ ] to_dict() method
+- [x] Implement `Heatmap` class
+  - [x] to_dict() method
+- [x] Implement `Compute` class
+  - [x] `gpgpu()` static method
+  - [x] `render()` static method (optional for MVP)
+  - [x] to_dict() method
 - [ ] Add compute expression helpers (optional)
   - [ ] Consider expression language vs raw WGSL
 
@@ -626,9 +629,9 @@ Create hand-written example specs to validate design:
 - [x] Implement `Histogram` class
   - [x] source, x, y, bins, selection
   - [x] to_dict() method
-- [ ] Implement `Scatterplot` class
-  - [ ] source, x, y, color, selection
-  - [ ] to_dict() method
+- [x] Implement `Scatterplot` class
+  - [x] source, x, y, color, selection
+  - [x] to_dict() method
 - [ ] Implement `BarChart` class (optional for MVP)
 - [ ] Implement `Table` class (optional for MVP)
 
@@ -662,7 +665,7 @@ Create hand-written example specs to validate design:
   - [x] Include runtime bundle URL hook
 - [x] Implement `save_html()` for standalone exports
   - [x] Generate HTML file
-  - [ ] Bundle all dependencies (deferred to v0.2)
+  - [ ] Bundle all dependencies for fully offline use (runtime JS is embedded; DuckDB WASM assets still load from CDN)
   - [x] Include data inline or as references
 - [x] Test in browser with Playwright (automated tests passing)
 - [x] Create Jupyter notebook test infrastructure
@@ -681,7 +684,11 @@ Create hand-written example specs to validate design:
       (`autk-db/src/duckdb.ts`), and the spec schema is bundled inline
       (`autk-runtime/src/validator.ts`). Covered by
       `tests/runtime/widget-bundle.test.ts` (blob: URL import like anywidget).
-      Bidirectional JS→Python communication still future work.
+- [x] Widget selection feedback (2026-06-10): histogram brushes sync to the
+      kernel through the `selections` trait
+      (`{selection_name: [component_id, ...]}`); observe with
+      `widget.observe(handler, names="selections")`. Spec/height changes sync
+      Python→JS and re-render, completing bidirectional communication for MVP.
 
 ### 3.9 Python Testing
 - [x] Unit tests for MVP classes
@@ -691,9 +698,11 @@ Create hand-written example specs to validate design:
 - [x] Integration tests
   - [x] Build complete specs
   - [x] Validate against JSON schema
-  - [ ] Test pandas/GeoPandas serialization
+  - [x] Test pandas/GeoPandas serialization (GeoJSON.from_geopandas /
+        from_dataframe, duck-typed; tests/test_dataframe_sources.py)
 - [x] Type checking with mypy (strict; `python -m mypy` from python/, config in pyproject.toml)
-- [ ] Example notebooks as tests
+- [x] Example notebooks as tests (tests/test_notebooks.py executes the
+      integration notebook with nbclient)
 
 ### 3.10 Python Documentation
 - [x] Package README ([python/README.md](python/README.md))
@@ -719,7 +728,7 @@ Create hand-written example specs to validate design:
 - [ ] Comparison to imperative TypeScript API (deferred)
 - [ ] Migration guide (deferred)
 
-## Phase 4: Integration and Examples ✅ COMPLETE
+## Phase 4: Integration and Examples ✅ MVP COMPLETE
 
 ### 4.1 End-to-End Examples
 Create complete working examples:
@@ -745,16 +754,16 @@ Create complete working examples:
   - [x] Automated Playwright test ([tests/runtime/jupyter-test.test.ts](tests/runtime/jupyter-test.test.ts))
   - [x] Jupyter notebook template ([python/examples/test_jupyter_integration.ipynb](python/examples/test_jupyter_integration.ipynb))
   - [x] CLI test tool ([python/examples/test_html_output.py](python/examples/test_html_output.py))
-- [ ] Example 4: GeoPandas Workflow (deferred to v0.2)
-  - [ ] Load data with GeoPandas
-  - [ ] Process/filter with pandas
-  - [ ] Visualize with Autark
+- [x] Example 4: GeoPandas Workflow ([python/examples/geopandas_workflow.py](python/examples/geopandas_workflow.py))
+  - [x] Load data with GeoPandas in an end-to-end example
+  - [x] Process/filter with pandas
+  - [x] Visualize with Autark
 - [ ] Example 5: Urban Heat Island Analysis (deferred to future)
   - [ ] Recreate Niteroi use case from Python
   - [ ] Compare to TypeScript version
 
 ### 4.2 Gallery Integration (Deferred to v0.2)
-- [ ] Add Python examples to existing gallery
+- [ ] Add Python examples to existing gallery (not present in `gallery/` yet)
 - [ ] Side-by-side: TypeScript vs Python
 - [ ] Demonstrate equivalent capabilities
 - [ ] Link to generated specs
@@ -841,16 +850,19 @@ Create complete working examples:
 - [ ] Create video tutorials (optional)
 
 ### 6.3 Package Publishing
-- [ ] Prepare Python package for PyPI
-  - [ ] Version: 0.1.0-alpha
-  - [ ] License
-  - [ ] README
+- [x] Prepare Python package for PyPI (2026-06-10)
+  - [x] Version: 0.1.0a0
+  - [x] License (MIT), keywords, classifiers, project URLs
+  - [x] README
+  - [x] Widget bundle shipped in wheels/sdists (package-data + MANIFEST.in);
+        setup.py build guard fails distribution builds if the bundle is missing
   - [ ] CHANGELOG
 - [ ] Prepare TypeScript runtime for npm
   - [ ] Version: 0.1.0-alpha
   - [ ] Update package.json
   - [ ] CHANGELOG
-- [ ] Test installation from package managers
+- [x] Test installation: wheel installs into a fresh venv; bundle present and
+      embedded HTML export works from the installed package (2026-06-10)
 - [ ] Publish alpha releases
 - [ ] Announce to community
 
@@ -1462,7 +1474,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - [x] Display works in Jupyter ✅ (browser tests pass; manual testing pending)
 - [x] Can export standalone HTML scaffold ✅
 - [x] Documentation covers all MVP features ✅
-- [x] At least 3 working end-to-end examples ✅ (simple_geojson_map, csv_points_map, spatial_join)
+- [x] At least 4 working end-to-end examples ✅ (simple_geojson_map, csv_points_map, spatial_join, geopandas_workflow)
 
 ### Full Success (v1.0)
 - [ ] Feature parity with imperative TypeScript API
@@ -1491,7 +1503,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
 **Recent Updates (2026-06-10):**
 - ✅ Fixed critical AJV strict mode bug in runtime validator
 - ✅ Jupyter integration tested and validated in browser
-- ✅ Created 2 additional Python examples (simple_geojson_map, csv_points_map)
+- ✅ Created 3 additional Python examples (simple_geojson_map, csv_points_map, geopandas_workflow)
 - ✅ Created comprehensive documentation (quickstart, examples guide, Jupyter guides)
 - ✅ Runtime tests passing with CI-safe OSM HAR coverage (`npm run test:runtime`: 18 passed, 1 skipped manual live-network test)
 - ✅ Live Overpass manual path validated with `RUN_REAL_OVERPASS=1`
@@ -1684,6 +1696,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
 **Additional Examples Created (2026-06-10):**
 - ✅ [python/examples/simple_geojson_map.py](python/examples/simple_geojson_map.py) - Basic GeoJSON map with styling
 - ✅ [python/examples/csv_points_map.py](python/examples/csv_points_map.py) - CSV points + histogram
+- ✅ [python/examples/geopandas_workflow.py](python/examples/geopandas_workflow.py) - GeoPandas + pandas processing workflow
 - ✅ All examples include CLI interfaces (`--validate`, `--output`, `--html`)
 - ✅ All examples validate against JSON schema
 
@@ -1697,9 +1710,9 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - ✅ [MVP_COMPLETION_SUMMARY.md](MVP_COMPLETION_SUMMARY.md) - Completion report
 
 **Deliberately Deferred to v0.2:**
-- pandas/GeoPandas direct serialization helpers
+- Large-data pandas/GeoPandas handling polish
 - Runtime bundling for offline use
-- PyPI packaging and publishing
+- PyPI publishing
 - Full API reference documentation
 - Broader OSM/Overpass example coverage beyond current HAR/live smoke fixtures
 
@@ -1737,10 +1750,11 @@ Track unresolved design decisions here. These correspond to the recommendations 
   - [x] Examples documentation
   - [x] Jupyter integration guides
   - [x] API quick reference
-- [x] At least 3 working end-to-end examples ✅ **3 EXAMPLES COMPLETE**
+- [x] At least 4 working end-to-end examples ✅ **4 EXAMPLES COMPLETE**
   - [x] simple_geojson_map.py
   - [x] csv_points_map.py
   - [x] spatial_join.py
+  - [x] geopandas_workflow.py
 
 **Current Status:** MVP runtime/Python API complete for v0.1; remaining items are polish or explicitly deferred v0.2 scope.
 - Phase 1: ✅ **COMPLETE** (Schema, examples, conventions)

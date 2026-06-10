@@ -1,0 +1,3 @@
+# Ship the bundled widget runtime in sdists so `pip install` from an sdist
+# works without a JavaScript toolchain. Built by: cd autk-runtime && npm run build:widget
+graft autark/static

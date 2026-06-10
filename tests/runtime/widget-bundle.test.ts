@@ -37,7 +37,7 @@ const INLINE_GEOJSON = {
   features: [
     {
       type: 'Feature',
-      properties: { name: 'a' },
+      properties: { name: 'a', value: 1 },
       geometry: {
         type: 'Polygon',
         coordinates: [
@@ -81,7 +81,16 @@ const SPEC = {
         },
       ],
     },
+    {
+      type: 'histogram',
+      name: 'widget_hist',
+      source: 'inline_polys',
+      x: { field: 'value' },
+      bins: 5,
+      selection: { name: 'widget_brush', type: 'interval' },
+    },
   ],
+  layout: { type: 'vertical' },
 };
 
 test.describe('anywidget bundle', () => {
@@ -111,18 +120,42 @@ test.describe('anywidget bundle', () => {
           ['spec', spec],
           ['height', '400px'],
         ]);
+        // Mimic the real anywidget model, recording set()/save_changes() so
+        // kernel-bound selection sync can be asserted.
+        const recordedSets: Array<{ name: string; value: unknown }> = [];
+        let saveCount = 0;
         const model = {
           get: (name: string) => values.get(name),
           on: () => undefined,
           off: () => undefined,
+          set: (name: string, value: unknown) => {
+            values.set(name, value);
+            recordedSets.push({ name, value });
+          },
+          save_changes: () => {
+            saveCount += 1;
+          },
         };
         const el = document.createElement('div');
         document.body.appendChild(el);
         await mod.default.render({ model, el });
+
+        // Simulate a histogram brush; the widget should sync it to the model.
+        const runtime = (el as HTMLElement & { __autarkRuntime?: any }).__autarkRuntime;
+        const plot = runtime?.getPlot('widget_hist');
+        if (plot) {
+          plot.setSelection([0]);
+          plot.events.emit('brushX', { selection: plot.selection });
+        }
+
         return {
           html: el.innerHTML.slice(0, 500),
           canvases: el.querySelectorAll('canvas').length,
           errorText: el.querySelector('pre')?.textContent ?? null,
+          hadPlot: Boolean(plot),
+          selections: values.get('selections') ?? null,
+          recordedSets,
+          saveCount,
         };
       },
       { spec: SPEC },
@@ -131,5 +164,10 @@ test.describe('anywidget bundle', () => {
     expect(result.errorText, `widget error: ${result.errorText}\nconsole: ${errors.join('\n')}`).toBeNull();
     expect(result.canvases).toBeGreaterThanOrEqual(1);
     expect(cdnRequests.length, 'DuckDB assets should be loaded via the jsDelivr URLs').toBeGreaterThan(0);
+
+    // Selection sync back to the kernel-side model.
+    expect(result.hadPlot, 'histogram plot should be retrievable from the runtime').toBe(true);
+    expect(result.selections).toEqual({ widget_brush: [0] });
+    expect(result.saveCount).toBeGreaterThan(0);
   });
 });

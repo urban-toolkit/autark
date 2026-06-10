@@ -158,6 +158,7 @@ export class SpriteLayer extends Layer {
 
     toggleHighlightedIds(ids: number[]): void {
         for (const id of ids) {
+            if (id < 0 || id >= this._components.length) { continue; }
             if (this._highlightedIds.has(id)) {
                 this._highlightedIds.delete(id);
             } else {
@@ -165,7 +166,7 @@ export class SpriteLayer extends Layer {
             }
 
             const start = id > 0 ? this._components[id - 1].nPoints : 0;
-            const end = this._components[id]?.nPoints ?? start;
+            const end = this._components[id].nPoints;
             for (let index = start; index < end; index++) {
                 this._highlightedVertices[index] = 1 - this._highlightedVertices[index];
             }
@@ -184,9 +185,10 @@ export class SpriteLayer extends Layer {
     override setHighlightedIds(ids: number[]): void {
         this.clearHighlightedIds();
         for (const id of ids) {
+            if (id < 0 || id >= this._components.length) { continue; }
             this._highlightedIds.add(id);
             const start = id > 0 ? this._components[id - 1].nPoints : 0;
-            const end = this._components[id]?.nPoints ?? start;
+            const end = this._components[id].nPoints;
             this._highlightedVertices.fill(1, start, end);
         }
         this.makeLayerDataDirty();
@@ -195,9 +197,10 @@ export class SpriteLayer extends Layer {
     override setSkippedIds(ids: number[]): void {
         this.clearSkippedIds();
         for (const id of ids) {
+            if (id < 0 || id >= this._components.length) { continue; }
             this._skippedIds.add(id);
             const start = id > 0 ? this._components[id - 1].nPoints : 0;
-            const end = this._components[id]?.nPoints ?? start;
+            const end = this._components[id].nPoints;
             this._skippedVertices.fill(1, start, end);
         }
         this.makeLayerDataDirty();

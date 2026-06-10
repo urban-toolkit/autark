@@ -59,6 +59,13 @@
       }
     }
   ],
+  "links": [
+    {
+      "selection": "latitude_brush",
+      "target": "trees_layer",
+      "action": "highlight"
+    }
+  ],
   "layout": {
     "type": "vertical"
   }

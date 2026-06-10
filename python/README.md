@@ -50,6 +50,8 @@ spec.widget()
 - ✅ **Interactive visualizations** - Maps, histograms, linked selections
 - ✅ **Jupyter integration** - Display specs in notebooks
 - ✅ **Zero-server widget** - `spec.widget()` bundles the runtime (anywidget)
+- ✅ **Selections back in Python** - observe `widget.selections` for brushes
+- ✅ **pandas/GeoPandas input** - `GeoJSON.from_dataframe()` / `from_geopandas()`
 - ✅ **Standalone HTML export** - No Python runtime required
 
 ## Installation
@@ -72,6 +74,23 @@ Two options:
    JupyterLab, VS Code, and Colab. DuckDB WebAssembly assets are fetched from
    the jsDelivr CDN on first use, so network access is required. Data sources
    must use absolute URLs or inline `values`.
+
+   Plot selections sync back to the kernel:
+
+   ```python
+   w = spec.widget()
+   w  # display; brush the histogram, then:
+   w.selections  # {'latitude_brush': [0, 2]}
+   w.observe(lambda change: print(change["new"]), names="selections")
+   ```
+
+   DataFrames can be passed directly as inline data:
+
+   ```python
+   trees = ak.GeoJSON.from_dataframe("trees", df, latitude="lat", longitude="lon")
+   neighborhoods = ak.GeoJSON.from_geopandas("neighborhoods", gdf)  # reprojects to EPSG:4326
+   ```
+
 2. **Dev-server display** - evaluating `spec` in a cell uses `_repr_html_()`,
    which loads the runtime from `http://localhost:8000`. Start it from the
    repo root with `python cors_server.py 8000`. Useful during development

@@ -295,7 +295,10 @@
     },
     "Transform": {
       "oneOf": [
-        {"$ref": "#/definitions/SpatialJoinTransform"}
+        {"$ref": "#/definitions/SpatialJoinTransform"},
+        {"$ref": "#/definitions/HeatmapTransform"},
+        {"$ref": "#/definitions/GpgpuComputeTransform"},
+        {"$ref": "#/definitions/RenderComputeTransform"}
       ]
     },
     "SpatialJoinTransform": {
@@ -343,6 +346,356 @@
         }
       }
     },
+    "HeatmapTransform": {
+      "type": "object",
+      "description": "Builds a grid heatmap table from a source layer using spatial aggregation.",
+      "required": ["type", "source", "output", "near", "grid"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "heatmap"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source table/layer to aggregate into heatmap cells."
+        },
+        "output": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Output table name for the heatmap result."
+        },
+        "near": {
+          "type": "object",
+          "required": ["distance"],
+          "additionalProperties": false,
+          "properties": {
+            "distance": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "useCentroid": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "grid": {
+          "type": "object",
+          "required": ["rows", "columns"],
+          "additionalProperties": false,
+          "properties": {
+            "rows": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "groupBy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HeatmapAggregation"
+          }
+        }
+      }
+    },
+    "HeatmapAggregation": {
+      "type": "object",
+      "description": "Heatmap aggregation operation. collect is not supported for raster bands.",
+      "required": ["column"],
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string",
+          "enum": ["count", "sum", "avg", "min", "max", "weighted"]
+        },
+        "as": {
+          "type": "string"
+        },
+        "normalize": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "GpgpuComputeTransform": {
+      "type": "object",
+      "description": "Runs a WGSL GPGPU compute body over a GeoJSON source layer and materializes the result as a new GeoJSON table.",
+      "required": ["type", "source", "output", "variableMapping", "wgslBody"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "gpgpuCompute"
+        },
+        "source": {
+          "type": "string"
+        },
+        "output": {
+          "$ref": "#/definitions/Identifier"
+        },
+        "layerType": {
+          "type": "string",
+          "enum": ["polygons", "polylines", "points", "buildings"]
+        },
+        "coordinateFormat": {
+          "type": "string"
+        },
+        "variableMapping": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "attributeArrays": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "attributeMatrices": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["rows", "cols"],
+            "additionalProperties": false,
+            "properties": {
+              "rows": {
+                "oneOf": [
+                  {"type": "integer", "minimum": 1},
+                  {"type": "string", "const": "auto"}
+                ]
+              },
+              "cols": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "uniforms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "uniformArrays": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"type": "number"},
+            "minItems": 1
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "uniformMatrices": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["data", "cols"],
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {"type": "number"}
+                },
+                "minItems": 1
+              },
+              "cols": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "wgslBody": {
+          "type": "string",
+          "minLength": 1,
+          "description": "WGSL function body inserted into compute_value; runtime rejects full-module declarations."
+        },
+        "resultField": {
+          "$ref": "#/definitions/Identifier"
+        },
+        "outputColumns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Identifier"
+          },
+          "minItems": 1
+        }
+      },
+      "oneOf": [
+        {"required": ["resultField"]},
+        {"required": ["outputColumns"]}
+      ]
+    },
+    "RenderComputeTransform": {
+      "type": "object",
+      "description": "Runs render-based compute sampling and materializes viewpoint metrics as a new GeoJSON table.",
+      "required": ["type", "output", "layers", "viewpoints", "aggregation"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "renderCompute"
+        },
+        "output": {
+          "$ref": "#/definitions/Identifier"
+        },
+        "layerType": {
+          "type": "string",
+          "enum": ["polygons", "polylines", "points", "buildings"]
+        },
+        "coordinateFormat": {
+          "type": "string"
+        },
+        "layers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/RenderComputeLayer"
+          }
+        },
+        "viewpoints": {
+          "$ref": "#/definitions/RenderComputeViewpoints"
+        },
+        "aggregation": {
+          "$ref": "#/definitions/RenderComputeAggregation"
+        },
+        "camera": {
+          "$ref": "#/definitions/RenderComputeCamera"
+        },
+        "tileSize": {
+          "type": "integer",
+          "minimum": 8,
+          "multipleOf": 8
+        }
+      }
+    },
+    "RenderComputeLayer": {
+      "type": "object",
+      "required": ["id", "source", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/Identifier"
+        },
+        "source": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["buildings", "roads", "polygons", "polylines", "points"]
+        },
+        "objectIdProperty": {
+          "type": "string"
+        }
+      }
+    },
+    "RenderComputeViewpoints": {
+      "type": "object",
+      "required": ["source"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "strategy": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["type"],
+              "additionalProperties": false,
+              "properties": {
+                "type": {"type": "string", "const": "centroid"}
+              }
+            },
+            {
+              "type": "object",
+              "required": ["type", "floors"],
+              "additionalProperties": false,
+              "properties": {
+                "type": {"type": "string", "const": "building-windows"},
+                "floors": {"type": "integer", "minimum": 1}
+              }
+            }
+          ]
+        },
+        "sampling": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "directions": {"type": "integer", "minimum": 1},
+            "azimuthOffsetDeg": {"type": "number"},
+            "pitchDeg": {"type": "number"}
+          }
+        }
+      }
+    },
+    "RenderComputeAggregation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"type": "string", "const": "classes"},
+            "includeBackground": {"type": "boolean"},
+            "backgroundLayerType": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"type": "string", "const": "objects"}
+          }
+        }
+      ]
+    },
+    "RenderComputeCamera": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fov": {"type": "number", "exclusiveMinimum": 0},
+        "clip": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "near": {"type": "number", "exclusiveMinimum": 0},
+            "far": {"type": "number", "exclusiveMinimum": 0}
+          }
+        }
+      }
+    },
     "Aggregation": {
       "type": "object",
       "description": "Spatial join aggregation operation",
@@ -372,7 +725,9 @@
     "View": {
       "oneOf": [
         {"$ref": "#/definitions/MapView"},
-        {"$ref": "#/definitions/HistogramView"}
+        {"$ref": "#/definitions/HistogramView"},
+        {"$ref": "#/definitions/ScatterplotView"},
+        {"$ref": "#/definitions/TableView"}
       ]
     },
     "MapView": {
@@ -603,6 +958,82 @@
         },
         "selection": {
           "$ref": "#/definitions/Selection"
+        }
+      }
+    },
+    "ScatterplotView": {
+      "type": "object",
+      "description": "Scatterplot with x/y field encodings and optional selection.",
+      "required": ["type", "source", "x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "scatterplot"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "View identifier"
+        },
+        "source": {
+          "type": "string",
+          "description": "Data source name. Runtime must validate existence."
+        },
+        "x": {
+          "$ref": "#/definitions/PlotAxis"
+        },
+        "y": {
+          "$ref": "#/definitions/PlotAxis"
+        },
+        "color": {
+          "$ref": "#/definitions/PlotAxis"
+        },
+        "selection": {
+          "$ref": "#/definitions/Selection"
+        }
+      }
+    },
+    "TableView": {
+      "type": "object",
+      "description": "Interactive table view with sortable columns.",
+      "required": ["type", "source", "columns"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "table"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "View identifier"
+        },
+        "source": {
+          "type": "string",
+          "description": "Data source name. Runtime must validate existence."
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlotAxis"
+          },
+          "minItems": 1
+        },
+        "selection": {
+          "$ref": "#/definitions/Selection"
+        },
+        "sort": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          }
         }
       }
     },

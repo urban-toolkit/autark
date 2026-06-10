@@ -89,11 +89,13 @@ export class LinkManager {
 
     // Listen to selection events. Histograms use horizontal brushes, while
     // other plot types may emit the generic brush event.
+    sourcePlot.events.on(PlotEvent.CLICK, handler);
     sourcePlot.events.on(PlotEvent.BRUSH, handler);
     sourcePlot.events.on(PlotEvent.BRUSH_X, handler);
 
     // Store cleanup function
     this.eventCleanupFns.push(() => {
+      sourcePlot.events.off(PlotEvent.CLICK, handler);
       sourcePlot.events.off(PlotEvent.BRUSH, handler);
       sourcePlot.events.off(PlotEvent.BRUSH_X, handler);
     });
@@ -104,7 +106,10 @@ export class LinkManager {
    */
   private findViewWithSelection(views: View[], selectionName: string): View | undefined {
     return views.find((view) => {
-      if (view.type === 'histogram' && view.selection) {
+      if (
+        (view.type === 'histogram' || view.type === 'scatterplot' || view.type === 'table') &&
+        view.selection
+      ) {
         return view.selection.name === selectionName;
       }
       return false;

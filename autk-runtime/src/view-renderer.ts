@@ -7,7 +7,7 @@ import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 import { ColorMap, ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
 import type { ColorHEX, ColorRGB } from '@urban-toolkit/autk-core';
-import type { MapView, HistogramView, EncodingChannel } from './types.js';
+import type { MapView, HistogramView, ScatterplotView, TableView, EncodingChannel, Selection } from './types.js';
 
 export class ViewRenderer {
   /**
@@ -517,5 +517,99 @@ export class ViewRenderer {
     }
 
     return plot;
+  }
+
+  /**
+   * Render a scatterplot view.
+   */
+  async renderScatterplot(
+    db: AutkDb,
+    view: ScatterplotView,
+    container: HTMLElement
+  ): Promise<AutkPlot> {
+    const collection = await db.getLayer(view.source);
+
+    if (!collection) {
+      throw new Error(`Failed to load data for scatterplot: ${view.source}`);
+    }
+
+    const xField = view.x.field;
+    const yField = view.y.field;
+
+    const plot = new AutkPlot(container, {
+      type: 'scatterplot',
+      collection,
+      attributes: {
+        axis: [xField, yField],
+        ...(view.color && { color: view.color.field }),
+      },
+      events: this.eventsForSelection(view.selection, [PlotEvent.CLICK]),
+      labels: {
+        axis: [xField, yField],
+        ...(view.name && { title: view.name }),
+      },
+    });
+
+    if (view.selection) {
+      (plot as any)._selectionConfig = view.selection;
+    }
+
+    return plot;
+  }
+
+  /**
+   * Render a table view.
+   */
+  async renderTable(
+    db: AutkDb,
+    view: TableView,
+    container: HTMLElement
+  ): Promise<AutkPlot> {
+    const collection = await db.getLayer(view.source);
+
+    if (!collection) {
+      throw new Error(`Failed to load data for table: ${view.source}`);
+    }
+
+    const columns = view.columns.map((column) => column.field);
+
+    const plot = new AutkPlot(container, {
+      type: 'table',
+      collection,
+      attributes: {
+        axis: columns,
+      },
+      events: this.eventsForSelection(view.selection, [PlotEvent.CLICK]),
+      labels: {
+        axis: columns,
+        ...(view.name && { title: view.name }),
+      },
+      transform: {
+        preset: 'sort',
+        options: {
+          column: view.sort?.column ?? columns[0],
+          direction: view.sort?.direction ?? 'asc',
+        },
+      },
+    });
+
+    if (view.selection) {
+      (plot as any)._selectionConfig = view.selection;
+    }
+
+    return plot;
+  }
+
+  /**
+   * Select plot events according to the requested selection type.
+   */
+  private eventsForSelection(selection: Selection | undefined, fallback: PlotEvent[]): PlotEvent[] {
+    if (!selection) {
+      return fallback;
+    }
+    if (selection.type === 'interval') {
+      return [PlotEvent.BRUSH];
+    }
+    return [PlotEvent.CLICK];
   }
 }

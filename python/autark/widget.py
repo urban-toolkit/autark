@@ -49,11 +49,20 @@ def _build_widget_class() -> type:
         )
 
     class AutarkWidget(anywidget.AnyWidget):
-        """Jupyter widget that renders an Autark spec with the bundled runtime."""
+        """Jupyter widget that renders an Autark spec with the bundled runtime.
+
+        Attributes:
+            spec: The Autark spec dict being rendered (re-renders on change).
+            height: CSS height of the widget container.
+            selections: Updated by the frontend whenever a plot selection
+                changes: ``{selection_name: [component_id, ...]}``. Observe it
+                with ``widget.observe(handler, names="selections")``.
+        """
 
         _esm = _WIDGET_ESM
         spec = traitlets.Dict({}).tag(sync=True)
         height = traitlets.Unicode("640px").tag(sync=True)
+        selections = traitlets.Dict({}).tag(sync=True)
 
     return AutarkWidget
 
