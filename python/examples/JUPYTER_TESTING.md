@@ -24,34 +24,37 @@ This creates `autk-runtime/dist/autk-runtime.js`.
 
 ### 2. Start a Local Development Server
 
-You need to serve the runtime and data files. From the repo root, you can use Python's built-in HTTP server:
+You need to serve the runtime and data files with CORS enabled, because the
+Jupyter page (e.g. port 8888) loads them cross-origin. From the repo root:
 
 ```bash
-# Start server on port 8000
-python -m http.server 8000
+# Start CORS-enabled server on port 8000
+python cors_server.py 8000
 ```
 
-Or use any other local server. The key is that:
+(Or run `./start_jupyter_test.sh` to start the server and Jupyter together.)
+
+The key is that:
 - `/autk-runtime/dist/autk-runtime.js` should be accessible
 - `/examples/data/` should be accessible
 
-### 3. Update Runtime URL (if needed)
+Notes on cross-origin handling (no action needed, just context):
+- The runtime creates its DuckDB Web Worker via a same-origin `blob:` URL
+  (`autk-db/src/duckdb.ts`), so the browser's cross-origin Worker
+  restriction does not apply.
+- Root-relative data URLs in specs (e.g. `/examples/data/trees.csv`) are
+  automatically resolved against the runtime server's origin when a spec is
+  displayed or exported (`python/autark/display.py`).
+- A regression check for the cross-origin scenario lives at
+  `scripts/check-cross-origin.mjs` (uses `test-cross-origin.html`).
 
-If your server runs on a different port or you're using a different setup, edit `python/autark/display.py`:
+### 3. Use a Custom Runtime URL (if needed)
+
+If your server runs on a different port, pass `runtime_url` when displaying
+or exporting:
 
 ```python
-def to_html(
-    spec: Any,
-    *,
-    runtime_url: str = "http://localhost:8000/autk-runtime/dist/autk-runtime.js",  # Update this
-    height: str = "640px",
-) -> str:
-```
-
-Or pass the `runtime_url` parameter when calling `save_html()`:
-
-```python
-spec.save_html("output.html", runtime_url="http://localhost:8000/autk-runtime/dist/autk-runtime.js")
+spec.save_html("output.html", runtime_url="http://localhost:8765/autk-runtime/dist/autk-runtime.js")
 ```
 
 ## Running the Test Notebook

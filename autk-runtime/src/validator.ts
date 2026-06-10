@@ -28,8 +28,10 @@ export class SpecValidator {
    */
   private async loadSchema(): Promise<void> {
     try {
-      // Try to fetch from the schema directory (relative to the page)
-      const response = await fetch('/schema/autark-spec-v0.1.json');
+      // Fetch schema from the runtime server (same origin as the runtime module)
+      const runtimeUrl = new URL(import.meta.url);
+      const schemaUrl = new URL('/schema/autark-spec-v0.1.json', runtimeUrl.origin);
+      const response = await fetch(schemaUrl.toString());
       if (!response.ok) {
         throw new Error(`Failed to load schema: ${response.status}`);
       }

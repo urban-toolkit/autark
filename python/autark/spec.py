@@ -81,14 +81,14 @@ class AutarkSpec(Serializable):
         jsonschema.Draft7Validator.check_schema(schema)
         jsonschema.validate(self.to_dict(), schema)
 
-    def to_html(self, *, runtime_url: str = "/autk-runtime/dist/autk-runtime.js", height: str = "640px") -> str:
+    def to_html(self, *, runtime_url: str = "http://localhost:8000/autk-runtime/dist/autk-runtime.js", height: str = "640px") -> str:
         return to_html(self, runtime_url=runtime_url, height=height)
 
     def save_html(
         self,
         path: str | Path,
         *,
-        runtime_url: str = "/autk-runtime/dist/autk-runtime.js",
+        runtime_url: str = "http://localhost:8000/autk-runtime/dist/autk-runtime.js",
         height: str = "640px",
     ) -> None:
         Path(path).write_text(self.to_html(runtime_url=runtime_url, height=height), encoding="utf-8")

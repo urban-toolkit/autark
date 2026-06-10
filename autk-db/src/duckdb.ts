@@ -92,8 +92,23 @@ export async function loadDb() {
     }
 
     const bundle = await duckdb.selectBundle(BROWSER_BUNDLES);
-    const worker = new Worker(bundle.mainWorker!);
-    const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
-    await db.instantiate(bundle.mainModule);
-    return db;
+    // Browsers block `new Worker(url)` when `url` is cross-origin, even with
+    // CORS headers (e.g. runtime served from :8000 inside a Jupyter page on
+    // :8888). Workaround recommended by the DuckDB-WASM docs: create the
+    // worker from a same-origin blob: URL that importScripts() the real
+    // worker script. Classic-worker importScripts() may load cross-origin
+    // scripts, and the wasm module fetch still uses CORS as before.
+    const workerBlobUrl = URL.createObjectURL(
+        new Blob([`importScripts(${JSON.stringify(bundle.mainWorker!)});`], {
+            type: 'text/javascript',
+        }),
+    );
+    try {
+        const worker = new Worker(workerBlobUrl);
+        const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
+        await db.instantiate(bundle.mainModule);
+        return db;
+    } finally {
+        URL.revokeObjectURL(workerBlobUrl);
+    }
 }
