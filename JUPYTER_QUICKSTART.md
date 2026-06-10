@@ -137,7 +137,7 @@ Build the widget bundle first if needed: `cd autk-runtime && npm run build:widge
 
 Once you confirm Jupyter integration works:
 
-1. ✅ Update `PYTHON_API_IMPLEMENTATION.md` - Mark "Display works in Jupyter" as complete
+1. Keep Jupyter display status aligned in `PYTHON_API_IMPLEMENTATION.md`.
 2. Create more example notebooks:
    - Simple map example
    - CSV visualization example

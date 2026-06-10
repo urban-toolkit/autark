@@ -44,15 +44,15 @@ spec.widget()
 
 ## Features
 
-- ✅ **Declarative specs** - Python objects → JSON → TypeScript runtime
-- ✅ **Multiple data sources** - GeoJSON, CSV, OpenStreetMap
-- ✅ **Spatial operations** - Spatial joins with aggregation
-- ✅ **Interactive visualizations** - Maps, histograms, linked selections
-- ✅ **Jupyter integration** - Display specs in notebooks
-- ✅ **Zero-server widget** - `spec.widget()` bundles the runtime (anywidget)
-- ✅ **Selections back in Python** - observe `widget.selections` for brushes
-- ✅ **pandas/GeoPandas input** - `GeoJSON.from_dataframe()` / `from_geopandas()`
-- ✅ **Standalone HTML export** - No Python runtime required
+- **Declarative specs** - Python objects to JSON to TypeScript runtime
+- **Data sources** - GeoJSON, CSV, OpenStreetMap, plus Python builders for JSON and GeoTIFF
+- **Spatial operations** - Spatial joins and heatmaps
+- **Compute transforms** - GPGPU and render-compute spec builders
+- **Interactive visualizations** - Maps, histograms, scatterplots, tables, linked selections
+- **Jupyter integration** - HTML display and bundled anywidget rendering
+- **Selections back in Python** - observe `widget.selections` for brushes
+- **pandas/GeoPandas input** - `GeoJSON.from_dataframe()` / `from_geopandas()`
+- **Standalone HTML export** - No Python runtime required
 
 ## Installation
 
@@ -99,12 +99,14 @@ Two options:
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide
+- **[../PYTHON_API.md](../PYTHON_API.md)** - Full API guide and current status
 - **[examples/](examples/)** - Working examples
   - [simple_geojson_map.py](examples/simple_geojson_map.py) - Basic map
   - [csv_points_map.py](examples/csv_points_map.py) - CSV points + histogram
   - [spatial_join.py](examples/spatial_join.py) - Spatial join workflow
+  - [geopandas_workflow.py](examples/geopandas_workflow.py) - GeoPandas workflow
 - **[../JUPYTER_QUICKSTART.md](../JUPYTER_QUICKSTART.md)** - Jupyter integration
-- **[../PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md)** - Implementation details
+- **[../PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md)** - Implementation tracker
 
 ## Design
 
@@ -116,21 +118,22 @@ The Autark Python API follows the Vega-Lite/Altair pattern:
 4. All rendering/compute happens in **WebGPU/DuckDB-WASM**
 
 Benefits:
-- 🚀 Shareable (just send JSON/HTML)
-- 📓 Jupyter-friendly
-- 🤖 LLM/agent-friendly
-- 🔄 No Python runtime needed for visualization
+- Shareable as JSON or HTML
+- Jupyter-friendly
+- LLM/agent-friendly
+- No Python runtime needed for visualization
 
 ## Current Status
 
-**v0.1 MVP** - Core features implemented:
+Core features implemented:
 - Data: GeoJSON, CSV, OSM
-- Views: Map, Histogram
-- Transforms: Spatial join
+- Python builders: JSON, GeoTIFF
+- Views: Map, Histogram, Scatterplot, Table
+- Transforms: Spatial join, Heatmap, GPGPU compute, Render compute
 - Interactions: Highlight linking
-- Export: JSON, HTML, Jupyter
+- Export: JSON, HTML, Jupyter widget
 
-See [PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md) for roadmap.
+See [PYTHON_API.md](../PYTHON_API.md) for usage and current limitations.
 
 ## Testing
 

@@ -366,5 +366,6 @@ Make sure:
 
 For more details, see:
 - [JUPYTER_QUICKSTART.md](../../JUPYTER_QUICKSTART.md) - Jupyter integration guide
-- [PYTHON_API_IMPLEMENTATION.md](../../PYTHON_API_IMPLEMENTATION.md) - Full implementation details
+- [PYTHON_API.md](../../PYTHON_API.md) - Full Python API guide
+- [PYTHON_API_IMPLEMENTATION.md](../../PYTHON_API_IMPLEMENTATION.md) - Implementation tracker
 - [schema/autark-spec-v0.1.json](../../schema/autark-spec-v0.1.json) - JSON Schema reference

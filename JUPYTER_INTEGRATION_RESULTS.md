@@ -139,11 +139,11 @@ The Python API correctly generates specs that:
 
 ## Next Steps
 
-1. ✅ **Mark as complete:** "Display works in Jupyter" in `PYTHON_API_IMPLEMENTATION.md`
+1. Jupyter display status is now tracked in `PYTHON_API_IMPLEMENTATION.md`.
 2. Test in actual Jupyter notebook environment (manual)
 3. Test in JupyterLab (manual)
 4. Test in VS Code with Jupyter extension (manual)
-5. Create 2 more Python examples (simple map, CSV viz)
+5. Keep example coverage aligned with `PYTHON_API.md`.
 6. Add basic Python API documentation
 7. Consider bundling runtime for offline use (future)
 

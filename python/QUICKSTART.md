@@ -165,5 +165,5 @@ See [../JUPYTER_QUICKSTART.md](../JUPYTER_QUICKSTART.md) for details.
 ## Next Steps
 
 - Try the examples in [examples/](examples/)
-- Read the full API reference (coming soon)
-- Check out [PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md) for implementation details
+- Read the consolidated API guide in [PYTHON_API.md](../PYTHON_API.md)
+- Check [PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md) for current implementation status
