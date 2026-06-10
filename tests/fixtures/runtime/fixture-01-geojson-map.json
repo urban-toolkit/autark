@@ -1,0 +1,39 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Fixture Test - GeoJSON Map",
+    "description": "Local fixture test with GeoJSON polygons",
+    "created": "2026-06-07"
+  },
+  "data": [
+    {
+      "type": "geojson",
+      "name": "manhattan",
+      "url": "/tests/fixtures/runtime/mnt-small.geojson",
+      "coordinateFormat": "EPSG:3857",
+      "layerType": "polygons"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "manhattan_map",
+      "camera": {
+        "pitch": 0,
+        "bearing": 0,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "manhattan",
+          "id": "manhattan_layer",
+          "type": "polygons"
+        }
+      ]
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

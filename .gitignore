@@ -20,6 +20,9 @@ autk*/package-lock.json
 .cache
 .eslintcache
 .stylelintcache
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
 
 # Environment variables
 .env
@@ -46,6 +49,7 @@ npm-debug.log*
 # Playwright output
 tests/report/
 tests/results/
+**/test-results/
 
 # Test data
 **/public/data-ignore/*

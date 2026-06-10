@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "West Square"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.9900, 40.7400],
+          [-73.9800, 40.7400],
+          [-73.9800, 40.7500],
+          [-73.9900, 40.7500],
+          [-73.9900, 40.7400]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "East Square"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.9800, 40.7400],
+          [-73.9700, 40.7400],
+          [-73.9700, 40.7500],
+          [-73.9800, 40.7500],
+          [-73.9800, 40.7400]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "North Square"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.9900, 40.7500],
+          [-73.9800, 40.7500],
+          [-73.9800, 40.7600],
+          [-73.9900, 40.7600],
+          [-73.9900, 40.7500]
+        ]]
+      }
+    }
+  ]
+}

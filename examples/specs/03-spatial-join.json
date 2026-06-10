@@ -1,0 +1,117 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Spatial Join - Trees per Neighborhood",
+    "description": "Demonstrates spatial join between neighborhoods and tree points, aggregating tree counts and visualizing on a thematic map.",
+    "created": "2026-06-07"
+  },
+  "workspace": {
+    "name": "spatial_join_demo",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "geojson",
+      "name": "neighborhoods",
+      "url": "/examples/data/neighborhoods.geojson",
+      "coordinateFormat": "EPSG:4326",
+      "layerType": "polygons"
+    },
+    {
+      "type": "csv",
+      "name": "trees",
+      "url": "/examples/data/trees.csv",
+      "geometry": {
+        "type": "latlng",
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "coordinateFormat": "EPSG:4326"
+      }
+    }
+  ],
+  "transforms": [
+    {
+      "type": "spatialJoin",
+      "root": "neighborhoods",
+      "join": "trees",
+      "groupBy": [
+        {
+          "column": "*",
+          "op": "count"
+        },
+        {
+          "column": "species",
+          "op": "collect",
+          "as": "tree_species"
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "neighborhood_map",
+      "camera": {
+        "pitch": 0,
+        "bearing": 0,
+        "zoom": 12
+      },
+      "layers": [
+        {
+          "source": "neighborhoods",
+          "id": "neighborhoods_layer",
+          "type": "polygons",
+          "encoding": {
+            "color": {
+              "field": "properties.sjoin.count.trees",
+              "scale": {
+                "type": "quantile",
+                "scheme": "greens",
+                "domainStrategy": "minMax"
+              }
+            }
+          },
+          "style": {
+            "opacity": 0.8,
+            "strokeColor": "#333333",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "source": "trees",
+          "id": "trees_layer",
+          "type": "points",
+          "style": {
+            "color": "#228B22",
+            "size": 3,
+            "opacity": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "type": "histogram",
+      "name": "tree_count_histogram",
+      "source": "neighborhoods",
+      "x": {
+        "field": "sjoin.count.trees"
+      },
+      "bins": 20,
+      "selection": {
+        "name": "tree_count_brush",
+        "type": "interval"
+      }
+    }
+  ],
+  "links": [
+    {
+      "selection": "tree_count_brush",
+      "target": "neighborhoods_layer",
+      "action": "highlight"
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Map Test - Direct AutkMap API</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui;
+    }
+    #status {
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    canvas {
+      width: 100%;
+      height: 600px;
+      border: 2px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Loading...</div>
+  <canvas id="map-canvas"></canvas>
+
+  <script type="module">
+    import { AutkMap } from '/autk-map/dist/autk-map.js';
+
+    const statusEl = document.getElementById('status');
+    const canvas = document.getElementById('map-canvas');
+
+    async function main() {
+      try {
+        statusEl.textContent = 'Initializing map...';
+        console.log('Creating AutkMap...');
+
+        const map = new AutkMap(canvas);
+        await map.init();
+        console.log('Map initialized');
+
+        // Load the actual test fixture GeoJSON
+        statusEl.textContent = 'Fetching GeoJSON...';
+        const response = await fetch('/tests/fixtures/runtime/simple-points.geojson');
+        const geojson = await response.json();
+        console.log('Loaded GeoJSON:', geojson);
+
+        statusEl.textContent = 'Loading points...';
+        console.log('Loading GeoJSON into map...');
+        console.log('Features:', geojson.features.length);
+
+        // The fixture has a "value" property we can use
+        map.loadCollection('points', { collection: geojson, type: 'points', property: 'properties.value' });
+        console.log('Collection loaded with value property');
+
+        // Use default point size (40)
+        const layer = map.layerManager.searchByLayerId('points');
+        console.log('Layer point size:', layer?._pointSize);
+
+        // DON'T touch the camera - let AutkMap handle it automatically
+        console.log('Map origin:', map.layerManager.origin);
+        console.log('Default camera position:', map.camera.wEye);
+
+        statusEl.textContent = 'Drawing...';
+        console.log('Starting render loop...');
+
+        // Start continuous render loop
+        let frameCount = 0;
+        function renderLoop() {
+          map.draw();
+          frameCount++;
+          if (frameCount <= 100) {
+            requestAnimationFrame(renderLoop);
+          }
+        }
+        renderLoop();
+
+        console.log('Render loop started');
+
+        console.log('Layers:', map.layerManager.layers.length);
+        if (map.layerManager.layers[0]) {
+          const l = map.layerManager.layers[0];
+          console.log('Layer:', {
+            id: l.layerInfo.id,
+            type: l.layerInfo.typeLayer,
+            // @ts-ignore
+            pointSize: l._pointSize,
+            // @ts-ignore
+            pointInstancesLength: l._pointInstances?.length,
+            // @ts-ignore
+            pointCount: l._pointInstances?.length / 2
+          });
+
+          // Log all point coordinates
+          // @ts-ignore
+          const instances = l._pointInstances;
+          console.log('Point coordinates:');
+          for (let i = 0; i < instances.length; i += 2) {
+            console.log(`  Point ${i/2 + 1}: [${instances[i]}, ${instances[i+1]}]`);
+          }
+        }
+
+
+        statusEl.textContent = '✓ Done! You should see 3 points.';
+        statusEl.style.background = '#d1fae5';
+        statusEl.style.color = '#065f46';
+
+      } catch (error) {
+        console.error('Error:', error);
+        statusEl.textContent = `❌ Error: ${error.message}`;
+        statusEl.style.background = '#fee2e2';
+        statusEl.style.color = '#991b1b';
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Manhattan Buildings - Basic OSM Map",
+    "description": "Simple example loading OSM buildings and rendering them with height-based color encoding",
+    "created": "2026-06-07"
+  },
+  "workspace": {
+    "name": "manhattan_demo",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "osm",
+      "name": "manhattan_osm",
+      "area": "Manhattan, New York",
+      "layers": ["buildings", "roads"],
+      "source": "overpass"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "main_map",
+      "camera": {
+        "pitch": 55,
+        "bearing": 20,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "manhattan_osm_buildings",
+          "id": "buildings_layer",
+          "type": "buildings",
+          "encoding": {
+            "color": {
+              "field": "properties.height",
+              "scale": {
+                "type": "linear",
+                "scheme": "viridis",
+                "domainStrategy": "minMax"
+              }
+            }
+          },
+          "style": {
+            "opacity": 0.9
+          }
+        },
+        {
+          "source": "manhattan_osm_roads",
+          "id": "roads_layer",
+          "type": "roads",
+          "style": {
+            "color": "#444444",
+            "width": 1.5
+          }
+        }
+      ]
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

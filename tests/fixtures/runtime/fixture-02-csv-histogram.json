@@ -1,0 +1,62 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Fixture Test - CSV with Histogram",
+    "description": "Local fixture test with CSV points and histogram",
+    "created": "2026-06-07"
+  },
+  "data": [
+    {
+      "type": "csv",
+      "name": "points",
+      "url": "/tests/fixtures/runtime/simple-points.csv",
+      "geometry": {
+        "type": "latlng",
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "coordinateFormat": "EPSG:4326"
+      }
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "points_map",
+      "camera": {
+        "pitch": 0,
+        "bearing": 0,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "points",
+          "id": "points_layer",
+          "type": "points",
+          "encoding": {
+            "color": {
+              "field": "properties.value",
+              "scale": {
+                "type": "linear",
+                "scheme": "viridis",
+                "domainStrategy": "minMax"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "histogram",
+      "name": "value_histogram",
+      "source": "points",
+      "x": {
+        "field": "value"
+      },
+      "bins": 5
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

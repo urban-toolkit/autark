@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Autark Python API Test</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: sans-serif; }
+        h1 { font-size: 18px; margin-bottom: 10px; }
+        #status { padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        #status.loading { background: #fff3cd; color: #856404; }
+        #status.success { background: #d4edda; color: #155724; }
+        #status.error { background: #f8d7da; color: #721c24; }
+        .section { margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <h1>Autark Python API - Jupyter Integration Test</h1>
+
+    <div class="section">
+        <h2>Test 1: Simple GeoJSON Map</h2>
+        <div id="status1" class="loading">Loading...</div>
+        <div id="container1" style="width: 100%; height: 500px; border: 1px solid #ddd;"></div>
+    </div>
+
+    <div class="section">
+        <h2>Test 2: CSV Points with Histogram</h2>
+        <div id="status2" class="loading">Not started...</div>
+        <div id="container2" style="width: 100%; height: 600px; border: 1px solid #ddd;"></div>
+    </div>
+
+    <script type="module">
+        // Test 1: Simple GeoJSON Map
+        async function test1() {
+            const status = document.getElementById('status1');
+            try {
+                status.textContent = 'Importing AutarkRuntime...';
+                const { AutarkRuntime } = await import('./autk-runtime/dist/autk-runtime.js');
+
+                status.textContent = 'Loading GeoJSON data...';
+                const spec = {
+                    "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+                    "version": "0.1",
+                    "metadata": {
+                        "title": "Simple GeoJSON Map",
+                        "description": "Test Python-generated spec"
+                    },
+                    "workspace": {
+                        "name": "test1",
+                        "coordinateFormat": "EPSG:4326"
+                    },
+                    "data": [{
+                        "name": "neighborhoods",
+                        "url": "/examples/data/neighborhoods.geojson",
+                        "layerType": "polygons",
+                        "coordinateFormat": "EPSG:4326",
+                        "type": "geojson"
+                    }],
+                    "views": [{
+                        "type": "map",
+                        "name": "test_map",
+                        "camera": {
+                            "pitch": 0,
+                            "bearing": 0,
+                            "zoom": 12
+                        },
+                        "layers": [{
+                            "source": "neighborhoods",
+                            "id": "neighborhoods_layer",
+                            "type": "polygons",
+                            "style": {
+                                "color": "#4a90e2",
+                                "opacity": 0.7,
+                                "strokeColor": "#2c5aa0",
+                                "strokeWidth": 2
+                            }
+                        }]
+                    }]
+                };
+
+                status.textContent = 'Creating runtime...';
+                const container = document.getElementById('container1');
+                const runtime = await AutarkRuntime.fromSpec(spec, { container });
+
+                status.textContent = '✅ Success! Map rendered with ' + runtime.getDb()?.getTablesMetadata()?.length + ' tables';
+                status.className = 'success';
+
+                console.log('[Test 1] Runtime:', runtime);
+                console.log('[Test 1] Tables:', runtime.getDb()?.getTablesMetadata());
+
+                // Start test 2 after test 1 succeeds
+                await test2();
+
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+                status.className = 'error';
+                console.error('[Test 1] Error:', error);
+            }
+        }
+
+        // Test 2: CSV with Histogram
+        async function test2() {
+            const status = document.getElementById('status2');
+            try {
+                status.textContent = 'Loading CSV data...';
+                status.className = 'loading';
+
+                const { AutarkRuntime } = await import('./autk-runtime/dist/autk-runtime.js');
+
+                const spec = {
+                    "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+                    "version": "0.1",
+                    "metadata": {
+                        "title": "CSV Points with Histogram",
+                        "description": "Test CSV loading and histogram"
+                    },
+                    "workspace": {
+                        "name": "test2",
+                        "coordinateFormat": "EPSG:4326"
+                    },
+                    "data": [{
+                        "name": "trees",
+                        "url": "/examples/data/trees.csv",
+                        "geometry": {
+                            "type": "latlng",
+                            "latitude": "latitude",
+                            "longitude": "longitude",
+                            "coordinateFormat": "EPSG:4326"
+                        },
+                        "type": "csv"
+                    }],
+                    "views": [
+                        {
+                            "type": "map",
+                            "name": "points_map",
+                            "camera": {
+                                "pitch": 0,
+                                "bearing": 0,
+                                "zoom": 13
+                            },
+                            "layers": [{
+                                "source": "trees",
+                                "id": "trees_layer",
+                                "type": "points",
+                                "style": {
+                                    "color": "#228B22",
+                                    "size": 5,
+                                    "opacity": 0.8
+                                }
+                            }]
+                        },
+                        {
+                            "type": "histogram",
+                            "name": "tree_hist",
+                            "source": "trees",
+                            "x": { "field": "latitude" },
+                            "bins": 20
+                        }
+                    ],
+                    "layout": {
+                        "type": "vertical"
+                    }
+                };
+
+                status.textContent = 'Creating runtime with histogram...';
+                const container = document.getElementById('container2');
+                const runtime = await AutarkRuntime.fromSpec(spec, { container });
+
+                const plots = runtime.getPlots();
+                status.textContent = '✅ Success! Map + histogram rendered (' + plots.length + ' plots)';
+                status.className = 'success';
+
+                console.log('[Test 2] Runtime:', runtime);
+                console.log('[Test 2] Plots:', plots);
+
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+                status.className = 'error';
+                console.error('[Test 2] Error:', error);
+            }
+        }
+
+        // Start tests
+        test1();
+    </script>
+</body>
+</html>

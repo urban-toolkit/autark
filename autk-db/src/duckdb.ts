@@ -1,8 +1,9 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
-import mvpModuleUrl from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
-import mvpWorkerUrl from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
-import ehModuleUrl from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
-import ehWorkerUrl from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+
+const mvpModuleUrl = new URL(/* @vite-ignore */ './duckdb-mvp.wasm', import.meta.url).href;
+const mvpWorkerUrl = new URL(/* @vite-ignore */ './duckdb-browser-mvp.worker.js', import.meta.url).href;
+const ehModuleUrl = new URL(/* @vite-ignore */ './duckdb-eh.wasm', import.meta.url).href;
+const ehWorkerUrl = new URL(/* @vite-ignore */ './duckdb-browser-eh.worker.js', import.meta.url).href;
 
 /**
  * Browser-specific DuckDB-Wasm bundle definitions used for runtime selection.
@@ -20,6 +21,10 @@ const BROWSER_BUNDLES: duckdb.DuckDBBundles = {
   },
 };
 
+const NODE_PATH_MODULE = 'node:path';
+const NODE_WORKER_THREADS_MODULE = 'node:worker_threads';
+const NODE_MODULE_MODULE = 'node:module';
+
 /**
  * Loads and instantiates a DuckDB-Wasm database for the current runtime.
  *
@@ -35,9 +40,9 @@ const BROWSER_BUNDLES: duckdb.DuckDBBundles = {
  */
 export async function loadDb() {
     if (typeof process !== 'undefined' && process.versions?.node) {
-        const path = await import(/* @vite-ignore */ 'node:path');
-        const { Worker: NodeWorker } = await import(/* @vite-ignore */ 'node:worker_threads');
-        const { createRequire } = await import(/* @vite-ignore */ 'node:module');
+        const path = await import(/* @vite-ignore */ NODE_PATH_MODULE);
+        const { Worker: NodeWorker } = await import(/* @vite-ignore */ NODE_WORKER_THREADS_MODULE);
+        const { createRequire } = await import(/* @vite-ignore */ NODE_MODULE_MODULE);
         const require = createRequire(import.meta.url);
         const dist = path.dirname(require.resolve('@duckdb/duckdb-wasm'));
         const workerPath = path.join(dist, 'duckdb-node-eh.worker.cjs');

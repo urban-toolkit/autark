@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autark"
+version = "0.1.0a0"
+description = "Python builders for Autark declarative specifications"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Urban Toolkit" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+validation = ["jsonschema>=4.0"]
+test = ["jsonschema>=4.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["autark*"]

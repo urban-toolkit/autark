@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"value": 50, "location": "Near Origin"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-0.01, -0.01],
+          [0.01, -0.01],
+          [0.01, 0.01],
+          [-0.01, 0.01],
+          [-0.01, -0.01]
+        ]]
+      }
+    }
+  ]
+}

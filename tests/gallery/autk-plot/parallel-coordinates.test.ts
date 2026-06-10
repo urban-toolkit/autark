@@ -1,7 +1,7 @@
 /**
  * Visual regression test stub for the parallel-coordinates gallery example.
  */
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
-test('parallel-coordinates', async ({ page }) => {
+test('parallel-coordinates', async () => {
 });

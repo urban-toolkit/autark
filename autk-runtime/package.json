@@ -1,0 +1,43 @@
+{
+  "name": "@urban-toolkit/autk-runtime",
+  "version": "0.1.0",
+  "description": "Autark specification runtime - executes declarative AutarkSpec JSON",
+  "type": "module",
+  "main": "./dist/autk-runtime.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/autk-runtime.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "clean": "rm -rf dist",
+    "test": "cd .. && npm run test:runtime",
+    "validate": "cd .. && npm run validate:specs"
+  },
+  "dependencies": {
+    "@urban-toolkit/autk-core": "2.2.0",
+    "@urban-toolkit/autk-db": "2.3.0",
+    "@urban-toolkit/autk-compute": "2.3.0",
+    "@urban-toolkit/autk-map": "2.3.0",
+    "@urban-toolkit/autk-plot": "2.3.0",
+    "ajv": "^8.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "vite-plugin-dts": "^3.6.0",
+    "vite-plugin-glsl": "^1.1.2"
+  },
+  "keywords": [
+    "autark",
+    "urban-toolkit",
+    "visualization",
+    "runtime",
+    "declarative"
+  ],
+  "license": "MIT"
+}

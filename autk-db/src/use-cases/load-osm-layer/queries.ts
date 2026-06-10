@@ -33,7 +33,10 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, sourceCrs, targetCrs, outpu
 
   let actualTableName = qualifiedInputTableName;
   if (layer === 'surface') {
-    const baseTableName = tableName.replace(new RegExp(`^${workspace}\.`), '');
+    const workspacePrefix = `${workspace}.`;
+    const baseTableName = tableName.startsWith(workspacePrefix)
+      ? tableName.slice(workspacePrefix.length)
+      : tableName;
     actualTableName = `${workspace}.${baseTableName}_boundaries`;
   }
 

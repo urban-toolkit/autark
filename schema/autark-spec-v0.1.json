@@ -1,0 +1,679 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "title": "AutarkSpec",
+  "description": "Declarative specification for Autark urban visual analytics applications (v0.1 MVP)",
+  "type": "object",
+  "required": ["$schema", "version", "views"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+      "description": "JSON Schema reference"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1",
+      "description": "AutarkSpec version"
+    },
+    "metadata": {
+      "$ref": "#/definitions/Metadata"
+    },
+    "workspace": {
+      "$ref": "#/definitions/Workspace"
+    },
+    "data": {
+      "type": "array",
+      "description": "Data source definitions",
+      "items": {
+        "$ref": "#/definitions/DataSource"
+      }
+    },
+    "transforms": {
+      "type": "array",
+      "description": "Data transformation operations",
+      "items": {
+        "$ref": "#/definitions/Transform"
+      }
+    },
+    "views": {
+      "type": "array",
+      "description": "Visual view definitions (maps, plots)",
+      "items": {
+        "$ref": "#/definitions/View"
+      },
+      "minItems": 1
+    },
+    "links": {
+      "type": "array",
+      "description": "Cross-view interaction links",
+      "items": {
+        "$ref": "#/definitions/Link"
+      }
+    },
+    "layout": {
+      "$ref": "#/definitions/Layout"
+    }
+  },
+  "definitions": {
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "Valid SQL-safe identifier (letters, digits, underscores; must start with letter or underscore)"
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Optional metadata about the specification",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "created": {
+          "type": "string",
+          "description": "Creation date (ISO 8601 format recommended)"
+        }
+      }
+    },
+    "Workspace": {
+      "type": "object",
+      "description": "Workspace configuration for database and coordinate system",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Workspace name (used as DuckDB schema name)",
+          "default": "autk"
+        },
+        "coordinateFormat": {
+          "type": "string",
+          "description": "Default coordinate reference system",
+          "default": "EPSG:4326"
+        }
+      }
+    },
+    "DataSource": {
+      "oneOf": [
+        {"$ref": "#/definitions/OsmDataSource"},
+        {"$ref": "#/definitions/GeoJsonDataSource"},
+        {"$ref": "#/definitions/CsvDataSource"}
+      ]
+    },
+    "OsmDataSource": {
+      "type": "object",
+      "description": "OpenStreetMap data source via Overpass API or PBF file",
+      "required": ["type", "name", "area", "layers"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "osm"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Data source name (generates tables as ${name}_${layer})"
+        },
+        "area": {
+          "type": "string",
+          "description": "Place name for Overpass query (e.g., 'Manhattan, New York')"
+        },
+        "layers": {
+          "type": "array",
+          "description": "OSM layer types to extract",
+          "items": {
+            "type": "string",
+            "enum": ["buildings", "roads", "parks", "water", "surface"]
+          },
+          "minItems": 1
+        },
+        "source": {
+          "type": "string",
+          "enum": ["overpass", "pbf"],
+          "default": "overpass",
+          "description": "Data source type"
+        },
+        "pbfFileUrl": {
+          "type": "string",
+          "description": "URL to PBF file (required if source is 'pbf')"
+        },
+        "coordinateFormat": {
+          "type": "string",
+          "description": "Override workspace coordinate format"
+        }
+      },
+      "if": {
+        "properties": {"source": {"const": "pbf"}}
+      },
+      "then": {
+        "required": ["pbfFileUrl"]
+      }
+    },
+    "GeoJsonDataSource": {
+      "type": "object",
+      "description": "GeoJSON data source from URL or inline",
+      "required": ["type", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "geojson"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Data source name (table name in database)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL to GeoJSON file"
+        },
+        "values": {
+          "type": "object",
+          "description": "Inline GeoJSON FeatureCollection (alternative to url)"
+        },
+        "layerType": {
+          "type": "string",
+          "enum": ["polygons", "polylines", "points", "buildings"],
+          "description": "Geometry type hint for rendering"
+        },
+        "coordinateFormat": {
+          "type": "string",
+          "description": "CRS of the input GeoJSON data before it is transformed into the workspace CRS",
+          "default": "EPSG:4326"
+        }
+      },
+      "oneOf": [
+        {"required": ["url"]},
+        {"required": ["values"]}
+      ]
+    },
+    "CsvDataSource": {
+      "type": "object",
+      "description": "CSV data source with optional geometry",
+      "required": ["type", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "csv"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Data source name (table name in database)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL to CSV file"
+        },
+        "values": {
+          "type": "array",
+          "description": "Inline CSV data as array of arrays (alternative to url)"
+        },
+        "delimiter": {
+          "type": "string",
+          "default": ",",
+          "description": "CSV delimiter character"
+        },
+        "geometry": {
+          "$ref": "#/definitions/CsvGeometry"
+        }
+      },
+      "oneOf": [
+        {"required": ["url"]},
+        {"required": ["values"]}
+      ]
+    },
+    "CsvGeometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Latitude/longitude columns",
+          "required": ["type", "latitude", "longitude"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "latlng"
+            },
+            "latitude": {
+              "type": "string",
+              "description": "Column name for latitude"
+            },
+            "longitude": {
+              "type": "string",
+              "description": "Column name for longitude"
+            },
+            "coordinateFormat": {
+              "type": "string",
+              "default": "EPSG:4326"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "WKT geometry column",
+          "required": ["type", "column"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "wkt"
+            },
+            "column": {
+              "type": "string",
+              "description": "Column name containing WKT geometry"
+            },
+            "coordinateFormat": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "Transform": {
+      "oneOf": [
+        {"$ref": "#/definitions/SpatialJoinTransform"}
+      ]
+    },
+    "SpatialJoinTransform": {
+      "type": "object",
+      "description": "Spatial join that mutates root table in place (MVP). Runtime must validate that root and join reference existing data sources.",
+      "required": ["type", "root", "join"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "spatialJoin"
+        },
+        "root": {
+          "type": "string",
+          "description": "Root data source name (will be mutated in place). Runtime must validate existence."
+        },
+        "join": {
+          "type": "string",
+          "description": "Join data source name. Runtime must validate existence."
+        },
+        "near": {
+          "type": "object",
+          "description": "Nearest neighbor join configuration",
+          "required": ["distance"],
+          "additionalProperties": false,
+          "properties": {
+            "distance": {
+              "type": "number",
+              "description": "Maximum distance for near join",
+              "exclusiveMinimum": 0
+            },
+            "useCentroid": {
+              "type": "boolean",
+              "default": true,
+              "description": "Use centroid for distance calculation (matches runtime default)"
+            }
+          }
+        },
+        "groupBy": {
+          "type": "array",
+          "description": "Aggregation operations",
+          "items": {
+            "$ref": "#/definitions/Aggregation"
+          }
+        }
+      }
+    },
+    "Aggregation": {
+      "type": "object",
+      "description": "Spatial join aggregation operation",
+      "required": ["column", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "string",
+          "description": "Column to aggregate (use '*' for count)"
+        },
+        "op": {
+          "type": "string",
+          "enum": ["count", "sum", "avg", "min", "max", "weighted", "collect"],
+          "description": "Aggregation operation"
+        },
+        "as": {
+          "type": "string",
+          "description": "Output property name (defaults to column name)"
+        },
+        "normalize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Normalize result values"
+        }
+      }
+    },
+    "View": {
+      "oneOf": [
+        {"$ref": "#/definitions/MapView"},
+        {"$ref": "#/definitions/HistogramView"}
+      ]
+    },
+    "MapView": {
+      "type": "object",
+      "description": "3D map view with layers",
+      "required": ["type", "layers"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "map"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "View identifier"
+        },
+        "camera": {
+          "$ref": "#/definitions/Camera"
+        },
+        "style": {
+          "type": "object",
+          "description": "Map-level style configuration (runtime-defined properties)"
+        },
+        "layers": {
+          "type": "array",
+          "description": "Map layers to render",
+          "items": {
+            "$ref": "#/definitions/MapLayer"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "Camera": {
+      "type": "object",
+      "description": "Camera configuration for 3D map",
+      "additionalProperties": false,
+      "properties": {
+        "pitch": {
+          "type": "number",
+          "description": "Camera pitch angle in degrees (0-90)",
+          "minimum": 0,
+          "maximum": 90
+        },
+        "bearing": {
+          "type": "number",
+          "description": "Camera bearing/rotation in degrees (0-360)"
+        },
+        "zoom": {
+          "type": "number",
+          "description": "Zoom level",
+          "minimum": 0
+        }
+      }
+    },
+    "MapLayer": {
+      "type": "object",
+      "description": "Individual map layer. Runtime must validate that source references an existing data source or table.",
+      "required": ["source"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Data source name (e.g., 'manhattan_osm_buildings'). Runtime must validate existence."
+        },
+        "id": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Layer identifier (required for link targets)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["buildings", "roads", "polygons", "polylines", "points"],
+          "description": "Layer rendering type"
+        },
+        "encoding": {
+          "$ref": "#/definitions/Encoding"
+        },
+        "style": {
+          "$ref": "#/definitions/LayerStyle"
+        }
+      }
+    },
+    "Encoding": {
+      "type": "object",
+      "description": "Visual encoding mappings",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/definitions/EncodingChannel"
+        },
+        "opacity": {
+          "$ref": "#/definitions/EncodingChannel"
+        },
+        "size": {
+          "$ref": "#/definitions/EncodingChannel"
+        },
+        "height": {
+          "$ref": "#/definitions/EncodingChannel"
+        }
+      }
+    },
+    "EncodingChannel": {
+      "oneOf": [
+        {"$ref": "#/definitions/FieldEncoding"},
+        {"$ref": "#/definitions/ValueEncoding"}
+      ]
+    },
+    "FieldEncoding": {
+      "type": "object",
+      "description": "Data-driven encoding from field",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Property path (maps: 'properties.height', plots: 'height')"
+        },
+        "scale": {
+          "$ref": "#/definitions/Scale"
+        }
+      }
+    },
+    "ValueEncoding": {
+      "type": "object",
+      "description": "Constant value encoding",
+      "required": ["value"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "number"},
+            {"type": "boolean"}
+          ],
+          "description": "Constant value"
+        }
+      }
+    },
+    "Scale": {
+      "type": "object",
+      "description": "Scale configuration for encoding",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["linear", "quantile", "categorical"],
+          "default": "linear",
+          "description": "Scale type"
+        },
+        "scheme": {
+          "type": "string",
+          "description": "Color scheme name (e.g., 'viridis', 'plasma', 'greens')"
+        },
+        "domain": {
+          "type": "array",
+          "description": "Explicit domain values"
+        },
+        "domainStrategy": {
+          "type": "string",
+          "enum": ["minMax", "percentile", "user"],
+          "default": "minMax",
+          "description": "How to compute domain"
+        }
+      }
+    },
+    "LayerStyle": {
+      "type": "object",
+      "description": "Layer style properties",
+      "additionalProperties": false,
+      "properties": {
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "color": {
+          "type": "string",
+          "description": "Constant color (hex or CSS color)"
+        },
+        "strokeColor": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "width": {
+          "type": "number",
+          "description": "Line width for polylines/roads",
+          "minimum": 0
+        },
+        "size": {
+          "type": "number",
+          "description": "Point size",
+          "minimum": 0
+        }
+      }
+    },
+    "HistogramView": {
+      "type": "object",
+      "description": "Histogram plot. Runtime must validate that source references an existing data source.",
+      "required": ["type", "source", "x"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "histogram"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "View identifier"
+        },
+        "source": {
+          "type": "string",
+          "description": "Data source name. Runtime must validate existence."
+        },
+        "x": {
+          "$ref": "#/definitions/PlotAxis"
+        },
+        "y": {
+          "$ref": "#/definitions/PlotAxis"
+        },
+        "bins": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 1,
+          "description": "Number of histogram bins"
+        },
+        "selection": {
+          "$ref": "#/definitions/Selection"
+        }
+      }
+    },
+    "PlotAxis": {
+      "type": "object",
+      "description": "Plot axis configuration",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Property name (plots use short names, not 'properties.' prefix)"
+        },
+        "scale": {
+          "$ref": "#/definitions/Scale"
+        }
+      }
+    },
+    "Selection": {
+      "type": "object",
+      "description": "Interactive selection definition",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Selection identifier (used in links)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["point", "interval", "multi"],
+          "description": "Selection interaction type"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields to include in selection"
+        }
+      }
+    },
+    "Link": {
+      "type": "object",
+      "description": "Cross-view selection link. Runtime must validate that selection and target reference existing elements.",
+      "required": ["selection", "target", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "selection": {
+          "type": "string",
+          "description": "Selection name to link from. Runtime must validate existence."
+        },
+        "target": {
+          "type": "string",
+          "description": "Layer ID to link to (not data source name). Runtime must validate existence."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["highlight"],
+          "description": "Link action (MVP: 'highlight' only, 'filter' deferred)"
+        }
+      }
+    },
+    "Layout": {
+      "type": "object",
+      "description": "View layout configuration (MVP: simple only)",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["vertical", "horizontal", "grid"],
+          "default": "vertical",
+          "description": "Layout type"
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of columns for grid layout"
+        },
+        "gap": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Gap between views in pixels"
+        }
+      }
+    }
+  }
+}

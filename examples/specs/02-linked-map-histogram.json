@@ -1,0 +1,80 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Linked Map and Histogram - Building Heights",
+    "description": "Demonstrates linked selection between a map and histogram. Brushing the histogram highlights buildings on the map.",
+    "created": "2026-06-07"
+  },
+  "workspace": {
+    "name": "linked_views_demo",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "osm",
+      "name": "chicago_osm",
+      "area": "Chicago, Illinois",
+      "layers": ["buildings"],
+      "source": "overpass"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "building_map",
+      "camera": {
+        "pitch": 60,
+        "bearing": 0,
+        "zoom": 14
+      },
+      "layers": [
+        {
+          "source": "chicago_osm_buildings",
+          "id": "buildings_layer",
+          "type": "buildings",
+          "encoding": {
+            "color": {
+              "field": "properties.height",
+              "scale": {
+                "type": "linear",
+                "scheme": "plasma",
+                "domainStrategy": "minMax"
+              }
+            }
+          },
+          "style": {
+            "opacity": 0.85
+          }
+        }
+      ]
+    },
+    {
+      "type": "histogram",
+      "name": "height_histogram",
+      "source": "chicago_osm_buildings",
+      "x": {
+        "field": "height",
+        "scale": {
+          "type": "linear"
+        }
+      },
+      "bins": 30,
+      "selection": {
+        "name": "height_brush",
+        "type": "interval",
+        "fields": ["height"]
+      }
+    }
+  ],
+  "links": [
+    {
+      "selection": "height_brush",
+      "target": "buildings_layer",
+      "action": "highlight"
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

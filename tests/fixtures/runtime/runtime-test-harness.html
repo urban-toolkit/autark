@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autark Runtime Test Harness</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #status {
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    #status.loading {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    #status.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    #status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    #container {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+    }
+    #metadata {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f3f4f6;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="status" class="loading">Loading runtime...</div>
+  <div id="container"></div>
+  <div id="metadata"></div>
+
+  <script type="module">
+    console.log('Test harness loaded at:', new Date().toISOString());
+    import { AutarkRuntime } from '/autk-runtime/dist/autk-runtime.js';
+
+    const statusEl = document.getElementById('status');
+    const containerEl = document.getElementById('container');
+    const metadataEl = document.getElementById('metadata');
+
+    async function loadSpec(specUrl) {
+      try {
+        statusEl.textContent = `Loading spec: ${specUrl}`;
+        statusEl.className = 'loading';
+
+        const response = await fetch(specUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch spec: ${response.status} ${response.statusText}`);
+        }
+
+        const spec = await response.json();
+
+        statusEl.textContent = 'Initializing runtime...';
+        console.log('Spec loaded:', spec);
+
+        // Disable schema validation in browser (ajv not bundled)
+        // Specs are already validated in the schema-validation.test.ts suite
+        const runtime = await AutarkRuntime.fromSpec(spec, {
+          container: containerEl,
+          validate: false,
+        });
+
+        statusEl.textContent = 'Runtime loaded successfully';
+        statusEl.className = 'success';
+
+        // Expose for testing
+        window.__autarkRuntime = runtime;
+        window.__autarkSpec = spec;
+
+        // Display metadata
+        const db = runtime.getDb();
+        const tables = db.getTablesMetadata();
+        const maps = runtime.getMaps();
+        const plots = runtime.getPlots();
+
+        // Debug camera and canvas
+        const mapView = maps[0]; // This is { name, map }
+        const mapInstance = mapView?.map; // Extract the actual map
+        const canvas = containerEl.querySelector('canvas');
+
+        let debugInfo = '';
+        if (mapInstance) {
+          const layers = mapInstance.layerManager?.layers || [];
+          const layerIds = layers.map(l => l.layerInfo?.id || 'unknown');
+          const layerCount = layers.length;
+          debugInfo = `
+            <strong>Camera position:</strong> [${mapInstance.camera.wEye[0].toFixed(2)}, ${mapInstance.camera.wEye[1].toFixed(2)}, ${mapInstance.camera.wEye[2].toFixed(2)}]<br>
+            <strong>Canvas size:</strong> ${canvas?.width} x ${canvas?.height}<br>
+            <strong>Layer count:</strong> ${layerCount}<br>
+            <strong>Layer IDs:</strong> ${layerIds.join(', ') || '(none)'}<br>
+          `;
+        } else {
+          debugInfo = `<strong>ERROR:</strong> No map instance found. Maps array: ${JSON.stringify(maps)}<br>`;
+        }
+
+        metadataEl.innerHTML = `
+          <strong>Tables:</strong> ${tables.map(t => t.name).join(', ')}<br>
+          <strong>Maps:</strong> ${maps.map(m => m.name).join(', ')}<br>
+          <strong>Plots:</strong> ${plots.map(p => p.name).join(', ')}<br>
+          <strong>Table count:</strong> ${tables.length}<br>
+          ${debugInfo}
+        `;
+
+        console.log('Runtime initialized:', { runtime, tables, maps, plots });
+        console.log('Camera eye:', mapInstance?.camera.wEye);
+        console.log('Canvas:', canvas);
+        console.log('Canvas width/height:', canvas?.width, canvas?.height);
+        console.log('Map layerManager.layers:', mapInstance?.layerManager?.layers);
+
+        // Try to read canvas pixels to see if anything rendered
+        setTimeout(() => {
+          const gl = canvas.getContext('2d');
+          if (gl) {
+            const imageData = gl.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            let nonZeroPixels = 0;
+            for (let i = 0; i < pixels.length; i += 4) {
+              if (pixels[i] !== 0 || pixels[i+1] !== 0 || pixels[i+2] !== 0 || pixels[i+3] !== 0) {
+                nonZeroPixels++;
+              }
+            }
+            console.log('Canvas has', nonZeroPixels, 'non-zero pixels');
+          } else {
+            console.log('Cannot read canvas pixels (WebGPU canvas, not 2D context)');
+          }
+        }, 1000);
+
+      } catch (error) {
+        statusEl.textContent = `Error: ${error.message}`;
+        statusEl.className = 'error';
+        console.error('Runtime initialization failed:', error);
+        throw error;
+      }
+    }
+
+    // Read spec URL from query parameter
+    const params = new URLSearchParams(window.location.search);
+    const specUrl = params.get('spec');
+
+    if (!specUrl) {
+      statusEl.textContent = 'Error: No spec URL provided. Add ?spec=path/to/spec.json';
+      statusEl.className = 'error';
+    } else {
+      loadSpec(specUrl);
+    }
+  </script>
+</body>
+</html>

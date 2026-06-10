@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"value": 100, "location": "Times Square"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.99, 40.755],
+          [-73.98, 40.755],
+          [-73.98, 40.765],
+          [-73.99, 40.765],
+          [-73.99, 40.755]
+        ]]
+      }
+    }
+  ]
+}

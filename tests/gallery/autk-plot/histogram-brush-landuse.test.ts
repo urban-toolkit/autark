@@ -1,7 +1,7 @@
 /**
  * Visual regression test stub for the histogram-brush-landuse gallery example.
  */
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
-test('histogram-brush-landuse', async ({ page }) => {
+test('histogram-brush-landuse', async () => {
 });

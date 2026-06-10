@@ -5,7 +5,9 @@
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "test": "playwright test",
-        "test:ui": "playwright test --ui"
+        "test:ui": "playwright test --ui",
+        "validate:specs": "ajv validate -s schema/autark-spec-v0.1.json -d \"examples/specs/*.json\" --strict=false",
+        "test:runtime": "playwright test tests/runtime --workers=1"
     },
     "workspaces": [
         "autk",
@@ -14,6 +16,7 @@
         "autk-map",
         "autk-compute",
         "autk-plot",
+        "autk-runtime",
         "gallery",
         "usecases"
     ],
@@ -23,6 +26,8 @@
         "@types/node": "^25.6.0",
         "@typescript-eslint/eslint-plugin": "^8.58.1",
         "@typescript-eslint/parser": "^8.58.1",
+        "ajv": "^8.20.0",
+        "ajv-cli": "^5.0.0",
         "eslint": "^10.1.0",
         "globals": "^17.4.0"
     }

@@ -17,6 +17,7 @@ typecheck: build
 		"cd autk-db && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-plot && npx tsc --noEmit --skipLibCheck" \
 		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
+		"cd autk-runtime && npx tsc --noEmit --skipLibCheck" \
 		"cd autk && npx tsc --noEmit --skipLibCheck" \
 		"cd gallery && npx tsc --noEmit --skipLibCheck" \
 		"cd usecases && npx tsc --noEmit --skipLibCheck"
@@ -29,6 +30,7 @@ build:
 		"cd autk-plot && npm run build" \
 		"cd autk-compute && npm run build"
 	cd autk && npm run build
+	cd autk-runtime && npm run build
 
 docs:
 	$(CONCURRENTLY) \
@@ -63,6 +65,7 @@ dev:
 		"cd autk-plot && npm run dev-build" \
 		"cd autk-compute && npm run dev-build" \
 		"cd autk && npm run dev-build" \
+		"cd autk-runtime && npm run dev" \
 		"cd $(APP) && VITE_OPEN=\"$(OPEN)\" npm run dev"
 
 clean:
@@ -74,5 +77,6 @@ clean:
 		"cd autk-plot && $(RIMRAF) dist build node_modules" \
 		"cd autk-compute && $(RIMRAF) dist build node_modules" \
 		"cd autk && $(RIMRAF) dist build node_modules" \
+		"cd autk-runtime && $(RIMRAF) dist build node_modules" \
 		"cd gallery && $(RIMRAF) dist build node_modules" \
 		"cd usecases && $(RIMRAF) dist build node_modules"
