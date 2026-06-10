@@ -102,6 +102,10 @@ pip install -e ".[widget]"
 Use the `validation` extra for `spec.validate()`. Use the `widget` extra for
 zero-server Jupyter rendering with `spec.widget()`.
 
+Python package builds use Hatch and `hatch-jupyter-builder` to run
+`npm run build:widget` in `autk-runtime` and include the generated
+`autark/static/autark-widget.js` bundle in the wheel.
+
 ## Basic Usage
 
 ```python
@@ -488,6 +492,10 @@ w
 w.selections
 w.observe(lambda change: print(change["new"]), names="selections")
 ```
+
+The widget JavaScript is packaged with the Python wheel. DuckDB WASM and worker
+assets still load from the jsDelivr CDN in this mode, so the notebook needs
+network access unless those assets are bundled in a future release.
 
 For development against a local runtime bundle, evaluating `spec` in a notebook
 uses `_repr_html_()` and expects the local dev server/runtime URL configured by

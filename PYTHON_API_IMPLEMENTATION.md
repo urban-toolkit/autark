@@ -103,6 +103,7 @@ b941f2a feat(python): expand spec builders and runtime support
 - Render compute transform execution through `AutkCompute.renderPipeline()`
 - Map, histogram, scatterplot, and table rendering
 - Widget bundle selection sync
+- Hatch/Jupyter build hook generates and packages `autark-widget.js`
 
 ### Examples
 
@@ -174,6 +175,8 @@ were not reintroduced here.
 
 ### Jupyter And Packaging
 
+- [x] Generate and include `autark/static/autark-widget.js` during Python
+  package builds with Hatch and `hatch-jupyter-builder`.
 - [ ] Bundle DuckDB WASM assets, or document CDN requirements as the supported
   behavior for the widget path.
 - [ ] Test manually in Jupyter Notebook.
