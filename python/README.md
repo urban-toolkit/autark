@@ -65,6 +65,10 @@ pip install -e ".[validation]"  # Optional: JSON Schema validation
 pip install -e ".[widget]"      # Optional: zero-server Jupyter widget (anywidget)
 ```
 
+Package builds use Hatch and `hatch-jupyter-builder` to run
+`npm run build:widget` in `autk-runtime` and include
+`autark/static/autark-widget.js` automatically.
+
 ### Displaying specs in Jupyter
 
 Two options:

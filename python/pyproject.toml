@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.24", "hatch-jupyter-builder>=0.5.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "autark"
@@ -38,12 +38,26 @@ widget = ["anywidget>=0.9"]
 test = ["jsonschema>=4.0"]
 dev = ["jsonschema>=4.0", "anywidget>=0.9", "mypy>=1.8", "nbformat>=5.0", "nbclient>=0.7"]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["autark*"]
+[tool.hatch.build]
+only-packages = true
+artifacts = ["autark/static/autark-widget.js"]
 
-[tool.setuptools.package-data]
-autark = ["static/*.js"]
+[tool.hatch.build.targets.wheel]
+packages = ["autark"]
+
+[tool.hatch.build.targets.sdist]
+include = ["autark", "README.md", "pyproject.toml"]
+
+[tool.hatch.build.hooks.jupyter-builder]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = ["autark/static/autark-widget.js"]
+skip-if-exists = ["autark/static/autark-widget.js"]
+dependencies = ["hatch-jupyter-builder>=0.5.0"]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+path = "../autk-runtime"
+npm = "npm"
+build_cmd = "build:widget"
 
 [tool.mypy]
 python_version = "3.10"
