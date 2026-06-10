@@ -11,8 +11,7 @@ import { routeOverpassHar } from '../helpers/route-overpass-har';
 const HARNESS_URL = '/tests/fixtures/runtime/runtime-test-harness.html';
 
 test.describe('Runtime - OSM with HAR (CI-safe)', () => {
-  test.skip('loads basic OSM map spec with HAR', async ({ page }) => {
-    // Skip for now - requires actual example to have compatible runtime APIs
+  test('loads basic OSM map spec with HAR', async ({ page }) => {
     test.setTimeout(60000);
 
     page.on('console', msg => console.log(`Browser: [${msg.type()}] ${msg.text()}`));
@@ -21,11 +20,11 @@ test.describe('Runtime - OSM with HAR (CI-safe)', () => {
     // Route Overpass calls through HAR
     await routeOverpassHar(
       page,
-      path.join(__dirname, '../data/runtime-01-basic-osm-map.har'),
+      path.join(__dirname, '../data/osm-layers-api.har'),
       false
     );
 
-    await page.goto(`${HARNESS_URL}?spec=/examples/specs/01-basic-osm-map.json`);
+    await page.goto(`${HARNESS_URL}?spec=/tests/fixtures/runtime/fixture-03-osm-har.json`);
 
     // Wait for runtime to load
     await expect(page.locator('#status')).toHaveClass(/success/, { timeout: 60000 });
@@ -61,7 +60,9 @@ test.describe('Runtime - OSM with HAR (CI-safe)', () => {
 });
 
 test.describe('Runtime - OSM with Real Network (Manual)', () => {
-  test.skip('loads basic OSM map spec with real Overpass API', async ({ page }) => {
+  test.skip(process.env['RUN_REAL_OVERPASS'] !== '1', 'Set RUN_REAL_OVERPASS=1 to run the live Overpass test');
+
+  test('loads basic OSM map spec with real Overpass API', async ({ page }) => {
     // This test requires network access and is NOT CI-safe
     // Run manually to verify real Overpass integration
     test.setTimeout(120000);
@@ -69,7 +70,7 @@ test.describe('Runtime - OSM with Real Network (Manual)', () => {
     page.on('console', msg => console.log(`Browser: [${msg.type()}] ${msg.text()}`));
     page.on('pageerror', err => console.error(`Browser error: ${err.message}`));
 
-    await page.goto(`${HARNESS_URL}?spec=/examples/specs/01-basic-osm-map.json`);
+    await page.goto(`${HARNESS_URL}?spec=/tests/fixtures/runtime/fixture-04-osm-live.json`);
 
     // Wait for runtime to load (may take longer with real network)
     await expect(page.locator('#status')).toHaveClass(/success/, { timeout: 120000 });

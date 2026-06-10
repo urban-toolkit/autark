@@ -11,6 +11,7 @@
 
 import type {
     ColorMapConfig,
+    ColorRGB,
     ResolvedDomain,
     LayerBorder,
     LayerBorderComponent,
@@ -41,6 +42,10 @@ export interface LayerColormap {
 
 /** Mutable render state associated with a layer. */
 export interface LayerRenderInfo {
+    /** Optional fixed layer color used when thematic color mapping is disabled. */
+    color?: ColorRGB;
+    /** Optional fixed border/outline color used by layers with a border pass. */
+    strokeColor?: ColorRGB;
     /** Layer opacity in the range `[0, 1]`. */
     opacity: number;
     /** Enables thematic color interpolation when `true`. */

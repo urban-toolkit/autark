@@ -220,7 +220,7 @@ export class AutkMap {
      * @param params.allowZeroHeightBuildings Optional flag to treat building zero-height extrusions.
      * @throws Never throws. Errors are logged to the console.
      */
-    loadCollection(id: string, { collection, type = null, property, allowZeroHeightBuildings = false }: LoadCollectionParams): void {
+    loadCollection(id: string, { collection, type = null, property, allowZeroHeightBuildings = false, lineWidth }: LoadCollectionParams): void {
         if (!this.layerManager.hasOrigin) {
             this.layerManager.initializeOrigin(collection);
         }
@@ -238,7 +238,7 @@ export class AutkMap {
 
             case 'roads':
             case 'polylines': {
-                this.createPolylinesLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined);
+                this.createPolylinesLayer(id, collection as FeatureCollection, sType, typeof property === 'string' ? property : undefined, lineWidth);
                 break;
             }
             case 'points':
@@ -989,7 +989,7 @@ export class AutkMap {
      * @param property Optional value extractor used to initialize thematic data.
      * @returns Nothing. The layer is created when triangulation succeeds.
       */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string, lineWidth?: number) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -1004,8 +1004,12 @@ export class AutkMap {
             isSkip: false,
         };
 
-        TriangulatorPolylines.offset = typeLayer === 'roads' ? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH : 8.5;
-        const layerMesh = typeLayer === 'roads'
+        const fixedHalfWidth = typeof lineWidth === 'number' && Number.isFinite(lineWidth) && lineWidth > 0
+            ? lineWidth / 2
+            : undefined;
+
+        TriangulatorPolylines.offset = fixedHalfWidth ?? (typeLayer === 'roads' ? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH : 8.5);
+        const layerMesh = typeLayer === 'roads' && fixedHalfWidth === undefined
             ? TriangulatorPolylines.buildMesh(
                 geojson,
                 this.layerManager.origin,

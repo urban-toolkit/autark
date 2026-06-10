@@ -2,23 +2,23 @@
   "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
   "version": "0.1",
   "metadata": {
-    "title": "Fixture Test - GeoJSON Map",
-    "description": "Local fixture test with GeoJSON polygons",
-    "created": "2026-06-07"
+    "title": "Fixture Test - Line Style",
+    "description": "Local fixture test with polyline width and color styles",
+    "created": "2026-06-10"
   },
   "data": [
     {
       "type": "geojson",
-      "name": "manhattan",
-      "url": "/tests/fixtures/runtime/mnt-small.geojson",
+      "name": "lines",
+      "url": "/tests/fixtures/runtime/simple-lines.geojson",
       "coordinateFormat": "EPSG:3857",
-      "layerType": "polygons"
+      "layerType": "polylines"
     }
   ],
   "views": [
     {
       "type": "map",
-      "name": "manhattan_map",
+      "name": "line_map",
       "camera": {
         "pitch": 0,
         "bearing": 0,
@@ -26,12 +26,12 @@
       },
       "layers": [
         {
-          "source": "manhattan",
-          "id": "manhattan_layer",
-          "type": "polygons",
+          "source": "lines",
+          "id": "line_layer",
+          "type": "polylines",
           "style": {
-            "color": "#2f6f73",
-            "strokeColor": "#123456"
+            "color": "#654321",
+            "width": 12
           }
         }
       ]

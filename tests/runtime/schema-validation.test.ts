@@ -32,6 +32,26 @@ test.describe('Schema Validation - Positive Cases', () => {
     const valid = validate(spec);
     expect(valid).toBe(true);
   });
+
+  test('OSM source accepts explicit geocode area and relation areas', () => {
+    const spec = {
+      "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+      "version": "0.1",
+      "data": [
+        {
+          "type": "osm",
+          "name": "nyc_osm",
+          "area": "Battery Park City",
+          "geocodeArea": "New York",
+          "areas": ["Battery Park City", "Financial District"],
+          "layers": ["buildings", "roads"]
+        }
+      ],
+      "views": [{ "type": "map", "layers": [{ "source": "nyc_osm_buildings" }] }]
+    };
+    const valid = validate(spec);
+    expect(valid).toBe(true);
+  });
 });
 
 test.describe('Schema Validation - Negative Cases', () => {

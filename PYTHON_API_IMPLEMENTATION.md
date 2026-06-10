@@ -113,9 +113,9 @@ This approach exposes schema/runtime gaps faster than starting with builders.
 - ✅ autk-runtime resolves local packages correctly
 - ✅ Build progressed to real API integration errors (expected)
 
-## Current API Mismatch Blockers (2026-06-07)
+## API Mismatch Blockers (2026-06-07) ✅ RESOLVED 2026-06-10
 
-Build and package setup is now complete. The following API mismatches prevent runtime execution and need to be fixed:
+Build and package setup exposed several runtime/API mismatches. These no longer block execution; the runtime now compiles, builds, and passes browser tests.
 
 ### DataLoader API Mismatches ([autk-runtime/src/data-loader.ts](autk-runtime/src/data-loader.ts))
 
@@ -126,10 +126,10 @@ Build and package setup is now complete. The following API mismatches prevent ru
 2. **GeoJSON loading** - Uses `url` parameter name mismatch with `LoadGeojsonParams`
 3. **CSV loading** - Uses `latitudeColumn`, `longitudeColumn` but `LoadCsvParams` expects different names
 
-**Fix needed:** Review actual parameter interfaces and update runtime to match:
-- `autk-db/src/use-cases/load-osm-overpass/use-case.ts` - `LoadOsmParams`
-- `autk-db/src/use-cases/load-geojson/use-case.ts` - `LoadGeojsonParams`
-- `autk-db/src/use-cases/load-csv/use-case.ts` - `LoadCsvParams`
+**Resolved:**
+- [x] OSM maps to `queryArea`, `autoLoadLayers`, and `outputTableName`
+- [x] GeoJSON maps to `geojsonFileUrl` / `geojsonObject`
+- [x] CSV maps to `csvFileUrl` and `geometryColumns`
 
 ### TransformExecutor API Mismatches ([autk-runtime/src/transform-executor.ts](autk-runtime/src/transform-executor.ts))
 
@@ -137,7 +137,8 @@ Build and package setup is now complete. The following API mismatches prevent ru
 
 **Blocker:** Runtime passes `near` in wrong structure for `spatialQuery()`.
 
-**Fix needed:** Review `autk-db/src/use-cases/spatial-join/use-case.ts` - `SpatialQueryParams` interface.
+**Resolved:**
+- [x] Runtime uses the current `spatialQuery()` parameter names and `NearConfig` shape.
 
 ### ViewRenderer API Mismatches ([autk-runtime/src/view-renderer.ts](autk-runtime/src/view-renderer.ts))
 
@@ -148,10 +149,11 @@ Build and package setup is now complete. The following API mismatches prevent ru
 2. **AutkPlot constructor** - Runtime uses old API `new AutkPlot(container)` then `plot.histogram(...)`, but current package expects constructor config
 3. **Plot creation pattern** - Current autk-plot API likely uses factory methods or different initialization pattern
 
-**Fix needed:** Review actual APIs:
-- `autk-db/src/db.ts` - `getLayer()` return type
-- `autk-plot/src/api.ts` - Plot construction pattern
-- `autk-plot/src/plots/` - Individual plot constructors
+**Resolved:**
+- [x] Runtime handles `db.getLayer()` returning `FeatureCollection` directly
+- [x] Runtime uses current `AutkPlot` constructor/config shape
+- [x] Runtime separates `updateThematic()` and `updateColorMap()` calls
+- [x] Runtime applies constant fill colors, stroke colors, line width, opacity, and point size styles
 
 ### LinkManager API Mismatches ([autk-runtime/src/link-manager.ts](autk-runtime/src/link-manager.ts))
 
@@ -165,24 +167,17 @@ Build and package setup is now complete. The following API mismatches prevent ru
    - `PlotEvent.BRUSH_Y` (`'brushY'`)
    - `PlotEvent.CLICK` (`'click'`)
 
-**Fix needed:** Review actual APIs:
-- `autk-map/src/api.ts` - Find correct method for highlighting features (may need to use layer methods instead)
-- `autk-plot/src/types-events.ts` - Use `PlotEvent` enum instead of string literals
-- `autk-plot/src/plot.ts` - Event listener pattern
+**Resolved:**
+- [x] Runtime uses map layer highlight APIs
+- [x] Runtime listens to typed `PlotEvent` values
+- [x] Histogram-to-map highlight propagation is covered by browser tests
 
-### Next Steps to Unblock
+### Remaining Runtime TODOs After Unblocking
 
-1. **DataLoader fixes** - Highest priority, blocks all data loading
-   - Read actual `LoadOsmParams`, `LoadGeojsonParams`, `LoadCsvParams` interfaces
-   - Update runtime parameter mapping
-2. **ViewRenderer fixes** - Blocks rendering
-   - Fix `getLayer()` return type handling
-   - Update AutkPlot initialization to match current API
-3. **LinkManager fixes** - Blocks interactions
-   - Find correct AutkMap highlighting method
-   - Use `PlotEvent` enum for event names
-4. **TransformExecutor fixes** - Blocks spatial joins
-   - Fix `near` parameter structure
+1. Implement polygon `strokeWidth` with mesh-based outline geometry. Current `strokeColor` works, but border thickness is fixed by the WebGPU `line-list` pass.
+2. Implement field-driven `encoding.opacity`, `encoding.size`, and `encoding.height`.
+3. Add visual regression snapshots for stable browser rendering baselines.
+4. Keep live Overpass as manual validation via `RUN_REAL_OVERPASS=1`; CI should continue using HAR playback.
 
 ## Locked Executable Spec Conventions (2026-06-07)
 
@@ -436,12 +431,14 @@ Create hand-written example specs to validate design:
   - [x] Add layers from spec
 - [x] Implement map layer creation
   - [x] Resolve data sources
-  - [x] Apply MVP encodings (field color; style opacity/size)
-  - [x] Apply styles
+  - [x] Apply MVP encodings (field color; constant color)
+  - [x] Apply supported styles (fill color, stroke color, road/polyline width, opacity, point size)
+  - [ ] Apply polygon stroke width (requires mesh-based outline path)
   - [x] Handle layer interactions
 - [x] Implement encoding resolution
   - [x] Field-based encodings
-  - [ ] Value-based encodings
+  - [x] Value-based color encodings
+  - [ ] Field-based opacity/size/height encodings
   - [x] Scale application
   - [x] Color scheme resolution
 - [x] Implement histogram view
@@ -499,10 +496,13 @@ Create hand-written example specs to validate design:
   - [x] `simple-points.csv` - Local CSV fixture with lat/lng
   - [x] `fixture-01-geojson-map.json` - Test spec for GeoJSON map
   - [x] `fixture-02-csv-histogram.json` - Test spec for CSV + histogram
+  - [x] `fixture-03-osm-har.json` - HAR-backed OSM test spec
+  - [x] `fixture-04-osm-live.json` - Small live Overpass manual test spec
+  - [x] `fixture-05-line-style.json` - Polyline width/style test spec
   - [x] `runtime-test-harness.html` - Parameterized browser test page
 - [x] **HAR-backed OSM tests** ([tests/runtime/runtime-osm-har.test.ts](tests/runtime/runtime-osm-har.test.ts))
-  - [x] Infrastructure ready (uses existing `routeOverpassHar` helper)
-  - [ ] Currently skipped (requires OSM/HAR strategy decision)
+  - [x] CI-safe HAR playback enabled
+  - [x] Live Overpass manual test gated behind `RUN_REAL_OVERPASS=1`
   - [x] Can re-record with `HAR_UPDATE=1` environment variable
 - [ ] Unit tests for individual runtime modules (future)
 - [ ] Visual regression tests with screenshots (future)
@@ -1437,12 +1437,12 @@ Track unresolved design decisions here. These correspond to the recommendations 
 ## Success Criteria
 
 ### MVP Success (v0.1) - ✅ 10/10 CRITERIA MET
-- [x] Can create OSM map from Python (API exists, execution deferred)
+- [x] Can create OSM map from Python (HAR-backed runtime coverage, live manual validation available)
 - [x] Can create GeoJSON map from Python ✅
 - [x] Can add histogram linked to map ✅
 - [x] Can perform spatial join ✅
 - [x] Spec validates against JSON schema ✅
-- [x] Runtime executes all example specs correctly ✅ (GeoJSON, CSV working; OSM deferred)
+- [x] Runtime executes all MVP flows correctly ✅ (GeoJSON, CSV, spatial join, OSM HAR)
 - [x] Display works in Jupyter ✅ (browser tests pass; manual testing pending)
 - [x] Can export standalone HTML scaffold ✅
 - [x] Documentation covers all MVP features ✅
@@ -1477,7 +1477,10 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - ✅ Jupyter integration tested and validated in browser
 - ✅ Created 2 additional Python examples (simple_geojson_map, csv_points_map)
 - ✅ Created comprehensive documentation (quickstart, examples guide, Jupyter guides)
-- ✅ All automated tests passing (14/16 TypeScript, 4/4 Python, 1/1 Jupyter browser test)
+- ✅ Runtime tests passing with CI-safe OSM HAR coverage (`npm run test:runtime`: 18 passed, 1 skipped manual live-network test)
+- ✅ Live Overpass manual path validated with `RUN_REAL_OVERPASS=1`
+- ✅ Runtime styles expanded: constant fill color, stroke color, road/polyline width, opacity, and point size
+- ✅ All automated checks passing in latest run (`make typecheck`, `make lint`, runtime tests, fixture schema validation, Python unittest)
 - ✅ MVP success criteria: 10/10 met
 
 **See also:**
@@ -1502,7 +1505,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - ✅ Design contradictions resolved (transform semantics, field paths, etc.)
 - ✅ Schema validation scripts added (`npm run validate:specs`)
 
-### Phase 2: TypeScript Runtime ✅ LOCAL BROWSER TESTS PASS, ⚠️ OSM DEFERRED
+### Phase 2: TypeScript Runtime ✅ BROWSER TESTS PASS, ✅ OSM HAR COVERED
 
 **Package Created:** `autk-runtime/`
 
@@ -1531,11 +1534,13 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - ✅ **Transform executor** ([autk-runtime/src/transform-executor.ts](autk-runtime/src/transform-executor.ts))
   - Spatial join with mutation semantics
   - Aggregation support
-- ✅ **View rendering** ([autk-runtime/src/view-renderer.ts](autk-runtime/src/view-renderer.ts)) - **310 lines**
+- ✅ **View rendering** ([autk-runtime/src/view-renderer.ts](autk-runtime/src/view-renderer.ts))
   - Map creation with canvas
   - Layer loading with type inference
   - Camera application (pitch, bearing, zoom with workaround for absolute positioning)
-  - Color encoding (field-based with scales)
+  - Color encoding (field-based with scales and constant color values)
+  - Supported styles: fill color, stroke color, road/polyline width, opacity, point size
+  - Deferred style: polygon stroke width
   - Histogram creation with bins and field mapping
   - Data flattening for plots
 - ✅ **Link management** ([autk-runtime/src/link-manager.ts](autk-runtime/src/link-manager.ts)) - **160 lines**
@@ -1549,7 +1554,8 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - ✅ **Testing infrastructure** (see section 2.8 above)
   - Schema validation tests (positive + negative)
   - Local fixture tests (GeoJSON, CSV)
-  - HAR-backed OSM tests (infrastructure ready)
+  - HAR-backed OSM tests (CI-safe)
+  - Manual live Overpass smoke test gated by `RUN_REAL_OVERPASS=1`
   - Test harness and fixtures
   - Package scripts (`npm run test:runtime`, `npm run validate:specs`)
 - ✅ **Testing documentation** ([autk-runtime/TESTING.md](autk-runtime/TESTING.md))
@@ -1558,7 +1564,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
   - Debugging guides
   - API reference corrections
 
-**Status:** ✅ **BUILD + LOCAL BROWSER TESTS PASS** - OSM/live-network validation remains deferred.
+**Status:** ✅ **BUILD + BROWSER TESTS PASS** - OSM is covered by HAR in CI; live Overpass remains manual by design.
 
 **Total Code:** ~1,600 lines of production TypeScript + ~500 lines of tests/fixtures
 
@@ -1607,10 +1613,11 @@ Track unresolved design decisions here. These correspond to the recommendations 
 
 **Current Browser-Tested Results:**
 - ✅ `npm run validate:specs` passes for all 3 example specs
-- ✅ `npm run test:runtime` passes: 14 passed, 2 skipped
+- ✅ `npm run test:runtime` passes: 18 passed, 1 skipped (manual live Overpass)
 - ✅ `examples/specs/03-spatial-join.json` is executable using local data in `examples/data/`
-- ⚠️ `examples/specs/01-basic-osm-map.json` and `02-linked-map-histogram.json` validate, but live Overpass execution currently returns `400 Bad Request`; keep as manual/network-dependent until OSM/HAR strategy is resolved
+- ✅ OSM runtime execution is covered with HAR playback and a live-network manual smoke fixture
 - ✅ Selection/highlight link behavior has focused event-level browser coverage
+- ✅ Style coverage includes constant fill color, stroke color, road/polyline width, opacity, and point size
 
 **Next Steps:**
 1. ~~Fix tsconfig.json (project references)~~ ✅ DONE
@@ -1624,7 +1631,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
 9. ~~Run automated tests (`npm run test:runtime`)~~ ✅ DONE
 10. ~~Run local hand-authored spatial-join example in browser~~ ✅ DONE
 11. ~~Add focused browser test for selection/highlight links~~ ✅ DONE
-12. Resolve OSM example strategy: HAR-backed deterministic tests or defer live Overpass to manual validation ← **DEFERRED**
+12. ~~Resolve OSM example strategy: HAR-backed deterministic tests or defer live Overpass to manual validation~~ ✅ DONE
 13. ~~Start Phase 3 Python builders~~ ✅ DONE
 
 ### Phase 3: Python Package ✅ COMPLETE
@@ -1678,7 +1685,7 @@ Track unresolved design decisions here. These correspond to the recommendations 
 - Runtime bundling for offline use
 - PyPI packaging and publishing
 - Full API reference documentation
-- OSM/Overpass execution (API exists, network strategy TBD)
+- Broader OSM/Overpass example coverage beyond current HAR/live smoke fixtures
 
 ### Success Metrics
 
@@ -1701,8 +1708,8 @@ Track unresolved design decisions here. These correspond to the recommendations 
   - [x] Local spatial join example executes
   - [x] GeoJSON map example executes
   - [x] CSV + histogram example executes
-  - [ ] OSM examples execute (deferred - network/HAR strategy TBD)
-- [x] Can create OSM map from Python (API exists, execution deferred)
+  - [x] OSM HAR runtime fixture executes
+- [x] Can create OSM map from Python (API exists; runtime OSM path verified through HAR/live fixtures)
 - [x] Can create GeoJSON map from Python ✅ **VALIDATED**
 - [x] Can add histogram linked to map ✅ **VALIDATED**
 - [x] Can perform spatial join ✅ **VALIDATED**
@@ -1719,13 +1726,15 @@ Track unresolved design decisions here. These correspond to the recommendations 
   - [x] csv_points_map.py
   - [x] spatial_join.py
 
-**Current Status:** 98% complete (MVP v0.1)
+**Current Status:** MVP runtime/Python API complete for v0.1; remaining items are polish or explicitly deferred v0.2 scope.
 - Phase 1: ✅ **COMPLETE** (Schema, examples, conventions)
-- Phase 2: ✅ **COMPLETE** - Runtime tested and working (OSM deferred)
+- Phase 2: ✅ **COMPLETE** - Runtime tested and working (OSM HAR covered; live Overpass manual)
 - Phase 3: ✅ **COMPLETE** - Python API fully implemented
 - Phase 4: ✅ **COMPLETE** - Examples and documentation created
 
-**Remaining for 100%:**
+**Remaining TODOs:**
 - Manual testing in actual Jupyter/JupyterLab/VS Code notebooks (user testing)
-- OSM/Overpass execution strategy decision (deferred to v0.2)
+- Polygon `strokeWidth` support via mesh-based outline geometry
+- Field-driven `encoding.opacity`, `encoding.size`, and `encoding.height`
+- Visual regression snapshots
 - Full API reference documentation (deferred to v0.2)

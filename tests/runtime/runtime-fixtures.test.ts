@@ -47,6 +47,21 @@ test.describe('Runtime - Local Fixtures (CI-safe)', () => {
 
     expect(maps).toContain('manhattan_map');
 
+    // Verify constant layer styles are applied through render info.
+    const layerColor = await page.evaluate(() => {
+      const runtime = window.__autarkRuntime;
+      const map = runtime.getMaps()[0].map;
+      return map.layerManager.searchByLayerId('manhattan_layer')?.layerRenderInfo.color;
+    });
+    expect(layerColor).toMatchObject({ r: 47, g: 111, b: 115, alpha: 1 });
+
+    const strokeColor = await page.evaluate(() => {
+      const runtime = window.__autarkRuntime;
+      const map = runtime.getMaps()[0].map;
+      return map.layerManager.searchByLayerId('manhattan_layer')?.layerRenderInfo.strokeColor;
+    });
+    expect(strokeColor).toMatchObject({ r: 18, g: 52, b: 86, alpha: 1 });
+
     // Verify canvas is visible and non-blank
     const canvas = page.locator('canvas').first();
     await expect(canvas).toBeVisible();
@@ -131,6 +146,28 @@ test.describe('Runtime - Local Fixtures (CI-safe)', () => {
 
     // Verify canvas exists
     await expect(page.locator('canvas').first()).toBeVisible();
+  });
+
+  test('applies line width style while loading polylines', async ({ page }) => {
+    page.on('console', msg => console.log(`Browser: [${msg.type()}] ${msg.text()}`));
+    page.on('pageerror', err => console.error(`Browser error: ${err.message}`));
+
+    await page.goto(`${HARNESS_URL}?spec=/tests/fixtures/runtime/fixture-05-line-style.json`);
+    await expect(page.locator('#status')).toHaveClass(/success/, { timeout: 30000 });
+
+    const lineState = await page.evaluate(() => {
+      const runtime = window.__autarkRuntime;
+      const map = runtime.getMaps()[0].map;
+      const layer = map.layerManager.searchByLayerId('line_layer');
+      const yValues = Array.from(layer.position).filter((_, index) => index % 2 === 1);
+      return {
+        color: layer.layerRenderInfo.color,
+        ySpan: Math.max(...yValues) - Math.min(...yValues),
+      };
+    });
+
+    expect(lineState.color).toMatchObject({ r: 101, g: 67, b: 33, alpha: 1 });
+    expect(lineState.ySpan).toBeCloseTo(12, 5);
   });
 
   test('exposes correct runtime metadata APIs', async ({ page }) => {

@@ -210,6 +210,7 @@ export class Triangles2DLayer extends VectorLayer {
         // fill/picking pipelines, so preserve the data-dirty state needed to
         // keep the border buffers in sync for skip/geometry changes.
         const dataDirty = this._dataIsDirty;
+        const renderInfoDirty = this._renderInfoIsDirty;
 
         super.renderPass(camera, passEncoder);
 
@@ -217,6 +218,10 @@ export class Triangles2DLayer extends VectorLayer {
 
         if (dataDirty) {
             this._pipelineBorder.updateVertexBuffers(this);
+        }
+
+        if (renderInfoDirty) {
+            this._pipelineBorder.updateColorUniforms(this);
         }
 
         this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);

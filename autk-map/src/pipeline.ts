@@ -17,6 +17,7 @@ import {
     ColorMap, 
     DEFAULT_COLORMAP_RESOLUTION 
 } from '@urban-toolkit/autk-core';
+import type { ColorRGB } from '@urban-toolkit/autk-core';
 
 import { Renderer } from './renderer';
 import { MapStyle } from './map-style';
@@ -355,6 +356,18 @@ export abstract class Pipeline {
     }
 
     /**
+     * Resolves the fixed base color used by this pipeline.
+     *
+     * Subclasses can override this for alternate passes such as polygon borders.
+     *
+     * @param layer Layer instance whose render configuration is uploaded.
+     * @returns RGB color consumed by the shader uniform.
+     */
+    protected resolveLayerColor(layer: Layer): ColorRGB {
+        return layer.layerRenderInfo.color ?? MapStyle.getColor(layer.layerInfo.typeLayer);
+    }
+
+    /**
      * Writes the current layer styling state into the shared render uniforms.
      *
      * @param layer Layer instance whose render configuration is uploaded.
@@ -371,7 +384,7 @@ export abstract class Pipeline {
             && computedDomain.every(v => typeof v === 'string');
 
         const colors = {
-            color: MapStyle.getColor(layer.layerInfo.typeLayer),
+            color: this.resolveLayerColor(layer),
             highlightColor: MapStyle.getHighlightColor(),
             invalidValueColor: MapStyle.getInvalidValueColor(),
             colorMap: ColorMap.getColorMap(

@@ -50,7 +50,39 @@ export async function routeOverpassHar(page: Page, harPath: string, update: bool
     await page.route(OVERPASS_STATUS_PATTERN, route =>
       route.fulfill({ status: 200, contentType: 'text/plain', body: OVERPASS_STATUS_MOCK }),
     );
-    await page.routeFromHAR(harPath, { url: OVERPASS_INTERPRETER_PATTERN, update: false });
+    const har = JSON.parse(fs.readFileSync(harPath, 'utf-8')) as { log?: { entries?: HarEntry[] } };
+    const entries = har.log?.entries ?? [];
+    const exactEntries = new Map(entries.map(entry => [normalizePostData(entry.request.postData?.text), entry]));
+    const entriesByGroup = new Map<string, HarEntry>();
+
+    for (const entry of entries) {
+      const group = classifyOverpassQuery(entry.request.postData?.text);
+      if (group && !entriesByGroup.has(group)) {
+        entriesByGroup.set(group, entry);
+      }
+    }
+
+    await page.route(OVERPASS_INTERPRETER_PATTERN, async (route) => {
+      const postData = await route.request().postData();
+      const entry = exactEntries.get(normalizePostData(postData))
+        ?? entriesByGroup.get(classifyOverpassQuery(postData) ?? '');
+
+      if (!entry) {
+        await route.fulfill({
+          status: 599,
+          contentType: 'text/plain',
+          body: `No HAR entry for Overpass query:\n${normalizePostData(postData)}`,
+        });
+        return;
+      }
+
+      const content = entry.response.content;
+      await route.fulfill({
+        status: entry.response.status,
+        contentType: content.mimeType || 'application/json',
+        body: content.text,
+      });
+    });
     return;
   }
 
@@ -107,4 +139,36 @@ export async function routeOverpassHar(page: Page, harPath: string, update: bool
     fs.writeFileSync(harPath, JSON.stringify(har, null, 2));
     console.log(`[har-recorder] Saved ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} to ${harPath}`);
   });
+}
+
+function normalizePostData(postData: string | null | undefined): string {
+  if (!postData) return '';
+  const decoded = decodeURIComponent(postData);
+  const query = decoded.startsWith('data=') ? decoded.slice('data='.length) : decoded;
+  return query.replace(/\s+/g, ' ').trim();
+}
+
+function classifyOverpassQuery(postData: string | null | undefined): string | null {
+  const query = normalizePostData(postData);
+  if (!query) return null;
+
+  if (query.includes('boundaryWays') || (query.includes('relation["name"') && query.includes('out body'))) {
+    return 'boundaries';
+  }
+  if (query.includes('"highway"')) {
+    return 'roads';
+  }
+  if (query.includes('"building"') || query.includes('"building:part"') || query.includes('"type"="building"')) {
+    return 'buildings';
+  }
+  if (
+    query.includes('"leisure"')
+    || query.includes('"landuse"')
+    || query.includes('"water"')
+    || query.includes('"natural"')
+  ) {
+    return 'surface';
+  }
+
+  return null;
 }

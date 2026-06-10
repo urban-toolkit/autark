@@ -17,6 +17,7 @@ import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 
 import { Camera } from '@urban-toolkit/autk-core';
+import type { ColorRGB } from '@urban-toolkit/autk-core';
 
 import { Triangles2DLayer } from './layer-triangles2D';
 
@@ -66,6 +67,16 @@ export class PipelineTriangleBorder extends Pipeline {
      */
     constructor(renderer: Renderer) {
         super(renderer);
+    }
+
+    /**
+     * Border passes use the stroke color when one is configured.
+     *
+     * @param layer Layer instance whose render configuration is uploaded.
+     * @returns RGB color consumed by the border shader uniform.
+     */
+    protected override resolveLayerColor(layer: Triangles2DLayer): ColorRGB {
+        return layer.layerRenderInfo.strokeColor ?? super.resolveLayerColor(layer);
     }
 
     /**

@@ -36,6 +36,8 @@ class OSM(Serializable):
     name: str
     area: str
     layers: list[OsmLayer]
+    geocode_area: str | None = dataclass_field(default=None, metadata={"json": "geocodeArea"})
+    areas: list[str] | None = None
     source: Literal["overpass", "pbf"] | None = None
     pbf_file_url: str | None = dataclass_field(default=None, metadata={"json": "pbfFileUrl"})
     coordinate_format: str | None = dataclass_field(default=None, metadata={"json": "coordinateFormat"})
@@ -44,6 +46,8 @@ class OSM(Serializable):
     def __post_init__(self) -> None:
         if not self.layers:
             raise ValueError("OSM requires at least one layer")
+        if self.areas is not None and not self.areas:
+            raise ValueError("OSM areas must not be empty")
         if self.source == "pbf" and not self.pbf_file_url:
             raise ValueError("OSM with source='pbf' requires pbf_file_url")
 

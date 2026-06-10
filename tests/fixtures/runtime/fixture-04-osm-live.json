@@ -1,0 +1,48 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Fixture Test - Live OSM Overpass",
+    "description": "Small live Overpass fixture for manual network validation",
+    "created": "2026-06-10"
+  },
+  "workspace": {
+    "name": "runtime_osm_live",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "osm",
+      "name": "battery_park_osm",
+      "area": "Battery Park City",
+      "geocodeArea": "New York",
+      "areas": ["Battery Park City"],
+      "layers": ["roads"],
+      "source": "overpass"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "osm_live_map",
+      "camera": {
+        "pitch": 0,
+        "bearing": 0,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "battery_park_osm_roads",
+          "id": "roads_layer",
+          "type": "roads",
+          "style": {
+            "color": "#444444"
+          }
+        }
+      ]
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

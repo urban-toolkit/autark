@@ -61,6 +61,13 @@ export interface LoadCollectionParams {
      */
     allowZeroHeightBuildings?: boolean;
     /**
+     * Optional full visual width for triangulated polyline/road layers.
+     *
+     * The renderer stores polylines as buffered meshes, so this value is applied
+     * while loading the collection rather than as a later render-state update.
+     */
+    lineWidth?: number;
+    /**
      * Property accessor used to derive layer values.
      *
      * Use a dot-path string accessor such as `properties.shape_area`.

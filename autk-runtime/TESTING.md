@@ -44,7 +44,7 @@ npm test
 - ✅ **Build** - TypeScript compilation
 - ✅ **Runtime fixtures** - Local GeoJSON/CSV with Playwright
 - ✅ **Local example spec** - Spatial join example executes end-to-end
-- ⚠️ **OSM with HAR** - Infrastructure ready, currently skipped
+- ✅ **OSM with HAR** - Recorded Overpass playback runs in CI without network
 
 ### Manual Tests (Not CI-Safe)
 - ⏸️ **Real Overpass** - Network-dependent, for development only
@@ -52,9 +52,9 @@ npm test
 
 ### Known Gaps
 
-1. **OSM examples** - Live Overpass execution is network-dependent and currently returns `400 Bad Request` for the hand-authored OSM examples. Resolve with HAR-backed fixtures or keep as manual validation.
+1. **OSM examples** - HAR-backed OSM runtime coverage is automated; live Overpass execution remains network-dependent manual validation.
 2. **Selection/highlight interactions** - Event-level histogram-to-map highlight propagation is covered; full pointer-level brushing can be added later if needed.
-3. **Style coverage** - Some style properties are partially supported; stroke styles remain logged as unsupported.
+3. **Style coverage** - Constant fill color, stroke color, line width, opacity, and point size are covered; polygon stroke width still requires a mesh-based outline path.
 
 ---
 
@@ -224,7 +224,7 @@ tests/
 ├── runtime/
 │   ├── schema-validation.test.ts       # Positive and negative schema tests
 │   ├── runtime-fixtures.test.ts        # Local GeoJSON/CSV tests (CI-safe)
-│   └── runtime-osm-har.test.ts         # OSM with HAR (CI-safe, currently skipped)
+│   └── runtime-osm-har.test.ts         # OSM with HAR (CI-safe)
 ├── fixtures/
 │   └── runtime/
 │       ├── runtime-test-harness.html   # Browser test page
@@ -360,9 +360,9 @@ Instead of "visually inspect map," tests check:
 3. ✅ Create local fixture tests
 
 ### Short-term (Phase B)
-1. Fix plot event names in runtime (`brush` not `brushend`)
-2. Fix database API calls (`getTablesMetadata()` not `listTables()`)
-3. Unskip OSM HAR tests
+1. ✅ Fix plot event names in runtime (`brushX`)
+2. ✅ Fix database API calls (`getTablesMetadata()` not `listTables()`)
+3. ✅ Unskip OSM HAR tests
 4. Add visual regression snapshots
 
 ### Long-term (Phase C)

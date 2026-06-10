@@ -33,6 +33,26 @@ class SpecBuilderTests(unittest.TestCase):
         self.assertEqual(osm.layer_source("buildings"), "manhattan_osm_buildings")
         self.assertEqual(ak.Layer(osm.layer_source("roads")).to_dict(), {"source": "manhattan_osm_roads"})
 
+    def test_osm_serializes_explicit_geocode_area_and_relation_areas(self) -> None:
+        osm = ak.OSM(
+            "nyc_osm",
+            area="Battery Park City",
+            geocode_area="New York",
+            areas=["Battery Park City", "Financial District"],
+            layers=["buildings", "roads"],
+        )
+        self.assertEqual(
+            osm.to_dict(),
+            {
+                "name": "nyc_osm",
+                "area": "Battery Park City",
+                "layers": ["buildings", "roads"],
+                "geocodeArea": "New York",
+                "areas": ["Battery Park City", "Financial District"],
+                "type": "osm",
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

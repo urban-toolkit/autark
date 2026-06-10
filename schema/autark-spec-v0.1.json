@@ -125,7 +125,20 @@
         },
         "area": {
           "type": "string",
-          "description": "Place name for Overpass query (e.g., 'Manhattan, New York')"
+          "description": "Place name for Overpass query. Used as the relation area by default and as geocodeArea when geocodeArea is omitted."
+        },
+        "geocodeArea": {
+          "type": "string",
+          "description": "Parent geocoding area for Overpass area lookup (e.g., 'New York'). Defaults to area."
+        },
+        "areas": {
+          "type": "array",
+          "description": "One or more OSM relation area names inside geocodeArea. Defaults to [area].",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
         "layers": {
           "type": "array",
@@ -152,6 +165,7 @@
         }
       },
       "if": {
+        "required": ["source"],
         "properties": {"source": {"const": "pbf"}}
       },
       "then": {

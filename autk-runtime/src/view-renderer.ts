@@ -5,7 +5,8 @@
 import type { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
-import { ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
+import { ColorMap, ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
+import type { ColorHEX, ColorRGB } from '@urban-toolkit/autk-core';
 import type { MapView, HistogramView, EncodingChannel } from './types.js';
 
 export class ViewRenderer {
@@ -250,6 +251,7 @@ export class ViewRenderer {
     map.loadCollection(layerId, {
       collection,
       type: layerType,
+      lineWidth: layerSpec.style?.width,
     });
 
     console.log(`  Layer "${layerId}" loaded successfully`);
@@ -350,10 +352,12 @@ export class ViewRenderer {
         });
       }
     } else if ('value' in colorChannel) {
-      // Constant value encoding
-      // TODO: Apply constant color to all features
-      // This requires a method to set uniform color on a layer
-      console.warn('Constant color encoding not yet implemented');
+      const color = this.parseColorValue(colorChannel.value);
+      if (color) {
+        map.updateRenderInfo(layerId, { color, isColorMap: false });
+      } else {
+        console.warn(`Layer ${layerId}: color encoding value is not a supported color (${String(colorChannel.value)})`);
+      }
     }
   }
 
@@ -416,20 +420,56 @@ export class ViewRenderer {
 
     // Constant color needs color mapping disabled and uniform color
     if (style.color) {
-      // For now, just disable color mapping so the default color shows
-      // TODO: Add proper constant color support
-      map.updateRenderInfo(layerId, { isColorMap: false });
-      console.log(`Layer ${layerId}: disabled color mapping (constant color not fully implemented: ${style.color})`);
+      const color = this.parseColorValue(style.color);
+      if (color) {
+        map.updateRenderInfo(layerId, { color, isColorMap: false });
+        console.log(`Layer ${layerId}: set constant color to ${style.color}`);
+      } else {
+        console.warn(`Layer ${layerId}: unsupported color style (${style.color})`);
+      }
     }
 
     // Stroke styles
-    if (style.strokeColor || style.strokeWidth) {
-      console.warn(`Layer ${layerId}: stroke styles not yet supported`);
+    if (style.strokeColor) {
+      const strokeColor = this.parseColorValue(style.strokeColor);
+      if (strokeColor) {
+        map.updateRenderInfo(layerId, { strokeColor });
+        console.log(`Layer ${layerId}: set stroke color to ${style.strokeColor}`);
+      } else {
+        console.warn(`Layer ${layerId}: unsupported stroke color style (${style.strokeColor})`);
+      }
+    }
+
+    if (style.strokeWidth !== undefined) {
+      console.warn(`Layer ${layerId}: strokeWidth style not yet supported (requested: ${style.strokeWidth})`);
     }
 
     // Width for lines
     if (style.width) {
-      console.warn(`Layer ${layerId}: width style not yet supported (requested: ${style.width})`);
+      if (layer.layerInfo.typeLayer === 'roads' || layer.layerInfo.typeLayer === 'polylines') {
+        console.log(`Layer ${layerId}: set line width to ${style.width}`);
+      } else {
+        console.warn(`Layer ${layerId}: width style only applies to road/polyline layers`);
+      }
+    }
+  }
+
+  /**
+   * Convert a runtime color value into the map renderer's RGB uniform payload.
+   */
+  private parseColorValue(value: unknown): ColorRGB | null {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return null;
+    }
+
+    try {
+      const color = ColorMap.hexToRgb(value.trim() as ColorHEX);
+      if ([color.r, color.g, color.b].some(channel => Number.isNaN(channel))) {
+        return null;
+      }
+      return color;
+    } catch (_error) {
+      return null;
     }
   }
 

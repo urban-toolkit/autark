@@ -47,6 +47,8 @@ export interface OsmDataSource {
   type: 'osm';
   name: string; // SQL-safe identifier
   area: string; // Place name for Overpass query
+  geocodeArea?: string; // Parent area used to resolve Overpass relation areas
+  areas?: string[]; // Relation area names inside geocodeArea
   layers: Array<'buildings' | 'roads' | 'parks' | 'water' | 'surface'>;
   source?: 'overpass' | 'pbf'; // Default: "overpass"
   pbfFileUrl?: string; // Required if source is "pbf"

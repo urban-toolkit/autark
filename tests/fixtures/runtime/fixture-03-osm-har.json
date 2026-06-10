@@ -1,0 +1,56 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Fixture Test - OSM HAR",
+    "description": "OSM runtime fixture using a recorded Overpass HAR",
+    "created": "2026-06-10"
+  },
+  "workspace": {
+    "name": "runtime_osm_har",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "osm",
+      "name": "nyc_osm",
+      "area": "Battery Park City",
+      "geocodeArea": "New York",
+      "areas": ["Battery Park City", "Financial District"],
+      "layers": ["buildings", "roads"],
+      "source": "overpass"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "osm_map",
+      "camera": {
+        "pitch": 45,
+        "bearing": 0,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "nyc_osm_buildings",
+          "id": "buildings_layer",
+          "type": "buildings",
+          "style": {
+            "opacity": 0.85
+          }
+        },
+        {
+          "source": "nyc_osm_roads",
+          "id": "roads_layer",
+          "type": "roads",
+          "style": {
+            "color": "#444444"
+          }
+        }
+      ]
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

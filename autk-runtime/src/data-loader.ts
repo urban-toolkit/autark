@@ -48,10 +48,10 @@ export class DataLoader {
    * IMPORTANT: Must pass outputTableName to match spec convention.
    */
   private async loadOsmSource(db: AutkDb, source: Extract<DataSource, { type: 'osm' }>): Promise<void> {
-    // Spec has area as a simple string (place name for Overpass query)
-    // We use it as both geocodeArea and the single area in the areas array
-    const geocodeArea = source.area;
-    const areas = [source.area];
+    // Most specs can use a single area string. HAR-backed and larger OSM
+    // workflows can provide a parent geocode area plus exact relation names.
+    const geocodeArea = source.geocodeArea ?? source.area;
+    const areas = source.areas ?? [source.area];
 
     // CRITICAL: Pass outputTableName to ensure tables are named ${name}_${layer}
     await db.loadOsm({
