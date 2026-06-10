@@ -12,8 +12,12 @@
     <script type="module">
         const status = document.getElementById('status');
         try {
-            // Runtime loaded cross-origin, exactly like a Jupyter cell on :8888
-            const { AutarkRuntime } = await import('http://localhost:8000/autk-runtime/dist/autk-runtime.js');
+            // Runtime loaded cross-origin, exactly like a Jupyter cell on :8888.
+            // The runtime origin can be overridden via ?runtimeOrigin=... so
+            // automated tests can use their own ports.
+            const params = new URLSearchParams(location.search);
+            const runtimeOrigin = params.get('runtimeOrigin') ?? 'http://localhost:8000';
+            const { AutarkRuntime } = await import(`${runtimeOrigin}/autk-runtime/dist/autk-runtime.js`);
 
             const spec = {
                 "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
@@ -22,7 +26,7 @@
                 "workspace": { "name": "xorigin", "coordinateFormat": "EPSG:4326" },
                 "data": [{
                     "name": "neighborhoods",
-                    "url": "http://localhost:8000/examples/data/neighborhoods.geojson",
+                    "url": `${runtimeOrigin}/examples/data/neighborhoods.geojson`,
                     "layerType": "polygons",
                     "coordinateFormat": "EPSG:4326",
                     "type": "geojson"

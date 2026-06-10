@@ -1,4 +1,21 @@
+import * as http from 'http';
+import * as path from 'path';
 import { test, expect } from '@playwright/test';
+import { createStaticServer, listen, close } from '../helpers/static-server';
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const PORT = 8765;
+
+let server: http.Server;
+
+test.beforeAll(async () => {
+  server = createStaticServer(REPO_ROOT, { cors: false });
+  await listen(server, PORT);
+});
+
+test.afterAll(async () => {
+  await close(server);
+});
 
 test.describe('Jupyter Integration Test', () => {
   test('Python-generated HTML renders correctly', async ({ page }) => {

@@ -45,8 +45,9 @@ Notes on cross-origin handling (no action needed, just context):
 - Root-relative data URLs in specs (e.g. `/examples/data/trees.csv`) are
   automatically resolved against the runtime server's origin when a spec is
   displayed or exported (`python/autark/display.py`).
-- A regression check for the cross-origin scenario lives at
-  `scripts/check-cross-origin.mjs` (uses `test-cross-origin.html`).
+- A regression test for the cross-origin scenario lives at
+  `tests/runtime/cross-origin-worker.test.ts` (uses `test-cross-origin.html`
+  and spawns its own servers; runs with `npm run test:runtime`).
 
 ### 3. Use a Custom Runtime URL (if needed)
 

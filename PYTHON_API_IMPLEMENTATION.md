@@ -662,10 +662,15 @@ Create hand-written example specs to validate design:
   - [x] Include data inline or as references
 - [x] Test in browser with Playwright (automated tests passing)
 - [x] Create Jupyter notebook test infrastructure
-- [ ] Manual test in Jupyter notebook (pending user testing)
+- [x] Fix cross-origin display (2026-06-10): DuckDB worker created via
+      same-origin blob: URL (`autk-db/src/duckdb.ts`); root-relative data
+      URLs resolved against the runtime origin (`python/autark/display.py`);
+      schema fetched from runtime origin (`autk-runtime/src/validator.ts`).
+      Covered by Playwright cross-origin regression test.
+- [x] Manual test in Jupyter notebook (verified working 2026-06-10, requires `cors_server.py`)
 - [ ] Manual test in JupyterLab (pending user testing)
-- [ ] Manual test in VS Code notebooks (pending user testing)
-- [ ] Consider anywidget integration (future)
+- [x] Manual test in VS Code notebooks (verified working 2026-06-10, local Python kernel + `cors_server.py`)
+- [ ] Consider anywidget integration (future; also enables zero-server display)
 
 ### 3.9 Python Testing
 - [x] Unit tests for MVP classes
