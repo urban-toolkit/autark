@@ -16,6 +16,9 @@ pip install -e .
 
 # Optional: Install with validation support
 pip install -e ".[validation]"
+
+# Optional: zero-server Jupyter widget (anywidget)
+pip install -e ".[widget]"
 ```
 
 ## Quick Start
@@ -128,23 +131,34 @@ See [examples/](examples/) for complete working examples:
 
 ## Jupyter Integration
 
-```python
-# Build spec
-spec = ak.Spec(...)
+### Option 1: Widget (no server needed)
 
-# Display in notebook
-spec  # Calls _repr_html_() automatically
+```python
+spec = ak.Spec(...)
+spec.widget()  # Bundled runtime; works in Jupyter, JupyterLab, VS Code, Colab
+```
+
+Requires `pip install -e ".[widget]"`. DuckDB WebAssembly assets load from the
+jsDelivr CDN on first use. Data sources must use absolute URLs or inline
+`values` (there is no local server to resolve relative paths against).
+
+### Option 2: Dev-server display
+
+```python
+spec  # Calls _repr_html_() automatically; loads runtime from localhost:8000
 ```
 
 **Setup required:**
 ```bash
-# Terminal 1: Start server
+# Terminal 1: Start CORS-enabled server
 cd /path/to/autark
-python -m http.server 8000
+python cors_server.py 8000
 
 # Terminal 2: Jupyter
 jupyter notebook
 ```
+
+Useful during development: serves local data files and freshly built runtimes.
 
 See [../JUPYTER_QUICKSTART.md](../JUPYTER_QUICKSTART.md) for details.
 

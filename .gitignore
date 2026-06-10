@@ -24,6 +24,9 @@ autk*/package-lock.json
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+python/build/
+python/*.egg-info/
+python/autark.egg-info/
 
 # Environment variables
 .env

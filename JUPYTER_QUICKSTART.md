@@ -1,5 +1,10 @@
 # Jupyter Integration - Quick Start Guide
 
+> **No-server option:** `spec.widget()` (requires `pip install anywidget`)
+> renders with a runtime bundled inside the Python package - skip the server
+> setup below entirely. Data must use absolute URLs or inline `values`.
+> The steps below cover the dev-server display path (`spec` in a cell).
+
 ## Step-by-Step Instructions
 
 ### Step 1: Start Local Development Server
@@ -8,12 +13,14 @@ Open a terminal and run:
 
 ```bash
 cd /Users/csilva/src/autark
-python -m http.server 8000
+python cors_server.py 8000
 ```
+
+(CORS headers are required because Jupyter loads the runtime cross-origin.)
 
 Keep this terminal open. You should see:
 ```
-Serving HTTP on :: port 8000 (http://[::]:8000/) ...
+🚀 CORS-enabled server running on http://localhost:8000
 ```
 
 ### Step 2: Test HTML Generation (Simple Test)
@@ -114,15 +121,17 @@ This tests the selection/linking functionality.
 
 If any are 404, the server path is wrong.
 
-## Alternative: Use CDN or Different Runtime URL
+## Alternative: Zero-Server Widget
 
-If you don't want to run a local server, you could:
+If you don't want to run a local server, use the anywidget integration:
 
-1. **Build and use a bundled runtime** (future work)
-2. **Use relative file paths** (but CORS may block)
-3. **Deploy to a test server** (e.g., GitHub Pages)
+```python
+pip install anywidget  # or: pip install -e ".[widget]"
 
-For now, the local server approach is simplest.
+spec.widget()  # bundled runtime, DuckDB assets from jsDelivr CDN
+```
+
+Build the widget bundle first if needed: `cd autk-runtime && npm run build:widget`.
 
 ## Next Steps After Success
 
@@ -140,8 +149,8 @@ Once you confirm Jupyter integration works:
 ## Quick Commands Reference
 
 ```bash
-# Terminal 1: Start dev server
-cd /Users/csilva/src/autark && python -m http.server 8000
+# Terminal 1: Start dev server (CORS-enabled)
+cd /Users/csilva/src/autark && python cors_server.py 8000
 
 # Terminal 2: Test HTML output
 cd /Users/csilva/src/autark/python/examples && python test_html_output.py
