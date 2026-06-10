@@ -1,7 +1,7 @@
 """Python builders for Autark declarative specifications."""
 
 from .data import CSV, OSM, GeoJSON, latlng, wkt
-from .display import to_html
+from .display import to_embedded_html, to_html
 from .encodings import Encoding, Field, Scale, Value, field, value
 from .widget import create_widget
 from .links import Link
@@ -60,6 +60,7 @@ __all__ = [
     "multi",
     "point",
     "sum",
+    "to_embedded_html",
     "to_html",
     "total",
     "value",

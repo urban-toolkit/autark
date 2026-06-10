@@ -178,6 +178,10 @@ Build and package setup exposed several runtime/API mismatches. These no longer 
 2. Implement field-driven `encoding.opacity`, `encoding.size`, and `encoding.height`.
 3. Add visual regression snapshots for stable browser rendering baselines.
 4. Keep live Overpass as manual validation via `RUN_REAL_OVERPASS=1`; CI should continue using HAR playback.
+5. Support highlight links targeting points layers (found 2026-06-10): `AutkMap`
+   `setHighlightedIds` throws `Cannot read properties of undefined (reading
+   'nPoints')` for points layers; only polygon layers work as link targets
+   today. Example spec 05 omits the map link for this reason.
 
 ## Locked Executable Spec Conventions (2026-06-07)
 
@@ -357,9 +361,9 @@ Create hand-written example specs to validate design:
 - [x] `examples/specs/01-basic-osm-map.json` - OSM buildings with color encoding
 - [x] `examples/specs/02-linked-map-histogram.json` - Map + histogram with selection
 - [x] `examples/specs/03-spatial-join.json` - Neighborhoods + trees spatial join
-- [ ] `examples/specs/04-geojson-input.json` - GeoJSON layer rendering
-- [ ] `examples/specs/05-csv-points.json` - CSV with lat/lng geometry
-- [ ] `examples/specs/06-multiple-layers.json` - Buildings + roads + parks
+- [x] `examples/specs/04-geojson-input.json` - GeoJSON layer rendering (browser-tested)
+- [x] `examples/specs/05-csv-points.json` - CSV with lat/lng geometry (browser-tested; map link omitted, see runtime TODO 5)
+- [x] `examples/specs/06-multiple-layers.json` - Buildings + roads + parks (schema-validated; execution needs Overpass)
 - [x] Document each example with comments/README
 
 ## Phase 2: TypeScript Runtime
@@ -688,7 +692,7 @@ Create hand-written example specs to validate design:
   - [x] Build complete specs
   - [x] Validate against JSON schema
   - [ ] Test pandas/GeoPandas serialization
-- [ ] Type checking with mypy
+- [x] Type checking with mypy (strict; `python -m mypy` from python/, config in pyproject.toml)
 - [ ] Example notebooks as tests
 
 ### 3.10 Python Documentation

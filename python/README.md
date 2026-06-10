@@ -119,6 +119,9 @@ See [PYTHON_API_IMPLEMENTATION.md](../PYTHON_API_IMPLEMENTATION.md) for roadmap.
 # Run Python tests
 python -m unittest discover -s tests
 
+# Type check (pip install -e ".[dev]")
+python -m mypy
+
 # Validate examples
 python examples/simple_geojson_map.py --validate
 python examples/csv_points_map.py --validate

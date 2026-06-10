@@ -1,0 +1,74 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "Multiple Layers - Buildings, Roads, and Parks",
+    "description": "Composes several OSM sub-layers on one map: extruded buildings colored by height over roads and parks.",
+    "created": "2026-06-10"
+  },
+  "workspace": {
+    "name": "multiple_layers_demo",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "osm",
+      "name": "manhattan_osm",
+      "area": "Manhattan, New York",
+      "layers": ["buildings", "roads", "parks"],
+      "source": "overpass"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "layered_map",
+      "camera": {
+        "pitch": 45,
+        "bearing": 15,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "manhattan_osm_parks",
+          "id": "parks_layer",
+          "type": "polygons",
+          "style": {
+            "color": "#7cb342",
+            "opacity": 0.6
+          }
+        },
+        {
+          "source": "manhattan_osm_roads",
+          "id": "roads_layer",
+          "type": "roads",
+          "style": {
+            "color": "#444444",
+            "width": 1.5
+          }
+        },
+        {
+          "source": "manhattan_osm_buildings",
+          "id": "buildings_layer",
+          "type": "buildings",
+          "encoding": {
+            "color": {
+              "field": "properties.height",
+              "scale": {
+                "type": "linear",
+                "scheme": "viridis",
+                "domainStrategy": "minMax"
+              }
+            }
+          },
+          "style": {
+            "opacity": 0.9
+          }
+        }
+      ]
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

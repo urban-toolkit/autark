@@ -78,6 +78,38 @@ test.describe('Runtime - Example Specs', () => {
     await expect(page.locator('canvas').first()).toBeVisible();
   });
 
+  test('executes geojson input example successfully', async ({ page }) => {
+    page.on('pageerror', err => console.error(`Browser error: ${err.message}`));
+
+    await page.goto(`${HARNESS_URL}?spec=/examples/specs/04-geojson-input.json`);
+
+    await expect(page.locator('#status')).toHaveClass(/success/, { timeout: 30000 });
+    await expect(page.locator('#metadata')).toContainText('Tables: neighborhoods');
+    await expect(page.locator('#metadata')).toContainText('Maps: neighborhoods_map');
+    await expect(page.locator('canvas').first()).toBeVisible();
+  });
+
+  test('executes csv points example successfully', async ({ page }) => {
+    page.on('pageerror', err => console.error(`Browser error: ${err.message}`));
+
+    await page.goto(`${HARNESS_URL}?spec=/examples/specs/05-csv-points.json`);
+
+    await expect(page.locator('#status')).toHaveClass(/success/, { timeout: 30000 });
+    await expect(page.locator('#metadata')).toContainText('Tables: trees');
+    await expect(page.locator('#metadata')).toContainText('Maps: trees_map');
+    await expect(page.locator('#metadata')).toContainText('Plots: latitude_histogram');
+
+    // NOTE: highlight links targeting points layers are not yet supported by
+    // the runtime (AutkMap setHighlightedIds expects polygon picking buffers),
+    // so this example brushes the histogram without a map link.
+    const plotCount = await page.evaluate(() => {
+      const runtime = window.__autarkRuntime;
+      return runtime.getPlots().length;
+    });
+    expect(plotCount).toBe(1);
+    await expect(page.locator('canvas').first()).toBeVisible();
+  });
+
   test('executes Python-generated spatial join spec successfully', async ({ page }) => {
     page.on('console', msg => console.log(`Browser: [${msg.type()}] ${msg.text()}`));
     page.on('pageerror', err => console.error(`Browser error: ${err.message}`));

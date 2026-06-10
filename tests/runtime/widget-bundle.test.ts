@@ -3,6 +3,7 @@ import * as http from 'http';
 import * as path from 'path';
 import { test, expect } from '@playwright/test';
 import { createStaticServer, listen, close } from '../helpers/static-server';
+import { routeDuckdbCdnLocal } from '../helpers/route-duckdb-cdn';
 
 /**
  * Regression test for the anywidget bundle (python/autark/static/autark-widget.js).
@@ -18,7 +19,6 @@ import { createStaticServer, listen, close } from '../helpers/static-server';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const WIDGET_BUNDLE = path.join(REPO_ROOT, 'python', 'autark', 'static', 'autark-widget.js');
-const DUCKDB_DIST = path.join(REPO_ROOT, 'node_modules', '@duckdb', 'duckdb-wasm', 'dist');
 const PORT = 8903;
 
 let server: http.Server;
@@ -88,27 +88,7 @@ test.describe('anywidget bundle', () => {
   test('renders a spec when imported from a blob: URL with CDN DuckDB assets', async ({ page, context }) => {
     expect(fs.existsSync(WIDGET_BUNDLE), `widget bundle missing - run: cd autk-runtime && npm run build:widget`).toBe(true);
 
-    // Serve jsDelivr DuckDB asset requests from the local package so the test
-    // does not depend on the network. context.route also covers requests
-    // initiated inside Web Workers.
-    const cdnRequests: string[] = [];
-    await context.route('https://cdn.jsdelivr.net/**', async (route) => {
-      const url = new URL(route.request().url());
-      cdnRequests.push(url.pathname);
-      const fileName = path.basename(url.pathname);
-      const filePath = path.join(DUCKDB_DIST, fileName);
-      if (!fs.existsSync(filePath)) {
-        await route.fulfill({ status: 404, body: `No local asset for ${fileName}` });
-        return;
-      }
-      const contentType = fileName.endsWith('.wasm') ? 'application/wasm' : 'text/javascript';
-      await route.fulfill({
-        status: 200,
-        contentType,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: fs.readFileSync(filePath),
-      });
-    });
+    const cdnRequests = await routeDuckdbCdnLocal(context);
 
     const errors: string[] = [];
     page.on('console', (msg) => {

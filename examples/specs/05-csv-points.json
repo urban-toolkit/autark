@@ -1,0 +1,65 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "CSV Points - Trees with Histogram",
+    "description": "Loads point data from a CSV file using lat/lng geometry columns and links a map with a latitude histogram.",
+    "created": "2026-06-10"
+  },
+  "workspace": {
+    "name": "csv_points_demo",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "csv",
+      "name": "trees",
+      "url": "/examples/data/trees.csv",
+      "geometry": {
+        "type": "latlng",
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "coordinateFormat": "EPSG:4326"
+      }
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "trees_map",
+      "camera": {
+        "pitch": 0,
+        "bearing": 0,
+        "zoom": 13
+      },
+      "layers": [
+        {
+          "source": "trees",
+          "id": "trees_layer",
+          "type": "points",
+          "style": {
+            "color": "#228B22",
+            "size": 5,
+            "opacity": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "type": "histogram",
+      "name": "latitude_histogram",
+      "source": "trees",
+      "x": {
+        "field": "latitude"
+      },
+      "bins": 20,
+      "selection": {
+        "name": "latitude_brush",
+        "type": "interval"
+      }
+    }
+  ],
+  "layout": {
+    "type": "vertical"
+  }
+}

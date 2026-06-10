@@ -1,0 +1,46 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "GeoJSON Input - Neighborhood Polygons",
+    "description": "Minimal example loading polygons from a GeoJSON file and rendering them with constant styling.",
+    "created": "2026-06-10"
+  },
+  "workspace": {
+    "name": "geojson_input_demo",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "geojson",
+      "name": "neighborhoods",
+      "url": "/examples/data/neighborhoods.geojson",
+      "coordinateFormat": "EPSG:4326",
+      "layerType": "polygons"
+    }
+  ],
+  "views": [
+    {
+      "type": "map",
+      "name": "neighborhoods_map",
+      "camera": {
+        "pitch": 0,
+        "bearing": 0,
+        "zoom": 12
+      },
+      "layers": [
+        {
+          "source": "neighborhoods",
+          "id": "neighborhoods_layer",
+          "type": "polygons",
+          "style": {
+            "color": "#4a90e2",
+            "opacity": 0.7,
+            "strokeColor": "#2c5aa0",
+            "strokeWidth": 2
+          }
+        }
+      ]
+    }
+  ]
+}

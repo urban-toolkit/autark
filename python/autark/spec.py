@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ._serialise import Serializable, to_plain
-from .display import to_html
+from .display import DEFAULT_RUNTIME_URL, to_embedded_html, to_html
 
 SCHEMA_URL = "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json"
 VERSION = "0.1"
@@ -81,19 +81,34 @@ class AutarkSpec(Serializable):
         jsonschema.Draft7Validator.check_schema(schema)
         jsonschema.validate(self.to_dict(), schema)
 
-    def to_html(self, *, runtime_url: str = "http://localhost:8000/autk-runtime/dist/autk-runtime.js", height: str = "640px") -> str:
+    def to_html(self, *, runtime_url: str = DEFAULT_RUNTIME_URL, height: str = "640px") -> str:
         return to_html(self, runtime_url=runtime_url, height=height)
 
     def save_html(
         self,
         path: str | Path,
         *,
-        runtime_url: str = "http://localhost:8000/autk-runtime/dist/autk-runtime.js",
+        runtime_url: str | None = None,
         height: str = "640px",
+        title: str | None = None,
     ) -> None:
-        Path(path).write_text(self.to_html(runtime_url=runtime_url, height=height), encoding="utf-8")
+        """Save the spec as an HTML file.
 
-    def widget(self, *, height: str = "640px"):
+        By default the file is fully self-contained: the runtime bundle is
+        embedded inline, so it opens anywhere (file://, web host) without a
+        local server. DuckDB assets load from the jsDelivr CDN, and data
+        sources must use absolute URLs or inline values.
+
+        Pass ``runtime_url`` to instead produce a lightweight file that loads
+        the runtime from a dev server (useful during development).
+        """
+        if runtime_url is not None:
+            content = self.to_html(runtime_url=runtime_url, height=height)
+        else:
+            content = to_embedded_html(self, height=height, title=title)
+        Path(path).write_text(content, encoding="utf-8")
+
+    def widget(self, *, height: str = "640px") -> Any:
         """Render the spec as a Jupyter widget using the bundled runtime.
 
         Requires the ``widget`` extra (``pip install autark[widget]``). Works

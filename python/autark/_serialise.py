@@ -9,7 +9,9 @@ class Serializable:
     """Mixin for objects that serialize into an Autark JSON spec fragment."""
 
     def to_dict(self) -> dict[str, Any]:
-        return to_plain(self)
+        plain = to_plain(self)
+        assert isinstance(plain, dict)
+        return plain
 
 
 def to_plain(value: Any) -> Any:
@@ -30,15 +32,15 @@ def to_plain(value: Any) -> Any:
     if isinstance(value, Serializable):
         return value.to_dict()
     if isinstance(value, Mapping):
-        out: dict[str, Any] = {}
+        mapped: dict[str, Any] = {}
         for key, item in value.items():
             if item is None:
                 continue
             plain = to_plain(item)
             if plain == {} or plain == []:
                 continue
-            out[str(key)] = plain
-        return out
+            mapped[str(key)] = plain
+        return mapped
     if isinstance(value, (list, tuple)):
         return [to_plain(item) for item in value if item is not None]
     if isinstance(value, Path):

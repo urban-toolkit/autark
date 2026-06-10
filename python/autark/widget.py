@@ -23,6 +23,16 @@ _WIDGET_ESM = _STATIC_DIR / "autark-widget.js"
 _widget_class: type | None = None
 
 
+def _read_widget_esm() -> str:
+    """Return the bundled widget runtime source, or raise with a build hint."""
+    if not _WIDGET_ESM.exists():
+        raise RuntimeError(
+            f"Bundled widget runtime not found: {_WIDGET_ESM}. "
+            "Build it with: cd autk-runtime && npm run build:widget"
+        )
+    return _WIDGET_ESM.read_text(encoding="utf-8")
+
+
 def _build_widget_class() -> type:
     try:
         import anywidget
@@ -63,7 +73,7 @@ def _warn_on_relative_urls(spec_dict: dict[str, Any]) -> None:
             )
 
 
-def create_widget(spec: Any, *, height: str = "640px"):
+def create_widget(spec: Any, *, height: str = "640px") -> Any:
     """Create an anywidget instance rendering the given spec.
 
     @param spec: An AutarkSpec (or plain dict spec).
