@@ -154,6 +154,21 @@ export class DataLoader {
       throw new Error('JSON source must have either url or values');
     }
 
+    if (source.geometry) {
+      if (source.geometry.type === 'latlng') {
+        jsonOptions.geometryColumns = {
+          latColumnName: source.geometry.latitude,
+          longColumnName: source.geometry.longitude,
+          coordinateFormat: source.geometry.coordinateFormat,
+        };
+      } else if (source.geometry.type === 'wkt') {
+        jsonOptions.geometryColumns = {
+          wktColumnName: source.geometry.column,
+          coordinateFormat: source.geometry.coordinateFormat,
+        };
+      }
+    }
+
     // Note: The 'flatten' option from the schema could be used in the future
     // to control how nested structures are handled
 
@@ -176,6 +191,9 @@ export class DataLoader {
     // Add coordinate format override if specified
     if (source.coordinateFormat) {
       geotiffOptions.coordinateFormat = source.coordinateFormat;
+    }
+    if (source.maxPixels) {
+      geotiffOptions.maxPixels = source.maxPixels;
     }
 
     // Note: Band selection is specified in the schema but not yet supported in AutkDb.

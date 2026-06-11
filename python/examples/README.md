@@ -109,6 +109,39 @@ conda run -n urban python geopandas_workflow.py --html /tmp/geopandas_workflow.h
 
 ---
 
+### 5. OSMnx to Autark Workflow ([osmnx_autark_workflow.py](osmnx_autark_workflow.py))
+
+**What it demonstrates:**
+- Downloading a small street network with OSMnx
+- Computing edge speeds and travel times
+- Converting an OSMnx graph to GeoPandas node/edge GeoDataFrames
+- Serializing those GeoDataFrames with `GeoJSON.from_geopandas()`
+- Visualizing the network with an Autark map and edge table
+
+**Usage:**
+```bash
+# Requires OSMnx/GeoPandas and network access to Overpass.
+# The local uv environment created during testing is:
+.venv-osmnx/bin/python python/examples/osmnx_autark_workflow.py --validate
+
+# Save to HTML file
+.venv-osmnx/bin/python python/examples/osmnx_autark_workflow.py --html /tmp/osmnx_autark.html
+```
+
+**Jupyter:**
+Use the `Python (Autark OSMnx)` kernel, then:
+
+```python
+from osmnx_autark_workflow import build_spec
+
+spec = build_spec()
+spec.widget(height="700px")
+```
+
+**Generated spec:** inline GeoJSON for OSMnx street edges and nodes
+
+---
+
 ## Testing the Examples
 
 ### Option 1: Generate and Inspect JSON
@@ -118,6 +151,7 @@ conda run -n urban python geopandas_workflow.py --html /tmp/geopandas_workflow.h
 python simple_geojson_map.py --validate
 python csv_points_map.py --validate
 conda run -n urban python geopandas_workflow.py --validate
+.venv-osmnx/bin/python python/examples/osmnx_autark_workflow.py --validate
 ```
 
 This checks that the generated spec matches the JSON Schema.
@@ -129,6 +163,7 @@ This checks that the generated spec matches the JSON Schema.
 python simple_geojson_map.py --html /tmp/simple_map.html
 python csv_points_map.py --html /tmp/csv_points.html
 conda run -n urban python geopandas_workflow.py --html /tmp/geopandas_workflow.html
+.venv-osmnx/bin/python python/examples/osmnx_autark_workflow.py --html /tmp/osmnx_autark.html
 python spatial_join.py --output /tmp/spatial_join.json
 
 # Start a local server from the repo root

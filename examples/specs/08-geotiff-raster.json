@@ -2,8 +2,8 @@
   "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
   "version": "0.1",
   "metadata": {
-    "title": "GeoTIFF Raster Example",
-    "description": "Example demonstrating GeoTIFF raster data loading and visualization"
+    "title": "GeoTIFF Data Example",
+    "description": "Example demonstrating GeoTIFF raster data loading and table inspection"
   },
   "workspace": {
     "name": "raster_example",
@@ -14,33 +14,23 @@
       "type": "geotiff",
       "name": "temperature",
       "url": "https://example.com/data/land_surface_temperature.tif",
-      "band": 1
+      "band": 1,
+      "maxPixels": 1000000
     }
   ],
   "views": [
     {
-      "id": "map",
-      "type": "map",
-      "title": "Land Surface Temperature",
-      "layers": [
-        {
-          "id": "temp_layer",
-          "source": "temperature",
-          "type": "raster",
-          "encoding": {
-            "color": {
-              "field": "value",
-              "scale": {
-                "domain": [0, 50],
-                "range": ["blue", "red"]
-              }
-            }
-          }
-        }
+      "type": "table",
+      "name": "temperature_table",
+      "source": "temperature",
+      "columns": [
+        {"field": "x"},
+        {"field": "y"},
+        {"field": "value"}
       ],
-      "viewport": {
-        "center": [-73.935, 40.730],
-        "zoom": 10
+      "sort": {
+        "column": "value",
+        "direction": "desc"
       }
     }
   ]

@@ -321,6 +321,10 @@
           "type": "boolean",
           "default": false,
           "description": "Whether to flatten nested JSON structures into columns"
+        },
+        "geometry": {
+          "$ref": "#/definitions/CsvGeometry",
+          "description": "Optional geometry columns for spatial JSON records"
         }
       },
       "oneOf": [
@@ -331,7 +335,7 @@
     "GeoTiffDataSource": {
       "type": "object",
       "description": "GeoTIFF raster data source",
-      "required": ["type", "name"],
+      "required": ["type", "name", "url"],
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -354,9 +358,13 @@
         "coordinateFormat": {
           "type": "string",
           "description": "Override coordinate reference system (defaults to GeoTIFF CRS)"
+        },
+        "maxPixels": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Maximum number of raster pixels to load"
         }
-      },
-      "required": ["url"]
+      }
     },
     "Transform": {
       "oneOf": [

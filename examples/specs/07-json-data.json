@@ -13,6 +13,12 @@
     {
       "type": "json",
       "name": "events",
+      "geometry": {
+        "type": "latlng",
+        "latitude": "lat",
+        "longitude": "lon",
+        "coordinateFormat": "EPSG:4326"
+      },
       "values": [
         {"id": 1, "name": "Event A", "lat": 40.7128, "lon": -74.0060, "attendance": 150},
         {"id": 2, "name": "Event B", "lat": 40.7580, "lon": -73.9855, "attendance": 200},
@@ -24,37 +30,34 @@
   ],
   "views": [
     {
-      "id": "scatter",
       "type": "scatterplot",
-      "title": "Event Attendance",
-      "data": "events",
-      "encoding": {
-        "x": {
-          "field": "id",
-          "title": "Event ID"
-        },
-        "y": {
-          "field": "attendance",
-          "title": "Attendance"
-        },
-        "color": {
-          "field": "name"
-        }
+      "name": "scatter",
+      "source": "events",
+      "x": {
+        "field": "id"
+      },
+      "y": {
+        "field": "attendance"
+      },
+      "color": {
+        "field": "name"
       }
     },
     {
-      "id": "table",
       "type": "table",
-      "title": "Event Data",
-      "data": "events",
-      "columns": ["id", "name", "lat", "lon", "attendance"]
+      "name": "table",
+      "source": "events",
+      "columns": [
+        {"field": "id"},
+        {"field": "name"},
+        {"field": "lat"},
+        {"field": "lon"},
+        {"field": "attendance"}
+      ]
     }
   ],
   "layout": {
     "type": "grid",
-    "gridTemplate": [
-      ["scatter"],
-      ["table"]
-    ]
+    "columns": 1
   }
 }

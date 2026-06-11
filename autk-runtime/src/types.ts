@@ -94,6 +94,7 @@ export interface JsonDataSource {
   url?: string;
   values?: object | unknown[]; // JSON object or array
   flatten?: boolean; // Default: false
+  geometry?: CsvGeometry;
 }
 
 export interface GeoTiffDataSource {
@@ -102,6 +103,7 @@ export interface GeoTiffDataSource {
   url: string; // Required
   band?: number; // Default: 1 (1-based index)
   coordinateFormat?: string; // Override CRS
+  maxPixels?: number;
 }
 
 // ============================================================================
