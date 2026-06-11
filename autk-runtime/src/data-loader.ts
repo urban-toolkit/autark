@@ -37,6 +37,12 @@ export class DataLoader {
       case 'csv':
         await this.loadCsvSource(db, source);
         break;
+      case 'json':
+        await this.loadJsonSource(db, source);
+        break;
+      case 'geotiff':
+        await this.loadGeoTiffSource(db, source);
+        break;
       default:
         throw new Error(`Unknown data source type: ${(source as DataSource).type}`);
     }
@@ -127,5 +133,57 @@ export class DataLoader {
     }
 
     await db.loadCsv(csvOptions);
+  }
+
+  /**
+   * Load JSON data source.
+   */
+  private async loadJsonSource(db: AutkDb, source: Extract<DataSource, { type: 'json' }>): Promise<void> {
+    const jsonOptions: Parameters<typeof db.loadJson>[0] = {
+      outputTableName: source.name,
+    };
+
+    if (source.url) {
+      jsonOptions.jsonFileUrl = source.url;
+    } else if (source.values) {
+      // The loadJson expects an array, so ensure we have an array
+      // If it's an object, wrap it in an array
+      const jsonArray = Array.isArray(source.values) ? source.values : [source.values];
+      jsonOptions.jsonObject = jsonArray;
+    } else {
+      throw new Error('JSON source must have either url or values');
+    }
+
+    // Note: The 'flatten' option from the schema could be used in the future
+    // to control how nested structures are handled
+
+    await db.loadJson(jsonOptions);
+  }
+
+  /**
+   * Load GeoTIFF data source.
+   */
+  private async loadGeoTiffSource(db: AutkDb, source: Extract<DataSource, { type: 'geotiff' }>): Promise<void> {
+    if (!source.url) {
+      throw new Error('GeoTIFF source must have url');
+    }
+
+    const geotiffOptions: Parameters<typeof db.loadGeoTiff>[0] = {
+      geotiffFileUrl: source.url,
+      outputTableName: source.name,
+    };
+
+    // Add coordinate format override if specified
+    if (source.coordinateFormat) {
+      geotiffOptions.coordinateFormat = source.coordinateFormat;
+    }
+
+    // Note: Band selection is specified in the schema but not yet supported in AutkDb.
+    // When it becomes available, use: source.band - 1 (convert 1-based to 0-based)
+    if (source.band && source.band !== 1) {
+      console.warn(`GeoTIFF band selection requested (band ${source.band}) but not yet supported. Using default band.`);
+    }
+
+    await db.loadGeoTiff(geotiffOptions);
   }
 }

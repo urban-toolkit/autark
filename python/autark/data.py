@@ -248,8 +248,8 @@ class CSV(Serializable):
 class JSON(Serializable):
     name: str
     url: str | None = None
-    values: list[Any] | None = None
-    geometry: LatLngGeometry | WktGeometry | None = None
+    values: list[Any] | dict[str, Any] | None = None
+    flatten: bool = False
     type: Literal["json"] = "json"
 
     def __post_init__(self) -> None:
@@ -260,6 +260,6 @@ class JSON(Serializable):
 class GeoTIFF(Serializable):
     name: str
     url: str
+    band: int = 1  # 1-based index, default to first band
     coordinate_format: str | None = dataclass_field(default=None, metadata={"json": "coordinateFormat"})
-    max_pixels: int | None = dataclass_field(default=None, metadata={"json": "maxPixels"})
     type: Literal["geotiff"] = "geotiff"

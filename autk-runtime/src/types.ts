@@ -41,7 +41,7 @@ export interface Workspace {
 // Data Sources
 // ============================================================================
 
-export type DataSource = OsmDataSource | GeoJsonDataSource | CsvDataSource;
+export type DataSource = OsmDataSource | GeoJsonDataSource | CsvDataSource | JsonDataSource | GeoTiffDataSource;
 
 export interface OsmDataSource {
   type: 'osm';
@@ -86,6 +86,22 @@ export interface CsvWktGeometry {
   type: 'wkt';
   column: string; // Column name containing WKT
   coordinateFormat?: string;
+}
+
+export interface JsonDataSource {
+  type: 'json';
+  name: string; // SQL-safe identifier
+  url?: string;
+  values?: object | unknown[]; // JSON object or array
+  flatten?: boolean; // Default: false
+}
+
+export interface GeoTiffDataSource {
+  type: 'geotiff';
+  name: string; // SQL-safe identifier
+  url: string; // Required
+  band?: number; // Default: 1 (1-based index)
+  coordinateFormat?: string; // Override CRS
 }
 
 // ============================================================================

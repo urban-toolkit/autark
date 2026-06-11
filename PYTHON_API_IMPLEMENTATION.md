@@ -43,8 +43,8 @@ b941f2a feat(python): expand spec builders and runtime support
 - `ak.GeoJSON.from_dataframe()`
 - `ak.GeoJSON.from_geopandas()`
 - `ak.CSV`
-- `ak.JSON` Python builder
-- `ak.GeoTIFF` Python builder
+- `ak.JSON` Python builder with runtime support (completed 2024-12-20)
+- `ak.GeoTIFF` Python builder with runtime support (completed 2024-12-20)
 - CSV lat/lng geometry helper
 - CSV WKT geometry helper
 
@@ -111,12 +111,16 @@ b941f2a feat(python): expand spec builders and runtime support
 - `python/examples/csv_points_map.py`
 - `python/examples/spatial_join.py`
 - `python/examples/geopandas_workflow.py`
+- `python/examples/json_data_example.py` (added 2024-12-20)
+- `python/examples/geotiff_raster_example.py` (added 2024-12-20)
 - `examples/specs/01-basic-osm-map.json`
 - `examples/specs/02-linked-map-histogram.json`
 - `examples/specs/03-spatial-join.json`
 - `examples/specs/04-geojson-input.json`
 - `examples/specs/05-csv-points.json`
 - `examples/specs/06-multiple-layers.json`
+- `examples/specs/07-json-data.json` (added 2024-12-20)
+- `examples/specs/08-geotiff-raster.json` (added 2024-12-20)
 - `tests/fixtures/runtime/fixture-06-scatter-table.json`
 
 ## Open Backlog
@@ -127,12 +131,12 @@ were not reintroduced here.
 
 ### Runtime Data Sources And Schema
 
-- [ ] Wire `type: "json"` into `schema/autark-spec-v0.1.json`.
-- [ ] Load JSON data sources in `autk-runtime/src/data-loader.ts` through
-  `AutkDb.loadJson()`.
-- [ ] Wire `type: "geotiff"` into `schema/autark-spec-v0.1.json`.
-- [ ] Load GeoTIFF data sources in `autk-runtime/src/data-loader.ts` through
-  `AutkDb.loadGeoTiff()`.
+- [x] Wire `type: "json"` into `schema/autark-spec-v0.1.json` (completed 2024-12-20).
+- [x] Load JSON data sources in `autk-runtime/src/data-loader.ts` through
+  `AutkDb.loadJson()` (completed 2024-12-20).
+- [x] Wire `type: "geotiff"` into `schema/autark-spec-v0.1.json` (completed 2024-12-20).
+- [x] Load GeoTIFF data sources in `autk-runtime/src/data-loader.ts` through
+  `AutkDb.loadGeoTiff()` (completed 2024-12-20).
 - [ ] Add GeoTIFF map/raster workflow tests.
 - [ ] Decide whether `TableRef` belongs in AutarkSpec and add schema/runtime
   support if accepted.

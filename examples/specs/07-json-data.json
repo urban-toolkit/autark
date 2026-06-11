@@ -1,0 +1,60 @@
+{
+  "$schema": "https://urban-toolkit.github.io/autark/schema/autark-spec-v0.1.json",
+  "version": "0.1",
+  "metadata": {
+    "title": "JSON Data Source Example",
+    "description": "Example demonstrating JSON data loading with points visualization"
+  },
+  "workspace": {
+    "name": "json_example",
+    "coordinateFormat": "EPSG:4326"
+  },
+  "data": [
+    {
+      "type": "json",
+      "name": "events",
+      "values": [
+        {"id": 1, "name": "Event A", "lat": 40.7128, "lon": -74.0060, "attendance": 150},
+        {"id": 2, "name": "Event B", "lat": 40.7580, "lon": -73.9855, "attendance": 200},
+        {"id": 3, "name": "Event C", "lat": 40.7489, "lon": -73.9680, "attendance": 175},
+        {"id": 4, "name": "Event D", "lat": 40.7614, "lon": -73.9776, "attendance": 225},
+        {"id": 5, "name": "Event E", "lat": 40.7282, "lon": -73.9942, "attendance": 190}
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "scatter",
+      "type": "scatterplot",
+      "title": "Event Attendance",
+      "data": "events",
+      "encoding": {
+        "x": {
+          "field": "id",
+          "title": "Event ID"
+        },
+        "y": {
+          "field": "attendance",
+          "title": "Attendance"
+        },
+        "color": {
+          "field": "name"
+        }
+      }
+    },
+    {
+      "id": "table",
+      "type": "table",
+      "title": "Event Data",
+      "data": "events",
+      "columns": ["id", "name", "lat", "lon", "attendance"]
+    }
+  ],
+  "layout": {
+    "type": "grid",
+    "gridTemplate": [
+      ["scatter"],
+      ["table"]
+    ]
+  }
+}

@@ -26,6 +26,8 @@ Runtime-backed data sources:
 - `ak.OSM`
 - `ak.GeoJSON`
 - `ak.CSV`
+- `ak.JSON` (as of 2024-12-20)
+- `ak.GeoTIFF` (as of 2024-12-20)
 
 Python-side helpers:
 
@@ -33,11 +35,6 @@ Python-side helpers:
   latitude/longitude columns into inline GeoJSON points.
 - `ak.GeoJSON.from_geopandas()` converts GeoPandas-like objects into inline
   GeoJSON, reprojecting to EPSG:4326 when CRS metadata is available.
-
-Python builders present, runtime/schema wiring still deferred:
-
-- `ak.JSON`
-- `ak.GeoTIFF`
 
 ### Transforms
 
@@ -480,6 +477,71 @@ spec = ak.Spec(
 more verbose because the runtime needs layer, viewpoint, aggregation, camera,
 and tile-size configuration.
 
+## JSON Data Source
+
+```python
+import autark as ak
+
+# Load JSON from URL
+remote_json = ak.JSON("remote_data", url="/data/events.json")
+
+# Use inline JSON data
+inline_json = ak.JSON(
+    "events",
+    values=[
+        {"id": 1, "name": "Event A", "value": 100},
+        {"id": 2, "name": "Event B", "value": 150},
+    ],
+)
+
+spec = ak.Spec(
+    data=[inline_json],
+    views=[
+        ak.Scatterplot(
+            inline_json,
+            x="id",
+            y="value",
+            color="name",
+        ),
+        ak.Table(inline_json, columns=["id", "name", "value"]),
+    ],
+)
+```
+
+## GeoTIFF Raster Data
+
+```python
+import autark as ak
+
+# Load GeoTIFF raster
+raster = ak.GeoTIFF(
+    "elevation",
+    url="/data/elevation.tif",
+    band=1,  # Use first band (1-based index)
+    coordinate_format="EPSG:4326",
+)
+
+spec = ak.Spec(
+    data=[raster],
+    views=[
+        ak.Map(
+            layers=[
+                # Note: Raster layer support depends on runtime implementation
+                ak.Layer(raster, type="raster").encode(
+                    color=ak.field(
+                        "value",
+                        scale=ak.Scale(
+                            domain=[0, 1000],
+                            range=["green", "brown", "white"],
+                        ),
+                    )
+                )
+            ]
+        )
+    ],
+)
+```
+
 ## Jupyter Usage
 
 For the bundled widget path:
@@ -520,6 +582,8 @@ Python examples:
 - `python/examples/csv_points_map.py`
 - `python/examples/spatial_join.py`
 - `python/examples/geopandas_workflow.py`
+- `python/examples/json_data_example.py` (new)
+- `python/examples/geotiff_raster_example.py` (new)
 
 Spec examples:
 
@@ -529,6 +593,8 @@ Spec examples:
 - `examples/specs/04-geojson-input.json`
 - `examples/specs/05-csv-points.json`
 - `examples/specs/06-multiple-layers.json`
+- `examples/specs/07-json-data.json` (new)
+- `examples/specs/08-geotiff-raster.json` (new)
 
 Runtime fixtures:
 
@@ -562,15 +628,14 @@ environments.
 
 ## Current Limitations
 
-- `ak.JSON` and `ak.GeoTIFF` serialize from Python, but `type: "json"` and
-  `type: "geotiff"` are not yet accepted by the AutarkSpec schema/runtime data
-  loader.
 - OSM support works through the runtime and is covered by HAR-backed tests; live
   Overpass tests remain manual/skipped by default.
 - Large dataset handling is still GeoJSON-oriented. Arrow/Parquet or tiled
   raster workflows remain future work.
 - Higher-level expression helpers for compute are not implemented; use raw WGSL
   bodies through `Compute.gpgpu()`.
+- GeoTIFF band selection is defined in the schema but not yet implemented in the
+  runtime (defaults to first band).
 
 ## Documentation Map
 

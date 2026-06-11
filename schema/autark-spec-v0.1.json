@@ -106,7 +106,9 @@
       "oneOf": [
         {"$ref": "#/definitions/OsmDataSource"},
         {"$ref": "#/definitions/GeoJsonDataSource"},
-        {"$ref": "#/definitions/CsvDataSource"}
+        {"$ref": "#/definitions/CsvDataSource"},
+        {"$ref": "#/definitions/JsonDataSource"},
+        {"$ref": "#/definitions/GeoTiffDataSource"}
       ]
     },
     "OsmDataSource": {
@@ -292,6 +294,69 @@
           }
         }
       ]
+    },
+    "JsonDataSource": {
+      "type": "object",
+      "description": "JSON data source for arbitrary tabular or nested data",
+      "required": ["type", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "json"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Data source name (table name in database)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL to JSON file"
+        },
+        "values": {
+          "type": ["object", "array"],
+          "description": "Inline JSON data (alternative to url)"
+        },
+        "flatten": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to flatten nested JSON structures into columns"
+        }
+      },
+      "oneOf": [
+        {"required": ["url"]},
+        {"required": ["values"]}
+      ]
+    },
+    "GeoTiffDataSource": {
+      "type": "object",
+      "description": "GeoTIFF raster data source",
+      "required": ["type", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "geotiff"
+        },
+        "name": {
+          "$ref": "#/definitions/Identifier",
+          "description": "Data source name (table name in database)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL to GeoTIFF file"
+        },
+        "band": {
+          "type": "integer",
+          "default": 1,
+          "description": "Band index to use (1-based)"
+        },
+        "coordinateFormat": {
+          "type": "string",
+          "description": "Override coordinate reference system (defaults to GeoTIFF CRS)"
+        }
+      },
+      "required": ["url"]
     },
     "Transform": {
       "oneOf": [
