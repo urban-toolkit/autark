@@ -55,11 +55,11 @@ export type {
 /** Abstract base class returned by layer lookup and picking APIs. */
 export { Layer } from './layer';
 
-/** Built-in map style presets and helpers. */
-export { MapStyle } from './map-style';
+/** Built-in map style presets, helpers, and required semantic color slots. */
+export { MapStyle, MAP_STYLE_KEYS } from './map-style';
 
-/** Types for selecting and describing map style presets. */
-export type { MapStylePresetId, MapStyleShape } from './map-style';
+/** Types for selecting and describing map style presets and color slots. */
+export type { MapStyleKey, MapStylePresetId, MapStyleShape } from './map-style';
 
 /** Map event enums and interaction status values. */
 export { MapEvent, MouseStatus } from './types-events';

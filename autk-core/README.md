@@ -79,7 +79,7 @@ console.log(origin, geometry.length, components.length, camera.eye, colormap.len
 - **Events**: `EventEmitter`, `EventListener`, `SelectionData`
 - **Mesh types**: `LayerGeometry`, `LayerComponent`, `LayerBorder`, `LayerBorderComponent`
 - **Layer and buffer types**: `LayerType`, `BoundingBox`, `TypedArray`, `TypedArrayConstructor`
-- **Utilities**: `valueAtPath`, `isNumericLike`, `computeOrigin`, `computeGeometryCentroid`, `computeBoundingBox`, `isLayerType`, `mapGeometryTypeToLayerType`, `offsetPolyline`
+- **Utilities**: `valueAtPath`, `isNumericLike`, `computeOrigin`, `computeGeometryCentroid`, `computeBoundingBox`, `mapGeometryTypeToLayerType`, `offsetPolyline`
 - **Triangulators**: `TriangulatorPoints`, `TriangulatorPolylines`, `TriangulatorPolygons`, `TriangulatorBuildings`, `TriangulatorBuildingWithWindows`, `TriangulatorRaster`
 
 The complete export list lives in [`src/index.ts`](./src/index.ts).

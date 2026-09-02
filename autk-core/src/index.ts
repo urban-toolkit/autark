@@ -151,9 +151,6 @@ export type {
 /** OSM base layer types in fixed bottom-up render order. */
 export { OSM_BASE_LAYER_ORDER } from './types-layer';
 
-/** All `LayerType` values as a readonly array. */
-export { LAYER_TYPE_VALUES } from './types-layer';
-
 export type {
     /** Supported TypedArray views for binary data buffers. */
     TypedArray,
@@ -179,8 +176,6 @@ export { computeGeometryCentroid } from './utils-geojson';
 export { computeBoundingBox } from './utils-geojson';
 /** Type guard that checks whether a value is a GeoJSON FeatureCollection. */
 export { isFeatureCollection } from './utils-geojson';
-/** Returns true when a string matches a shared layer type. */
-export { isLayerType } from './utils-layer';
 /** Maps a GeoJSON geometry type to the shared layer taxonomy. */
 export { mapGeometryTypeToLayerType } from './utils-layer';
 /** Builds a closed planar offset polygon from a local-space polyline. */

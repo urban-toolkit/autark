@@ -15,7 +15,6 @@
  * selection, and thematic handling.
  */
 export type LayerType =
-  | 'background'
   | 'surface'
   | 'parks'
   | 'water'
@@ -25,20 +24,6 @@ export type LayerType =
   | 'polygons'
   | 'polylines'
   | 'raster';
-
-/** All `LayerType` values as a readonly array, in union definition order. */
-export const LAYER_TYPE_VALUES: readonly LayerType[] = [
-  'background',
-  'surface',
-  'parks',
-  'water',
-  'roads',
-  'buildings',
-  'points',
-  'polygons',
-  'polylines',
-  'raster',
-] as const;
 
 /**
  * OSM base layer types in fixed bottom-up render order.

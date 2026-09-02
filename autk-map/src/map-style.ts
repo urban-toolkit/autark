@@ -7,8 +7,7 @@
  * `MapStyle` instance so multiple maps can use different visual treatments.
  */
 
-import { ColorHEX, ColorRGB, ColorMap, LAYER_TYPE_VALUES } from '@urban-toolkit/autk-core';
-import type { LayerType } from '@urban-toolkit/autk-core';
+import { ColorHEX, ColorRGB, ColorMap } from '@urban-toolkit/autk-core';
 
 import defaultStyle from './styles/default.json';
 import light from './styles/light.json';
@@ -21,10 +20,21 @@ export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm';
 
 /** Ordered preset ids used for keyboard style cycling. */
 const PRESET_IDS: readonly MapStylePresetId[] = ['apple', 'default', 'light', 'google', 'osm'];
-/** Required keys for a valid map style object — derived from `LayerType` minus `raster`. */
-const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = LAYER_TYPE_VALUES.filter(
-  (l): l is Exclude<LayerType, 'raster'> => l !== 'raster',
-) as Array<keyof MapStyleShape>;
+/** Required semantic color slots for a map style. */
+export const MAP_STYLE_KEYS = [
+    'background',
+    'surface',
+    'parks',
+    'water',
+    'roads',
+    'buildings',
+    'points',
+    'polylines',
+    'polygons',
+] as const;
+
+/** Semantic color slot accepted by a map style. */
+export type MapStyleKey = typeof MAP_STYLE_KEYS[number];
 /** Accepts #RGB, #RRGGBB and #RRGGBBAA color literals. */
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
@@ -35,17 +45,7 @@ const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
  * color literal. Runtime custom styles must provide every field defined by this
  * interface.
  */
-export interface MapStyleShape {
-    background: ColorHEX;
-    surface: ColorHEX;
-    parks: ColorHEX;
-    water: ColorHEX;
-    roads: ColorHEX;
-    buildings: ColorHEX;
-    points: ColorHEX;
-    polylines: ColorHEX;
-    polygons: ColorHEX;
-}
+export type MapStyleShape = Record<MapStyleKey, ColorHEX>;
 
 /**
  * Instance-owned map style state and semantic color resolver.
