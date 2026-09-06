@@ -47,3 +47,4 @@
 ## GIT
 - Never commit or push the code if I did not explicitly ask you to do that.
 - Always commit the code using git best practices (https://www.conventionalcommits.org/en/v1.0.0/)
+- Never reference AI tools, models, assistants, agents, or their vendors in branch names, commit messages, pull request titles or descriptions, comments, generated artifacts, or any contributor-facing text. Use neutral project terminology.

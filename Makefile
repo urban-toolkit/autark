@@ -1,4 +1,4 @@
-.PHONY: lint typecheck build package-validate docs verify dev gallery usecases clean
+.PHONY: lint test typecheck build package-validate docs verify dev gallery usecases clean
 
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
@@ -7,6 +7,9 @@ APP ?= gallery
 
 lint:
 	npm run lint
+
+test:
+	npm test
 
 typecheck: build
 	$(CONCURRENTLY) \
@@ -39,7 +42,7 @@ docs:
 		"cd autk-plot && npm run doc" \
 		"cd autk-compute && npm run doc"
 
-verify: lint typecheck
+verify: lint test typecheck
 
 dev:
 	npm install

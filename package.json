@@ -4,6 +4,7 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test": "vitest run",
     "validate:packages": "node .github/scripts/validate-packages.mjs"
   },
   "workspaces": [
@@ -22,6 +23,7 @@
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1",
     "eslint": "^10.6.0",
-    "globals": "^17.7.0"
+    "globals": "^17.7.0",
+    "vitest": "^5.0.0"
   }
 }

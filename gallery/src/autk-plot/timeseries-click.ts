@@ -47,7 +47,7 @@ export class MapD3Timeseries {
 
     protected initPlot(): void {
         this.plot = new AutkPlot(this.plotDiv, {
-            type: 'barchart',
+            type: 'linechart',
             collection: this.geojson,
             attributes: { axis: ['series', '@transform'] },
             labels: { axis: ['bucket', 'avg'], title: 'Average synthetic timeseries (neighborhoods)' },
