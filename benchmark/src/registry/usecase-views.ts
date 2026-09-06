@@ -1,0 +1,40 @@
+import type { ViewDefinition } from './types';
+
+export const USECASE_VIEWS: ViewDefinition[] = [
+  {
+    id: 'usecase-urbane',
+    name: 'Urbane Dashboard',
+    app: 'usecases',
+    path: '/src/urbane/main.html',
+    category: 'usecase',
+    dataTypes: ['osm-pbf', 'geojson', 'csv', 'multi-dataset'],
+    description: 'Comprehensive urban visual analytics dashboard linking PBF, GeoJSON, and 7 CSV datasets',
+    canvasRequired: true,
+    plotRequired: true,
+    loadingOverlay: true,
+  },
+  {
+    id: 'usecase-shadows',
+    name: 'Street-Level Shadow Analysis',
+    app: 'usecases',
+    path: '/src/shadows/main.html',
+    category: 'usecase',
+    dataTypes: ['osm-overpass', 'csv'],
+    description: 'Analytical shadow simulation using WebGPU compute shaders and spatial join queries',
+    canvasRequired: true,
+    plotRequired: true,
+    loadingOverlay: true,
+  },
+  {
+    id: 'usecase-niteroi',
+    name: 'Land Surface Temperature',
+    app: 'usecases',
+    path: '/src/niteroi/main.html',
+    category: 'usecase',
+    dataTypes: ['osm-overpass', 'geotiff'],
+    description: '24-year satellite LST raster regression and spatial join with road networks',
+    canvasRequired: true,
+    plotRequired: true,
+    loadingOverlay: true,
+  },
+];

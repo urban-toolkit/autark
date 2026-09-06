@@ -19,7 +19,7 @@ export class RawQueryUseCase {
     this.validateQuery(params.query);
     await this.conn.query(`USE ${workspace}`);
 
-    if (params.output.type === 'CREATE_TABLE') {
+    if (params.output?.type === 'CREATE_TABLE') {
       if (!params.output.tableName) {
         throw new Error('output.tableName must be provided when output.type is "CREATE_TABLE"');
       }

@@ -69,6 +69,12 @@ xcode-select --install
 sudo apt-get install build-essential
 ```
 
+Alternatively, Nix users can enter a development shell with Node.js and GNU Make available:
+
+```bash
+nix-shell
+```
+
 ### Building and Running
 
 After installing Node.js and GNU Make, run the following command from the project's root folder:

@@ -88,7 +88,7 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
     ? `${NEAR_CTE_ALIAS} AS (
         SELECT * FROM ${qualifiedTableJoinName} AS ${params.tableJoin.name}
         WHERE ST_Intersects(
-          (SELECT ST_Union_Agg(ST_Expand(${rootGeomExpr(params.tableRoot.name, params.geometricColumnRoot)}, ${params.nearDistance})) FROM ${qualifiedTableRootName} AS ${params.tableRoot.name}),
+          (SELECT ST_Expand(ST_Envelope_Agg(${rootGeomExpr(params.tableRoot.name, params.geometricColumnRoot)}), ${params.nearDistance}) FROM ${qualifiedTableRootName} AS ${params.tableRoot.name}),
           ${params.tableJoin.name}.${quoteIdentifier(params.geometricColumnJoin)}
         )
       )`

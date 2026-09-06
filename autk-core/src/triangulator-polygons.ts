@@ -169,7 +169,7 @@ export class TriangulatorPolygons {
      */
     static lineStringToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
-        const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatCoords = TriangulatorPolygons.flattenCoordinates(coordinates, origin);
         const flatIds = earcut(flatCoords);
         return [{ flatCoords, flatIds }];
     }
@@ -186,7 +186,7 @@ export class TriangulatorPolygons {
      */
     static lineStringToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <LineString>feature.geometry;
-        const flatCoords = coordinates.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const flatCoords = TriangulatorPolygons.flattenCoordinates(coordinates, origin);
         const flatIds = TriangulatorPolygons.generateOpenBorderIds(flatCoords.length / 2);
         return [{ flatCoords, flatIds }];
     }
@@ -205,7 +205,7 @@ export class TriangulatorPolygons {
         const { coordinates } = <MultiLineString>feature.geometry;
         const meshes = [];
         for (const lineString of coordinates) {
-            const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatCoords = TriangulatorPolygons.flattenCoordinates(lineString, origin);
             const flatIds = earcut(flatCoords);
             meshes.push({ flatCoords, flatIds });
         }
@@ -226,7 +226,7 @@ export class TriangulatorPolygons {
         const { coordinates } = <MultiLineString>feature.geometry;
         const borders = [];
         for (const lineString of coordinates) {
-            const flatCoords = lineString.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatCoords = TriangulatorPolygons.flattenCoordinates(lineString, origin);
             const flatIds = TriangulatorPolygons.generateOpenBorderIds(flatCoords.length / 2);
             borders.push({ flatCoords, flatIds });
         }
@@ -245,14 +245,7 @@ export class TriangulatorPolygons {
      */
     static polygonToMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
-        const coords = coordinates[0].map((cord: number[]) => cord);
-        const holes: number[] = [];
-        for (let i = 1; i < coordinates.length; i++) {
-            holes.push(coords.length);
-            coordinates[i].forEach((cord: number[]) => coords.push(cord));
-        }
-
-        const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+        const { flatCoords, holes } = TriangulatorPolygons.flattenPolygonRings(coordinates, origin);
         const flatIds = earcut(flatCoords, holes.length > 0 ? holes : undefined);
         return [{ flatCoords, flatIds }];
     }
@@ -270,7 +263,7 @@ export class TriangulatorPolygons {
     static polygonToBorderMesh(feature: Feature, origin: number[]): { flatCoords: number[], flatIds: number[] }[] {
         const { coordinates } = <Polygon>feature.geometry;
         return coordinates.map((ring: number[][]) => {
-            const flatCoords = ring.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const flatCoords = TriangulatorPolygons.flattenCoordinates(ring, origin);
             const flatIds = TriangulatorPolygons.generateClosedBorderIds(ring);
             return { flatCoords, flatIds };
         });
@@ -290,14 +283,7 @@ export class TriangulatorPolygons {
         const meshes = [];
         const { coordinates } = <MultiPolygon>feature.geometry;
         for (const polygon of coordinates) {
-            const coords = polygon[0].map((cord: number[]) => cord);
-            const holes: number[] = [];
-            for (let i = 1; i < polygon.length; i++) {
-                holes.push(coords.length);
-                polygon[i].forEach((cord: number[]) => coords.push(cord));
-            }
-            
-            const flatCoords = coords.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+            const { flatCoords, holes } = TriangulatorPolygons.flattenPolygonRings(polygon, origin);
             const flatIds = earcut(flatCoords, holes.length > 0 ? holes : undefined);
             meshes.push({ flatCoords, flatIds });
         }
@@ -319,12 +305,58 @@ export class TriangulatorPolygons {
         const { coordinates } = <MultiPolygon>feature.geometry;
         for (const polygon of coordinates) {
             for (const ring of polygon) {
-                const flatCoords = ring.map((cord: number[]) => [cord[0] - origin[0], cord[1] - origin[1]]).flat();
+                const flatCoords = TriangulatorPolygons.flattenCoordinates(ring, origin);
                 const flatIds = TriangulatorPolygons.generateClosedBorderIds(ring);
                 borders.push({ flatCoords, flatIds });
             }
         }
         return borders;
+    }
+
+    /**
+     * Flattens a 2D coordinate list into local planar XY coordinates without intermediate array allocations.
+     */
+    private static flattenCoordinates(coords: number[][], origin: number[]): number[] {
+        const len = coords.length;
+        const flat: number[] = new Array(len * 2);
+        const ox = origin[0];
+        const oy = origin[1];
+        for (let i = 0; i < len; i++) {
+            const pt = coords[i];
+            const idx = i * 2;
+            flat[idx] = pt[0] - ox;
+            flat[idx + 1] = pt[1] - oy;
+        }
+        return flat;
+    }
+
+    /**
+     * Flattens polygon outer and inner rings with hole offsets without intermediate array allocations.
+     */
+    private static flattenPolygonRings(rings: number[][][], origin: number[]): { flatCoords: number[]; holes: number[] } {
+        let totalPoints = 0;
+        for (let i = 0; i < rings.length; i++) {
+            totalPoints += rings[i].length;
+        }
+        const flatCoords: number[] = new Array(totalPoints * 2);
+        const holes: number[] = [];
+        const ox = origin[0];
+        const oy = origin[1];
+        let offset = 0;
+
+        for (let r = 0; r < rings.length; r++) {
+            if (r > 0) {
+                holes.push(offset / 2);
+            }
+            const ring = rings[r];
+            const rlen = ring.length;
+            for (let i = 0; i < rlen; i++) {
+                const pt = ring[i];
+                flatCoords[offset++] = pt[0] - ox;
+                flatCoords[offset++] = pt[1] - oy;
+            }
+        }
+        return { flatCoords, holes };
     }
 
     /**

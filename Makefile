@@ -1,4 +1,4 @@
-.PHONY: lint typecheck build package-validate docs verify dev gallery usecases clean
+.PHONY: lint test typecheck build package-validate docs verify dev gallery usecases benchmark benchmark-views benchmark-synthetic benchmark-spatialbench clean
 
 CONCURRENTLY := npx concurrently
 RIMRAF := npx rimraf
@@ -7,6 +7,9 @@ APP ?= gallery
 
 lint:
 	npm run lint
+
+test:
+	npm test
 
 typecheck: build
 	$(CONCURRENTLY) \
@@ -17,7 +20,8 @@ typecheck: build
 		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
 		"cd autk && npx tsc --noEmit --skipLibCheck" \
 		"cd gallery && npx tsc --noEmit --skipLibCheck" \
-		"cd usecases && npx tsc --noEmit --skipLibCheck"
+		"cd usecases && npx tsc --noEmit --skipLibCheck" \
+		"cd benchmark && npx tsc --noEmit --skipLibCheck"
 
 build:
 	cd autk-core && npm run build
@@ -39,7 +43,7 @@ docs:
 		"cd autk-plot && npm run doc" \
 		"cd autk-compute && npm run doc"
 
-verify: lint typecheck
+verify: lint test typecheck
 
 dev:
 	npm install
@@ -59,6 +63,18 @@ gallery:
 usecases:
 	$(MAKE) dev APP=usecases$(if $(OPEN), OPEN=$(OPEN))
 
+benchmark: build
+	cd benchmark && npx playwright test
+
+benchmark-views: build
+	cd benchmark && npx playwright test tests/views.spec.ts
+
+benchmark-synthetic: build
+	cd benchmark && npx playwright test tests/synthetic-scaling.spec.ts
+
+benchmark-spatialbench: build
+	cd benchmark && npx playwright test tests/spatialbench.spec.ts
+
 clean:
 	$(RIMRAF) node_modules package-lock.json
 	$(CONCURRENTLY) \
@@ -69,4 +85,5 @@ clean:
 		"cd autk-compute && $(RIMRAF) dist build node_modules" \
 		"cd autk && $(RIMRAF) dist build node_modules" \
 		"cd gallery && $(RIMRAF) dist build node_modules" \
-		"cd usecases && $(RIMRAF) dist build node_modules"
+		"cd usecases && $(RIMRAF) dist build node_modules" \
+		"cd benchmark && $(RIMRAF) dist build node_modules results"

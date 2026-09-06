@@ -1,0 +1,31 @@
+{
+  "name": "benchmark",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "benchmark": "playwright test",
+    "benchmark:views": "playwright test tests/views.spec.ts",
+    "benchmark:synthetic": "playwright test tests/synthetic-scaling.spec.ts",
+    "benchmark:spatialbench": "playwright test tests/spatialbench.spec.ts",
+    "typecheck": "tsc --noEmit --skipLibCheck"
+  },
+  "dependencies": {
+    "@turf/helpers": "^7.2.0",
+    "@turf/random": "^7.2.0",
+    "d3": "^7.9.0",
+    "@urban-toolkit/autk-core": "3.0.1",
+    "@urban-toolkit/autk-db": "3.0.2",
+    "@urban-toolkit/autk-map": "3.0.1",
+    "@urban-toolkit/autk-plot": "3.0.1",
+    "@urban-toolkit/autk-compute": "3.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/d3": "^7.4.3",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
+  }
+}

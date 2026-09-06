@@ -111,9 +111,13 @@ export class LoadGeoTiffUseCase {
 
     this.assertFiniteBounds(transformedBounds, sourceCrs, targetCrs);
 
+    const bandColumnsSql = bandNames.map((b) => `0.0::DOUBLE AS "${b}"`).join(',\n        ');
+
     await this.conn.query(`
       CREATE OR REPLACE TABLE ${qualifiedTableName} AS
       SELECT
+        ST_MakeEnvelope(${transformedBounds.minX}, ${transformedBounds.minY}, ${transformedBounds.maxX}, ${transformedBounds.maxY}) AS geometry,
+        ${bandColumnsSql ? bandColumnsSql + ',' : ''}
         ${width}::INTEGER AS width,
         ${height}::INTEGER AS height,
         ${fullWidth}::INTEGER AS original_width,

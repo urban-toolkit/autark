@@ -589,7 +589,7 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const table = this.getTablesMetadata().find((t) => t.name === tableName);
-        if (!table || !isRasterTable(table) || this.tableHasGeometry(table))
+        if (!table || !isRasterTable(table))
             throw new Error(`Table ${tableName} is not a compact raster table.`);
 
         return this.getRasterUseCase.exec(tableName, this.currentWorkspace);
@@ -800,7 +800,7 @@ export class AutkDb {
 
         const result = await this.rawQueryUseCase.exec(params, this.currentWorkspace);
 
-        if (params.output.type === 'CREATE_TABLE') {
+        if (params.output?.type === 'CREATE_TABLE') {
             this.registerTable(result as Table);
             return this.initializeSpatialMetadata(result as Table);
         }
