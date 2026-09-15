@@ -4,6 +4,10 @@ import { dirname, resolve } from 'path';
 import { defineConfig, type Plugin } from 'vite';
 import dts from 'vite-plugin-dts';
 
+// Keep the workspace alias out of the emitted declarations: published types must
+// import the package, not a path into autk-core's source, which is not published.
+const CORE_PACKAGE = '@urban-toolkit/autk-core';
+
 const require = createRequire(import.meta.url);
 const duckdbDistDir = dirname(require.resolve('@duckdb/duckdb-wasm'));
 
@@ -60,7 +64,7 @@ export default defineConfig({
             '@urban-toolkit/autk-core': coreAlias,
           },
   },
-  plugins: buildTarget === 'browser' ? [duckdbAssets(), dts()] : [],
+  plugins: buildTarget === 'browser' ? [duckdbAssets(), dts({ aliasesExclude: [CORE_PACKAGE] })] : [],
   build: {
     lib: {
       entry,

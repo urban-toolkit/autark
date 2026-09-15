@@ -56,6 +56,24 @@ for (const dir of packageDirs) {
     }
   }
 
+  // Declarations must not point outside the package. A workspace alias resolved
+  // into a sibling's source (../../autk-core/src/index.ts) type-checks here and
+  // breaks for everyone installing from npm, where only dist/ is published.
+  for (const packedFile of packedFiles) {
+    if (!packedFile.endsWith('.d.ts') && !packedFile.endsWith('.d.cts') && !packedFile.endsWith('.d.mts')) {
+      continue;
+    }
+    const declaration = readFileSync(path.join(packageDir, packedFile), 'utf8');
+    const fileDir = path.dirname(path.join(packageDir, packedFile));
+    for (const [, specifier] of declaration.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+      if (!specifier.startsWith('.')) continue;
+      const resolved = path.resolve(fileDir, specifier);
+      if (!resolved.startsWith(packageDir + path.sep)) {
+        fail(`${dir}: ${packedFile} imports ${specifier}, which is outside the published package`);
+      }
+    }
+  }
+
   if (dir === 'autk-db') {
     const browserBundlePath = path.join(packageDir, 'dist/browser.js');
     const browserBundle = readFileSync(browserBundlePath, 'utf8');
