@@ -98,7 +98,7 @@ export const SELECT_BUILDING_IDS_QUERY = (qualifiedTableName: string) => `
  * @example const sql = CREATE_TEMP_AGG_TABLE_QUERY('tmp_agg');
  */
 export const CREATE_TEMP_AGG_TABLE_QUERY = (tempTableName: string) =>
-  `CREATE OR REPLACE TEMP TABLE ${tempTableName} (building_id BIGINT, agg_geometry BLOB)`;
+  `CREATE OR REPLACE TEMP TABLE ${tempTableName} (building_id BIGINT, agg_geometry GEOMETRY)`;
 
 /**
  * Generates a query to batch insert aggregated geometries.
