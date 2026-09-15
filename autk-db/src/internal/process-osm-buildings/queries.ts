@@ -150,6 +150,8 @@ export const NULL_INSERT_QUERY = (tempTableName: string, buildingId: string) =>
 
 /**
  * Generates a query to join the aggregated geometry back to the main table.
+ * A row whose building has no aggregated geometry (its union failed) keeps its own geometry,
+ * so spatial joins still match it by its part.
  * @param qualifiedTableName The workspace-qualified table name.
  * @param tempTableName The temporary aggregation table name.
  * @returns A SQL string to update the main table with aggregated geometry.
@@ -159,21 +161,23 @@ export const ADD_AGG_COLUMN_QUERY = (qualifiedTableName: string, tempTableName: 
   CREATE OR REPLACE TABLE ${qualifiedTableName} AS
   SELECT
     b.*,
-    agg.agg_geometry
+    COALESCE(agg.agg_geometry, b.geometry) AS agg_geometry
   FROM ${qualifiedTableName} b
   LEFT JOIN ${tempTableName} agg ON b.building_id = agg.building_id;
 `;
 
 /**
- * Generates a query to count rows with missing aggregated geometry.
+ * Generates a query to count rows whose building has no aggregated geometry.
  * @param qualifiedTableName The workspace-qualified table name.
- * @returns A SQL string to count NULL agg_geometry rows.
- * @example const sql = NULL_COUNT_QUERY('autk.osm_buildings');
+ * @param tempTableName The temporary aggregation table name.
+ * @returns A SQL string to count rows without an aggregated geometry.
+ * @example const sql = NULL_COUNT_QUERY('autk.osm_buildings', 'tmp_agg');
  */
-export const NULL_COUNT_QUERY = (qualifiedTableName: string) => `
+export const NULL_COUNT_QUERY = (qualifiedTableName: string, tempTableName: string) => `
   SELECT COUNT(*) AS cnt
-  FROM ${qualifiedTableName}
-  WHERE agg_geometry IS NULL
+  FROM ${qualifiedTableName} b
+  LEFT JOIN ${tempTableName} agg ON b.building_id = agg.building_id
+  WHERE agg.agg_geometry IS NULL
 `;
 
 /**

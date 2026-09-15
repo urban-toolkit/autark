@@ -111,12 +111,12 @@ export class ProcessOsmBuildingsUseCase {
       }
     }
 
-    await this.conn.query(ADD_AGG_COLUMN_QUERY(qualifiedTableName, tempTableName));
-
-    const nullCount = (await this.conn.query(NULL_COUNT_QUERY(qualifiedTableName))).toArray()[0]?.cnt as number;
+    const nullCount = (await this.conn.query(NULL_COUNT_QUERY(qualifiedTableName, tempTableName))).toArray()[0]?.cnt as number;
     if (nullCount > 0) {
-      console.warn(`[ProcessOsmBuildings] ${nullCount} rows have no agg_geometry (union failed)`);
+      console.warn(`[ProcessOsmBuildings] ${nullCount} rows have no aggregated geometry (union failed); using their own geometry`);
     }
+
+    await this.conn.query(ADD_AGG_COLUMN_QUERY(qualifiedTableName, tempTableName));
 
     await this.conn.query(DROP_TEMP_TABLE_QUERY(tempTableName));
   }
