@@ -223,7 +223,13 @@ function buildSjoinObject(
 
   Object.entries(aggregatesByFunction).forEach(([funcName, columns]) => {
     if (funcName === 'count') {
-      sjoinParts.push(buildCountExpression(columns[0], geomContext.tableJoinNameForKeys));
+      sjoinParts.push(
+        buildCountExpression(
+          columns[0],
+          geomContext.tableJoinNameForKeys,
+          `${geomContext.tableJoin.name}.${quoteIdentifier(geomContext.geometricColumnJoin)}`,
+        ),
+      );
     } else if (funcName === 'weighted') {
       sjoinParts.push(buildWeightedExpression(columns[0], geomContext));
     } else if (funcName === 'collect') {
@@ -285,11 +291,16 @@ function buildCollectExpression(column: { column: string }, tableJoin: Table, ta
  *
  * @param column - the column spec containing the column name to count, or `'*'` for row count.
  * @param tableJoinNameForKeys - original join table name used for the JSON key.
+ * @param joinGeometryReference - qualified geometry column of the join table, counted for `'*'`.
  * @returns SQL fragment for the `'count'` JSON key.
  * @throws No runtime errors.
  */
-function buildCountExpression(column: { column: string }, tableJoinNameForKeys: string): string {
-  const valueExpression = generateValueExpressionForCount(column.column);
+function buildCountExpression(
+  column: { column: string },
+  tableJoinNameForKeys: string,
+  joinGeometryReference: string,
+): string {
+  const valueExpression = generateValueExpressionForCount(column.column, joinGeometryReference);
   return `'count', json_object('${escapeSqlString(tableJoinNameForKeys)}', ${valueExpression})`;
 }
 
@@ -349,9 +360,11 @@ function buildNonAggregateColumns(
  * @returns SQL count expression string.
  * @throws No runtime errors.
  */
-function generateValueExpressionForCount(columnName: string): string {
+function generateValueExpressionForCount(columnName: string, joinGeometryReference: string): string {
   if (columnName === '*') {
-    return 'COUNT(*)';
+    // The join is a LEFT join, so COUNT(*) would count a root row with no match
+    // as one. Counting the join geometry counts matches, and is 0 without any.
+    return `COUNT(${joinGeometryReference})`;
   }
   return `COUNT(${quoteIdentifier(columnName)})`;
 }
