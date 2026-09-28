@@ -42,6 +42,8 @@ export async function getSharedGpuDevice(): Promise<GPUDevice> {
                     requiredLimits: {
                         maxBufferSize: adapter.limits.maxBufferSize,
                         maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+                        // Uniform arrays and matrices are storage buffers too.
+                        maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
                     },
                 });
 

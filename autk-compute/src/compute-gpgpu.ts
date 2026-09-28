@@ -86,10 +86,12 @@ export class ComputeGpgpu extends GpuPipeline {
 
         const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wgslBody, outputColumns.length);
         const allInputArrays = { ...inputArrays, ...globalInputArrays };
+        const storageGlobals = new Set(globalMeta.filter((meta) => meta.kind !== 'scalar').map((meta) => meta.name));
 
         const result = await this.dispatch(
             orderedVarNames,
             globalVarNames,
+            storageGlobals,
             allInputArrays,
             shader,
             featureCount,
@@ -219,6 +221,7 @@ export class ComputeGpgpu extends GpuPipeline {
     private async dispatch(
         featureVarNames: string[],
         globalVarNames: string[],
+        storageGlobals: Set<string>,
         inputArrays: { [varName: string]: Float32Array },
         shader: string,
         featureCount: number,
@@ -231,7 +234,8 @@ export class ComputeGpgpu extends GpuPipeline {
             inputs[varName] = { type: 'storage', data: inputArrays[varName], binding: binding++ };
         });
         globalVarNames.forEach((varName) => {
-            inputs[varName] = { type: 'uniform', data: inputArrays[varName], binding: binding++ };
+            const type = storageGlobals.has(varName) ? 'storage' : 'uniform';
+            inputs[varName] = { type, data: inputArrays[varName], binding: binding++ };
         });
 
         const outputs: ComputeConfig['outputs'] = {};
@@ -377,7 +381,7 @@ export class ComputeGpgpu extends GpuPipeline {
      * @returns Generated symbol names for the global variable.
      */
     private getGlobalGeneratedSymbols(name: string, kind: 'scalar' | 'array' | 'matrix'): string[] {
-        const symbols = [name, `${name}Buf`, `${name}_Uniform`, `${name}_uniform_at`];
+        const symbols = [name, `${name}Buf`, `${name}_Uniform`];
         if (kind === 'array') {
             symbols.push(`${name}_Array`, `${name}_length`);
         } else if (kind === 'matrix') {
@@ -638,7 +642,6 @@ export class ComputeGpgpu extends GpuPipeline {
         const computeFunctionParams: string[] = [];
         const computeFunctionArgs: string[] = [];
         const arrayTypeDecls: string[] = [];
-        const uniformHelpers: string[] = [];
 
         const structDef = 'struct ArrayF32 { data: array<f32> }';
 
@@ -691,54 +694,32 @@ export class ComputeGpgpu extends GpuPipeline {
         }
 
         for (const meta of globalMeta) {
-            const packedLength = meta.kind === 'scalar'
-                ? 1
-                : meta.kind === 'array'
-                    ? meta.length
-                    : meta.rows * meta.cols;
-            const packedVec4Count = Math.max(1, Math.ceil(packedLength / 4));
-            const uniformStruct = `${meta.name}_Uniform`;
-            bufferDecls.push(
-                `struct ${uniformStruct} { data: array<vec4f, ${packedVec4Count}>, }`
-            );
-            bufferDecls.push(
-                `@group(0) @binding(${bindingIdx++}) var<uniform> ${meta.name}Buf: ${uniformStruct};`
-            );
-            uniformHelpers.push(
-                `fn ${meta.name}_uniform_at(index: u32) -> f32 {
-                    let chunk = ${meta.name}Buf.data[index / 4u];
-                    let lane = index % 4u;
-                    if (lane == 0u) { return chunk.x; }
-                    if (lane == 1u) { return chunk.y; }
-                    if (lane == 2u) { return chunk.z; }
-                    return chunk.w;
-                }`
-            );
             if (meta.kind === 'scalar') {
-                locals.push(`  let ${meta.name}: f32 = ${meta.name}_uniform_at(0u);`);
+                const uniformStruct = `${meta.name}_Uniform`;
+                bufferDecls.push(`struct ${uniformStruct} { data: array<vec4f, 1>, }`);
+                bufferDecls.push(
+                    `@group(0) @binding(${bindingIdx++}) var<uniform> ${meta.name}Buf: ${uniformStruct};`
+                );
+                locals.push(`  let ${meta.name}: f32 = ${meta.name}Buf.data[0].x;`);
                 computeFunctionParams.push(`${meta.name}: f32`);
                 computeFunctionArgs.push(meta.name);
-            } else if (meta.kind === 'array') {
-                arrayTypeDecls.push(`alias ${meta.name}_Array = array<f32, ${meta.length}>;`);
-                arrayCopyCode.push(`  var ${meta.name}: ${meta.name}_Array;`);
-                arrayCopyCode.push(
-                    `  for (var i = 0u; i < ${meta.length}u; i++) { ${meta.name}[i] = ${meta.name}_uniform_at(i); }`
-                );
-                computeFunctionParams.push(`${meta.name}: ${meta.name}_Array`, `${meta.name}_length: u32`);
-                computeFunctionArgs.push(meta.name, `${meta.length}u`);
+                continue;
+            }
+            // An array or matrix is read in place from a module-scope storage buffer, under its
+            // own name. Copying it into a function-local array and passing that by value is what
+            // GPU compilers refuse at a few thousand floats (NVIDIA on Vulkan from 2048, Apple on
+            // Metal from about 7600), and a uniform buffer would cap it at 64 KB.
+            const isArray = meta.kind === 'array';
+            const size = isArray ? meta.length : meta.rows * meta.cols;
+            const alias = isArray ? `${meta.name}_Array` : `${meta.name}_Matrix`;
+            arrayTypeDecls.push(`alias ${alias} = array<f32, ${Math.max(1, size)}>;`);
+            bufferDecls.push(`@group(0) @binding(${bindingIdx++}) var<storage, read> ${meta.name}: ${alias};`);
+            if (isArray) {
+                computeFunctionParams.push(`${meta.name}_length: u32`);
+                computeFunctionArgs.push(`${meta.length}u`);
             } else {
-                const size = meta.rows * meta.cols;
-                arrayTypeDecls.push(`alias ${meta.name}_Matrix = array<f32, ${size}>;`);
-                arrayCopyCode.push(`  var ${meta.name}: ${meta.name}_Matrix;`);
-                arrayCopyCode.push(
-                    `  for (var i = 0u; i < ${size}u; i++) { ${meta.name}[i] = ${meta.name}_uniform_at(i); }`
-                );
-                computeFunctionParams.push(
-                    `${meta.name}: ${meta.name}_Matrix`,
-                    `${meta.name}_rows: u32`,
-                    `${meta.name}_cols: u32`
-                );
-                computeFunctionArgs.push(meta.name, `${meta.rows}u`, `${meta.cols}u`);
+                computeFunctionParams.push(`${meta.name}_rows: u32`, `${meta.name}_cols: u32`);
+                computeFunctionArgs.push(`${meta.rows}u`, `${meta.cols}u`);
             }
         }
 
@@ -760,7 +741,6 @@ export class ComputeGpgpu extends GpuPipeline {
         ${outputTypeDecl}
         ${arrayTypeDecls.join('\n        ')}
         ${bufferDecls.join('\n        ')}
-        ${uniformHelpers.join('\n        ')}
         ${outBufDecls.join('\n        ')}
 
         fn compute_value(${computeFunctionParams.join(', ')}) -> ${returnType} { ${wgslBody} }
