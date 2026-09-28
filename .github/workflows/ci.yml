@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   verify:
-    name: Lint, typecheck, build, and validate packages
+    name: Lint, test, typecheck, build, and validate packages
     runs-on: macos-latest
     timeout-minutes: 30
 
@@ -31,6 +31,9 @@ jobs:
 
       - name: Lint
         run: make lint
+
+      - name: Test
+        run: make test
 
       - name: Build and typecheck
         run: make typecheck
