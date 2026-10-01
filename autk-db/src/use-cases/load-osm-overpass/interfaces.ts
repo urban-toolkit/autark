@@ -46,6 +46,44 @@ export interface OsmLoadTimings {
   layers: LayerLoadTimings[];
 }
 
+/** Named admin areas inside a region: `areas` are boundary names, `geocodeArea` scopes them. */
+export type OsmNamedArea = {
+  geocodeArea: string;
+  areas: string[];
+};
+
+/** A WGS84 bounding box, `[west, south, east, north]` in degrees. */
+export type OsmBoundingBoxArea = {
+  bbox: [number, number, number, number];
+};
+
+/** What `loadOsm` loads: named areas, or everything inside a box. */
+export type OsmQueryArea = OsmNamedArea | OsmBoundingBoxArea;
+
+/** True for the bounding-box form of a query area. */
+export function isBoundingBoxArea(area: OsmQueryArea): area is OsmBoundingBoxArea {
+  return 'bbox' in area;
+}
+
+/**
+ * Checks a bounding-box query area and returns it as south, north, west, east.
+ *
+ * @throws When the box is not four finite WGS84 degrees with west < east and south < north.
+ */
+export function boundingBoxOf(area: OsmBoundingBoxArea): { south: number; north: number; west: number; east: number } {
+  const box = area.bbox;
+  if (!Array.isArray(box) || box.length !== 4 || !box.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+    throw new Error('queryArea.bbox must be [west, south, east, north] in WGS84 degrees.');
+  }
+  const [west, south, east, north] = box;
+  if (!(west >= -180 && east <= 180 && west < east && south >= -90 && north <= 90 && south < north)) {
+    throw new Error(
+      'queryArea.bbox must be [west, south, east, north] in WGS84 degrees, with west < east and south < north.',
+    );
+  }
+  return { south, north, west, east };
+}
+
 export type LoadOsmParams = {
   outputTableName?: string;
   autoLoadLayers: {
@@ -53,11 +91,13 @@ export type LoadOsmParams = {
     coordinateFormat?: string;
     layers: Array<LayerType>;
   };
-  queryArea: {
-    geocodeArea: string;
-    areas: string[];
-  };
-  /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
+  /**
+   * Named areas inside a region, or a WGS84 bounding box. With a box, the box
+   * is the area's boundary: layers are cropped and clipped to it, and the
+   * `surface` layer is the box itself.
+   */
+  queryArea: OsmQueryArea;
+  /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. Takes named areas only. */
   pbfFileUrl?: string;
   /** When true, bypasses the cached Overpass response and fetches fresh data. */
   forceRefresh?: boolean;

@@ -85,6 +85,36 @@ export class OsmProcessingPipeline {
     return { osmData, boundariesData };
   }
 
+  /**
+   * The boundary of a bounding-box query area: one closed way around the box,
+   * shaped like an Overpass boundary way (`nodes` and inline `geometry`), so
+   * the boundaries table, the workspace extent, the `surface` layer and the
+   * clipping read it as they read a named area's boundary. Its ids are
+   * negative, which no OSM element has.
+   *
+   * @param box The box, in WGS84 degrees.
+   * @returns A response holding the one boundary way.
+   */
+  boundingBoxBoundary(box: { south: number; north: number; west: number; east: number }): OverpassApiResponse {
+    const corners = [
+      { lat: box.south, lon: box.west },
+      { lat: box.south, lon: box.east },
+      { lat: box.north, lon: box.east },
+      { lat: box.north, lon: box.west },
+    ];
+    return {
+      elements: [
+        {
+          type: 'way',
+          id: -1,
+          nodes: [-1, -2, -3, -4, -1],
+          geometry: [...corners, corners[0]],
+          tags: { boundary: 'bounding_box' },
+        },
+      ],
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Bounding-box computation
   // ---------------------------------------------------------------------------

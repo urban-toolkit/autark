@@ -1,3 +1,4 @@
+import { isBoundingBoxArea } from '../load-osm-overpass/interfaces';
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { readOsmPbf } from '@osmix/pbf';
 
@@ -110,6 +111,10 @@ export class LoadOsmFromPbfUseCase {
   async exec(params: LoadOsmParams): Promise<OsmExecResult> {
     const pbfFileUrl = params.pbfFileUrl;
     if (!pbfFileUrl) throw new Error('pbfFileUrl must be provided for PBF loading');
+    if (isBoundingBoxArea(params.queryArea)) {
+      throw new Error('Loading from a .pbf extract takes queryArea as named areas; a bbox is not supported with pbfFileUrl.');
+    }
+    const queryArea = params.queryArea;
     const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
     const outputTableName = params.outputTableName || 'table_osm';
     const onProgress = params.onProgress;
@@ -117,7 +122,7 @@ export class LoadOsmFromPbfUseCase {
 
     onProgress?.('downloading-osm-data');
 
-    const boundaryContext = await this.collectBoundaryContext(pbfFileUrl, params.queryArea.areas);
+    const boundaryContext = await this.collectBoundaryContext(pbfFileUrl, queryArea.areas);
     const bbox = await this.collectBoundaryBbox(pbfFileUrl, boundaryContext.boundaryWayIds);
 
     onProgress?.('processing-osm-data');
@@ -153,7 +158,7 @@ export class LoadOsmFromPbfUseCase {
       this.mergeResponses(grouped.boundaries, grouped.parksWater),
       this.mergeResponses(grouped.roads, grouped.buildings),
     );
-    const { osmData, boundariesData } = this.pipeline.splitCombinedResponse(combined, params.queryArea);
+    const { osmData, boundariesData } = this.pipeline.splitCombinedResponse(combined, queryArea);
 
     const t0 = performance.now();
     await this.pipeline.insertOsmDataUsingJson(outputTableName, osmData, workspace);

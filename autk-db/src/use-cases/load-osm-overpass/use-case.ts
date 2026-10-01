@@ -1,6 +1,14 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { LoadOsmParams, OsmElement, OnLoadingProgress } from './interfaces';
+import {
+  LoadOsmParams,
+  OsmElement,
+  OnLoadingProgress,
+  OsmNamedArea,
+  OsmQueryArea,
+  boundingBoxOf,
+  isBoundingBoxArea,
+} from './interfaces';
 import { OsmTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { HttpCache } from '../../http-cache';
@@ -83,28 +91,39 @@ export class LoadOsmFromOverpassApiUseCase {
     const outputTableName = params.outputTableName || 'table_osm';
     const onProgress = params.onProgress;
 
+    const queryArea = params.queryArea;
+    // Checked before any request, so a malformed box costs Overpass nothing.
+    const box = isBoundingBoxArea(queryArea) ? boundingBoxOf(queryArea) : null;
+
     const combined = await this.fetchCombinedOsmData(
-      params.queryArea,
+      queryArea,
       params.autoLoadLayers.layers,
       onProgress,
       params.forceRefresh,
     );
 
-    // Verify every requested area has an admin boundary relation in the response.
-    const relationNames = new Set(
-      combined.elements
-        .filter(e => e.type === 'relation' && e.tags?.name)
-        .map(e => e.tags!.name),
-    );
-    const missingAreas = params.queryArea.areas.filter(area => !relationNames.has(area));
-    if (missingAreas.length > 0) {
-      throw new Error(
-        `No administrative boundary found in OSM for: ${missingAreas.map(a => `"${a}"`).join(', ')}. ` +
-        `Verify the area names match OSM relation names exactly (check openstreetmap.org).`,
+    let split: { osmData: OverpassApiResponse; boundariesData: OverpassApiResponse };
+    if (box) {
+      // A box is its own boundary: nothing to look up, nothing missing.
+      split = { osmData: combined, boundariesData: this.pipeline.boundingBoxBoundary(box) };
+    } else {
+      const namedArea = queryArea as OsmNamedArea;
+      // Verify every requested area has an admin boundary relation in the response.
+      const relationNames = new Set(
+        combined.elements
+          .filter(e => e.type === 'relation' && e.tags?.name)
+          .map(e => e.tags!.name),
       );
+      const missingAreas = namedArea.areas.filter(area => !relationNames.has(area));
+      if (missingAreas.length > 0) {
+        throw new Error(
+          `No administrative boundary found in OSM for: ${missingAreas.map(a => `"${a}"`).join(', ')}. ` +
+          `Verify the area names match OSM relation names exactly (check openstreetmap.org).`,
+        );
+      }
+      split = this.pipeline.splitCombinedResponse(combined, namedArea);
     }
-
-    const { osmData, boundariesData } = this.pipeline.splitCombinedResponse(combined, params.queryArea);
+    const { osmData, boundariesData } = split;
     console.log(`[autk-db] Split: ${osmData.elements.length} OSM elements, ${boundariesData.elements.length} boundary elements`);
 
     onProgress?.('processing-osm-data');
@@ -146,7 +165,11 @@ export class LoadOsmFromOverpassApiUseCase {
    * @param layers - Optional list of requested layers to include in the cache key.
    * @returns A stable cache key string.
    */
-  private getCacheKey(queryArea: { geocodeArea: string; areas: string[] }, layers?: string[]): string {
+  private getCacheKey(queryArea: OsmQueryArea, layers?: string[]): string {
+    if (isBoundingBoxArea(queryArea)) {
+      const layerKey = layers && layers.length > 0 ? `-${[...layers].sort().join(',')}` : '';
+      return `overpass-combined-bbox-${queryArea.bbox.join(',')}${layerKey}`;
+    }
     const areas = [...queryArea.areas].sort().join(',');
     const layerKey = layers && layers.length > 0 ? `-layers:${[...layers].sort().join('+')}` : '';
     return `overpass-combined-${queryArea.geocodeArea}-${areas}${layerKey}`;
@@ -158,7 +181,8 @@ export class LoadOsmFromOverpassApiUseCase {
    * @param queryArea - Object containing the geocodeArea and area names.
    * @returns A cache key string for the full dataset.
    */
-  private getFullDataCacheKey(queryArea: { geocodeArea: string; areas: string[] }): string {
+  private getFullDataCacheKey(queryArea: OsmQueryArea): string {
+    if (isBoundingBoxArea(queryArea)) return `overpass-combined-bbox-${queryArea.bbox.join(',')}`;
     const areas = [...queryArea.areas].sort().join(',');
     return `overpass-combined-${queryArea.geocodeArea}-${areas}`;
   }
@@ -175,9 +199,11 @@ export class LoadOsmFromOverpassApiUseCase {
    *
    * `geocodeArea` (e.g. "New York") is used only as a disambiguation scope.
    * All data is spatially constrained to the entries in `queryArea.areas`.
+   * A bounding box needs no boundaries request: the box is the boundary, and
+   * every layer request is constrained to it.
    */
   private async fetchCombinedOsmData(
-    queryArea: { geocodeArea: string; areas: string[] },
+    queryArea: OsmQueryArea,
     layers: string[] | undefined,
     onProgress?: OnLoadingProgress,
     forceRefresh: boolean = false,
@@ -209,17 +235,25 @@ export class LoadOsmFromOverpassApiUseCase {
 
     onProgress?.('querying-osm-server');
 
-    // Request 1: boundaries (always needed, always small)
-    console.log('[autk-db] Fetching boundary data from Overpass API…');
-    const boundariesResponse = await this.fetchWithRetry(this.buildBoundariesQuery(queryArea));
-    onProgress?.('downloading-osm-data');
-    const boundariesData: OverpassApiResponse = await boundariesResponse.json();
-    console.log(`[autk-db] Boundaries: ${boundariesData.elements?.length ?? 0} elements`);
-    let combined: OverpassApiResponse = boundariesData;
+    let combined: OverpassApiResponse;
+    let boundariesBbox: { south: number; north: number; west: number; east: number } | null;
+    if (isBoundingBoxArea(queryArea)) {
+      combined = { elements: [] };
+      boundariesBbox = boundingBoxOf(queryArea);
+      onProgress?.('downloading-osm-data');
+    } else {
+      // Request 1: boundaries (always needed, always small)
+      console.log('[autk-db] Fetching boundary data from Overpass API…');
+      const boundariesResponse = await this.fetchWithRetry(this.buildBoundariesQuery(queryArea));
+      onProgress?.('downloading-osm-data');
+      const boundariesData: OverpassApiResponse = await boundariesResponse.json();
+      console.log(`[autk-db] Boundaries: ${boundariesData.elements?.length ?? 0} elements`);
+      combined = boundariesData;
 
-    // Compute the area bbox once from boundary data only — independent of which
-    // layers are requested, so parks/roads/etc. never pollute the extent.
-    const boundariesBbox = this.pipeline.computeBboxFromElements(boundariesData.elements ?? []);
+      // Compute the area bbox once from boundary data only, independent of which
+      // layers are requested, so parks/roads/etc. never pollute the extent.
+      boundariesBbox = this.pipeline.computeBboxFromElements(boundariesData.elements ?? []);
+    }
 
     // Requests 2–4: one per layer group, skipped when not requested.
     // Buildings are fetched as a 2×2 tiled grid to stay within Overpass maxsize limits.
@@ -468,11 +502,12 @@ export class LoadOsmFromOverpassApiUseCase {
    * Returns null when no tag selectors apply to the given group (e.g. surface-only).
    */
   private buildLayerGroupQuery(
-    queryArea: { geocodeArea: string; areas: string[] },
+    queryArea: OsmQueryArea,
     layerGroup: string[],
   ): string | null {
     const tagSelectors = this.getTagSelectorsForLayers(layerGroup);
     if (tagSelectors.way.length === 0 && tagSelectors.relation.length === 0) return null;
+    if (isBoundingBoxArea(queryArea)) return this.buildBoundingBoxQuery(boundingBoxOf(queryArea), tagSelectors);
 
     const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
     const areaLines: string[] = [];
@@ -583,7 +618,7 @@ export class LoadOsmFromOverpassApiUseCase {
    * each response well within Overpass limits.
    */
   private buildBuildingsTileQueries(
-    queryArea: { geocodeArea: string; areas: string[] },
+    queryArea: OsmQueryArea,
     bbox: { south: number; north: number; west: number; east: number },
     cols = 2,
     rows = 2,
@@ -599,6 +634,12 @@ export class LoadOsmFromOverpassApiUseCase {
         const west  = bbox.west  + col * lonStep;
         const east  = west  + lonStep;
         const tileBbox = `${south},${west},${north},${east}`;
+
+        if (isBoundingBoxArea(queryArea)) {
+          // The tile is inside the box, so the tile alone constrains it.
+          queries.push(this.buildBoundingBoxQuery({ south, north, west, east }, this.getTagSelectorsForLayers(['buildings'])));
+          continue;
+        }
 
         const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
         const areaLines: string[] = [];
@@ -642,6 +683,48 @@ export class LoadOsmFromOverpassApiUseCase {
     }
 
     return queries;
+  }
+
+  /**
+   * Builds a layer query for everything inside a WGS84 box. Same tag
+   * selectors and output as the named-area queries, with the box as the only
+   * spatial filter.
+   */
+  private buildBoundingBoxQuery(
+    box: { south: number; north: number; west: number; east: number },
+    tagSelectors: OverpassTagSelectors,
+  ): string {
+    const filter = `(${box.south},${box.west},${box.north},${box.east})`;
+    const lines: string[] = [];
+    const ways: string[] = [];
+    const relations: string[] = [];
+    if (tagSelectors.way.length > 0) {
+      lines.push(`(
+        ${tagSelectors.way.map(selector => `way[${selector}]${filter};`).join('\n        ')}
+      )->.dataWays;`);
+      ways.push('.dataWays;');
+    }
+    if (tagSelectors.relation.length > 0) {
+      lines.push(`(
+        ${tagSelectors.relation.map(selector => `relation[${selector}]${filter};`).join('\n        ')}
+      )->.dataRelations;`);
+      lines.push('way(r.dataRelations)->.dataRelationWays;');
+      relations.push('.dataRelations;');
+      ways.push('.dataRelationWays;');
+    }
+    const relationOutput = relations.length > 0 ? `
+      ( ${relations.join(' ')} );
+      out body;` : '';
+    const wayOutput = ways.length > 0 ? `
+      ( ${ways.join(' ')} );
+      out geom qt;` : '';
+    return `
+      [out:json][timeout:60][maxsize:268435456];
+
+      ${lines.join('\n      ')}
+      ${relationOutput}
+      ${wayOutput}
+    `;
   }
 
   /** Merges two Overpass responses, deduplicating all elements by (type, id). */
