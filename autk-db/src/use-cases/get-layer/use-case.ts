@@ -2,6 +2,7 @@ import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { FeatureCollection } from 'geojson';
 
 import { GET_LAYER_AS_GEOJSON_QUERY } from './queries';
+import { GetLayerOptions } from './interfaces';
 import { Table } from '../../interfaces';
 import type { LayerType } from '@urban-toolkit/autk-core';
 import { DEFAULT_WORKSPACE_NAME } from '../../consts';
@@ -30,11 +31,16 @@ export class GetLayerUseCase {
    *
    * @param table - The layer table with its type and column metadata.
    * @param workspace - Workspace (schema) name; defaults to `autk`.
+   * @param options - Export options; `osmElements` exports one feature per OSM element.
    * @returns A GeoJSON FeatureCollection representing the layer data.
    * @throws If the DuckDB query fails or the response cannot be parsed as GeoJSON.
    */
-  async exec(table: Table & { type: LayerType }, workspace: string = DEFAULT_WORKSPACE_NAME): Promise<FeatureCollection> {
-    const query = GET_LAYER_AS_GEOJSON_QUERY(table, workspace);
+  async exec(
+    table: Table & { type: LayerType },
+    workspace: string = DEFAULT_WORKSPACE_NAME,
+    options: GetLayerOptions = {},
+  ): Promise<FeatureCollection> {
+    const query = GET_LAYER_AS_GEOJSON_QUERY(table, workspace, options);
     const response = await this.conn.query(query);
 
     const raw: string = response.toArray()[0]?.geojson ?? '{"type":"FeatureCollection","features":[]}';

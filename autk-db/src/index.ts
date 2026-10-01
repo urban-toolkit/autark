@@ -47,6 +47,7 @@ export {
 
 export type { LoadGeoTiffParams } from './use-cases/load-geotiff';
 export type { GetTableOutput } from './use-cases/get-table';
+export type { GetLayerOptions } from './use-cases/get-layer';
 export type {
   LoadingPhase,
   OnLoadingProgress,

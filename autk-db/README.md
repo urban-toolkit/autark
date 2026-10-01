@@ -76,7 +76,7 @@ console.log(parcels.type); // 'polygons'
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
 * `loadGeojson(params)`: Imports custom GeoJSON layers.
 * `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers.
-* `getLayer(layerTableName)`: Exports a layer table as a GeoJSON `FeatureCollection`.
+* `getLayer(layerTableName, options?)`: Exports a layer table as a GeoJSON `FeatureCollection`. With `{ osmElements: true }`, an OSM layer exports one feature per way or relation, with `osm_type` and `osm_id` in its properties; buildings are not merged, and each element carries the `building_id` of its building.
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
 * `getTableData(params)`: Reads table data for inspection or UI display.
 * `updateTable(params)`: Updates a table using the supported update strategies.

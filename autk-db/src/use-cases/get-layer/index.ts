@@ -7,3 +7,4 @@
  * @module get-layer
  */
 export * from './use-case';
+export * from './interfaces';

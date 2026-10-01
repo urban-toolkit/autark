@@ -1,19 +1,30 @@
 import { Table } from '../../interfaces';
 import type { LayerType } from '@urban-toolkit/autk-core';
+import { GetLayerOptions } from './interfaces';
 
 /**
  * Builds a SQL query that exports a layer table as a GeoJSON FeatureCollection.
  *
  * @remarks Raster layers return a single feature with raster metadata. Building layers
  *   without `building_id` group geometries by row; those with it merge parts per building.
+ *   With `osmElements`, an OSM layer exports one feature per way or relation instead.
  * @param layerTable - The layer table including its type and column definitions.
  * @param workspace - Workspace (schema) name containing the table.
+ * @param options - Export options.
  * @returns A SQL string that returns a single `geojson` column with GeoJSON output.
  */
-export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: Table & { type: LayerType }, workspace: string) => {
+export const GET_LAYER_AS_GEOJSON_QUERY = (
+  layerTable: Table & { type: LayerType },
+  workspace: string,
+  options: GetLayerOptions = {},
+) => {
   const hasBuildingIdColumn = !!layerTable.columns?.some((c) => c.name === 'building_id');
   const qualifiedTableName = `${workspace}.${layerTable.name}`;
   const propertiesExpression = buildPropertiesExpression(layerTable);
+
+  if (options.osmElements && isOsmElementTable(layerTable)) {
+    return buildOsmElementsQuery(qualifiedTableName, hasBuildingIdColumn);
+  }
 
   if (layerTable.type === 'raster') {
     return `
@@ -93,6 +104,55 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (layerTable: Table & { type: LayerType
     ) sub;
 `;
 };
+
+/**
+ * Builds a SQL query that exports an OSM layer table with one feature per row.
+ *
+ * @remarks Each row of a layer `loadOsm` built is one way or one relation. A relation's
+ *   row is written with empty `refs`, and a way's row always has its node refs, so the
+ *   element type follows from `refs`. The added keys win over a tag of the same name.
+ * @param qualifiedTableName - Workspace-qualified layer table name.
+ * @param hasBuildingIdColumn - Whether rows carry the `building_id` of their building.
+ * @returns A SQL string that returns a single `geojson` column with GeoJSON output.
+ */
+function buildOsmElementsQuery(qualifiedTableName: string, hasBuildingIdColumn: boolean): string {
+  const osmType = `CASE WHEN len(refs) = 0 THEN 'relation' ELSE 'way' END`;
+  const identity = hasBuildingIdColumn
+    ? `json_object('osm_type', osm_type, 'osm_id', id, 'building_id', building_id)`
+    : `json_object('osm_type', osm_type, 'osm_id', id)`;
+  const order = hasBuildingIdColumn ? 'building_id, osm_type, id' : 'osm_type, id';
+
+  return `
+    SELECT json_object(
+         'type', 'FeatureCollection',
+         'features', to_json(list(feature ORDER BY ${order}))
+       ) AS geojson
+    FROM (
+      SELECT
+        ${hasBuildingIdColumn ? 'building_id,' : ''}
+        id,
+        osm_type,
+        json_object(
+          'type', 'Feature',
+          'geometry', CAST(ST_AsGeoJSON(geometry) AS JSON),
+          'properties', json_merge_patch(COALESCE(CAST(properties AS JSON), '{}'::JSON), ${identity})
+        ) AS feature
+      FROM (SELECT *, ${osmType} AS osm_type FROM ${qualifiedTableName}) elements
+    ) sub;
+  `;
+}
+
+/**
+ * Checks whether a table holds OSM elements: a layer `loadOsm` built, whose rows keep
+ * the element's `id`, its `refs` and its tags as `properties`.
+ *
+ * @param table - The table to inspect.
+ * @returns `true` for an OSM layer table with `id`, `refs` and `properties` columns.
+ */
+function isOsmElementTable(table: Table): boolean {
+  const names = new Set(table.columns.map((column) => column.name));
+  return table.source === 'osm' && names.has('id') && names.has('refs') && names.has('properties');
+}
 
 /**
  * Builds a SQL expression that extracts table properties as JSON.

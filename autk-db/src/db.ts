@@ -29,7 +29,7 @@ import { DropTableUseCase } from './use-cases/drop-table';
 import { GetLayerBboxUseCase } from './use-cases/get-layer-bbox';
 import { GetOsmBboxUseCase } from './internal/get-osm-bbox/use-case';
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
-import { GetLayerUseCase } from './use-cases/get-layer';
+import { GetLayerUseCase, GetLayerOptions } from './use-cases/get-layer';
 import { GetRasterUseCase } from './use-cases/get-raster';
 import { GetTableOutput, GetTableUseCase } from './use-cases/get-table';
 import { LoadCsvParams, LoadCsvUseCase } from './use-cases/load-csv';
@@ -601,13 +601,15 @@ export class AutkDb {
      * The bbox is resolved from the immutable workspace bounds, then the layer's own bounds.
      *
      * @param layerTableName - Name of the layer table to export.
+     * @param options - Export options; `osmElements` exports one feature per OSM way or relation, with its id.
      * @returns A FeatureCollection with a `bbox` property.
      * @throws If the database is not initialized, the table is missing, or it is not a layer table.
      * @example
      * const buildings = await db.getLayer('osm_buildings');
      * map.loadCollection('buildings', { collection: buildings, type: 'buildings' });
+     * const elements = await db.getLayer('osm_buildings', { osmElements: true });
      */
-    async getLayer(layerTableName: string): Promise<FeatureCollection> {
+    async getLayer(layerTableName: string, options: GetLayerOptions = {}): Promise<FeatureCollection> {
         if (!this.db || !this.conn || !this.getLayerUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
@@ -617,7 +619,7 @@ export class AutkDb {
 
         const featureCollection = layerTable.type === 'raster' && !this.tableHasGeometry(layerTable)
             ? await this.getRaster(layerTableName) as unknown as FeatureCollection
-            : await this.getLayerUseCase.exec(layerTable, this.currentWorkspace);
+            : await this.getLayerUseCase.exec(layerTable, this.currentWorkspace, options);
 
         const workspaceData = this.getCurrentWorkspaceData();
         if (workspaceData.workspaceBoundingBox) {
