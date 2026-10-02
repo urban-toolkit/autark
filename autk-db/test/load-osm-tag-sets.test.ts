@@ -81,9 +81,11 @@ const SETS: OsmTagSet[] = [
 /** The Overpass queries sent, decoded. */
 let sent: string[] = [];
 const realFetch = globalThis.fetch;
+/** What a tag query is answered with, when a test sets it. */
+let taggedAnswer: unknown[] | null = null;
 
 function answer(query: string): unknown[] {
-  if (query.includes('->.tagHits')) return TAGGED;
+  if (query.includes('->.tagHits')) return taggedAnswer ?? TAGGED;
   if (query.includes('->.boundaryWays1')) return GOLF_BOUNDARY;
   if (query.includes('way["building"]')) return [HOUSE];
   if (query.includes('"leisure"')) return [square(101, 1, [-87.795, 42.052, -87.79, 42.055], { leisure: 'park' })];
@@ -256,6 +258,28 @@ describe('a tag set', () => {
     ).rejects.toThrow(message);
     expect(sent).toHaveLength(0);
   }, 120_000);
+
+  it('loads the relations of an answer that starts with many nodes', async () => {
+    // More nodes than DuckDB samples to detect a JSON file's column types,
+    // ahead of the relation and its outer way.
+    const benches = Array.from({ length: 21000 }, (_, i) =>
+      node(100000 + i, 42.051 + (i % 100) * 0.00008, -87.799 + Math.floor(i / 100) * 0.00008, { amenity: 'bench' }));
+    taggedAnswer = [...benches, SCHOOL, SCHOOL_OUTER];
+    try {
+      const db = await freshDb();
+      const timings = await db.loadOsm({
+        queryArea: { bbox: BOX },
+        autoLoadLayers: { layers: [] },
+        tagSets: [{ name: 'poi', tags: [{ key: 'amenity' }] }],
+      });
+      const counts = Object.fromEntries(timings.layers.map((l) => [l.layerName, l.featureCount]));
+      expect(counts).toEqual({ table_osm_poi_points: 21000, table_osm_poi_polygons: 1 });
+      const polygons = (await db.getLayer('table_osm_poi_polygons', { osmElements: true })).features;
+      expect(polygons.map(keyOf)).toEqual(['relation/3001']);
+    } finally {
+      taggedAnswer = null;
+    }
+  }, 180_000);
 
   it('is refused with a .pbf extract', async () => {
     const db = await freshDb();
