@@ -72,11 +72,11 @@ console.log(parcels.type); // 'polygons'
 * `init()`: Initializes DuckDB-Wasm and loads the spatial extension.
 * `tables`: Lists tables registered in the current workspace.
 * `setWorkspace(name)`, `getWorkspaces()`, `getCurrentWorkspace()`: Manage isolated database schemas.
-* `loadOsm(params)`: Loads OpenStreetMap data from Overpass API or PBF-backed workflows.
+* `loadOsm(params)`: Loads OpenStreetMap data from Overpass API or PBF-backed workflows. With `tagSets: [{ name, tags: [{ key, value? }] }]`, it also loads the nodes, ways and multipolygon relations matching any of a set's tags, as `<table>_<name>_points`, `_polylines` and `_polygons` layers (Overpass only).
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
 * `loadGeojson(params)`: Imports custom GeoJSON layers.
 * `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers.
-* `getLayer(layerTableName, options?)`: Exports a layer table as a GeoJSON `FeatureCollection`. With `{ osmElements: true }`, an OSM layer exports one feature per way or relation, with `osm_type` and `osm_id` in its properties; buildings are not merged, and each element carries the `building_id` of its building.
+* `getLayer(layerTableName, options?)`: Exports a layer table as a GeoJSON `FeatureCollection`. With `{ osmElements: true }`, an OSM layer exports one feature per node, way or relation, with `osm_type` and `osm_id` in its properties; buildings are not merged, and each element carries the `building_id` of its building.
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
 * `getTableData(params)`: Reads table data for inspection or UI display.
 * `updateTable(params)`: Updates a table using the supported update strategies.

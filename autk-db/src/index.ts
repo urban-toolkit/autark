@@ -57,6 +57,8 @@ export type {
   OsmQueryArea,
   OsmNamedArea,
   OsmBoundingBoxArea,
+  OsmTagFilter,
+  OsmTagSet,
 } from './use-cases/load-osm-overpass';
 export { isBoundingBoxArea } from './use-cases/load-osm-overpass';
 export type { SpatialQueryParams, AggregateFunction, NearConfig } from './use-cases/spatial-join';

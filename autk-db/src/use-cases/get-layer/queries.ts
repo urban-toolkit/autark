@@ -23,7 +23,8 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (
   const propertiesExpression = buildPropertiesExpression(layerTable);
 
   if (options.osmElements && isOsmElementTable(layerTable)) {
-    return buildOsmElementsQuery(qualifiedTableName, hasBuildingIdColumn);
+    const hasOsmTypeColumn = layerTable.columns.some((c) => c.name === 'osm_type');
+    return buildOsmElementsQuery(qualifiedTableName, hasBuildingIdColumn, hasOsmTypeColumn);
   }
 
   if (layerTable.type === 'raster') {
@@ -108,15 +109,20 @@ export const GET_LAYER_AS_GEOJSON_QUERY = (
 /**
  * Builds a SQL query that exports an OSM layer table with one feature per row.
  *
- * @remarks Each row of a layer `loadOsm` built is one way or one relation. A relation's
- *   row is written with empty `refs`, and a way's row always has its node refs, so the
- *   element type follows from `refs`. The added keys win over a tag of the same name.
+ * @remarks Each row of a layer `loadOsm` built is one node, way or relation. A tag
+ *   set's tables record it in an `osm_type` column. The thematic layers hold ways and
+ *   relations: a relation's row is written with empty `refs`, and a way's row always
+ *   has its node refs, so the element type follows from `refs`. The added keys win
+ *   over a tag of the same name.
  * @param qualifiedTableName - Workspace-qualified layer table name.
  * @param hasBuildingIdColumn - Whether rows carry the `building_id` of their building.
+ * @param hasOsmTypeColumn - Whether rows record their element type in `osm_type`.
  * @returns A SQL string that returns a single `geojson` column with GeoJSON output.
  */
-function buildOsmElementsQuery(qualifiedTableName: string, hasBuildingIdColumn: boolean): string {
-  const osmType = `CASE WHEN len(refs) = 0 THEN 'relation' ELSE 'way' END`;
+function buildOsmElementsQuery(qualifiedTableName: string, hasBuildingIdColumn: boolean, hasOsmTypeColumn = false): string {
+  const elements = hasOsmTypeColumn
+    ? qualifiedTableName
+    : `(SELECT *, CASE WHEN len(refs) = 0 THEN 'relation' ELSE 'way' END AS osm_type FROM ${qualifiedTableName})`;
   const identity = hasBuildingIdColumn
     ? `json_object('osm_type', osm_type, 'osm_id', id, 'building_id', building_id)`
     : `json_object('osm_type', osm_type, 'osm_id', id)`;
@@ -137,7 +143,7 @@ function buildOsmElementsQuery(qualifiedTableName: string, hasBuildingIdColumn: 
           'geometry', CAST(ST_AsGeoJSON(geometry) AS JSON),
           'properties', json_merge_patch(COALESCE(CAST(properties AS JSON), '{}'::JSON), ${identity})
         ) AS feature
-      FROM (SELECT *, ${osmType} AS osm_type FROM ${qualifiedTableName}) elements
+      FROM ${elements} elements
     ) sub;
   `;
 }

@@ -3,6 +3,8 @@ import type { Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 
 import { LoadOsmLayerParams } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
+import { TAG_SET_MATCH, TAG_SET_TABLES_QUERY } from './tag-set-queries';
+import type { OsmTagSet } from '../load-osm-overpass/interfaces';
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
 import { OsmLayerTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
@@ -130,6 +132,63 @@ export class LoadOsmLayerUseCase {
   }
 
   /**
+   * Builds a tag set's layers from the raw OSM table: matching nodes as
+   * `points`, matching ways as `polylines` or `polygons`, and matching
+   * multipolygon relations as `polygons`. Features are whole elements; nothing
+   * is cut. A geometry with no feature gets no table.
+   *
+   * @param params - Raw OSM table, the checked tag set, CRS and workspace.
+   * @returns The tables created, `<input>_<set>_points|polylines|polygons`, each with rows.
+   */
+  async execTagSet(params: {
+    osmInputTableName: string;
+    tagSet: OsmTagSet;
+    coordinateFormat?: string;
+    workspaceCoordinateFormat?: string;
+    workspace?: string;
+  }): Promise<OsmLayerTable[]> {
+    const sourceCrs = params.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
+    const targetCrs = params.workspaceCoordinateFormat || DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+    const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
+    const base = `${params.osmInputTableName}_${params.tagSet.name}`;
+    const names = { points: `${base}_points`, polylines: `${base}_polylines`, polygons: `${base}_polygons` } as const;
+    const match = TAG_SET_MATCH(params.tagSet.tags);
+
+    await this.conn.query(TAG_SET_TABLES_QUERY({
+      inputTable: `${workspace}.${params.osmInputTableName}`,
+      points: `${workspace}.${names.points}`,
+      polylines: `${workspace}.${names.polylines}`,
+      polygons: `${workspace}.${names.polygons}`,
+      match,
+      sourceCrs,
+      targetCrs,
+    }));
+    await this.appendRelationAreaGeometries({
+      inputTableName: params.osmInputTableName,
+      outputTableName: names.polygons,
+      layer: 'polygons',
+      sourceCrs,
+      targetCrs,
+      workspace,
+      relationWhere: `map_extract(tags, 'type')[1] = 'multipolygon' AND ${match}`,
+      withOsmType: true,
+    });
+
+    const tables: OsmLayerTable[] = [];
+    for (const type of ['points', 'polylines', 'polygons'] as const) {
+      const qualifiedName = `${workspace}.${names[type]}`;
+      const count = Number((await this.conn.query(`SELECT COUNT(*) AS cnt FROM ${qualifiedName}`)).toArray()[0].cnt);
+      if (count === 0) {
+        await this.conn.query(`DROP TABLE ${qualifiedName}`);
+        continue;
+      }
+      const describe = await this.conn.query(`DESCRIBE ${qualifiedName}`);
+      tables.push({ source: 'osm', type, name: names[type], columns: getColumnsFromDuckDbTableDescribe(describe.toArray()) });
+    }
+    return tables;
+  }
+
+  /**
    * Appends resolved relation area geometries to the output layer table.
    *
    * The method builds relation area records, writes them to a temporary VFS file,
@@ -146,8 +205,17 @@ export class LoadOsmLayerUseCase {
     targetCrs: string;
     boundingBox?: BoundingBox;
     workspace: string;
+    /** Which relations to add; defaults to the layer's own (`__autk_layer`). */
+    relationWhere?: string;
+    /** Write `'relation'` into the output's `osm_type` column. */
+    withOsmType?: boolean;
   }): Promise<number> {
-    const { records, skipped } = await this.buildRelationAreaRecords(params.inputTableName, params.layer, params.workspace);
+    const { records, skipped } = await this.buildRelationAreaRecords(
+      params.inputTableName,
+      params.layer,
+      params.workspace,
+      params.relationWhere,
+    );
     if (records.length === 0) return skipped;
 
     const fileName = `temp_${params.layer}_relations_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
@@ -168,9 +236,10 @@ export class LoadOsmLayerUseCase {
 
     try {
       await this.conn.query(`
-        INSERT INTO ${qualifiedOutputTableName} (id, properties, refs, geometry)
+        INSERT INTO ${qualifiedOutputTableName} (id, ${params.withOsmType ? 'osm_type, ' : ''}properties, refs, geometry)
         SELECT
           id::BIGINT,
+          ${params.withOsmType ? `'relation' AS osm_type,` : ''}
           CASE
             WHEN tags IS NULL OR tags = [] THEN NULL
             ELSE map_from_entries(tags)
@@ -193,18 +262,20 @@ export class LoadOsmLayerUseCase {
    * @param inputTableName - Name of the OSM elements table to read.
    * @param layer - The thematic layer name used to filter relations.
    * @param workspace - Workspace containing the input table.
+   * @param relationWhere - Which relations to build; defaults to the layer's own (`__autk_layer`).
    * @returns An object containing the list of GeoJSON relation records and the count of skipped relations.
    */
   private async buildRelationAreaRecords(
     inputTableName: string,
     layer: LayerType,
     workspace: string,
+    relationWhere: string = `map_extract(tags, '__autk_layer')[1] = '${layer}'`,
   ): Promise<{ records: RelationAreaRecord[]; skipped: number }> {
     const qualifiedInputTableName = `${workspace}.${inputTableName}`;
     const relations = (await this.conn.query(`
       SELECT id, refs, ref_roles, ref_types, CAST(tags AS JSON) AS tags_json
         FROM ${qualifiedInputTableName}
-        WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = '${layer}';
+        WHERE kind = 'relation' AND ${relationWhere};
     `)).toArray() as unknown as RelationRow[];
 
     if (relations.length === 0) return { records: [], skipped: 0 };

@@ -39,6 +39,7 @@ import { deleteRasterPayload } from './raster-store';
 import { LoadJsonParams, LoadJsonUseCase } from './use-cases/load-json';
 import { LoadOsmLayerParams, LoadOsmLayerUseCase } from './use-cases/load-osm-layer';
 import { LoadOsmFromOverpassApiUseCase, LoadOsmParams, OsmLoadTimings } from './use-cases/load-osm-overpass';
+import { checkTagSets } from './use-cases/load-osm-overpass/interfaces';
 import { LoadOsmFromPbfUseCase } from './use-cases/load-osm-pbf';
 import { OsmProcessingPipeline } from './internal/process-osm/pipeline';
 import { PolygonizeOsmSurfaceUseCase } from './internal/process-osm-surface/use-case';
@@ -284,9 +285,15 @@ export class AutkDb {
             !this.loadOsmFromPbfUseCase ||
             !this.dropTableUseCase ||
             !this.getOsmBboxUseCase ||
-            !this.polygonizeOsmSurfaceUseCase
+            !this.polygonizeOsmSurfaceUseCase ||
+            !this.loadOsmLayerUseCase
         )
             throw new Error('Database not initialized. Please call init() first.');
+
+        const tagSets = checkTagSets(params.tagSets);
+        if (tagSets.length > 0 && params.pbfFileUrl) {
+            throw new Error('tagSets are not supported with pbfFileUrl: a .pbf extract loads layers only.');
+        }
 
         const workspaceData = this.getCurrentWorkspaceData();
         if (workspaceData.tables.some((table) => table.source !== 'osm')) {
@@ -299,7 +306,7 @@ export class AutkDb {
         const sourceCrs = params.autoLoadLayers.coordinateFormat ?? DEFAULT_INPUT_COORDINATE_FORMAT;
         const outputTableName = params.outputTableName ?? 'table_osm';
 
-        const loadParams = { ...params, outputTableName, workspace: this.currentWorkspace };
+        const loadParams = { ...params, tagSets, outputTableName, workspace: this.currentWorkspace };
         const execResult = params.pbfFileUrl
             ? await this.loadOsmFromPbfUseCase.exec(loadParams)
             : await this.loadOsmFromOverpassApiUseCase.exec(loadParams);
@@ -362,6 +369,28 @@ export class AutkDb {
                 surfaceLayerName = layerTable.name;
             } else {
                 clippableLayerNames.push(layerTable.name);
+            }
+        }
+
+        // Tag sets: whole elements, never clipped; a geometry with no feature has no table.
+        for (const tagSet of tagSets) {
+            const t0 = performance.now();
+            const tables = await this.loadOsmLayerUseCase.execTagSet({
+                osmInputTableName: outputTableName,
+                tagSet,
+                coordinateFormat: sourceCrs,
+                workspaceCoordinateFormat: targetCrs,
+                workspace: this.currentWorkspace,
+            });
+            const loadMs = performance.now() - t0;
+            for (const table of tables) {
+                this.registerTable(table);
+                await this.initializeSpatialMetadata(table);
+                const countResult = await this.conn.query(
+                    `SELECT COUNT(*) as cnt FROM ${this.currentWorkspace}.${table.name}`
+                );
+                const featureCount = Number(countResult.toArray()[0].cnt);
+                timings.layers.push({ layerName: table.name, layerType: table.type, tagSet: tagSet.name, loadMs, featureCount });
             }
         }
 

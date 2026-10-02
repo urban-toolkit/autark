@@ -15,5 +15,7 @@ export type {
   OsmQueryArea,
   OsmNamedArea,
   OsmBoundingBoxArea,
+  OsmTagFilter,
+  OsmTagSet,
 } from './interfaces';
 export { isBoundingBoxArea } from './interfaces';
