@@ -261,37 +261,27 @@ export class OsmProcessingPipeline {
    */
   formatOsmDataForJson(osmData: OverpassApiResponse): FormattedElement[] {
     const formattedElements: FormattedElement[] = [];
-    const emittedNodeIds = new Set<number>();
+    // Where each node's record is, so a node listed with its tags after a way's
+    // copy of it (from the way's inline geometry) gives that record its tags.
+    const nodeRecords = new Map<number, FormattedElement>();
 
     const emitNode = (id: number, lat: number, lon: number, tags?: Record<string, string>) => {
-      if (!emittedNodeIds.has(id)) {
-        emittedNodeIds.add(id);
-        formattedElements.push({
-          kind: 'node',
-          id,
-          tags: tags ? Object.entries(tags).map(([k, v]) => ({ k, v })) : [],
-          refs: [],
-          lat,
-          lon,
-          ref_roles: [],
-          ref_types: [],
-        });
+      const entries = tags ? Object.entries(tags).map(([k, v]) => ({ k, v })) : [];
+      const emitted = nodeRecords.get(id);
+      if (emitted) {
+        if (emitted.tags.length === 0 && entries.length > 0) emitted.tags = entries;
+        return;
       }
+      const record: FormattedElement = { kind: 'node', id, tags: entries, refs: [], lat, lon, ref_roles: [], ref_types: [] };
+      nodeRecords.set(id, record);
+      formattedElements.push(record);
     };
-
-    // Nodes the response lists itself come first, with their tags, so a way's
-    // copy of the same node (from its inline geometry) does not replace them.
-    osmData.elements.forEach((element) => {
-      if (element.type === 'node' && element.lat !== undefined && element.lon !== undefined) {
-        emitNode(element.id, element.lat, element.lon, element.tags);
-      }
-    });
 
     osmData.elements.forEach((element) => {
       switch (element.type) {
         case 'node':
           if (element.lat !== undefined && element.lon !== undefined) {
-            emitNode(element.id, element.lat, element.lon);
+            emitNode(element.id, element.lat, element.lon, element.tags);
           }
           break;
 

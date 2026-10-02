@@ -50,6 +50,23 @@ export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, works
     lon::DOUBLE,
     ref_roles::VARCHAR[],
     ref_types::VARCHAR[]
-  FROM '${fileName}';
+  FROM read_json('${fileName}', format = 'array', columns = ${OSM_JSON_COLUMNS});
 `;
 };
+
+/**
+ * The record types, given rather than detected: detection reads a sample of the
+ * first records, and a file that starts with thousands of nodes (empty `refs`,
+ * `ref_roles` and `ref_types`) would type those columns wrong for the ways and
+ * relations after it.
+ */
+const OSM_JSON_COLUMNS = `{
+    kind: 'VARCHAR',
+    id: 'BIGINT',
+    tags: 'STRUCT(k VARCHAR, v VARCHAR)[]',
+    refs: 'BIGINT[]',
+    lat: 'DOUBLE',
+    lon: 'DOUBLE',
+    ref_roles: 'VARCHAR[]',
+    ref_types: 'VARCHAR[]'
+  }`;
