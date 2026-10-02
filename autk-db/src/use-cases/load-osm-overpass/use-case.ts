@@ -498,6 +498,19 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
+   * Overpass lines that bind `.area${i}` to the named area inside `.areaMain`:
+   * the relation of that name within the geocode area, mapped to its area.
+   * An `area["name"=...](area.areaMain)` statement would not be confined to
+   * `.areaMain`, and would match every area of that name.
+   */
+  private namedAreaLines(areaName: string, i: number): string[] {
+    return [
+      `relation["name"="${areaName}"](area.areaMain)->.rel${i};`,
+      `.rel${i} map_to_area->.area${i};`,
+    ];
+  }
+
+  /**
    * Builds a query for a specific group of layers.
    * Returns null when no tag selectors apply to the given group (e.g. surface-only).
    */
@@ -517,7 +530,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
-      areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
+      areaLines.push(...this.namedAreaLines(areaName, i));
       if (tagSelectors.way.length > 0) {
         areaLines.push(`(
         ${tagSelectors.way.map(filter => `way[${filter}](area.area${i});`).join('\n        ')}
@@ -649,7 +662,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
         queryArea.areas.forEach((areaName, idx) => {
           const i = idx + 1;
-          areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
+          areaLines.push(...this.namedAreaLines(areaName, i));
           areaLines.push(`(
         way["building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
         way["building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
