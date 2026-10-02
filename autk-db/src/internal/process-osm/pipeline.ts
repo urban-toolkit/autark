@@ -263,12 +263,29 @@ export class OsmProcessingPipeline {
     const formattedElements: FormattedElement[] = [];
     const emittedNodeIds = new Set<number>();
 
-    const emitNode = (id: number, lat: number, lon: number) => {
+    const emitNode = (id: number, lat: number, lon: number, tags?: Record<string, string>) => {
       if (!emittedNodeIds.has(id)) {
         emittedNodeIds.add(id);
-        formattedElements.push({ kind: 'node', id, tags: [], refs: [], lat, lon, ref_roles: [], ref_types: [] });
+        formattedElements.push({
+          kind: 'node',
+          id,
+          tags: tags ? Object.entries(tags).map(([k, v]) => ({ k, v })) : [],
+          refs: [],
+          lat,
+          lon,
+          ref_roles: [],
+          ref_types: [],
+        });
       }
     };
+
+    // Nodes the response lists itself come first, with their tags, so a way's
+    // copy of the same node (from its inline geometry) does not replace them.
+    osmData.elements.forEach((element) => {
+      if (element.type === 'node' && element.lat !== undefined && element.lon !== undefined) {
+        emitNode(element.id, element.lat, element.lon, element.tags);
+      }
+    });
 
     osmData.elements.forEach((element) => {
       switch (element.type) {
