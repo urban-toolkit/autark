@@ -392,6 +392,13 @@ export class AutkDb {
                 const featureCount = Number(countResult.toArray()[0].cnt);
                 timings.layers.push({ layerName: table.name, layerType: table.type, tagSet: tagSet.name, loadMs, featureCount });
             }
+            // A geometry left empty this time has no table: forget the one an earlier load registered.
+            for (const type of ['points', 'polylines', 'polygons'] as const) {
+                const name = `${outputTableName}_${tagSet.name}_${type}`;
+                if (!tables.some((t) => t.name === name) && workspaceData.tables.some((t) => t.name === name)) {
+                    await this.removeLayer(name);
+                }
+            }
         }
 
         if (surfaceLayerName && clippableLayerNames.length > 0) {

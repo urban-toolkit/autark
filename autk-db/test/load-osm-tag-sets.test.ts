@@ -295,6 +295,47 @@ describe('a tag set', () => {
   }, 120_000);
 });
 
+describe('a tag set loaded again on the same AutkDb', () => {
+  const POI: OsmTagSet[] = [{ name: 'poi', tags: [{ key: 'amenity' }] }];
+
+  /** Loads POI with the given tag answer and checks the load asked Overpass for it. */
+  async function load(db: AutkDb, tagged: unknown[] | null) {
+    taggedAnswer = tagged;
+    sent = [];
+    try {
+      await db.loadOsm({ queryArea: { bbox: BOX }, autoLoadLayers: { layers: [] }, tagSets: POI });
+    } finally {
+      taggedAnswer = null;
+    }
+    expect(sent.filter((q) => q.includes('->.tagHits'))).toHaveLength(1);
+  }
+
+  const listed = (db: AutkDb) => db.getTablesMetadata().map((t) => t.name).filter((n) => n.startsWith('table_osm_poi_'));
+
+  it('forgets every layer when the new answer has none', async () => {
+    const db = await freshDb();
+    await load(db, null);
+    expect(listed(db).sort()).toEqual(['table_osm_poi_points', 'table_osm_poi_polygons']);
+
+    await load(db, []);
+    expect(listed(db)).toEqual([]);
+    await expect(db.getLayer('table_osm_poi_points')).rejects.toThrow('not found');
+    await expect(db.getLayer('table_osm_poi_polygons')).rejects.toThrow('not found');
+  }, 180_000);
+
+  it('keeps only the geometries of the new answer', async () => {
+    const db = await freshDb();
+    await load(db, [CAFE]);
+    expect(listed(db)).toEqual(['table_osm_poi_points']);
+
+    await load(db, [PARKING]);
+    expect(listed(db)).toEqual(['table_osm_poi_polygons']);
+    await expect(db.getLayer('table_osm_poi_points')).rejects.toThrow('not found');
+    const polygons = (await db.getLayer('table_osm_poi_polygons', { osmElements: true })).features;
+    expect(polygons.map(keyOf)).toEqual(['way/2001']);
+  }, 180_000);
+});
+
 describe('the Overpass cache with tag sets', () => {
   const store = new Map<string, string>();
 
