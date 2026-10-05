@@ -28,7 +28,10 @@ export interface NearConfig {
  * Parameters for a spatial join between two tables.
  *
  * The join always modifies the root table in place using a LEFT join.
- * Aggregated results are stored under `properties.sjoin.<aggregateFn>.<key>` in the root table.
+ * Each root feature remains one row. Aggregated results are stored under
+ * `properties.sjoin.<aggregateFn>.<key>`. Without groupBy, matches are an array of
+ * `{ id?, properties }` under `properties.sjoin.matches`, without repeated geometry.
+ * Multipart geometries contribute once per pair of stored features.
  *
  * @example
  * await db.spatialQuery({ tableRootName: 'roads', tableJoinName: 'noise' });
@@ -52,9 +55,9 @@ export interface SpatialQueryParams {
   near?: NearConfig;
   /** Optional aggregation applied to join-side data. Keys are derived from `tableJoinName` and the aggregate function. */
   groupBy?: Array<{
-    /** Column name to aggregate. Use `'*'` for row-level aggregations like `count`. */
+    /** Column name to aggregate. Use `'*'` to count matched features, not their parts. */
     column: string;
-    /** Aggregation function. Omit to pass the column through without aggregation. */
+    /** Aggregation function. Omit to collect the matched column values in an array. */
     aggregateFn?: AggregateFunction;
     /** When `true`, normalizes the aggregated value between 0 and 1. */
     normalize?: boolean;

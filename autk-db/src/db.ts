@@ -23,8 +23,6 @@ import {
     DEFAULT_WORKSPACE_COORDINATE_FORMAT
 } from './consts';
 
-import { getColumnsFromDuckDbTableDescribe } from './utils';
-
 import { DropTableUseCase } from './use-cases/drop-table';
 import { GetLayerBboxUseCase } from './use-cases/get-layer-bbox';
 import { GetOsmBboxUseCase } from './internal/get-osm-bbox/use-case';
@@ -303,84 +301,90 @@ export class AutkDb {
         const execResult = params.pbfFileUrl
             ? await this.loadOsmFromPbfUseCase.exec(loadParams)
             : await this.loadOsmFromOverpassApiUseCase.exec(loadParams);
-        for (const table of execResult.tables) {
-            this.registerTable(table);
-        }
+        try {
+            for (const table of execResult.tables) {
+                this.registerTable(table);
+            }
 
-        const timings: OsmLoadTimings = {
-            osmElementCount: execResult.osmElementCount,
-            boundaryElementCount: execResult.boundaryElementCount,
-            osmDataProcessingMs: execResult.osmDataProcessingMs,
-            boundariesProcessingMs: execResult.boundariesProcessingMs,
-            layers: [],
-        };
-
-        const boundaryTableName = `${outputTableName}_boundaries`;
-        const osmBoundingBox = await this.getOsmBboxUseCase.exec({
-            osmTableName: boundaryTableName,
-            workspace: this.currentWorkspace,
-            coordinateFormat: targetCrs,
-        });
-        if (!workspaceData.workspaceBoundingBox) {
-            workspaceData.workspaceBoundingBox = osmBoundingBox;
-        }
-
-        let surfaceLayerName: string | null = null;
-        const clippableLayerNames: string[] = [];
-
-        for (const layer of params.autoLoadLayers.layers) {
-            const shouldCropToBbox = layer !== 'buildings';
-
-            const layerParams: LoadOsmLayerParams = {
-                osmInputTableName: outputTableName,
-                coordinateFormat: sourceCrs,
-                layer,
+            const timings: OsmLoadTimings = {
+                osmElementCount: execResult.osmElementCount,
+                boundaryElementCount: execResult.boundaryElementCount,
+                osmDataProcessingMs: execResult.osmDataProcessingMs,
+                boundariesProcessingMs: execResult.boundariesProcessingMs,
+                layers: [],
             };
 
-            layerParams.boundingBox = shouldCropToBbox ? osmBoundingBox : undefined;
+            const boundaryTableName = `${outputTableName}_boundaries`;
+            const osmBoundingBox = await this.getOsmBboxUseCase.exec({
+                osmTableName: boundaryTableName,
+                workspace: this.currentWorkspace,
+                coordinateFormat: targetCrs,
+            });
+            if (!workspaceData.workspaceBoundingBox) {
+                workspaceData.workspaceBoundingBox = osmBoundingBox;
+            }
 
-            const t0 = performance.now();
-            const layerTable = await this.loadOsmLayer({ ...layerParams, workspaceCoordinateFormat: targetCrs });
-            const loadMs = performance.now() - t0;
+            let surfaceLayerName: string | null = null;
+            const clippableLayerNames: string[] = [];
 
-            const countResult = await this.conn.query(
-                `SELECT COUNT(*) as cnt FROM ${this.currentWorkspace}.${layerTable.name}`
-            );
-            const featureCount = Number(countResult.toArray()[0].cnt);
+            for (const layer of params.autoLoadLayers.layers) {
+                const shouldCropToBbox = layer !== 'buildings';
 
-            timings.layers.push({ layerName: layerTable.name, layerType: layer, loadMs, featureCount });
+                const layerParams: LoadOsmLayerParams = {
+                    osmInputTableName: outputTableName,
+                    coordinateFormat: sourceCrs,
+                    layer,
+                };
 
-            if (layer === 'surface') {
-                const updatedTable = await this.polygonizeOsmSurfaceUseCase.exec(
-                    { surfaceTableName: layerTable.name, workspace: this.currentWorkspace },
-                    layerTable
+                layerParams.boundingBox = shouldCropToBbox ? osmBoundingBox : undefined;
+
+                const t0 = performance.now();
+                const layerTable = await this.loadOsmLayer({ ...layerParams, workspaceCoordinateFormat: targetCrs });
+                const loadMs = performance.now() - t0;
+
+                const countResult = await this.conn.query(
+                    `SELECT COUNT(*) as cnt FROM ${this.currentWorkspace}.${layerTable.name}`
                 );
-                const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
-                if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
-                await this.refreshStoredBoundingBox(layerTable.name);
-                workspaceData.workspaceCropLayer = layerTable.name;
-                surfaceLayerName = layerTable.name;
-            } else {
-                clippableLayerNames.push(layerTable.name);
+                const featureCount = Number(countResult.toArray()[0].cnt);
+
+                timings.layers.push({ layerName: layerTable.name, layerType: layer, loadMs, featureCount });
+
+                if (layer === 'surface') {
+                    const updatedTable = await this.polygonizeOsmSurfaceUseCase.exec(
+                        { surfaceTableName: layerTable.name, workspace: this.currentWorkspace },
+                        layerTable
+                    );
+                    const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
+                    if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
+                    await this.refreshStoredBoundingBox(layerTable.name);
+                    workspaceData.workspaceCropLayer = layerTable.name;
+                    surfaceLayerName = layerTable.name;
+                } else {
+                    clippableLayerNames.push(layerTable.name);
+                }
+            }
+
+            if (surfaceLayerName && clippableLayerNames.length > 0) {
+                for (const layerName of clippableLayerNames) {
+                    const cropGeometry = !layerName.endsWith('_buildings');
+                    await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
+                    await this.refreshStoredBoundingBox(layerName);
+                }
+            }
+
+            console.log(`OSM data loaded and completed in workspace '${this.currentWorkspace}'!`);
+
+            return timings;
+        } finally {
+            for (const table of execResult.tables) {
+                const result = await this.dropTableUseCase.exec({ tableName: table.name, workspace: loadParams.workspace });
+                if (result.success) {
+                    workspaceData.tables = workspaceData.tables.filter((t) => t.name !== table.name);
+                } else {
+                    console.warn(`[AutkDb.loadOsm] Could not clean staging table ${loadParams.workspace}.${table.name}: ${result.message}`);
+                }
             }
         }
-
-        if (surfaceLayerName && clippableLayerNames.length > 0) {
-            for (const layerName of clippableLayerNames) {
-                const cropGeometry = !layerName.endsWith('_buildings');
-                await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
-                await this.refreshStoredBoundingBox(layerName);
-            }
-        }
-
-        for (const table of execResult.tables) {
-            await this.dropTableUseCase.exec({ tableName: table.name, workspace: this.currentWorkspace });
-            workspaceData.tables = workspaceData.tables.filter((t) => t.name !== table.name);
-        }
-
-        console.log(`OSM data loaded and completed in workspace '${this.currentWorkspace}'!`);
-
-        return timings;
     }
 
     /**
@@ -483,7 +487,8 @@ export class AutkDb {
     /**
      * Loads a GeoJSON FeatureCollection as a spatial layer, optionally auto-clipping to the workspace bbox when OSM data is present.
      *
-     * When `layerType` is `'buildings'`, computes `building_id` by clustering overlapping geometries.
+     * Building features keep their own identity and original parts; independent GeoJSON
+     * features are never clustered merely because their geometries overlap.
      *
      * @param params - File URL or object, table name, and layer type.
      * @returns The created custom layer table metadata.
@@ -517,18 +522,6 @@ export class AutkDb {
         }
 
         const tableWithSpatialMetadata = await this.initializeSpatialMetadata(table);
-
-        if (params.layerType === 'buildings') {
-            const qualifiedTableName = `${this.currentWorkspace}.${tableWithSpatialMetadata.name}`;
-            const hasBuildingId = tableWithSpatialMetadata.columns.some((column) => column.name === 'building_id');
-            if (!hasBuildingId) {
-                await this.conn.query(`ALTER TABLE ${qualifiedTableName} ADD COLUMN building_id BIGINT`);
-            }
-            await this.conn.query(`UPDATE ${qualifiedTableName} SET building_id = CAST(id AS BIGINT)`);
-
-            const describeUpdatedTableResponse = await this.conn.query(`DESCRIBE ${qualifiedTableName}`);
-            tableWithSpatialMetadata.columns = getColumnsFromDuckDbTableDescribe(describeUpdatedTableResponse.toArray());
-        }
 
         return tableWithSpatialMetadata;
     }
@@ -601,7 +594,7 @@ export class AutkDb {
      * The bbox is resolved from the immutable workspace bounds, then the layer's own bounds.
      *
      * @param layerTableName - Name of the layer table to export.
-     * @returns A FeatureCollection with a `bbox` property.
+     * @returns A FeatureCollection with `bbox` when workspace or nonempty layer bounds are available.
      * @throws If the database is not initialized, the table is missing, or it is not a layer table.
      * @example
      * const buildings = await db.getLayer('osm_buildings');
@@ -628,13 +621,17 @@ export class AutkDb {
                 workspaceData.workspaceBoundingBox.maxLat,
             ];
         } else {
-            const layerBoundingBox = await this.getBoundingBoxFromLayer(layerTableName);
-            featureCollection.bbox = [
-                layerBoundingBox.minLon,
-                layerBoundingBox.minLat,
-                layerBoundingBox.maxLon,
-                layerBoundingBox.maxLat,
-            ];
+            const layerBoundingBox = this.tableHasGeometry(layerTable)
+                ? (await this.refreshStoredBoundingBox(layerTableName)).boundingBox
+                : await this.getBoundingBoxFromLayer(layerTableName);
+            if (layerBoundingBox) {
+                featureCollection.bbox = [
+                    layerBoundingBox.minLon,
+                    layerBoundingBox.minLat,
+                    layerBoundingBox.maxLon,
+                    layerBoundingBox.maxLat,
+                ];
+            }
         }
 
         return featureCollection;
@@ -938,7 +935,7 @@ export class AutkDb {
      * Computes and stores the bounding box for a geometry-bearing table.
      */
     private async refreshStoredBoundingBox(tableName: string): Promise<Table> {
-        if (!this.getLayerBboxUseCase) {
+        if (!this.conn || !this.getLayerBboxUseCase) {
             throw new Error('Database not initialized. Please call init() first.');
         }
 
@@ -946,6 +943,15 @@ export class AutkDb {
         const table = workspaceData.tables.find((item) => item.name === tableName);
         if (!table) throw new Error(`Table ${tableName} not found.`);
         if (!this.tableHasGeometry(table)) return table;
+
+        const nonempty = await this.conn.query(`
+            SELECT 1 FROM "${this.currentWorkspace.replace(/"/g, '""')}"."${tableName.replace(/"/g, '""')}"
+            WHERE geometry IS NOT NULL AND NOT ST_IsEmpty(geometry) LIMIT 1
+        `);
+        if (nonempty.numRows === 0) {
+            table.boundingBox = undefined;
+            return table;
+        }
 
         table.boundingBox = await this.getLayerBboxUseCase.exec({
             layerTableName: tableName,
@@ -963,7 +969,7 @@ export class AutkDb {
 
         const tableWithBoundingBox = await this.refreshStoredBoundingBox(table.name) as T;
         const workspaceData = this.getCurrentWorkspaceData();
-        if (!workspaceData.workspaceBoundingBox) {
+        if (!workspaceData.workspaceBoundingBox && tableWithBoundingBox.boundingBox) {
             workspaceData.workspaceBoundingBox = tableWithBoundingBox.boundingBox;
             if (this.isPolygonalTable(tableWithBoundingBox)) {
                 workspaceData.workspaceCropLayer = tableWithBoundingBox.name;

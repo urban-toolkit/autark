@@ -46,6 +46,27 @@ const buildings = await db.getLayer('buildings');
 console.log(db.tables, buildings);
 ```
 
+### Building features and spatial joins
+
+With `layerType: 'buildings'`, each feature is stored/exported as one GeometryCollection of original parts. Use `properties.parts[].geometryIndex` for per-part attributes. Distinct GeoJSON features remain distinct even when they overlap. OSM `type=building` relations associate original member ways without generating a duplicate geometry, including disconnected/untagged members. Orphan ways tagged `building:part` (except `no`) are associated with a relation only when their whole geometry is covered by an original outline of exactly one usable surface relation. Outline roles are authoritative; empty/outer-role members qualify only when tagged as whole buildings, not parts. Holes are respected, explicit ownership is never overridden, and inferred parts do not become outlines. Ambiguous containment warns and leaves the part unassociated; partial overlap and independent buildings do not qualify. Remaining unassociated ways retain intersection-based clustering. General relation attributes are inherited by parts, whose own tags take precedence. `properties.osmRelation` retains the relation ID (string), way membership/roles and original tags; optional `osmRelation.inferredParts` records inferred IDs and `method: 'outline-containment'` separately from original members. Feature.id remains the minimum source part ID; unusable/missing member geometry or shared ownership causes a console warning and omission of the whole affected relation, avoiding partial buildings. Unsupported membership contracts still throw. Explicit `location=underground` parts and relations are excluded from this surface building layer with a console warning, before spatial clustering; above-ground parts of mixed buildings remain. Height zero, negative `layer` and basement-level tags alone do not trigger exclusion. There is no union, convex hull or persistent `agg_geometry`. Both PBF and Overpass collect `type=building` relations and their way members; Overpass uses versioned cache keys so older responses lacking these relations are not reused. Source parity requires the same OSM snapshot and complete relation geometry: a local extract cannot reconstruct coordinates for members absent from the PBF.
+
+Public GeoJSON IDs are separate from internal numeric row IDs:
+
+```ts
+await db.updateTable({
+  tableName: 'buildings', strategy: 'update',
+  idColumn: 'geojson_id', data: updatedBuildings,
+});
+```
+
+Keep each input Feature.id for this update; missing IDs are rejected. `idColumn: 'id'` deliberately addresses an internal row key instead.
+
+Spatial joins count matched features once, not individual parts. Aggregate paths remain `properties.sjoin.count.points` and similar. A join without aggregation now keeps one root feature with `properties.sjoin.matches: [{ id?, properties }]`; no matches gives an empty array. Nonaggregated named fields become arrays. NEAR still defaults to centroid distance; `near.useCentroid: false` uses minimum component distance.
+
+GeoJSON building import/update rejects invalid geometry without repair. OSM buildings instead log invalid/missing/empty/non-polygonal geometry with `console.warn` and skip the affected feature, continuing the import without repair. Database/transaction errors are not swallowed. Explicit bbox import filters whole buildings instead of cutting parts; existing workspace polygon crop behavior remains. Old per-part OSM tables, custom SQL, flattened join consumers and stored window IDs need migration/reload.
+
+Tests from the repository root: `npm test -- autk-db/test` (real DuckDB-WASM in Node; spatial extension access required, no Playwright).
+
 ### JSON geometry loading
 
 `loadJson` can import plain JSON records or materialize geometry during load using the same geometry options supported by `loadCsv`:

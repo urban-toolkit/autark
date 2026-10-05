@@ -46,7 +46,7 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, sourceCrs, targetCrs, outpu
       SELECT id, UNNEST(refs) as ref, UNNEST(range(length(refs))) as ref_idx
         FROM ${actualTableName}
         SEMI JOIN ${layer} USING (id)
-          WHERE kind IN ('way', 'relation');
+          WHERE kind = 'way';
 
     CREATE OR REPLACE TEMP TABLE ${layer}_required_nodes_with_geometries AS
       SELECT id, ST_POINT(lon, lat) geometry
@@ -209,8 +209,16 @@ const GET_WATER = (tableName: string) => `
  */
 const GET_BUILDINGS = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE buildings AS
-    SELECT id, tags, refs FROM ${tableName}
-      WHERE kind = 'way' AND map_extract(tags, '__autk_layer')[1] = 'buildings';
+    WITH relation_members AS (
+      SELECT UNNEST(refs) AS member_id, UNNEST(ref_types) AS member_type
+      FROM ${tableName}
+      WHERE kind = 'relation' AND map_extract(tags, 'type')[1] = 'building'
+    )
+    SELECT id, tags, refs FROM ${tableName} w
+      WHERE kind = 'way' AND (
+        map_extract(tags, '__autk_layer')[1] = 'buildings'
+        OR EXISTS (SELECT 1 FROM relation_members m WHERE m.member_type = 'way' AND m.member_id = w.id)
+      );
 `;
 
 /**

@@ -96,6 +96,9 @@ export { TriangulatorPolylines } from './triangulator-polylines';
 export { TriangulatorPolygons }  from './triangulator-polygons';
 /** Triangulates OSM-style building features into extruded 3D meshes. */
 export { TriangulatorBuildings } from './triangulator-buildings';
+/** Normalizes building parts without changing their original geometries. */
+export { normalizeBuildingFeature } from './building-feature';
+export type { BuildingPartProperties } from './building-feature';
 /** Triangulates simplified building shells and emits procedural window layouts. */
 export { TriangulatorBuildingWithWindows } from './triangulator-windows';
 

@@ -1,5 +1,17 @@
 import type { BoundingBox } from '@urban-toolkit/autk-core';
 
+// Both readers consume the entire FeatureCollection as one JSON object.
+const GEOJSON_MAXIMUM_OBJECT_SIZE = 100 * 1024 * 1024;
+
+/** Finds a topologically invalid building before any target table is replaced. */
+export const FIND_INVALID_BUILDING_GEOMETRY_QUERY = (fileName: string) => `
+  SELECT feature->>'id' AS id
+  FROM read_json('${fileName}', columns = {type: 'VARCHAR', features: 'JSON[]'}, maximum_object_size=${GEOJSON_MAXIMUM_OBJECT_SIZE}),
+    UNNEST(features) AS t(feature)
+  WHERE NOT ST_IsValid(ST_GeomFromGeoJSON(feature->'geometry'))
+  LIMIT 1;
+`;
+
 /**
  * Creates a temporary DuckDB table from a GeoJSON file registered in the VFS.
  *
@@ -14,7 +26,7 @@ export const LOAD_FEATURE_COLLECTION_QUERY = (geojsonFileUrl: string, featureCol
   const qualifiedTableName = `${workspace}.${featureCollectionTableName}`;
   return `
     CREATE OR REPLACE TABLE ${qualifiedTableName} AS
-    SELECT * FROM read_json('${geojsonFileUrl}', maximum_object_size=104857600);
+    SELECT * FROM read_json('${geojsonFileUrl}', columns = {type: 'VARCHAR', features: 'JSON[]'}, maximum_object_size=${GEOJSON_MAXIMUM_OBJECT_SIZE});
   `;
 };
 
@@ -41,18 +53,19 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
   targetCrs: string,
   workspace: string,
   boundingBox?: BoundingBox,
+  cropGeometry = true,
 ) => {
   const qualifiedFeatureCollectionTableName = `${workspace}.${featureCollectionTableName}`;
   const qualifiedOutputTableName = `${workspace}.${outputTableName}`;
 
   const geometryTransform = `ST_Transform(
-    ST_GeomFromGeoJSON(JSON(feature.geometry)),
+    ST_GeomFromGeoJSON(feature->'geometry'),
     '${sourceCrs}',
     '${targetCrs}',
     always_xy := true
   )`;
 
-  const geometrySelect = boundingBox
+  const geometrySelect = boundingBox && cropGeometry
     ? `ST_Intersection(
         ${geometryTransform},
         ST_MakeEnvelope(${boundingBox.minLon}, ${boundingBox.minLat}, ${boundingBox.maxLon}, ${boundingBox.maxLat})
@@ -63,8 +76,9 @@ export const LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY = (
     CREATE OR REPLACE TABLE ${qualifiedOutputTableName} AS
     SELECT
       row_number() OVER () AS id,
+      feature->'id' AS geojson_id,
       ${geometrySelect} AS geometry,
-      feature.properties AS properties
+      feature->'properties' AS properties
     FROM (
       SELECT UNNEST(features) AS feature
       FROM ${qualifiedFeatureCollectionTableName}

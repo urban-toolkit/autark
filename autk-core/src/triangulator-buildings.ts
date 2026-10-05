@@ -16,19 +16,20 @@ import {
     MultiLineString, 
     MultiPolygon, 
     Polygon, 
-    GeometryCollection, 
     GeoJsonProperties 
 } from "geojson";
 
 import { LayerComponent, LayerGeometry } from "./types-mesh";
 
 import { buildBuildingPartMesh, MeshData } from "./triangulator-roofs";
+import { getBuildingParts } from './building-feature';
 
 /**
  * Builds extruded mesh geometry for OSM-style buildings.
  *
- * Each feature is expected to contain a `GeometryCollection` whose entries are
- * matched by index against `feature.properties.parts`. For every supported part
+ * Each feature contains original component geometries associated with
+ * `properties.parts[].geometryIndex` (legacy positional metadata is accepted).
+ * Parts inherit building attributes and override them individually. For every supported part
  * geometry, the triangulator converts world coordinates into local XY space,
  * resolves wall heights from part metadata, and emits mesh chunks with feature
  * component counts. Roof geometry is delegated to `triangulator-roofs`.
@@ -42,9 +43,11 @@ export class TriangulatorBuildings {
      *
      * @param geojson Source building feature collection.
      * @param origin World-space origin used to convert coordinates into local XY space.
-     * @param allowZeroHeightBuildings When `true`, parts with no height metadata get a random fallback height.
+     * @param allowZeroHeightBuildings When `true`, parts with missing height tags get a random fallback height.
+     * Explicit zero or invalid height tags are never replaced by that fallback.
      * @returns A tuple of mesh chunks and per-feature component metadata.
-     * @throws Never throws. Parts without height metadata are skipped (or given fallback height).
+     * @throws If building geometries or part indices are unsupported or ambiguous.
+     * Parts without height metadata are skipped (or given fallback height).
      * @example
      * const [meshes, comps] = TriangulatorBuildings.buildMesh(buildingsFC, origin);
      */
@@ -55,39 +58,21 @@ export class TriangulatorBuildings {
 
         for (let fId = 0; fId < geojson.features.length; fId++) {
             const feature = geojson.features[fId];
-
-            // Normalize top-level geometry into a GeometryCollection-like array
-            let geometries: GeometryCollection['geometries'];
-            let parts: GeoJsonProperties[];
-
-            if (feature.geometry?.type === 'GeometryCollection') {
-                geometries = (feature.geometry as GeometryCollection).geometries;
-                parts = (feature.properties?.parts ?? []) as GeoJsonProperties[];
-            } else if (
-                feature.geometry?.type === 'Polygon' ||
-                feature.geometry?.type === 'MultiPolygon' ||
-                feature.geometry?.type === 'LineString' ||
-                feature.geometry?.type === 'MultiLineString'
-            ) {
-                geometries = [feature.geometry as Polygon | MultiPolygon | LineString | MultiLineString];
-                parts = [feature.properties ?? {}] as GeoJsonProperties[];
-            } else {
-                console.warn('Unexpected building geometry, got:', feature.geometry?.type);
-                continue;
-            }
+            const parts = getBuildingParts(feature);
 
             let nPoints = 0;
             let nTriangles = 0;
 
-            for (let i = 0; i < geometries.length; i++) {
-                const partGeom = geometries[i];
-                const partProps = parts[i] ?? {};
+            for (const part of parts) {
+                const partGeom = part.geometry;
+                const partProps = part.properties;
 
                 let heightInfo = TriangulatorBuildings.computeBuildingHeights(partProps);
                 if (!heightInfo.length) { 
                     skippedNoHeight++;
-                    if (!allowZeroHeightBuildings) continue; // Skip parts with no valid height when allowZeroHeightBuildings is false
-                    heightInfo = [0, (3 + 4 * Math.random()) * 3.4]; // Fallback to a default height when no valid metadata is found
+                    const hasHeightTag = ['height', 'building:height', 'levels', 'building:levels'].some(key => key in partProps);
+                    if (!allowZeroHeightBuildings || hasHeightTag) continue;
+                    heightInfo = [0, (3 + 4 * Math.random()) * 3.4]; // Fallback only when height metadata is missing
                 }
 
                 const partFeature: Feature = { type: 'Feature', geometry: partGeom, properties: partProps };
@@ -160,6 +145,7 @@ export class TriangulatorBuildings {
 
         let height = 0;
         if ('height' in props) height = num(props['height']);
+        else if ('building:height' in props) height = num(props['building:height']);
         else if ('levels' in props) height = FLOOR_HEIGHT * num(props['levels']);
         else if ('building:levels' in props) height = FLOOR_HEIGHT * num(props['building:levels']);
 

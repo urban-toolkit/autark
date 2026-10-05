@@ -21,11 +21,13 @@ export const REPLACE_LAYER_TABLE_QUERY = (
   return `
     CREATE OR REPLACE TABLE ${qualifiedTableName} AS
     SELECT
-      ST_GeomFromGeoJSON(JSON(feature.geometry)) AS geometry,
-      CAST(feature.properties AS JSON) AS properties
+      row_number() OVER () AS id,
+      feature->'id' AS geojson_id,
+      ST_GeomFromGeoJSON(feature->'geometry') AS geometry,
+      feature->'properties' AS properties
     FROM (
       SELECT UNNEST(features) AS feature
-      FROM read_json_auto('${tempFileName}')
+      FROM read_json('${tempFileName}', columns = {type: 'VARCHAR', features: 'JSON[]'})
     );
     
     DESCRIBE ${qualifiedTableName};
@@ -79,11 +81,13 @@ export const CREATE_LAYER_STAGING_TABLE_QUERY = (
   return `
     CREATE OR REPLACE TEMP TABLE ${stagingTableName} AS
     SELECT
-      ST_GeomFromGeoJSON(JSON(feature.geometry)) AS geometry,
-      CAST(feature.properties AS JSON) AS properties
+      TRY_CAST(feature->>'id' AS BIGINT) AS id,
+      feature->'id' AS geojson_id,
+      ST_GeomFromGeoJSON(feature->'geometry') AS geometry,
+      feature->'properties' AS properties
     FROM (
       SELECT UNNEST(features) AS feature
-      FROM read_json_auto('${tempFileName}')
+      FROM read_json('${tempFileName}', columns = {type: 'VARCHAR', features: 'JSON[]'})
     );
   `;
 };

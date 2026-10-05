@@ -36,11 +36,11 @@ function duckdbAssets(): Plugin {
   };
 }
 
-const coreAlias = resolve(__dirname, '../autk-core/src/index.ts');
-const nodeDuckDbModule = resolve(__dirname, 'src/duckdb-node.ts');
+const coreAlias = resolve(import.meta.dirname, '../autk-core/src/index.ts');
+const nodeDuckDbModule = resolve(import.meta.dirname, 'src/duckdb-node.ts');
 const buildTarget = process.env.AUTK_DB_TARGET === 'node' ? 'node' : 'browser';
 const isWatch = process.argv.includes('--watch');
-const entry = resolve(__dirname, 'src/index.ts');
+const entry = resolve(import.meta.dirname, 'src/index.ts');
 
 export default defineConfig({
   resolve: {

@@ -8,6 +8,7 @@ import { OsmLayerTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
 import { ProcessOsmBuildingsUseCase } from '../../internal/process-osm-buildings/use-case';
+import type { OsmBuildingRelation } from '../../internal/process-osm-buildings/interfaces';
 import { getOsmProcessingConfig } from './osm-processing-config';
 
 type RelationRow = {
@@ -118,6 +119,7 @@ export class LoadOsmLayerUseCase {
       columns = await this.processOsmBuildingsUseCase.exec({
         tableName: layerOutputTableName,
         workspace,
+        relations: await this.loadBuildingRelations(params.osmInputTableName, workspace),
       });
     }
 
@@ -130,7 +132,38 @@ export class LoadOsmLayerUseCase {
   }
 
   /**
-   * Appends resolved relation area geometries to the output layer table.
+   * Reads building ownership and general tags without constructing relation footprints.
+   * Member ways remain the only coordinate representation; ambiguous/incomplete ownership is rejected.
+   */
+  private async loadBuildingRelations(inputTableName: string, workspace: string): Promise<OsmBuildingRelation[]> {
+    const rows = (await this.conn.query(`
+      SELECT id, refs, ref_roles, ref_types, CAST(tags AS JSON) AS tags_json
+      FROM ${workspace}.${inputTableName}
+      WHERE kind = 'relation' AND map_extract(tags, 'type')[1] = 'building'
+      ORDER BY id;
+    `)).toArray() as unknown as RelationRow[];
+    return rows.map(row => {
+      const refs = Array.from(row.refs as Iterable<unknown>, String);
+      const roles = this.toStringArray(row.ref_roles);
+      const types = this.toStringArray(row.ref_types);
+      const members = new Map<string, { id: string; role: string }>();
+      refs.forEach((id, index) => {
+        if (types[index] === 'node') return; // Labels/entrances are not geometry parts.
+        const role = roles[index] ?? '';
+        if (types[index] !== 'way' || !['', 'part', 'outline', 'outer'].includes(role)) {
+          throw new Error(`OSM building relation ${String(row.id)} has unsupported member ${id} (${types[index]}, role ${role})`);
+        }
+        if (members.has(id) && members.get(id)!.role !== role) {
+          throw new Error(`OSM building relation ${String(row.id)} has conflicting roles for way ${id}`);
+        }
+        members.set(id, { id, role });
+      });
+      return { id: String(row.id), members: [...members.values()], properties: this.parseTags(row.tags_json) };
+    });
+  }
+
+  /**
+   * Appends resolved area relation geometries; type=building ownership is handled separately.
    *
    * The method builds relation area records, writes them to a temporary VFS file,
    * and inserts them into the output table, optionally clipping by bounding box.
@@ -204,7 +237,8 @@ export class LoadOsmLayerUseCase {
     const relations = (await this.conn.query(`
       SELECT id, refs, ref_roles, ref_types, CAST(tags AS JSON) AS tags_json
         FROM ${qualifiedInputTableName}
-        WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = '${layer}';
+        WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = '${layer}'
+          ${layer === 'buildings' ? "AND COALESCE(map_extract(tags, 'type')[1], '') <> 'building'" : ''};
     `)).toArray() as unknown as RelationRow[];
 
     if (relations.length === 0) return { records: [], skipped: 0 };

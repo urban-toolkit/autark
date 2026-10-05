@@ -80,9 +80,18 @@ console.log(origin, geometry.length, components.length, camera.eye, colormap.len
 - **Mesh types**: `LayerGeometry`, `LayerComponent`, `LayerBorder`, `LayerBorderComponent`
 - **Layer and buffer types**: `LayerType`, `BoundingBox`, `TypedArray`, `TypedArrayConstructor`
 - **Utilities**: `valueAtPath`, `isNumericLike`, `computeOrigin`, `computeGeometryCentroid`, `computeBoundingBox`, `isLayerType`, `mapGeometryTypeToLayerType`, `offsetPolyline`
+- **Building features**: `normalizeBuildingFeature`, `BuildingPartProperties`
 - **Triangulators**: `TriangulatorPoints`, `TriangulatorPolylines`, `TriangulatorPolygons`, `TriangulatorBuildings`, `TriangulatorBuildingWithWindows`, `TriangulatorRaster`
 
 The complete export list lives in [`src/index.ts`](./src/index.ts).
+
+## Building parts
+
+`normalizeBuildingFeature(feature)` wraps original geometry in a GeometryCollection and validates `properties.parts[].geometryIndex`; it does not union, repair or clone coordinates. Legacy positional metadata is supported. General height/base attributes are inherited unless a part supplies its own tags, including explicit zero.
+
+`TriangulatorBuildings` preserves building identity across its original parts. Window triangulation uses original roofs/rings and component-aware window IDs, not a convex hull.
+
+Tests from the repository root: `npm test -- autk-core/test` (CPU only).
 
 ## Notes
 

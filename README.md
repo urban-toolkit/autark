@@ -69,6 +69,19 @@ xcode-select --install
 sudo apt-get install build-essential
 ```
 
+### Tests and verification
+
+Run from the repository root:
+
+```bash
+npm test                    # Vitest, package test directories
+npm test -- autk-core/test  # one package
+make verify                 # lint, tests, typecheck and build
+make package-validate       # validate publishable artifacts
+```
+
+Vitest requires a supported Node release (22.12+ within 22.x, 24.x, or 26+). DB integration tests use real DuckDB-WASM in Node and load the spatial extension; extension access is required. Browser/WebGPU tests are separate and currently deferred. There are currently no test cases for `autk-plot`; the other five packages have regression tests.
+
 ### Building and Running
 
 After installing Node.js and GNU Make, run the following command from the project's root folder:

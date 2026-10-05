@@ -23,7 +23,7 @@ export class GetLayerUseCase {
   }
 
   /**
-   * Exports a layer as GeoJSON, handling raster and building layers specially.
+   * Exports one feature per stored vector row, or raster metadata for raster layers.
    *
    * The returned FeatureCollection always includes `__autk_layer` at the root,
    * and any duplicated per-feature `properties.__autk_layer` values are removed.

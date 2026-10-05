@@ -2,11 +2,11 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { GeojsonTable } from '../../interfaces';
 import { LoadGeojsonParams } from './interfaces';
 import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
-import { LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
+import { FIND_INVALID_BUILDING_GEOMETRY_QUERY, LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { FeatureCollection } from 'geojson';
 import type { BoundingBox } from '@urban-toolkit/autk-core';
-import { mapGeometryTypeToLayerType } from '@urban-toolkit/autk-core';
+import { mapGeometryTypeToLayerType, normalizeBuildingFeature } from '@urban-toolkit/autk-core';
 
 /**
  * Loads a GeoJSON FeatureCollection as a spatial layer table.
@@ -82,6 +82,23 @@ export class LoadGeojsonUseCase {
     }
 
     const geometryType = layerType ?? mapGeometryTypeToLayerType(firstFeature.geometry.type);
+    const ids = new Set<string>();
+    const suppliedIds = new Set(geojson.features.filter(feature => feature.id != null).map(feature => JSON.stringify(feature.id)));
+    const features = geojson.features.map((feature, index) => {
+      let id = feature.id ?? `autk-feature-${index}`;
+      if (feature.id == null) {
+        while (suppliedIds.has(JSON.stringify(id)) || ids.has(JSON.stringify(id))) id = `${id}-generated`;
+      }
+      if ((typeof id !== 'string' && typeof id !== 'number') || (typeof id === 'number' && !Number.isFinite(id))) {
+        throw new Error(`Invalid GeoJSON feature ID at index ${index}`);
+      }
+      const key = JSON.stringify(id);
+      if (ids.has(key)) throw new Error(`Duplicate GeoJSON feature ID: ${key}`);
+      ids.add(key);
+      const identified = { ...feature, id };
+      return geometryType === 'buildings' ? normalizeBuildingFeature(identified) : identified;
+    });
+    geojson = { ...geojson, features };
     const sourceCrs = coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
 
     const describeTableResponse = await this.createTableFromFeatureCollection(
@@ -91,6 +108,7 @@ export class LoadGeojsonUseCase {
       workspaceCoordinateFormat,
       workspace,
       boundingBox,
+      geometryType !== 'buildings',
     );
 
     return {
@@ -122,25 +140,28 @@ export class LoadGeojsonUseCase {
     targetCrs: string,
     workspace: string,
     boundingBox?: BoundingBox,
+    cropGeometry = true,
   ) {
     const fileName = `temp_geojson_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
 
     await this.db.registerFileText(fileName, JSON.stringify(geojson));
 
-    const featureCollectionQuery = LOAD_FEATURE_COLLECTION_QUERY(fileName, `${outputTableName}_feature_collection`, workspace);
-    await this.conn.query(featureCollectionQuery);
-
-    const queryLayer = LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY(
-      `${outputTableName}_feature_collection`,
-      outputTableName,
-      sourceCrs,
-      targetCrs,
-      workspace,
-      boundingBox,
-    );
-
-    await this.db.dropFile(fileName);
-
-    return await this.conn.query(queryLayer);
+    const stagingTable = `${outputTableName}_feature_collection_${Date.now()}`;
+    try {
+      if (!cropGeometry) {
+        const invalid = (await this.conn.query(FIND_INVALID_BUILDING_GEOMETRY_QUERY(fileName))).toArray()[0];
+        if (invalid) throw new Error(`Building ${invalid.id} has invalid geometry; original coordinates were not changed`);
+      }
+      await this.conn.query(LOAD_FEATURE_COLLECTION_QUERY(fileName, stagingTable, workspace));
+      return await this.conn.query(LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY(
+        stagingTable, outputTableName, sourceCrs, targetCrs, workspace, boundingBox, cropGeometry,
+      ));
+    } finally {
+      try {
+        await this.conn.query(`DROP TABLE IF EXISTS ${workspace}.${stagingTable}`);
+      } finally {
+        await this.db.dropFile(fileName);
+      }
+    }
   }
 }

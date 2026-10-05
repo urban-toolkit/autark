@@ -1,11 +1,12 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { FeatureCollection } from 'geojson';
-import { isFeatureCollection } from '@urban-toolkit/autk-core';
+import { isFeatureCollection, normalizeBuildingFeature } from '@urban-toolkit/autk-core';
 
 import { isVectorTable, Table } from '../../interfaces';
 import { DEFAULT_WORKSPACE_NAME } from '../../consts';
 import { UpdateTableParams, UpdateTableResult, parseIdColumn } from './interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
+import { FIND_INVALID_BUILDING_GEOMETRY_QUERY } from '../load-geojson/queries';
 import {
   REPLACE_LAYER_TABLE_QUERY,
   REPLACE_DATA_TABLE_QUERY,
@@ -62,6 +63,28 @@ export class UpdateTableUseCase {
     }
 
     const isLayer = isVectorTable(existingTable);
+    if (isLayer && isFeatureCollection(params.data)) {
+      const ids = new Set<string>();
+      const suppliedIds = new Set(params.data.features.filter(feature => feature.id != null).map(feature => JSON.stringify(feature.id)));
+      const features = params.data.features.map((feature, index) => {
+        if (strategy === 'update' && (params.idColumn === 'geojson_id' || params.idColumn === 'id') && feature.id == null) {
+          throw new Error(`Feature ID is required for an update by ${params.idColumn} at index ${index}`);
+        }
+        let id = feature.id ?? `autk-feature-${index}`;
+        if (feature.id == null) {
+          while (suppliedIds.has(JSON.stringify(id)) || ids.has(JSON.stringify(id))) id = `${id}-generated`;
+        }
+        if ((typeof id !== 'string' && typeof id !== 'number') || (typeof id === 'number' && !Number.isFinite(id))) {
+          throw new Error(`Invalid GeoJSON feature ID at index ${index}`);
+        }
+        const key = JSON.stringify(id);
+        if (ids.has(key)) throw new Error(`Duplicate GeoJSON feature ID: ${key}`);
+        ids.add(key);
+        const identified = { ...feature, id };
+        return existingTable.type === 'buildings' ? normalizeBuildingFeature(identified) : identified;
+      });
+      params = { ...params, data: { ...params.data, features } };
+    }
 
     if (strategy === 'replace') {
       return this.executeReplaceStrategy(params, existingTable, isLayer, workspace);
@@ -143,6 +166,10 @@ export class UpdateTableUseCase {
     const tempFileName = await this.createTempFile(data);
 
     try {
+      if (isLayer && existingTable.type === 'buildings') {
+        const invalid = (await this.conn.query(FIND_INVALID_BUILDING_GEOMETRY_QUERY(tempFileName))).toArray()[0];
+        if (invalid) throw new Error(`Building ${invalid.id} has invalid geometry; original coordinates were not changed`);
+      }
       let query: string;
       if (isLayer) {
         query = REPLACE_LAYER_TABLE_QUERY(tempFileName, tableName, workspace);
@@ -194,6 +221,10 @@ export class UpdateTableUseCase {
     const tempFileName = await this.createTempFile(data);
 
     try {
+      if (isLayer && existingTable.type === 'buildings') {
+        const invalid = (await this.conn.query(FIND_INVALID_BUILDING_GEOMETRY_QUERY(tempFileName))).toArray()[0];
+        if (invalid) throw new Error(`Building ${invalid.id} has invalid geometry; original coordinates were not changed`);
+      }
       // 1. Create staging table with transformed data
       let createStagingQuery: string;
       if (isLayer) {

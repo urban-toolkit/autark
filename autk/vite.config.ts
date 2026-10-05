@@ -17,12 +17,12 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        index: resolve(__dirname, 'src/index.ts'),
-        core: resolve(__dirname, 'src/core.ts'),
-        map: resolve(__dirname, 'src/map.ts'),
-        db: resolve(__dirname, 'src/db.ts'),
-        compute: resolve(__dirname, 'src/compute.ts'),
-        plot: resolve(__dirname, 'src/plot.ts'),
+        index: resolve(import.meta.dirname, 'src/index.ts'),
+        core: resolve(import.meta.dirname, 'src/core.ts'),
+        map: resolve(import.meta.dirname, 'src/map.ts'),
+        db: resolve(import.meta.dirname, 'src/db.ts'),
+        compute: resolve(import.meta.dirname, 'src/compute.ts'),
+        plot: resolve(import.meta.dirname, 'src/plot.ts'),
       },
       formats: ['es'],
     },

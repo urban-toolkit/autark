@@ -149,7 +149,7 @@ export class LoadOsmFromOverpassApiUseCase {
   private getCacheKey(queryArea: { geocodeArea: string; areas: string[] }, layers?: string[]): string {
     const areas = [...queryArea.areas].sort().join(',');
     const layerKey = layers && layers.length > 0 ? `-layers:${[...layers].sort().join('+')}` : '';
-    return `overpass-combined-${queryArea.geocodeArea}-${areas}${layerKey}`;
+    return `overpass-combined-v2-${queryArea.geocodeArea}-${areas}${layerKey}`;
   }
 
   /**
@@ -160,7 +160,7 @@ export class LoadOsmFromOverpassApiUseCase {
    */
   private getFullDataCacheKey(queryArea: { geocodeArea: string; areas: string[] }): string {
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-${queryArea.geocodeArea}-${areas}`;
+    return `overpass-combined-v2-${queryArea.geocodeArea}-${areas}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -542,6 +542,7 @@ export class LoadOsmFromOverpassApiUseCase {
           wayFilters.add(`"type"="building"`);
           relationFilters.add(`"building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}]`);
           relationFilters.add(`"building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}]`);
+          relationFilters.add(`"type"="building"`);
           break;
         case 'parks':
           wayFilters.add(this.buildExactValueSelector('leisure', PARKS_LEISURE_VALUES));
@@ -618,6 +619,7 @@ export class LoadOsmFromOverpassApiUseCase {
           areaLines.push(`(
         relation["building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
         relation["building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
+        relation["type"="building"](area.area${i})(${tileBbox});
       )->.dataRelations${i};`);
           areaLines.push(`way(r.dataRelations${i})->.dataRelationWays${i};`);
           dataRelationSelectors.push(`.dataRelations${i};`);
