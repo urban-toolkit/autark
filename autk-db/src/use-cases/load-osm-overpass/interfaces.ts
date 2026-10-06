@@ -46,7 +46,9 @@ export interface OsmLoadTimings {
   layers: LayerLoadTimings[];
 }
 
-/** Administrative boundary names, scoped by a named region. */
+/** Exact OSM boundary names (including boundary=place), scoped by member nodes inside a named region.
+ * Both sources apply this scope when available. PBF warns and falls back to exact
+ * area names if the extract lacks a usable region boundary. */
 export type OsmNamedArea = { geocodeArea: string; areas: string[] };
 /** WGS84 degrees in [west, south, east, north] order. Antimeridian crossings are unsupported. */
 export type OsmBoundingBoxArea = { bbox: [number, number, number, number] };

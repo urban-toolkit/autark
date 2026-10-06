@@ -264,7 +264,7 @@ describe('bbox Overpass acquisition and cache', () => {
     expect(requests).toHaveLength(10);
     expect(api.getCacheKey({ bbox }, ['roads'])).not.toBe(api.getCacheKey({ bbox }, ['buildings']));
     expect(api.getCacheKey({ bbox: [0, 0, 9, 10] }, ['buildings'])).not.toBe(api.getCacheKey({ bbox }, ['buildings']));
-    expect(api.getCacheKey({ geocodeArea: 'Fixture', areas: ['Test District'] }, ['buildings'])).toContain('v3');
+    expect(api.getCacheKey({ geocodeArea: 'Fixture', areas: ['Test District'] }, ['buildings'])).toContain('v4');
     expect(boundingBoxOf({ bbox })).toEqual({ west: 0, south: 0, east: 10, north: 10 });
   });
 });

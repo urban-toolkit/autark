@@ -115,6 +115,7 @@ await db.loadOsm({
     geocodeArea: 'New York',
     areas: ['Battery Park City', 'Financial District'],
   },
+  // Neste extrato, New York é incompleta: aviso + seleção só pelos nomes de areas.
   outputTableName: 'table_osm',
   autoLoadLayers: {
     layers: ['surface', 'parks', 'water', 'roads', 'buildings'],
@@ -125,7 +126,7 @@ await db.loadOsm({
 | Parâmetro | Efeito atual |
 |---|---|
 | `pbfFileUrl` | Escolhe o importador PBF. Sem ele, usa Overpass. Não é fallback automático. |
-| `queryArea.geocodeArea` | Escopo de desambiguação nas consultas Overpass. O seletor local PBF não usa esse escopo. |
+| `queryArea.geocodeArea` | Região administrativa que restringe `areas` em Overpass e, quando sua geometria é utilizável, em PBF. Sem esse limite no arquivo, o PBF avisa e seleciona só pelos nomes exatos de `areas`. |
 | `queryArea.areas` | Nomes exatos das relações de fronteira a buscar. |
 | `queryArea.bbox` | Alternativa às áreas nomeadas: `[west, south, east, north]` em WGS84, para Overpass ou PBF. |
 | `autoLoadLayers.layers` | Camadas públicas extraídas, na ordem informada. Surface sempre é construída; se omitida, fica escondida da listagem de layers. |
@@ -153,13 +154,13 @@ Antes de consultar o servidor:
 3. Entradas expiram após **24 horas**.
 4. `forceRefresh: true` ignora essas entradas.
 
-O cache usa a Cache API do navegador quando disponível. Chaves atuais têm versão `v3`, para não reutilizar respostas antigas sem coastlines ou relações `type=building`. Bboxes têm chaves próprias por coordenadas e camadas; respostas em cache também incluem os dados necessários à máscara costeira.
+O cache usa a Cache API do navegador quando disponível. Chaves de áreas nomeadas têm versão `v4`, invalidando respostas antigas com escopo incorreto, inclusive supersets. Bboxes mantêm `v3`, pois sua seleção não mudou; têm chaves próprias por coordenadas e camadas. Ambas incluem os dados necessários à máscara costeira e às relações `type=building`.
 
 > Cache recente não significa dados iguais ao PBF. Pode representar outro momento do OSM, e uma entrada completa reutilizada pode conter mais candidatos que uma consulta temática específica.
 
 ### 3.2 Fronteiras primeiro
 
-A consulta identifica o escopo por nome, depois áreas e relações correspondentes aos nomes pedidos. Busca também os ways membros dessas relações.
+A consulta encontra a região por nome e, dentro dela, as relações de limite OSM correspondentes aos nomes pedidos (`boundary=administrative`, `boundary=place` e outros limites nomeados). Cada relação gera sua área por `map_to_area`; fronteiras, grupos temáticos e todos os tiles usam essa mesma seleção. Não é feita uma segunda busca global por uma área homônima. Busca também os ways membros dessas relações.
 
 ```text
 geocodeArea
@@ -175,7 +176,7 @@ geocodeArea
 - Para bbox pública, não há consulta administrativa: um way retangular sintético estabelece as fronteiras e a extensão.
 - Nos dois casos, uma consulta adicional coleta `natural=coastline` na extensão da área, preservando ways completos e sua direção.
 
-A implementação confere a presença dos nomes solicitados. A identificação por nome não deve ser interpretada como uma validação completa de todas as tags administrativas possíveis.
+A implementação exige a tag `boundary` e confere a presença dos nomes solicitados. Não restringe seu valor a `administrative`: Battery Park City e Financial District, por exemplo, usam `boundary=place`. O critério de escopo é um node membro dentro da região, como em `relation(area)` do Overpass, não contenção integral do limite solicitado; relações selecionadas permanecem completas. Nomes homônimos dentro da própria região continuam podendo corresponder a mais de uma relação.
 
 ### 3.3 Consultas temáticas
 
@@ -247,8 +248,8 @@ Os logs chamam o procedimento de três passes, mas cada fase pode fazer mais de 
 
 | Fase lógica | Leituras atuais | Produto |
 |---|---:|---|
-| 1. Descoberta das fronteiras | 1 | IDs de relações por nome e de seus ways membros |
-| 2. Bbox das fronteiras | 2 | Ways da fronteira, depois seus nodes; bbox geográfica |
+| 1. Descoberta das fronteiras | 1 | Relações com tag `boundary` e nomes da região e das áreas solicitadas |
+| 2. Escopo e bbox das fronteiras | 2 | Ways/nodes, reconstrução do polígono da região, seleção por pertencimento de nodes e bbox somente das fronteiras selecionadas |
 | 3. Coleta temática | 3 | Relações candidatas, depois ways, depois nodes necessários |
 | **Total** | **6** | Elementos selecionados com geometria resolvida |
 
@@ -256,9 +257,9 @@ Cada leitura chama `fetch(pbfFileUrl)` e decodifica o stream. Isso não signific
 
 ```mermaid
 flowchart LR
-    A[PBF] --> B[Encontrar fronteiras por nome]
-    B --> C[Coletar ways das fronteiras]
-    C --> D[Coletar seus nodes e calcular bbox]
+    A[PBF] --> B[Encontrar região e limites OSM por nome]
+    B --> C[Coletar seus ways]
+    C --> D[Coletar nodes, aplicar escopo da região e calcular bbox selecionada]
     D --> E[Coletar relações temáticas]
     E --> F[Coletar ways temáticos e membros]
     F --> G[Coletar nodes necessários]
@@ -306,7 +307,9 @@ No agrupamento, fronteiras têm prioridade. Entre temas, buildings vêm antes de
 
 Por fim, o importador entrega o conjunto combinado ao mesmo `OsmProcessingPipeline` usado pelo Overpass.
 
-**Diferença de escopo:** a descoberta local das fronteiras compara `queryArea.areas` aos nomes presentes no arquivo. Não aplica `geocodeArea`. Um PBF com relações homônimas precisa de atenção adicional.
+**Mesmo critério quando o escopo está disponível:** o PBF tenta aplicar `geocodeArea` antes de definir fronteiras e bbox. Reconstrói a região com segmentos abertos/revertidos, componentes desconectadas e holes, e seleciona relações de limite OSM cujo nome corresponde a `areas` e que têm algum node membro dentro dessa geometria. Homônimos fora da região ou dentro de seus holes não ampliam a bbox.
+
+**Fallback para extratos incompletos:** se a região estiver ausente ou sua geometria não puder ser usada, o PBF emite `console.warn` e seleciona apenas as relações de limite com nomes exatos de `areas` presentes no arquivo, incluindo `boundary=place`. Não consulta Overpass para completar o escopo e não abandona o carregamento por falta dessa região. Nesse caso podem ser incluídos homônimos de outras regiões dentro do extrato; use arquivo completo ou `queryArea.bbox` se precisar evitar essa ambiguidade. Nomes solicitados em `areas` que não existam continuam causando erro. O arquivo `lower_mnt.osm.pbf` da galeria tem geometria incompleta de New York; seu exemplo nomeado usa esse fallback com aviso.
 
 ## 5. Separação e normalização comuns
 
@@ -790,7 +793,7 @@ A `featureCount` de cada entrada é medida logo após a extração, **antes** do
 |---|---|---|
 | Fonte | Resposta remota, normalmente do estado atual | Snapshot contido no arquivo |
 | Cache específico | Cache combinado com TTL de 24h | Não usa esse cache; pode haver cache HTTP do arquivo |
-| Descoberta do escopo | `geocodeArea` + áreas por nome | Nomes encontrados no arquivo |
+| Descoberta do escopo | Relações de limite OSM por nome dentro de `geocodeArea`, convertidas com `map_to_area` | Mesmo critério com geometria de região utilizável; caso contrário, aviso e fallback aos nomes de limites de `areas` |
 | Pré-seleção espacial | Filtros Overpass de área e tiles de buildings | Sobreposição de bbox de ways e retenção de relações/membros |
 | Geometria inicial dos ways | Inline na resposta | Resolvida a partir de nodes |
 | Membros externos | Ways membros retornados pelas consultas | Somente membros disponíveis no arquivo |

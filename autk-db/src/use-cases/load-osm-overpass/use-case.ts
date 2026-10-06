@@ -96,11 +96,11 @@ export class LoadOsmFromOverpassApiUseCase {
     );
 
     if (!isBoundingBoxArea(params.queryArea)) {
-      const relationNames = new Set(combined.elements.filter(e => e.type === 'relation' && e.tags?.name).map(e => e.tags!.name));
+      const relationNames = new Set(combined.elements.filter(e => e.type === 'relation' && e.tags?.boundary && e.tags.name).map(e => e.tags!.name));
       const missingAreas = params.queryArea.areas.filter(area => !relationNames.has(area));
       if (missingAreas.length > 0) {
         throw new Error(
-          `No administrative boundary found in OSM for: ${missingAreas.map(a => `"${a}"`).join(', ')}. ` +
+          `No area boundary found in OSM for: ${missingAreas.map(a => `"${a}"`).join(', ')}. ` +
           `Verify the area names match OSM relation names exactly (check openstreetmap.org).`,
         );
       }
@@ -157,7 +157,7 @@ export class LoadOsmFromOverpassApiUseCase {
     const layerKey = layers && layers.length > 0 ? `-layers:${[...layers].sort().join('+')}` : '';
     if (isBoundingBoxArea(queryArea)) return `overpass-combined-v3-bbox-${queryArea.bbox.join(',')}${layerKey}`;
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-v3-${queryArea.geocodeArea}-${areas}${layerKey}`;
+    return `overpass-combined-v4-${queryArea.geocodeArea}-${areas}${layerKey}`;
   }
 
   /**
@@ -169,7 +169,7 @@ export class LoadOsmFromOverpassApiUseCase {
   private getFullDataCacheKey(queryArea: OsmQueryArea): string {
     if (isBoundingBoxArea(queryArea)) return `overpass-combined-v3-bbox-${queryArea.bbox.join(',')}`;
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-v3-${queryArea.geocodeArea}-${areas}`;
+    return `overpass-combined-v4-${queryArea.geocodeArea}-${areas}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -446,21 +446,28 @@ export class LoadOsmFromOverpassApiUseCase {
   // Query builders
   // ---------------------------------------------------------------------------
 
+  /** Select the named boundary relation inside the region, then derive its area. */
+  private namedAreaLines(areaName: string, i: number): string[] {
+    return [
+      `relation["name"="${areaName}"]["boundary"](area.areaMain)->.rel${i};`,
+      `.rel${i} map_to_area->.area${i};`,
+    ];
+  }
+
   /**
    * Builds the boundaries query: admin relations + their member ways.
    * Relations are output with `body` only (tags + member IDs); ways get full
    * inline geometry via `out geom qt`.
    */
   private buildBoundariesQuery(queryArea: { geocodeArea: string; areas: string[] }): string {
-    const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
+    const geocodeLine = `area["name"="${queryArea.geocodeArea}"]["boundary"]->.areaMain;`;
     const areaLines: string[] = [];
     const relSelectors: string[] = [];
     const boundaryWaySelectors: string[] = [];
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
-      areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
-      areaLines.push(`relation["name"="${areaName}"](area.areaMain)->.rel${i};`);
+      areaLines.push(...this.namedAreaLines(areaName, i));
       areaLines.push(`way(r.rel${i})->.boundaryWays${i};`);
       relSelectors.push(`.rel${i};`);
       boundaryWaySelectors.push(`.boundaryWays${i};`);
@@ -492,7 +499,7 @@ export class LoadOsmFromOverpassApiUseCase {
     if (tagSelectors.way.length === 0 && tagSelectors.relation.length === 0) return null;
     if (isBoundingBoxArea(queryArea)) return this.buildBoundingBoxQuery(boundingBoxOf(queryArea), tagSelectors);
 
-    const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
+    const geocodeLine = `area["name"="${queryArea.geocodeArea}"]["boundary"]->.areaMain;`;
     const areaLines: string[] = [];
     const dataWaySelectors: string[] = [];
     const dataRelationSelectors: string[] = [];
@@ -500,7 +507,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     queryArea.areas.forEach((areaName, idx) => {
       const i = idx + 1;
-      areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
+      areaLines.push(...this.namedAreaLines(areaName, i));
       if (tagSelectors.way.length > 0) {
         areaLines.push(`(
         ${tagSelectors.way.map(filter => `way[${filter}](area.area${i});`).join('\n        ')}
@@ -623,7 +630,7 @@ export class LoadOsmFromOverpassApiUseCase {
           queries.push(this.buildBoundingBoxQuery({ south, north, west, east }, this.getTagSelectorsForLayers(['buildings'])));
           continue;
         }
-        const geocodeLine = `area["name"="${queryArea.geocodeArea}"]->.areaMain;`;
+        const geocodeLine = `area["name"="${queryArea.geocodeArea}"]["boundary"]->.areaMain;`;
         const areaLines: string[] = [];
         const dataWaySelectors: string[] = [];
         const dataRelationSelectors: string[] = [];
@@ -631,7 +638,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
         queryArea.areas.forEach((areaName, idx) => {
           const i = idx + 1;
-          areaLines.push(`area["name"="${areaName}"](area.areaMain)->.area${i};`);
+          areaLines.push(...this.namedAreaLines(areaName, i));
           areaLines.push(`(
         way["building"][${this.buildExcludedValueSelector('building', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});
         way["building:part"][${this.buildExcludedValueSelector('building:part', EXCLUDED_BUILDING_VALUES)}](area.area${i})(${tileBbox});

@@ -156,8 +156,8 @@ export class OsmProcessingPipeline {
     const requestedAreaNames = new Set(areaNames);
 
     for (const element of elements) {
-      if (element.type !== 'relation') continue;
-      if (element.tags?.name && requestedAreaNames.has(element.tags.name)) {
+      if (element.type !== 'relation' || !element.tags?.boundary) continue;
+      if (element.tags.name && requestedAreaNames.has(element.tags.name)) {
         boundaryRelationIds.add(element.id);
       }
     }

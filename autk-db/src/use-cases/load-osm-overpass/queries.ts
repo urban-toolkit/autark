@@ -42,7 +42,7 @@ export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, works
         ? 'NULL'
         : `CASE 
       WHEN tags IS NULL OR tags = [] THEN NULL
-      ELSE map_from_entries(tags)
+      ELSE map_from_entries(CAST(tags AS STRUCT(k VARCHAR, v VARCHAR)[]))
     END`
     } AS tags,
     refs::BIGINT[],

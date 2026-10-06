@@ -437,18 +437,18 @@ describe('building import pipeline — stages', () => {
   it('2. discovers the requested administrative relation and its boundary ways', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(pbf)));
     const loader = new LoadOsmFromPbfUseCase(conn, pipeline) as any;
-    const context = await loader.collectBoundaryContext('/fixture.pbf', ['Test District']);
+    const context = await loader.collectBoundaryContext('/fixture.pbf', { geocodeArea: 'Fixture', areas: ['Test District'] });
     expect([...context.boundaryRelationIds]).toEqual([900]);
     expect([...context.boundaryWayIds]).toEqual([800]);
-    expect(fetch).toHaveBeenCalledOnce();
-    await expect(loader.collectBoundaryContext('/fixture.pbf', ['Missing District'])).rejects.toThrow(/Missing District/);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await expect(loader.collectBoundaryContext('/fixture.pbf', { geocodeArea: 'Fixture', areas: ['Missing District'] })).rejects.toThrow(/Missing District/);
   });
 
   it('3. resolves boundary nodes and computes the bbox without clipping building coordinates', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(pbf)));
     const loader = new LoadOsmFromPbfUseCase(conn, pipeline) as any;
-    expect(await loader.collectBoundaryBbox('/fixture.pbf', new Set([800])))
-      .toEqual({ south: 0, north: 10, west: 0, east: 10 });
+    const context = await loader.collectBoundaryContext('/fixture.pbf', { geocodeArea: 'Fixture', areas: ['Test District'] });
+    expect(context.bbox).toEqual({ south: 0, north: 10, west: 0, east: 10 });
   });
 
   it('4. scans real PBF bytes, selects thematic ways/nodes and separates raw boundaries', async () => {

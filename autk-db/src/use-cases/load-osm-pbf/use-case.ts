@@ -17,6 +17,7 @@ import { LoadOsmParams, OsmElement, OsmNamedArea, boundingBoxOf, isBoundingBoxAr
 import type { MultiPolygon } from 'geojson';
 import { coastalLandMask } from '../../internal/process-osm-surface/coastline';
 import { OsmProcessingPipeline } from '../../internal/process-osm/pipeline';
+import { selectScopedBoundaryRelations } from '../../internal/process-osm/named-area';
 import { blockToElements, resolveWayGeometries } from './osm-pbf-parser';
 
 interface OverpassApiResponse {
@@ -122,9 +123,9 @@ export class LoadOsmFromPbfUseCase {
 
     const box = isBoundingBoxArea(params.queryArea) ? boundingBoxOf(params.queryArea) : null;
     const boundaryContext = box
-      ? { boundaryRelationIds: new Set<number>(), boundaryWayIds: new Set<number>() }
-      : await this.collectBoundaryContext(pbfFileUrl, (params.queryArea as OsmNamedArea).areas);
-    const bbox = box ?? await this.collectBoundaryBbox(pbfFileUrl, boundaryContext.boundaryWayIds);
+      ? { boundaryRelationIds: new Set<number>(), boundaryWayIds: new Set<number>(), bbox: box }
+      : await this.collectBoundaryContext(pbfFileUrl, params.queryArea as OsmNamedArea);
+    const bbox = boundaryContext.bbox;
 
     onProgress?.('processing-osm-data');
     console.log('[autk-db] PBF pass 3/3: thematic collection started');
@@ -204,79 +205,44 @@ export class LoadOsmFromPbfUseCase {
     );
   }
 
-  // Pass 1: find requested boundary relations and their member ways
-  /**
-   * Scans the PBF file to locate administrative boundary relations and collects
-   * the IDs of their member ways. Returns sets of relation IDs and way IDs.
-   */
+  /** Discover named boundary relations, reconstruct the region and scope by its geometry. */
   private async collectBoundaryContext(
     pbfFileUrl: string,
-    areaNames: string[],
-  ): Promise<{
-    boundaryRelationIds: Set<number>;
-    boundaryWayIds: Set<number>;
-  }> {
+    queryArea: OsmNamedArea,
+  ): Promise<{ boundaryRelationIds: Set<number>; boundaryWayIds: Set<number>; bbox: Bbox }> {
     console.log('[autk-db] PBF pass 1/3: boundary discovery started');
-    const requestedAreaNames = new Set(areaNames);
-    const foundAreaNames = new Set<string>();
-    const boundaryRelationIds = new Set<number>();
-    const boundaryWayIds = new Set<number>();
-
-    await this.streamPbfBlocks(pbfFileUrl, async (elements) => {
-      for (const element of elements) {
-        if (element.type !== 'relation') continue;
-        const name = element.tags?.name;
-        if (!name || !requestedAreaNames.has(name)) continue;
-
-        foundAreaNames.add(name);
-        boundaryRelationIds.add(element.id);
+    const names = new Set([queryArea.geocodeArea, ...queryArea.areas]);
+    const elements: OsmElement[] = [];
+    const candidateWayIds = new Set<number>();
+    const requiredNodeIds = new IdFilter();
+    await this.streamPbfBlocks(pbfFileUrl, async block => {
+      for (const element of block) {
+        if (element.type !== 'relation' || !element.tags?.boundary || !names.has(element.tags.name)) continue;
+        elements.push(element);
         for (const member of element.members ?? []) {
-          if (member.type === 'way') boundaryWayIds.add(member.ref);
+          if (member.type === 'way') candidateWayIds.add(member.ref);
+          if (member.type === 'node') requiredNodeIds.add(member.ref);
         }
       }
     });
-
-    const missingAreas = areaNames.filter((name) => !foundAreaNames.has(name));
-    if (missingAreas.length > 0) {
-      throw new Error(
-        `No administrative boundary found in PBF for: ${missingAreas.map(a => `"${a}"`).join(', ')}. ` +
-        `Verify the area names match OSM relation names exactly.`,
-      );
-    }
-
-    console.log(
-      `[autk-db] PBF pass 1/3: boundary discovery finished (${boundaryRelationIds.size} relations, ${boundaryWayIds.size} ways)`
-    );
-    return { boundaryRelationIds, boundaryWayIds };
-  }
-
-  // Pass 2: collect boundary ways/nodes and compute bbox
-  private async collectBoundaryBbox(
-    pbfFileUrl: string,
-    boundaryWayIds: Set<number>,
-  ): Promise<Bbox> {
-    console.log('[autk-db] PBF pass 2/3: boundary bbox collection started');
-    const elements: OsmElement[] = [];
-    const requiredNodeIds = new IdFilter();
-
-    await this.streamPbfBlocks(pbfFileUrl, async (blockElements) => {
-      for (const element of blockElements) {
-        if (element.type !== 'way' || !boundaryWayIds.has(element.id)) continue;
+    console.log('[autk-db] PBF pass 2/3: scoped boundary geometry collection started');
+    await this.streamPbfBlocks(pbfFileUrl, async block => {
+      for (const element of block) {
+        if (element.type !== 'way' || !candidateWayIds.has(element.id)) continue;
         elements.push(element);
-        for (const nodeId of element.nodes ?? []) requiredNodeIds.add(nodeId);
+        for (const ref of element.nodes ?? []) requiredNodeIds.add(ref);
       }
     });
-
     await this.collectRequiredNodes(pbfFileUrl, requiredNodeIds, elements);
     resolveWayGeometries(elements);
-
-    const bbox = this.pipeline.computeBboxFromElements(elements);
-    if (!bbox) throw new Error('Failed to compute bounding box from boundary elements');
-
-    console.log(
-      `[autk-db] PBF pass 2/3: boundary bbox collection finished (${bbox.south}, ${bbox.west}) → (${bbox.north}, ${bbox.east})`
-    );
-    return bbox;
+    const selected = selectScopedBoundaryRelations(elements, queryArea);
+    const boundaryRelationIds = new Set(selected.map(relation => relation.id));
+    const boundaryWayIds = new Set(selected.flatMap(relation => (relation.members ?? [])
+      .filter(member => member.type === 'way').map(member => member.ref)));
+    const bbox = this.pipeline.computeBboxFromElements(elements.filter(element => element.type === 'way' && boundaryWayIds.has(element.id)));
+    if (!bbox) throw new Error('Failed to compute bounding box from scoped boundary elements');
+    console.log(`[autk-db] PBF scoped boundary discovery finished (${boundaryRelationIds.size} relations, ${boundaryWayIds.size} ways)`);
+    return { boundaryRelationIds, boundaryWayIds, bbox };
   }
 
   // Pass 3: collect candidate thematic relations + ways and required node ids

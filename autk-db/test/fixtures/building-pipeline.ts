@@ -17,6 +17,8 @@ const ways: Array<{ id: number; start: number; coordinates: number[][]; tags: Re
 ];
 
 export const syntheticElements: OsmElement[] = [
+  { type: 'relation', id: 901, tags: { name: 'Fixture', type: 'boundary', boundary: 'administrative' },
+    members: [{ type: 'way', ref: 800, role: 'outer' }] },
   { type: 'relation', id: 900, tags: { name: 'Test District', type: 'boundary', boundary: 'administrative' },
     members: [{ type: 'way', ref: 800, role: 'outer' }] },
   ...ways.map(way => ({ type: 'way' as const, id: way.id, tags: way.tags,
@@ -26,6 +28,8 @@ export const syntheticElements: OsmElement[] = [
 
 // Same real relation, with a small administrative boundary enclosing its members.
 export const continentalWithBoundary: OsmElement[] = [
+  { type: 'relation', id: 901, tags: { name: 'Fixture', type: 'boundary', boundary: 'administrative' },
+    members: [{ type: 'way', ref: 800, role: 'outer' }] },
   { type: 'relation', id: 900, tags: { name: 'Test District', type: 'boundary', boundary: 'administrative' },
     members: [{ type: 'way', ref: 800, role: 'outer' }] },
   { type: 'way', id: 800, nodes: [700, 701, 702, 703, 700] },
