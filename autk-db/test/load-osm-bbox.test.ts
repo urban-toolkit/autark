@@ -112,6 +112,34 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     expect(booleanPointInPolygon([9, 9], (await client.getLayer('table_osm_surface')).features[0] as any)).toBe(true);
   });
 
+  it.each(['api', 'pbf'])('handles #112 empty parks without losing other layers through %s', async source => {
+    const box: [number, number, number, number] = [-87.8, 42.05, -87.78, 42.06];
+    const house: OsmElement[] = [
+      { type: 'way', id: 201, nodes: [11, 12, 13, 14, 11], tags: { building: 'house' } },
+      ...[[42.0525, -87.7945], [42.0525, -87.7942], [42.0527, -87.7942], [42.0527, -87.7945]]
+        .map(([lat, lon], i) => ({ type: 'node' as const, id: 11 + i, lat, lon })),
+    ];
+    const requests: Array<Array<'buildings' | 'parks' | 'surface'>> = [
+      ['buildings', 'parks'], ['parks'], ['buildings', 'parks', 'surface'],
+    ];
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (const layers of requests) {
+      await client.setWorkspace(`empty_parks_${++workspace}`);
+      await provide(layers.includes('buildings') ? house : [], source);
+      const result = await client.loadOsm({ queryArea: { bbox: box },
+        ...(source === 'pbf' ? { pbfFileUrl: '/empty-parks.pbf' } : {}), autoLoadLayers: { layers } });
+      expect(result.layers.map(layer => layer.layerType)).toEqual(layers);
+      expect(client.getLayersMetadata().map(layer => layer.type)).toEqual(layers);
+      expect(client.getTablesMetadata().find(table => table.name === 'table_osm_parks')?.boundingBox).toBeUndefined();
+      expect((await client.getLayer('table_osm_parks')).features).toEqual([]);
+      expect(await client.getTable('table_osm_parks')).toEqual([]);
+      expect((await client.getLayer('table_osm_surface')).features).toHaveLength(1);
+      if (layers.includes('buildings')) {
+        expect((await client.getLayer('table_osm_buildings')).features.map(feature => feature.id)).toEqual([201]);
+      }
+    }
+  });
+
   it.each(['api', 'pbf'])('warns and falls back on incomplete %s coastline', async source => {
     await client.setWorkspace(`invalid_coast_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     const elements = structuredClone(extra).filter(element => element.id !== 600);
