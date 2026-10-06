@@ -164,6 +164,8 @@ export interface WorkspaceData {
   workspaceBoundingBox?: BoundingBox;
   /** Cached immutable default crop layer for the workspace, or `null` when none exists. */
   workspaceCropLayer?: string | null;
+  /** OSM masks retained for spatial constraints but omitted from public layer listings. */
+  internalLayerNames?: string[];
 }
 
 /**

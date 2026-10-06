@@ -3,6 +3,8 @@ export interface OsmBuildingRelation {
   id: string;
   members: Array<{ id: string; role: string }>;
   properties: Record<string, unknown>;
+  /** Invalid source membership: omit the whole relation and its direct way members. */
+  skipReason?: string;
 }
 
 /**

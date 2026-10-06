@@ -330,16 +330,52 @@ describe('building relations preserve original way ownership', () => {
   });
 
   it.each([
-    { members: [{ type: 'relation' as const, ref: 999, role: 'part' }], error: /unsupported member 999/ },
+    { members: [{ type: 'relation' as const, ref: 999, role: 'part' }, { type: 'way' as const, ref: 10, role: 'part' }], error: /unsupported member 999/ },
     { members: [{ type: 'way' as const, ref: 10, role: 'inner' }], error: /unsupported member 10/ },
+    { members: [{ type: 'way' as const, ref: 20, role: 'roof' }, { type: 'way' as const, ref: 10, role: 'part' }], error: /unsupported member 20.*role roof/ },
     { members: [{ type: 'way' as const, ref: 10, role: 'part' }, { type: 'way' as const, ref: 10, role: 'outline' }], error: /conflicting roles for way 10/ },
-    { members: [{ type: 'node' as const, ref: 100, role: 'label' }], error: /has no way members/ },
-  ])('rejects unsupported/incomplete membership: $error', async ({ members, error }) => {
+    { members: [{ type: 'node' as const, ref: 100, role: 'label' }], error: /no way members/ },
+    { members: [], error: /no way members/ },
+  ])('logs unsupported/incomplete membership and continues other buildings: $error', async ({ members, error }) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const elements = structuredClone(syntheticElements);
-    elements.push({ type: 'relation', id: 600, tags: { type: 'building' }, members });
+    elements.push({ type: 'relation', id: 600, tags: { type: 'building' }, members },
+      { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 30, role: 'part' }] });
     await pipeline.insertOsmDataUsingJson('unsupported', { elements }, 'stages');
-    await expect(new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'unsupported', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' })).rejects.toThrow(error);
+    const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'unsupported', layer: 'buildings',
+      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+    const output = await new GetLayerUseCase(conn).exec(table, 'stages');
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(error));
+    expect(output.features.some(feature => feature.properties?.osmRelation?.id === '600')).toBe(false);
+    expect(output.features.some(feature => feature.properties?.osmRelation?.id === '601')).toBe(true);
+    const omitted = members.filter(member => member.type === 'way').map(member => member.ref);
+    for (const feature of output.features) {
+      expect(feature.properties?.parts.some((part: any) => omitted.includes(part.id))).toBe(false);
+    }
+    expect(output.features.some(feature => feature.id === 40)).toBe(true);
+  });
+
+  it.each(['api', 'pbf'])('public %s import survives unsupported roof members and completes all layers', async source => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const elements = structuredClone(syntheticElements);
+    elements.push({ type: 'relation', id: 15931242, tags: { type: 'building' }, members: [
+      { type: 'way', ref: 20, role: 'roof' }, { type: 'way', ref: 10, role: 'part' },
+    ] }, { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 30, role: 'part' }] });
+    if (source === 'pbf') {
+      const bytes = await encodeBuildingPbf(elements);
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(bytes)));
+    } else {
+      resolveWayGeometries(elements);
+      vi.spyOn(LoadOsmFromOverpassApiUseCase.prototype as any, 'fetchCombinedOsmData').mockResolvedValue({ elements });
+    }
+    const result = await client.loadOsm({ queryArea: { geocodeArea: 'Fixture', areas: ['Test District'] },
+      ...(source === 'pbf' ? { pbfFileUrl: '/roof.pbf' } : {}), autoLoadLayers: { layers: ['surface', 'buildings', 'roads', 'water', 'parks'] } });
+    expect(result.layers).toHaveLength(5);
+    const output = await client.getLayer('table_osm_buildings');
+    expect(output.features.map(feature => feature.id)).toEqual([30]);
+    expect(output.features[0].properties?.osmRelation?.id).toBe('601');
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Skipping OSM building relation 15931242.*unsupported member 20.*role roof/));
+    expect(client.getTablesMetadata().some(table => ['table_osm', 'table_osm_boundaries'].includes(table.name))).toBe(false);
   });
 
   it('still assembles genuine multipolygon relations with inner rings as polygons with holes', async () => {

@@ -46,17 +46,40 @@ export interface OsmLoadTimings {
   layers: LayerLoadTimings[];
 }
 
+/** Administrative boundary names, scoped by a named region. */
+export type OsmNamedArea = { geocodeArea: string; areas: string[] };
+/** WGS84 degrees in [west, south, east, north] order. Antimeridian crossings are unsupported. */
+export type OsmBoundingBoxArea = { bbox: [number, number, number, number] };
+export type OsmQueryArea = OsmNamedArea | OsmBoundingBoxArea;
+
+export function isBoundingBoxArea(area: OsmQueryArea): area is OsmBoundingBoxArea {
+  return 'bbox' in area;
+}
+
+/** Validates the public bbox before any network request or PBF scan. */
+export function boundingBoxOf(area: OsmBoundingBoxArea): { west: number; south: number; east: number; north: number } {
+  const box = area.bbox;
+  if (!Array.isArray(box) || box.length !== 4 || !Array.from(box).every(value => typeof value === 'number' && Number.isFinite(value))) {
+    throw new Error('queryArea.bbox must be [west, south, east, north] in finite WGS84 degrees.');
+  }
+  const [west, south, east, north] = box;
+  if (west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north) {
+    throw new Error('queryArea.bbox must be [west, south, east, north] with west < east and south < north within WGS84 limits.');
+  }
+  return { west, south, east, north };
+}
+
 export type LoadOsmParams = {
   outputTableName?: string;
   autoLoadLayers: {
     /** CRS of the OSM input data (source). Defaults to EPSG:4326. */
     coordinateFormat?: string;
+    /** Public layers to retain. Surface is always constructed as a workspace mask, hidden unless requested. */
     layers: Array<LayerType>;
   };
-  queryArea: {
-    geocodeArea: string;
-    areas: string[];
-  };
+  /** Named boundaries or a WGS84 bbox. Surface excludes sea when coastline reconstruction succeeds;
+   * otherwise the full query area is used with a warning. Buildings retain complete original parts. */
+  queryArea: OsmQueryArea;
   /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
   pbfFileUrl?: string;
   /** When true, bypasses the cached Overpass response and fetches fresh data. */

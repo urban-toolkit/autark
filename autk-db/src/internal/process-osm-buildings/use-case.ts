@@ -24,7 +24,8 @@ export class ProcessOsmBuildingsUseCase {
    * Builds GeometryCollections with indexed part attributes, replacing the table atomically.
    * Explicit location=underground parts/relations are omitted from this surface layer before clustering.
    * Logs and omits unusable geometry; a relation with any unusable member is omitted as a whole.
-   * Conflicting ownership also omits the affected relations rather than guessing identity.
+   * Invalid membership and conflicting ownership also omit the affected relations
+   * rather than aborting the import or guessing identity.
    * @throws If IDs are duplicated or database/collection construction fails.
    */
   async exec(params: ProcessOsmBuildingsParams): Promise<Column[]> {
@@ -60,7 +61,11 @@ export class ProcessOsmBuildingsUseCase {
     const skippedRelations = new Set<string>();
     for (const relation of params.relations ?? []) {
       if (relationProperties.has(relation.id)) throw new Error(`Duplicate OSM building relation ${relation.id}`);
-      if (relation.members.length === 0) throw new Error(`OSM building relation ${relation.id} has no way members`);
+      const skipReason = relation.skipReason ?? (relation.members.length === 0 ? 'no way members' : undefined);
+      if (skipReason) {
+        skippedRelations.add(relation.id);
+        console.warn(`[autk-db] Skipping OSM building relation ${relation.id} in ${qualifiedTableName}: ${skipReason}; all direct member ways omitted to avoid a partial building.`);
+      }
       if (relation.properties.location === 'underground') {
         skippedRelations.add(relation.id);
         console.warn(`[autk-db] Skipping OSM building relation ${relation.id} in ${qualifiedTableName}: location=underground is excluded from the surface building layer.`);

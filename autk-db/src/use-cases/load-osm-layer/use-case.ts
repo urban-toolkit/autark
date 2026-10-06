@@ -133,7 +133,9 @@ export class LoadOsmLayerUseCase {
 
   /**
    * Reads building ownership and general tags without constructing relation footprints.
-   * Member ways remain the only coordinate representation; ambiguous/incomplete ownership is rejected.
+   * Member ways remain the only coordinate representation. Invalid membership is
+   * marked for whole-relation omission, retaining all direct way IDs to prevent
+   * those parts from reappearing as unrelated or partially reconstructed buildings.
    */
   private async loadBuildingRelations(inputTableName: string, workspace: string): Promise<OsmBuildingRelation[]> {
     const rows = (await this.conn.query(`
@@ -147,18 +149,20 @@ export class LoadOsmLayerUseCase {
       const roles = this.toStringArray(row.ref_roles);
       const types = this.toStringArray(row.ref_types);
       const members = new Map<string, { id: string; role: string }>();
+      let skipReason: string | undefined;
       refs.forEach((id, index) => {
         if (types[index] === 'node') return; // Labels/entrances are not geometry parts.
         const role = roles[index] ?? '';
         if (types[index] !== 'way' || !['', 'part', 'outline', 'outer'].includes(role)) {
-          throw new Error(`OSM building relation ${String(row.id)} has unsupported member ${id} (${types[index]}, role ${role})`);
+          skipReason ??= `unsupported member ${id} (${types[index]}, role ${role})`;
         }
+        if (types[index] !== 'way') return;
         if (members.has(id) && members.get(id)!.role !== role) {
-          throw new Error(`OSM building relation ${String(row.id)} has conflicting roles for way ${id}`);
+          skipReason ??= `conflicting roles for way ${id}`;
         }
         members.set(id, { id, role });
       });
-      return { id: String(row.id), members: [...members.values()], properties: this.parseTags(row.tags_json) };
+      return { id: String(row.id), members: [...members.values()], properties: this.parseTags(row.tags_json), skipReason };
     });
   }
 

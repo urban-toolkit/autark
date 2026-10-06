@@ -13,7 +13,9 @@ import {
   DEFAULT_WORKSPACE_NAME,
 } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { LoadOsmParams, OsmElement } from '../load-osm-overpass/interfaces';
+import { LoadOsmParams, OsmElement, OsmNamedArea, boundingBoxOf, isBoundingBoxArea } from '../load-osm-overpass/interfaces';
+import type { MultiPolygon } from 'geojson';
+import { coastalLandMask } from '../../internal/process-osm-surface/coastline';
 import { OsmProcessingPipeline } from '../../internal/process-osm/pipeline';
 import { blockToElements, resolveWayGeometries } from './osm-pbf-parser';
 
@@ -27,6 +29,7 @@ interface OsmExecResult {
   boundaryElementCount: number;
   osmDataProcessingMs: number;
   boundariesProcessingMs: number;
+  surfaceMask?: MultiPolygon;
 }
 
 type RequestedLayer = 'roads' | 'buildings' | 'parks' | 'water';
@@ -117,8 +120,11 @@ export class LoadOsmFromPbfUseCase {
 
     onProgress?.('downloading-osm-data');
 
-    const boundaryContext = await this.collectBoundaryContext(pbfFileUrl, params.queryArea.areas);
-    const bbox = await this.collectBoundaryBbox(pbfFileUrl, boundaryContext.boundaryWayIds);
+    const box = isBoundingBoxArea(params.queryArea) ? boundingBoxOf(params.queryArea) : null;
+    const boundaryContext = box
+      ? { boundaryRelationIds: new Set<number>(), boundaryWayIds: new Set<number>() }
+      : await this.collectBoundaryContext(pbfFileUrl, (params.queryArea as OsmNamedArea).areas);
+    const bbox = box ?? await this.collectBoundaryBbox(pbfFileUrl, boundaryContext.boundaryWayIds);
 
     onProgress?.('processing-osm-data');
     console.log('[autk-db] PBF pass 3/3: thematic collection started');
@@ -149,11 +155,15 @@ export class LoadOsmFromPbfUseCase {
       `[autk-db] PBF filter summary: boundaries=${grouped.boundaries.elements.length}, parks+water=${grouped.parksWater.elements.length}, roads=${grouped.roads.elements.length}, buildings=${grouped.buildings.elements.length}, total=${filteredElements.length}`
     );
 
+    const coastlines = filteredElements.filter(element => element.type === 'way' && element.tags?.natural === 'coastline');
+    const surfaceMask = coastalLandMask(coastlines, bbox);
     const combined = this.mergeResponses(
       this.mergeResponses(grouped.boundaries, grouped.parksWater),
-      this.mergeResponses(grouped.roads, grouped.buildings),
+      this.mergeResponses(this.mergeResponses(grouped.roads, grouped.buildings), { elements: coastlines }),
     );
-    const { osmData, boundariesData } = this.pipeline.splitCombinedResponse(combined, params.queryArea);
+    const { osmData, boundariesData } = box
+      ? { osmData: combined, boundariesData: this.pipeline.boundingBoxBoundary(box) }
+      : this.pipeline.splitCombinedResponse(combined, params.queryArea as OsmNamedArea);
 
     const t0 = performance.now();
     await this.pipeline.insertOsmDataUsingJson(outputTableName, osmData, workspace);
@@ -173,6 +183,7 @@ export class LoadOsmFromPbfUseCase {
         { source: 'osm', name: outputTableName, columns },
         { source: 'osm', name: `${outputTableName}_boundaries`, columns },
       ],
+      surfaceMask,
       osmElementCount: osmData.elements.length,
       boundaryElementCount: boundariesData.elements.length,
       osmDataProcessingMs,
@@ -302,6 +313,7 @@ export class LoadOsmFromPbfUseCase {
 
         const keep =
           boundaryWayIds.has(element.id) ||
+          element.tags?.natural === 'coastline' ||
           relationWayIds.has(element.id) ||
           this.matchesRequestedWayLayers(element.tags, requestedLayers);
 

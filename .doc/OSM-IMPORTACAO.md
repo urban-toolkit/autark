@@ -37,13 +37,13 @@ flowchart TD
     E --> F[Separar dados temáticos e fronteiras]
     F --> G[Normalizar e inserir no DuckDB]
     G --> H[Calcular bbox das fronteiras]
-    H --> I[Extrair cada camada solicitada]
+    H --> I[Extrair camadas solicitadas e surface obrigatória]
     I --> J[Construir geometrias e transformar CRS]
     J --> K{Camada}
     K -->|Buildings| L[Validar partes e consolidar entidades]
-    K -->|Surface| M[Polygonizar fronteiras]
+    K -->|Surface| M[Polygonizar geometria-base e aplicar máscara costeira]
     K -->|Parks / water / roads| N[Concluir extração temática]
-    L --> O[Filtrar ou recortar pela surface, se solicitada]
+    L --> O[Filtrar ou recortar pela surface obrigatória]
     M --> O
     N --> O
     O --> P[Manter tabelas finais e atualizar metadados]
@@ -127,7 +127,8 @@ await db.loadOsm({
 | `pbfFileUrl` | Escolhe o importador PBF. Sem ele, usa Overpass. Não é fallback automático. |
 | `queryArea.geocodeArea` | Escopo de desambiguação nas consultas Overpass. O seletor local PBF não usa esse escopo. |
 | `queryArea.areas` | Nomes exatos das relações de fronteira a buscar. |
-| `autoLoadLayers.layers` | Camadas extraídas, na ordem informada. Recomenda-se `surface` primeiro. |
+| `queryArea.bbox` | Alternativa às áreas nomeadas: `[west, south, east, north]` em WGS84, para Overpass ou PBF. |
+| `autoLoadLayers.layers` | Camadas públicas extraídas, na ordem informada. Surface sempre é construída; se omitida, fica escondida da listagem de layers. |
 | `autoLoadLayers.coordinateFormat` | CRS declarado da entrada; padrão `EPSG:4326`. Não muda o CRS dos dados na fonte. |
 | `outputTableName` | Prefixo das tabelas; padrão `table_osm`. |
 | `forceRefresh` | Ignora o cache Overpass. Não completa nem atualiza o arquivo PBF. |
@@ -137,7 +138,7 @@ O workspace usa `EPSG:3395` por padrão para armazenamento. A API pública usa o
 
 **Pré-condições:** `db.init()` deve ter sido executado. OSM deve ser carregado antes de camadas não OSM no mesmo workspace, pois estabelece o contexto espacial.
 
-A seleção pública descrita aqui é por áreas nomeadas. Não há, neste contrato, uma consulta OSM pública arbitrária por bbox.
+A seleção pública aceita áreas nomeadas ou `queryArea: { bbox: [west, south, east, north] }`, tanto por Overpass quanto por PBF. A bbox é validada antes de HTTP/leitura: quatro coordenadas finitas dentro dos limites WGS84, `west < east` e `south < north`. Cruzamento do antimeridiano não é suportado. O filtro Overpass seleciona candidatos; não promete uma consulta geométrica exaustiva de tudo que intersecta a caixa.
 
 ## 3. Aquisição via Overpass
 
@@ -152,7 +153,7 @@ Antes de consultar o servidor:
 3. Entradas expiram após **24 horas**.
 4. `forceRefresh: true` ignora essas entradas.
 
-O cache usa a Cache API do navegador quando disponível. Chaves atuais têm versão `v2`, para não reutilizar respostas antigas que não coletavam todas as relações `type=building`.
+O cache usa a Cache API do navegador quando disponível. Chaves atuais têm versão `v3`, para não reutilizar respostas antigas sem coastlines ou relações `type=building`. Bboxes têm chaves próprias por coordenadas e camadas; respostas em cache também incluem os dados necessários à máscara costeira.
 
 > Cache recente não significa dados iguais ao PBF. Pode representar outro momento do OSM, e uma entrada completa reutilizada pode conter mais candidatos que uma consulta temática específica.
 
@@ -171,6 +172,8 @@ geocodeArea
 - `out geom qt` entrega ways com coordenadas inline.
 - A bbox utilizada para dividir consultas de buildings é calculada **somente a partir das fronteiras**.
 - Parques, água e edifícios não devem ampliar essa bbox de aquisição.
+- Para bbox pública, não há consulta administrativa: um way retangular sintético estabelece as fronteiras e a extensão.
+- Nos dois casos, uma consulta adicional coleta `natural=coastline` na extensão da área, preservando ways completos e sua direção.
 
 A implementação confere a presença dos nomes solicitados. A identificação por nome não deve ser interpretada como uma validação completa de todas as tags administrativas possíveis.
 
@@ -178,12 +181,13 @@ A implementação confere a presença dos nomes solicitados. A identificação p
 
 | Grupo | Aquisição | Observação |
 |---|---|---|
-| Fronteiras | Uma consulta obrigatória | Mesmo sem solicitar a camada `surface` |
+| Fronteiras | Uma consulta para áreas nomeadas; sintéticas para bbox | Mesmo sem solicitar a camada `surface` |
+| Coastlines | Uma consulta pela extensão da área | Sempre, independentemente das camadas públicas |
 | Parks + water | Uma consulta conjunta, com os seletores ativos | Pode solicitar apenas um desses temas |
 | Roads | Uma consulta de ways | Relações de roads não são reconstruídas como áreas |
 | Buildings | Normalmente quatro consultas, numa grade 2 × 2 | Combina filtro de área com bbox de cada tile |
 
-Com as cinco camadas, sem cache e com bbox disponível, são normalmente **sete consultas de dados**: uma de fronteiras, uma de parks/water, uma de roads e quatro de buildings. Consultas de status e retries são adicionais.
+Com as cinco camadas, sem cache e com extensão disponível, são normalmente **oito consultas de dados para áreas nomeadas**: fronteiras, coastlines, parks/water, roads e quatro tiles de buildings. Para bbox são sete, sem a busca de fronteiras. Consultas de status e retries são adicionais.
 
 Nos tiles de buildings, a relação pode aparecer em mais de uma resposta. A mesclagem remove repetições por `(type, id)`.
 
@@ -218,6 +222,8 @@ Ao final, as respostas são mescladas e seguem para o processamento comum.
 ## 4. Aquisição via PBF
 
 Responsáveis: [`LoadOsmFromPbfUseCase`](../autk-db/src/use-cases/load-osm-pbf/use-case.ts) e [`osm-pbf-parser.ts`](../autk-db/src/use-cases/load-osm-pbf/osm-pbf-parser.ts).
+
+Para bbox pública, o importador usa diretamente a extensão fornecida e dispensa as fases de descoberta administrativa e cálculo de bbox das fronteiras. A coleta temática existente também conserva coastlines e seus nodes, mesmo sem surface na lista pública. Relações selecionadas mantêm todos os membros disponíveis no arquivo. Coastlines ausentes/incompletas acionam o fallback da surface, não uma busca externa automática.
 
 ### 4.1 Decodificação
 
@@ -539,9 +545,9 @@ flowchart TD
 | Parte intencionalmente excluída por ser subterrânea | Não é tratada como falha de geometria; os membros de superfície podem permanecer |
 | Mesmo way pertencendo a relações distintas | Relações afetadas são omitidas, com aviso; não se escolhe um dono arbitrário |
 | IDs duplicados ou falha SQL/transacional | Erro propagado |
-| Nested member, role não suportada, roles conflitantes ou relação sem ways | Erro de contrato propagado |
+| Nested member, role não suportada (incluindo `roof`), roles conflitantes ou relação sem ways | Aviso e omissão da relação e de todos os seus ways diretos; outros edifícios continuam |
 
-Na leitura de ownership, roles aceitas de ways são vazia, `part`, `outline` e `outer`. Membros node, como labels, não viram partes geométricas. Referências repetidas com a mesma role são deduplicadas.
+Na leitura de ownership, roles aceitas de ways são vazia, `part`, `outline` e `outer`. Membros node, como labels, não viram partes geométricas. Referências repetidas com a mesma role são deduplicadas. Membership inválida é marcada com um motivo para omissão, mantendo todos os IDs dos ways diretos, inclusive os posteriores ao membro inválido. A consolidação registra `console.warn` com o ID da relação e o motivo e impede que seus membros reapareçam como edifícios parciais/independentes. Erros de banco/transação e invariantes internos continuam sendo propagados; não há um catch genérico que esconda falhas da camada inteira.
 
 **Não excluem por si só:** altura zero, `layer` negativo ou `building:levels:underground`. A exclusão específica desta etapa exige `location=underground`.
 
@@ -662,18 +668,23 @@ polígonos fechados
 table_osm_surface, substituída por polígonos
 ```
 
-A polygonização procura polígonos formados pelas linhas disponíveis. Não transforma a bbox numa surface retangular.
+A polygonização constrói a geometria-base: polígonos administrativos para áreas nomeadas ou um retângulo sintético para bbox. Nos dois casos, [`coastalLandMask`](../autk-db/src/internal/process-osm-surface/coastline.ts) reconstrói a região terrestre na extensão geográfica e a surface final é a interseção dessa máscara com a geometria-base.
+
+A reconstrução preserva a direção OSM (terra à esquerda), recorta segmentos à extensão, divide as bordas nos encontros, polygoniza e classifica faces. Anéis desconectados são organizados por contenção para preservar ilhas e buracos. Somente coordenadas da rede da máscara são quantizadas a `1e-10` graus; coordenadas temáticas/buildings não são alteradas por esse ajuste. Coastline ausente, incompleta, ambígua ou inválida gera `console.warn` e conserva a geometria-base inteira. Assim, uma bbox inteiramente marítima sem coastline também usa o retângulo. Lagos/rios não são subtraídos: permanecem disponíveis para `water`. Erros de rede, leitura e banco não são tratados como fallback costeiro.
 
 | Sem solicitar `surface` | Solicitando `surface` |
 |---|---|
-| Fronteiras ainda são adquiridas para contexto/bbox | Além disso, fronteiras viram polígonos |
-| Não ocorre recorte final por polígono administrativo neste fluxo | Outras camadas são filtradas/recortadas por esses polígonos |
+| Surface é construída e mantida como máscara interna | Surface é construída e exposta como camada pública |
+| Não aparece em `getLayersMetadata()` nem nos timings por layer | Aparece na listagem e nos timings |
+| Outras camadas são filtradas/recortadas normalmente | Mesmo recorte/filtragem |
+
+A máscara interna permanece registrada e pode ser inspecionada por `getTablesMetadata()`/`getLayer()`. `workspaceCropLayer` continua apontando para ela para restringir cargas posteriores. **Mudança de comportamento:** omitir surface não desativa mais o clipping final.
 
 A `surface` não mantém necessariamente IDs de ways: sua tabela polygonizada armazena geometria e propriedades dos polígonos resultantes.
 
 ## 12. Filtragem e recorte final
 
-Após extrair as camadas, se existe surface carregada, `AutkDb.loadOsm()` processa as outras camadas contra ela.
+Após extrair as camadas e construir a surface obrigatória, `AutkDb.loadOsm()` processa as outras camadas contra ela, independentemente da exposição pública da máscara.
 
 ### Dois contratos diferentes
 
@@ -749,7 +760,7 @@ Para investigar seleção, compare as partes da feature selecionada e seu owners
 | `table_osm` | Staging bruto temático | Removido |
 | `table_osm_boundaries` | Staging das fronteiras | Removido |
 | Temporárias SQL de refs/nodes | Auxílio na montagem das camadas | Reutilizadas/substituídas; associadas à conexão DuckDB |
-| `table_osm_surface` | Linhas, depois polígonos | Mantida como camada final |
+| `table_osm_surface` | Linhas, depois polígonos e máscara costeira | Mantida; escondida das layers públicas quando não solicitada |
 | `table_osm_parks`, `_water`, `_roads` | Camadas temáticas | Mantidas |
 | `table_osm_buildings` | Partes, depois entities consolidadas | Mantida |
 | JSON de mapeamento de buildings | IDs e atributos para consolidar | Arquivo VFS removido em `finally` |
@@ -767,7 +778,7 @@ Para investigar seleção, compare as partes da feature selecionada e seu owners
 
 ### Métricas retornadas
 
-`loadOsm()` retorna contagens de elementos, tempos de processamento e entradas por camada.
+`loadOsm()` retorna contagens de elementos, tempos de processamento e entradas por camada solicitada. A surface interna não solicitada não acrescenta uma entrada aos timings.
 
 A `featureCount` de cada entrada é medida logo após a extração, **antes** do recorte final; para surface, também antes de sua polygonização. Não é necessariamente a contagem final obtida por `getLayer()`.
 

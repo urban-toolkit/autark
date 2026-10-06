@@ -85,6 +85,16 @@ export class OsmProcessingPipeline {
     return { osmData, boundariesData };
   }
 
+  /** Synthetic boundary in the same representation as an Overpass way, isolated from real OSM IDs. */
+  boundingBoxBoundary(box: { west: number; south: number; east: number; north: number }): OverpassApiResponse {
+    const corners = [
+      { lon: box.west, lat: box.south }, { lon: box.east, lat: box.south },
+      { lon: box.east, lat: box.north }, { lon: box.west, lat: box.north },
+    ];
+    return { elements: [{ type: 'way', id: -1, nodes: [-1, -2, -3, -4, -1],
+      geometry: [...corners, corners[0]], tags: { boundary: 'bounding_box' } }] };
+  }
+
   // ---------------------------------------------------------------------------
   // Bounding-box computation
   // ---------------------------------------------------------------------------

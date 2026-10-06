@@ -261,7 +261,9 @@ export class AutkDb {
      *
      * `autoLoadLayers` is required. The raw OSM import tables are treated as temporary
      * staging tables and are always dropped after the requested layers are extracted.
-     * The surface layer is polygonized and other layers are clipped to its geometry.
+     * Surface is always built, excluding sea when coastline reconstruction succeeds.
+     * It stays hidden unless requested. Other layers are clipped to it; buildings
+     * are filtered as complete features without modifying their parts.
      *
      * @param params - Area query, optional output table name, and required layer extraction settings.
      * @returns Timing breakdown for OSM download and layer extraction.
@@ -327,7 +329,9 @@ export class AutkDb {
             let surfaceLayerName: string | null = null;
             const clippableLayerNames: string[] = [];
 
-            for (const layer of params.autoLoadLayers.layers) {
+            const requestedLayers = params.autoLoadLayers.layers;
+            const layers = [...new Set([...requestedLayers, 'surface' as const])];
+            for (const layer of layers) {
                 const shouldCropToBbox = layer !== 'buildings';
 
                 const layerParams: LoadOsmLayerParams = {
@@ -347,7 +351,9 @@ export class AutkDb {
                 );
                 const featureCount = Number(countResult.toArray()[0].cnt);
 
-                timings.layers.push({ layerName: layerTable.name, layerType: layer, loadMs, featureCount });
+                if (requestedLayers.includes(layer)) {
+                    timings.layers.push({ layerName: layerTable.name, layerType: layer, loadMs, featureCount });
+                }
 
                 if (layer === 'surface') {
                     const updatedTable = await this.polygonizeOsmSurfaceUseCase.exec(
@@ -356,6 +362,21 @@ export class AutkDb {
                     );
                     const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
                     if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
+                    if (execResult.surfaceMask) {
+                        const maskJson = JSON.stringify(execResult.surfaceMask).replace(/'/g, "''");
+                        const mask = `ST_Transform(ST_GeomFromGeoJSON('${maskJson}'), 'EPSG:4326', '${targetCrs}', always_xy := true)`;
+                        const valid = (await this.conn.query(`SELECT ST_IsValid(${mask}) AS valid_geometry`)).toArray()[0].valid_geometry;
+                        if (valid) {
+                            await this.conn.query(`UPDATE ${this.currentWorkspace}.${layerTable.name}
+                                SET geometry = ST_Intersection(ST_MakeValid(geometry), ${mask});
+                                DELETE FROM ${this.currentWorkspace}.${layerTable.name} WHERE ST_IsEmpty(geometry);`);
+                        } else {
+                            console.warn('[autk-db] Invalid reconstructed coastline mask; surface uses the full query area instead.');
+                        }
+                    }
+                    const internalLayers = workspaceData.internalLayerNames ??= [];
+                    workspaceData.internalLayerNames = internalLayers.filter(name => name !== layerTable.name);
+                    if (!requestedLayers.includes('surface')) workspaceData.internalLayerNames.push(layerTable.name);
                     await this.refreshStoredBoundingBox(layerTable.name);
                     workspaceData.workspaceCropLayer = layerTable.name;
                     surfaceLayerName = layerTable.name;
@@ -684,7 +705,7 @@ export class AutkDb {
      */
     getLayersMetadata(): Array<Table & { type: Exclude<LayerType, 'raster'> }> {
         return this.getTablesMetadata().filter((table): table is Table & { type: Exclude<LayerType, 'raster'> } => {
-            return isVectorTable(table);
+            return isVectorTable(table) && !this.getCurrentWorkspaceData().internalLayerNames?.includes(table.name);
         });
     }
 
@@ -828,6 +849,7 @@ export class AutkDb {
             deleteRasterPayload(this.currentWorkspace, tableName);
         }
         workspaceData.tables = workspaceData.tables.filter((t) => t.name !== tableName);
+        workspaceData.internalLayerNames = workspaceData.internalLayerNames?.filter(name => name !== tableName);
         if (workspaceData.workspaceCropLayer === tableName) {
             workspaceData.workspaceCropLayer = null;
         }
