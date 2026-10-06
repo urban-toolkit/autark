@@ -1,10 +1,10 @@
 # Revisão dos PRs pendentes de Fabio Miranda
 
-Atualizado em **2026-10-06, 17:07 UTC**. Repositório: [urban-toolkit/autark](https://github.com/urban-toolkit/autark). Autor: [`fabio-miranda`](https://github.com/fabio-miranda).
+Atualizado em **2026-10-06, 17:45 UTC**. Repositório: [urban-toolkit/autark](https://github.com/urban-toolkit/autark). Autor: [`fabio-miranda`](https://github.com/fabio-miranda).
 
 ## Escopo e método
 
-Este relatório contém somente os **quatro PRs ainda abertos** do autor: #105, #108, #110 e #111. As discussões de PRs já resolvidos foram removidas.
+Este relatório contém somente os **três PRs ainda abertos** do autor: #105, #108 e #111. As discussões de PRs já resolvidos foram removidas.
 
 A consulta ao GitHub confirmou os títulos, SHAs e checks registrados abaixo. A revisão confrontou os patches com o `main` utilizado na revisão, `ce2a0371695bf05df9ae1e4a112d9e5f5c025718`, e examinou os testes e o código relacionado. Os branches OSM ainda carregam uma pilha histórica baseada em `77c8b32108c90d4f949519771540d152dfda83a6`; seus diffs completos não representam apenas funcionalidades novas em relação ao `main` atual.
 
@@ -21,10 +21,9 @@ Classificação:
 |---|---|---|---|
 | [#105](https://github.com/urban-toolkit/autark/pull/105) | Arrays/matrizes globais em storage buffers | 3/3 testes passaram; sem execução GPU | Favorável à abordagem, condicionado à validação WebGPU |
 | [#108](https://github.com/urban-toolkit/autark/pull/108) | Exportação por elemento OSM | 4 testes específicos passaram na pilha de #111 | Útil, mas precisa ser adaptado ao modelo atual de edifícios |
-| [#110](https://github.com/urban-toolkit/autark/pull/110) | Escopo de áreas nomeadas | 2 testes específicos passaram na pilha de #111 | Favorável; correção pequena e ainda necessária |
 | [#111](https://github.com/urban-toolkit/autark/pull/111) | Camadas selecionadas por tags OSM | 34/34 testes da pilha passaram; reprodução espacial adicional falhou | Corrigir seleção espacial e adaptar à pipeline atual |
 
-Todos os quatro PRs tinham seus checks de CI concluídos com **SUCCESS** na consulta. Isso não elimina o achado adicional em #111 nem as lacunas de integração e execução GPU.
+Os três PRs tinham seus checks de CI concluídos com **SUCCESS** na consulta. Isso não elimina o achado adicional em #111 nem as lacunas de integração e execução GPU.
 
 ## PR #105 — `fix(compute): read uniform arrays and matrices from storage buffers`
 
@@ -76,31 +75,6 @@ Evidências: [`isOsmElementTable` e `SELECT_OSM_ELEMENTS_GEOJSON_QUERY`](https:/
 
 **Parecer:** implementar a ideia sobre a pipeline atual; não integrar a pilha antiga diretamente.
 
-## PR #110 — `fix(db): scope a named area to the boundary relation found inside its region`
-
-Commit revisado: [`6a8ab46311f0392abd458d5cb746f1e3d0fb9198`](https://github.com/urban-toolkit/autark/commit/6a8ab46311f0392abd458d5cb746f1e3d0fb9198).
-
-### Achados
-
-**Correção ainda necessária.** O caminho atual procura áreas com `area["name"=...](area.areaMain)`. O filtro por área não confina essa busca de objetos `area` da forma pretendida; áreas homônimas podem entrar na aquisição.
-
-O PR seleciona a relação por nome **dentro da região** e converte o conjunto com `map_to_area`. A construção é reutilizada nas consultas de camadas e nos tiles de edifícios, alinhando o escopo à seleção das relações de limite.
-
-Evidência: [`namedAreaLines`](https://github.com/urban-toolkit/autark/blob/6a8ab46311f0392abd458d5cb746f1e3d0fb9198/autk-db/src/use-cases/load-osm-overpass/use-case.ts#L497-L510). Referência: [Overpass QL — Area filter](https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL#Area_filter).
-
-**Nenhuma regressão concreta identificada.** No `main` atual, a superfície obrigatória já filtra o resultado posteriormente; isso não corrige uma aquisição indevidamente ampla nem seu custo de tempo, memória e tráfego.
-
-### Observações e integração
-
-- Portar a correção pequena para as consultas atuais, preservando bbox, máscara costeira, filtros de edifícios corrigidos e mensagens de erro HTTP.
-- Invalidar/versionar o cache das consultas nomeadas ao mudar o escopo; entradas antigas podem impedir que o novo query seja executado.
-- Os testes verificam o texto gerado e o carregamento simulado, não o comportamento de um servidor Overpass real. Acrescentar uma verificação real com nomes homônimos quando o serviço estiver acessível.
-- A escolha por nome ainda pode resultar em mais de uma relação dentro da mesma região. O PR corrige o escopo, não define desambiguação por ID ou nível administrativo.
-
-**Validação:** os dois testes de `load-osm-named-area.test.ts` passaram na pilha de #111: escopo nas consultas de camadas/edifícios e múltiplos nomes com áreas próprias.
-
-**Parecer:** favorável. É uma correção pequena que pode ser portada independentemente da exportação de #108.
-
 ## PR #111 — `feat(db): load OSM features chosen by tags as point, line and polygon layers`
 
 Commit revisado: [`367b0c818604939099a2eeac45cbe989778832a9`](https://github.com/urban-toolkit/autark/commit/367b0c818604939099a2eeac45cbe989778832a9).
@@ -150,11 +124,10 @@ Acoplar `tagSets` à pipeline atual, definindo explicitamente se cada camada rep
 
 ## Ordem recomendada e limites
 
-1. **#110:** portar o escopo correto de áreas nomeadas e invalidar o cache afetado.
-2. **#105:** validar execução WebGPU antes de integrar a mudança de bindings.
-3. **#108:** definir identidade OSM no modelo atual e implementar exportação opt-in sem alterar o formato padrão.
-4. **#111:** adicionar seleção por tags sobre essa base, corrigindo o achado espacial e mantendo surface obrigatória.
+1. **#105:** validar execução WebGPU antes de integrar a mudança de bindings.
+2. **#108:** definir identidade OSM no modelo atual e implementar exportação opt-in sem alterar o formato padrão.
+3. **#111:** adicionar seleção por tags sobre essa base, corrigindo o achado espacial e mantendo surface obrigatória.
 
-A ordem não significa que #110 dependa funcionalmente de #108: ele pode ser portado separadamente. Já o branch de #111 contém os commits de #108 e #110; separar os patches úteis da pilha histórica para não reintroduzir implementações superadas.
+O branch de #111 contém a implementação de #108 e uma pilha histórica; separar os patches úteis para não reintroduzir implementações superadas.
 
-Os pareceres se referem aos SHAs registrados. Não foi testada uma integração desses quatro patches com o `main` atual; os testes da pilha antiga não substituem essa verificação.
+Os pareceres se referem aos SHAs registrados. Não foi testada uma integração desses três patches com o `main` atual; os testes da pilha antiga não substituem essa verificação.
