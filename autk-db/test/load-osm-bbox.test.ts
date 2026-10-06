@@ -61,8 +61,7 @@ async function provide(elements: OsmElement[], source: string): Promise<void> {
 
 describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   it.each(['api', 'pbf'])('loads bbox with %s, filters whole buildings and retains an internal mask for later imports', async source => {
-    await client.setWorkspace(`bbox_${++workspace}`);
-    client.getCurrentWorkspaceData().coordinateFormat = 'EPSG:4326';
+    await client.setWorkspace(`bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([...structuredClone(syntheticElements), ...extra], source);
     const result = await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/bbox.pbf' } : {}),
       autoLoadLayers: { layers: ['buildings', 'roads', 'water'] } });
@@ -75,8 +74,10 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     const buildings = await client.getLayer('table_osm_buildings');
     const building = buildings.features.find(feature => feature.properties?.osmRelation?.id === '600')!;
     expect(building.properties?.parts.map((part: any) => [part.id, part.geometryIndex])).toEqual([[10, 0], [50, 1]]);
-    expect(building.geometry).toMatchObject({ type: 'GeometryCollection', geometries: [expect.any(Object),
-      { type: 'Polygon', coordinates: [[[20, 20], [21, 20], [21, 21], [20, 21], [20, 20]]] }] });
+    expect(building.geometry).toMatchObject({ type: 'GeometryCollection', geometries: [expect.any(Object), { type: 'Polygon' }] });
+    if (building.geometry.type !== 'GeometryCollection') throw new Error('Expected building parts');
+    expect((await conn.query(`SELECT ST_Equals(ST_GeomFromGeoJSON('${JSON.stringify(building.geometry.geometries[1])}'),
+      ST_GeomFromText('POLYGON((20 20,21 20,21 21,20 21,20 20))')) same_geometry`)).toArray()[0].same_geometry).toBe(true);
     expect(buildings.features.map(feature => feature.id)).not.toContain(30);
     expect(buildings.features.map(feature => feature.id)).not.toContain(40);
     const road = await client.getLayer('table_osm_roads');
@@ -89,8 +90,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('intersects administrative geometry with coastline for %s and exposes requested surface', async source => {
-    await client.setWorkspace(`named_coast_${++workspace}`);
-    client.getCurrentWorkspaceData().coordinateFormat = 'EPSG:4326';
+    await client.setWorkspace(`named_coast_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([...structuredClone(syntheticElements), ...extra], source);
     await client.loadOsm({ queryArea: { geocodeArea: 'Fixture', areas: ['Test District'] },
       ...(source === 'pbf' ? { pbfFileUrl: '/named.pbf' } : {}), autoLoadLayers: { layers: ['surface', 'buildings'] } });
@@ -102,8 +102,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('warns and uses the full bbox for empty %s data', async source => {
-    await client.setWorkspace(`empty_bbox_${++workspace}`);
-    client.getCurrentWorkspaceData().coordinateFormat = 'EPSG:4326';
+    await client.setWorkspace(`empty_bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([], source);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/empty.pbf' } : {}),
@@ -114,8 +113,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('warns and falls back on incomplete %s coastline', async source => {
-    await client.setWorkspace(`invalid_coast_${++workspace}`);
-    client.getCurrentWorkspaceData().coordinateFormat = 'EPSG:4326';
+    await client.setWorkspace(`invalid_coast_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     const elements = structuredClone(extra).filter(element => element.id !== 600);
     elements.find(element => element.id === 810)!.lat = 1;
     elements.find(element => element.id === 812)!.lat = 9;

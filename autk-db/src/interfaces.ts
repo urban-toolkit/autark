@@ -150,16 +150,18 @@ export interface UserTable extends BaseTable {
  */
 export type Table = OsmTable | OsmLayerTable | CsvTable | JsonTable | GeojsonTable | GeotiffTable | UserTable;
 
-/**
- * Workspace-local state cached by `AutkDb` for one schema.
- *
- * Groups the registered tables, target CRS, and cached extents associated with a workspace.
- */
-export interface WorkspaceData {
-  /** Table metadata currently registered for the workspace schema. */
-  tables: Array<Table>;
+/** Paired target CRS and coordinate precision for a workspace's vector geometries. */
+export interface WorkspaceConfiguration {
   /** Target coordinate reference system used for stored geometries. */
   coordinateFormat: string;
+  /** Coordinate grid in workspace CRS units for stored vectors and spatial operation results. */
+  precisionGrid: number;
+}
+
+/** Workspace-local registry, spatial configuration and cached extents for one schema. */
+export interface WorkspaceData extends WorkspaceConfiguration {
+  /** Table metadata currently registered for the workspace schema. */
+  tables: Array<Table>;
   /** Cached immutable default bounding box for the workspace. */
   workspaceBoundingBox?: BoundingBox;
   /** Cached immutable default crop layer for the workspace, or `null` when none exists. */

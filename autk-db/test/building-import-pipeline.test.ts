@@ -625,8 +625,9 @@ describe('building import pipeline — public orchestration', () => {
     const crossing = (await conn.query(`SELECT ST_Within(b.geometry,s.geometry) AS inside FROM ${ws}.table_osm_buildings b,
       ${ws}.table_osm_surface s WHERE b.id=30`)).toArray()[0];
     expect(crossing.inside).toBe(false); // Buildings intersecting the surface remain whole, by contract.
-    expect((await conn.query(`SELECT ST_AsWKB(geometry) AS bytes FROM ${ws}.table_osm_buildings WHERE id=30`)).toArray()[0].bytes)
-      .toEqual(originalCrossingGeometry);
+    expect((await conn.query(`SELECT ST_Equals((ST_Dump(geometry)[1]).geom,
+      ST_ReducePrecision((ST_Dump(ST_GeomFromWKB(from_hex('${Buffer.from(originalCrossingGeometry!).toString('hex')}')))[1]).geom, 0.01)) same_part
+      FROM ${ws}.table_osm_buildings WHERE id=30`)).toArray()[0].same_part).toBe(true);
     expect(output.features.find(feature => feature.id === 30)?.properties?.parts).toEqual([
       expect.objectContaining({ id: 30, geometryIndex: 0, height: '8' }),
     ]);

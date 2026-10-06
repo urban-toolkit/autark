@@ -85,8 +85,7 @@ describe('named OSM boundaries are scoped by the region, not its bbox', () => {
   });
 
   it.each(['missing', 'incomplete'])('imports exact-name areas and untagged ways through the public PBF API with a %s region', async state => {
-    await client.setWorkspace(`fallback_region_${++serial}`);
-    client.getCurrentWorkspaceData().coordinateFormat = 'EPSG:4326';
+    await client.setWorkspace(`fallback_region_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     const fixture = elements.filter(element => element.id !== (state === 'missing' ? 100 : 110));
     const bytes = await encodeBuildingPbf(fixture);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -148,7 +147,7 @@ describe('named OSM boundaries are scoped by the region, not its bbox', () => {
     const selected = inline.filter(element => [200, 210, 700].includes(element.id));
     const snapshots = [];
     for (const source of ['pbf', 'api']) {
-      await client.setWorkspace(`named_scope_${++serial}`); client.getCurrentWorkspaceData().coordinateFormat = 'EPSG:4326';
+      await client.setWorkspace(`named_scope_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
       if (source === 'pbf') vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(bytes)));
       else vi.spyOn(LoadOsmFromOverpassApiUseCase.prototype as any, 'fetchCombinedOsmData').mockResolvedValue({ elements: selected });
       await client.loadOsm({ queryArea: area, ...(source === 'pbf' ? { pbfFileUrl: '/scope.pbf' } : {}), autoLoadLayers: { layers: ['surface', 'roads'] } });

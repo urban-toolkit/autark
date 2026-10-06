@@ -13,7 +13,7 @@ vi.mock('../src/duckdb', () => ({
 }));
 
 import { AutkDb } from '../src/db';
-import { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../src/consts';
+import { DEFAULT_WORKSPACE_COORDINATE_FORMAT, DEFAULT_WORKSPACE_PRECISION_GRID } from '../src/consts';
 
 let db: AutkDb;
 
@@ -40,6 +40,22 @@ const buildings: FeatureCollection = { type: 'FeatureCollection', features: [{
 
 // Exercises the real public API, workspace constraints and registry, without browser/GPU.
 describe('public building feature API', () => {
+  it('uses a paired CRS and precision-grid workspace configuration', async () => {
+    expect(db.getWorkspaceConfiguration()).toEqual({
+      coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+      precisionGrid: DEFAULT_WORKSPACE_PRECISION_GRID,
+    });
+    await db.setWorkspace('precision_grid', { coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
+    expect(db.getWorkspaceConfiguration()).toEqual({ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
+    await db.loadGeojson({ outputTableName: 'point', layerType: 'points', coordinateFormat: 'EPSG:3395',
+      geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {},
+        geometry: { type: 'Point', coordinates: [1.234, 5.678] } }] } });
+    await expect(db.setWorkspace('precision_grid', { coordinateFormat: 'EPSG:4326' } as any))
+      .rejects.toThrow(/coordinateFormat and precisionGrid/);
+    await expect(db.setWorkspace('precision_grid', { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 }))
+      .rejects.toThrow(/non-empty workspace/);
+  });
+
   it('keeps one stored/exported building and reports counts 8 and 1 in opposite directions', async () => {
     await db.setWorkspace('matches');
     await db.loadGeojson({ geojsonObject: buildings, outputTableName: 'buildings', layerType: 'buildings',
@@ -53,7 +69,8 @@ describe('public building feature API', () => {
     const output = await db.getLayer('buildings');
     expect(output.features).toHaveLength(1);
     expect(output.features[0].id).toBe('building-a');
-    expect(output.features[0].geometry).toEqual(buildings.features[0].geometry);
+    expect((await (db as any).conn.query(`SELECT ST_Equals(geometry,
+      ST_GeomFromGeoJSON('${JSON.stringify(buildings.features[0].geometry)}')) same_geometry FROM matches.buildings`)).toArray()[0].same_geometry).toBe(true);
     expect(output.features[0].properties?.sjoin.count.points).toBe(8);
     expect(output.features[0].properties?.parts).toEqual([{ geometryIndex: 1, height: 25 }]);
     expect(await db.getTable('buildings')).toHaveLength(1);
@@ -82,7 +99,8 @@ describe('public building feature API', () => {
     });
     await db.loadGeojson({ outputTableName: 'buildings', geojsonObject: buildings, coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT, layerType: 'buildings' });
     expect((await db.getLayer('buildings')).features).toHaveLength(1);
-    expect((await db.getLayer('buildings')).features[0].geometry).toEqual(buildings.features[0].geometry);
+    expect((await (db as any).conn.query(`SELECT ST_Equals(geometry,
+      ST_GeomFromGeoJSON('${JSON.stringify(buildings.features[0].geometry)}')) same_geometry FROM empty.buildings`)).toArray()[0].same_geometry).toBe(true);
   });
 
   it('updates by public ID, preserves indexed attributes and does not multiply features after repeated joins', async () => {
@@ -95,7 +113,8 @@ describe('public building feature API', () => {
     const output = await db.getLayer('buildings');
     expect(output.features[0].id).toBe('building-a');
     expect(output.features[0].properties?.parts).toEqual([{ geometryIndex: 1, height: 35 }]);
-    expect(output.features[0].geometry).toEqual(buildings.features[0].geometry);
+    expect((await (db as any).conn.query(`SELECT ST_Equals(geometry,
+      ST_GeomFromGeoJSON('${JSON.stringify(buildings.features[0].geometry)}')) same_geometry FROM updates.buildings`)).toArray()[0].same_geometry).toBe(true);
 
     await db.loadGeojson({ outputTableName: 'points', layerType: 'points', coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
       geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', id: 42,

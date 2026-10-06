@@ -14,13 +14,14 @@ import {
     OsmLayerTable,
     Table,
 } from './interfaces';
-import type { WorkspaceData } from './interfaces';
+import type { WorkspaceConfiguration, WorkspaceData } from './interfaces';
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
 
 import {
     DEFAULT_WORKSPACE_NAME,
     DEFAULT_INPUT_COORDINATE_FORMAT,
-    DEFAULT_WORKSPACE_COORDINATE_FORMAT
+    DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+    DEFAULT_WORKSPACE_PRECISION_GRID,
 } from './consts';
 
 import { DropTableUseCase } from './use-cases/drop-table';
@@ -165,6 +166,7 @@ export class AutkDb {
         this.workspaces.set(DEFAULT_WORKSPACE_NAME, {
             tables: [],
             coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+            precisionGrid: DEFAULT_WORKSPACE_PRECISION_GRID,
             workspaceBoundingBox: undefined,
             workspaceCropLayer: null,
         });
@@ -202,25 +204,39 @@ export class AutkDb {
      * Updates both the active DuckDB schema and the in-memory workspace registry used by this instance.
      *
      * @param name - The name of the workspace to activate.
+     * @param configuration - Optional CRS and precision grid. Both values are required together.
      * @returns Resolves when the workspace has been created if necessary and set as active.
-     * @throws If the database has not been initialized.
+     * @throws If the database has not been initialized, configuration is invalid, or existing tables would change CRS.
      * @example
-     * await db.setWorkspace('my-analysis');
+     * await db.setWorkspace('my-analysis', { coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
      * await db.loadCsv({ csvFileUrl: '/data.csv', outputTableName: 'points' });
      */
-    async setWorkspace(name: string): Promise<void> {
+    async setWorkspace(name: string, configuration?: WorkspaceConfiguration): Promise<void> {
         if (!this.conn) {
             throw new Error('Database not initialized. Please call init() first.');
         }
+        if (configuration) this.validateWorkspaceConfiguration(configuration);
 
-        if (!this.workspaces.has(name)) {
+        const existing = this.workspaces.get(name);
+        if (!existing) {
             await this.conn.query(`CREATE SCHEMA IF NOT EXISTS ${name}`);
             this.workspaces.set(name, {
                 tables: [],
-                coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+                ...(configuration ?? {
+                    coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+                    precisionGrid: DEFAULT_WORKSPACE_PRECISION_GRID,
+                }),
                 workspaceBoundingBox: undefined,
                 workspaceCropLayer: null,
             });
+        } else if (configuration && (configuration.coordinateFormat !== existing.coordinateFormat || configuration.precisionGrid !== existing.precisionGrid)) {
+            if (existing.tables.length > 0) {
+                throw new Error(`Cannot change the CRS or precision grid of non-empty workspace '${name}'. Create a new workspace or reload its layers.`);
+            }
+            existing.coordinateFormat = configuration.coordinateFormat;
+            existing.precisionGrid = configuration.precisionGrid;
+            existing.workspaceBoundingBox = undefined;
+            existing.workspaceCropLayer = null;
         }
 
         await this.conn.query(`USE ${name}`);
@@ -254,6 +270,16 @@ export class AutkDb {
      */
     getCurrentWorkspace(): string {
         return this.currentWorkspace;
+    }
+
+    /**
+     * Returns the CRS and precision grid used for stored vectors and spatial results in the active workspace.
+     *
+     * @returns A copy of the active workspace configuration.
+     */
+    getWorkspaceConfiguration(): WorkspaceConfiguration {
+        const { coordinateFormat, precisionGrid } = this.getCurrentWorkspaceData();
+        return { coordinateFormat, precisionGrid };
     }
 
     /**
@@ -362,14 +388,26 @@ export class AutkDb {
                     );
                     const tableIndex = workspaceData.tables.findIndex((t) => t.name === layerTable.name);
                     if (tableIndex !== -1) workspaceData.tables[tableIndex] = updatedTable;
+                    await this.normalizeGeometryPrecision(updatedTable);
                     if (execResult.surfaceMask) {
                         const maskJson = JSON.stringify(execResult.surfaceMask).replace(/'/g, "''");
-                        const mask = `ST_Transform(ST_GeomFromGeoJSON('${maskJson}'), 'EPSG:4326', '${targetCrs}', always_xy := true)`;
-                        const valid = (await this.conn.query(`SELECT ST_IsValid(${mask}) AS valid_geometry`)).toArray()[0].valid_geometry;
-                        if (valid) {
-                            await this.conn.query(`UPDATE ${this.currentWorkspace}.${layerTable.name}
-                                SET geometry = ST_Intersection(ST_MakeValid(geometry), ${mask});
-                                DELETE FROM ${this.currentWorkspace}.${layerTable.name} WHERE ST_IsEmpty(geometry);`);
+                        const mask = `ST_ReducePrecision(ST_Transform(ST_GeomFromGeoJSON('${maskJson}'), 'EPSG:4326', '${targetCrs}', always_xy := true), ${workspaceData.precisionGrid})`;
+                        const validation = (await this.conn.query(`SELECT ST_IsValid(${mask}) AS valid_geometry,
+                            NOT ST_IsEmpty(ST_GeomFromGeoJSON('${maskJson}')) AND ST_IsEmpty(${mask}) AS collapsed`)).toArray()[0];
+                        if (validation.collapsed) {
+                            throw new Error(`Workspace precisionGrid ${workspaceData.precisionGrid} collapses the coastline mask; use a finer grid in a new workspace.`);
+                        }
+                        if (validation.valid_geometry) {
+                            await this.conn.query('BEGIN TRANSACTION');
+                            try {
+                                await this.conn.query(`UPDATE ${this.currentWorkspace}.${layerTable.name}
+                                    SET geometry = ST_ReducePrecision(ST_Intersection(ST_MakeValid(geometry), ${mask}), ${workspaceData.precisionGrid});
+                                    DELETE FROM ${this.currentWorkspace}.${layerTable.name} WHERE ST_IsEmpty(geometry);`);
+                                await this.conn.query('COMMIT');
+                            } catch (error) {
+                                await this.conn.query('ROLLBACK');
+                                throw error;
+                            }
                         } else {
                             console.warn('[autk-db] Invalid reconstructed coastline mask; surface uses the full query area instead.');
                         }
@@ -427,19 +465,11 @@ export class AutkDb {
         if (!this.db || !this.conn || !this.loadCsvUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
-        const workspaceData = this.getCurrentWorkspaceData();
-        const hasWorkspaceContext = Boolean(workspaceData.workspaceBoundingBox);
-        const table = await this.loadCsvUseCase.exec({
+        return this.loadVectorTable(() => this.loadCsvUseCase!.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: workspaceData.coordinateFormat,
-        });
-        this.registerTable(table);
-        if (hasWorkspaceContext) {
-            await this.applyWorkspaceConstraints(table.name);
-        }
-
-        return this.initializeSpatialMetadata(table);
+            workspaceCoordinateFormat: this.getCurrentWorkspaceData().coordinateFormat,
+        }));
     }
 
     /**
@@ -461,19 +491,11 @@ export class AutkDb {
         if (!this.db || !this.conn || !this.loadJsonUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
-        const workspaceData = this.getCurrentWorkspaceData();
-        const hasWorkspaceContext = Boolean(workspaceData.workspaceBoundingBox);
-        const table = await this.loadJsonUseCase.exec({
+        return this.loadVectorTable(() => this.loadJsonUseCase!.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: workspaceData.coordinateFormat,
-        });
-        this.registerTable(table);
-        if (hasWorkspaceContext) {
-            await this.applyWorkspaceConstraints(table.name);
-        }
-
-        return this.initializeSpatialMetadata(table);
+            workspaceCoordinateFormat: this.getCurrentWorkspaceData().coordinateFormat,
+        }));
     }
 
     /**
@@ -501,6 +523,8 @@ export class AutkDb {
             workspaceCoordinateFormat: params.workspaceCoordinateFormat ?? workspaceData.coordinateFormat,
         });
         this.registerTable(table);
+        // Surface linework is normalized once it has been polygonized by loadOsm.
+        if (table.type !== 'surface') await this.normalizeGeometryPrecision(table);
 
         return this.initializeSpatialMetadata(table);
     }
@@ -530,21 +554,11 @@ export class AutkDb {
         )
             throw new Error('Database not initialized. Please call init() first.');
 
-        const workspaceData = this.getCurrentWorkspaceData();
-        const hasWorkspaceContext = Boolean(workspaceData.workspaceBoundingBox);
-        const table = await this.loadGeojsonUseCase.exec({
+        return this.loadVectorTable(() => this.loadGeojsonUseCase!.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: workspaceData.coordinateFormat,
-        });
-        this.registerTable(table);
-        if (hasWorkspaceContext) {
-            await this.applyWorkspaceConstraints(table.name);
-        }
-
-        const tableWithSpatialMetadata = await this.initializeSpatialMetadata(table);
-
-        return tableWithSpatialMetadata;
+            workspaceCoordinateFormat: this.getCurrentWorkspaceData().coordinateFormat,
+        }));
     }
 
     /**
@@ -761,18 +775,25 @@ export class AutkDb {
         const table = this.getTablesMetadata().find((t) => t.name === params.tableName);
         if (!table) throw new Error(`Table ${params.tableName} not found.`);
 
-        const result = await this.updateTableUseCase.exec(
-            { ...params, workspace: this.currentWorkspace },
-            table
-        );
-
         const workspaceData = this.getCurrentWorkspaceData();
-        const tableIndex = workspaceData.tables.findIndex((t) => t.name === params.tableName);
-        if (tableIndex !== -1) {
-            workspaceData.tables[tableIndex] = result.table;
+        const previousTables = workspaceData.tables.map(item => ({ ...item }));
+        await this.conn.query('BEGIN TRANSACTION');
+        try {
+            const result = await this.updateTableUseCase.exec(
+                { ...params, workspace: this.currentWorkspace },
+                table
+            );
+            const tableIndex = workspaceData.tables.findIndex((t) => t.name === params.tableName);
+            if (tableIndex !== -1) workspaceData.tables[tableIndex] = result.table;
+            await this.normalizeGeometryPrecision(result.table);
+            const updated = await this.refreshStoredBoundingBox(params.tableName);
+            await this.conn.query('COMMIT');
+            return updated;
+        } catch (error) {
+            await this.conn.query('ROLLBACK');
+            workspaceData.tables = previousTables;
+            throw error;
         }
-
-        return this.refreshStoredBoundingBox(params.tableName);
     }
 
     /**
@@ -816,14 +837,10 @@ export class AutkDb {
         if (!this.db || !this.conn || !this.rawQueryUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
-        const result = await this.rawQueryUseCase.exec(params, this.currentWorkspace);
-
         if (params.output.type === 'CREATE_TABLE') {
-            this.registerTable(result as Table);
-            return this.initializeSpatialMetadata(result as Table);
+            return this.loadVectorTable(async () => await this.rawQueryUseCase!.exec(params, this.currentWorkspace) as Table, false);
         }
-
-        return result as unknown as T;
+        return await this.rawQueryUseCase.exec(params, this.currentWorkspace) as unknown as T;
     }
 
     /**
@@ -904,6 +921,64 @@ export class AutkDb {
         return data;
     }
 
+    /** Validates the paired CRS and precision-grid workspace contract. */
+    private validateWorkspaceConfiguration(configuration: WorkspaceConfiguration): void {
+        if (!configuration.coordinateFormat?.trim() || !Number.isFinite(configuration.precisionGrid) || configuration.precisionGrid <= 0) {
+            throw new Error('Workspace coordinateFormat and precisionGrid must be provided together; precisionGrid must be a finite number greater than zero.');
+        }
+    }
+
+    /** Loads, normalizes and clips a vector-capable table atomically, restoring metadata on failure. */
+    private async loadVectorTable<T extends Table>(load: () => Promise<T>, applyConstraints = true): Promise<T> {
+        const workspaceData = this.getCurrentWorkspaceData();
+        const hasWorkspaceContext = Boolean(workspaceData.workspaceBoundingBox);
+        const previous = { ...workspaceData, tables: workspaceData.tables.map(table => ({ ...table })) };
+        await this.conn!.query('BEGIN TRANSACTION');
+        try {
+            const table = await load();
+            this.registerTable(table);
+            await this.normalizeGeometryPrecision(table);
+            if (applyConstraints && hasWorkspaceContext) await this.applyWorkspaceConstraints(table.name, false);
+            const result = await this.initializeSpatialMetadata(table);
+            await this.conn!.query('COMMIT');
+            return result;
+        } catch (error) {
+            await this.conn!.query('ROLLBACK');
+            Object.assign(workspaceData, previous);
+            throw error;
+        }
+    }
+
+    /**
+     * Applies the workspace grid after CRS transformation, preserving building component indices.
+     * Rejects precision grids that collapse a geometry or any indexed building part.
+     */
+    private async normalizeGeometryPrecision(table: Table): Promise<void> {
+        if (!this.tableHasGeometry(table) || table.type === 'raster') return;
+        const grid = this.getCurrentWorkspaceData().precisionGrid;
+        const qualifiedTable = `"${this.currentWorkspace.replace(/"/g, '""')}"."${table.name.replace(/"/g, '""')}"`;
+        // Reducing a whole collection could dissolve overlapping parts or remove indices.
+        const reduced = table.type === 'buildings'
+            ? `ST_GeomFromGeoJSON(json_object('type', 'GeometryCollection', 'geometries',
+                to_json(list_transform(CAST(CASE WHEN ST_GeometryType(geometry) = 'GEOMETRYCOLLECTION'
+                    THEN ST_AsGeoJSON(geometry)->'geometries' ELSE json_array(CAST(ST_AsGeoJSON(geometry) AS JSON)) END AS JSON[]),
+                    part -> CAST(ST_AsGeoJSON(ST_ReducePrecision(ST_GeomFromGeoJSON(part), ${grid})) AS JSON)))))`
+            : `ST_ReducePrecision(geometry, ${grid})`;
+        const invalid = await this.conn!.query(table.type === 'buildings'
+            ? `SELECT 1 FROM ${qualifiedTable},
+                UNNEST(CAST(ST_AsGeoJSON(${reduced})->'geometries' AS JSON[])) t(part)
+                WHERE geometry IS NOT NULL AND NOT ST_IsEmpty(geometry)
+                  AND (ST_IsEmpty(ST_GeomFromGeoJSON(part)) OR NOT ST_IsValid(ST_GeomFromGeoJSON(part))) LIMIT 1`
+            : `SELECT 1 FROM ${qualifiedTable} WHERE geometry IS NOT NULL AND NOT ST_IsEmpty(geometry)
+                AND (ST_IsEmpty(${reduced}) OR NOT ST_IsValid(${reduced})) LIMIT 1`);
+        if (invalid.numRows > 0) {
+            throw new Error(`Workspace precisionGrid ${grid} collapses or invalidates ${table.type === 'buildings' ? 'a building part' : 'a geometry'} in ${table.name}; use a finer grid in a new workspace.`);
+        }
+        await this.conn!.query(`UPDATE ${qualifiedTable}
+            SET geometry = ${reduced}
+            WHERE geometry IS NOT NULL AND NOT ST_IsEmpty(geometry)`);
+    }
+
     /**
      * Returns whether the table currently stores geometry data.
      */
@@ -932,24 +1007,31 @@ export class AutkDb {
     /**
      * Applies the current workspace bounding-box filter and optional crop layer to a loaded table.
      */
-    private async applyWorkspaceConstraints(tableName: string): Promise<void> {
+    private async applyWorkspaceConstraints(tableName: string, transactional = true): Promise<void> {
         const workspaceData = this.getCurrentWorkspaceData();
         const table = workspaceData.tables.find((item) => item.name === tableName);
         if (!table || !this.tableHasGeometry(table) || !workspaceData.workspaceBoundingBox) return;
 
-        await this.clipLayerToBoundingBox(
-            tableName,
-            workspaceData.workspaceBoundingBox,
-            this.currentWorkspace,
-        );
-
-        if (workspaceData.workspaceCropLayer && workspaceData.workspaceCropLayer !== tableName) {
-            await this.clipLayerToLayer(
+        if (transactional) await this.conn!.query('BEGIN TRANSACTION');
+        try {
+            await this.clipLayerToBoundingBox(
                 tableName,
-                workspaceData.workspaceCropLayer,
+                workspaceData.workspaceBoundingBox,
                 this.currentWorkspace,
-                this.shouldCropGeometry(table),
             );
+            if (workspaceData.workspaceCropLayer && workspaceData.workspaceCropLayer !== tableName) {
+                await this.clipLayerToLayer(
+                    tableName,
+                    workspaceData.workspaceCropLayer,
+                    this.currentWorkspace,
+                    this.shouldCropGeometry(table),
+                    false,
+                );
+            }
+            if (transactional) await this.conn!.query('COMMIT');
+        } catch (error) {
+            if (transactional) await this.conn!.query('ROLLBACK');
+            throw error;
         }
     }
 
@@ -1049,9 +1131,11 @@ export class AutkDb {
         cropLayerName: string,
         workspace: string,
         cropGeometry: boolean = true,
+        transactional = true,
     ): Promise<void> {
         const qualifiedLayer = `${workspace}.${layerTableName}`;
         const qualifiedCropLayer = `${workspace}.${cropLayerName}`;
+        const grid = this.getCurrentWorkspaceData().precisionGrid;
 
         if (!cropGeometry) {
             await this.conn!.query(`
@@ -1065,7 +1149,9 @@ export class AutkDb {
             return;
         }
 
-        await this.conn!.query(`
+        if (transactional) await this.conn!.query('BEGIN TRANSACTION');
+        try {
+            await this.conn!.query(`
       DELETE FROM ${qualifiedLayer} AS l
       WHERE NOT EXISTS (
         SELECT 1
@@ -1073,19 +1159,19 @@ export class AutkDb {
         WHERE ST_Intersects(l.geometry, ST_MakeValid(crop.geometry))
       );
     `);
-
-        await this.conn!.query(`
+            await this.conn!.query(`
       UPDATE ${qualifiedLayer} AS l
-      SET geometry = ST_Intersection(ST_MakeValid(l.geometry), crop.geom)
+      SET geometry = ST_ReducePrecision(ST_Intersection(ST_MakeValid(l.geometry), crop.geom), ${grid})
       FROM (
-        SELECT ST_Union_Agg(ST_MakeValid(geometry)) AS geom FROM ${qualifiedCropLayer}
+        SELECT ST_ReducePrecision(ST_Union_Agg(ST_MakeValid(geometry)), ${grid}) AS geom FROM ${qualifiedCropLayer}
       ) crop
       WHERE ST_Intersects(l.geometry, crop.geom);
     `);
-
-        await this.conn!.query(`
-      DELETE FROM ${qualifiedLayer}
-      WHERE ST_IsEmpty(geometry);
-    `);
+            await this.conn!.query(`DELETE FROM ${qualifiedLayer} WHERE ST_IsEmpty(geometry);`);
+            if (transactional) await this.conn!.query('COMMIT');
+        } catch (error) {
+            if (transactional) await this.conn!.query('ROLLBACK');
+            throw error;
+        }
     }
 }

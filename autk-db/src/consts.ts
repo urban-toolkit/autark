@@ -20,6 +20,12 @@ export const DEFAULT_INPUT_COORDINATE_FORMAT = 'EPSG:4326';
 export const DEFAULT_WORKSPACE_COORDINATE_FORMAT = 'EPSG:3395';
 
 /**
+ * Default coordinate grid in workspace units for stored vectors and spatial operation results.
+ * With the default EPSG:3395 workspace CRS, this is one centimetre.
+ */
+export const DEFAULT_WORKSPACE_PRECISION_GRID = 0.01;
+
+/**
  * Default geometry column name used for generated point tables.
  *
  * Provides a stable column name for internal SQL and downstream consumers.

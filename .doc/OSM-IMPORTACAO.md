@@ -135,7 +135,7 @@ await db.loadOsm({
 | `forceRefresh` | Ignora o cache Overpass. Não completa nem atualiza o arquivo PBF. |
 | `onProgress` | Recebe fases do carregamento; não é uma porcentagem de progresso. |
 
-O workspace usa `EPSG:3395` por padrão para armazenamento. A API pública usa o workspace corrente; opções internas também recebem seu nome explicitamente.
+O workspace usa `{ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 }` por padrão para armazenamento; a grade representa 1 cm porque esse CRS é métrico. Para alterar o CRS, use `setWorkspace(nome, { coordinateFormat, precisionGrid })` e forneça os dois valores, antes de carregar tabelas no workspace. A grade é expressa nas unidades do CRS: não use `0.01` para `EPSG:4326`. A API pública usa o workspace corrente; opções internas também recebem seu nome explicitamente. As geometrias vetoriais carregadas são normalizadas nessa grade após a transformação de CRS; resultados de recortes e máscaras costeiras também usam a grade. Isso pode alterar coordenadas e a ordem dos vértices de anéis. As partes de edifícios são normalizadas individualmente, sem dissolução ou reordenação dos componentes de `GeometryCollection`, preservando `geometryIndex` e atributos. Uma grade que colapse uma geometria de entrada ou uma parte inteira é rejeitada; componentes pequenos/buracos podem desaparecer dentro da tolerância. Raster mantém resolução própria. Os recortes são transacionais, sem retry; `loadGeojson` também desfaz a criação/substituição da tabela e seu registro quando houver erro.
 
 **Pré-condições:** `db.init()` deve ter sido executado. OSM deve ser carregado antes de camadas não OSM no mesmo workspace, pois estabelece o contexto espacial.
 
@@ -651,7 +651,7 @@ properties.osmRelation
 
 **Não há união geométrica, convex hull ou coluna persistente `agg_geometry`.** O arquivo temporário de mapeamento contém IDs e atributos, não uma segunda cópia das coordenadas. A collection é construída a partir das geometrias da tabela de origem.
 
-“Preservar a geometria original” aqui significa não unir, recortar ou reparar as partes na consolidação. As coordenadas já passaram pela transformação de CRS necessária ao workspace.
+“Preservar a geometria original” aqui significa não unir ou recortar as partes na consolidação. As coordenadas passam pela transformação de CRS e pela grade de precisão do workspace; a representação dos anéis pode mudar. A normalização ocorre individualmente por componente e mantém os índices das partes, sem dissolver polígonos sobrepostos.
 
 ## 11. Construção da surface
 
@@ -673,7 +673,7 @@ table_osm_surface, substituída por polígonos
 
 A polygonização constrói a geometria-base: polígonos administrativos para áreas nomeadas ou um retângulo sintético para bbox. Nos dois casos, [`coastalLandMask`](../autk-db/src/internal/process-osm-surface/coastline.ts) reconstrói a região terrestre na extensão geográfica e a surface final é a interseção dessa máscara com a geometria-base.
 
-A reconstrução preserva a direção OSM (terra à esquerda), recorta segmentos à extensão, divide as bordas nos encontros, polygoniza e classifica faces. Anéis desconectados são organizados por contenção para preservar ilhas e buracos. Somente coordenadas da rede da máscara são quantizadas a `1e-10` graus; coordenadas temáticas/buildings não são alteradas por esse ajuste. Coastline ausente, incompleta, ambígua ou inválida gera `console.warn` e conserva a geometria-base inteira. Assim, uma bbox inteiramente marítima sem coastline também usa o retângulo. Lagos/rios não são subtraídos: permanecem disponíveis para `water`. Erros de rede, leitura e banco não são tratados como fallback costeiro.
+A reconstrução preserva a direção OSM (terra à esquerda), recorta segmentos à extensão, divide as bordas nos encontros, polygoniza e classifica faces. Anéis desconectados são organizados por contenção para preservar ilhas e buracos. Na reconstrução, coordenadas da rede da máscara são quantizadas a `1e-10` graus; depois da projeção, máscara, superfície e camadas temáticas/buildings são normalizadas na grade do workspace. Coastline ausente, incompleta, ambígua ou inválida gera `console.warn` e conserva a geometria-base inteira. Assim, uma bbox inteiramente marítima sem coastline também usa o retângulo. Lagos/rios não são subtraídos: permanecem disponíveis para `water`. Erros de rede, leitura e banco não são tratados como fallback costeiro.
 
 | Sem solicitar `surface` | Solicitando `surface` |
 |---|---|

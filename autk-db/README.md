@@ -46,6 +46,25 @@ const buildings = await db.getLayer('buildings');
 console.log(db.tables, buildings);
 ```
 
+### Workspace CRS and precision
+
+Every workspace defaults to `{ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 }`; the grid is one centimetre because the default CRS is metric. Inspect it with `db.getWorkspaceConfiguration()`.
+
+To use another CRS, configure **both** values atomically when creating or selecting an empty workspace. Autark refuses a CRS/grid change after the workspace has tables, because existing geometries cannot be silently reprojected.
+
+```ts
+await db.setWorkspace('geographic', {
+  coordinateFormat: 'EPSG:4326',
+  precisionGrid: 1e-7,
+});
+```
+
+`precisionGrid` is expressed in the workspace CRS units. It must be a finite positive value; do not reuse `0.01` for geographic degrees.
+
+Managed vector imports (OSM, GeoJSON, spatial CSV/JSON), updates and vector tables created by `rawQuery` are normalized with `ST_ReducePrecision` **after** transformation to the workspace CRS. Crop/union results and coastal masks use the same grid. This is a behavior change: coordinates and polygon ring order may change; byte-identical geometry round-trips are no longer promised. Building collections are normalized one top-level part at a time, preserving component order, `geometryIndex` and attributes without dissolving overlapping parts. A grid that collapses an input geometry or an entire indexed building part rejects the operation; choose a finer grid. Small holes/components may disappear within the configured tolerance. Raster grids retain their own resolution.
+
+Spatial crops are transactional and do not retry. GeoJSON loading rolls back the new/replaced table and its metadata if normalization or cropping fails. The #106 Back Bay surface/park round-trip is covered by a local regression fixture in `autk-db/test/workspace-precision.test.ts`.
+
 ### OpenStreetMap areas, bounding boxes and surface
 
 Both Overpass and local `.osm.pbf` loading accept named administrative areas or a WGS84 bounding box:
@@ -62,7 +81,7 @@ Named queries use `queryArea: { geocodeArea: 'Illinois', areas: ['Golf'] }`. Bot
 
 Boxes require four finite WGS84 coordinates within geographic limits, with west < east and south < north; antimeridian crossings are unsupported. Overpass spatial selectors acquire candidates, not an exhaustive geometric intersection query. PBF cannot recover relation members absent from the extract.
 
-**Surface is always constructed**, whether requested or not. Its base geometry is the named administrative region or the bbox rectangle. Coastlines (`natural=coastline`, land on the left) define a terrestrial mask intersected with that base. Lakes/rivers remain inside surface and can be represented by `water`. Missing, incomplete, ambiguous or invalid coastlines produce a clear `console.warn` and retain the full base area, potentially including sea. This also happens for an entirely maritime bbox without coastlines. Coastline mask coordinates are quantized to 1e-10 degrees for endpoint matching; thematic/building coordinates are not changed by that operation.
+**Surface is always constructed**, whether requested or not. Its base geometry is the named administrative region or the bbox rectangle. Coastlines (`natural=coastline`, land on the left) define a terrestrial mask intersected with that base. Lakes/rivers remain inside surface and can be represented by `water`. Missing, incomplete, ambiguous or invalid coastlines produce a clear `console.warn` and retain the full base area, potentially including sea. This also happens for an entirely maritime bbox without coastlines. Coastline mask coordinates are quantized to 1e-10 degrees for endpoint matching; after projection, both the mask and loaded vector layers use the workspace precision grid.
 
 All imports now clip roads/parks/water and filter complete buildings by this surface, even if `surface` is omitted from `layers`. This changes the previous optional-surface behavior and can reduce results. An omitted surface is retained internally for subsequent workspace constraints but excluded from `getLayersMetadata()` and per-layer load timings; it remains inspectable through `getTablesMetadata()`/`getLayer()`. Include `surface` to expose it normally. Named Overpass queries use cache version `v4` to reject old incorrectly scoped entries (including full-data supersets); unchanged bbox queries retain `v3`.
 
@@ -70,7 +89,7 @@ BBox gallery examples: [`osm-layers-api-bbox`](../gallery/src/autk-map/osm-layer
 
 ### Building features and spatial joins
 
-With `layerType: 'buildings'`, each feature is stored/exported as one GeometryCollection of original parts. Use `properties.parts[].geometryIndex` for per-part attributes. Distinct GeoJSON features remain distinct even when they overlap. OSM `type=building` relations associate original member ways without generating a duplicate geometry, including disconnected/untagged members. Orphan ways tagged `building:part` (except `no`) are associated with a relation only when their whole geometry is covered by an original outline of exactly one usable surface relation. Outline roles are authoritative; empty/outer-role members qualify only when tagged as whole buildings, not parts. Holes are respected, explicit ownership is never overridden, and inferred parts do not become outlines. Ambiguous containment warns and leaves the part unassociated; partial overlap and independent buildings do not qualify. Remaining unassociated ways retain intersection-based clustering. General relation attributes are inherited by parts, whose own tags take precedence. `properties.osmRelation` retains the relation ID (string), way membership/roles and original tags; optional `osmRelation.inferredParts` records inferred IDs and `method: 'outline-containment'` separately from original members. Feature.id remains the minimum source part ID; unusable/missing member geometry or shared ownership causes a console warning and omission of the whole affected relation, avoiding partial buildings. Unsupported member types/roles (including `roof`), conflicting roles and relations with no way members also warn and skip the affected relation plus all its direct way members; unrelated buildings continue loading. Invalid membership is not converted into a partial building or standalone member features. Explicit `location=underground` parts and relations are excluded from this surface building layer with a console warning, before spatial clustering; above-ground parts of mixed buildings remain. Height zero, negative `layer` and basement-level tags alone do not trigger exclusion. There is no union, convex hull or persistent `agg_geometry`. Both PBF and Overpass collect `type=building` relations and their way members; Overpass uses versioned cache keys so older responses lacking these relations are not reused. Source parity requires the same OSM snapshot and complete relation geometry: a local extract cannot reconstruct coordinates for members absent from the PBF.
+With `layerType: 'buildings'`, each feature is stored/exported as one GeometryCollection of its original parts, normalized independently to the workspace precision grid. Use `properties.parts[].geometryIndex` for per-part attributes. Distinct GeoJSON features remain distinct even when they overlap. OSM `type=building` relations associate original member ways without generating a duplicate geometry, including disconnected/untagged members. Orphan ways tagged `building:part` (except `no`) are associated with a relation only when their whole geometry is covered by an original outline of exactly one usable surface relation. Outline roles are authoritative; empty/outer-role members qualify only when tagged as whole buildings, not parts. Holes are respected, explicit ownership is never overridden, and inferred parts do not become outlines. Ambiguous containment warns and leaves the part unassociated; partial overlap and independent buildings do not qualify. Remaining unassociated ways retain intersection-based clustering. General relation attributes are inherited by parts, whose own tags take precedence. `properties.osmRelation` retains the relation ID (string), way membership/roles and original tags; optional `osmRelation.inferredParts` records inferred IDs and `method: 'outline-containment'` separately from original members. Feature.id remains the minimum source part ID; unusable/missing member geometry or shared ownership causes a console warning and omission of the whole affected relation, avoiding partial buildings. Unsupported member types/roles (including `roof`), conflicting roles and relations with no way members also warn and skip the affected relation plus all its direct way members; unrelated buildings continue loading. Invalid membership is not converted into a partial building or standalone member features. Explicit `location=underground` parts and relations are excluded from this surface building layer with a console warning, before spatial clustering; above-ground parts of mixed buildings remain. Height zero, negative `layer` and basement-level tags alone do not trigger exclusion. There is no union, convex hull or persistent `agg_geometry`. Both PBF and Overpass collect `type=building` relations and their way members; Overpass uses versioned cache keys so older responses lacking these relations are not reused. Source parity requires the same OSM snapshot and complete relation geometry: a local extract cannot reconstruct coordinates for members absent from the PBF.
 
 Public GeoJSON IDs are separate from internal numeric row IDs:
 
@@ -114,7 +133,7 @@ console.log(parcels.type); // 'polygons'
 * `new AutkDb()`: Creates an isolated database controller.
 * `init()`: Initializes DuckDB-Wasm and loads the spatial extension.
 * `tables`: Lists tables registered in the current workspace.
-* `setWorkspace(name)`, `getWorkspaces()`, `getCurrentWorkspace()`: Manage isolated database schemas.
+* `setWorkspace(name, configuration?)`, `getWorkspaces()`, `getCurrentWorkspace()`, `getWorkspaceConfiguration()`: Manage isolated database schemas and their paired CRS/precision-grid configuration.
 * `loadOsm(params)`: Loads OpenStreetMap data from Overpass API or PBF-backed workflows.
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
 * `loadGeojson(params)`: Imports custom GeoJSON layers.
