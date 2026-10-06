@@ -32,6 +32,7 @@
     "dev-build": "tsc && vite build --watch",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:webgpu": "node test/run-webgpu.mjs",
     "format": "prettier --write .",
     "doc": "typedoc --options typedoc.json"
   },

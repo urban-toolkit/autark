@@ -38,10 +38,11 @@ export async function getSharedGpuDevice(): Promise<GPUDevice> {
                 }
 
                 const device = await adapter.requestDevice({
-                    // Request maximum buffer sizes for large compute workloads
+                    // Request buffer and storage binding limits for large compute workloads
                     requiredLimits: {
                         maxBufferSize: adapter.limits.maxBufferSize,
                         maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+                        maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
                     },
                 });
 

@@ -142,13 +142,13 @@ export interface GpgpuPipelineParams {
     /** Per-feature matrices keyed by WGSL variable name. */
     attributeMatrices?: Record<string, { rows: number | 'auto'; cols: number }>;
 
-    /** Global scalar constants shared across the dispatch. */
+    /** Global scalar constants shared across the dispatch, backed by uniform buffers. */
     uniforms?: Record<string, number>;
 
-    /** Global fixed-length arrays shared across the dispatch. */
+    /** Global read-only arrays backed by storage buffers; WGSL accesses name[index] and name_length (u32). */
     uniformArrays?: Record<string, number[]>;
 
-    /** Global matrices shared across the dispatch. */
+    /** Global read-only, row-major storage matrices; WGSL accesses name[row * name_cols + col], name_rows/name_cols (u32). */
     uniformMatrices?: Record<string, { data: number[][]; cols: number }>;
 
     /** WGSL function body inserted into the generated `compute_value` function. */

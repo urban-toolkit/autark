@@ -13,14 +13,14 @@ import {
 } from '@urban-toolkit/autk-core';
 
 /**
- * Metadata for a global uniform exposed to the generated WGSL shader.
+ * Metadata for a global scalar or read-only storage array exposed to the generated WGSL shader.
  */
 export type GlobalVarMeta =
     /** Single f32 uniform value. */
     | { kind: 'scalar'; name: string }
-    /** Fixed-length uniform array of f32 values. */
+    /** Fixed-length read-only storage array of f32 values. */
     | { kind: 'array'; name: string; length: number }
-    /** Fixed-size uniform matrix of f32 values stored in row-major order. */
+    /** Fixed-size read-only storage matrix of f32 values in row-major order. */
     | { kind: 'matrix'; name: string; rows: number; cols: number };
 
 /**

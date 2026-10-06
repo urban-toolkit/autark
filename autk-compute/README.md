@@ -48,6 +48,28 @@ const result = await compute.gpgpuPipeline({
 console.log(result.features[0].properties?.compute?.volumeProxy);
 ```
 
+### Global arrays and matrices
+
+`uniforms` contains scalar constants in uniform buffers. Despite their historical names, `uniformArrays` and `uniformMatrices` are **global read-only storage buffers**, shared by every feature. Large globals are read in place rather than copied into function-local arrays or passed by value. This avoids the uniform-buffer size limit and large-array compiler stack issues; it is not a promise of faster computation.
+
+Inside `wgslBody`, access an array as `weights[index]`, with `weights_length: u32`. Matrices are flattened row-major: `matrix[row * matrix_cols + col]`, with `matrix_rows` and `matrix_cols` of type `u32`. Empty globals report zero logical length/rows; avoid indexing outside the logical dimensions. Per-feature `attributeArrays`/`attributeMatrices` keep their existing behavior.
+
+```ts
+const result = await compute.gpgpuPipeline({
+  collection: buildingsGeojson,
+  variableMapping: { height: 'properties.height' },
+  uniforms: { scale: 2 },
+  uniformArrays: { weights: [0.5, 1.5, 2.5] },
+  uniformMatrices: { matrix: { data: [[1, 2], [3, 4]], cols: 2 } },
+  wgslBody: 'return height * scale + weights[weights_length - 1u] + matrix[matrix_rows * matrix_cols - 1u];',
+  resultField: 'weightedHeight',
+});
+```
+
+Each feature buffer, global array/matrix and output consumes a storage binding. The shared device requests the adapter's `maxStorageBuffersPerShaderStage`; dispatches exceeding the resulting device limit throw before GPU resources are created. Storage binding size and total buffer size limits still apply. Scalars do not consume storage bindings. Global arrays/matrices cannot be modified in WGSL; code that previously modified a local copy must use separate local working data.
+
+For actual GPU regression tests, run `npm run test:webgpu --workspace=@urban-toolkit/autk-compute` from the repository root. This uses local source through Vite and headless Chrome (no CDN/downloaded fixtures); requires Node with built-in WebSocket support and a WebGPU-enabled Chrome. Set `CHROME_BIN` if Chrome is not at the default macOS/Linux path. The test fails if no GPU is available, checks numerical results and validation errors, and prints adapter information. Ordinary Vitest tests check shader generation and binding configuration, not GPU execution.
+
 ### API summary
 
 * `new AutkComputeEngine()`: Creates the unified compute engine.
