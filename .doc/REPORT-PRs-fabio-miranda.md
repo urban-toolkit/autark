@@ -1,139 +1,160 @@
-# Revisão dos PRs de Fabio Miranda
+# Revisão dos PRs pendentes de Fabio Miranda
 
-Data: 2026-10-01 (UTC). Repositório: [urban-toolkit/autark](https://github.com/urban-toolkit/autark). Autor identificado: [`fabio-miranda`](https://github.com/fabio-miranda).
+Atualizado em **2026-10-06, 17:07 UTC**. Repositório: [urban-toolkit/autark](https://github.com/urban-toolkit/autark). Autor: [`fabio-miranda`](https://github.com/fabio-miranda).
 
 ## Escopo e método
 
-Foram revisados **os cinco PRs abertos** desse autor na consulta ao GitHub: #101, #102, #103, #105 e #107. PRs fechados ou já integrados não fazem parte deste relatório.
+Este relatório contém somente os **quatro PRs ainda abertos** do autor: #105, #108, #110 e #111. As discussões de PRs já resolvidos foram removidas.
 
-A análise incluiu descrições, diffs completos, código relacionado da base e resultados dos checks do GitHub. A base comum era `77c8b32108c90d4f949519771540d152dfda83a6`. Os testes foram executados em cópias temporárias dos commits, com Node 26.0.0, Vitest 5.0.0 instalado separadamente e dependências locais reutilizadas. Não houve checkout de branches, alteração de código no repositório, commits ou pushes.
+A consulta ao GitHub confirmou os títulos, SHAs e checks registrados abaixo. A revisão confrontou os patches com o `main` utilizado na revisão, `ce2a0371695bf05df9ae1e4a112d9e5f5c025718`, e examinou os testes e o código relacionado. Os branches OSM ainda carregam uma pilha histórica baseada em `77c8b32108c90d4f949519771540d152dfda83a6`; seus diffs completos não representam apenas funcionalidades novas em relação ao `main` atual.
+
+As verificações foram executadas em cópias temporárias, sem checkout de branches. Foram reutilizadas as dependências locais, com Vitest 5.0.3. Os testes OSM usam DuckDB nativo e respostas Overpass simuladas; não houve validação contra um servidor Overpass real nem execução WebGPU.
 
 Classificação:
-- **Must fix:** defeito bloqueante confirmado.
-- **Should fix:** correção ou esclarecimento recomendado antes da integração.
-- **Observações:** contratos, limites e lacunas de validação; não equivalem a bugs confirmados.
+- **Must fix:** defeito confirmado que deve ser corrigido antes da integração.
+- **Should fix:** adaptação ou validação recomendada antes da integração.
+- **Observações:** contratos e limites; não equivalem a regressões confirmadas.
 
 ## Resumo
 
-| PR | Tema | Validação local | Parecer |
+| PR | Tema | Validação desta revisão | Parecer |
 |---|---|---|---|
-| [#101](https://github.com/urban-toolkit/autark/pull/101) | Footprint de edifícios como GEOMETRY | 9/9 testes passaram | Favorável, com atenção à contagem por parte |
-| [#102](https://github.com/urban-toolkit/autark/pull/102) | Imports publicados de autk-core | Build local impedido por dependências de tipos | Favorável pela inspeção; validação local incompleta |
-| [#103](https://github.com/urban-toolkit/autark/pull/103) | Contagem de matches no spatial join | 2/2 testes passaram | Favorável |
-| [#105](https://github.com/urban-toolkit/autark/pull/105) | Arrays/matrizes globais em storage buffers | 3/3 testes passaram | Favorável, com ressalvas de validação GPU |
-| [#107](https://github.com/urban-toolkit/autark/pull/107) | Carregamento OSM por bbox | 8/8 testes originais passaram; caso adicional falhou | Esclarecer/corrigir o contrato espacial antes de integrar |
+| [#105](https://github.com/urban-toolkit/autark/pull/105) | Arrays/matrizes globais em storage buffers | 3/3 testes passaram; sem execução GPU | Favorável à abordagem, condicionado à validação WebGPU |
+| [#108](https://github.com/urban-toolkit/autark/pull/108) | Exportação por elemento OSM | 4 testes específicos passaram na pilha de #111 | Útil, mas precisa ser adaptado ao modelo atual de edifícios |
+| [#110](https://github.com/urban-toolkit/autark/pull/110) | Escopo de áreas nomeadas | 2 testes específicos passaram na pilha de #111 | Favorável; correção pequena e ainda necessária |
+| [#111](https://github.com/urban-toolkit/autark/pull/111) | Camadas selecionadas por tags OSM | 34/34 testes da pilha passaram; reprodução espacial adicional falhou | Corrigir seleção espacial e adaptar à pipeline atual |
 
-Todos os cinco PRs tinham o check de CI concluído com **success** na consulta. Não foram identificados achados classificados como Must fix.
-
-## PR #101 — `fix(db): store building agg_geometry as GEOMETRY`
-
-Commit revisado: `f494891a8b1545c3de5d81cbe28288edcc1ac51d`.
-
-### Achados
-
-**Nenhum defeito bloqueante identificado.** A mudança para `GEOMETRY` permite que a seleção da coluna geométrica reconheça o footprint agregado. O fallback com `COALESCE(agg.agg_geometry, b.geometry)` evita perder partes quando a união falha. A contagem de falhas ocorre antes desse fallback, preservando o aviso.
-
-Evidências: [`queries.ts`, linhas 101 e 164](https://github.com/urban-toolkit/autark/blob/f494891a8b1545c3de5d81cbe28288edcc1ac51d/autk-db/src/internal/process-osm-buildings/queries.ts#L101); `use-case.ts`, movimentação da consulta de geometrias ausentes antes da criação da tabela final.
-
-### Observações
-
-- **O match passa a usar o footprint, mas a unidade de contagem continua sendo a parte.** O teste `matches by footprint when buildings are the join table` espera explicitamente `2` para um ponto em um edifício com duas partes. Isso é uma mudança relevante para aplicações que interpretam o resultado como “número de edifícios”. Está explicado na descrição do PR e não é um defeito oculto; merece documentação de usuário/release notes.
-- O teste de falha de união injeta uma exceção na conexão: valida o fallback, não reproduz uma falha topológica real do GEOS.
-
-**Validação:** nove testes passaram, incluindo tipo da coluna, união de partes, exportação, INTERSECT, NEAR com centroides, agregação e fallback.
-
-**Parecer:** favorável. Não condicionar a aprovação a uma mudança para contagem distinta de edifícios: isso seria outro contrato e outro escopo.
-
-## PR #102 — `fix(build): keep the core alias out of published types`
-
-Commit revisado: `2a551f37e160cd76477882ae35548bb84d601195`.
-
-### Achados
-
-**Nenhuma regressão concreta identificada.** `aliasesExclude` é aplicado à geração de declarações nos quatro pacotes dependentes, sem modificar os aliases usados no bundle JavaScript. A mudança é pequena e direcionada ao problema de publicação descrito.
-
-### Observações
-
-- **A nova validação cobre imports/exports com `from`, não toda referência possível a outro pacote local.** Em [`validate-packages.mjs`, linha 68](https://github.com/urban-toolkit/autark/blob/2a551f37e160cd76477882ae35548bb84d601195/.github/scripts/validate-packages.mjs#L68), a expressão `/from\s+['"]([^'"]+)['"]/g` não reconhece, por exemplo, `import('../../outro-pacote/...')` em um tipo ou uma referência triple-slash. Isso não invalida a correção atual, mas significa que o check não garante integralmente a regra anunciada no comentário. Não foi encontrado um vazamento dessa natureza introduzido pelo PR.
-- A validação verifica escape do diretório do pacote, mas não comprova que cada referência interna relativa estará presente no tarball. Um teste consumidor sem aliases/workspaces seria uma proteção complementar mais completa.
-- O bundle de autk-core continuar incorporado aos bundles dependentes é explicitamente deixado fora do escopo. Não foi tratado como regressão deste PR.
-
-**Validação:** tentei `make build` em uma cópia temporária. O build parou em autk-core por resolução de tipos (`geojson`, `d3-color`, `d3-format`, `d3-scale`, `earcut`, entre outros) no ambiente de dependências reutilizadas. `validate:packages` não chegou a executar. Esses erros não demonstram um defeito do PR; o CI do commit passou. Não reproduzi localmente a contagem de declarações ou o teste consumidor mencionados pelo autor.
-
-**Parecer:** favorável pela inspeção, com validação local de empacotamento incompleta.
-
-## PR #103 — `fix(db): count join matches, not rows, for count('*')`
-
-Commit revisado: `c053f976d7eb4b4754ba918ff5461bdc97345133`.
-
-### Achados
-
-**Nenhuma regressão concreta identificada.** A troca de `COUNT(*)` por `COUNT(<geometria do join>)` corrige a linha artificial preservada pelo LEFT JOIN: sem match, a geometria do lado direito é NULL e o resultado passa a ser zero.
-
-Evidência: [`queries.ts`, linha 367](https://github.com/urban-toolkit/autark/blob/c053f976d7eb4b4754ba918ff5461bdc97345133/autk-db/src/use-cases/spatial-join/queries.ts#L367). A referência usa o contexto efetivo da tabela do join; a inspeção também confirmou o uso do alias `csv_candidates` no caminho NEAR.
-
-### Observações
-
-- Os testes cobrem um match e ausência de matches, além da preservação de `count` em coluna nomeada. Não cobrem múltiplos matches, NEAR, normalização ou o uso de `agg_geometry`; seria útil acrescentar esses casos, sem considerar sua ausência uma falha comprovada.
-- Em conjunto com #101, `count('*')` conta partes que deram match, não edifícios distintos. As duas correções são compatíveis, mas não devem ser apresentadas como uma contagem de edifícios únicos.
-
-**Validação:** dois testes passaram; resultado esperado `[1, 0, 0]` confirmado para os dois caminhos testados.
-
-**Parecer:** favorável; correção bem delimitada.
+Todos os quatro PRs tinham seus checks de CI concluídos com **SUCCESS** na consulta. Isso não elimina o achado adicional em #111 nem as lacunas de integração e execução GPU.
 
 ## PR #105 — `fix(compute): read uniform arrays and matrices from storage buffers`
 
-Commit revisado: `fdddab989ad74220afb4e3f304ad9001e2a856ed`.
+Commit revisado: [`fdddab989ad74220afb4e3f304ad9001e2a856ed`](https://github.com/urban-toolkit/autark/commit/fdddab989ad74220afb4e3f304ad9001e2a856ed).
 
 ### Achados
 
-**Nenhuma regressão concreta identificada nos caminhos testados.** A geração do shader e o dispatch mudam de forma consistente: arrays/matrizes globais são declarações de storage somente leitura, enquanto escalares continuam uniforms. Os parâmetros de dimensão permanecem em `compute_value`, e os dados são enviados pelo binding correspondente.
+**Nenhuma regressão concreta identificada nos caminhos testados.** A geração do shader e o dispatch mudam de forma consistente: arrays/matrizes globais passam a storage somente leitura; escalares permanecem uniforms. As dimensões continuam disponíveis em `compute_value`, e os dados acompanham os bindings correspondentes.
+
+### Should fix — Validar compilação e resultados na GPU
+
+Os testes interceptam `runCompute`: verificam strings WGSL, classes de buffers e dados enviados, mas **não compilam nem executam o shader**. Antes da integração, executar ao menos array global, matriz global e combinação com escalar, verificando resultados numéricos e ausência de erros de validação. Os testes NVIDIA/Apple descritos pelo autor não foram reproduzidos nesta revisão.
 
 ### Observações
 
-- **Os testes novos não compilam nem executam WGSL.** O mock intercepta `runCompute`; eles comprovam strings do shader, classes dos buffers e parte dos dados, mas não resultados numéricos na GPU. Os testes manuais NVIDIA/Apple descritos no PR são evidência do autor, não reproduzida nesta revisão.
-- Cada array/matriz global passa a consumir um slot de storage. Solicitar `maxStorageBuffersPerShaderStage` do adapter amplia a capacidade disponível, mas não elimina o limite. Workloads com muitos atributos, globais e outputs merecem um teste de limite e erro explícito; não foi demonstrada uma falha desse tipo nesta revisão.
-- O caráter somente leitura está na descrição do PR, mas não está explicitado nos comentários públicos de `uniformArrays`/`uniformMatrices` em `autk-compute/src/api.ts`, linhas 148–152. Recomendo documentar esse contrato junto à API, incluindo as dimensões disponíveis no corpo WGSL.
-- A ausência de captura robusta de erros de pipeline relatada pelo autor não é resolvida por este PR. Não foi contabilizada como um novo defeito.
+- Cada array/matriz global passa a consumir um slot de storage. Solicitar `maxStorageBuffersPerShaderStage` do adapter não elimina o limite. Cobrir workloads próximos ao limite e excedidos, além de tamanho/alinhamento dos buffers.
+- Documentar na API pública que `uniformArrays` e `uniformMatrices` são globais somente leitura, apesar do nome histórico, e explicar as dimensões acessíveis no corpo WGSL.
+- A captura de erros de criação de pipeline é uma limitação anterior, não resolvida por este patch. Não foi contabilizada como regressão.
 
-**Validação:** três testes passaram: array global com 3.000 floats, matriz global e escalar uniform. Não houve execução em navegador/WebGPU nesta revisão.
+**Validação:** os três testes de `gpgpu-shader.test.ts` passaram no SHA de #105: array com 3.000 floats, matriz e escalar. Não houve execução em navegador/WebGPU.
 
-**Parecer:** favorável à abordagem; manter a ressalva de que os testes automatizados verificam geração, não execução GPU.
+**Parecer:** favorável à abordagem; não confundir teste de geração com validação real de GPU.
 
-## PR #107 — `feat(db): load OSM for a bounding box`
+## PR #108 — `feat(db): export one feature per OSM element from getLayer on request`
 
-Commit revisado: `c647f64f0229acbe4119e919f4192efda2f1d0a1`.
+Commit revisado: [`1c4e0f293fbbadc8f2238155341e39f3231fd6b2`](https://github.com/urban-toolkit/autark/commit/1c4e0f293fbbadc8f2238155341e39f3231fd6b2).
 
-O diff contra main inclui #103 e sua infraestrutura de testes. O achado abaixo diz respeito à funcionalidade nova de bbox, não à contagem herdada.
+### Achados
 
-### Should fix — O contrato de recorte não é garantido para edifícios multipolígonos
+**A opção é útil e opt-in.** `getLayer(name, { osmElements: true })` exporta features individuais com `osm_type` e `osm_id`, preservando tags; quando disponível, inclui também `building_id`. O formato agregado padrão permanece inalterado na base do PR.
 
-**Evidência:** [`buildBoundingBoxQuery`, linha 711](https://github.com/urban-toolkit/autark/blob/c647f64f0229acbe4119e919f4192efda2f1d0a1/autk-db/src/use-cases/load-osm-overpass/use-case.ts#L711) expande relações com `way(r.dataRelations)->.dataRelationWays;`, sem filtro espacial nos membros. Isso é necessário para reconstruir geometrias completas, mas também traz partes fora da caixa.
+### Should fix — Adaptar à consolidação atual dos edifícios
 
-A documentação nova de [`queryArea`, linhas 95–97](https://github.com/urban-toolkit/autark/blob/c647f64f0229acbe4119e919f4192efda2f1d0a1/autk-db/src/use-cases/load-osm-overpass/interfaces.ts#L95) afirma que as camadas são recortadas à bbox. Entretanto, `AutkDb.loadOsm` não passa bbox à construção de edifícios (`db.ts`, linhas 332–340). O clipping final depende de solicitar `surface` e, para edifícios, apenas filtra geometrias que intersectam a superfície, sem cortar sua geometria (`db.ts`, linhas 368–371 e 1028–1038). Portanto, a fronteira sintética por si só não garante esse contrato.
+A implementação do PR reconhece tabelas OSM pelas colunas `id`, `refs` e `properties`, e deduz way/relation pelo comprimento de `refs`. Isso corresponde ao modelo antigo de linhas por parte.
 
-**Reprodução local:** em uma cópia temporária do teste do PR, a resposta simulada incluiu uma relação `type=multipolygon, building=yes` com duas ways externas: uma dentro da caixa e outra inteiramente fora. A segunda foi construída deslocando latitude e longitude da primeira em +1 grau, com IDs próprios. A chamada usou apenas `layers: ['buildings']` e o workspace foi configurado em `EPSG:4326` para comparar coordenadas diretamente. O GeoJSON exportado manteve a parte externa: latitude máxima **43.0527**, para uma caixa cuja latitude norte é **42.06**. A asserção de limite falhou. Não foi uma consulta a um servidor Overpass real; foi uma resposta simulada compatível com a expansão de membros que o código solicita.
+No `main` atual, edifícios são consolidados em uma linha por building, com `GeometryCollection`, `properties.parts` e `geometryIndex`; a tabela final não conserva `refs`. Aplicar apenas o exportador do PR faria a detecção falhar e cair no formato agregado, sem entregar a exportação por elemento esperada para edifícios.
 
-**Impacto:** um consumidor que baixa a área escolhida pode receber componentes inteiramente fora dela. A fixture original tem apenas um edifício interno e não detecta esse caso.
+Evidências: [`isOsmElementTable` e `SELECT_OSM_ELEMENTS_GEOJSON_QUERY`](https://github.com/urban-toolkit/autark/blob/1c4e0f293fbbadc8f2238155341e39f3231fd6b2/autk-db/src/use-cases/get-layer/queries.ts#L107-L155); no `main`, `autk-db/src/internal/process-osm-buildings/queries.ts`, `COLLECT_BUILDING_PARTS_QUERY`.
 
-**Recomendação:** definir explicitamente se bbox significa seleção de objetos completos ou recorte geométrico. Se for seleção de objetos completos, ajustar a promessa pública e documentar partes externas. Se for recorte, implementar a política correspondente sem depender de o consumidor pedir `surface`. Preservar edifícios completos pode ser desejável, mas precisa estar refletido no contrato. Acrescentar um teste de relação com componente fora da caixa.
+**Recomendação:** decidir quais fontes de identidade/geometria alimentarão o modo por elemento e preservar explicitamente `osm_type` e `osm_id`. Não inferir apenas de `refs` nem desmanchar o contrato padrão de edifícios consolidados. Testar identidade, associação ao building e correspondência de `geometryIndex`.
 
 ### Observações
 
-- O filtro bbox de Overpass seleciona elementos, não equivale a uma interseção geométrica exaustiva. A documentação oficial explica que ways/relações podem se estender além dos limites, especialmente após recursão. Não prometer cobertura de “tudo que intersecta a caixa” sem definir essas limitações. Fonte: [Overpass QL — Global bounding box](https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL#Global_bounding_box_(bbox)).
-- A validação de coordenadas ocorre antes de pedidos HTTP; o formato `[west, south, east, north]` e a conversão para a ordem Overpass estão consistentes. Caixas cruzando o antimeridiano são rejeitadas pelo contrato `west < east`, explicitado no PR.
-- O teste de área nomeada verifica a consulta inicial e o erro de fronteira ausente, não um carregamento nomeado completo bem-sucedido.
-- A falha de camada de edifícios vazia é declarada pelo autor como preexistente. Não foi reclassificada como regressão desta mudança, mas é uma limitação importante para caixas arbitrárias escolhidas pelo usuário.
+- A exportação individual do branch não usa o filtro `ST_IsValid` do formato padrão antigo. Ela pode expor geometrias inválidas já armazenadas. Isso é comportamento coberto pelo teste do autor, não um defeito oculto; não deve reintroduzir elementos que a pipeline atual deliberadamente omite com warning.
+- IDs de node, way e relation pertencem a namespaces distintos. Preservar o par tipo/ID também no caminho por tags de #111.
+- Tabelas derivadas que perderam identidade OSM recebem o formato comum. Documentar esse fallback para evitar que a opção pareça aplicável a qualquer tabela de origem OSM.
 
-**Validação:** oito testes originais passaram (seis de bbox/área nomeada e dois herdados de #103). A fixture adicional identificou o comportamento espacial descrito acima.
+**Validação:** os quatro testes de `get-layer-osm-elements.test.ts` passaram na cópia de #111, que contém a implementação de #108. Cobrem agrupamento padrão versus individual, IDs/tags, geometria inválida e fallback não OSM. Isso **não valida a integração com o modelo atual do `main`**.
 
-**Parecer:** esclarecer/corrigir o contrato de bbox e adicionar a cobertura de membros externos antes de integrar.
+**Parecer:** implementar a ideia sobre a pipeline atual; não integrar a pilha antiga diretamente.
 
-## Integração e limites da revisão
+## PR #110 — `fix(db): scope a named area to the boundary relation found inside its region`
 
-1. **#107 depende de #103.** Integrar #103 antes, ou atualizar a base de #107 para que sua revisão mostre somente a funcionalidade de bbox.
-2. #101, #103, #105 e #107 compartilham alterações equivalentes de infraestrutura Vitest. Mesmo que os patches sejam equivalentes, conferir a resolução da integração e executar a suíte combinada; esta revisão executou cada branch separadamente, não uma branch com todos os PRs integrados.
-3. Nenhum resultado de CI substitui as lacunas indicadas: consumidor TypeScript isolado para #102, execução GPU para #105 e casos espaciais de fronteira para #107.
-4. Os pareceres se referem aos SHAs registrados acima. Commits posteriores precisam de nova checagem.
+Commit revisado: [`6a8ab46311f0392abd458d5cb746f1e3d0fb9198`](https://github.com/urban-toolkit/autark/commit/6a8ab46311f0392abd458d5cb746f1e3d0fb9198).
 
-**Único arquivo criado no repositório:** este relatório Markdown. Nenhuma correção foi aplicada ao código do checkout e nenhum commit ou push foi realizado.
+### Achados
+
+**Correção ainda necessária.** O caminho atual procura áreas com `area["name"=...](area.areaMain)`. O filtro por área não confina essa busca de objetos `area` da forma pretendida; áreas homônimas podem entrar na aquisição.
+
+O PR seleciona a relação por nome **dentro da região** e converte o conjunto com `map_to_area`. A construção é reutilizada nas consultas de camadas e nos tiles de edifícios, alinhando o escopo à seleção das relações de limite.
+
+Evidência: [`namedAreaLines`](https://github.com/urban-toolkit/autark/blob/6a8ab46311f0392abd458d5cb746f1e3d0fb9198/autk-db/src/use-cases/load-osm-overpass/use-case.ts#L497-L510). Referência: [Overpass QL — Area filter](https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL#Area_filter).
+
+**Nenhuma regressão concreta identificada.** No `main` atual, a superfície obrigatória já filtra o resultado posteriormente; isso não corrige uma aquisição indevidamente ampla nem seu custo de tempo, memória e tráfego.
+
+### Observações e integração
+
+- Portar a correção pequena para as consultas atuais, preservando bbox, máscara costeira, filtros de edifícios corrigidos e mensagens de erro HTTP.
+- Invalidar/versionar o cache das consultas nomeadas ao mudar o escopo; entradas antigas podem impedir que o novo query seja executado.
+- Os testes verificam o texto gerado e o carregamento simulado, não o comportamento de um servidor Overpass real. Acrescentar uma verificação real com nomes homônimos quando o serviço estiver acessível.
+- A escolha por nome ainda pode resultar em mais de uma relação dentro da mesma região. O PR corrige o escopo, não define desambiguação por ID ou nível administrativo.
+
+**Validação:** os dois testes de `load-osm-named-area.test.ts` passaram na pilha de #111: escopo nas consultas de camadas/edifícios e múltiplos nomes com áreas próprias.
+
+**Parecer:** favorável. É uma correção pequena que pode ser portada independentemente da exportação de #108.
+
+## PR #111 — `feat(db): load OSM features chosen by tags as point, line and polygon layers`
+
+Commit revisado: [`367b0c818604939099a2eeac45cbe989778832a9`](https://github.com/urban-toolkit/autark/commit/367b0c818604939099a2eeac45cbe989778832a9).
+
+### Funcionalidade proposta
+
+`tagSets` reúne filtros exatos de chave/valor, combinados por OR, e gera camadas de pontos, linhas e polígonos por conjunto. Preserva tags de nodes, classifica ways fechadas conforme `area` e a presença de tags lineares, monta relações multipolígonas e incorpora a exportação por elemento de #108.
+
+O head inclui também correções úteis para ordem dos elementos, tipagem explícita de `read_json` quando há muitos nodes antes de ways/relations e remoção de metadados de uma camada do mesmo conjunto que fica vazia após reload.
+
+### Must fix — Membros auxiliares fora da seleção viram features independentes
+
+A consulta busca `.tagHits` com filtros espaciais e expande os membros das relações multipolígonas para reconstruir sua geometria completa. Entretanto, a geração das tabelas aplica os filtros de tags a **todas as ways recebidas**, sem distinguir hits espaciais de membros auxiliares.
+
+Evidências no SHA revisado: `autk-db/src/use-cases/load-osm-overpass/use-case.ts`, `buildTagSetQuery` (`way(r.tagAreas)->.tagAreaWays`); `autk-db/src/use-cases/load-osm-layer/tag-set-queries.ts`, `TAG_SET_TABLES_QUERY`, que seleciona ways pelo filtro de tags, sem identificação de `.tagHits` nem filtro espacial posterior.
+
+**Reprodução:** em uma cópia temporária, carreguei bbox `[0, 0, 10, 10]`, somente `tagSets` para `amenity=school`, e uma resposta compatível com a expansão solicitada: relação multipolígona `relation/3`, uma outer way dentro da caixa (`way/1`) e outra completamente fora (`way/2`, coordenadas entre 20 e 21). Ambas tinham a tag selecionada. O resultado individual foi:
+
+```text
+['relation/3', 'way/1', 'way/2']
+```
+
+A asserção de que `way/2` não deveria surgir como uma **feature independente selecionada** falhou. Preservar essa componente na geometria completa de `relation/3` é compatível com seleção de objetos completos; promover o membro externo a outro objeto selecionado é um problema distinto.
+
+**Impacto:** a camada pode conter objetos inteiramente fora da área pedida, baixados apenas para reconstruir outra feature. Os 34 testes originais da pilha não detectam o caso.
+
+**Recomendação:** conservar a identidade dos hits selecionados separadamente dos elementos auxiliares, ou aplicar uma seleção espacial explícita antes de exportar cada objeto independente. Não cortar arbitrariamente componentes de uma relação selecionada. Acrescentar o teste de relação com membro externo também tagueado.
+
+### Should fix — Integrar com a pipeline atual, não restaurar a antiga
+
+O branch usa a pipeline OSM antiga em `AutkDb.loadOsm` e condiciona a criação de surface às camadas solicitadas. No `main`, surface é obrigatória, pode ser interna, incorpora a máscara costeira e alimenta o recorte das camadas existentes.
+
+Acoplar `tagSets` à pipeline atual, definindo explicitamente se cada camada representa objetos completos ou geometrias recortadas. Preservar superfície interna, transações, comportamento de workspace e a política de warn/skip para elementos individuais inválidos. Também preservar os avanços de consolidação dos edifícios discutidos em #108.
+
+### Observações
+
+- `tagSets` é recusado explicitamente com `pbfFileUrl`. Não é uma falha silenciosa; documentar que o novo modo é Overpass-only ou planejar suporte PBF separadamente.
+- Nodes solicitados com `out body` conservam tags, e a deduplicação faz o node explícito prevalecer sobre sua cópia geométrica de uma way. Os testes incluem IDs numéricos compartilhados entre tipos OSM.
+- A tipagem explícita do JSON evita depender de uma amostra inicial formada só por nodes. Preservar essa correção ao adaptar o carregador.
+- Cache é distinguido pelos seletores; o PR evita responder pedidos de tags com o cache comum sem nodes tagueados. Preservar também a versão e os contratos atuais do cache.
+- O reload remove as camadas vazias do mesmo conjunto. Conferir isso contra os metadados e índices da implementação atual antes de portar a remoção.
+- As regras de classificação de ways são uma política limitada, não uma classificação universal de todas as tags OSM. Documentar `area=yes/no`, as tags lineares consideradas, a regra padrão que transforma outras ways fechadas em polígonos e a exclusão de relações não multipolígonas.
+
+**Validação:** todos os **34 testes de cinco arquivos** de `autk-db/test` passaram no head de #111, incluindo cobertura herdada de exportação, áreas nomeadas e bbox. Um teste adicional, separado, reproduziu o achado espacial acima e falhou como esperado. As respostas eram simuladas; não houve pedido real ao Overpass.
+
+**Parecer:** a funcionalidade é útil, mas não integrar sem corrigir a promoção de membros externos e adaptar à pipeline atual.
+
+## Ordem recomendada e limites
+
+1. **#110:** portar o escopo correto de áreas nomeadas e invalidar o cache afetado.
+2. **#105:** validar execução WebGPU antes de integrar a mudança de bindings.
+3. **#108:** definir identidade OSM no modelo atual e implementar exportação opt-in sem alterar o formato padrão.
+4. **#111:** adicionar seleção por tags sobre essa base, corrigindo o achado espacial e mantendo surface obrigatória.
+
+A ordem não significa que #110 dependa funcionalmente de #108: ele pode ser portado separadamente. Já o branch de #111 contém os commits de #108 e #110; separar os patches úteis da pilha histórica para não reintroduzir implementações superadas.
+
+Os pareceres se referem aos SHAs registrados. Não foi testada uma integração desses quatro patches com o `main` atual; os testes da pilha antiga não substituem essa verificação.
