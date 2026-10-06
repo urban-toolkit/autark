@@ -13,7 +13,8 @@ export default defineConfig({
       '@urban-toolkit/autk-core': resolve(import.meta.dirname, '../autk-core/src/index.ts'),
     },
   },
-  plugins: [glsl(), dts()],
+  // Published declarations must reference the core package, not its workspace source.
+  plugins: [glsl(), dts({ aliasesExclude: ['@urban-toolkit/autk-core'] })],
   build: {
     lib: {
       entry: resolve(import.meta.dirname, 'src/index.ts'),

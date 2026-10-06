@@ -60,7 +60,10 @@ export default defineConfig({
             '@urban-toolkit/autk-core': coreAlias,
           },
   },
-  plugins: buildTarget === 'browser' ? [duckdbAssets(), dts()] : [],
+  // Published declarations must reference the core package, not its workspace source.
+  plugins: buildTarget === 'browser'
+    ? [duckdbAssets(), dts({ aliasesExclude: ['@urban-toolkit/autk-core'] })]
+    : [],
   build: {
     lib: {
       entry,

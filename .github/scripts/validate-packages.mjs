@@ -56,6 +56,20 @@ for (const dir of packageDirs) {
     }
   }
 
+  // Workspace aliases must not leak sibling source paths into published types.
+  for (const packedFile of packedFiles) {
+    if (!/\.d\.(?:ts|cts|mts)$/.test(packedFile)) continue;
+    const declaration = readFileSync(path.join(packageDir, packedFile), 'utf8');
+    const fileDir = path.dirname(path.join(packageDir, packedFile));
+    for (const [, specifier] of declaration.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+      if (!specifier.startsWith('.')) continue;
+      const resolved = path.resolve(fileDir, specifier);
+      if (!resolved.startsWith(packageDir + path.sep)) {
+        fail(`${dir}: ${packedFile} imports ${specifier}, which is outside the published package`);
+      }
+    }
+  }
+
   if (dir === 'autk-db') {
     const browserBundlePath = path.join(packageDir, 'dist/browser.js');
     const browserBundle = readFileSync(browserBundlePath, 'utf8');
