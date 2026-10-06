@@ -15,12 +15,7 @@ export class OsmLayersApi {
                 areas: [
                     'Near North Side',
                     'Loop',
-                    'Near South Side',
-                    'West Town',
-                    'Near West Side',
-                    'Lower West Side',
-                    'Armour Square',
-                    'Bridgeport'
+                    'Near South Side'
                 ],
             }, 
             outputTableName: 'table_osm',
