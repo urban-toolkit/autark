@@ -6,7 +6,7 @@ import { LOAD_LAYER_QUERY } from './queries';
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
 import { OsmLayerTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 import { ProcessOsmBuildingsUseCase } from '../../internal/process-osm-buildings/use-case';
 import type { OsmBuildingRelation } from '../../internal/process-osm-buildings/interfaces';
 import { getOsmProcessingConfig } from './osm-processing-config';
@@ -204,17 +204,22 @@ export class LoadOsmLayerUseCase {
       : '';
 
     try {
+      // Building consolidation uses numeric part keys. Reserve a negative internal key
+      // only for a relation colliding with a way; provenance always keeps its real type/ID.
       await this.conn.query(`
-        INSERT INTO ${qualifiedOutputTableName} (id, properties, refs, geometry)
+        INSERT INTO ${qualifiedOutputTableName} (id, properties, refs, geometry, ${OSM_ELEMENT_METADATA_COLUMN})
         SELECT
-          id::BIGINT,
+          ${params.layer === 'buildings' ? `CASE WHEN EXISTS (SELECT 1 FROM ${qualifiedOutputTableName} existing WHERE existing.id = records.id::BIGINT)
+            THEN -records.id::BIGINT ELSE records.id::BIGINT END` : 'records.id::BIGINT'},
           CASE
             WHEN tags IS NULL OR tags = [] THEN NULL
             ELSE map_from_entries(tags)
           END AS properties,
           []::BIGINT[] AS refs,
-          ${geometrySelect} AS geometry
-        FROM '${fileName}'
+          ${geometrySelect} AS geometry,
+          json_array(json_object('osm_type', 'relation', 'osm_id', records.id::BIGINT, 'geometryIndex', 0,
+            'tags', CASE WHEN tags IS NULL OR tags = [] THEN '{}'::JSON ELSE CAST(map_from_entries(tags) AS JSON) END))
+        FROM '${fileName}' records
         ${whereClause};
       `);
     } finally {

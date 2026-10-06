@@ -1,5 +1,5 @@
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
-import { DEFAULT_WORKSPACE_NAME } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 
 type Params = {
   tableName: string;
@@ -60,7 +60,9 @@ export const LOAD_LAYER_QUERY = ({ tableName, layer, sourceCrs, targetCrs, outpu
           ${layer}.id,
           ${layer}.tags properties,
           ${layer}.refs,
-          ${buildGeometrySelect({ sourceCrs, targetCrs, boundingBox, layer })} geometry
+          ${buildGeometrySelect({ sourceCrs, targetCrs, boundingBox, layer })} geometry,
+          json_array(json_object('osm_type', 'way', 'osm_id', ${layer}.id, 'geometryIndex', 0,
+            'tags', COALESCE(CAST(${layer}.tags AS JSON), '{}'::JSON))) AS ${OSM_ELEMENT_METADATA_COLUMN}
       FROM ${layer}
       JOIN ${layer}_with_nodes_refs
       ON ${layer}.id = ${layer}_with_nodes_refs.id

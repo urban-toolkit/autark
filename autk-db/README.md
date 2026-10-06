@@ -89,7 +89,7 @@ BBox gallery examples: [`osm-layers-api-bbox`](../gallery/src/autk-map/osm-layer
 
 ### Building features and spatial joins
 
-With `layerType: 'buildings'`, each feature is stored/exported as one GeometryCollection of its original parts, normalized independently to the workspace precision grid. Use `properties.parts[].geometryIndex` for per-part attributes. Distinct GeoJSON features remain distinct even when they overlap. OSM `type=building` relations associate original member ways without generating a duplicate geometry, including disconnected/untagged members. Orphan ways tagged `building:part` (except `no`) are associated with a relation only when their whole geometry is covered by an original outline of exactly one usable surface relation. Outline roles are authoritative; empty/outer-role members qualify only when tagged as whole buildings, not parts. Holes are respected, explicit ownership is never overridden, and inferred parts do not become outlines. Ambiguous containment warns and leaves the part unassociated; partial overlap and independent buildings do not qualify. Remaining unassociated ways retain intersection-based clustering. General relation attributes are inherited by parts, whose own tags take precedence. `properties.osmRelation` retains the relation ID (string), way membership/roles and original tags; optional `osmRelation.inferredParts` records inferred IDs and `method: 'outline-containment'` separately from original members. Feature.id remains the minimum source part ID; unusable/missing member geometry or shared ownership causes a console warning and omission of the whole affected relation, avoiding partial buildings. Unsupported member types/roles (including `roof`), conflicting roles and relations with no way members also warn and skip the affected relation plus all its direct way members; unrelated buildings continue loading. Invalid membership is not converted into a partial building or standalone member features. Explicit `location=underground` parts and relations are excluded from this surface building layer with a console warning, before spatial clustering; above-ground parts of mixed buildings remain. Height zero, negative `layer` and basement-level tags alone do not trigger exclusion. There is no union, convex hull or persistent `agg_geometry`. Both PBF and Overpass collect `type=building` relations and their way members; Overpass uses versioned cache keys so older responses lacking these relations are not reused. Source parity requires the same OSM snapshot and complete relation geometry: a local extract cannot reconstruct coordinates for members absent from the PBF.
+With `layerType: 'buildings'`, each feature is stored/exported as one GeometryCollection of its original parts, normalized independently to the workspace precision grid. Use `properties.parts[].geometryIndex` for per-part attributes. Distinct GeoJSON features remain distinct even when they overlap. OSM `type=building` relations associate original member ways without generating a duplicate geometry, including disconnected/untagged members. Orphan ways tagged `building:part` (except `no`) are associated with a relation only when their whole geometry is covered by an original outline of exactly one usable surface relation. Outline roles are authoritative; empty/outer-role members qualify only when tagged as whole buildings, not parts. Holes are respected, explicit ownership is never overridden, and inferred parts do not become outlines. Ambiguous containment warns and leaves the part unassociated; partial overlap and independent buildings do not qualify. Remaining unassociated ways retain intersection-based clustering. General relation attributes are inherited by parts, whose own tags take precedence. `properties.osmRelation` retains the relation ID (string), way membership/roles and original tags; optional `osmRelation.inferredParts` records inferred IDs and `method: 'outline-containment'` separately from original members. Feature.id normally remains the minimum source part ID (negative internal keys disambiguate rare way/relation ID collisions; use the element export for OSM identity); unusable/missing member geometry or shared ownership causes a console warning and omission of the whole affected relation, avoiding partial buildings. Unsupported member types/roles (including `roof`), conflicting roles and relations with no way members also warn and skip the affected relation plus all its direct way members; unrelated buildings continue loading. Invalid membership is not converted into a partial building or standalone member features. Explicit `location=underground` parts and relations are excluded from this surface building layer with a console warning, before spatial clustering; above-ground parts of mixed buildings remain. Height zero, negative `layer` and basement-level tags alone do not trigger exclusion. There is no union, convex hull or persistent `agg_geometry`. Both PBF and Overpass collect `type=building` relations and their way members; Overpass uses versioned cache keys so older responses lacking these relations are not reused. Source parity requires the same OSM snapshot and complete relation geometry: a local extract cannot reconstruct coordinates for members absent from the PBF.
 
 Public GeoJSON IDs are separate from internal numeric row IDs:
 
@@ -107,6 +107,31 @@ Spatial joins count matched features once, not individual parts. Aggregate paths
 GeoJSON building import/update rejects invalid geometry without repair. OSM buildings instead log invalid/missing/empty/non-polygonal geometry with `console.warn` and skip the affected feature, continuing the import without repair. Database/transaction errors are not swallowed. Explicit bbox import filters whole buildings instead of cutting parts; existing workspace polygon crop behavior remains. Old per-part OSM tables, custom SQL, flattened join consumers and stored window IDs need migration/reload.
 
 Tests from the repository root: `npm test -- autk-db/test` (real DuckDB-WASM in Node; spatial extension access required, no Playwright).
+
+### Exporting individual OSM elements
+
+The default `getLayer(name)` is unchanged: buildings remain consolidated GeometryCollections. For an analytical download with one feature per retained OSM element, request the opt-in mode:
+
+```ts
+import type { GetLayerOptions } from '@urban-toolkit/autk-db';
+
+const options: GetLayerOptions = { osmElements: true };
+const elements = await db.getLayer('table_osm_buildings', options);
+// Feature.id: 'way/201' or 'relation/201' (separate OSM namespaces).
+// Properties: own source tags + osm_type, numeric osm_id, and building_id for buildings.
+// Geometry: the current Polygon/MultiPolygon component, not an aggregated collection.
+
+const parks = await db.getLayer('table_osm_parks', options);
+const roads = await db.getLayer('table_osm_roads', options);
+```
+
+Two touching house ways can export as two features with their own heights and a shared `building_id`. Multipolygon relations with their own stored geometry export as `relation/...`. Ownership-only `type=building` relations do not generate duplicate geometry/features; their members retain the association via `building_id`. Treat building IDs as opaque grouping keys, not OSM identities. Results are ordered by building ID (buildings), then OSM type and numeric ID.
+
+The mode preserves source tags separately from common/inherited building attributes and from added analytical properties. Generated `osm_type`/`osm_id` and building association fields take precedence over source tags with those names. Internal layer markers are removed from feature properties; root layer metadata and workspace bbox follow ordinary export.
+
+Geometries are the currently stored, CRS-transformed, precision-normalized and filtered/cropped geometries, not the original raw OSM coordinates. Buildings remain whole components; roads/parks/water retain the existing crop behavior. Invalid or underground building elements omitted by the import are not resurrected.
+
+Overpass and PBF imports retain source identity/tags/component indices in the internal `__autk_osm_elements` JSON column, without a second geometry copy. Surface, rasters, non-OSM tables, legacy tables without provenance and derived building tables missing component/association metadata fall back to ordinary export. Do not infer OSM identity from `refs` or user-supplied `osm_id` tags. User `updateTable` operations conservatively invalidate element provenance for the entire layer; reload OSM to restore this mode. Raw SQL that alters geometries while retaining provenance must not claim that stale provenance describes the derived layer.
 
 ### JSON geometry loading
 
@@ -138,7 +163,7 @@ console.log(parcels.type); // 'polygons'
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
 * `loadGeojson(params)`: Imports custom GeoJSON layers.
 * `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers.
-* `getLayer(layerTableName)`: Exports a layer table as a GeoJSON `FeatureCollection`.
+* `getLayer(layerTableName, options?)`: Exports a layer table as a GeoJSON `FeatureCollection`; `GetLayerOptions.osmElements` opts into individual OSM elements when preserved provenance is available.
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
 * `getTableData(params)`: Reads table data for inspection or UI display.
 * `updateTable(params)`: Updates a table using the supported update strategies.

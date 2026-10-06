@@ -635,7 +635,7 @@ properties.parts=[
 ]
 ```
 
-O ID é o **menor ID das partes retidas**, inclusive partes inferidas. Não é um índice de cluster ou obrigatoriamente o ID da relação.
+O ID normalmente é o **menor ID das partes retidas**, inclusive partes inferidas. Não é um índice de cluster ou obrigatoriamente o ID da relação. Se uma relação com geometria própria e um way compartilham o mesmo número, a relação recebe uma chave interna negativa para evitar colisão; sua identidade OSM real permanece na proveniência. Portanto, `building_id` deve ser tratado como chave opaca de agrupamento.
 
 As partes são ordenadas por ID. Os índices `geometryIndex` apontam para as geometrias da collection na mesma ordem.
 
@@ -735,7 +735,15 @@ Se uma camada já sofreu interseção com a bbox, ela pode passar por um segundo
 | Tipo de camada | `__autk_layer` na raiz da collection |
 | Marker interno no nível da feature | Removido pelo use case de exportação |
 
-A exportação não cria uma segunda representação agrupada: o building já está consolidado no banco.
+A exportação padrão não cria uma segunda representação agrupada: o building já está consolidado no banco.
+
+### 13.1 Exportação opt-in por elemento OSM
+
+`await db.getLayer('table_osm_buildings', { osmElements: true })` separa os elementos retidos, sem mudar o armazenamento ou a exportação padrão. Cada feature usa `id: 'way/201'` ou `'relation/201'`, as tags próprias do elemento e `properties.osm_type`/`osm_id`; edifícios incluem `building_id` para recuperar a associação ao grupo. As chaves de identidade geradas prevalecem sobre tags de mesmo nome.
+
+A coluna interna JSON `__autk_osm_elements` preserva tipo/ID, tags de origem e índice do componente, sem duplicar coordenadas. Na consolidação, o índice acompanha `geometryIndex`; na exportação, a geometria vem do componente atualmente armazenado. Não se infere identidade pelo tamanho de `refs`. Relações multipolígonas com geometria própria são exportadas como elementos; relações `type=building` de associação não geram uma geometria/feature duplicada. Tags de uma relação proprietária não são inventadas como tags de seus membros.
+
+As coordenadas já estão transformadas, normalizadas e filtradas/recortadas segundo os contratos da camada; esse modo não recupera a geometria OSM anterior ao recorte nem elementos omitidos por invalidade. Surface, raster, tabelas não OSM e tabelas sem proveniência suficiente mantêm a exportação comum. `updateTable` invalida conservadoramente a proveniência de toda a camada, evitando atribuir tags/índices antigos à geometria alterada; recarregar OSM restaura o modo. Bbox e marker de raiz permanecem como na exportação padrão. A ordem por elemento é `building_id` quando aplicável, tipo OSM e ID numérico.
 
 **CRS:** `getLayer()` exporta as coordenadas armazenadas; não faz automaticamente uma conversão de volta para WGS84. No workspace padrão, o resultado usado pelo mapa tem coordenadas projetadas `EPSG:3395`.
 
@@ -749,7 +757,8 @@ Identidades diferentes precisam ser distinguidas:
 |---|---|---|
 | ID OSM de parte | `289386871` | Way original |
 | ID OSM da relação | String em `osmRelation.id` | Associação declarada no OSM |
-| `Feature.id` / `building_id` | Menor ID retido do grupo | Building armazenado |
+| `Feature.id` padrão / `building_id` | Normalmente o menor ID retido; negativo em colisões entre namespaces | Building armazenado |
+| `Feature.id` com `osmElements` | `way/289386871` | Identidade OSM explícita |
 | Índice de seleção do mapa | Posição de um componente/feature no carregamento | Não necessariamente um ID OSM |
 
 Para investigar seleção, compare as partes da feature selecionada e seu ownership, não apenas o número exibido pelo picking.

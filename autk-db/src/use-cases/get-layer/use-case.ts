@@ -1,10 +1,11 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { FeatureCollection } from 'geojson';
 
-import { GET_LAYER_AS_GEOJSON_QUERY } from './queries';
+import { GET_LAYER_AS_GEOJSON_QUERY, GET_LAYER_OSM_ELEMENTS_QUERY } from './queries';
+import type { GetLayerOptions } from './interfaces';
 import { Table } from '../../interfaces';
 import type { LayerType } from '@urban-toolkit/autk-core';
-import { DEFAULT_WORKSPACE_NAME } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 
 /**
  * Exports a layer table as a GeoJSON FeatureCollection.
@@ -30,15 +31,25 @@ export class GetLayerUseCase {
    *
    * @param table - The layer table with its type and column metadata.
    * @param workspace - Workspace (schema) name; defaults to `autk`.
+   * @param options - Optional OSM element granularity; falls back to ordinary export without preserved provenance.
    * @returns A GeoJSON FeatureCollection representing the layer data.
    * @throws If the DuckDB query fails or the response cannot be parsed as GeoJSON.
    */
-  async exec(table: Table & { type: LayerType }, workspace: string = DEFAULT_WORKSPACE_NAME): Promise<FeatureCollection> {
-    const query = GET_LAYER_AS_GEOJSON_QUERY(table, workspace);
+  async exec(table: Table & { type: LayerType }, workspace: string = DEFAULT_WORKSPACE_NAME, options: GetLayerOptions = {}): Promise<FeatureCollection> {
+    let osmElements = Boolean(options.osmElements && table.source === 'osm' && table.type !== 'surface' && table.type !== 'raster'
+      && table.columns.some(column => column.name === OSM_ELEMENT_METADATA_COLUMN && column.type === 'JSON')
+      && (table.type !== 'buildings' || table.columns.some(column => column.name === 'building_id')));
+    if (osmElements) {
+      const missing = await this.conn.query(`SELECT 1 FROM "${workspace.replace(/"/g, '""')}"."${table.name.replace(/"/g, '""')}"
+        WHERE ${OSM_ELEMENT_METADATA_COLUMN} IS NULL LIMIT 1`);
+      osmElements = missing.numRows === 0;
+    }
+    const query = osmElements ? GET_LAYER_OSM_ELEMENTS_QUERY(table, workspace) : GET_LAYER_AS_GEOJSON_QUERY(table, workspace);
     const response = await this.conn.query(query);
 
     const raw: string = response.toArray()[0]?.geojson ?? '{"type":"FeatureCollection","features":[]}';
-    const featureCollection = JSON.parse(raw.replace(/\bNaN\b/g, 'null')) as FeatureCollection & { __autk_layer?: LayerType };
+    // Source tags are strings: do not rewrite a legitimate tag containing "NaN".
+    const featureCollection = JSON.parse(osmElements ? raw : raw.replace(/\bNaN\b/g, 'null')) as FeatureCollection & { __autk_layer?: LayerType };
 
     featureCollection.__autk_layer = table.type;
 

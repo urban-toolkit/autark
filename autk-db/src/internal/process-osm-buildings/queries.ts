@@ -1,6 +1,9 @@
+import { OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
+
 /** Selects original parts in deterministic order for the existing OSM clustering rule. */
-export const SELECT_BUILDING_GEOMETRY_QUERY = (qualifiedTableName: string) => `
-  SELECT id, CAST(properties AS JSON) AS properties_json, CAST(ST_AsGeoJSON(geometry) AS JSON) AS geometry_json, ST_IsValid(geometry) AS valid_geometry, ST_IsEmpty(geometry) AS empty_geometry
+export const SELECT_BUILDING_GEOMETRY_QUERY = (qualifiedTableName: string, hasOsmMetadata = false) => `
+  SELECT id, CAST(properties AS JSON) AS properties_json, CAST(ST_AsGeoJSON(geometry) AS JSON) AS geometry_json, ST_IsValid(geometry) AS valid_geometry, ST_IsEmpty(geometry) AS empty_geometry,
+    ${hasOsmMetadata ? `json_extract_string(${OSM_ELEMENT_METADATA_COLUMN}, '$[0].osm_type')` : "'way'"} AS osm_type
   FROM ${qualifiedTableName}
   ORDER BY id
 `;
@@ -32,10 +35,11 @@ export const SELECT_ORPHAN_OUTLINE_OWNERS_QUERY = (
  * The mapping file contains IDs and relation attributes, never coordinates.
  * Coordinates are collected directly from the source table exactly once.
  */
-export const COLLECT_BUILDING_PARTS_QUERY = (qualifiedTableName: string, mappingFile: string) => `
+export const COLLECT_BUILDING_PARTS_QUERY = (qualifiedTableName: string, mappingFile: string, hasOsmMetadata = false) => `
   CREATE OR REPLACE TABLE ${qualifiedTableName} AS
   WITH indexed_parts AS (
     SELECT p.id, p.geometry, COALESCE(CAST(p.properties AS JSON), '{}'::JSON) AS properties,
+      ${hasOsmMetadata ? `p.${OSM_ELEMENT_METADATA_COLUMN},` : ''}
       m.building_id, m.building_properties,
       ROW_NUMBER() OVER (PARTITION BY m.building_id ORDER BY p.id) - 1 AS geometry_index,
       COUNT(*) OVER (PARTITION BY m.building_id) AS part_count
@@ -59,7 +63,9 @@ export const COLLECT_BUILDING_PARTS_QUERY = (qualifiedTableName: string, mapping
     json_merge_patch(COALESCE(c.properties, '{}'::JSON), first(p.building_properties),
       json_object('building_id', p.building_id, 'parts',
         to_json(list(json_merge_patch(p.properties,
-          json_object('id', p.id, 'geometryIndex', geometry_index)) ORDER BY geometry_index)))) AS properties
+          json_object('id', ${hasOsmMetadata ? `CAST(p.${OSM_ELEMENT_METADATA_COLUMN}->0->>'osm_id' AS BIGINT)` : 'p.id'}, 'geometryIndex', geometry_index)) ORDER BY geometry_index)))) AS properties
+    ${hasOsmMetadata ? `, to_json(list(json_merge_patch(p.${OSM_ELEMENT_METADATA_COLUMN}->0,
+      json_object('geometryIndex', geometry_index)) ORDER BY geometry_index)) AS ${OSM_ELEMENT_METADATA_COLUMN}` : ''}
   FROM indexed_parts p
   LEFT JOIN common_properties c ON p.building_id = c.building_id
   GROUP BY p.building_id, c.properties;

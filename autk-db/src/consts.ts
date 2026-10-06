@@ -25,6 +25,9 @@ export const DEFAULT_WORKSPACE_COORDINATE_FORMAT = 'EPSG:3395';
  */
 export const DEFAULT_WORKSPACE_PRECISION_GRID = 0.01;
 
+/** Internal OSM provenance: source identity/tags and component indices, never duplicate geometry. */
+export const OSM_ELEMENT_METADATA_COLUMN = '__autk_osm_elements';
+
 /**
  * Default geometry column name used for generated point tables.
  *

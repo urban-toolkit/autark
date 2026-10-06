@@ -22,6 +22,7 @@ import {
     DEFAULT_INPUT_COORDINATE_FORMAT,
     DEFAULT_WORKSPACE_COORDINATE_FORMAT,
     DEFAULT_WORKSPACE_PRECISION_GRID,
+    OSM_ELEMENT_METADATA_COLUMN,
 } from './consts';
 
 import { DropTableUseCase } from './use-cases/drop-table';
@@ -29,6 +30,7 @@ import { GetLayerBboxUseCase } from './use-cases/get-layer-bbox';
 import { GetOsmBboxUseCase } from './internal/get-osm-bbox/use-case';
 import { BuildHeatmapParams, BuildHeatmapUseCase } from './use-cases/build-heatmap';
 import { GetLayerUseCase } from './use-cases/get-layer';
+import type { GetLayerOptions } from './use-cases/get-layer';
 import { GetRasterUseCase } from './use-cases/get-raster';
 import { GetTableOutput, GetTableUseCase } from './use-cases/get-table';
 import { LoadCsvParams, LoadCsvUseCase } from './use-cases/load-csv';
@@ -629,13 +631,14 @@ export class AutkDb {
      * The bbox is resolved from the immutable workspace bounds, then the layer's own bounds.
      *
      * @param layerTableName - Name of the layer table to export.
+     * @param options - Optional per-OSM-element export with preserved source tags and typed IDs.
      * @returns A FeatureCollection with `bbox` when workspace or nonempty layer bounds are available.
      * @throws If the database is not initialized, the table is missing, or it is not a layer table.
      * @example
      * const buildings = await db.getLayer('osm_buildings');
      * map.loadCollection('buildings', { collection: buildings, type: 'buildings' });
      */
-    async getLayer(layerTableName: string): Promise<FeatureCollection> {
+    async getLayer(layerTableName: string, options: GetLayerOptions = {}): Promise<FeatureCollection> {
         if (!this.db || !this.conn || !this.getLayerUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
@@ -645,7 +648,7 @@ export class AutkDb {
 
         const featureCollection = layerTable.type === 'raster' && !this.tableHasGeometry(layerTable)
             ? await this.getRaster(layerTableName) as unknown as FeatureCollection
-            : await this.getLayerUseCase.exec(layerTable, this.currentWorkspace);
+            : await this.getLayerUseCase.exec(layerTable, this.currentWorkspace, options);
 
         const workspaceData = this.getCurrentWorkspaceData();
         if (workspaceData.workspaceBoundingBox) {
@@ -785,6 +788,11 @@ export class AutkDb {
             );
             const tableIndex = workspaceData.tables.findIndex((t) => t.name === params.tableName);
             if (tableIndex !== -1) workspaceData.tables[tableIndex] = result.table;
+            if (result.table.source === 'osm' && result.table.columns.some(column => column.name === OSM_ELEMENT_METADATA_COLUMN && column.type === 'JSON')) {
+                // An arbitrary user update can change source identity, tags or component order.
+                await this.conn.query(`UPDATE "${this.currentWorkspace.replace(/"/g, '""')}"."${params.tableName.replace(/"/g, '""')}"
+                    SET ${OSM_ELEMENT_METADATA_COLUMN} = NULL`);
+            }
             await this.normalizeGeometryPrecision(result.table);
             const updated = await this.refreshStoredBoundingBox(params.tableName);
             await this.conn.query('COMMIT');
