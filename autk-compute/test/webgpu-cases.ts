@@ -55,6 +55,15 @@ export async function runWebGpuCases() {
         if (!(error instanceof Error) || !error.message.includes(`requires ${limit + 1} storage buffers`)) throw error;
         passed.push('storage-binding-limit-exceeded');
     }
+    try {
+        // The GPU rejects this shader; run must reject with its message, not read back zeros.
+        const result = await new ComputeGpgpu().run({ collection, variableMapping: { h: 'properties.h' },
+            wgslBody: 'return h + undefined_gpu_symbol;', resultField: 'out' });
+        throw new Error(`Invalid WGSL resolved with ${JSON.stringify(result.features.map(feature => feature.properties?.compute.out))}`);
+    } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('GPU validation error') || !error.message.includes('undefined_gpu_symbol')) throw error;
+        passed.push('gpu-validation-error-rejected');
+    }
     await device.queue.onSubmittedWorkDone();
     if (uncaptured.length) throw new Error(`Uncaptured GPU errors: ${uncaptured.join('; ')}`);
     const info = device.adapterInfo;
