@@ -241,20 +241,31 @@ export class OsmProcessingPipeline {
    */
   formatOsmDataForJson(osmData: OverpassApiResponse): FormattedElement[] {
     const formattedElements: FormattedElement[] = [];
-    const emittedNodeIds = new Set<number>();
+    const nodeRecords = new Map<number, FormattedElement>();
 
-    const emitNode = (id: number, lat: number, lon: number) => {
-      if (!emittedNodeIds.has(id)) {
-        emittedNodeIds.add(id);
-        formattedElements.push({ kind: 'node', id, tags: [], refs: [], lat, lon, ref_roles: [], ref_types: [] });
+    const emitNode = (id: number, lat: number, lon: number, tags?: Record<string, string>) => {
+      const existing = nodeRecords.get(id);
+      // Explicit nodes enrich inline way vertices without reordering the response.
+      if (existing) {
+        if (tags) {
+          existing.tags = Object.entries(tags).map(([k, v]) => ({ k, v }));
+          existing.lat = lat;
+          existing.lon = lon;
+        }
+        return;
       }
+      const record: FormattedElement = { kind: 'node', id,
+        tags: tags ? Object.entries(tags).map(([k, v]) => ({ k, v })) : [],
+        refs: [], lat, lon, ref_roles: [], ref_types: [] };
+      nodeRecords.set(id, record);
+      formattedElements.push(record);
     };
 
     osmData.elements.forEach((element) => {
       switch (element.type) {
         case 'node':
           if (element.lat !== undefined && element.lon !== undefined) {
-            emitNode(element.id, element.lat, element.lon);
+            emitNode(element.id, element.lat, element.lon, element.tags);
           }
           break;
 

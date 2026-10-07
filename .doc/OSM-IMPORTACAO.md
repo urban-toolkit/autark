@@ -132,6 +132,7 @@ await db.loadOsm({
 | `autoLoadLayers.layers` | Camadas públicas extraídas, na ordem informada. Surface sempre é construída; se omitida, fica escondida da listagem de layers. |
 | `autoLoadLayers.coordinateFormat` | CRS declarado da entrada; padrão `EPSG:4326`. Não muda o CRS dos dados na fonte. |
 | `outputTableName` | Prefixo das tabelas; padrão `table_osm`. |
+| `tagSets` | Camadas Overpass selecionadas por tags, cada conjunto com `type` obrigatório: `points`, `polylines` ou `polygons`. Todas passam pela surface. Não aceita `pbfFileUrl`. |
 | `forceRefresh` | Ignora o cache Overpass. Não completa nem atualiza o arquivo PBF. |
 | `onProgress` | Recebe fases do carregamento; não é uma porcentagem de progresso. |
 
@@ -140,6 +141,27 @@ O workspace usa `{ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 }` por pad
 **Pré-condições:** `db.init()` deve ter sido executado. OSM deve ser carregado antes de camadas não OSM no mesmo workspace, pois estabelece o contexto espacial.
 
 A seleção pública aceita áreas nomeadas ou `queryArea: { bbox: [west, south, east, north] }`, tanto por Overpass quanto por PBF. A bbox é validada antes de HTTP/leitura: quatro coordenadas finitas dentro dos limites WGS84, `west < east` e `south < north`. Cruzamento do antimeridiano não é suportado. O filtro Overpass seleciona candidatos; não promete uma consulta geométrica exaustiva de tudo que intersecta a caixa.
+
+### Camadas por tags e tipo explícito
+
+```ts
+await db.loadOsm({
+  queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+  autoLoadLayers: { layers: [] },
+  tagSets: [{ name: 'escolas', type: 'points', tags: [{ key: 'amenity', value: 'school' }] }],
+});
+// Apenas table_osm_escolas_points, se houver features após a filtragem.
+```
+
+Cada conjunto exige um único tipo e não converte geometrias: `points` aceita nodes, `polylines` aceita ways lineares e `polygons` aceita ways de área e relações `type=multipolygon`. Uma escola cadastrada somente como área não aparece em um conjunto `points`. Filtros usam OR, por presença da chave ou valor exato; não há regex. Ways abertas são linhas. Ways fechadas também são linhas quando `area=no` ou quando possuem `highway`, `barrier`, `railway` ou `waterway` sem `area=yes`; outras ways fechadas são áreas. Relações de outros tipos não geram features.
+
+A aquisição conserva membros para montar as relações, mas a camada final passa pela surface, incluindo a máscara costeira: pontos externos são excluídos; linhas e áreas são recortadas; resultados vazios e componentes incompatíveis com o tipo são descartados. Isso impede que um membro auxiliar inteiramente externo sobreviva como uma feature independente. Um membro interno com tags próprias ainda pode ser uma feature; não há deduplicação semântica entre uma relação e seus membros.
+
+Há no máximo 8 conjuntos, nomes únicos em formato de identificador minúsculo (até 32 caracteres) e 1–64 filtros por conjunto. Chaves têm até 255 caracteres e formato `[A-Za-z0-9][A-Za-z0-9_:.-]*`; valores têm 1–255 caracteres, sem controles. Parâmetros inválidos e combinação com PBF são recusados antes da aquisição. Ways inválidas ou sem todas as coordenadas são omitidas com aviso; a reconstrução de relações mantém os limites existentes da seção 9. Erros SQL e colapso na grade de precisão são propagados.
+
+Um conjunto produz apenas `<outputTableName>_<name>_<type>`. Se ficar vazio após o recorte, não há tabela nem timing. Reload remove tabelas antigas de outros tipos do mesmo conjunto; conjuntos omitidos na nova chamada não são removidos. Substituição, normalização e recorte de cada conjunto são transacionais, restaurando tabela/metadados anteriores em caso de erro; a carga OSM inteira não é uma transação única. A exportação por elemento usa a proveniência explícita atual, sem inferência por `refs`. Nodes explícitos preservam tags mesmo quando já foram emitidos como vértices de ways, sem reordenar os elementos. `read_json` usa tipos de colunas explícitos para não depender de uma amostra inicial composta apenas por nodes.
+
+Exemplo na gallery: [`osm-tag-sets.ts`](../gallery/src/autk-map/osm-tag-sets.ts), baseado em `osm-layers-pbf.ts`, usando Overpass e os mesmos limites nomeados de Lower Manhattan.
 
 ## 3. Aquisição via Overpass
 
@@ -155,6 +177,8 @@ Antes de consultar o servidor:
 4. `forceRefresh: true` ignora essas entradas.
 
 O cache usa a Cache API do navegador quando disponível. Chaves de áreas nomeadas têm versão `v4`, invalidando respostas antigas com escopo incorreto, inclusive supersets. Bboxes mantêm `v3`, pois sua seleção não mudou; têm chaves próprias por coordenadas e camadas. Ambas incluem os dados necessários à máscara costeira e às relações `type=building`.
+
+Para `tagSets`, um sufixo próprio `tag-sets-v1` inclui tipos geométricos e seletores canônicos. Nomes/ordem dos conjuntos não alteram a aquisição; mudar o tipo ou os filtros altera a chave. O superset tradicional não contém todos os nodes/tags arbitrários e nunca atende uma consulta com conjuntos.
 
 > Cache recente não significa dados iguais ao PBF. Pode representar outro momento do OSM, e uma entrada completa reutilizada pode conter mais candidatos que uma consulta temática específica.
 
@@ -187,6 +211,7 @@ A implementação exige a tag `boundary` e confere a presença dos nomes solicit
 | Parks + water | Uma consulta conjunta, com os seletores ativos | Pode solicitar apenas um desses temas |
 | Roads | Uma consulta de ways | Relações de roads não são reconstruídas como áreas |
 | Buildings | Normalmente quatro consultas, numa grade 2 × 2 | Combina filtro de área com bbox de cada tile |
+| Tag sets | Uma consulta adicional para todos os conjuntos | Nodes somente para `points`; ways para linhas/áreas; relações multipolígonas e seus membros somente quando há `polygons` |
 
 Com as cinco camadas, sem cache e com extensão disponível, são normalmente **oito consultas de dados para áreas nomeadas**: fronteiras, coastlines, parks/water, roads e quatro tiles de buildings. Para bbox são sete, sem a busca de fronteiras. Consultas de status e retries são adicionais.
 
@@ -697,6 +722,8 @@ Após extrair as camadas e construir a surface obrigatória, `AutkDb.loadOsm()` 
 | Parks | Sim | Sim |
 | Water | Sim | Sim |
 | Roads | Sim | Sim |
+| Tag sets: points | Sim | Não se aplica |
+| Tag sets: polylines / polygons | Sim | Sim, descartando componentes de outra dimensão |
 
 ```text
 Building que atravessa a surface:
@@ -792,7 +819,7 @@ Para investigar seleção, compare as partes da feature selecionada e seu owners
 
 `loadOsm()` retorna contagens de elementos, tempos de processamento e entradas por camada solicitada. A surface interna não solicitada não acrescenta uma entrada aos timings.
 
-A `featureCount` de cada entrada é medida logo após a extração, **antes** do recorte final; para surface, também antes de sua polygonização. Não é necessariamente a contagem final obtida por `getLayer()`.
+Para camadas temáticas tradicionais, a `featureCount` de cada entrada é medida logo após a extração, **antes** do recorte final; para surface, também antes de sua polygonização. Não é necessariamente a contagem final obtida por `getLayer()`. Entradas de `tagSets` incluem `tagSet` e contam as features **depois** do clipping e da remoção de componentes incompatíveis; seu tempo inclui extração, normalização e recorte, sem HTTP.
 
 ## 15. Paridade entre fontes e diagnóstico
 

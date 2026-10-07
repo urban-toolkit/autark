@@ -1,4 +1,4 @@
-import { Camera, LayerComponent } from '@urban-toolkit/autk-core';
+import { Camera, LayerComponent, TriangulatorPoints } from '@urban-toolkit/autk-core';
 import { LayerData, LayerInfo, LayerRenderInfo, LayerThematic } from './types-layers';
 import { Layer } from './layer';
 import { Renderer } from './renderer';
@@ -16,7 +16,7 @@ export class SpriteLayer extends Layer {
     protected _pipelinePicking!: PipelineSpritePicking;
     protected _highlightedIds: Set<number> = new Set();
     protected _skippedIds: Set<number> = new Set();
-    protected _pointSize = 40;
+    protected _pointSize = TriangulatorPoints.getPointSize();
 
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo);

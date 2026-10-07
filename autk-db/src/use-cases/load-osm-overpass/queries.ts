@@ -50,6 +50,9 @@ export const INSERT_OSM_DATA_QUERY = (tableName: string, fileName: string, works
     lon::DOUBLE,
     ref_roles::VARCHAR[],
     ref_types::VARCHAR[]
-  FROM '${fileName}';
+  FROM read_json('${fileName}', format = 'array', columns = {
+    kind: 'VARCHAR', id: 'BIGINT', tags: 'STRUCT(k VARCHAR, v VARCHAR)[]',
+    refs: 'BIGINT[]', lat: 'DOUBLE', lon: 'DOUBLE', ref_roles: 'VARCHAR[]', ref_types: 'VARCHAR[]'
+  });
 `;
 };

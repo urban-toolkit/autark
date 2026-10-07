@@ -224,8 +224,11 @@ export class Triangles2DLayer extends VectorLayer {
             this._pipelineBorder.updateColorUniforms(this);
         }
 
-        this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);
-        this._pipelineBorder.renderPass(camera, passEncoder);
+        // Keep hidden border buffers/uniforms synchronized so toggling them back on needs no reload.
+        if (this._layerRenderInfo.showBorders !== false) {
+            this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);
+            this._pipelineBorder.renderPass(camera, passEncoder);
+        }
     }
 
     /**

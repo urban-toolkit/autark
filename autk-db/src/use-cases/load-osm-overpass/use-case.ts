@@ -1,6 +1,6 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
-import { LoadOsmParams, OsmElement, OnLoadingProgress, OsmNamedArea, OsmQueryArea, boundingBoxOf, isBoundingBoxArea } from './interfaces';
+import { LoadOsmParams, OsmElement, OnLoadingProgress, OsmNamedArea, OsmQueryArea, OsmTagSet, boundingBoxOf, checkTagSets, isBoundingBoxArea } from './interfaces';
 import type { MultiPolygon } from 'geojson';
 import { coastalLandMask } from '../../internal/process-osm-surface/coastline';
 import { OsmTable } from '../../interfaces';
@@ -47,6 +47,18 @@ type OverpassTagSelectors = {
   relation: string[];
 };
 
+/** Canonical exact selectors per requested geometry family, independent of set names. */
+function tagSelectors(sets: OsmTagSet[]): Record<OsmTagSet['type'], string[]> {
+  const selectors = { points: new Set<string>(), polylines: new Set<string>(), polygons: new Set<string>() };
+  for (const set of sets) {
+    for (const tag of set.tags) {
+      selectors[set.type].add(tag.value === undefined ? `[${JSON.stringify(tag.key)}]`
+        : `[${JSON.stringify(tag.key)}=${JSON.stringify(tag.value)}]`);
+    }
+  }
+  return { points: [...selectors.points].sort(), polylines: [...selectors.polylines].sort(), polygons: [...selectors.polygons].sort() };
+}
+
 /**
  * Loads OSM data from the Overpass API with caching, retry, and slot polling.
  *
@@ -87,12 +99,14 @@ export class LoadOsmFromOverpassApiUseCase {
     const outputTableName = params.outputTableName || 'table_osm';
     const onProgress = params.onProgress;
     const box = isBoundingBoxArea(params.queryArea) ? boundingBoxOf(params.queryArea) : null;
+    const tagSets = checkTagSets(params.tagSets);
 
     const combined = await this.fetchCombinedOsmData(
       params.queryArea,
       params.autoLoadLayers.layers,
       onProgress,
       params.forceRefresh,
+      tagSets,
     );
 
     if (!isBoundingBoxArea(params.queryArea)) {
@@ -153,11 +167,12 @@ export class LoadOsmFromOverpassApiUseCase {
    * @param layers - Optional list of requested layers to include in the cache key.
    * @returns A stable cache key string.
    */
-  private getCacheKey(queryArea: OsmQueryArea, layers?: string[]): string {
+  private getCacheKey(queryArea: OsmQueryArea, layers?: string[], tagSets: OsmTagSet[] = []): string {
+    const tagKey = tagSets.length > 0 ? `-tag-sets-v1:${JSON.stringify(tagSelectors(tagSets))}` : '';
     const layerKey = layers && layers.length > 0 ? `-layers:${[...layers].sort().join('+')}` : '';
-    if (isBoundingBoxArea(queryArea)) return `overpass-combined-v3-bbox-${queryArea.bbox.join(',')}${layerKey}`;
+    if (isBoundingBoxArea(queryArea)) return `overpass-combined-v3-bbox-${queryArea.bbox.join(',')}${layerKey}${tagKey}`;
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-v4-${queryArea.geocodeArea}-${areas}${layerKey}`;
+    return `overpass-combined-v4-${queryArea.geocodeArea}-${areas}${layerKey}${tagKey}`;
   }
 
   /**
@@ -191,8 +206,9 @@ export class LoadOsmFromOverpassApiUseCase {
     layers: string[] | undefined,
     onProgress?: OnLoadingProgress,
     forceRefresh: boolean = false,
+    tagSets: OsmTagSet[] = [],
   ): Promise<OverpassApiResponse> {
-    const cacheKey = this.getCacheKey(queryArea, layers);
+    const cacheKey = this.getCacheKey(queryArea, layers, tagSets);
     if (!forceRefresh) {
       const cachedData = await this.cache.get(cacheKey);
       if (cachedData) {
@@ -202,7 +218,8 @@ export class LoadOsmFromOverpassApiUseCase {
 
       // A full-data cache entry (no layer filter) is a valid superset — reuse it.
       const fullDataCacheKey = this.getFullDataCacheKey(queryArea);
-      if (fullDataCacheKey !== cacheKey) {
+      // Traditional supersets contain neither arbitrary tagged nodes nor all custom tags.
+      if (fullDataCacheKey !== cacheKey && tagSets.length === 0) {
         const fullData = await this.cache.get(fullDataCacheKey);
         if (fullData) {
           console.log(`[autk-db] Using cached Overpass full-data superset: ${fullDataCacheKey}`);
@@ -213,7 +230,8 @@ export class LoadOsmFromOverpassApiUseCase {
       console.log(`[autk-db] forceRefresh enabled — bypassing Overpass cache for: ${cacheKey}`);
     }
 
-    const requestedLayers = layers && layers.length > 0 ? layers : ['roads', 'buildings', 'parks', 'water'];
+    const requestedLayers = layers && layers.length > 0 ? layers
+      : tagSets.length > 0 ? [] : ['roads', 'buildings', 'parks', 'water'];
     const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
     const BETWEEN_REQUESTS_MS = 3_000;
 
@@ -286,6 +304,14 @@ export class LoadOsmFromOverpassApiUseCase {
         console.warn(`[autk-db] ${label}: 0 elements — skipping cache.`);
         anyGroupEmpty = true;
       }
+      combined = this.mergeResponses(combined, data);
+    }
+
+    if (tagSets.length > 0) {
+      await pause(BETWEEN_REQUESTS_MS);
+      const response = await this.fetchWithRetry(this.buildTagSetQuery(queryArea, tagSets));
+      const data: OverpassApiResponse = await response.json();
+      if ((data.elements?.length ?? 0) === 0) anyGroupEmpty = true;
       combined = this.mergeResponses(combined, data);
     }
 
@@ -485,6 +511,37 @@ export class LoadOsmFromOverpassApiUseCase {
       ( ${boundaryWaySelectors.join(' ')} );
       out geom qt;
     `;
+  }
+
+  /** Acquires only the requested OSM geometry families; polygon relations keep full member ways for assembly. */
+  private buildTagSetQuery(queryArea: OsmQueryArea, tagSets: OsmTagSet[]): string {
+    const scopeLines: string[] = [];
+    let filters: string[];
+    if (isBoundingBoxArea(queryArea)) {
+      const box = boundingBoxOf(queryArea);
+      filters = [`(${box.south},${box.west},${box.north},${box.east})`];
+    } else {
+      scopeLines.push(`area["name"=${JSON.stringify(queryArea.geocodeArea)}]["boundary"]->.areaMain;`);
+      filters = queryArea.areas.map((areaName, index) => {
+        scopeLines.push(...this.namedAreaLines(areaName, index + 1));
+        return `(area.area${index + 1})`;
+      });
+    }
+    const selectors = tagSelectors(tagSets);
+    const waySelectors = [...new Set([...selectors.polylines, ...selectors.polygons])];
+    const hits = filters.flatMap(filter => [
+      ...selectors.points.map(selector => `node${selector}${filter};`),
+      ...waySelectors.map(selector => `way${selector}${filter};`),
+      ...selectors.polygons.map(selector => `relation${selector}["type"="multipolygon"]${filter};`),
+    ]);
+    return `[out:json][timeout:60][maxsize:268435456];
+      ${scopeLines.join('\n')}
+      (${hits.join('\n')})->.tagHits;
+      ${selectors.points.length > 0 ? 'node.tagHits; out body;' : ''}
+      ${selectors.polygons.length > 0 ? `rel.tagHits["type"="multipolygon"]->.tagAreas;
+        way(r.tagAreas)->.tagAreaWays;
+        .tagAreas out body;` : ''}
+      ${waySelectors.length > 0 ? `(way.tagHits; ${selectors.polygons.length > 0 ? '.tagAreaWays;' : ''}); out geom qt;` : ''}`;
   }
 
   /**

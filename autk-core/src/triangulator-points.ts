@@ -30,7 +30,7 @@ export interface PointInstancesData {
  */
 export class TriangulatorPoints {
     /** Shared point-marker radius used by sprite rendering. */
-    private static pointSize: number = 40;
+    private static pointSize: number = 10;
 
     /**
      * Sets the shared base point radius used by sprite rendering.

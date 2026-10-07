@@ -56,6 +56,20 @@ map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
 map.draw();
 ```
 
+### Generic layer defaults and polygon borders
+
+Built-in presets give `points`, `polylines` and `polygons` muted colors coordinated with the base map; surface, parks, water, roads and buildings keep their existing palettes. Generic polylines default to a full width of **3 local planar units**, while roads retain their highway-specific widths. Override line width with `loadConfig: { polylinesWidth: 12 }`. Point sprites default to a radius of **10 local planar units**; `TriangulatorPoints.setPointSize()` from `@urban-toolkit/autk-core` changes the shared radius used for subsequent point-layer loads. These sizes are coordinate-space values, not screen pixels.
+
+Generic polygon outlines are visible by default. Toggle their separate border pass at runtime without reloading the layer or hiding its fill:
+
+```ts
+map.updateRenderInfo('table_osm_playgrounds_polygons', { showBorders: false });
+// Later, show the same borders again:
+map.updateRenderInfo('table_osm_playgrounds_polygons', { showBorders: true });
+```
+
+The nested form `{ renderInfo: { showBorders: false } }` also works. Border geometry remains synchronized while hidden; the setting does not generate borders for layers that have none. The gallery's typed OSM tag-set polygons start with `showBorders: false`.
+
 ### API summary
 
 * `new AutkMap(canvas)`: Creates a map controller bound to an HTML canvas.

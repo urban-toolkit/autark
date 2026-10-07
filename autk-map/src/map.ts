@@ -1104,7 +1104,7 @@ export class AutkMap {
             ? polylinesWidth / 2
             : undefined;
 
-        TriangulatorPolylines.offset = fixedHalfWidth ?? (typeLayer === 'roads' ? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH : 8.5);
+        TriangulatorPolylines.offset = fixedHalfWidth ?? (typeLayer === 'roads' ? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH : 1.5);
         const layerMesh = typeLayer === 'roads' && fixedHalfWidth === undefined
             ? TriangulatorPolylines.buildMesh(
                 geojson,

@@ -96,6 +96,7 @@ Tests from the repository root: `npm test -- autk-core/test` (CPU only).
 ## Notes
 
 - Geometry helpers assume planar coordinates unless a function states otherwise.
+- Point sprites use a default radius of 10 local planar units. `TriangulatorPoints.setPointSize(radius)` accepts a finite positive radius and affects subsequently loaded point layers.
 - Triangulators convert GeoJSON and related feature data into render-ready mesh buffers.
 - `@urban-toolkit/autk-core` is a stable shared dependency of the other Autark packages, but it exposes lower-level APIs than the higher-level modules.
 

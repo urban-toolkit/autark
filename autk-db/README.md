@@ -87,6 +87,33 @@ All imports now clip roads/parks/water and filter complete buildings by this sur
 
 BBox gallery examples: [`osm-layers-api-bbox`](../gallery/src/autk-map/osm-layers-api-bbox.ts) and [`osm-layers-pbf-bbox`](../gallery/src/autk-map/osm-layers-pbf-bbox.ts).
 
+### Typed OpenStreetMap tag sets
+
+Overpass loads custom tag-selected layers beside the standard themes. **Each set requires one `type`** and creates only `<outputTableName>_<name>_<type>`; there is no automatic three-layer split or geometry conversion.
+
+```ts
+await db.loadOsm({
+  queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+  autoLoadLayers: { layers: [] }, // Tag-only load; surface is still mandatory and internal.
+  tagSets: [{
+    name: 'cafes',
+    type: 'points',
+    tags: [{ key: 'amenity', value: 'cafe' }],
+  }],
+});
+const cafes = await db.getLayer('table_osm_cafes_points', { osmElements: true });
+```
+
+Filters within a set use **OR**: `{ key: 'shop' }` matches key presence, while `{ key: 'amenity', value: 'school' }` matches an exact value, never a regex. `points` accepts nodes only; a school mapped only as an area is not converted into a centroid. `polylines` accepts open ways and closed linear ways. `polygons` accepts closed area ways and `type=multipolygon` relations; other relation types are ignored. A closed way is linear when `area=no`, or when `highway`, `barrier`, `railway` or `waterway` is present without `area=yes`; other closed ways default to areas. This is a limited classification policy, not a universal OSM tag classifier.
+
+All tag sets are filtered/cropped against the same mandatory, optionally coastal **surface**: external points are removed, lines/polygons are clipped, and empty or wrong-dimensional intersection components are discarded. Relation members outside the area are downloaded for assembly, but their external geometries do not survive clipping as independent features. Results use the workspace CRS and precision grid, including element export. Invalid or incomplete ways are skipped with a warning; relations use the existing ring assembler and its missing-member warnings/limitations. Database failures and precision-grid collapse errors still propagate.
+
+A set with no features after clipping has no table or timings entry. Reload replaces the set's layer, removes obsolete geometry-family tables for that same set, and restores its old table/metadata if processing fails. Sets omitted from a later call are not deleted. Per-set table replacement and clipping are transactional; the entire OSM import remains non-atomic. Tag timing entries carry `tagSet` and a **final, post-clipping** `featureCount`.
+
+Tag sets are **Overpass-only**; combining them with `pbfFileUrl` throws before acquisition. Validation allows at most 8 sets, unique lowercase identifier names (up to 32 characters), and 1–64 filters per set. Keys use `[A-Za-z0-9][A-Za-z0-9_:.-]*` (up to 255 characters); values are 1–255 characters without control characters. One extra Overpass request acquires all sets, with selectors restricted to requested element families. Cache keys include geometry types and canonical filters, not set names/order; traditional full-data cache entries never satisfy tag requests.
+
+Gallery example, based on `osm-layers-pbf.ts` but using Overpass: [`osm-tag-sets`](../gallery/src/autk-map/osm-tag-sets.ts). Open `/src/autk-map/osm-tag-sets.html` to see food points, footway lines and playground polygons with the standard Lower Manhattan layers.
+
 ### Building features and spatial joins
 
 With `layerType: 'buildings'`, each feature is stored/exported as one GeometryCollection of its original parts, normalized independently to the workspace precision grid. Use `properties.parts[].geometryIndex` for per-part attributes. Distinct GeoJSON features remain distinct even when they overlap. OSM `type=building` relations associate original member ways without generating a duplicate geometry, including disconnected/untagged members. Orphan ways tagged `building:part` (except `no`) are associated with a relation only when their whole geometry is covered by an original outline of exactly one usable surface relation. Outline roles are authoritative; empty/outer-role members qualify only when tagged as whole buildings, not parts. Holes are respected, explicit ownership is never overridden, and inferred parts do not become outlines. Ambiguous containment warns and leaves the part unassociated; partial overlap and independent buildings do not qualify. Remaining unassociated ways retain intersection-based clustering. General relation attributes are inherited by parts, whose own tags take precedence. `properties.osmRelation` retains the relation ID (string), way membership/roles and original tags; optional `osmRelation.inferredParts` records inferred IDs and `method: 'outline-containment'` separately from original members. Feature.id normally remains the minimum source part ID (negative internal keys disambiguate rare way/relation ID collisions; use the element export for OSM identity); unusable/missing member geometry or shared ownership causes a console warning and omission of the whole affected relation, avoiding partial buildings. Unsupported member types/roles (including `roof`), conflicting roles and relations with no way members also warn and skip the affected relation plus all its direct way members; unrelated buildings continue loading. Invalid membership is not converted into a partial building or standalone member features. Explicit `location=underground` parts and relations are excluded from this surface building layer with a console warning, before spatial clustering; above-ground parts of mixed buildings remain. Height zero, negative `layer` and basement-level tags alone do not trigger exclusion. There is no union, convex hull or persistent `agg_geometry`. Both PBF and Overpass collect `type=building` relations and their way members; Overpass uses versioned cache keys so older responses lacking these relations are not reused. Source parity requires the same OSM snapshot and complete relation geometry: a local extract cannot reconstruct coordinates for members absent from the PBF.

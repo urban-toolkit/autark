@@ -46,6 +46,8 @@ export interface LayerRenderInfo {
     color?: ColorRGB;
     /** Optional fixed border/outline color used by layers with a border pass. */
     strokeColor?: ColorRGB;
+    /** Draws available polygon borders unless false. Can be toggled through updateRenderInfo without rebuilding geometry. */
+    showBorders?: boolean;
     /** Layer opacity in the range `[0, 1]`. */
     opacity: number;
     /** Enables thematic color interpolation when `true`. */

@@ -40,6 +40,7 @@ import { deleteRasterPayload } from './raster-store';
 import { LoadJsonParams, LoadJsonUseCase } from './use-cases/load-json';
 import { LoadOsmLayerParams, LoadOsmLayerUseCase } from './use-cases/load-osm-layer';
 import { LoadOsmFromOverpassApiUseCase, LoadOsmParams, OsmLoadTimings } from './use-cases/load-osm-overpass';
+import { checkTagSets } from './use-cases/load-osm-overpass/interfaces';
 import { LoadOsmFromPbfUseCase } from './use-cases/load-osm-pbf';
 import { OsmProcessingPipeline } from './internal/process-osm/pipeline';
 import { PolygonizeOsmSurfaceUseCase } from './internal/process-osm-surface/use-case';
@@ -290,8 +291,8 @@ export class AutkDb {
      * `autoLoadLayers` is required. The raw OSM import tables are treated as temporary
      * staging tables and are always dropped after the requested layers are extracted.
      * Surface is always built, excluding sea when coastline reconstruction succeeds.
-     * It stays hidden unless requested. Other layers are clipped to it; buildings
-     * are filtered as complete features without modifying their parts.
+     * It stays hidden unless requested. Other layers and typed tag sets are clipped
+     * to it; buildings are filtered as complete features without modifying their parts.
      *
      * @param params - Area query, optional output table name, and required layer extraction settings.
      * @returns Timing breakdown for OSM download and layer extraction.
@@ -312,9 +313,15 @@ export class AutkDb {
             !this.loadOsmFromPbfUseCase ||
             !this.dropTableUseCase ||
             !this.getOsmBboxUseCase ||
-            !this.polygonizeOsmSurfaceUseCase
+            !this.polygonizeOsmSurfaceUseCase ||
+            !this.loadOsmLayerUseCase
         )
             throw new Error('Database not initialized. Please call init() first.');
+
+        const tagSets = checkTagSets(params.tagSets);
+        if (tagSets.length > 0 && params.pbfFileUrl) {
+            throw new Error('tagSets are not supported with pbfFileUrl.');
+        }
 
         const workspaceData = this.getCurrentWorkspaceData();
         if (workspaceData.tables.some((table) => table.source !== 'osm')) {
@@ -327,7 +334,7 @@ export class AutkDb {
         const sourceCrs = params.autoLoadLayers.coordinateFormat ?? DEFAULT_INPUT_COORDINATE_FORMAT;
         const outputTableName = params.outputTableName ?? 'table_osm';
 
-        const loadParams = { ...params, outputTableName, workspace: this.currentWorkspace };
+        const loadParams = { ...params, tagSets, outputTableName, workspace: this.currentWorkspace };
         const execResult = params.pbfFileUrl
             ? await this.loadOsmFromPbfUseCase.exec(loadParams)
             : await this.loadOsmFromOverpassApiUseCase.exec(loadParams);
@@ -430,6 +437,44 @@ export class AutkDb {
                     const cropGeometry = !layerName.endsWith('_buildings');
                     await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
                     await this.refreshStoredBoundingBox(layerName);
+                }
+            }
+
+            for (const tagSet of tagSets) {
+                const previousTables = [...workspaceData.tables];
+                const t0 = performance.now();
+                await this.conn.query('BEGIN TRANSACTION');
+                try {
+                    const table = await this.loadOsmLayerUseCase.execTagSet({
+                        osmInputTableName: outputTableName, tagSet, coordinateFormat: sourceCrs,
+                        workspaceCoordinateFormat: targetCrs, workspace: this.currentWorkspace,
+                    });
+                    this.registerTable(table);
+                    await this.normalizeGeometryPrecision(table);
+                    await this.clipLayerToLayer(table.name, surfaceLayerName!, this.currentWorkspace, tagSet.type !== 'points', false);
+                    const qualifiedTable = `${this.currentWorkspace}.${table.name}`;
+                    // Intersections can be mixed-dimensional (e.g. a polygon merely touches the boundary).
+                    const dimension = tagSet.type === 'points' ? 1 : tagSet.type === 'polylines' ? 2 : 3;
+                    await this.conn.query(`UPDATE ${qualifiedTable} SET geometry = ST_CollectionExtract(geometry, ${dimension});
+                        DELETE FROM ${qualifiedTable} WHERE geometry IS NULL OR ST_IsEmpty(geometry);`);
+                    const featureCount = Number((await this.conn.query(`SELECT COUNT(*) AS cnt FROM ${qualifiedTable}`)).toArray()[0].cnt);
+                    // A reload retains only this set's requested, nonempty family.
+                    for (const type of ['points', 'polylines', 'polygons']) {
+                        const name = `${outputTableName}_${tagSet.name}_${type}`;
+                        if (name === table.name && featureCount > 0) continue;
+                        await this.conn.query(`DROP TABLE IF EXISTS ${this.currentWorkspace}.${name}`);
+                        workspaceData.tables = workspaceData.tables.filter(item => item.name !== name);
+                    }
+                    if (featureCount > 0) await this.initializeSpatialMetadata(table);
+                    await this.conn.query('COMMIT');
+                    if (featureCount > 0) timings.layers.push({
+                        layerName: table.name, layerType: table.type, tagSet: tagSet.name,
+                        loadMs: performance.now() - t0, featureCount,
+                    });
+                } catch (error) {
+                    await this.conn.query('ROLLBACK');
+                    workspaceData.tables = previousTables;
+                    throw error;
                 }
             }
 

@@ -6,5 +6,5 @@
  * @module load-osm-overpass
  */
 export * from './use-case';
-export type { LoadOsmParams, LoadingPhase, OnLoadingProgress, OsmLoadTimings, LayerLoadTimings, OsmQueryArea, OsmNamedArea, OsmBoundingBoxArea } from './interfaces';
+export type { LoadOsmParams, LoadingPhase, OnLoadingProgress, OsmLoadTimings, LayerLoadTimings, OsmQueryArea, OsmNamedArea, OsmBoundingBoxArea, OsmTagSet, OsmTagFilter } from './interfaces';
 export { isBoundingBoxArea } from './interfaces';

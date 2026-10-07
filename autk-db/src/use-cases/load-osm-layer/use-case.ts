@@ -3,6 +3,8 @@ import type { Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 
 import { LoadOsmLayerParams } from './interfaces';
 import { LOAD_LAYER_QUERY } from './queries';
+import { TAG_SET_MATCH, TAG_SET_TABLE_QUERY } from './tag-set-queries';
+import type { OsmTagSet } from '../load-osm-overpass/interfaces';
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
 import { OsmLayerTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
@@ -131,6 +133,37 @@ export class LoadOsmLayerUseCase {
     };
   }
 
+  /** Extracts one custom family; AutkDb subsequently normalizes and clips it to surface. */
+  async execTagSet(params: {
+    osmInputTableName: string;
+    tagSet: OsmTagSet;
+    coordinateFormat: string;
+    workspaceCoordinateFormat: string;
+    workspace: string;
+  }): Promise<OsmLayerTable> {
+    const { tagSet, workspace } = params;
+    const outputTableName = `${params.osmInputTableName}_${tagSet.name}_${tagSet.type}`;
+    const qualifiedOutput = `${workspace}.${outputTableName}`;
+    await this.conn.query(TAG_SET_TABLE_QUERY({
+      inputTable: `${workspace}.${params.osmInputTableName}`, outputTable: qualifiedOutput,
+      tagSet, sourceCrs: params.coordinateFormat, targetCrs: params.workspaceCoordinateFormat,
+    }));
+    if (tagSet.type === 'polygons') {
+      await this.appendRelationAreaGeometries({
+        inputTableName: params.osmInputTableName, outputTableName, layer: tagSet.type,
+        sourceCrs: params.coordinateFormat, targetCrs: params.workspaceCoordinateFormat, workspace,
+        relationWhere: `map_extract(tags, 'type')[1] = 'multipolygon' AND ${TAG_SET_MATCH(tagSet.tags)}`,
+      });
+    }
+    const invalid = `geometry IS NULL OR ST_IsEmpty(geometry) OR NOT ST_IsValid(geometry)`;
+    const skipped = (await this.conn.query(`SELECT id FROM ${qualifiedOutput} WHERE ${invalid}`)).toArray();
+    for (const row of skipped) console.warn(`[autk-db] Skipping invalid OSM ${tagSet.type} element ${String(row.id)} in tag set ${tagSet.name}.`);
+    await this.conn.query(`DELETE FROM ${qualifiedOutput} WHERE ${invalid}`);
+    const describe = await this.conn.query(`DESCRIBE ${qualifiedOutput}`);
+    return { source: 'osm', type: tagSet.type, name: outputTableName,
+      columns: getColumnsFromDuckDbTableDescribe(describe.toArray()) };
+  }
+
   /**
    * Reads building ownership and general tags without constructing relation footprints.
    * Member ways remain the only coordinate representation. Invalid membership is
@@ -183,8 +216,10 @@ export class LoadOsmLayerUseCase {
     targetCrs: string;
     boundingBox?: BoundingBox;
     workspace: string;
+    /** Custom relation predicate; thematic layers retain their existing selection/ownership policy. */
+    relationWhere?: string;
   }): Promise<number> {
-    const { records, skipped } = await this.buildRelationAreaRecords(params.inputTableName, params.layer, params.workspace);
+    const { records, skipped } = await this.buildRelationAreaRecords(params.inputTableName, params.layer, params.workspace, params.relationWhere);
     if (records.length === 0) return skipped;
 
     const fileName = `temp_${params.layer}_relations_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`;
@@ -241,12 +276,13 @@ export class LoadOsmLayerUseCase {
     inputTableName: string,
     layer: LayerType,
     workspace: string,
+    relationWhere = `map_extract(tags, '__autk_layer')[1] = '${layer}'`,
   ): Promise<{ records: RelationAreaRecord[]; skipped: number }> {
     const qualifiedInputTableName = `${workspace}.${inputTableName}`;
     const relations = (await this.conn.query(`
       SELECT id, refs, ref_roles, ref_types, CAST(tags AS JSON) AS tags_json
         FROM ${qualifiedInputTableName}
-        WHERE kind = 'relation' AND map_extract(tags, '__autk_layer')[1] = '${layer}'
+        WHERE kind = 'relation' AND ${relationWhere}
           ${layer === 'buildings' ? "AND COALESCE(map_extract(tags, 'type')[1], '') <> 'building'" : ''};
     `)).toArray() as unknown as RelationRow[];
 

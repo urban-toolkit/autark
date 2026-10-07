@@ -27,6 +27,8 @@ export type OnLoadingProgress = (phase: LoadingPhase) => void;
 export interface LayerLoadTimings {
   layerName: string;
   layerType: string;
+  /** Name of the custom tag set, when this timing describes a tag-selected layer. */
+  tagSet?: string;
   /** Time in ms to run the SQL query that extracts this layer from the OSM table (excludes HTTP). */
   loadMs: number;
   /** Number of GeoJSON features in the loaded layer. */
@@ -71,17 +73,64 @@ export function boundingBoxOf(area: OsmBoundingBoxArea): { west: number; south: 
   return { west, south, east, north };
 }
 
+/** Exact tag value, or key presence when value is omitted. Filters within a set use OR. */
+export type OsmTagFilter = { key: string; value?: string };
+
+/** One geometry family; no centroid conversion or automatic multi-layer splitting. */
+export type OsmTagSet = {
+  name: string;
+  type: 'points' | 'polylines' | 'polygons';
+  tags: OsmTagFilter[];
+};
+
+/** Validates before acquisition and canonicalizes filters for deterministic queries/cache keys. */
+export function checkTagSets(sets: unknown): OsmTagSet[] {
+  if (sets === undefined) return [];
+  if (!Array.isArray(sets) || sets.length > 8) {
+    throw new Error('tagSets must be a list of at most 8 tag sets.');
+  }
+  const names = new Set<string>();
+  return sets.map((set: OsmTagSet) => {
+    if (typeof set?.name !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(set.name) || names.has(set.name)) {
+      throw new Error('A tag set name must be a unique lowercase identifier starting with a letter (at most 32 characters).');
+    }
+    names.add(set.name);
+    if (!['points', 'polylines', 'polygons'].includes(set.type)) {
+      throw new Error(`Tag set "${set.name}" requires type: points, polylines or polygons.`);
+    }
+    if (!Array.isArray(set.tags) || set.tags.length === 0 || set.tags.length > 64) {
+      throw new Error(`Tag set "${set.name}" must have 1 to 64 tags.`);
+    }
+    const unique = new Map<string, OsmTagFilter>();
+    for (const tag of set.tags) {
+      const { key, value } = tag ?? {};
+      if (typeof key !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_:.-]{0,254}$/.test(key)) {
+        throw new Error(`Tag set "${set.name}" has an invalid OSM tag key.`);
+      }
+      if (value !== undefined && (typeof value !== 'string' || value.length === 0 || value.length > 255
+        || [...value].some(character => character.charCodeAt(0) < 0x20 || character.charCodeAt(0) === 0x7f))) {
+        throw new Error(`Tag set "${set.name}" has an empty, oversized or control-character tag value.`);
+      }
+      unique.set(JSON.stringify([key, value ?? null]), value === undefined ? { key } : { key, value });
+    }
+    return { name: set.name, type: set.type,
+      tags: [...unique.entries()].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, filter]) => filter) };
+  });
+}
+
 export type LoadOsmParams = {
   outputTableName?: string;
   autoLoadLayers: {
     /** CRS of the OSM input data (source). Defaults to EPSG:4326. */
     coordinateFormat?: string;
-    /** Public layers to retain. Surface is always constructed as a workspace mask, hidden unless requested. */
+    /** Public layers to retain; may be empty for tag-only loads. Surface is always constructed as a workspace mask, hidden unless requested. */
     layers: Array<LayerType>;
   };
   /** Named boundaries or a WGS84 bbox. Surface excludes sea when coastline reconstruction succeeds;
    * otherwise the full query area is used with a warning. Buildings retain complete original parts. */
   queryArea: OsmQueryArea;
+  /** Overpass-only tag-selected layers, clipped to the mandatory surface. Each set requires one geometry type. */
+  tagSets?: OsmTagSet[];
   /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
   pbfFileUrl?: string;
   /** When true, bypasses the cached Overpass response and fetches fresh data. */

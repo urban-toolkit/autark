@@ -13,7 +13,7 @@ import {
   DEFAULT_WORKSPACE_NAME,
 } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { LoadOsmParams, OsmElement, OsmNamedArea, boundingBoxOf, isBoundingBoxArea } from '../load-osm-overpass/interfaces';
+import { LoadOsmParams, OsmElement, OsmNamedArea, boundingBoxOf, checkTagSets, isBoundingBoxArea } from '../load-osm-overpass/interfaces';
 import type { MultiPolygon } from 'geojson';
 import { coastalLandMask } from '../../internal/process-osm-surface/coastline';
 import { OsmProcessingPipeline } from '../../internal/process-osm/pipeline';
@@ -112,6 +112,9 @@ export class LoadOsmFromPbfUseCase {
   }
 
   async exec(params: LoadOsmParams): Promise<OsmExecResult> {
+    if (checkTagSets(params.tagSets).length > 0) {
+      throw new Error('tagSets are not supported with pbfFileUrl.');
+    }
     const pbfFileUrl = params.pbfFileUrl;
     if (!pbfFileUrl) throw new Error('pbfFileUrl must be provided for PBF loading');
     const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
