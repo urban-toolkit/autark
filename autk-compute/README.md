@@ -48,6 +48,8 @@ const result = await compute.gpgpuPipeline({
 console.log(result.features[0].properties?.compute?.volumeProxy);
 ```
 
+If the GPU rejects the pass, `gpgpuPipeline` (and `ComputeGpgpu.run`) rejects with an `Error` whose message names the GPU error type (`validation`, `out-of-memory` or `internal`) and includes the GPU's own message, for example for a `wgslBody` that does not compile, a binding over the device's `maxStorageBufferBindingSize`, a buffer the GPU cannot allocate, or a pipeline the driver cannot build. It does not resolve with the zeros a failed pass leaves in its output.
+
 ### Global arrays and matrices
 
 `uniforms` contains scalar constants in uniform buffers. Despite their historical names, `uniformArrays` and `uniformMatrices` are **global read-only storage buffers**, shared by every feature. Large globals are read in place rather than copied into function-local arrays or passed by value. This avoids the uniform-buffer size limit and large-array compiler stack issues; it is not a promise of faster computation.
@@ -66,16 +68,16 @@ const result = await compute.gpgpuPipeline({
 });
 ```
 
-Each feature buffer, global array/matrix and output consumes a storage binding. The shared device requests the adapter's `maxStorageBuffersPerShaderStage`; dispatches exceeding the resulting device limit throw before GPU resources are created. Storage binding size and total buffer size limits still apply. Scalars do not consume storage bindings. Global arrays/matrices cannot be modified in WGSL; code that previously modified a local copy must use separate local working data.
+Each feature buffer, global array/matrix and output consumes a storage binding. The shared device requests the adapter's `maxStorageBuffersPerShaderStage`; dispatches exceeding the resulting device limit throw before GPU resources are created. Storage binding size and total buffer size limits still apply: a dispatch over them rejects with the GPU's message. Scalars do not consume storage bindings. Global arrays/matrices cannot be modified in WGSL; code that previously modified a local copy must use separate local working data.
 
-For actual GPU regression tests, run `npm run test:webgpu --workspace=@urban-toolkit/autk-compute` from the repository root. This uses local source through Vite and headless Chrome (no CDN/downloaded fixtures); requires Node with built-in WebSocket support and a WebGPU-enabled Chrome. Set `CHROME_BIN` if Chrome is not at the default macOS/Linux path. The test fails if no GPU is available, checks numerical results and validation errors, and prints adapter information. Ordinary Vitest tests check shader generation and binding configuration, not GPU execution.
+For actual GPU regression tests, run `npm run test:webgpu --workspace=@urban-toolkit/autk-compute` from the repository root. This uses local source through Vite and headless Chrome (no CDN/downloaded fixtures); requires Node with built-in WebSocket support and a WebGPU-enabled Chrome. Set `CHROME_BIN` if Chrome is not at the default macOS/Linux path. The test fails if no GPU is available, checks numerical results and validation errors, and prints adapter information. Ordinary Vitest tests check shader generation, binding configuration and GPU error handling against a fake device, not GPU execution.
 
 ### API summary
 
 * `new AutkComputeEngine()`: Creates the unified compute engine.
-* `gpgpuPipeline(params)`: Runs a WGSL compute pass over feature properties and writes scalar or columnar results into `properties.compute`.
+* `gpgpuPipeline(params)`: Runs a WGSL compute pass over feature properties and writes scalar or columnar results into `properties.compute`. Rejects with the GPU's message if the GPU rejects the pass.
 * `renderPipeline(params)`: Renders layer views from sampled viewpoints and writes visibility metrics into `properties.compute.render`.
-* `ComputeGpgpu`: Lower-level GPGPU pipeline class used by the engine.
+* `ComputeGpgpu`: Lower-level GPGPU pipeline class used by the engine; its `run(params)` resolves and rejects as `gpgpuPipeline` does.
 * `ComputeRender`: Lower-level render-analysis pipeline class used by the engine.
 * `generateViewOrigins(...)`: Builds camera origins from viewpoint collections.
 * `expandCameraSamples(...)`: Expands origins into directional camera samples.

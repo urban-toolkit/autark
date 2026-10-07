@@ -54,6 +54,7 @@ export class ComputeGpgpu extends GpuPipeline {
      * @returns Promise resolving to a copied collection with results in `feature.properties.compute`.
      * @throws If neither `resultField` nor `outputColumns` is provided.
      * @throws If WGSL identifiers are invalid or collide with reserved words.
+     * @throws If the GPU rejects the pass with a validation, out-of-memory or internal error; the message includes the GPU's message.
      * @example
      * const gpgpu = new ComputeGpgpu();
      * const result = await gpgpu.run({
@@ -105,7 +106,8 @@ export class ComputeGpgpu extends GpuPipeline {
      *
      * @param config Compute configuration.
      * @returns Output names mapped to readback typed arrays.
-     * @throws If device creation fails, the storage binding limit is exceeded, or shader compilation fails.
+     * @throws If device creation fails or the storage binding limit is exceeded.
+     * @throws If the GPU reports a validation (including shader compilation), out-of-memory or internal error for the pass; the message includes the GPU's message.
      * @example
      * const result = await pipeline.runCompute({
      *   shader: wgslCode,
@@ -127,66 +129,69 @@ export class ComputeGpgpu extends GpuPipeline {
         const outputBuffers = new Map<string, GPUBuffer>();
         const stagingBuffers = new Map<string, GPUBuffer>();
         try {
-            const shaderModule = device.createShaderModule({ code: shader });
-            const pipeline = device.createComputePipeline({
-                layout: 'auto',
-                compute: { module: shaderModule, entryPoint },
+            // A pass the GPU rejects would read back as zeros: reject with the GPU's message instead.
+            await this.submitInErrorScopes(device, 'ComputeGpgpu', () => {
+                const shaderModule = device.createShaderModule({ code: shader });
+                const pipeline = device.createComputePipeline({
+                    layout: 'auto',
+                    compute: { module: shaderModule, entryPoint },
+                });
+
+                const outputSizes = new Map<string, number>();
+                const groupEntries = new Map<number, GPUBindGroupEntry[]>();
+
+                for (const [name, input] of Object.entries(inputs)) {
+                    const group = input.group ?? 0;
+                    const usage = input.type === 'uniform'
+                        ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+                        : GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
+                    const aligned = this.alignTo(input.data.byteLength, input.type === 'uniform' ? 16 : 4);
+                    const buf = this.createBuffer(device, aligned, usage, input.data);
+                    inputBuffers.set(name, buf);
+                    const entries = groupEntries.get(group) ?? [];
+                    entries.push({ binding: input.binding, resource: { buffer: buf } });
+                    groupEntries.set(group, entries);
+                }
+
+                for (const [name, output] of Object.entries(outputs)) {
+                    const group = output.group ?? 0;
+                    const aligned = this.alignTo(output.size, 4);
+                    const buf = this.createBuffer(device, aligned, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+                    outputBuffers.set(name, buf);
+                    outputSizes.set(name, aligned);
+                    const entries = groupEntries.get(group) ?? [];
+                    entries.push({ binding: output.binding, resource: { buffer: buf } });
+                    groupEntries.set(group, entries);
+                }
+
+                const groups = [...groupEntries.keys()].sort((a, b) => a - b);
+                const bindGroups = new Map<number, GPUBindGroup>();
+                for (const g of groups) {
+                    bindGroups.set(g, device.createBindGroup({
+                        layout: pipeline.getBindGroupLayout(g),
+                        entries: groupEntries.get(g)!,
+                    }));
+                }
+
+                const encoder = device.createCommandEncoder();
+
+                const pass = encoder.beginComputePass();
+                pass.setPipeline(pipeline);
+                for (const g of groups) {
+                    pass.setBindGroup(g, bindGroups.get(g)!);
+                }
+                pass.dispatchWorkgroups(dispatchSize[0] ?? 1, dispatchSize[1] ?? 1, dispatchSize[2] ?? 1);
+                pass.end();
+
+                for (const [key, buf] of outputBuffers) {
+                    const size = outputSizes.get(key)!;
+                    const staging = this.createStagingBuffer(device, size);
+                    stagingBuffers.set(key, staging);
+                    encoder.copyBufferToBuffer(buf, 0, staging, 0, size);
+                }
+
+                device.queue.submit([encoder.finish()]);
             });
-
-            const outputSizes = new Map<string, number>();
-            const groupEntries = new Map<number, GPUBindGroupEntry[]>();
-
-            for (const [name, input] of Object.entries(inputs)) {
-                const group = input.group ?? 0;
-                const usage = input.type === 'uniform'
-                    ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-                    : GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
-                const aligned = this.alignTo(input.data.byteLength, input.type === 'uniform' ? 16 : 4);
-                const buf = this.createBuffer(device, aligned, usage, input.data);
-                inputBuffers.set(name, buf);
-                const entries = groupEntries.get(group) ?? [];
-                entries.push({ binding: input.binding, resource: { buffer: buf } });
-                groupEntries.set(group, entries);
-            }
-
-            for (const [name, output] of Object.entries(outputs)) {
-                const group = output.group ?? 0;
-                const aligned = this.alignTo(output.size, 4);
-                const buf = this.createBuffer(device, aligned, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-                outputBuffers.set(name, buf);
-                outputSizes.set(name, aligned);
-                const entries = groupEntries.get(group) ?? [];
-                entries.push({ binding: output.binding, resource: { buffer: buf } });
-                groupEntries.set(group, entries);
-            }
-
-            const groups = [...groupEntries.keys()].sort((a, b) => a - b);
-            const bindGroups = new Map<number, GPUBindGroup>();
-            for (const g of groups) {
-                bindGroups.set(g, device.createBindGroup({
-                    layout: pipeline.getBindGroupLayout(g),
-                    entries: groupEntries.get(g)!,
-                }));
-            }
-
-            const encoder = device.createCommandEncoder();
-
-            const pass = encoder.beginComputePass();
-            pass.setPipeline(pipeline);
-            for (const g of groups) {
-                pass.setBindGroup(g, bindGroups.get(g)!);
-            }
-            pass.dispatchWorkgroups(dispatchSize[0] ?? 1, dispatchSize[1] ?? 1, dispatchSize[2] ?? 1);
-            pass.end();
-
-            for (const [key, buf] of outputBuffers) {
-                const size = outputSizes.get(key)!;
-                const staging = this.createStagingBuffer(device, size);
-                stagingBuffers.set(key, staging);
-                encoder.copyBufferToBuffer(buf, 0, staging, 0, size);
-            }
-
-            device.queue.submit([encoder.finish()]);
 
             const result: Record<string, TypedArray> = {};
             for (const [key, staging] of stagingBuffers) {

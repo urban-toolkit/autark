@@ -50,6 +50,7 @@ export class AutkComputeEngine {
      * @param params Pipeline parameters.
      * @returns Promise resolving to the input collection with computed values attached.
      * @throws If `resultField` or `outputColumns` is missing, or WGSL identifiers are invalid.
+     * @throws If the GPU rejects the pass with a validation, out-of-memory or internal error; the message includes the GPU's message.
      * @example
      * const engine = new AutkComputeEngine();
      * const result = await engine.gpgpuPipeline({

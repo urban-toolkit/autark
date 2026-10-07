@@ -10,6 +10,9 @@
 
 import { getSharedGpuDevice } from './device-manager';
 
+/** Error scopes opened around submitted work, in push order. */
+const GPU_ERROR_FILTERS: GPUErrorFilter[] = ['validation', 'out-of-memory', 'internal'];
+
 /**
  * Shared base class for WebGPU compute pipelines.
  *
@@ -93,6 +96,44 @@ export abstract class GpuPipeline {
         const result = new Ctor(staging.getMappedRange().slice(0));
         staging.unmap();
         return result;
+    }
+
+    /**
+     * Runs synchronous GPU work inside validation, out-of-memory and internal error scopes.
+     *
+     * WebGPU does not throw for an invalid shader, binding or allocation: it reports the
+     * error on the device and the submitted pass does nothing, so its output reads back
+     * as zeros. The scopes are pushed and popped within this one synchronous stretch, so
+     * work that other callers submit to the shared device cannot land in them.
+     *
+     * @param device GPU device that receives the work.
+     * @param label Prefix for the rejection message.
+     * @param work Synchronous function that creates resources and encodes and submits commands.
+     * @returns Promise resolving to the value returned by `work` once no scope caught an error.
+     * @throws If a scope caught a GPU error; the message names the error type and includes the GPU's message.
+     * @throws If `work` throws; the scopes are popped first.
+     * @example
+     * await this.submitInErrorScopes(device, 'ComputeGpgpu', () => device.queue.submit([encoder.finish()]));
+     */
+    protected async submitInErrorScopes<T>(device: GPUDevice, label: string, work: () => T): Promise<T> {
+        for (const filter of GPU_ERROR_FILTERS) {
+            device.pushErrorScope(filter);
+        }
+        let value: T;
+        let popped: Promise<(GPUError | null)[]>;
+        try {
+            value = work();
+        } finally {
+            // Scopes form a stack: the first pop returns the last filter pushed.
+            popped = Promise.all(GPU_ERROR_FILTERS.map(() => device.popErrorScope()).reverse());
+        }
+        const messages = (await popped).flatMap((error, i) =>
+            error ? [`GPU ${GPU_ERROR_FILTERS[i]} error: ${error.message}`] : []
+        );
+        if (messages.length > 0) {
+            throw new Error(`${label}: ${messages.join('\n')}`);
+        }
+        return value;
     }
 
     /**
