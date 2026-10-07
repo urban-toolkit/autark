@@ -51,6 +51,7 @@
     "vite-plugin-dts": "^5.0.3"
   },
   "dependencies": {
+    "@types/emscripten": "^1.41.6",
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@osmix/pbf": "^0.0.9",
     "@osmix/shared": "^0.0.13",

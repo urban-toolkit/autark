@@ -8,10 +8,9 @@ dist/
 
 # Dependencies
 node_modules/
-*package-lock.json
-
 # Lock files (managed at workspace root)
-autk*/package-lock.json
+**/package-lock.json
+!/package-lock.json
 
 # TypeScript
 *.tsbuildinfo

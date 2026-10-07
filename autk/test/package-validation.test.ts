@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -31,6 +31,28 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
+});
+
+describe('published package dependencies', () => {
+  it.each(['0.9.0', 'workspace:*', 'file:../autk-core'])('rejects mismatched internal dependency %s', version => {
+    const file = resolve(root, 'autk-map/package.json');
+    const manifest = JSON.parse(readFileSync(file, 'utf8'));
+    manifest.dependencies = { '@urban-toolkit/autk-core': version };
+    writeFileSync(file, JSON.stringify(manifest));
+    const result = spawnSync(process.execPath, [validator], { cwd: root, encoding: 'utf8' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('must match workspace version 1.0.0');
+  }, 30_000);
+
+  it('rejects local references to non-workspace dependencies', () => {
+    const file = resolve(root, 'autk-core/package.json');
+    const manifest = JSON.parse(readFileSync(file, 'utf8'));
+    manifest.dependencies = { other: 'file:../other' };
+    writeFileSync(file, JSON.stringify(manifest));
+    const result = spawnSync(process.execPath, [validator], { cwd: root, encoding: 'utf8' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unpublished local reference');
+  });
 });
 
 describe('published package declarations', () => {

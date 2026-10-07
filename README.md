@@ -54,7 +54,7 @@ npm install @urban-toolkit/autk-map
 
 ### Dependencies
 
-You need Node.js installed to build and run this project for development purposes. Please check the [Node.js website](https://nodejs.org/) for instructions.
+CI uses Node.js 22.23.3 and npm 11.15.0. Use those versions to reproduce CI and release checks. Install workspace dependencies with `npm ci`; the root `package-lock.json` is versioned. Use `npm install` only when intentionally updating dependencies, and include the resulting lockfile changes.
 
 We also use GNU Make to automate the build process. To install it, please use one of the following commands (we recommend using the package manager [Chocolatey](https://chocolatey.org/) on Windows):
 
@@ -76,13 +76,15 @@ Run from the repository root:
 ```bash
 npm test                    # Vitest, package test directories
 npm test -- autk-core/test  # one package
-make verify                 # lint, tests, typecheck and build
-make package-validate       # validate publishable artifacts
+make verify                 # lint, tests, typecheck, build and package validation
+make package-validate       # build and validate publishable artifacts
+npm run pack:packages       # produce local tarballs; never publishes
+npm run test:packages       # test those tarballs outside the workspace
 ```
 
-Package validation also rejects relative `from` references in packed TypeScript declarations that escape the package directory. Published types must reference shared core APIs through `@urban-toolkit/autk-core`, not workspace source paths.
+Package validation rejects mismatched internal dependency versions, local dependency references, and relative `from` references in packed TypeScript declarations that escape the package directory. Published types must reference shared core APIs through `@urban-toolkit/autk-core`, not workspace source paths. Isolated consumer checks install all six tarballs outside the repository, typecheck without `skipLibCheck`, check Node imports and bundle browser imports, including the umbrella subpaths.
 
-Vitest requires a supported Node release (22.12+ within 22.x, 24.x, or 26+). DB integration tests use real DuckDB-WASM in Node and load the spatial extension; extension access is required. Browser/WebGPU tests are separate and currently deferred. There are currently no test cases for `autk-plot`; the other five packages have regression tests.
+Vitest requires a supported Node release (22.14+ within 22.x, 24.x, or 26+). DB integration tests use real DuckDB-WASM in Node and load the spatial extension; extension access is required. CI runs the complete Vitest suite and isolated package checks. Before approving a release, run `npm run test:webgpu --workspace=@urban-toolkit/autk-compute` locally with WebGPU-enabled Chrome and visually check the gallery. The GPU runner reports browser/adapter information and fails if GPU execution is unavailable; CI shader tests do not replace this hardware check. `autk-plot` is covered by isolated package consumption but has no dedicated behavior tests.
 
 ### Building and Running
 
@@ -117,10 +119,14 @@ The `Makefile` provides several commands to help with the development process:
 | `make lint` | Runs ESLint. |
 | `make typecheck` | Builds package outputs, then typechecks all workspaces. |
 | `make build` | Builds the publishable packages and the `autk` umbrella package. |
-| `make verify` | Runs lint and typecheck (including the build required for type resolution). |
+| `make verify` | Runs lint, tests, typecheck, build and package validation. |
 | `make package-validate` | Builds packages and validates the publishable npm artifacts. |
 | `make docs` | Generates TypeDoc documentation for the core libraries. |
-| `make clean` | Removes `node_modules` and build artifacts. |
+| `make clean` | Removes `node_modules` and build artifacts, preserving the root lockfile. |
+
+### Releases
+
+Releases are disabled by default. CI only builds, tests and uploads tarballs; it cannot publish. See [the release procedure](.doc/NPM-RELEASE.md) for GitHub environment setup, stage-only npm Trusted Publishers, 2FA approval, recovery and Git tag finalization. The next coordinated major is 4.0.0, but its version bump is deferred until the remaining PR is integrated. Draft migration notes are in [.doc/RELEASE-4.0.0.md](.doc/RELEASE-4.0.0.md).
 
 ## Notes
 

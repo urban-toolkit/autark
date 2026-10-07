@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
@@ -11,6 +11,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const chrome = process.env.CHROME_BIN ?? (process.platform === 'darwin'
     ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
 if (!existsSync(chrome)) throw new Error('Chrome not found; set CHROME_BIN to a WebGPU-enabled Chrome executable.');
+console.log(`Node ${process.version}; ${execFileSync(chrome, ['--version'], { encoding: 'utf8' }).trim()}`);
 await mkdir(resolve(root, '.cache'), { recursive: true });
 const profile = await mkdtemp(resolve(root, '.cache/autk-webgpu-'));
 const server = await createServer({ root, configFile: false, plugins: [glsl()],
@@ -80,6 +81,13 @@ try {
     console.log(JSON.stringify(result.result.value, null, 2));
 } finally {
     socket?.close();
-    browser?.kill('SIGTERM');
+    if (browser?.pid && browser.exitCode === null && browser.signalCode === null) {
+        await new Promise(resolveExit => {
+            const timeout = setTimeout(() => browser.kill('SIGKILL'), 5000);
+            browser.once('exit', () => { clearTimeout(timeout); resolveExit(); });
+            browser.kill('SIGTERM');
+        });
+    }
     await server.close();
+    await rm(profile, { recursive: true, force: true });
 }

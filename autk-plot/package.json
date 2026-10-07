@@ -32,7 +32,6 @@
     "doc:watch": "typedoc --options typedoc.json --watch"
   },
   "devDependencies": {
-    "@types/d3": "^7.4.3",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1",
     "eslint": "^10.6.0",
@@ -48,6 +47,7 @@
     "vite-plugin-dts": "^5.0.3"
   },
   "dependencies": {
+    "@types/d3": "^7.4.3",
     "@turf/turf": "^7.3.5",
     "@urban-toolkit/autk-core": "3.0.1",
     "d3": "^7.9.0",

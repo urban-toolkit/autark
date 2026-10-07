@@ -23,10 +23,23 @@ function collectTargets(exportsField, targets = new Set()) {
   return targets;
 }
 
+const manifests = new Map(packageDirs.map(dir => {
+  const manifest = JSON.parse(readFileSync(path.join(rootDir, dir, 'package.json'), 'utf8'));
+  return [manifest.name, manifest];
+}));
+
 for (const dir of packageDirs) {
   const packageDir = path.join(rootDir, dir);
   const manifestPath = path.join(packageDir, 'package.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  for (const [name, version] of Object.entries({ ...manifest.dependencies, ...manifest.optionalDependencies, ...manifest.peerDependencies })) {
+    if (manifests.has(name) && version !== manifests.get(name).version) {
+      fail(`${dir}: ${name} must match workspace version ${manifests.get(name).version}, got ${version}`);
+    }
+    if (/^(?:file:|link:|workspace:)/.test(version)) {
+      fail(`${dir}: dependency ${name} uses unpublished local reference ${version}`);
+    }
+  }
   const exportTargets = [...collectTargets(manifest.exports)];
   const directTargets = [manifest.main, manifest.module, manifest.types].filter(Boolean);
   const expectedTargets = [...new Set([...exportTargets, ...directTargets])]

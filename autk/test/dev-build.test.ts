@@ -1,6 +1,16 @@
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { loadConfigFromFile } from 'vite';
 import { describe, expect, it } from 'vitest';
+
+it('cleans every workspace before removing root tools and preserves the lockfile', () => {
+  const commands = execFileSync('make', ['-n', 'clean'], { encoding: 'utf8' });
+  expect(commands).not.toContain('package-lock.json');
+  expect(commands.trim().split('\n').at(-1)).toBe('./node_modules/.bin/rimraf node_modules');
+  for (const dir of ['autk-core', 'autk-map', 'autk-db', 'autk-plot', 'autk-compute', 'autk', 'gallery', 'usecases']) {
+    expect(commands).toContain(`cd ${dir} && .././node_modules/.bin/rimraf dist build node_modules`);
+  }
+});
 
 describe('workspace library watch builds', () => {
   it.each([

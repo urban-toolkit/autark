@@ -11,5 +11,6 @@ export default defineConfig({
   },
   test: {
     include: ['autk*/test/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/._*'],
   },
 });

@@ -1,7 +1,7 @@
 .PHONY: lint test typecheck build package-validate docs verify dev gallery usecases clean
 
-CONCURRENTLY := npx concurrently
-RIMRAF := npx rimraf
+CONCURRENTLY := ./node_modules/.bin/concurrently
+RIMRAF := ./node_modules/.bin/rimraf
 
 APP ?= gallery
 
@@ -13,14 +13,14 @@ test:
 
 typecheck: build
 	$(CONCURRENTLY) \
-		"cd autk-core && npx tsc --noEmit --skipLibCheck" \
-		"cd autk-map && npx tsc --noEmit --skipLibCheck" \
-		"cd autk-db && npx tsc --noEmit --skipLibCheck" \
-		"cd autk-plot && npx tsc --noEmit --skipLibCheck" \
-		"cd autk-compute && npx tsc --noEmit --skipLibCheck" \
-		"cd autk && npx tsc --noEmit --skipLibCheck" \
-		"cd gallery && npx tsc --noEmit --skipLibCheck" \
-		"cd usecases && npx tsc --noEmit --skipLibCheck"
+		"cd autk-core && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd autk-map && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd autk-db && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd autk-plot && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd autk-compute && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd autk && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd gallery && ../node_modules/.bin/tsc --noEmit --skipLibCheck" \
+		"cd usecases && ../node_modules/.bin/tsc --noEmit --skipLibCheck"
 
 build:
 	cd autk-core && npm run build
@@ -43,9 +43,10 @@ docs:
 		"cd autk-compute && npm run doc"
 
 verify: lint test typecheck
+	npm run validate:packages
 
 dev:
-	npm install
+	npm ci
 	make build
 	$(CONCURRENTLY) \
 		"cd autk-core && npm run dev-build" \
@@ -63,13 +64,13 @@ usecases:
 	$(MAKE) dev APP=usecases$(if $(OPEN), OPEN=$(OPEN))
 
 clean:
-	$(RIMRAF) node_modules package-lock.json
 	$(CONCURRENTLY) \
-		"cd autk-core && $(RIMRAF) dist build node_modules" \
-		"cd autk-map && $(RIMRAF) dist build node_modules" \
-		"cd autk-db && $(RIMRAF) dist build node_modules" \
-		"cd autk-plot && $(RIMRAF) dist build node_modules" \
-		"cd autk-compute && $(RIMRAF) dist build node_modules" \
-		"cd autk && $(RIMRAF) dist build node_modules" \
-		"cd gallery && $(RIMRAF) dist build node_modules" \
-		"cd usecases && $(RIMRAF) dist build node_modules"
+		"cd autk-core && ../$(RIMRAF) dist build node_modules" \
+		"cd autk-map && ../$(RIMRAF) dist build node_modules" \
+		"cd autk-db && ../$(RIMRAF) dist build node_modules" \
+		"cd autk-plot && ../$(RIMRAF) dist build node_modules" \
+		"cd autk-compute && ../$(RIMRAF) dist build node_modules" \
+		"cd autk && ../$(RIMRAF) dist build node_modules" \
+		"cd gallery && ../$(RIMRAF) dist build node_modules" \
+		"cd usecases && ../$(RIMRAF) dist build node_modules"
+	$(RIMRAF) node_modules

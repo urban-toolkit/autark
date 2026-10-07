@@ -5,7 +5,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "validate:packages": "node .github/scripts/validate-packages.mjs"
+    "validate:packages": "node .github/scripts/validate-packages.mjs",
+    "pack:packages": "node .github/scripts/pack-packages.mjs",
+    "test:packages": "node .github/scripts/test-packages.mjs",
+    "release:prepare": "node .github/scripts/prepare-release.mjs"
   },
   "workspaces": [
     "autk",
@@ -17,6 +20,14 @@
     "gallery",
     "usecases"
   ],
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "overrides": {
+    "concurrently": {
+      "shell-quote": "1.12.0"
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.1.0",
@@ -24,6 +35,9 @@
     "@typescript-eslint/parser": "^8.62.1",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
+    "concurrently": "9.2.4",
+    "rimraf": "6.1.3",
+    "semver": "7.8.5",
     "vitest": "^5.0.0"
   }
 }

@@ -1,12 +1,13 @@
-name: Publish to npm
+name: Finalize npm release
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: Successful main-push CI run ID whose staged packages were approved on npm
+        required: true
+        type: string
 
-# Disabled unless a maintainer explicitly sets NPM_RELEASE_ENABLED=true.
 permissions:
   contents: read
 
@@ -16,13 +17,7 @@ concurrency:
 
 jobs:
   candidate:
-    name: Verify release candidate
-    if: >-
-      ${{ vars.NPM_RELEASE_ENABLED == 'true' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'main' &&
-          github.event.workflow_run.head_repository.full_name == github.repository }}
+    if: vars.NPM_RELEASE_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: macos-latest
     timeout-minutes: 10
     permissions:
@@ -43,48 +38,42 @@ jobs:
           node-version: 22.23.3
       - run: npm install --global npm@11.15.0
       - run: npm ci --ignore-scripts
-      - name: Inspect the successful CI run and version changes
+      - name: Verify original CI execution
         id: ci
         env:
           GH_TOKEN: ${{ github.token }}
-          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
         run: node .github/scripts/resolve-release-run.mjs
 
-  stage:
-    name: Stage tested packages for npm approval
+  tags:
     needs: candidate
     if: needs.candidate.outputs.has_release == 'true'
     environment: npm-release
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       actions: read
-      id-token: write
     steps:
-      - name: Checkout tested commit
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.candidate.outputs.sha }}
           fetch-depth: 0
-          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22.23.3
-          registry-url: https://registry.npmjs.org
       - run: npm install --global npm@11.15.0
       - run: npm ci --ignore-scripts
-      - name: Download artifacts from the verified CI attempt
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ needs.candidate.outputs.artifact }}
           run-id: ${{ needs.candidate.outputs.run_id }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/npm-release
-      - name: Preflight and stage (never approve or publish directly)
+      - name: Verify public npm versions and atomically create Git tags
         env:
           NPM_RELEASE_ENABLED: ${{ vars.NPM_RELEASE_ENABLED }}
           RELEASE_SHA: ${{ needs.candidate.outputs.sha }}
           RELEASE_RUN_ID: ${{ needs.candidate.outputs.run_id }}
           RELEASE_RUN_ATTEMPT: ${{ needs.candidate.outputs.run_attempt }}
-        run: node .github/scripts/release.mjs stage "$RUNNER_TEMP/npm-release"
+        run: node .github/scripts/release.mjs finalize "$RUNNER_TEMP/npm-release"
