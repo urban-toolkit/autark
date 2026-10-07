@@ -126,7 +126,7 @@ The `Makefile` provides several commands to help with the development process:
 
 ### Releases
 
-Releases are disabled by default. CI only builds, tests and uploads tarballs; it cannot publish. See [the release procedure](.doc/NPM-RELEASE.md) for GitHub environment setup, stage-only npm Trusted Publishers, 2FA approval, recovery and Git tag finalization. The coordinated 4.0.0 release candidate includes PR #114's GPU error handling; npm approval is required before publication. Migration notes are in [.doc/RELEASE-4.0.0.md](.doc/RELEASE-4.0.0.md).
+Releases are disabled by default. CI only builds, tests and uploads tarballs; it cannot publish. See [the release procedure](.doc/NPM-RELEASE.md) for GitHub environment setup, stage-only npm Trusted Publishers, 2FA approval, recovery and Git tag finalization. The coordinated 4.0.0 release is public on npm and includes PR #114's GPU error handling. Its package integrity/provenance and six Git tags match the tested release commit. Migration notes are in [.doc/RELEASE-4.0.0.md](.doc/RELEASE-4.0.0.md).
 
 ## Notes
 

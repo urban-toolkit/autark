@@ -1,8 +1,8 @@
 # Autark 4.0.0 — migration notes
 
-Status: **release candidate**, awaiting npm staging and maintainer 2FA approval. PR #114 is integrated and all six package versions and internal dependencies are prepared as 4.0.0.
+Status: **published on 2026-10-07**. All six packages are public as `latest` 4.0.0, after npm staging and maintainer approval. Their integrity and provenance match release commit `30159045d4c004f98140fe4bd941e84bee5088b8`; all six Git tags point to that commit.
 
-The six packages will use 4.0.0 together: `@urban-toolkit/autk-core`, `autk-db`, `autk-map`, `autk-compute`, `autk-plot` and the `autk` umbrella package. The major increase is required by incompatible core/DB/compute contracts; map/plot also move to the coordinated major, not because every package introduced a separate breaking API change.
+The six packages use 4.0.0 together: `@urban-toolkit/autk-core`, `autk-db`, `autk-map`, `autk-compute`, `autk-plot` and the `autk` umbrella package. The major increase is required by incompatible core/DB/compute contracts; map/plot also move to the coordinated major, not because every package introduced a separate breaking API change.
 
 ## Building features and joins
 
@@ -45,13 +45,17 @@ The six packages will use 4.0.0 together: `@urban-toolkit/autk-core`, `autk-db`,
 - CI validates real tarballs outside the workspace, including declarations, Node imports and browser bundling.
 - Release artifacts are submitted through stage-only npm Trusted Publishing. npm approval requires maintainer 2FA; Git tags are finalized only after public package integrity is verified.
 
-## Before release
+## Release verification
 
 - [x] Integrate and document PR #114.
 - [x] Prepare coordinated 4.0.0 versions and root lockfile.
-- [ ] Pass CI and isolated tarball checks.
+- [x] [CI and isolated tarball checks](https://github.com/urban-toolkit/autark/actions/runs/37679077299) passed.
 - [x] Local verification: 272 Vitest cases, lint, build/typecheck, package validation and isolated consumers passed with Node 22.23.3 / npm 11.15.0.
 - [x] Hardware WebGPU: 11 cases passed with Chrome 154.0.8037.98 on Apple Metal 3, including invalid WGSL rejection.
-- [ ] Visually inspect the gallery before npm approval.
-- [ ] Review all six npm stages and approve in dependency order.
-- [ ] Verify npm versions/provenance, finalize Git tags and test registry installation.
+- [x] All six npm stages were approved by the maintainer and became public.
+- [x] Public tarball integrity and provenance source/package digests match the original CI artifacts.
+- [x] [Git tag finalization](https://github.com/urban-toolkit/autark/actions/runs/37684907924) passed; all six tags point to release commit `3015904`.
+- [x] Clean registry installation of `@urban-toolkit/autk@4.0.0`, all internal versions, declarations, Node imports and browser bundling passed.
+- [x] `NPM_RELEASE_ENABLED` restored to `false`.
+
+Manual gallery visual inspection was not recorded as part of this release verification.

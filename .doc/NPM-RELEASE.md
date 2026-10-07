@@ -2,7 +2,7 @@
 
 ## Current safety state
 
-Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. PR #114 is integrated; the coordinated 4.0.0 release candidate is prepared and requires npm staging and maintainer 2FA approval before becoming public.
+Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. The coordinated 4.0.0 release is public, its six Git tags are finalized, and `NPM_RELEASE_ENABLED` is restored to `false`. See the [completed release verification](RELEASE-4.0.0.md#release-verification).
 
 This procedure uses staged publishing, not direct publishing. GitHub only submits artifacts; a maintainer approves them on npm with 2FA. Git tags are created in a separate workflow after all selected versions are public and their integrity has been verified.
 
@@ -27,11 +27,11 @@ Official references: [Trusted Publishers](https://docs.npmjs.com/trusted-publish
 
 ## Prepare a release (local, no npm mutation)
 
-Only after integrating the agreed PRs and approving the release contents:
+Only after integrating the agreed PRs and approving the release contents. Choose a version greater than the current one; the following example prepares a patch release after 4.0.0:
 
 ```bash
 npm ci
-npm run release:prepare -- 4.0.0
+npm run release:prepare -- 4.0.1
 make verify
 npm run pack:packages
 npm run test:packages
@@ -40,9 +40,9 @@ npm run test:webgpu --workspace=@urban-toolkit/autk-compute
 
 `release:prepare` raises all six versions together, updates internal references in libraries/gallery/usecases, and refreshes the root lockfile without running install scripts. It does not create Git tags, commits, pushes, stages or public versions.
 
-Review the generated manifest/lockfile changes and update the [migration notes](RELEASE-4.0.0.md). Visually inspect the gallery: smaller generic points/lines, harmonious colors, typed OSM tag sets and runtime polygon border toggles. Hardware WebGPU checks remain local; CI validates shader generation and runs the complete Vitest suite.
+Review the generated manifest/lockfile changes and write migration notes for the new version; [4.0.0](RELEASE-4.0.0.md) is a completed example. Visually inspect the gallery: smaller generic points/lines, harmonious colors, typed OSM tag sets and runtime polygon border toggles. Hardware WebGPU checks remain local; CI validates shader generation and runs the complete Vitest suite.
 
-Commit and push only when authorized, using a message such as `chore(release): prepare 4.0.0`. Enable `NPM_RELEASE_ENABLED=true` immediately before the authorized release push. Do not merge another version bump while this release is pending.
+Commit and push only when authorized, using a message such as `chore(release): prepare 4.0.1`. Enable `NPM_RELEASE_ENABLED=true` immediately before the authorized release push. Do not merge another version bump while this release is pending.
 
 ## CI and staging
 
@@ -80,7 +80,7 @@ After all selected versions are public:
 2. Enter the original successful main-push CI run ID from the release commit (the numeric ID in its Actions URL), not the staging workflow ID.
 3. Approve the `npm-release` environment again.
 4. The workflow retrieves the original artifacts and verifies that each public version has identical integrity and is the expected `latest`. Only then does it create missing `${package-name}@${version}` tags pointing to the tested commit, using one atomic Git push. Matching existing tags are left intact; conflicts fail.
-5. Inspect both workflow summaries and verify a clean external `npm install @urban-toolkit/autk@4.0.0`, package versions, dist-tags and provenance.
+5. Inspect both workflow summaries and verify a clean external installation of the released umbrella version (for example, `npm install @urban-toolkit/autk@4.0.1`), package versions, dist-tags and provenance.
 6. Set `NPM_RELEASE_ENABLED=false` again.
 
 Finalization never stages, approves or republishes npm packages. Creating a GitHub Release with the migration notes is optional and separate.
