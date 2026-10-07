@@ -22,10 +22,10 @@
   },
   "dependencies": {
     "d3": "^7.9.0",
-    "@urban-toolkit/autk-core": "3.0.1",
-    "@urban-toolkit/autk-db": "3.0.2",
-    "@urban-toolkit/autk-map": "3.0.1",
-    "@urban-toolkit/autk-plot": "3.0.1",
-    "@urban-toolkit/autk-compute": "3.0.1"
+    "@urban-toolkit/autk-core": "4.0.0",
+    "@urban-toolkit/autk-db": "4.0.0",
+    "@urban-toolkit/autk-map": "4.0.0",
+    "@urban-toolkit/autk-plot": "4.0.0",
+    "@urban-toolkit/autk-compute": "4.0.0"
   }
 }

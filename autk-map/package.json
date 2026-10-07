@@ -1,6 +1,6 @@
 {
   "name": "@urban-toolkit/autk-map",
-  "version": "3.0.1",
+  "version": "4.0.0",
   "keywords": [
     "visualization",
     "urban",
@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "@turf/turf": "^7.3.5",
-    "@urban-toolkit/autk-core": "3.0.1",
+    "@urban-toolkit/autk-core": "4.0.0",
     "d3": "^7.9.0",
     "earcut": "^3.2.3",
     "gl-matrix": "^3.4.4",

@@ -1,6 +1,6 @@
-# Autark 4.0.0 — draft migration notes
+# Autark 4.0.0 — migration notes
 
-Status: **unreleased**. Versions have not been bumped. Integrate the remaining PR, review its compatibility impact and complete these notes before preparing the release.
+Status: **release candidate**, awaiting npm staging and maintainer 2FA approval. PR #114 is integrated and all six package versions and internal dependencies are prepared as 4.0.0.
 
 The six packages will use 4.0.0 together: `@urban-toolkit/autk-core`, `autk-db`, `autk-map`, `autk-compute`, `autk-plot` and the `autk` umbrella package. The major increase is required by incompatible core/DB/compute contracts; map/plot also move to the coordinated major, not because every package introduced a separate breaking API change.
 
@@ -26,6 +26,8 @@ The six packages will use 4.0.0 together: `@urban-toolkit/autk-core`, `autk-db`,
 - WGSL that modified a local copy must allocate separate local working data.
 - Each global array/matrix consumes a storage binding, including unused globals. Dispatches exceeding device limits fail before resource creation.
 - Scalar uniforms retain their existing behavior.
+- GPU validation, out-of-memory and internal errors now reject `ComputeGpgpu.run` / `gpgpuPipeline` with the GPU's message instead of silently returning zeros (Fabio Miranda, PR #114). Valid passes retain their existing results; scopes are closed synchronously to isolate concurrent submissions.
+- This error handling does not yet cover `ComputeRender`; that pre-existing limitation remains outside PR #114.
 
 ## New features and rendering defaults
 
@@ -45,9 +47,11 @@ The six packages will use 4.0.0 together: `@urban-toolkit/autk-core`, `autk-db`,
 
 ## Before release
 
-- [ ] Integrate and document the remaining PR.
-- [ ] Prepare coordinated 4.0.0 versions and root lockfile.
+- [x] Integrate and document PR #114.
+- [x] Prepare coordinated 4.0.0 versions and root lockfile.
 - [ ] Pass CI and isolated tarball checks.
-- [ ] Record local hardware WebGPU results and visually inspect the gallery.
+- [x] Local verification: 272 Vitest cases, lint, build/typecheck, package validation and isolated consumers passed with Node 22.23.3 / npm 11.15.0.
+- [x] Hardware WebGPU: 11 cases passed with Chrome 154.0.8037.98 on Apple Metal 3, including invalid WGSL rejection.
+- [ ] Visually inspect the gallery before npm approval.
 - [ ] Review all six npm stages and approve in dependency order.
 - [ ] Verify npm versions/provenance, finalize Git tags and test registry installation.

@@ -2,7 +2,7 @@
 
 ## Current safety state
 
-Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` while the remaining PR is being integrated. Neither CI nor `release:prepare` publishes or submits stages. Current package versions are intentionally unchanged; the next coordinated release is 4.0.0.
+Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. PR #114 is integrated; the coordinated 4.0.0 release candidate is prepared and requires npm staging and maintainer 2FA approval before becoming public.
 
 This procedure uses staged publishing, not direct publishing. GitHub only submits artifacts; a maintainer approves them on npm with 2FA. Git tags are created in a separate workflow after all selected versions are public and their integrity has been verified.
 
@@ -27,7 +27,7 @@ Official references: [Trusted Publishers](https://docs.npmjs.com/trusted-publish
 
 ## Prepare a release (local, no npm mutation)
 
-Only after integrating the remaining PR and agreeing on the release contents:
+Only after integrating the agreed PRs and approving the release contents:
 
 ```bash
 npm ci
@@ -40,7 +40,7 @@ npm run test:webgpu --workspace=@urban-toolkit/autk-compute
 
 `release:prepare` raises all six versions together, updates internal references in libraries/gallery/usecases, and refreshes the root lockfile without running install scripts. It does not create Git tags, commits, pushes, stages or public versions.
 
-Review the generated manifest/lockfile changes and finalize [.doc/RELEASE-4.0.0.md](RELEASE-4.0.0.md). Visually inspect the gallery: smaller generic points/lines, harmonious colors, typed OSM tag sets and runtime polygon border toggles. Hardware WebGPU checks remain local; CI validates shader generation and runs the complete Vitest suite.
+Review the generated manifest/lockfile changes and update the [migration notes](RELEASE-4.0.0.md). Visually inspect the gallery: smaller generic points/lines, harmonious colors, typed OSM tag sets and runtime polygon border toggles. Hardware WebGPU checks remain local; CI validates shader generation and runs the complete Vitest suite.
 
 Commit and push only when authorized, using a message such as `chore(release): prepare 4.0.0`. Enable `NPM_RELEASE_ENABLED=true` immediately before the authorized release push. Do not merge another version bump while this release is pending.
 

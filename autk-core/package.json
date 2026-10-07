@@ -1,6 +1,6 @@
 {
   "name": "@urban-toolkit/autk-core",
-  "version": "3.0.1",
+  "version": "4.0.0",
   "description": "Shared runtime utilities for the Autark toolkit",
   "repository": {
     "type": "git",
