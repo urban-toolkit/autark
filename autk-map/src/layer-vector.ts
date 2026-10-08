@@ -69,7 +69,7 @@ export abstract class VectorLayer extends Layer {
     protected _pipeline!: Pipeline;
 
     /** Off-screen triangle-picking pipeline. */
-    protected _pipelinePicking!: PipelineTrianglePicking;
+    protected _pipelinePicking!: Pipeline;
 
     /** Number of vertices in the position buffer. */
     protected get _vertexCount(): number {

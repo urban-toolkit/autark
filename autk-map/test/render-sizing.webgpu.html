@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Render sizing WebGPU regression</title></head>
+<body>
+<pre id="result">Running WebGPU regression against built packages…</pre>
+<canvas style="width:256px;height:256px"></canvas>
+<script type="module">
+import { AutkMap } from '../dist/autk-map.js';
+
+// Serve the repository root on localhost after make build. This test requires real WebGPU.
+window.renderSizingResult = (async () => {
+    const map = new AutkMap(document.querySelector('canvas'), false);
+    let readback;
+    let numericReadback;
+    let numericOutput;
+    try {
+        await map.init();
+        const renderer = map.renderer;
+        const device = renderer.device;
+        if (!device) { throw new Error('WebGPU initialization failed'); }
+        renderer.resize(256, 256, 1);
+        const errors = [];
+        device.addEventListener('uncapturederror', event => errors.push(event.error.message));
+        device.pushErrorScope('validation');
+        const source = { type: 'FeatureCollection', features: [{ type: 'Feature', id: 'line',
+            geometry: { type: 'LineString', coordinates: [[-50, 0], [50, 0]] }, properties: { highway: 'motorway' } }] };
+        map.loadCollection('lines', { collection: source, type: 'polylines' });
+        map.loadCollection('roads', { collection: source, type: 'roads' });
+        map.loadCollection('points', { collection: { type: 'FeatureCollection', features: [{ type: 'Feature',
+            geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} }] }, type: 'points' });
+        const layer = id => map.layerManager.searchByLayerId(id);
+        const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+        const projection = new Float32Array([0.01, 0, 0, 0, 0, 0.01, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 1]);
+        const camera = { getModelViewMatrix: () => identity, getProjectionMatrix: () => projection };
+        readback = device.createBuffer({ size: 256 * 256 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+
+        async function pixels(target) {
+            renderer.start();
+            const main = renderer.beginMainRenderPass();
+            target.renderPass(camera, main);
+            main.end();
+            const picking = renderer.beginPickingRenderPass();
+            target.renderPickingPass(camera, picking);
+            picking.end();
+            renderer.commandEncoder.copyTextureToBuffer({ texture: renderer.pickingTexture },
+                { buffer: readback, bytesPerRow: 1024 }, { width: 256, height: 256 });
+            renderer.finish();
+            await readback.mapAsync(GPUMapMode.READ);
+            const result = new Uint8Array(readback.getMappedRange()).slice();
+            readback.unmap();
+            return result;
+        }
+        const hit = (data, x, y) => data[(y * 256 + x) * 4] === 1;
+        const assert = (condition, message) => { if (!condition) { throw new Error(message); } };
+        map.updateRenderInfo('lines', { renderInfo: { polylinesWidth: 3 } });
+        const thin = await pixels(layer('lines'));
+        map.updateRenderInfo('lines', { renderInfo: { polylinesWidth: 20 } });
+        const wide = await pixels(layer('lines'));
+        assert(hit(thin, 128, 128) && !hit(thin, 128, 138) && hit(wide, 128, 138), 'Dynamic line width/picking mismatch');
+        layer('lines').setSkippedIds([0]);
+        assert(!hit(await pixels(layer('lines')), 128, 128), 'Skipped line is still pickable');
+        assert(hit(await pixels(layer('roads')), 128, 138), 'OSM default road width missing');
+        map.updateRenderInfo('roads', { renderInfo: { polylinesWidth: 3 } });
+        assert(!hit(await pixels(layer('roads')), 128, 138), 'Road width override ignored');
+        map.updateRenderInfo('points', { renderInfo: { pointSize: 3 } });
+        const small = await pixels(layer('points'));
+        map.updateRenderInfo('points', { renderInfo: { pointSize: 20 } });
+        const large = await pixels(layer('points'));
+        assert(hit(small, 128, 128) && !hit(small, 138, 128) && hit(large, 138, 128), 'Dynamic point radius/picking mismatch');
+
+        const paths = [
+            [[0, 0], [30, 0], [30, 30]],
+            [[0, 0], [30, 0], [30, 30], [0, 0]],
+            [[0, 0], [30, 0], [0, 0.01]],
+            [[0, 0], [30, 0], [0, 0], [30, 30]],
+            [[0, 0], [0, 0], [30, 0]],
+        ];
+        for (let i = 0; i < paths.length; i++) {
+            const id = `join-${i}`;
+            map.loadCollection(id, { collection: { type: 'FeatureCollection', features: [{ type: 'Feature',
+                geometry: { type: 'LineString', coordinates: paths[i] }, properties: {} }] }, type: 'polylines' });
+            map.updateRenderInfo(id, { renderInfo: { polylinesWidth: 20 } });
+            await pixels(layer(id));
+        }
+
+        // Execute the same expansion function numerically on the GPU, not a CPU approximation.
+        const expansion = await fetch('../src/shaders/polyline-expansion.wgsl').then(response => response.text());
+        const module = device.createShaderModule({ code: `${expansion}
+            @group(0) @binding(0) var<storage, read_write> result: array<vec2f>;
+            @compute @workgroup_size(1) fn main() {
+                result[0] = expandPolyline(vec2f(0), vec2f(-10, 0), vec2f(0, 10), vec2f(1, 1), 10);
+                result[1] = expandPolyline(vec2f(0), vec2f(-10, 0), vec2f(-10, 0), vec2f(1, 1), 10);
+                result[2] = expandPolyline(vec2f(0), vec2f(-10, 0), vec2f(-10, 0.01), vec2f(1, 1), 10);
+                result[3] = expandPolyline(vec2f(0), vec2f(0), vec2f(10, 0), vec2f(1, 1), 10);
+                result[4] = expandPolyline(vec2f(0), vec2f(0), vec2f(0.0000001, 0), vec2f(1, 1), 10);
+            }` });
+        const compute = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } });
+        numericOutput = device.createBuffer({ size: 40, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+        numericReadback = device.createBuffer({ size: 40, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        pass.setPipeline(compute);
+        pass.setBindGroup(0, device.createBindGroup({ layout: compute.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: numericOutput } }] }));
+        pass.dispatchWorkgroups(1);
+        pass.end();
+        encoder.copyBufferToBuffer(numericOutput, 0, numericReadback, 0, 40);
+        device.queue.submit([encoder.finish()]);
+        await numericReadback.mapAsync(GPUMapMode.READ);
+        const values = new Float32Array(numericReadback.getMappedRange()).slice();
+        numericReadback.unmap();
+        assert(values.every(Number.isFinite), 'Join produced non-finite coordinates');
+        assert(Math.abs(values[0] + 5) < 0.001 && Math.abs(values[1] - 5) < 0.001, '90-degree miter is incorrect');
+        assert(Math.abs(values[2]) < 0.001 && Math.abs(values[3] + 5) < 0.001, 'Reversal fallback is incorrect');
+        assert(Math.hypot(values[4], values[5]) <= 5.001, 'Acute join exceeds bevel bound');
+        assert(Math.abs(values[7] - 5) < 0.001 && Math.abs(values[9] - 5) < 0.001, 'Endpoint/tiny-segment width is incorrect');
+        const validation = await device.popErrorScope();
+        if (validation) { errors.push(validation.message); }
+        await device.queue.onSubmittedWorkDone();
+        assert(errors.length === 0, errors.join('\n'));
+        return { status: 'passed', checks: 'dynamic radius/width, OSM defaults, skip, picking, closed/acute/reversal/duplicate paths, numerical shader expansion' };
+    } finally {
+        readback?.destroy();
+        numericOutput?.destroy();
+        numericReadback?.destroy();
+        map.destroy();
+    }
+})();
+window.renderSizingResult.then(result => {
+    document.querySelector('#result').textContent = JSON.stringify(result, null, 2);
+}, error => {
+    document.querySelector('#result').textContent = `FAILED: ${error.stack}`;
+});
+</script>
+</body>
+</html>

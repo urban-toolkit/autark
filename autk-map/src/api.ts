@@ -45,13 +45,6 @@ export interface LoadCollectionConfig {
      * Optional flag to preserve buildings that lack valid height metadata.
      */
     buildingsZeroHeight?: boolean;
-    /**
-     * Optional full visual width for triangulated polyline/road layers.
-     *
-     * The renderer stores polylines as buffered meshes, so this value is applied
-     * while loading the collection rather than as a later render-state update.
-     */
-    polylinesWidth?: number;
 }
 
 export interface LoadCollectionParams {

@@ -1,6 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ColorMap, TriangulatorPoints, TriangulatorPolylines, TriangulatorPolygons } from '@urban-toolkit/autk-core';
+import { ColorMap, TriangulatorPolylines, TriangulatorPolygons } from '@urban-toolkit/autk-core';
 import { AutkMap } from '../src/map';
 import { Triangles2DLayer } from '../src/layer-triangles2D';
 import { VectorLayer } from '../src/layer-vector';
@@ -8,10 +8,8 @@ import { MapStyle } from '../src/map-style';
 import type { LayerData } from '../src/types-layers';
 
 const originalOffset = TriangulatorPolylines.offset;
-const originalPointSize = TriangulatorPoints.getPointSize();
 afterEach(() => {
   TriangulatorPolylines.offset = originalOffset;
-  TriangulatorPoints.setPointSize(originalPointSize);
   vi.restoreAllMocks();
 });
 
@@ -30,7 +28,7 @@ describe('subdued generic layer defaults', () => {
     expect(style.getColor('custom-category')).toEqual(style.getColor('polygons'));
   });
 
-  it('buffers generic lines more narrowly than residential roads and preserves explicit widths', () => {
+  it('keeps generic and road widths in render state, not centerline geometry', () => {
     const map = Object.create(AutkMap.prototype) as any;
     map._layerManager = { origin: [0, 0], computeZindex: () => 1 };
     map.defaultColorMap = vi.fn(() => ({}));
@@ -38,17 +36,15 @@ describe('subdued generic layer defaults', () => {
     const collection: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature',
       geometry: { type: 'LineString', coordinates: [[0, 0], [100, 0]] }, properties: { highway: 'residential' } }] };
     map.createPolylinesLayer('paths', collection, 'polylines');
-    let data = map.createLayer.mock.calls.at(-1)[2] as LayerData;
-    const ys = Array.from(data.geometry[0].position).filter((_, i) => i % 2 === 1);
-    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(3);
+    const data = map.createLayer.mock.calls.at(-1)[2] as LayerData;
+    expect(map.createLayer.mock.calls.at(-1)[1].polylinesWidth).toBe(12);
+    expect(Array.from(data.geometry[0].position).filter((_, i) => i % 2 === 1).every(y => y === 0)).toBe(true);
     map.createPolylinesLayer('roads', collection, 'roads');
-    data = map.createLayer.mock.calls.at(-1)[2];
-    const roadYs = Array.from(data.geometry[0].position).filter((_, i) => i % 2 === 1);
-    expect(Math.max(...roadYs) - Math.min(...roadYs)).toBeCloseTo(7);
-    map.createPolylinesLayer('wide', collection, 'polylines', undefined, 12);
-    data = map.createLayer.mock.calls.at(-1)[2];
-    const wideYs = Array.from(data.geometry[0].position).filter((_, i) => i % 2 === 1);
-    expect(Math.max(...wideYs) - Math.min(...wideYs)).toBeCloseTo(12);
+    const roads = map.createLayer.mock.calls.at(-1);
+    expect(roads[1].polylinesWidthByComponent).toEqual(new Float32Array([7]));
+    expect(roads[2].geometry).toEqual(data.geometry);
+    expect(roads[2].polylineAttributes).toEqual(data.polylineAttributes);
+    expect(TriangulatorPolylines.offset).toBe(originalOffset);
   });
 
   it('toggles polygon borders through updateRenderInfo without rebuilding geometry or skipping the fill', () => {
@@ -89,7 +85,7 @@ describe('subdued generic layer defaults', () => {
     expect(map.createLayer.mock.calls.at(-1)[2].border).toEqual([]);
   });
 
-  it('passes the smaller point radius to rendering while respecting explicit point sizes', () => {
+  it('loads only positions for points, leaving radius to the renderer', () => {
     const map = Object.create(AutkMap.prototype) as any;
     map._layerManager = { origin: [0, 0], computeZindex: () => 1 };
     map.defaultColorMap = vi.fn(() => ({}));
@@ -97,9 +93,7 @@ describe('subdued generic layer defaults', () => {
     const collection: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature',
       geometry: { type: 'Point', coordinates: [1, 2] }, properties: {} }] };
     map.createPointsLayer('pois', collection, 'points');
-    expect(map.createLayer.mock.calls.at(-1)[2].pointSize).toBe(10);
-    TriangulatorPoints.setPointSize(24);
-    map.createPointsLayer('larger', collection, 'points');
-    expect(map.createLayer.mock.calls.at(-1)[2].pointSize).toBe(24);
+    expect(map.createLayer.mock.calls.at(-1)[2]).not.toHaveProperty('pointSize');
+    expect(map.createLayer.mock.calls.at(-1)[2].pointInstances).toEqual(new Float32Array([1, 2]));
   });
 });

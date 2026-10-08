@@ -10,7 +10,7 @@
  */
 
 import { Camera } from '@urban-toolkit/autk-core';
-import { LayerInfo, LayerRenderInfo } from './types-layers';
+import { LayerInfo, LayerRenderInfo, DEFAULT_POINT_SIZE, DEFAULT_LINE_WIDTH } from './types-layers';
 import { Renderer } from './renderer';
 
 /**
@@ -44,7 +44,12 @@ export abstract class Layer {
      */
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo) {
         this._layerInfo = layerInfo;
-        this._layerRenderInfo = layerRenderInfo;
+        this._layerRenderInfo = { ...layerRenderInfo };
+        delete this._layerRenderInfo.pointSize;
+        delete this._layerRenderInfo.polylinesWidth;
+        if (layerInfo.typeLayer === 'points') { this._layerRenderInfo.pointSize = DEFAULT_POINT_SIZE; }
+        if (layerInfo.typeLayer === 'polylines') { this._layerRenderInfo.polylinesWidth = DEFAULT_LINE_WIDTH; }
+        this.updateLayerRenderInfo(layerRenderInfo);
     }
 
     /**
@@ -103,6 +108,15 @@ export abstract class Layer {
     updateLayerRenderInfo(info: Partial<LayerRenderInfo>): void {
         const canPick = this.supportsPicking && this.supportsHighlight;
         const nextInfo: Partial<LayerRenderInfo> = { ...info };
+
+        for (const key of ['pointSize', 'polylinesWidth'] as const) {
+            if (!(key in nextInfo)) { continue; }
+            const value = nextInfo[key];
+            if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)) || Math.fround(value) <= 0) {
+                console.warn(`Layer '${this._layerInfo.id}': ${key} must be a finite positive float32 number.`);
+                delete nextInfo[key];
+            }
+        }
 
         // Keep picking state coherent with layer capabilities.
         if ('isPick' in nextInfo && nextInfo.isPick === true && !canPick) {

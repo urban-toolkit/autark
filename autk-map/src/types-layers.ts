@@ -20,6 +20,12 @@ import type {
     LayerType,
 } from '@urban-toolkit/autk-core';
 
+/** Default point radius in local planar units. */
+export const DEFAULT_POINT_SIZE = 64;
+
+/** Default full width of generic polylines in local planar units. */
+export const DEFAULT_LINE_WIDTH = 12;
+
 /** Static metadata used to identify and order a layer in the map stack. */
 export interface LayerInfo {
     /** Stable layer identifier used for lookup and updates. */
@@ -42,6 +48,12 @@ export interface LayerColormap {
 
 /** Mutable render state associated with a layer. */
 export interface LayerRenderInfo {
+    /** Point radius in local planar units. Defaults to DEFAULT_POINT_SIZE (64); camera transforms provide all zoom scaling. */
+    pointSize?: number;
+    /** Full polyline/road width in local planar units. Defaults to DEFAULT_LINE_WIDTH (12) for polylines; overrides road category widths when set. */
+    polylinesWidth?: number;
+    /** Default full widths per component, used for OSM road styling when polylinesWidth is omitted. */
+    polylinesWidthByComponent?: Float32Array;
     /** Optional fixed layer color used when thematic color mapping is disabled. */
     color?: ColorRGB;
     /** Optional fixed border/outline color used by layers with a border pass. */
@@ -76,8 +88,8 @@ export interface LayerData {
     pointInstances?: Float32Array;
     /** Number of point instances stored in `pointInstances`. */
     pointInstanceCount?: number;
-    /** Base point radius in local planar units for instanced point rendering. */
-    pointSize?: number;
+    /** Width-independent polyline adjacency: previous XY and next XY per node (five topology vertices per node). */
+    polylineAttributes?: Float32Array;
     /** Raster grid width in cells, for raster layers only. */
     rasterResX?: number;
     /** Raster grid height in cells, for raster layers only. */

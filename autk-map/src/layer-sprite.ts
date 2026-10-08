@@ -1,5 +1,5 @@
-import { Camera, LayerComponent, TriangulatorPoints } from '@urban-toolkit/autk-core';
-import { LayerData, LayerInfo, LayerRenderInfo, LayerThematic } from './types-layers';
+import { Camera, LayerComponent } from '@urban-toolkit/autk-core';
+import { LayerData, LayerInfo, LayerRenderInfo, LayerThematic, DEFAULT_POINT_SIZE } from './types-layers';
 import { Layer } from './layer';
 import { Renderer } from './renderer';
 import { PipelineSprite } from './pipeline-sprite';
@@ -16,7 +16,6 @@ export class SpriteLayer extends Layer {
     protected _pipelinePicking!: PipelineSpritePicking;
     protected _highlightedIds: Set<number> = new Set();
     protected _skippedIds: Set<number> = new Set();
-    protected _pointSize = TriangulatorPoints.getPointSize();
 
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo);
@@ -39,7 +38,7 @@ export class SpriteLayer extends Layer {
     }
 
     get pointSize(): number {
-        return this._pointSize;
+        return this._layerRenderInfo.pointSize ?? DEFAULT_POINT_SIZE;
     }
 
     get thematic(): Float32Array {
@@ -64,7 +63,6 @@ export class SpriteLayer extends Layer {
 
     loadLayerData(layerData: LayerData): void {
         this._pointInstances = layerData.pointInstances ?? new Float32Array(0);
-        this._pointSize = layerData.pointSize ?? this._pointSize;
         this.loadComponent(layerData.components);
         this._resetInteractionState();
 
@@ -143,16 +141,14 @@ export class SpriteLayer extends Layer {
             this._dataIsDirty = false;
         }
 
-        const scale = Math.min(Math.max(camera.getZoomScale(), 0.75), 6.0);
         this._pipeline.updateZIndex(this._layerInfo.zIndex);
-        this._pipeline.updatePointSize(this._pointSize * scale);
+        this._pipeline.updatePointSize(this.pointSize);
         this._pipeline.renderPass(camera, passEncoder);
     }
 
     override renderPickingPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void {
-        const scale = Math.min(Math.max(camera.getZoomScale(), 0.75), 6.0);
         this._pipelinePicking.updateZIndex(this._layerInfo.zIndex);
-        this._pipelinePicking.updatePointSize(this._pointSize * scale);
+        this._pipelinePicking.updatePointSize(this.pointSize);
         this._pipelinePicking.renderPass(camera, passEncoder);
     }
 

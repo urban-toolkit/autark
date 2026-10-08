@@ -29,28 +29,6 @@ export interface PointInstancesData {
  * skipping unsupported features with a warning.
  */
 export class TriangulatorPoints {
-    /** Shared point-marker radius used by sprite rendering. */
-    private static pointSize: number = 10;
-
-    /**
-     * Sets the shared base point radius used by sprite rendering.
-     *
-     * @param size - Marker radius in local planar units.
-     * @returns Nothing.
-     * @throws If `size` is not a finite positive number.
-     */
-    static setPointSize(size: number): void {
-        if (!Number.isFinite(size) || size <= 0) {
-            throw new Error(`TriangulatorPoints point size must be a finite positive number. Received: ${size}`);
-        }
-        TriangulatorPoints.pointSize = size;
-    }
-
-    /** Returns the shared point-marker radius used by point rendering. */
-    static getPointSize(): number {
-        return TriangulatorPoints.pointSize;
-    }
-
     /**
      * Builds point-instance data for a feature collection.
      *

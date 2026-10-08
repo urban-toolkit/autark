@@ -11,6 +11,9 @@
 /** Main map controller for rendering, interaction, and layer lifecycle. */
 export { AutkMap } from './map';
 
+/** Default point radius and generic polyline width in local planar units. */
+export { DEFAULT_POINT_SIZE, DEFAULT_LINE_WIDTH } from './types-layers';
+
 /** WebGPU renderer used by the map controller. */
 export { Renderer } from './renderer';
 

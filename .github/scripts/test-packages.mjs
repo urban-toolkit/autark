@@ -24,7 +24,15 @@ try {
     const specifiers = [...manifest.packages.map(pkg => pkg.name),
         ...['core', 'map', 'db', 'compute', 'plot'].map(name => `@urban-toolkit/autk/${name}`)];
     const imports = specifiers.map((name, i) => `import * as pkg${i} from '${name}';`).join('\n');
-    writeFileSync(resolve(consumer, 'index.ts'), `${imports}\nconsole.log(${specifiers.map((_, i) => `pkg${i}`).join(', ')});\n`);
+    writeFileSync(resolve(consumer, 'index.ts'), `${imports}\nconsole.log(${specifiers.map((_, i) => `pkg${i}`).join(', ')});\n
+        export function configureRenderSizes(map: import('@urban-toolkit/autk-map').AutkMap) {
+            map.updateRenderInfo('lines', { renderInfo: { polylinesWidth: 12 } });
+            map.updateRenderInfo('points', { renderInfo: { pointSize: 120 } });
+        }
+        const centerlines: import('@urban-toolkit/autk-core').PolylineData =
+            pkg${specifiers.indexOf('@urban-toolkit/autk-core')}.PolylineBuilder.build({ type: 'FeatureCollection', features: [] }, [0, 0]);
+        console.log(centerlines);
+    `);
     writeFileSync(resolve(consumer, 'tsconfig.json'), JSON.stringify({
         compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true,
             noEmit: true, skipLibCheck: false, types: [], ignoreDeprecations: '6.0' },

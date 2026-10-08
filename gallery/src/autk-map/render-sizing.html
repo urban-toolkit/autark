@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark — render sizing</title>
+    <link rel="stylesheet" href="/src/autk-map/geojson-lines-vis.css">
+</head>
+<body>
+    <div id="app">
+        <h2>Point radius and line width</h2>
+        <p>Local planar units. Zoom changes apparent size through the camera only.</p>
+        <label>Point radius <input id="point-size" type="range" min="1" max="128"> <output id="point-value"></output></label>
+        <label>Line width <input id="line-width" type="range" min="1" max="40"> <output id="line-value"></output></label>
+        <label>Road width override <input id="road-width" type="range" min="1" max="40" value="7"> <output id="road-value">OSM defaults until adjusted</output></label>
+        <label>Picking layer <select id="picking-layer"><option value="points">Points</option><option value="lines">Lines</option><option value="roads">Roads</option></select></label>
+        <p id="selection">Click a feature to pick/highlight it.</p>
+        <canvas></canvas>
+    </div>
+    <script type="module" src="/src/autk-map/render-sizing.ts"></script>
+</body>
+</html>

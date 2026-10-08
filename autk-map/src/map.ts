@@ -16,6 +16,9 @@
 
 /// <reference types="@webgpu/types" />
 
+// Keep definitions independent of the map controller to avoid circular layer imports.
+import { DEFAULT_LINE_WIDTH } from './types-layers';
+
 import {
     FeatureCollection,
     Geometry,
@@ -30,6 +33,7 @@ import {
     EventEmitter,
     isNumericLike,
     TriangulatorPoints,
+    PolylineBuilder,
     TriangulatorPolygons,
     TriangulatorPolylines,
     TriangulatorBuildings,
@@ -272,7 +276,6 @@ export class AutkMap {
                     collection as FeatureCollection,
                     sType,
                     typeof property === 'string' ? property : undefined,
-                    loadConfig?.polylinesWidth,
                 );
                 break;
             }
@@ -1077,15 +1080,15 @@ export class AutkMap {
     }
 
     /**
-     * Creates a polyline-based vector layer from GeoJSON.
+     * Creates a width-independent centerline layer from GeoJSON for shader expansion.
      *
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
      * @param property Optional value extractor used to initialize thematic data.
-     * @returns Nothing. The layer is created when triangulation succeeds.
+     * @returns Nothing. The layer is created when valid centerline data is available.
       */
-    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string, polylinesWidth?: number) {
+    private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex(typeLayer),
@@ -1100,27 +1103,24 @@ export class AutkMap {
             isSkip: false,
         };
 
-        const fixedHalfWidth = typeof polylinesWidth === 'number' && Number.isFinite(polylinesWidth) && polylinesWidth > 0
-            ? polylinesWidth / 2
-            : undefined;
-
-        TriangulatorPolylines.offset = fixedHalfWidth ?? (typeLayer === 'roads' ? TriangulatorPolylines.DEFAULT_ROAD_HALF_WIDTH : 1.5);
-        const layerMesh = typeLayer === 'roads' && fixedHalfWidth === undefined
-            ? TriangulatorPolylines.buildMesh(
-                geojson,
-                this.layerManager.origin,
-                TriangulatorPolylines.resolveRoadHalfWidth
-            )
-            : TriangulatorPolylines.buildMesh(geojson, this.layerManager.origin);
-        if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Roads Layer.');
+        const lines = PolylineBuilder.build(geojson, this.layerManager.origin);
+        if (lines.geometry.length === 0 || lines.components.length === 0) {
+            console.error('Invalid Polyline Layer.');
             return;
+        }
+        if (typeLayer === 'roads') {
+            layerRenderInfo.polylinesWidthByComponent = new Float32Array(lines.components.map(component =>
+                TriangulatorPolylines.resolveRoadHalfWidth(geojson.features[component.featureIndex]) * 2,
+            ));
+        } else {
+            layerRenderInfo.polylinesWidth = DEFAULT_LINE_WIDTH;
         }
 
         const layerData = {
-            geometry: layerMesh[0],
-            components: layerMesh[1],
-            thematic: layerMesh[1].map(() => {
+            geometry: lines.geometry,
+            components: lines.components,
+            polylineAttributes: lines.attributes,
+            thematic: lines.components.map(() => {
                 return {
                     value: 0,
                     valid: 1,
@@ -1142,7 +1142,7 @@ export class AutkMap {
      * @param geojson Source feature collection.
      * @param typeLayer Layer type.
      * @param property Optional value extractor used to initialize thematic data.
-     * @returns Nothing. The layer is created when triangulation succeeds.
+     * @returns Nothing. The layer is created when valid point instances are available.
       */
     private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
@@ -1170,7 +1170,6 @@ export class AutkMap {
             components: pointInstances.components,
             pointInstances: pointInstances.instances,
             pointInstanceCount: pointInstances.instances.length / 2,
-            pointSize: TriangulatorPoints.getPointSize(),
             thematic: pointInstances.components.map(() => {
                 return {
                     value: 0,

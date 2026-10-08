@@ -25,6 +25,7 @@ import { RasterLayer } from './layer-raster';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
 import { SpriteLayer } from './layer-sprite';
+import { PolylineLayer } from './layer-polyline';
 
 /**
  * Manages all map layers as a single ordered list.
@@ -90,7 +91,9 @@ export class LayerManager {
                 ? new RasterLayer(layerInfo, layerRender, layerData)
                 : layerInfo.typeLayer === 'points'
                     ? new SpriteLayer(layerInfo, layerRender, layerData)
-                    : new Triangles2DLayer(layerInfo, layerRender, layerData);
+                    : layerData.polylineAttributes
+                        ? new PolylineLayer(layerInfo, layerRender, layerData)
+                        : new Triangles2DLayer(layerInfo, layerRender, layerData);
 
         if (!OSM_BASE_LAYER_ORDER.includes(layerInfo.typeLayer) && layerInfo.typeLayer !== 'buildings') {
             this._dynamicOrder.push(layerInfo.id);

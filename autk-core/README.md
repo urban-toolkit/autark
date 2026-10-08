@@ -81,6 +81,7 @@ console.log(origin, geometry.length, components.length, camera.eye, colormap.len
 - **Layer and buffer types**: `LayerType`, `BoundingBox`, `TypedArray`, `TypedArrayConstructor`
 - **Utilities**: `valueAtPath`, `isNumericLike`, `computeOrigin`, `computeGeometryCentroid`, `computeBoundingBox`, `isLayerType`, `mapGeometryTypeToLayerType`, `offsetPolyline`
 - **Building features**: `normalizeBuildingFeature`, `BuildingPartProperties`
+- **Geometry builders**: `PolylineBuilder`, `PolylineData` (width-independent centerlines for shader expansion)
 - **Triangulators**: `TriangulatorPoints`, `TriangulatorPolylines`, `TriangulatorPolygons`, `TriangulatorBuildings`, `TriangulatorBuildingWithWindows`, `TriangulatorRaster`
 
 The complete export list lives in [`src/index.ts`](./src/index.ts).
@@ -96,7 +97,8 @@ Tests from the repository root: `npm test -- autk-core/test` (CPU only).
 ## Notes
 
 - Geometry helpers assume planar coordinates unless a function states otherwise.
-- Point sprites use a default radius of 10 local planar units. `TriangulatorPoints.setPointSize(radius)` accepts a finite positive radius and affects subsequently loaded point layers.
+- `TriangulatorPoints.buildInstances()` produces positions and feature metadata only. Point radius belongs to `autk-map` render state (`updateRenderInfo(id, { renderInfo: { pointSize } })`); the global point-size setter/getter have been removed.
+- `PolylineBuilder.build()` produces centerline topology and adjacency, independent of visual width, supporting nested line-bearing geometry collections. `autk-map` resolves line widths in render state and expands centerlines in its shaders. The legacy `TriangulatorPolylines.buildMesh()` API remains available for consumers that explicitly need buffered triangle meshes; the map no longer uses it.
 - Triangulators convert GeoJSON and related feature data into render-ready mesh buffers.
 - `@urban-toolkit/autk-core` is a stable shared dependency of the other Autark packages, but it exposes lower-level APIs than the higher-level modules.
 

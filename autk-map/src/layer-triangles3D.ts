@@ -40,6 +40,7 @@ import type { Heightfield } from '@urban-toolkit/autk-core';
  * layer.createPipeline(renderer);
  */
 export class Triangles3DLayer extends VectorLayer {
+    declare protected _pipelinePicking: PipelineTrianglePicking;
     /**
      * Vertex normals for lighting calculations.
      * One normal (3 floats: x, y, z) per vertex.

@@ -535,6 +535,6 @@ export abstract class Pipeline {
      */
     abstract updateVertexBuffers(data: Layer): void;
 
-    /** Records draw commands for this pipeline into an existing render pass. */
-    abstract renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void;
+    /** Records draw commands; picking pipelines may create their own pass when no encoder is supplied. */
+    abstract renderPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void;
 }
