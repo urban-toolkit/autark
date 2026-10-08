@@ -128,7 +128,7 @@ The `Makefile` provides several commands to help with the development process:
 
 ### Releases
 
-Releases are disabled by default. CI only builds, tests and uploads tarballs; it cannot publish. See [the release procedure](.doc/NPM-RELEASE.md) for GitHub environment setup, stage-only npm Trusted Publishers, 2FA approval, recovery and Git tag finalization. The coordinated 4.0.0 release is public on npm and includes PR #114's GPU error handling. Its package integrity/provenance and six Git tags match the tested release commit. Migration notes are in [.doc/RELEASE-4.0.0.md](.doc/RELEASE-4.0.0.md). The coordinated 4.1.0 release candidate and its API/rendering migrations are documented in [.doc/RELEASE-4.1.0.md](.doc/RELEASE-4.1.0.md).
+Releases are disabled by default. CI only builds, tests and uploads tarballs; it cannot publish. See [the release procedure](.doc/NPM-RELEASE.md) for GitHub environment setup, stage-only npm Trusted Publishers, 2FA approval, recovery and Git tag finalization. The coordinated 4.0.0 release is public on npm and includes PR #114's GPU error handling. Its package integrity/provenance and six Git tags match the tested release commit. Migration notes are in [.doc/RELEASE-4.0.0.md](.doc/RELEASE-4.0.0.md). The coordinated 4.1.0 release is also public on npm; its verification and API/rendering migrations are documented in [.doc/RELEASE-4.1.0.md](.doc/RELEASE-4.1.0.md). Every npm release must also have a corresponding GitHub Release marked Latest, created by finalization after verifying the published packages and Git tags.
 
 ## Notes
 

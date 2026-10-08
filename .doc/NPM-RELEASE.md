@@ -2,7 +2,7 @@
 
 ## Current safety state
 
-Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. The coordinated 4.0.0 release is public, its six Git tags are finalized, and `NPM_RELEASE_ENABLED` is restored to `false`. See the [completed release verification](RELEASE-4.0.0.md#release-verification).
+Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. The coordinated 4.1.0 release is public, its six Git tags are finalized, and `NPM_RELEASE_ENABLED` is restored to `false`. See the [completed release verification](RELEASE-4.1.0.md#release-verification).
 
 This procedure uses staged publishing, not direct publishing. GitHub only submits artifacts; a maintainer approves them on npm with 2FA. Git tags are created in a separate workflow after all selected versions are public and their integrity has been verified.
 
@@ -80,10 +80,11 @@ After all selected versions are public:
 2. Enter the original successful main-push CI run ID from the release commit (the numeric ID in its Actions URL), not the staging workflow ID.
 3. Approve the `npm-release` environment again.
 4. The workflow retrieves the original artifacts and verifies that each public version has identical integrity and is the expected `latest`. Only then does it create missing `${package-name}@${version}` tags pointing to the tested commit, using one atomic Git push. Matching existing tags are left intact; conflicts fail.
-5. Inspect both workflow summaries and verify a clean external installation of the released umbrella version (for example, `npm install @urban-toolkit/autk@4.0.1`), package versions, dist-tags and provenance.
-6. Set `NPM_RELEASE_ENABLED=false` again.
+5. Every coordinated npm publication must also have a GitHub Release. Finalization automatically creates `Autark ${version}` using the umbrella tag `@urban-toolkit/autk@${version}`, migration notes from `.doc/RELEASE-${version}.md`, and the GitHub **Latest** designation. Candidate status and pending verification checklists are omitted from the public release body. On retries, an existing public stable release is marked Latest without overwriting maintainer notes; drafts or prereleases fail for manual review.
+6. Inspect both workflow summaries and verify a clean external installation of the released umbrella version (for example, `npm install @urban-toolkit/autk@4.1.0`), package versions, dist-tags, provenance and the GitHub Release.
+7. Set `NPM_RELEASE_ENABLED=false` again.
 
-Finalization never stages, approves or republishes npm packages. Creating a GitHub Release with the migration notes is optional and separate.
+Finalization never stages, approves or republishes npm packages.
 
 ## Recovery
 
@@ -91,7 +92,7 @@ Finalization never stages, approves or republishes npm packages. Creating a GitH
 - **Partially staged release:** inspect stages on npm. Approve existing stages only after verifying their contents/integrity; rerun the original staging workflow. Public versions with matching integrity are skipped. Pending stages cannot be silently skipped because OIDC cannot inspect them. A stage/version conflict aborts with instructions to inspect and approve or reject with 2FA.
 - **Wrong staged contents or tag:** reject the stage with npm 2FA before submitting the corrected stage. Never approve unknown contents. Changed artifacts require a new tested release candidate, not an unchecked local substitution.
 - **Partially approved release:** approve the remaining stages. Finalization refuses to create any new tags until all selected packages are public and intact.
-- **Git push failure:** rerun finalization with the same original CI ID. The tag push is atomic and existing matching tags are verified.
+- **Git push or GitHub Release failure:** rerun finalization with the same original CI ID. The tag push is atomic and existing matching tags are verified. A missing GitHub Release is created even if all tags already exist; an existing public stable release keeps its maintainer-edited notes.
 - **Different registry integrity or conflicting remote tag:** stop and investigate. The workflow never overwrites a published version, moves a tag or treats a conflict as success.
 - **Expired CI artifacts:** restore the original verified artifacts through an explicitly reviewed recovery process. Do not substitute a new build silently. Artifact retention is not a permanent release archive.
 

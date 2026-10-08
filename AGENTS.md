@@ -44,6 +44,10 @@
 - **Environment**: Requires WebGPU enabled in the browser (Chrome/Edge default; Firefox Nightly requires configuration).
 - **Data Formats**: OpenStreetMap, GeoJSON, GeoTIFF.
 
+## Releases
+- Every coordinated npm publication must also have a GitHub Release using the umbrella package tag, with migration notes and marked Latest.
+- Create it only after all six npm packages and their matching Git tags are verified. See `.doc/NPM-RELEASE.md`.
+
 ## GIT
 - Never commit or push the code if I did not explicitly ask you to do that.
 - Always commit the code using git best practices (https://www.conventionalcommits.org/en/v1.0.0/)

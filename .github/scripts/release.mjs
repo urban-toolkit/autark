@@ -116,11 +116,42 @@ export async function stageRelease(packages, stage, report) {
     }
 }
 
+/** Create the coordinated GitHub Release, or mark an existing public release Latest on retries. */
+export async function ensureGitHubRelease({ repository, token, version, notes }) {
+    if (!repository || !token) throw new Error('GitHub Release requires GITHUB_REPOSITORY and GH_TOKEN');
+    const tag = `@urban-toolkit/autk@${version}`;
+    const endpoint = `https://api.github.com/repos/${repository}/releases`;
+    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' };
+    const existing = await fetch(`${endpoint}/tags/${encodeURIComponent(tag)}`, {
+        headers, signal: AbortSignal.timeout(30_000),
+    });
+    if (!existing.ok && existing.status !== 404) throw new Error(`GitHub Release lookup returned HTTP ${existing.status}`);
+    let url = endpoint;
+    let method = 'POST';
+    let body = { tag_name: tag, name: `Autark ${version}`, body: notes,
+        draft: false, prerelease: false, make_latest: 'true' };
+    if (existing.ok) {
+        const release = await existing.json();
+        if (release.tag_name !== tag || release.draft || release.prerelease || !Number.isSafeInteger(release.id)) {
+            throw new Error('Existing GitHub Release is not the expected public stable release');
+        }
+        url += `/${release.id}`;
+        method = 'PATCH';
+        // Preserve any maintainer edits to an already-published release.
+        body = { make_latest: 'true' };
+    }
+    const response = await fetch(url, { method, headers, body: JSON.stringify(body), signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`GitHub Release update returned HTTP ${response.status}`);
+    return response.json();
+}
+
 /** Only called after all selected versions have been confirmed public and intact. */
-export async function finalizeRelease(packages, createTags, report) {
+export async function finalizeRelease(packages, createTags, report, createRelease) {
     const missing = packages.filter(pkg => !pkg.tagged).map(pkg => `${pkg.name}@${pkg.version}`);
     if (missing.length) await createTags(missing);
     for (const pkg of packages) report(`${pkg.name}@${pkg.version}: npm approval verified; Git tag ${pkg.tagged ? 'already existed' : 'created'}.`);
+    await createRelease();
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -157,10 +188,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
                 env: { ...process.env, GITHUB_SHA: current },
             }), report);
         } else {
+            const version = packages.find(pkg => pkg.dir === 'autk').version;
+            const migrationNotes = readFileSync(resolve(`.doc/RELEASE-${version}.md`), 'utf8')
+                .split('\n## Release verification')[0].replace(/^Status:.*\n/m, '');
+            const notes = `Install the coordinated toolkit: npm install @urban-toolkit/autk@${version}\n\n` +
+                `Published npm artifacts verified against commit ${current} and CI run ${context.runId}.\n\n${migrationNotes}`;
             await finalizeRelease(packages, tags => {
                 for (const tag of tags) execFileSync('git', ['tag', tag, current]);
                 execFileSync('git', ['push', '--atomic', 'origin', ...tags.map(tag => `refs/tags/${tag}`)], { stdio: 'inherit' });
-            }, report);
+            }, report, async () => {
+                const release = await ensureGitHubRelease({ repository: process.env.GITHUB_REPOSITORY,
+                    token: process.env.GH_TOKEN, version, notes });
+                report(`GitHub Release marked Latest: ${release.html_url}`);
+            });
         }
     }
 }

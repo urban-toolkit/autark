@@ -1,6 +1,6 @@
 # Autark 4.1.0 — migration notes
 
-Status: **release candidate; not yet published**. The coordinated packages are `@urban-toolkit/autk-core`, `autk-map`, `autk-db`, `autk-plot`, `autk-compute` and the `autk` umbrella package. Internal dependencies are pinned to 4.1.0.
+Status: **published on 2026-10-08**. All six packages are public as `latest` 4.1.0. Their integrity and provenance match release commit `2c8ba2bc3a76792db0e07ffa02bd5ab8613e2062`; all six Git tags point to that commit. The coordinated packages are `@urban-toolkit/autk-core`, `autk-map`, `autk-db`, `autk-plot`, `autk-compute` and the `autk` umbrella package. Internal dependencies are pinned to 4.1.0.
 
 Although this release uses the requested 4.1.0 version, it includes breaking API and rendering changes. Review the following migrations before upgrading from 4.0.0.
 
@@ -53,9 +53,11 @@ External dependencies and compatible transitive resolutions have been refreshed,
 - [x] Eleven compute WebGPU cases passed in Chrome 154.0.8037.98 on Apple Metal 3.
 - [x] Real Chrome/WebGPU map checks passed for dynamic sizing/picking, on-demand invalidation/teardown and poster generation/export. Poster checks used synthetic Overpass fixtures, not a live Rio download.
 - [x] Local npm audit reported zero known vulnerabilities.
-- [ ] Release commit's main-push CI succeeded and its exact artifacts were staged.
-- [ ] Maintainer approved all six npm stages with 2FA.
-- [ ] Public integrity/provenance and `latest` tags verified; Git tags finalized.
-- [ ] `NPM_RELEASE_ENABLED` restored to `false`.
+- [x] [Release commit's main-push CI](https://github.com/urban-toolkit/autark/actions/runs/37858067957) succeeded and its exact artifacts were staged.
+- [x] Maintainer approved all six npm stages with 2FA.
+- [x] Public integrity/provenance and `latest` tags verified; [Git tag finalization](https://github.com/urban-toolkit/autark/actions/runs/37859907639) passed.
+- [x] Clean public-registry installation passed declaration checks, Node imports and browser bundling.
+- [x] [GitHub Release](https://github.com/urban-toolkit/autark/releases/tag/%40urban-toolkit/autk%404.1.0) published and marked Latest.
+- [x] `NPM_RELEASE_ENABLED` restored to `false`.
 
 Publication uses the existing stage-only Trusted Publishing workflow; npm approval requires maintainer 2FA. Git tags must only be finalized after all six public versions match the original CI artifacts. See [the release procedure](NPM-RELEASE.md).

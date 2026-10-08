@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-    finalizeRelease, isTrustedCiRun, packageDirs, preflightRelease,
+    ensureGitHubRelease, finalizeRelease, isTrustedCiRun, packageDirs, preflightRelease,
     readRegistryPackage, readReleaseArtifacts, selectReleasePackages, stageRelease,
 } from '../../.github/scripts/release.mjs';
 
@@ -132,8 +132,76 @@ describe('staging and recovery', () => {
     });
     it('creates missing tags in one batch and leaves matching tags alone', async () => {
         const tags = vi.fn();
-        await finalizeRelease([{ ...pkg, tagged: true }, { ...pkg, name: '@urban-toolkit/autk-db', tagged: false }], tags, vi.fn());
+        const release = vi.fn();
+        await finalizeRelease([{ ...pkg, tagged: true }, { ...pkg, name: '@urban-toolkit/autk-db', tagged: false }], tags, vi.fn(), release);
         expect(tags).toHaveBeenCalledExactlyOnceWith(['@urban-toolkit/autk-db@4.0.0']);
+        expect(release).toHaveBeenCalledOnce();
+        expect(tags.mock.invocationCallOrder[0]).toBeLessThan(release.mock.invocationCallOrder[0]);
+    });
+    it('creates the GitHub Release on a retry even if all tags already exist', async () => {
+        const tags = vi.fn();
+        const release = vi.fn();
+        await finalizeRelease([{ ...pkg, tagged: true }], tags, vi.fn(), release);
+        expect(tags).not.toHaveBeenCalled();
+        expect(release).toHaveBeenCalledOnce();
+    });
+    it('does not create a GitHub Release if tag creation fails', async () => {
+        const release = vi.fn();
+        await expect(finalizeRelease([{ ...pkg, tagged: false }], async () => {
+            throw new Error('tag push failed');
+        }, vi.fn(), release)).rejects.toThrow('tag push failed');
+        expect(release).not.toHaveBeenCalled();
+    });
+    it('propagates GitHub Release failures so finalization can be retried', async () => {
+        await expect(finalizeRelease([{ ...pkg, tagged: true }], vi.fn(), vi.fn(), async () => {
+            throw new Error('release failed');
+        })).rejects.toThrow('release failed');
+    });
+});
+
+describe('GitHub Releases', () => {
+    const options = { repository: 'urban-toolkit/autark', token: 'test-token', version: '4.1.0', notes: 'Migration notes' };
+    it('creates a stable Latest release only when the tag has no release', async () => {
+        const fetch = vi.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(new Response('', { status: 404 }))
+            .mockResolvedValueOnce(Response.json({ html_url: 'https://github.com/urban-toolkit/autark/releases/4.1.0' }, { status: 201 }));
+        await ensureGitHubRelease(options);
+        const [url, request] = fetch.mock.calls[1];
+        expect(url).toBe('https://api.github.com/repos/urban-toolkit/autark/releases');
+        expect(request?.method).toBe('POST');
+        expect(JSON.parse(request?.body as string)).toEqual({ tag_name: '@urban-toolkit/autk@4.1.0', name: 'Autark 4.1.0',
+            body: 'Migration notes', draft: false, prerelease: false, make_latest: 'true' });
+    });
+    it('marks an existing release Latest without overwriting maintainer notes', async () => {
+        const fetch = vi.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(Response.json({ id: 123, tag_name: '@urban-toolkit/autk@4.1.0', draft: false, prerelease: false }))
+            .mockResolvedValueOnce(Response.json({ html_url: 'release-url' }));
+        await ensureGitHubRelease(options);
+        expect(fetch.mock.calls[1][0]).toBe('https://api.github.com/repos/urban-toolkit/autark/releases/123');
+        expect(fetch.mock.calls[1][1]?.method).toBe('PATCH');
+        expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual({ make_latest: 'true' });
+    });
+    it.each([401, 403, 429, 500])('does not treat HTTP %i as a missing release', async status => {
+        const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status }));
+        await expect(ensureGitHubRelease(options)).rejects.toThrow(`HTTP ${status}`);
+        expect(fetch).toHaveBeenCalledOnce();
+    });
+    it.each([{ draft: true }, { prerelease: true }, { tag_name: 'wrong' }, { id: undefined }])('rejects unexpected existing releases %j', async change => {
+        const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({
+            id: 123, tag_name: '@urban-toolkit/autk@4.1.0', draft: false, prerelease: false, ...change,
+        }));
+        await expect(ensureGitHubRelease(options)).rejects.toThrow('expected public stable release');
+        expect(fetch).toHaveBeenCalledOnce();
+    });
+    it('propagates a failed release creation', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 404 }))
+            .mockResolvedValueOnce(new Response('', { status: 422 }));
+        await expect(ensureGitHubRelease(options)).rejects.toThrow('HTTP 422');
+    });
+    it('requires explicit GitHub credentials', async () => {
+        const fetch = vi.spyOn(globalThis, 'fetch');
+        await expect(ensureGitHubRelease({ ...options, token: '' })).rejects.toThrow('GH_TOKEN');
+        expect(fetch).not.toHaveBeenCalled();
     });
 });
 
@@ -173,4 +241,8 @@ it('keeps publication opt-in and never grants CI npm credentials', () => {
     expect(ci).toContain('npm run test:packages');
     expect(ci).not.toContain('id-token: write');
     expect(ci).not.toContain('NPM_TOKEN');
+    const finalize = readFileSync('.github/workflows/finalize-release.yml', 'utf8');
+    expect(finalize).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(finalize).toContain('contents: write');
+    expect(finalize).not.toContain('id-token: write');
 });
