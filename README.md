@@ -56,6 +56,8 @@ npm install @urban-toolkit/autk-map
 
 CI uses Node.js 22.23.3 and npm 11.15.0. Use those versions to reproduce CI and release checks. Install workspace dependencies with `npm ci`; the root `package-lock.json` is versioned. Use `npm install` only when intentionally updating dependencies, and include the resulting lockfile changes.
 
+TypeScript remains on the latest 6.0 release: TypeDoc and `typescript-eslint` currently declare peer support for TypeScript 6, not 7. Keep this compatibility constraint when refreshing dependencies; do not bypass it with `--force` or `--legacy-peer-deps`. Internal `@urban-toolkit/autk-*` dependency versions remain coordinated with the workspace release.
+
 We also use GNU Make to automate the build process. To install it, please use one of the following commands (we recommend using the package manager [Chocolatey](https://chocolatey.org/) on Windows):
 
 ```bash
