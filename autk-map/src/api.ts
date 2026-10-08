@@ -197,3 +197,28 @@ export interface UpdateRenderInfoParams {
      */
     renderInfo: Partial<LayerRenderInfo>;
 }
+
+/**
+ * Options for starting map rendering with `AutkMap.draw`.
+ *
+ * By default the map redraws on every animation frame. With `onDemand: true`
+ * it draws once and then only when something changes the picture.
+ */
+export interface MapDrawOptions {
+    /**
+     * Target frames per second of the continuous loop (default `60`).
+     *
+     * Pass `0` to render as fast as possible. Ignored when `onDemand` is `true`.
+     */
+    fps?: number;
+    /**
+     * Draws only when the picture changes instead of on every frame (default `false`).
+     *
+     * The map then requests a frame itself after every change it can observe:
+     * camera navigation and resizing, layer loads, updates and removals, style
+     * changes, picking and terrain changes. Changes made in the same frame are
+     * drawn once. Call `AutkMap.requestRender()` after changing anything else
+     * that affects the picture.
+     */
+    onDemand?: boolean;
+}

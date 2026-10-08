@@ -182,6 +182,8 @@ export class TerrainRenderer {
     private boundsReadbackPending = false;
     /** Whether the readback buffer is currently mapped or awaiting mapping. */
     private boundsReadbackInFlight = false;
+    /** Whether a frame drew while a readback was in flight, so the bounds of its own view were never read back. */
+    private boundsReadbackSkipped = false;
     /** Number of block instances uploaded for the current frame. */
     private instanceCount = 0;
 
@@ -672,13 +674,21 @@ export class TerrainRenderer {
     /**
      * Starts or completes asynchronous readback of reduced visible bounds.
      *
+     * @param requestRender Optional callback run when the landed readback means the next frame draws
+     * differently: the bounds changed, or a frame drew while the readback was in flight, so the
+     * bounds of that frame's view were never read back.
      * @returns Nothing. `visibleBounds` is updated asynchronously when mapping completes.
      * @throws Never throws synchronously. Mapping failures are caught and logged.
      * @example
-     * terrain.resolveVisibleBoundsReadback();
+     * terrain.resolveVisibleBoundsReadback(() => map.requestRender());
      */
-    resolveVisibleBoundsReadback(): void {
-        if (!this.boundsReadbackPending || this.boundsReadbackInFlight) {
+    resolveVisibleBoundsReadback(requestRender?: () => void): void {
+        if (this.boundsReadbackInFlight) {
+            // This frame could not queue its own copy, so the readback in flight describes an older view.
+            this.boundsReadbackSkipped = true;
+            return;
+        }
+        if (!this.boundsReadbackPending) {
             return;
         }
 
@@ -688,7 +698,10 @@ export class TerrainRenderer {
             const values = new Float32Array(this.reduceReadback.getMappedRange().slice(0));
             this.reduceReadback.unmap();
             this.boundsReadbackInFlight = false;
+            const skipped = this.boundsReadbackSkipped;
+            this.boundsReadbackSkipped = false;
 
+            let changed = false;
             const [minX, minY, maxX, maxY] = values;
             if (
                 Number.isFinite(minX) &&
@@ -698,7 +711,15 @@ export class TerrainRenderer {
                 minX <= maxX &&
                 minY <= maxY
             ) {
-                this.latestReducedBounds = [minX, minY, maxX, maxY];
+                const previous = this.latestReducedBounds;
+                const bounds: [number, number, number, number] = [minX, minY, maxX, maxY];
+                this.latestReducedBounds = bounds;
+                changed = !previous || bounds.some((value, index) => value !== previous[index]);
+            }
+
+            // Every frame queues a readback, so requesting a frame after each one would redraw forever.
+            if (changed || skipped) {
+                requestRender?.();
             }
         }).catch((error: unknown) => {
             this.boundsReadbackInFlight = false;

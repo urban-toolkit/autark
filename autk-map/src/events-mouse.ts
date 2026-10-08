@@ -303,7 +303,8 @@ export class MouseEvents {
      * browser behavior is suppressed.
      *
      * @param event Mouse event raised on double click.
-     * @returns Stores the canvas-relative click position on the active picking layer when picking is enabled.
+     * @returns Stores the canvas-relative click position on the active picking layer when picking is enabled,
+     * and requests the frame whose picking pass resolves it.
      */
     mouseDoubleClick(event: MouseEvent) {
         event.preventDefault();
@@ -317,6 +318,7 @@ export class MouseEvents {
         const activePickingLayer = this._map.activePickingLayer;
         if (activePickingLayer?.layerRenderInfo.isPick) {
             activePickingLayer.layerRenderInfo.pickedComps = [mouseX, mouseY];
+            this._map.requestRender();
         }
     }
 

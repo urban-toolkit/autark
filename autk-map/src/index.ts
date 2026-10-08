@@ -36,6 +36,8 @@ export type {
     UpdateColorMapParams,
     /** Parameters for patching one or more layer render settings. */
     UpdateRenderInfoParams,
+    /** Options for continuous or on-demand rendering with `draw()`. */
+    MapDrawOptions,
 } from './api';
 
 /** Layer state and configuration types exposed by the map API. */

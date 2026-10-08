@@ -53,6 +53,7 @@ import {
 import {
     LoadCollectionParams,
     LoadMeshParams,
+    MapDrawOptions,
     UpdateColorMapParams,
     UpdateRenderInfoParams,
     UpdateRasterParams,
@@ -72,6 +73,7 @@ import { RasterLayer } from './layer-raster';
 import { SpriteLayer } from './layer-sprite';
 import { AutkMapUi } from './map-ui';
 import { MapStyle } from './map-style';
+import { MapCamera } from './map-camera';
 import { FlatMapRenderPath } from './map-flat';
 import { MapPickingController } from './map-picking';
 import { TerrainMapRenderPath } from './map-terrain';
@@ -117,8 +119,10 @@ export class AutkMap {
     protected _showUi: boolean = true;
     /** Backing WebGPU canvas. */
     protected _canvas!: HTMLCanvasElement;
-    /** Active requestAnimationFrame id, if draw loop is running. */
+    /** Active requestAnimationFrame id: the continuous loop's next frame, or the frame requested in on-demand mode. */
     protected _animationFrameId: number | null = null;
+    /** Whether the map draws only when something changes, set by `draw({ onDemand: true })`. */
+    protected _onDemand: boolean = false;
     /** Indicates whether this map instance has been destroyed. */
     protected _isDestroyed: boolean = false;
     /** Set after the first render-loop error to deduplicate repeated frame failures. */
@@ -141,9 +145,10 @@ export class AutkMap {
         this._canvas = canvas;
         this._showUi = showUi;
         this._style = new MapStyle();
+        this._style.setChangeListener(() => this.requestRender());
         this._renderer = new Renderer(canvas, this._style);
 
-        this._camera = new Camera();
+        this._camera = new MapCamera(() => this.requestRender());
         this._layerManager = new LayerManager();
 
         this._keyEvents = new KeyEvents(this);
@@ -681,9 +686,14 @@ export class AutkMap {
      * @throws Never throws. Unknown ids are silently ignored.
      */
     removeLayer(id: string): void {
+        const removed = this._layerManager.searchByLayerId(id) !== null;
         this._layerManager.removeLayerById(id);
         this._ui.handleLayerRemoved(id);
         this._ui.refreshLayerList();
+
+        if (removed) {
+            this.requestRender();
+        }
     }
 
     /**
@@ -779,7 +789,9 @@ export class AutkMap {
             this._picking,
             this._style,
             heightfield,
+            () => this.requestRender(),
         );
+        this.requestRender();
     }
 
     /**
@@ -791,8 +803,13 @@ export class AutkMap {
      * map.disableTerrainMode();
      */
     disableTerrainMode(): void {
-        this._terrainRenderPath?.destroy();
+        if (!this._terrainRenderPath) {
+            return;
+        }
+
+        this._terrainRenderPath.destroy();
         this._terrainRenderPath = null;
+        this.requestRender();
     }
 
     /**
@@ -807,7 +824,12 @@ export class AutkMap {
      * map.updateTerrainDebug({ showMesh: true, enableCulling: false });
      */
     updateTerrainDebug(options: Partial<TerrainDebugOptions>): void {
-        this._terrainRenderPath?.updateDebug(options);
+        if (!this._terrainRenderPath) {
+            return;
+        }
+
+        this._terrainRenderPath.updateDebug(options);
+        this.requestRender();
     }
 
     /**
@@ -842,18 +864,31 @@ export class AutkMap {
         }
 
         this._terrainRenderPath.toggleOverlayBoundsDebug();
+        this.requestRender();
     }
 
     /**
-     * Starts the continuous render loop at the target frame rate.
+     * Starts rendering, either on every frame or only when the picture changes.
      *
-     * @param fps Target frames per second (default `60`). Pass `0` to render as fast as possible.
+     * With a number, or with `{ fps }`, the map redraws in a continuous loop at
+     * the target frame rate, whether or not anything changed. With
+     * `{ onDemand: true }` it draws once and then only when something changes:
+     * camera navigation and resizing, layer loads, updates and removals, style
+     * changes, picking and terrain changes each request a frame, and changes
+     * made in the same frame are drawn once. Call {@link AutkMap.requestRender}
+     * after changing anything else that affects the picture.
+     *
+     * Calling `draw` again replaces the current mode, so a map that is already
+     * drawing continuously can be switched to on-demand rendering and back.
+     *
+     * @param options Target frames per second for the continuous loop (default `60`, `0` renders as fast as possible), or {@link MapDrawOptions}.
      * @returns Nothing. Rendering is scheduled via `requestAnimationFrame`.
      * @throws Never throws.
      * @example
-     * map.draw(30);  // render at 30 fps
+     * map.draw(30);                   // redraw at 30 fps
+     * map.draw({ onDemand: true });   // draw only when something changes
      */
-    draw(fps: number = 60) {
+    draw(options: number | MapDrawOptions = 60) {
         if (this._isDestroyed) {
             return;
         }
@@ -863,6 +898,14 @@ export class AutkMap {
             this._animationFrameId = null;
         }
 
+        const settings: MapDrawOptions = typeof options === 'number' ? { fps: options } : options;
+        this._onDemand = settings.onDemand ?? false;
+        if (this._onDemand) {
+            this.requestRender();
+            return;
+        }
+
+        const fps = settings.fps ?? 60;
         let previousDelta = 0;
 
         const update = (currentDelta: number) => {
@@ -883,6 +926,38 @@ export class AutkMap {
         };
 
         this._animationFrameId = requestAnimationFrame(update);
+    }
+
+    /**
+     * Schedules one frame when the map renders on demand.
+     *
+     * Calls made before that frame runs are merged into it, so a burst of
+     * changes is drawn once. The map already requests a frame after every change
+     * it can observe; call this after changing anything else that affects the
+     * picture, such as a layer's GPU resources written directly.
+     *
+     * Has no effect before `draw({ onDemand: true })`, while the continuous loop
+     * of `draw()` runs (it draws every frame anyway), or after `destroy()`.
+     *
+     * @returns Nothing. The frame is scheduled via `requestAnimationFrame`.
+     * @throws Never throws.
+     * @example
+     * map.draw({ onDemand: true });
+     * // ...after changing something the map cannot observe:
+     * map.requestRender();
+     */
+    requestRender(): void {
+        if (this._isDestroyed || !this._onDemand || this._animationFrameId !== null) {
+            return;
+        }
+
+        this._animationFrameId = requestAnimationFrame(() => {
+            if (!this._isDestroyed) {
+                this.render();
+            }
+            // Cleared only after rendering: requests made while this frame renders are already in it.
+            this._animationFrameId = null;
+        });
     }
 
     /**
@@ -1292,6 +1367,9 @@ export class AutkMap {
         const layer = this._layerManager.addLayer(layerInfo, layerRenderInfo, layerData);
         if (layer) {
             layer.createPipeline(this._renderer);
+            // Every later data, render-state, highlight or skip change marks the layer dirty and requests a frame.
+            layer.setChangeListener(() => this.requestRender());
+            this.requestRender();
         }
     }
 

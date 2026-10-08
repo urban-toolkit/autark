@@ -80,6 +80,8 @@ export class MapStyle {
     protected _current: MapStyleShape;
     /** Identifier of the currently active style or `custom`. */
     protected _currentStyle: string;
+    /** Callback run after the active style or one of its colors changes. */
+    private _onChange: (() => void) | null = null;
 
     /**
      * Creates a style state initialized from a built-in preset.
@@ -145,6 +147,20 @@ export class MapStyle {
     }
 
     /**
+     * Registers the callback run after the style changes.
+     *
+     * `AutkMap` uses it to schedule a frame in on-demand mode. Pass `null` to
+     * remove the callback.
+     *
+     * @param listener Callback run after each style change, or `null`.
+     * @returns Nothing.
+     * @throws Never throws.
+     */
+    setChangeListener(listener: (() => void) | null): void {
+        this._onChange = listener;
+    }
+
+    /**
      * Applies one of the built-in map style presets.
      *
      * @param style Preset identifier. Unknown ids fall back to `apple`.
@@ -157,6 +173,7 @@ export class MapStyle {
         const presetId: MapStylePresetId = MapStyle._isPresetId(style) ? style : MapStyle._defaultStyleId;
         this._current = MapStyle._presets[presetId];
         this._currentStyle = presetId;
+        this._onChange?.();
     }
 
     /**
@@ -171,6 +188,7 @@ export class MapStyle {
     setCustomStyle(style: MapStyleShape): void {
         this._current = MapStyle._normalizeStyle(style, 'custom');
         this._currentStyle = 'custom';
+        this._onChange?.();
     }
 
     /**
@@ -192,6 +210,7 @@ export class MapStyle {
      */
     setHighlightColor(color: ColorHEX): void {
         this._highlight = color;
+        this._onChange?.();
     }
 
     /**
@@ -203,6 +222,7 @@ export class MapStyle {
      */
     setInvalidValueColor(color: ColorHEX): void {
         this._invalidValue = color;
+        this._onChange?.();
     }
 
     /**

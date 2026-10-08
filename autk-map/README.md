@@ -70,6 +70,21 @@ map.updateRenderInfo('table_osm_playgrounds_polygons', { showBorders: true });
 
 The nested form `{ renderInfo: { showBorders: false } }` also works. Border geometry remains synchronized while hidden; the setting does not generate borders for layers that have none. The gallery's typed OSM tag-set polygons start with `showBorders: false`.
 
+### Rendering on demand
+
+`map.draw()` redraws the map on every animation frame, even when nothing changes. A page with several maps, or a map that sits idle, spends GPU time on every one of them. Pass `{ onDemand: true }` to draw once and then only when the picture changes:
+
+```ts
+map.draw({ onDemand: true });
+
+// Later, after changing something the map cannot observe:
+map.requestRender();
+```
+
+In on-demand mode the map requests a frame itself after every change it can observe: mouse, touch, keyboard and window-resize navigation, camera changes made from code (including `CameraMotion` animations), loading, updating and removing layers, highlights and picking results, style changes, and terrain changes. Changes made in the same frame are drawn once. Call `requestRender()` after changing anything else that affects the picture, such as a layer's GPU resources written directly.
+
+Calling `draw()` again switches modes, so a map that is already drawing every frame can be moved to on-demand rendering with `draw({ onDemand: true })`, and back with `draw()`. Keep `draw()` or `draw(fps)` for apps that animate every frame.
+
 ### API summary
 
 * `new AutkMap(canvas)`: Creates a map controller bound to an HTML canvas.
@@ -86,7 +101,8 @@ The nested form `{ renderInfo: { showBorders: false } }` also works. Border geom
 * `removeLayer(id)`: Removes a layer from the map.
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
 * `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
-* `draw(fps?)`: Starts a continuous render loop.
+* `draw(fps?)`: Starts a continuous render loop. `draw({ onDemand: true })` draws only when the picture changes.
+* `requestRender()`: Schedules one frame in on-demand mode; several calls before it runs draw once.
 * `destroy()`: Releases event handlers and GPU resources.
 
 ## Resources

@@ -34,6 +34,8 @@ export abstract class Layer {
     protected _renderInfoIsDirty = false;
     /** Indicates that geometry/data buffers must be refreshed on the GPU. */
     protected _dataIsDirty = false;
+    /** Callback run whenever the layer marks its data or render state dirty. */
+    private _onChange: (() => void) | null = null;
 
     /**
      * Creates a base layer instance.
@@ -115,12 +117,27 @@ export abstract class Layer {
     }
 
     /**
+     * Registers the callback run whenever this layer marks itself dirty.
+     *
+     * `AutkMap` uses it to schedule a frame in on-demand mode. Pass `null` to
+     * remove the callback.
+     *
+     * @param listener Callback run after each dirty mark, or `null`.
+     * @returns Nothing.
+     * @throws Never throws.
+     */
+    setChangeListener(listener: (() => void) | null): void { this._onChange = listener; }
+
+    /**
      * Marks layer data buffers as stale for the next render pass.
      *
      * @returns Causes subclasses to refresh geometry-dependent GPU resources.
      * @throws Never throws.
      */
-    makeLayerDataDirty(): void { this._dataIsDirty = true; }
+    makeLayerDataDirty(): void {
+        this._dataIsDirty = true;
+        this._onChange?.();
+    }
 
     /**
      * Marks render uniforms and render-state as stale for the next render pass.
@@ -128,7 +145,10 @@ export abstract class Layer {
      * @returns Causes subclasses to refresh GPU-side render-state.
      * @throws Never throws.
      */
-    makeLayerRenderInfoDirty(): void { this._renderInfoIsDirty = true; }
+    makeLayerRenderInfoDirty(): void {
+        this._renderInfoIsDirty = true;
+        this._onChange?.();
+    }
 
     /**
      * Initializes GPU resources and pipeline objects for this layer.
