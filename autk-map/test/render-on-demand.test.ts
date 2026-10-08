@@ -565,4 +565,37 @@ describe('terrain mode on demand', () => {
         }
         expect(terrain.visibleBounds).toEqual([5, 0, 20, 10]);
     });
+
+    it('asks for one more frame when a frame drew while a terrain readback was in flight, even if the bounds stay the same', async () => {
+        vi.stubGlobal('GPUMapMode', { READ: 1 });
+        let land: () => void = () => undefined;
+        const terrain = Object.assign(Object.create(TerrainRenderer.prototype), {
+            boundsReadbackPending: false,
+            boundsReadbackInFlight: false,
+            latestReducedBounds: [0, 0, 10, 10],
+            reduceReadback: {
+                mapAsync: () => new Promise<void>((resolve) => {
+                    land = resolve;
+                }),
+                getMappedRange: () => new Float32Array([0, 0, 10, 10]).buffer,
+                unmap: () => undefined,
+            },
+        }) as TerrainRenderer;
+        const requestFrame = vi.fn();
+
+        // Frame 1 queues a readback; frame 2 draws a new view before it lands, so its own copy is skipped.
+        (terrain as any).boundsReadbackPending = true;
+        terrain.resolveVisibleBoundsReadback(requestFrame);
+        terrain.resolveVisibleBoundsReadback(requestFrame);
+        land();
+        await flushPromises();
+        expect(requestFrame).toHaveBeenCalledOnce();
+
+        // The frame it asked for reads back its own view; the same bounds again need nothing more.
+        (terrain as any).boundsReadbackPending = true;
+        terrain.resolveVisibleBoundsReadback(requestFrame);
+        land();
+        await flushPromises();
+        expect(requestFrame).toHaveBeenCalledOnce();
+    });
 });
