@@ -15,12 +15,13 @@ import light from './styles/light.json';
 import google from './styles/google.json';
 import apple from './styles/apple.json';
 import osm from './styles/osm.json';
+import poster from './styles/poster.json';
 
 /** Supported built-in style preset identifiers. */
-export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm';
+export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm' | 'poster';
 
 /** Ordered preset ids used for keyboard style cycling. */
-const PRESET_IDS: readonly MapStylePresetId[] = ['apple', 'default', 'light', 'google', 'osm'];
+const PRESET_IDS: readonly MapStylePresetId[] = ['apple', 'default', 'light', 'google', 'osm', 'poster'];
 /** Required keys for a valid map style object — derived from `LayerType` minus `raster`. */
 const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = LAYER_TYPE_VALUES.filter(
   (l): l is Exclude<LayerType, 'raster'> => l !== 'raster',
@@ -67,6 +68,7 @@ export class MapStyle {
         google: MapStyle._normalizeStyle(google as MapStyleShape, 'google'),
         apple: MapStyle._normalizeStyle(apple as MapStyleShape, 'apple'),
         osm: MapStyle._normalizeStyle(osm as MapStyleShape, 'osm'),
+        poster: MapStyle._normalizeStyle(poster as MapStyleShape, 'poster'),
     };
 
     /** Default style assigned to new maps. */
@@ -80,6 +82,8 @@ export class MapStyle {
     protected _current: MapStyleShape;
     /** Identifier of the currently active style or `custom`. */
     protected _currentStyle: string;
+    /** Callback run after the active style or one of its colors changes. */
+    private _onChange: (() => void) | null = null;
 
     /**
      * Creates a style state initialized from a built-in preset.
@@ -145,6 +149,20 @@ export class MapStyle {
     }
 
     /**
+     * Registers the callback run after the style changes.
+     *
+     * `AutkMap` uses it to schedule a frame in on-demand mode. Pass `null` to
+     * remove the callback.
+     *
+     * @param listener Callback run after each style change, or `null`.
+     * @returns Nothing.
+     * @throws Never throws.
+     */
+    setChangeListener(listener: (() => void) | null): void {
+        this._onChange = listener;
+    }
+
+    /**
      * Applies one of the built-in map style presets.
      *
      * @param style Preset identifier. Unknown ids fall back to `apple`.
@@ -157,6 +175,7 @@ export class MapStyle {
         const presetId: MapStylePresetId = MapStyle._isPresetId(style) ? style : MapStyle._defaultStyleId;
         this._current = MapStyle._presets[presetId];
         this._currentStyle = presetId;
+        this._onChange?.();
     }
 
     /**
@@ -171,6 +190,7 @@ export class MapStyle {
     setCustomStyle(style: MapStyleShape): void {
         this._current = MapStyle._normalizeStyle(style, 'custom');
         this._currentStyle = 'custom';
+        this._onChange?.();
     }
 
     /**
@@ -192,6 +212,7 @@ export class MapStyle {
      */
     setHighlightColor(color: ColorHEX): void {
         this._highlight = color;
+        this._onChange?.();
     }
 
     /**
@@ -203,6 +224,7 @@ export class MapStyle {
      */
     setInvalidValueColor(color: ColorHEX): void {
         this._invalidValue = color;
+        this._onChange?.();
     }
 
     /**

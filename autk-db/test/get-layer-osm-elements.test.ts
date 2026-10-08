@@ -86,7 +86,7 @@ describe('OSM element export (#108)', () => {
     expect(parks.features.map(feature => feature.id)).toEqual(['relation/601', 'way/601']);
     expect(parks.features.find(feature => feature.id === 'way/601')?.properties).toMatchObject({ osm_type: 'way', osm_id: 601, leisure: 'park' });
     const roads = await db.getLayer('table_osm_roads', { osmElements: true });
-    expect(roads.features[0]).toMatchObject({ id: 'way/701', geometry: { type: 'LineString', coordinates: [[0, 4], [10, 4]] } });
+    expect(roads.features[0]).toMatchObject({ id: 'way/701', geometry: { type: 'LineString', coordinates: [[-1, 4], [11, 4]] } });
     expect(await db.getLayer('table_osm_surface', { osmElements: true })).toEqual(await db.getLayer('table_osm_surface'));
     await db.rawQuery({ query: 'SELECT id, geometry, properties FROM table_osm_parks', output: { type: 'CREATE_TABLE', tableName: 'derived', tableType: 'parks', source: 'osm' } });
     expect(await db.getLayer('derived', { osmElements: true })).toEqual(await db.getLayer('derived'));

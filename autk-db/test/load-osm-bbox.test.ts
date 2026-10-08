@@ -81,7 +81,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     expect(buildings.features.map(feature => feature.id)).not.toContain(30);
     expect(buildings.features.map(feature => feature.id)).not.toContain(40);
     const road = await client.getLayer('table_osm_roads');
-    expect(road.features[0].geometry).toMatchObject({ type: 'LineString', coordinates: [[0, 3], [5, 3]] });
+    expect(road.features[0].geometry).toMatchObject({ type: 'LineString', coordinates: [[-1, 3], [9, 3]] });
     expect((await client.getLayer('table_osm_water')).features).toHaveLength(1);
     await client.loadGeojson({ outputTableName: 'later', layerType: 'points', coordinateFormat: 'EPSG:4326',
       geojsonObject: { type: 'FeatureCollection', features: [2, 8].map(x => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [x, 8] }, properties: {} })) } });

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — gerador de mapas</title>
+    <link rel="stylesheet" href="/src/autk-map/map-poster.css" />
+</head>
+<body>
+    <main>
+        <aside>
+            <a href="/">← Galeria</a>
+            <h1>Seu mapa, em um pôster</h1>
+            <p>Ruas em grafite, terra branca e água azul-clara. Inspirado em mapas urbanos minimalistas.</p>
+            <form id="generator">
+                <label>Título <input id="title" value="Rio de Janeiro" maxlength="40" /></label>
+                <label>Subtítulo <input id="subtitle" value="Rio de Janeiro · Brasil" maxlength="70" /></label>
+                <label>Recorte WGS84 <code>[oeste, sul, leste, norte]</code>
+                    <input id="bbox" type="text" spellcheck="false" value="[-43.325, -23.045, -43.065, -22.760]" required />
+                </label>
+                <p class="hint">O recorte inicial inclui Rio, a Baía de Guanabara e Niterói. Por exemplo: <code>[2.2242, 48.8156, 2.4699, 48.9022]</code>. Áreas maiores podem demorar no Overpass. Arraste e use o scroll para ajustar o enquadramento.</p>
+                <button id="generate" type="submit">Gerar mapa</button>
+            </form>
+            <label>Largura das ruas (unidades locais)
+                <input id="road-width" type="range" min="1" max="20" step="0.5" value="7" />
+                <output id="road-value">7</output>
+            </label>
+            <button id="download" type="button" disabled>Baixar pôster PNG</button>
+            <p id="status" role="status" aria-live="polite">Carregando o recorte de Rio e Niterói. Requer WebGPU e acesso ao Overpass.</p>
+        </aside>
+        <article id="poster" aria-label="Prévia do pôster">
+            <div class="map-frame">
+                <canvas aria-label="Mapa urbano interativo"></canvas>
+            </div>
+            <footer>
+                <h2 id="poster-title">Rio de Janeiro</h2>
+                <p id="poster-subtitle">Rio de Janeiro · Brasil</p>
+            </footer>
+        </article>
+    </main>
+    <script type="module" src="/src/autk-map/map-poster.ts"></script>
+</body>
+</html>

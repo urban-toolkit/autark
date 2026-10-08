@@ -89,10 +89,6 @@ export class KeyEvents {
 
             const id = (styles.indexOf(current) + 1) % styles.length;
             this._map.style.setPredefinedStyle(styles[id]);
-
-            for (const layer of this._map.layerManager.layers) {
-                layer.makeLayerRenderInfoDirty();
-            }
         }
 
         if (event.key.toLowerCase() === 'b') {

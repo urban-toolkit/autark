@@ -54,6 +54,9 @@ export class AutkMapUi {
     protected _performanceOverlay: HTMLDivElement | null = null;
     /** Persistent menu toggle handler removed during teardown. */
     protected _onMenuIconClick: ((event: MouseEvent) => void) | null = null;
+    /** Branding shown independently of the optional map controls. */
+    private _branding: HTMLDivElement | null = null;
+    private _brandingResizeObserver: ResizeObserver | null = null;
 
     /**
      * Creates a UI controller bound to a map instance.
@@ -87,6 +90,14 @@ export class AutkMapUi {
      * @returns Updates the inline position styles of any UI elements that have been built.
      */
     handleResize(): void {
+        if (this._branding) {
+            const canvas = this.map.canvas;
+            Object.assign(this._branding.style, {
+                left: `${canvas.offsetLeft}px`, top: `${canvas.offsetTop}px`,
+                width: `${canvas.offsetWidth}px`, height: `${canvas.offsetHeight}px`,
+                display: canvas.offsetWidth > 0 && canvas.offsetHeight > 0 ? 'block' : 'none',
+            });
+        }
         if (this._menuIcon) {
             this._menuIcon.style.top  = (this.map.canvas.offsetTop  + this._uiMargin) + 'px';
             this._menuIcon.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
@@ -105,6 +116,27 @@ export class AutkMapUi {
             this._performanceOverlay.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 92 - this._uiMargin) + 'px';
             this._performanceOverlay.style.top = (this.map.canvas.offsetTop + this._uiMargin) + 'px';
         }
+    }
+
+    /**
+     * Adds a faint “made with autark” watermark at the bottom right. Branding is independent of `showUi` and never
+     * intercepts canvas interaction. No animation loop is needed for positioning.
+     */
+    buildBranding(): void {
+        if (this._branding || !this.map.canvas.parentElement) return;
+
+        this._branding = document.createElement('div');
+        this._branding.className = 'autk-map-branding';
+        Object.assign(this._branding.style, {
+            position: 'absolute', pointerEvents: 'none', zIndex: '10', overflow: 'hidden',
+        });
+        this._branding.innerHTML = `<span class="autk-map-credit" style="position:absolute;right:10px;bottom:10px;font:11px system-ui,sans-serif;color:#555;opacity:0.6;white-space:nowrap">made with autark</span>`;
+        this.map.canvas.parentElement.appendChild(this._branding);
+        if (typeof ResizeObserver !== 'undefined') {
+            this._brandingResizeObserver = new ResizeObserver(() => this.handleResize());
+            this._brandingResizeObserver.observe(this.map.canvas);
+        }
+        this.handleResize();
     }
 
     // ── Active layer ──────────────────────────────────────────────────────────
@@ -174,6 +206,11 @@ export class AutkMapUi {
         if (this._menuIcon && this._onMenuIconClick) {
             this._menuIcon.removeEventListener('click', this._onMenuIconClick);
         }
+
+        this._brandingResizeObserver?.disconnect();
+        this._branding?.remove();
+        this._branding = null;
+        this._brandingResizeObserver = null;
 
         this._menuIcon?.remove();
         this._subMenu?.remove();

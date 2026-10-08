@@ -20,9 +20,9 @@ export class OsmTagSets {
             },
             tagSets: [
                 {
-                    name: 'food',
-                    type: 'points',
-                    tags: [{ key: 'amenity', value: 'cafe' }, { key: 'amenity', value: 'restaurant' }],
+                    name: 'playgrounds',
+                    type: 'polygons',
+                    tags: [{ key: 'leisure', value: 'playground' }],
                 },
                 {
                     name: 'paths',
@@ -30,9 +30,9 @@ export class OsmTagSets {
                     tags: [{ key: 'highway', value: 'footway' }],
                 },
                 {
-                    name: 'playgrounds',
-                    type: 'polygons',
-                    tags: [{ key: 'leisure', value: 'playground' }],
+                    name: 'food',
+                    type: 'points',
+                    tags: [{ key: 'amenity', value: 'cafe' }, { key: 'amenity', value: 'restaurant' }],
                 },
             ],
         });
@@ -40,7 +40,11 @@ export class OsmTagSets {
         this.map = new AutkMap(canvas);
         await this.map.init();
         await this.loadLayers();
+
         this.map.updateRenderInfo('table_osm_buildings', { opacity: 0.35 });
+        this.map.updateRenderInfo('table_osm_food_points', { pointSize: 32 });
+        this.map.updateRenderInfo('table_osm_paths_polylines', { polylinesWidth:8 });
+
         this.map.draw();
         this.addOpacitySlider(canvas);
 

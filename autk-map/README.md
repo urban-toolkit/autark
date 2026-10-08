@@ -56,9 +56,42 @@ map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
 map.draw();
 ```
 
+### On-demand rendering
+
+`map.draw()` now renders once and then only when something changes. Camera navigation and
+`CameraMotion` animations, resize, layer loads/updates/removals, style setters, highlighting,
+picking and terrain updates request frames automatically. Changes made before the next frame
+are grouped into one redraw. GPU readbacks can request a follow-up frame, for example to show
+a picking highlight or updated terrain bounds. An idle map does not keep scheduling frames.
+
+```ts
+map.draw();                         // on demand (default)
+map.draw({ onDemand: true });       // explicit on demand
+map.draw(30);                       // continuous, 30 fps (existing behavior)
+map.draw({ fps: 30 });              // continuous, 30 fps
+map.draw({ onDemand: false });      // continuous, 60 fps
+```
+
+Calling `draw()` again switches modes. `requestRender()` schedules one on-demand frame and
+coalesces repeated requests; it has no effect before rendering starts, in continuous mode,
+or after `destroy()`.
+
+Existing subsystem getters remain available; inputs are not defensively copied. Direct
+writes to objects or buffers are **not observed**. If you write GPU resources yourself,
+call `map.requestRender()` afterward. Direct edits to cached render state or CPU geometry
+also require `layer.makeLayerRenderInfoDirty()` or `layer.makeLayerDataDirty()` respectively;
+these dirty marks already request a frame for attached layers. `requestRender()` alone does
+not upload CPU buffers or refresh cached uniforms. Prefer the update APIs, which handle both
+resource updates and redraws.
+
+**Migration:** `draw()` no longer runs continuously. Applications doing unobserved updates
+every frame should request rendering explicitly or use `draw({ onDemand: false })`.
+Numeric `draw(fps)` calls retain their continuous behavior. No encapsulation migration is
+required for existing camera and style methods.
+
 ### Generic layer defaults and polygon borders
 
-Built-in presets give `points`, `polylines` and `polygons` muted colors coordinated with the base map; surface, parks, water, roads and buildings keep their existing palettes. Point sprites default to a **radius of 64 local planar units**. Generic polylines default to a **full width of 12 local planar units**, while roads retain their highway-specific widths unless explicitly overridden. These values are centralized in `src/types-layers.ts` and exported as `DEFAULT_POINT_SIZE` and `DEFAULT_LINE_WIDTH`; explicit layer values take precedence.
+General-purpose presets use `surface` as the base for muted generic colors: `polygons` are approximately 10% darker, `polylines` 20% darker, and `points` 30% darker; surface, parks, water, roads and buildings keep their existing palettes. Point sprites default to a **radius of 64 local planar units**. Generic polylines default to a **full width of 12 local planar units**, while roads retain their highway-specific widths unless explicitly overridden. These values are centralized in `src/types-layers.ts` and exported as `DEFAULT_POINT_SIZE` and `DEFAULT_LINE_WIDTH`; explicit layer values take precedence.
 
 Sizes belong to each layer's render state, not its geometry. Set or update them after loading:
 
@@ -90,6 +123,26 @@ map.updateRenderInfo('table_osm_playgrounds_polygons', { showBorders: true });
 
 The nested form `{ renderInfo: { showBorders: false } }` also works. Border geometry remains synchronized while hidden; the setting does not generate borders for layers that have none. The gallery's typed OSM tag-set polygons start with `showBorders: false`.
 
+### Minimalist map posters
+
+The `poster` preset uses white land, graphite roads and pale-blue water/background:
+
+```ts
+map.style.setPredefinedStyle('poster');
+```
+
+Gallery example: `gallery/src/autk-map/map-poster.html`. It automatically loads a WGS84
+crop covering Rio de Janeiro, Guanabara Bay and Niterói. The crop remains editable, with
+title/subtitle controls, road widths, interactive framing and a 2400-pixel-wide PNG export.
+The exporter temporarily redraws the WebGPU map at export resolution rather than scaling the
+on-screen canvas. Every `autk-map`
+canvas includes a faint “made with autark” watermark at the bottom right, even with
+`showUi: false`. It follows canvas resizing and is removed by `destroy()`. It has no logo
+or year and does not intercept pointer events. The poster PNG includes the same watermark.
+The poster omits the OpenStreetMap credit text; published uses still require
+appropriate OpenStreetMap attribution. Data loading requires network access to Overpass;
+larger crops may take longer.
+
 ### Render sizing verification
 
 - Interactive example: `gallery/src/autk-map/render-sizing.html` (point/line sliders and picking).
@@ -114,7 +167,8 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `removeLayer(id)`: Removes a layer from the map.
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
 * `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
-* `draw(fps?)`: Starts a continuous render loop.
+* `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
+* `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.
 * `destroy()`: Releases event handlers and GPU resources.
 
 ## Resources

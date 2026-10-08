@@ -56,10 +56,12 @@ export class TerrainMapRenderPath {
      * @param camera Main perspective camera used for terrain rendering.
      * @param layerManager Ordered layer source used for overlays and buildings.
      * @param picking Shared picking helper for readback and event emission.
+     * @param style Instance-specific style used for terrain water and overlay colors.
      * @param heightfield Local-space heightfield sampled by terrain and buildings.
+     * @param requestRender Schedules another frame when GPU work that lands after a frame changes what the next one draws.
      * @throws If renderer overlay texture views cannot be created by the renderer.
      * @example
-     * const terrainPath = new TerrainMapRenderPath(renderer, camera, layers, picking, heightfield);
+     * const terrainPath = new TerrainMapRenderPath(renderer, camera, layers, picking, style, heightfield, () => map.requestRender());
      */
     constructor(
         /** Shared renderer used to create render passes and submit commands. */
@@ -74,6 +76,8 @@ export class TerrainMapRenderPath {
         private readonly style: MapStyle,
         /** Local-space height samples used to initialize the terrain renderer. */
         private readonly heightfield: Heightfield,
+        /** Schedules another frame when a GPU readback changes what the next frame draws. */
+        private readonly requestRender: () => void,
     ) {
         this.fitCameraToTerrainBounds();
         const overlaySize = this.getTerrainOverlayTextureSize();
@@ -195,7 +199,8 @@ export class TerrainMapRenderPath {
         const pickReadbackSlot = this.renderTerrainPickingPass(pendingPick, activeTerrain, overlayPixelRect);
         this.renderer.finish();
         this.picking.resolvePickingReadback(pendingPick, pickReadbackSlot);
-        activeTerrain.resolveVisibleBoundsReadback();
+        // The overlay of the next frame covers the bounds this readback finds, so new bounds need a frame.
+        activeTerrain.resolveVisibleBoundsReadback(this.requestRender);
     }
 
     /**

@@ -1,0 +1,27 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #eeefed; color: #252525; font-family: system-ui, sans-serif; }
+main { display: grid; grid-template-columns: 260px minmax(0, 900px); gap: 24px; justify-content: center; align-items: start; padding: 28px 24px; }
+aside { position: sticky; top: 24px; }
+aside > a { color: #646b69; font-size: 13px; }
+h1 { font-size: 26px; font-weight: 500; line-height: 1.2; }
+aside p { font-size: 14px; line-height: 1.5; }
+label { display: grid; gap: 6px; margin: 16px 0; font-size: 13px; }
+input, select, button { width: 100%; font: inherit; }
+input:not([type="range"]), select { padding: 9px; border: 1px solid #c8ceca; border-radius: 4px; background: white; }
+fieldset { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; border: 1px solid #c8ceca; border-radius: 4px; }
+fieldset label { margin: 8px 0; }
+legend, .hint { font-size: 12px; color: #646b69; }
+button { padding: 12px; background: #252525; color: white; border: 0; border-radius: 4px; cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+#status { min-height: 42px; color: #646b69; }
+#poster { padding: 20px; background: white; box-shadow: 0 8px 30px #00000012; }
+.map-frame { position: relative; aspect-ratio: 4 / 5; border: 1px solid #252525; }
+canvas { display: block; width: 100%; height: 100%; }
+footer { padding: 28px 8px 12px; text-align: center; }
+footer h2 { margin: 0; text-transform: uppercase; letter-spacing: .24em; font-size: clamp(18px, 3vw, 28px); font-weight: 400; overflow-wrap: anywhere; }
+#poster-subtitle { margin: 12px 0 24px; text-transform: uppercase; letter-spacing: .2em; font-size: 9px; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+    main { grid-template-columns: minmax(0, 700px); gap: 24px; padding: 20px 12px; }
+    aside { position: static; }
+    #poster { padding: 12px; }
+}

@@ -118,6 +118,7 @@ export class LayerManager {
             return;
         }
 
+        layer.setChangeListener(null);
         layer.destroy();
         this._layers = this._layers.filter((candidate) => candidate.layerInfo.id !== layerId);
         this._dynamicOrder = this._dynamicOrder.filter((id) => id !== layerId);

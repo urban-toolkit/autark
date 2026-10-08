@@ -108,6 +108,19 @@ describe('typed OSM tag sets', () => {
     expect(timings.layers.map(layer => layer.layerType)).toEqual(['roads', 'polylines', 'polygons']);
   });
 
+  it('does not clip bbox-selected standard roads to the land surface', async () => {
+    await db.setWorkspace(`bbox_roads_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    const clipToSurface = vi.spyOn(db as any, 'clipLayerToLayer');
+    const clipToBbox = vi.spyOn(db as any, 'clipLayerToBoundingBox');
+
+    await load([], fixture, ['roads']);
+
+    expect(clipToSurface).not.toHaveBeenCalled();
+    expect(clipToBbox).toHaveBeenCalledWith('table_osm_roads', expect.objectContaining({
+      minLon: 0, minLat: 0, maxLon: 10, maxLat: 10,
+    }), expect.any(String));
+  });
+
   it('uses the coastal surface even for tag-only loads and cleans layers emptied by a reload', async () => {
     await db.setWorkspace(`tag_coast_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
     await load([schools('points')]);

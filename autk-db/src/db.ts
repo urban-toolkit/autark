@@ -40,7 +40,7 @@ import { deleteRasterPayload } from './raster-store';
 import { LoadJsonParams, LoadJsonUseCase } from './use-cases/load-json';
 import { LoadOsmLayerParams, LoadOsmLayerUseCase } from './use-cases/load-osm-layer';
 import { LoadOsmFromOverpassApiUseCase, LoadOsmParams, OsmLoadTimings } from './use-cases/load-osm-overpass';
-import { checkTagSets } from './use-cases/load-osm-overpass/interfaces';
+import { checkTagSets, isBoundingBoxArea } from './use-cases/load-osm-overpass/interfaces';
 import { LoadOsmFromPbfUseCase } from './use-cases/load-osm-pbf';
 import { OsmProcessingPipeline } from './internal/process-osm/pipeline';
 import { PolygonizeOsmSurfaceUseCase } from './internal/process-osm-surface/use-case';
@@ -363,6 +363,9 @@ export class AutkDb {
 
             let surfaceLayerName: string | null = null;
             const clippableLayerNames: string[] = [];
+            // Bbox selection already bounds OSM roads. Do not apply the coastal
+            // land mask to them or bridges and other water crossings disappear.
+            const preserveBboxRoads = isBoundingBoxArea(params.queryArea);
 
             const requestedLayers = params.autoLoadLayers.layers;
             const layers = [...new Set([...requestedLayers, 'surface' as const])];
@@ -434,8 +437,12 @@ export class AutkDb {
 
             if (surfaceLayerName && clippableLayerNames.length > 0) {
                 for (const layerName of clippableLayerNames) {
-                    const cropGeometry = !layerName.endsWith('_buildings');
-                    await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
+                    if (preserveBboxRoads && layerName.endsWith('_roads')) {
+                        await this.clipLayerToBoundingBox(layerName, osmBoundingBox, this.currentWorkspace);
+                    } else {
+                        const cropGeometry = !layerName.endsWith('_buildings');
+                        await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
+                    }
                     await this.refreshStoredBoundingBox(layerName);
                 }
             }
