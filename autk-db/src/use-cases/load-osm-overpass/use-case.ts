@@ -18,12 +18,17 @@ import {
 } from '../../consts';
 
 import { OsmProcessingPipeline } from '../../internal/process-osm/pipeline';
+import { resolveNamedAreaBoundaries } from '../../internal/process-osm/named-area';
 
 /**
  * Internal shape for a parsed Overpass API JSON response.
  */
 interface OverpassApiResponse {
   elements: OsmElement[];
+  /** Kept independently so thematic member ways cannot replace coastline geometry. */
+  coastlines?: OsmElement[];
+  coastlineExtent?: { west: number; south: number; east: number; north: number } | null;
+  remark?: string;
 }
 
 /**
@@ -37,6 +42,8 @@ interface OsmExecResult {
   boundariesProcessingMs: number;
   /** WGS84 land mask; undefined retains the complete query-area surface. */
   surfaceMask?: MultiPolygon;
+  queryExtent: { west: number; south: number; east: number; north: number };
+  coastlineExtent?: { west: number; south: number; east: number; north: number };
 }
 
 /**
@@ -124,7 +131,9 @@ export class LoadOsmFromOverpassApiUseCase {
       : this.pipeline.splitCombinedResponse(combined, params.queryArea as OsmNamedArea);
     const extent = box ?? this.pipeline.computeBboxFromElements(boundariesData.elements);
     if (!extent) throw new Error('Failed to compute query-area extent');
-    const surfaceMask = coastalLandMask(combined.elements, extent);
+    const coastlineExtent = box ?? (combined.coastlineExtent !== undefined ? combined.coastlineExtent
+      : resolveNamedAreaBoundaries(combined.elements, params.queryArea as OsmNamedArea, 'OSM').geocodeExtent);
+    const surfaceMask = coastlineExtent ? coastalLandMask(combined.coastlines ?? combined.elements, coastlineExtent) : undefined;
     console.log(`[autk-db] Split: ${osmData.elements.length} OSM elements, ${boundariesData.elements.length} boundary elements`);
 
     onProgress?.('processing-osm-data');
@@ -149,6 +158,8 @@ export class LoadOsmFromOverpassApiUseCase {
         { source: 'osm', name: `${outputTableName}_boundaries`, columns },
       ],
       surfaceMask,
+      queryExtent: extent,
+      coastlineExtent: coastlineExtent ?? undefined,
       osmElementCount: osmData.elements.length,
       boundaryElementCount: boundariesData.elements.length,
       osmDataProcessingMs,
@@ -170,9 +181,9 @@ export class LoadOsmFromOverpassApiUseCase {
   private getCacheKey(queryArea: OsmQueryArea, layers?: string[], tagSets: OsmTagSet[] = []): string {
     const tagKey = tagSets.length > 0 ? `-tag-sets-v1:${JSON.stringify(tagSelectors(tagSets))}` : '';
     const layerKey = layers && layers.length > 0 ? `-layers:${[...layers].sort().join('+')}` : '';
-    if (isBoundingBoxArea(queryArea)) return `overpass-combined-v3-bbox-${queryArea.bbox.join(',')}${layerKey}${tagKey}`;
+    if (isBoundingBoxArea(queryArea)) return `overpass-combined-v4-bbox-${queryArea.bbox.join(',')}${layerKey}${tagKey}`;
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-v4-${queryArea.geocodeArea}-${areas}${layerKey}${tagKey}`;
+    return `overpass-combined-v5-${queryArea.geocodeArea}-${areas}${layerKey}${tagKey}`;
   }
 
   /**
@@ -182,9 +193,9 @@ export class LoadOsmFromOverpassApiUseCase {
    * @returns A cache key string for the full dataset.
    */
   private getFullDataCacheKey(queryArea: OsmQueryArea): string {
-    if (isBoundingBoxArea(queryArea)) return `overpass-combined-v3-bbox-${queryArea.bbox.join(',')}`;
+    if (isBoundingBoxArea(queryArea)) return `overpass-combined-v4-bbox-${queryArea.bbox.join(',')}`;
     const areas = [...queryArea.areas].sort().join(',');
-    return `overpass-combined-v4-${queryArea.geocodeArea}-${areas}`;
+    return `overpass-combined-v5-${queryArea.geocodeArea}-${areas}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -197,8 +208,9 @@ export class LoadOsmFromOverpassApiUseCase {
    * 504. A pause between requests avoids immediate rate-limiting. Results are
    * cached for 24h.
    *
-   * `geocodeArea` (e.g. "New York") is used only as a disambiguation scope.
-   * Thematic candidates are selected by named areas or bbox. Complete relation
+   * `geocodeArea` (e.g. "New York") scopes names and defines the coastline collection bbox.
+   * Coastlines remain a separate response; thematic candidates/building tiles still
+   * use the requested areas or explicit bbox. Complete relation
    * members can extend outside the query area; the mandatory surface clips later.
    */
   private async fetchCombinedOsmData(
@@ -241,17 +253,24 @@ export class LoadOsmFromOverpassApiUseCase {
     let boundariesBbox: { south: number; north: number; west: number; east: number } | null;
     if (isBoundingBoxArea(queryArea)) {
       boundariesBbox = boundingBoxOf(queryArea);
+      combined.coastlineExtent = boundariesBbox;
     } else {
       console.log('[autk-db] Fetching boundary data from Overpass API…');
       const boundariesResponse = await this.fetchWithRetry(this.buildBoundariesQuery(queryArea));
       combined = await boundariesResponse.json();
-      boundariesBbox = this.pipeline.computeBboxFromElements(combined.elements ?? []);
+      if (combined.remark) throw new Error(`Overpass boundary query returned incomplete data: ${combined.remark}`);
+      const { geocodeExtent } = resolveNamedAreaBoundaries(combined.elements, queryArea, 'OSM');
+      combined.coastlineExtent = geocodeExtent ?? null;
+      const { boundariesData } = this.pipeline.splitCombinedResponse(combined, queryArea);
+      boundariesBbox = this.pipeline.computeBboxFromElements(boundariesData.elements);
     }
     onProgress?.('downloading-osm-data');
-    if (boundariesBbox) {
+    if (combined.coastlineExtent) {
       await pause(BETWEEN_REQUESTS_MS);
-      const response = await this.fetchWithRetry(this.buildBoundingBoxQuery(boundariesBbox, { way: ['"natural"="coastline"'], relation: [] }));
-      combined = this.mergeResponses(combined, await response.json());
+      const response = await this.fetchWithRetry(this.buildBoundingBoxQuery(combined.coastlineExtent, { way: ['"natural"="coastline"'], relation: [] }));
+      const coastData: OverpassApiResponse = await response.json();
+      if (coastData.remark) throw new Error(`Overpass coastline query returned incomplete data: ${coastData.remark}`);
+      combined.coastlines = coastData.elements ?? [];
     }
 
     // Requests 2–4: one per layer group, skipped when not requested.
@@ -481,7 +500,7 @@ export class LoadOsmFromOverpassApiUseCase {
   }
 
   /**
-   * Builds the boundaries query: admin relations + their member ways.
+   * Builds the boundaries query: geocode and scoped area relations + complete member ways.
    * Relations are output with `body` only (tags + member IDs); ways get full
    * inline geometry via `out geom qt`.
    */
@@ -503,12 +522,14 @@ export class LoadOsmFromOverpassApiUseCase {
       [out:json][timeout:60][maxsize:134217728];
 
       ${geocodeLine}
+      rel(pivot.areaMain)->.geocodeRelations;
+      way(r.geocodeRelations)->.geocodeWays;
       ${areaLines.join('\n      ')}
 
-      ( ${relSelectors.join(' ')} );
+      ( .geocodeRelations; ${relSelectors.join(' ')} );
       out body;
 
-      ( ${boundaryWaySelectors.join(' ')} );
+      ( .geocodeWays; ${boundaryWaySelectors.join(' ')} );
       out geom qt;
     `;
   }
@@ -756,7 +777,7 @@ export class LoadOsmFromOverpassApiUseCase {
       existingIds.add(`${e.type}:${e.id}`);
     }
     const dedupedB = b.elements.filter(e => !existingIds.has(`${e.type}:${e.id}`));
-    return { elements: [...a.elements, ...dedupedB] };
+    return { ...a, elements: [...a.elements, ...dedupedB] };
   }
 
 }

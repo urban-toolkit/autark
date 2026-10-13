@@ -2,14 +2,16 @@ import { booleanPointInPolygon, featureCollection, lineString, polygonize } from
 import type { MultiPolygon, Position } from 'geojson';
 import type { OsmElement } from '../../use-cases/load-osm-overpass/interfaces';
 
-/** Builds land inside a WGS84 extent. Undefined means retain the original area mask. */
+/** Classifies land inside a complete coastline collection extent (normally geocode bbox).
+ * Undefined retains the original area mask and must never be treated as empty land for water generation.
+ */
 export function coastalLandMask(
   elements: OsmElement[],
   box: { west: number; south: number; east: number; north: number },
 ): MultiPolygon | undefined {
   const coastlines = elements.filter(element => element.type === 'way' && element.tags?.natural === 'coastline');
   if (coastlines.length === 0) {
-    console.warn('[autk-db] No coastline available; surface uses the full query area (land and sea are not distinguished).');
+    console.warn('[autk-db] No coastline available; surface uses the full query area (land and sea are not distinguished). Coastal water is not generated.');
     return undefined;
   }
   try {
@@ -130,7 +132,7 @@ export function coastalLandMask(
     }
     return land;
   } catch (error) {
-    console.warn(`[autk-db] Cannot reconstruct coastline surface: ${error instanceof Error ? error.message : String(error)}. Using the full query area instead.`);
+    console.warn(`[autk-db] Cannot reconstruct coastline surface: ${error instanceof Error ? error.message : String(error)}. Using the full query area instead; coastal water is not generated.`);
     return undefined;
   }
 }

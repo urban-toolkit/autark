@@ -112,6 +112,8 @@ make dev APP=gallery OPEN=/src/autk-plot/map-d3-table.html
 make dev APP=usecases OPEN=/src/urbane/main.html
 ```
 
+See [usecases/README.md](usecases/README.md) for case-study architecture, analytical limitations and browser validation steps.
+
 ### Development Workflow
 
 The `Makefile` provides several commands to help with the development process:

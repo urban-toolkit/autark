@@ -1,6 +1,7 @@
-// ── Accumulated shadow time + building contribution %: 07:00–19:00, Chicago ──
+// ── Hourly daylight-sampled shadow estimate + building contribution %, Chicago ──
 // out[0] — accumulated shadow minutes (each hourly sample contributes 60 min).
 // out[1] — contribution %: (accumulated / sjoin_avg) * 100.
+// Interpretation assumes the baseline CSV's units are also minutes (see README).
 // bld_height, doy, ring are global variables (same for all road segments).
 // seg and sjoin_avg are per-feature attributes.
 let pi      = 3.14159265359;

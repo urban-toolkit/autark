@@ -124,7 +124,7 @@ describe('named OSM boundaries are scoped by the region, not its bbox', () => {
     }
   });
 
-  it('invalidates both old named caches without invalidating unchanged bbox selection', async () => {
+  it('invalidates old caches that mixed coastlines with areas-only data', async () => {
     const api = new LoadOsmFromOverpassApiUseCase(conn, pipeline) as any;
     const keys: string[] = [];
     vi.spyOn(HttpCache.prototype, 'get').mockImplementation(async key => {
@@ -136,9 +136,9 @@ describe('named OSM boundaries are scoped by the region, not its bbox', () => {
     vi.useFakeTimers();
     const run = api.fetchCombinedOsmData(area, ['surface']);
     await vi.runAllTimersAsync(); await run;
-    expect(keys).toHaveLength(2); expect(keys.every(key => key.includes('v4'))).toBe(true);
+    expect(keys).toHaveLength(2); expect(keys.every(key => key.includes('v5'))).toBe(true);
     expect(fetch).toHaveBeenCalled();
-    expect(api.getCacheKey({ bbox: [0, 0, 10, 10] }, ['roads'])).toContain('v3-bbox');
+    expect(api.getCacheKey({ bbox: [0, 0, 10, 10] }, ['roads'])).toContain('v4-bbox');
   });
 
   it('produces the same selected surface and roads from real PBF bytes and scoped Overpass responses', async () => {

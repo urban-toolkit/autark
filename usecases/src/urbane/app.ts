@@ -1,142 +1,123 @@
-import { FeatureCollection } from 'geojson';
-
-import { computeRoadSkyView, computeScore } from './analysis';
+import type { FeatureCollection } from 'geojson';
+import { computeRoadSkyView, computeScore } from './compute';
 import { UrbaneData } from './data';
-import { setLoadingState } from './ui';
-import { UrbaneViews } from './views';
-
-type UrbaneLevel = 'neighborhoods' | 'active_buildings';
+import { UrbaneMap } from './map';
+import { UrbanePlots } from './plot';
+import { DATASETS, DEFAULT_DISTANCE, DEFAULT_WEIGHTS, type UrbaneLevel } from './config';
 
 export class UrbaneApp {
-    protected data!: UrbaneData;
-    protected views!: UrbaneViews;
-
-    protected neighs!: FeatureCollection;
-    protected activeBuildings!: FeatureCollection;
-    protected roadsWithSky?: FeatureCollection;
+    private readonly data = new UrbaneData();
+    private map!: UrbaneMap;
+    private plots!: UrbanePlots;
+    private neighborhoods!: FeatureCollection;
+    private activeBuildings!: FeatureCollection;
+    private busy = false;
 
     public currentLevel: UrbaneLevel = 'neighborhoods';
     public selectedNeighIds: number[] = [];
-    public distance = 300;
-
-    public datasets = ['arrest', 'new_building', 'noise', 'restaurants', 'school', 'subway', 'tree'];
-    public weights = [0.3, 0.2, 0.0, 0.5, 0.0, 0.0, 0.0];
-    public skyExposureWeight = 0.0;
+    public readonly distance = DEFAULT_DISTANCE;
+    public readonly datasets = [...DATASETS];
+    public weights = [...DEFAULT_WEIGHTS];
+    public skyExposureWeight = 0;
 
     public async init(args: {
-        canvas: HTMLCanvasElement,
-        plotDivParallel: HTMLElement,
-        plotDivTable: HTMLElement,
+        canvas: HTMLCanvasElement;
+        plotDivParallel: HTMLElement;
+        plotDivTable: HTMLElement;
+        onProgress: (message: string, note?: string) => void;
     }): Promise<void> {
-        this.views = new UrbaneViews(args.plotDivParallel, args.plotDivTable);
-
-        setLoadingState('Initializing spatial database...', 'Preparing the in-browser data environment.');
-        this.data = new UrbaneData();
+        args.onProgress('Initializing spatial database...');
         await this.data.init();
-
-        setLoadingState('Loading OpenStreetMap data...', 'Fetching Manhattan from Overpass API.');
+        args.onProgress('Loading Manhattan datasets...', 'Importing local OSM, neighborhoods and point datasets.');
         await this.data.loadBaseData(this.datasets);
-
-        setLoadingState('Computing sky view factor...', 'Running render-based GPU analysis for road segments.');
-        const buildings = await this.data.getLayer('table_osm_buildings');
-        const roads = await this.data.getLayer('table_osm_roads');
-        this.roadsWithSky = await computeRoadSkyView(buildings, roads);
-        await this.data.updateLayer('table_osm_roads', this.roadsWithSky);
-
-        setLoadingState('Joining sky exposure to neighborhoods...', 'Computing average sky exposure per neighborhood.');
+        args.onProgress('Computing road sky view...', 'Running render-based GPU analysis.');
+        const roadsWithSky = await computeRoadSkyView(
+            await this.data.getLayer('table_osm_buildings'), await this.data.getLayer('table_osm_roads'),
+        );
+        await this.data.updateLayer('table_osm_roads', roadsWithSky);
+        args.onProgress('Joining sky exposure to neighborhoods...');
         await this.data.joinNeighborhoodSkyExposure();
-
-        setLoadingState('Computing score...', 'Applying weighted GPU function over neighborhood data.');
-        this.neighs = await computeScore(
-            await this.data.getLayer('neighborhoods'),
-            this.datasets,
-            this.weights,
-            this.skyExposureWeight,
-        );
-
-        setLoadingState('Initializing map...', 'Preparing the WebGPU rendering context.');
-        await this.views.initMap(args.canvas);
-
-        setLoadingState('Rendering layers...', 'Uploading geometry to the GPU.');
-        await this.views.initAllLayers(
-            this.data.getLayersMetadata(),
-            (name) => this.data.getLayer(name),
-            this.neighs,
-            this.roadsWithSky,
-        );
-
-        this.views.reloadPlots(this.currentLevel, this.datasets, this.neighs, this.activeBuildings);
-        this.views.bindMapSelection(() => this.currentLevel, (selection) => this.updateNeighborhoodSelection(selection));
-        this.bindPlotSelection();
+        args.onProgress('Computing neighborhood scores...');
+        this.neighborhoods = await computeScore(await this.data.getLayer('neighborhoods'), this.datasets, this.weights, this.skyExposureWeight);
+        args.onProgress('Initializing map and plots...');
+        this.map = new UrbaneMap(args.canvas);
+        await this.map.init(this.data.getLayersMetadata(), (name) => this.data.getLayer(name), this.neighborhoods, roadsWithSky);
+        this.plots = new UrbanePlots(args.plotDivParallel, args.plotDivTable);
+        this.reloadPlots();
+        this.map.onSelection((level, ids) => {
+            if (level !== this.currentLevel) return;
+            this.plots.setSelection(ids);
+            this.updateSelection(ids);
+        });
     }
 
-
     public updateThematic(column: string): void {
-        this.views.updateThematic(this.currentLevel, this.getCurrentCollection(), column);
+        this.map.updateThematic(this.currentLevel, this.getCurrentCollection(), column);
     }
 
     public async updateWeights(newWeights: number[], thematicColumn: string): Promise<void> {
-        this.weights = newWeights.slice(0, this.datasets.length);
-        this.skyExposureWeight = newWeights[this.datasets.length] ?? 0;
-
-        const rawLayer = await this.data.getLayer(this.currentLevel);
-        const scoredLayer = await computeScore(rawLayer, this.datasets, this.weights, this.skyExposureWeight);
-
-        if (this.currentLevel === 'neighborhoods') this.neighs = scoredLayer;
-        else this.activeBuildings = scoredLayer;
-
-        this.views.reloadPlots(this.currentLevel, this.datasets, this.neighs, this.activeBuildings);
-        this.bindPlotSelection();
-        this.updateThematic(thematicColumn);
+        if (this.busy) throw new Error('Please wait for the current operation to finish.');
+        this.busy = true;
+        try {
+            if (newWeights.length !== this.datasets.length + 1) throw new Error('Provide a weight for each dataset and sky exposure.');
+            const weights = newWeights.slice(0, this.datasets.length);
+            const skyWeight = newWeights[this.datasets.length];
+            const scored = await computeScore(await this.data.getLayer(this.currentLevel), this.datasets, weights, skyWeight);
+            this.weights = weights;
+            this.skyExposureWeight = skyWeight;
+            if (this.currentLevel === 'neighborhoods') this.neighborhoods = scored;
+            else this.activeBuildings = scored;
+            this.plots.updateCollection(scored);
+            this.plots.setSelection([]);
+            this.map.highlight(this.currentLevel, []);
+            this.selectedNeighIds = [];
+            this.updateThematic(thematicColumn);
+        } finally { this.busy = false; }
     }
 
     public async drillDown(thematicColumn: string): Promise<void> {
-        if (this.selectedNeighIds.length === 0) {
-            alert('Please select at least one neighborhood to drill down into its buildings.');
-            return;
-        }
-
-        const neighborhoodNames = [...new Set(
-            this.selectedNeighIds
-                .map((id) => this.neighs.features[id]?.properties?.ntaname)
-                .filter((name): name is string => typeof name === 'string' && name.length > 0),
-        )];
-
-        this.currentLevel = 'active_buildings';
-        this.activeBuildings = await this.data.loadActiveBuildings(this.datasets, neighborhoodNames, this.distance);
-        this.activeBuildings = await computeScore(
-            this.activeBuildings,
-            this.datasets,
-            this.weights,
-            this.skyExposureWeight,
-        );
-
-        this.views.showBuildingsLevel(this.activeBuildings);
-        this.views.reloadPlots(this.currentLevel, this.datasets, this.neighs, this.activeBuildings);
-        this.bindPlotSelection();
-        this.updateThematic(thematicColumn);
+        if (this.busy) throw new Error('Please wait for the current operation to finish.');
+        const names = [...new Set(this.selectedNeighIds
+            .map((id) => this.neighborhoods.features[id]?.properties?.ntaname)
+            .filter((name): name is string => typeof name === 'string' && name.length > 0))];
+        if (!names.length) throw new Error('Select at least one neighborhood before drilling into buildings.');
+        this.busy = true;
+        try {
+            const buildings = await this.data.loadActiveBuildings(this.datasets, names, this.distance);
+            const scored = await computeScore(buildings, this.datasets, this.weights, this.skyExposureWeight);
+            this.map.showBuildings(scored);
+            this.activeBuildings = scored;
+            this.currentLevel = 'active_buildings';
+            this.reloadPlots();
+            this.updateThematic(thematicColumn);
+        } finally { this.busy = false; }
     }
 
     public async drillUp(thematicColumn: string): Promise<void> {
-        this.currentLevel = 'neighborhoods';
-        this.selectedNeighIds = [];
-
-        await this.data.removeLayer('active_buildings');
-        this.views.showNeighborhoodLevel();
-        this.views.reloadPlots(this.currentLevel, this.datasets, this.neighs, this.activeBuildings);
-        this.bindPlotSelection();
-        this.updateThematic(thematicColumn);
+        if (this.busy) throw new Error('Please wait for the current operation to finish.');
+        this.busy = true;
+        try {
+            await this.data.removeLayer('active_buildings');
+            this.map.showNeighborhoods();
+            this.currentLevel = 'neighborhoods';
+            this.selectedNeighIds = [];
+            this.reloadPlots();
+            this.updateThematic(thematicColumn);
+        } finally { this.busy = false; }
     }
 
-    protected bindPlotSelection(): void {
-        this.views.bindPlotSelection(() => this.currentLevel, (selection) => this.updateNeighborhoodSelection(selection));
+    private reloadPlots(): void {
+        this.plots.show(this.currentLevel, this.datasets, this.getCurrentCollection(), (ids) => {
+            this.map.highlight(this.currentLevel, ids);
+            this.updateSelection(ids);
+        });
     }
 
-    protected updateNeighborhoodSelection(selection: number[]): void {
-        if (this.currentLevel === 'neighborhoods') this.selectedNeighIds = selection;
+    private updateSelection(ids: number[]): void {
+        if (this.currentLevel === 'neighborhoods') this.selectedNeighIds = ids;
     }
 
-    protected getCurrentCollection(): FeatureCollection {
-        return this.currentLevel === 'neighborhoods' ? this.neighs : this.activeBuildings;
+    private getCurrentCollection(): FeatureCollection {
+        return this.currentLevel === 'neighborhoods' ? this.neighborhoods : this.activeBuildings;
     }
 }

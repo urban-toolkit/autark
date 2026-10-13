@@ -11,6 +11,9 @@ export interface CompactRasterPayload {
   maxY: number;
   originX: number;
   originY: number;
+  /** Lower-left source-CRS corner of the normalized, bottom-up band arrays. */
+  sourceMinX: number;
+  sourceMinY: number;
   resX: number;
   resY: number;
   sourceCrs: string;

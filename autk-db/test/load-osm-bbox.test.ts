@@ -82,7 +82,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     expect(buildings.features.map(feature => feature.id)).not.toContain(40);
     const road = await client.getLayer('table_osm_roads');
     expect(road.features[0].geometry).toMatchObject({ type: 'LineString', coordinates: [[-1, 3], [9, 3]] });
-    expect((await client.getLayer('table_osm_water')).features).toHaveLength(1);
+    expect((await client.getLayer('table_osm_water')).features).toHaveLength(2); // explicit lake + inferred coastal water
     await client.loadGeojson({ outputTableName: 'later', layerType: 'points', coordinateFormat: 'EPSG:4326',
       geojsonObject: { type: 'FeatureCollection', features: [2, 8].map(x => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [x, 8] }, properties: {} })) } });
     expect((await client.getLayer('later')).features).toHaveLength(1);
@@ -242,7 +242,7 @@ describe('bbox Overpass acquisition and cache', () => {
   it('acquires coastlines for named areas even when only surface is requested', async () => {
     const api = new LoadOsmFromOverpassApiUseCase(conn, pipeline) as any;
     const requests: string[] = [];
-    const boundaries = structuredClone(syntheticElements).filter(element => element.id === 900 || element.id === 800 || (element.id >= 700 && element.id <= 703));
+    const boundaries = structuredClone(syntheticElements).filter(element => element.id === 900 || element.id === 901 || element.id === 800 || (element.id >= 700 && element.id <= 703));
     resolveWayGeometries(boundaries);
     vi.spyOn(api, 'fetchWithRetry').mockImplementation(async (query: string) => {
       requests.push(query);
@@ -290,7 +290,7 @@ describe('bbox Overpass acquisition and cache', () => {
     expect(requests).toHaveLength(10);
     expect(api.getCacheKey({ bbox }, ['roads'])).not.toBe(api.getCacheKey({ bbox }, ['buildings']));
     expect(api.getCacheKey({ bbox: [0, 0, 9, 10] }, ['buildings'])).not.toBe(api.getCacheKey({ bbox }, ['buildings']));
-    expect(api.getCacheKey({ geocodeArea: 'Fixture', areas: ['Test District'] }, ['buildings'])).toContain('v4');
+    expect(api.getCacheKey({ geocodeArea: 'Fixture', areas: ['Test District'] }, ['buildings'])).toContain('v5');
     expect(boundingBoxOf({ bbox })).toEqual({ west: 0, south: 0, east: 10, north: 10 });
   });
 });

@@ -33,6 +33,7 @@ export class BuildHeatmapUseCase {
         tables: Array<Table>,
         boundingBox: BoundingBox | undefined,
         workspace: string,
+        workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
     ): Promise<Table> {
         if (!boundingBox) {
             throw new Error('Bounding box is required to build a heatmap.');
@@ -61,6 +62,7 @@ export class BuildHeatmapUseCase {
             },
             [...tables, gridTable],
             workspace,
+            { coordinateFormat: workspaceCoordinateFormat },
         );
 
         const rasterBands = this.getRasterBands(params);
@@ -72,6 +74,7 @@ export class BuildHeatmapUseCase {
             params.grid.rows,
             params.grid.columns,
             workspace,
+            workspaceCoordinateFormat,
         );
 
         const describeTableResponse = await this.conn.query(`DESCRIBE ${workspace}.${gridTableName}`);
@@ -177,6 +180,7 @@ ${bandAssignments}
         rows: number,
         columns: number,
         workspace: string,
+        workspaceCoordinateFormat: string,
     ): Promise<void> {
         const qualifiedTableName = `${workspace}.${tableName}`;
         const bandSelect = bands.map((band) => `properties.${band.id} AS ${band.id}`).join(',\n          ');
@@ -221,10 +225,12 @@ ${bandAssignments}
             maxY: maxLat,
             originX: minLon,
             originY: maxLat,
+            sourceMinX: minLon,
+            sourceMinY: minLat,
             resX,
             resY,
-            sourceCrs: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
-            targetCrs: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+            sourceCrs: workspaceCoordinateFormat,
+            targetCrs: workspaceCoordinateFormat,
             bands: bands.map(({ id, label }) => ({ id, label })),
             values,
         });
@@ -244,8 +250,8 @@ ${bandAssignments}
             ${maxLat}::DOUBLE AS origin_y,
             ${resX}::DOUBLE AS res_x,
             ${resY}::DOUBLE AS res_y,
-            '${DEFAULT_WORKSPACE_COORDINATE_FORMAT}'::VARCHAR AS source_crs,
-            '${DEFAULT_WORKSPACE_COORDINATE_FORMAT}'::VARCHAR AS target_crs;
+            '${workspaceCoordinateFormat}'::VARCHAR AS source_crs,
+            '${workspaceCoordinateFormat}'::VARCHAR AS target_crs;
         `);
     }
 

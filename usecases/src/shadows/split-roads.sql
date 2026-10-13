@@ -7,6 +7,8 @@ WITH base AS (
 )
 SELECT
     b.* EXCLUDE (geometry, num_parts),
+    -- Keep b.id as the source OSM way ID; each derived segment needs its own feature ID.
+    'road/' || b.id::VARCHAR || '/segment/' || t.part_idx::VARCHAR AS geojson_id,
     ST_LineSubstring(
         b.geometry,
         t.part_idx::DOUBLE / b.num_parts::DOUBLE,

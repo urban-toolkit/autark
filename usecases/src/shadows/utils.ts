@@ -1,4 +1,4 @@
-import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 /** Supported month codes used by this shadows example. */
 export type MonthCode = 'jun' | 'sep' | 'dez';
@@ -6,21 +6,17 @@ export type MonthCode = 'jun' | 'sep' | 'dez';
 /**
  * Ordered month metadata used for DB aggregation loops and UI normalization.
  */
-export const MONTH_CONFIG: ReadonlyArray<{ code: MonthCode; doy: number }> = [
-    { code: 'jun', doy: 172 },
-    { code: 'sep', doy: 265 },
-    { code: 'dez', doy: 355 },
+export const MONTH_CONFIG: ReadonlyArray<{ code: MonthCode; doy: number; label: string }> = [
+    { code: 'jun', doy: 172, label: 'June 21 (summer solstice)' },
+    { code: 'sep', doy: 265, label: 'September 22 (autumnal equinox)' },
+    { code: 'dez', doy: 355, label: 'December 21 (winter solstice)' },
 ];
 
 /** Default month used when UI input is missing or invalid. */
 export const DEFAULT_MONTH: MonthCode = 'jun';
 
 /** Month -> day-of-year mapping used by analytical shader uniforms. */
-export const MONTH_DOY: Record<MonthCode, number> = {
-    jun: 172,
-    sep: 265,
-    dez: 355,
-};
+export const MONTH_DOY = Object.fromEntries(MONTH_CONFIG.map(({ code, doy }) => [code, doy])) as Record<MonthCode, number>;
 
 /**
  * Runtime type guard for month values coming from UI controls.
@@ -136,16 +132,18 @@ export function resolveBuildingHeight(feature: Feature): number {
 /**
  * Merges computed `properties.compute` payloads into the base roads collection.
  *
- * The merge is index-based and bounded by the shortest collection length.
+ * The merge is index-based; compute must preserve feature order and count.
  * Existing non-compute properties are preserved.
  *
  * @param baseRoads Mutable roads collection used by map/plot thematic updates.
  * @param computedRoads Analytical output collection.
  */
 export function mergeComputedRoads(baseRoads: FeatureCollection, computedRoads: FeatureCollection): void {
-    const count = Math.min(baseRoads.features.length, computedRoads.features.length);
+    if (baseRoads.features.length !== computedRoads.features.length) {
+        throw new Error('Computed roads must preserve the source feature count and order.');
+    }
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < baseRoads.features.length; i++) {
         const target = baseRoads.features[i];
         const source = computedRoads.features[i];
 

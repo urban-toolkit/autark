@@ -1,6 +1,7 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { SpatialQueryParams } from './interfaces';
-import { Table } from '../../interfaces';
+import { Table, WorkspaceConfiguration } from '../../interfaces';
+import { RasterSpatialJoinUseCase } from './raster';
 import { GeometryColumnNotFoundError, TableNotFoundError } from './errors';
 import { SPATIAL_JOIN_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
@@ -14,14 +15,21 @@ export class SpatialJoinUseCase {
    * Multipart geometry is evaluated directly; one stored join feature contributes once.
    * Without groupBy, matches are stored as an array under properties.sjoin.matches.
    */
-  async exec(params: SpatialQueryParams, tables: Table[], workspace: string): Promise<Table> {
+  async exec(params: SpatialQueryParams, tables: Table[], workspace: string,
+    configuration: Partial<WorkspaceConfiguration> = {}): Promise<Table> {
     const tableRoot = tables.find(table => table.name === params.tableRootName);
     if (!tableRoot) throw new TableNotFoundError(params.tableRootName);
     const tableJoin = tables.find(table => table.name === params.tableJoinName);
     if (!tableJoin) throw new TableNotFoundError(params.tableJoinName);
     const geometricColumnRoot = tableRoot.columns.find(column => column.type === 'GEOMETRY')?.name;
-    if (!geometricColumnRoot) throw new GeometryColumnNotFoundError(tableRoot.name);
+    if (!geometricColumnRoot) {
+      if (tableRoot.type === 'raster') throw new Error('spatialQuery requires a vector root; compact rasters are supported as tableJoinName.');
+      throw new GeometryColumnNotFoundError(tableRoot.name);
+    }
     const geometricColumnJoin = tableJoin.columns.find(column => column.type === 'GEOMETRY')?.name;
+    if (!geometricColumnJoin && tableJoin.type === 'raster') {
+      return new RasterSpatialJoinUseCase(this.conn).exec(params, tableRoot, tableJoin, workspace, configuration);
+    }
     if (!geometricColumnJoin) throw new GeometryColumnNotFoundError(tableJoin.name);
 
     const query = SPATIAL_JOIN_QUERY({

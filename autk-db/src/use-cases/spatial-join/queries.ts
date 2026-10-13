@@ -23,6 +23,8 @@ interface Params {
   nearUseCentroid?: boolean;
   /** Columns to aggregate, or `null` for no aggregation. */
   groupBy: Array<InternalColumn> | null;
+  /** Optional virtual pointset evaluated against each autk_root_feature row. */
+  rasterCandidates?: string;
 }
 
 /** CTE alias used when the NEAR predicate pre-filters join candidates. */
@@ -56,7 +58,7 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
   const effectiveRootTable: Table = { ...params.tableRoot, name: 'autk_root_feature' };
   const effectiveJoinTable: Table = {
     ...params.tableJoin,
-    name: isNear ? NEAR_CTE_ALIAS : 'autk_join_feature',
+    name: isNear && !params.rasterCandidates ? NEAR_CTE_ALIAS : 'autk_join_feature',
   };
 
   const selectString = getSelectString({
@@ -78,6 +80,7 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
     geometricColumnJoin: params.geometricColumnJoin,
     nearDistance: params.nearDistance,
     nearUseCentroid: params.nearUseCentroid,
+    rasterCandidates: params.rasterCandidates,
   });
 
   // A supplied `rowid` column can shadow DuckDB's physical rowid. Give each root
@@ -92,7 +95,7 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
   const rootGeomExpr = (tableAlias: string, col: string) =>
     params.nearUseCentroid ? `ST_Centroid(${tableAlias}.${quoteIdentifier(col)})` : `${tableAlias}.${quoteIdentifier(col)}`;
 
-  const nearCtePart = isNear
+  const nearCtePart = isNear && !params.rasterCandidates
     ? `${NEAR_CTE_ALIAS} AS (
         SELECT * FROM ${qualifiedTableJoinName} AS ${params.tableJoin.name}
         WHERE ST_Intersects(
@@ -454,7 +457,7 @@ function buildNormalizationMergePatch(normalizedColumns: Array<InternalColumn>, 
       funcName === 'count' || funcName === 'weighted' || funcName === 'collect'
         ? tableJoinName
         : `${tableJoinName}.${col.column}`;
-    const jsonPath = `$.sjoin.${funcName}.${colKey}`;
+    const jsonPath = `$.sjoin.${funcName}.${JSON.stringify(colKey)}`;
 
     if (!byAggFn[funcName]) byAggFn[funcName] = [];
     byAggFn[funcName].push({ colKey, jsonPath });
@@ -540,6 +543,7 @@ function getJoinString({
   geometricColumnJoin,
   nearDistance,
   nearUseCentroid,
+  rasterCandidates,
 }: {
   spatialPredicate: string;
   qualifiedTableJoinName: string;
@@ -549,7 +553,9 @@ function getJoinString({
   geometricColumnJoin: string;
   nearDistance?: number;
   nearUseCentroid?: boolean;
+  rasterCandidates?: string;
 }) {
+  let predicate = `ST_Intersects(${tableRoot.name}.${quoteIdentifier(geometricColumnRoot)}, ${tableJoin.name}.${quoteIdentifier(geometricColumnJoin)})`;
   if (spatialPredicate === 'NEAR') {
     const rootExpr = nearUseCentroid
       ? `ST_Centroid(${tableRoot.name}.${quoteIdentifier(geometricColumnRoot)})`
@@ -557,10 +563,15 @@ function getJoinString({
     const joinExpr = nearUseCentroid
       ? `ST_Centroid(${tableJoin.name}.${quoteIdentifier(geometricColumnJoin)})`
       : `${tableJoin.name}.${quoteIdentifier(geometricColumnJoin)}`;
-    return `LEFT JOIN ${tableJoin.name} ON NOT ST_IsEmpty(${rootExpr}) AND NOT ST_IsEmpty(${joinExpr}) AND ST_Distance(${rootExpr}, ${joinExpr}) <= ${nearDistance}`;
+    predicate = `NOT ST_IsEmpty(${rootExpr}) AND NOT ST_IsEmpty(${joinExpr}) AND ST_Distance(${rootExpr}, ${joinExpr}) <= ${nearDistance}`;
   }
-
-  return `LEFT JOIN ${qualifiedTableJoinName} AS ${tableJoin.name} ON ST_Intersects(${tableRoot.name}.${quoteIdentifier(geometricColumnRoot)}, ${tableJoin.name}.${quoteIdentifier(geometricColumnJoin)})`;
+  if (rasterCandidates) {
+    // DuckDB requires a comparison (or TRUE) for LEFT LATERAL joins; evaluate
+    // the spatial predicate inside the correlated source to retain unmatched roots.
+    return `LEFT JOIN LATERAL (SELECT * FROM (${rasterCandidates}) AS ${tableJoin.name} WHERE ${predicate}) AS ${tableJoin.name} ON TRUE`;
+  }
+  const source = spatialPredicate === 'NEAR' ? tableJoin.name : `${qualifiedTableJoinName} AS ${tableJoin.name}`;
+  return `LEFT JOIN ${source} ON ${predicate}`;
 }
 
 /**

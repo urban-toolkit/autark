@@ -81,9 +81,13 @@ Named queries use `queryArea: { geocodeArea: 'Illinois', areas: ['Golf'] }`. Bot
 
 Boxes require four finite WGS84 coordinates within geographic limits, with west < east and south < north; antimeridian crossings are unsupported. Overpass spatial selectors acquire candidates, not an exhaustive geometric intersection query. PBF cannot recover relation members absent from the extract.
 
-**Surface is always constructed**, whether requested or not. Its base geometry is the named administrative region or the bbox rectangle. Coastlines (`natural=coastline`, land on the left) define a terrestrial mask intersected with that base. Lakes/rivers remain inside surface and can be represented by `water`. Missing, incomplete, ambiguous or invalid coastlines produce a clear `console.warn` and retain the full base area, potentially including sea. This also happens for an entirely maritime bbox without coastlines. Coastline mask coordinates are quantized to 1e-10 degrees for endpoint matching; after projection, both the mask and loaded vector layers use the workspace precision grid.
+**Surface is always constructed**, whether requested or not. Its base geometry is the named administrative region or the bbox rectangle. For named queries, Overpass obtains the complete `geocodeArea` boundary and independently collects all `natural=coastline` ways in its **bbox**, including neighboring land regardless of jurisdiction. Building tiles and thematic selection still use `areas`, not the geocode bbox. PBF uses the same classification pipeline, reading all needed ways/nodes from that file without network supplementation. A PBF must contain a usable geocode boundary and complete coastline coverage of its bbox; containing only the requested areas or the administrative relation is insufficient. If region scoping falls back because the geocode is incomplete, no coastal water is inferred.
 
-Named-area imports clip roads/parks/water and filter complete buildings by this surface, even if `surface` is omitted from `layers`. Bbox imports retain **roads** that intersect the bbox without applying the coastal land mask, so bridges and other roads over water survive; the bbox is already the OSM search criterion. Buildings, parks and water retain their surface-based behavior. This changes the previous optional-surface behavior and can reduce results for named areas. An omitted surface is retained internally for subsequent workspace constraints but excluded from `getLayersMetadata()` and per-layer load timings; it remains inspectable through `getTablesMetadata()`/`getLayer()`. Include `surface` to expose it normally. Named Overpass queries use cache version `v4` to reject old incorrectly scoped entries (including full-data supersets); unchanged bbox queries retain `v3`.
+Coastline direction (land on the left), connected edges and closed/consistently classified faces define land inside the collection bbox. Surface intersects that land with the query's base geometry. Requested `water` retains explicit OSM water polygons and adds **bbox(areas) minus classified land**, bounded to the classified extent. This context can extend outside the administrative area but never outside its bbox, and protects all mapped land, including neighboring islands. Generated water has a negative internal ID and `properties.generated = 'coastline'`, `water = 'sea'`; it is not an OSM source object and is omitted from `getLayer(..., { osmElements: true })`. Filter this marker out when an analysis must use only administrative OSM features. An entirely inland areas bbox produces no generated coastal water; lakes/rivers still come from explicit OSM features.
+
+Missing, incomplete, ambiguous or invalid coastlines produce a clear `console.warn`, retain the full base surface and **never turn unknown land into sea**. This includes a bbox with no coastline: absence alone cannot distinguish all-land from all-sea. Validation detects broken references/networks, but cannot certify that an entire island was not omitted from a truncated extract; use a coherent, sufficiently complete regional snapshot. Coastline mask coordinates are quantized to 1e-10 degrees for endpoint matching; projected masks, generated water and loaded vectors use the workspace precision grid. Area-layer intersection crops retain only polygons, preventing linear remnants from rendering as filled areas.
+
+Named-area imports clip roads/parks/water and filter complete buildings by this surface, even if `surface` is omitted from `layers`. Bbox imports retain **roads** that intersect the bbox without applying the coastal land mask, so bridges and other roads over water survive; the bbox is already the OSM search criterion. Buildings, parks and water retain their surface-based behavior. This changes the previous optional-surface behavior and can reduce results for named areas. An omitted surface is retained internally for subsequent workspace constraints but excluded from `getLayersMetadata()` and per-layer load timings; it remains inspectable through `getTablesMetadata()`/`getLayer()`. Include `surface` to expose it normally. Overpass caches use `v5` for named queries and `v4` for bbox queries, rejecting older payloads that mixed coastlines into thematic responses or classified only the areas extent.
 
 BBox gallery examples: [`osm-layers-api-bbox`](../gallery/src/autk-map/osm-layers-api-bbox.ts) and [`osm-layers-pbf-bbox`](../gallery/src/autk-map/osm-layers-pbf-bbox.ts).
 
@@ -194,10 +198,30 @@ console.log(parcels.type); // 'polygons'
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
 * `getTableData(params)`: Reads table data for inspection or UI display.
 * `updateTable(params)`: Updates a table using the supported update strategies.
-* `spatialQuery(params)`: Runs spatial joins and aggregations between layers.
+* `spatialQuery(params)`: Runs spatial joins and aggregations from a vector root against vector features or compact raster cell centers.
 * `rawQuery(params)`: Executes custom SQL against the current workspace.
 * `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs.
 * `removeLayer(tableName)`: Drops a table from the current workspace.
+
+## Spatial joins with compact rasters
+
+Use a raster loaded by `loadGeoTiff()` or produced by `buildHeatmap()` as `tableJoinName`, with a vector `tableRootName`. The root is updated in place, preserving its feature identities and geometry.
+
+Each decoded cell is an implicit point at its center, not a pixel-area polygon. `INTERSECT` includes centers on polygon boundaries; `near` defaults to centroid-to-center distance and `useCentroid: false` measures distance to the entire root geometry. Distances use workspace CRS units. Centers are transformed individually from the source grid and evaluated on the workspace precision grid; the raster arrays retain their resolution.
+
+```ts
+await db.spatialQuery({
+  tableRootName: 'roads', tableJoinName: 'lst',
+  near: { distance: 1000 },
+  groupBy: [{ column: 'band_1', aggregateFn: 'avg' }],
+});
+```
+
+All existing aggregates, simple matches, column collections and numeric normalization use the same output contract as vector joins. Non-finite/NoData band values become SQL NULL: numeric aggregates and `count(band)` ignore them. `count('*')` counts matched cell centers, even when a band has NoData. Compact rasters are not supported as the root of an in-place join.
+
+Only requested bands cross into DuckDB, as one row of packed numeric arrays. Candidate row/column ranges come from the implicit grid index; no per-pixel geometry table or spatial index is persisted. Inverse-bbox pruning supports identical CRSs and axis-monotone WGS84/Mercator transformations within their domains. Other CRS transformations conservatively scan the full grid to avoid excluding valid centers; these can be more expensive. GeoTIFF grids must be axis-aligned; rotated/sheared grids are rejected rather than incorrectly sampled as their bbox. Resampled rasters use the decoded grid's centers and resolution.
+
+Join keys include literal dots: JavaScript reads `properties.sjoin.avg['lst.band_1']`; SQL uses `json_extract(properties, '$.sjoin.avg."lst.band_1"')`. Autark's shared `valueAtPath` also resolves `sjoin.avg.lst.band_1` for map, plot and compute bindings.
 
 ## Resources
 

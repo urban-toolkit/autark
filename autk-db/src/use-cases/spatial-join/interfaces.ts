@@ -18,7 +18,7 @@ export type AggregateFunction = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'weigh
  * const near: NearConfig = { distance: 1000, useCentroid: true };
  */
 export interface NearConfig {
-  /** Maximum search distance. */
+  /** Maximum search distance in workspace CRS units (metres in the default EPSG:3395). */
   distance: number;
   /** When `true`, uses centroid-to-centroid distance. Defaults to `true`. */
   useCentroid?: boolean;
@@ -32,6 +32,9 @@ export interface NearConfig {
  * `properties.sjoin.<aggregateFn>.<key>`. Without groupBy, matches are an array of
  * `{ id?, properties }` under `properties.sjoin.matches`, without repeated geometry.
  * Multipart geometries contribute once per pair of stored features.
+ * A compact raster can be the join table: each decoded cell contributes its center
+ * point, transformed to the workspace CRS. NoData values are ignored by numeric
+ * aggregations. Pixel-area intersections are not computed; the root must be vector.
  *
  * @example
  * await db.spatialQuery({ tableRootName: 'roads', tableJoinName: 'noise' });
@@ -46,7 +49,7 @@ export interface NearConfig {
 export interface SpatialQueryParams {
   /** Name of the root table that will be modified in place. */
   tableRootName: string;
-  /** Name of the table to join against the root. */
+  /** Name of the vector or compact raster table to join against the vector root. */
   tableJoinName: string;
   /**
    * NEAR predicate configuration. When present, the join uses `'NEAR'` instead of `'INTERSECT'`.

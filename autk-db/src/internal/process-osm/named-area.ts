@@ -1,4 +1,4 @@
-import { booleanPointInPolygon, booleanValid, featureCollection, lineString, polygonize } from '@turf/turf';
+import { bbox, booleanPointInPolygon, booleanValid, featureCollection, lineString, polygonize } from '@turf/turf';
 import type { MultiPolygon, Position } from 'geojson';
 import type { OsmElement, OsmNamedArea } from '../../use-cases/load-osm-overpass/interfaces';
 
@@ -8,6 +8,17 @@ import type { OsmElement, OsmNamedArea } from '../../use-cases/load-osm-overpass
  * warns and falls back to exact area names within the PBF (including homonyms).
  */
 export function selectScopedBoundaryRelations(elements: OsmElement[], queryArea: OsmNamedArea): OsmElement[] {
+  return resolveNamedAreaBoundaries(elements, queryArea).relations;
+}
+
+/** Resolves named boundaries and the extent of the complete geocode geometry.
+ * A missing/invalid geocode still permits the warned exact-name fallback, but
+ * cannot supply an extent for coastal classification.
+ */
+export function resolveNamedAreaBoundaries(elements: OsmElement[], queryArea: OsmNamedArea, source = 'PBF'): {
+  relations: OsmElement[];
+  geocodeExtent?: { west: number; south: number; east: number; north: number };
+} {
   const relations = elements.filter(element => element.type === 'relation' && !!element.tags?.boundary);
   const regions = relations.filter(element => element.tags?.name === queryArea.geocodeArea);
   const ways = new Map(elements.filter(element => element.type === 'way').map(element => [element.id, element]));
@@ -45,7 +56,7 @@ export function selectScopedBoundaryRelations(elements: OsmElement[], queryArea:
     }
   } catch (error) {
     scopes = undefined;
-    console.warn(`[autk-db] Cannot apply PBF geocodeArea "${queryArea.geocodeArea}": ${error instanceof Error ? error.message : String(error)}; falling back to exact area names without region scoping. Homonymous areas in the extract may be included.`);
+    console.warn(`[autk-db] Cannot apply ${source} geocodeArea "${queryArea.geocodeArea}": ${error instanceof Error ? error.message : String(error)}; falling back to exact area names without region scoping. Homonymous areas in the extract may be included.`);
   }
   const selected = relations.filter(relation => queryArea.areas.includes(relation.tags!.name) && (!scopes || (relation.members ?? []).some(member => {
     const coordinates = member.type === 'way'
@@ -57,7 +68,9 @@ export function selectScopedBoundaryRelations(elements: OsmElement[], queryArea:
   const missing = queryArea.areas.filter(name => !selected.some(relation => relation.tags?.name === name));
   if (missing.length > 0) {
     const location = scopes ? ` inside "${queryArea.geocodeArea}"` : '';
-    throw new Error(`No area boundary found in PBF${location} for: ${missing.map(name => `"${name}"`).join(', ')}. Verify names and include the requested boundaries in the extract.`);
+    throw new Error(`No area boundary found in ${source}${location} for: ${missing.map(name => `"${name}"`).join(', ')}. Verify names and include the requested boundaries in the extract.`);
   }
-  return selected;
+  if (!scopes) return { relations: selected };
+  const [west, south, east, north] = bbox({ type: 'MultiPolygon', coordinates: scopes.flatMap(scope => scope.coordinates) });
+  return { relations: selected, geocodeExtent: { west, south, east, north } };
 }

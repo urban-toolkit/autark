@@ -8,7 +8,10 @@
  */
 
 /**
- * Resolves a dot-delimited property path from an unknown value.
+ * Resolves a dot-delimited property path, including literal dotted leaf keys.
+ *
+ * Fully traversable nested paths take precedence. If traversal fails, an own key
+ * may match the remaining suffix, such as `shadows.jun` in spatial-join output.
  *
  * @param item - Source value to traverse.
  * @param path - Dot-delimited property path, for example `properties.area`.
@@ -18,12 +21,30 @@
  * @example
  * valueAtPath({ a: { b: 42 } }, 'a.b');  // 42
  * valueAtPath({ a: null }, 'a.b');       // undefined
+ * valueAtPath({ sjoin: { avg: { 'shadows.jun': 12 } } }, 'sjoin.avg.shadows.jun'); // 12
  */
 export function valueAtPath(item: unknown, path: string): unknown {
-    return path.split('.').reduce<unknown>((acc, key) => {
-        if (acc == null || typeof acc !== 'object') return undefined;
-        return (acc as Record<string, unknown>)[key];
-    }, item);
+    const keys = path.split('.');
+    let value = item;
+    let resolved = true;
+    for (const key of keys) {
+        if (value == null || typeof value !== 'object' || !(key in value)) {
+            resolved = false;
+            break;
+        }
+        value = (value as Record<string, unknown>)[key];
+    }
+    if (resolved) return value;
+
+    value = item;
+    for (let i = 0; i < keys.length; i++) {
+        if (value == null || typeof value !== 'object') return undefined;
+        const record = value as Record<string, unknown>;
+        const suffix = keys.slice(i).join('.');
+        if (Object.prototype.hasOwnProperty.call(record, suffix)) return record[suffix];
+        value = record[keys[i]];
+    }
+    return value;
 }
 
 /**

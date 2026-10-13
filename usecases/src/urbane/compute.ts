@@ -1,6 +1,7 @@
-import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
 import { ComputeGpgpu, ComputeRender } from '@urban-toolkit/autk-compute';
+import scoreShader from './score.wgsl?raw';
 
 export const SCORE_FIELD = 'compute.score';
 export const ROAD_SKY_VIEW_FIELD = 'compute.skyViewFactor';
@@ -29,7 +30,7 @@ type UrbaneProperties = GeoJsonProperties & {
 };
 
 function getProperties(feature: UrbaneFeature): UrbaneProperties {
-    return (feature.properties ?? {}) as UrbaneProperties;
+    return (feature.properties ??= {}) as UrbaneProperties;
 }
 
 export async function computeRoadSkyView(
@@ -90,6 +91,9 @@ export async function computeScore(
     weights: number[],
     skyExposureWeight: number,
 ): Promise<FeatureCollection> {
+    if (weights.length !== datasets.length || [...weights, skyExposureWeight].some((weight) => !Number.isFinite(weight) || weight < 0)) {
+        throw new Error('Provide one finite, non-negative weight per dataset and for sky exposure.');
+    }
     decorateSkyExposureFields(geojson);
     const invertedDatasets = new Set(['arrest', 'noise']);
     const inputLength = datasets.length + 1;
@@ -110,12 +114,6 @@ export async function computeScore(
         attributeArrays: { vals: inputLength },
         uniformArrays: { weights: [...weights, skyExposureWeight] },
         resultField: 'score',
-        wgslBody: `
-            var s = 0.0;
-            for (var i = 0u; i < vals_length; i++) {
-                s += vals[i] * weights[i];
-            }
-            return s;
-        `,
+        wgslBody: scoreShader,
     });
 }

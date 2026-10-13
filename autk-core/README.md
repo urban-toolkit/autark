@@ -86,6 +86,10 @@ console.log(origin, geometry.length, components.length, camera.eye, colormap.len
 
 The complete export list lives in [`src/index.ts`](./src/index.ts).
 
+## Attribute paths
+
+`valueAtPath(item, path)` traverses ordinary dot-delimited paths and resolves literal dotted leaf keys such as `sjoin.avg["shadows.jun"]` using the binding `sjoin.avg.shadows.jun`. Fully traversable nested paths take precedence when both forms exist. This shared accessor keeps database join output readable by map, plot and compute without reshaping the source data. Unknown paths still return `undefined`; zero, false and null are preserved.
+
 ## Building parts
 
 `normalizeBuildingFeature(feature)` wraps original geometry in a GeometryCollection and validates `properties.parts[].geometryIndex`; it does not union, repair or clone coordinates. Legacy positional metadata is supported. General height/base attributes are inherited unless a part supplies its own tags, including explicit zero.

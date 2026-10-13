@@ -1,5 +1,6 @@
 import { UrbaneApp } from './app';
-import { hideLoading, initUi, showError } from './ui';
+import { initUi } from './ui';
+import { hideLoading, setLoadingState, showError } from '../shared/ui';
 
 async function main(): Promise<void> {
     try {
@@ -12,14 +13,14 @@ async function main(): Promise<void> {
         }
 
         const app = new UrbaneApp();
-        await app.init({ canvas, plotDivParallel: plotPcoords, plotDivTable: plotTable });
+        await app.init({ canvas, plotDivParallel: plotPcoords, plotDivTable: plotTable, onProgress: setLoadingState });
 
-        hideLoading();
         initUi(app);
+        hideLoading();
     } catch (error) {
         console.error(error);
         showError('Failed to load the Urbane case study.', 'Please verify the dataset paths and reload the page.');
     }
 }
 
-main();
+void main();

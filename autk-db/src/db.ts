@@ -291,8 +291,10 @@ export class AutkDb {
      * `autoLoadLayers` is required. The raw OSM import tables are treated as temporary
      * staging tables and are always dropped after the requested layers are extracted.
      * Surface is always built, excluding sea when coastline reconstruction succeeds.
-     * It stays hidden unless requested. Other layers and typed tag sets are clipped
-     * to it; buildings are filtered as complete features without modifying their parts.
+     * Named coastlines use the geocode bbox, not only the selected areas. Requested
+     * water also includes bbox(areas) minus classified land, marked generated=coastline.
+     * Missing/invalid coastal data never generates presumed sea. Surface stays hidden
+     * unless requested; other layers/tag sets use it as a crop and whole buildings are filtered.
      *
      * @param params - Area query, optional output table name, and required layer extraction settings.
      * @returns Timing breakdown for OSM download and layer extraction.
@@ -362,6 +364,7 @@ export class AutkDb {
             }
 
             let surfaceLayerName: string | null = null;
+            let classifiedLandJson: string | null = null;
             const clippableLayerNames: string[] = [];
             // Bbox selection already bounds OSM roads. Do not apply the coastal
             // land mask to them or bridges and other water crossings disappear.
@@ -410,10 +413,11 @@ export class AutkDb {
                             throw new Error(`Workspace precisionGrid ${workspaceData.precisionGrid} collapses the coastline mask; use a finer grid in a new workspace.`);
                         }
                         if (validation.valid_geometry) {
+                            classifiedLandJson = maskJson;
                             await this.conn.query('BEGIN TRANSACTION');
                             try {
                                 await this.conn.query(`UPDATE ${this.currentWorkspace}.${layerTable.name}
-                                    SET geometry = ST_ReducePrecision(ST_Intersection(ST_MakeValid(geometry), ${mask}), ${workspaceData.precisionGrid});
+                                    SET geometry = ST_ReducePrecision(ST_CollectionExtract(ST_Intersection(ST_MakeValid(geometry), ${mask}), 3), ${workspaceData.precisionGrid});
                                     DELETE FROM ${this.currentWorkspace}.${layerTable.name} WHERE ST_IsEmpty(geometry);`);
                                 await this.conn.query('COMMIT');
                             } catch (error) {
@@ -421,7 +425,7 @@ export class AutkDb {
                                 throw error;
                             }
                         } else {
-                            console.warn('[autk-db] Invalid reconstructed coastline mask; surface uses the full query area instead.');
+                            console.warn('[autk-db] Invalid reconstructed coastline mask; surface uses the full query area instead and coastal water is not generated.');
                         }
                     }
                     const internalLayers = workspaceData.internalLayerNames ??= [];
@@ -445,6 +449,37 @@ export class AutkDb {
                     }
                     await this.refreshStoredBoundingBox(layerName);
                 }
+            }
+
+            // Coastal context belongs to the requested water layer, but not to
+            // the administrative/terrestrial workspace crop used for analysis.
+            // Subtract only inside the successfully classified geocode extent.
+            if (requestedLayers.includes('water') && classifiedLandJson && execResult.coastlineExtent) {
+                const t0 = performance.now();
+                const area = execResult.queryExtent;
+                const region = execResult.coastlineExtent;
+                const window = `ST_Intersection(ST_MakeEnvelope(${area.west}, ${area.south}, ${area.east}, ${area.north}),
+                    ST_MakeEnvelope(${region.west}, ${region.south}, ${region.east}, ${region.north}))`;
+                const sea = `ST_ReducePrecision(ST_Transform(ST_CollectionExtract(
+                    ST_Difference(${window}, ST_GeomFromGeoJSON('${classifiedLandJson}')), 3),
+                    'EPSG:4326', '${targetCrs}', always_xy := true), ${workspaceData.precisionGrid})`;
+                const waterName = `${outputTableName}_water`;
+                const waterTable = `${this.currentWorkspace}.${waterName}`;
+                await this.conn.query('BEGIN TRANSACTION');
+                try {
+                    await this.conn.query(`INSERT INTO ${waterTable} (id, properties, refs, geometry, ${OSM_ELEMENT_METADATA_COLUMN})
+                        SELECT (SELECT COALESCE(LEAST(MIN(id), 0), 0) - 1 FROM ${waterTable}),
+                            map(['natural', 'water', 'generated'], ['water', 'sea', 'coastline']), []::BIGINT[], geometry, '[]'::JSON
+                        FROM (SELECT ${sea} AS geometry) WHERE NOT ST_IsEmpty(geometry);`);
+                    await this.conn.query('COMMIT');
+                } catch (error) {
+                    await this.conn.query('ROLLBACK');
+                    throw error;
+                }
+                await this.refreshStoredBoundingBox(waterName);
+                const timing = timings.layers.find(item => item.layerName === waterName)!;
+                timing.loadMs += performance.now() - t0;
+                timing.featureCount = Number((await this.conn.query(`SELECT COUNT(*) AS cnt FROM ${waterTable}`)).toArray()[0].cnt);
             }
 
             for (const tagSet of tagSets) {
@@ -876,7 +911,7 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const workspaceData = this.getCurrentWorkspaceData();
-        const table = await this.spatialJoinUseCase.exec(params, workspaceData.tables, this.currentWorkspace);
+        const table = await this.spatialJoinUseCase.exec(params, workspaceData.tables, this.currentWorkspace, workspaceData);
         workspaceData.tables = workspaceData.tables.map((t) => (t.name === table.name ? table : t));
 
         return table;
@@ -954,7 +989,7 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const workspaceData = this.getCurrentWorkspaceData();
-        const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox, this.currentWorkspace);
+        const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox, this.currentWorkspace, workspaceData.coordinateFormat);
         this.registerTable(table);
 
         return this.refreshStoredBoundingBox(table.name);
@@ -1195,7 +1230,11 @@ export class AutkDb {
     ): Promise<void> {
         const qualifiedLayer = `${workspace}.${layerTableName}`;
         const qualifiedCropLayer = `${workspace}.${cropLayerName}`;
-        const grid = this.getCurrentWorkspaceData().precisionGrid;
+        const workspaceData = this.getCurrentWorkspaceData();
+        const grid = workspaceData.precisionGrid;
+        const table = workspaceData.tables.find(item => item.name === layerTableName);
+        const intersection = 'ST_Intersection(ST_MakeValid(l.geometry), crop.geom)';
+        const clipped = table && this.isPolygonalTable(table) ? `ST_CollectionExtract(${intersection}, 3)` : intersection;
 
         if (!cropGeometry) {
             await this.conn!.query(`
@@ -1221,7 +1260,7 @@ export class AutkDb {
     `);
             await this.conn!.query(`
       UPDATE ${qualifiedLayer} AS l
-      SET geometry = ST_ReducePrecision(ST_Intersection(ST_MakeValid(l.geometry), crop.geom), ${grid})
+      SET geometry = ST_ReducePrecision(${clipped}, ${grid})
       FROM (
         SELECT ST_ReducePrecision(ST_Union_Agg(ST_MakeValid(geometry)), ${grid}) AS geom FROM ${qualifiedCropLayer}
       ) crop

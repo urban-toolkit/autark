@@ -60,6 +60,11 @@ export class LoadGeoTiffUseCase {
     const image = await tiff.getImage(0);
 
     const origin = image.getOrigin();
+    const matrix = image.getFileDirectory().getValue('ModelTransformation');
+    if (matrix && (matrix[1] !== 0 || matrix[4] !== 0)) {
+      throw new Error('Rotated or sheared GeoTIFF grids are not supported by compact rasters.');
+    }
+    const resolution = matrix ? [matrix[0], matrix[5]] : image.getResolution();
     const bbox = image.getBoundingBox();
     const originX = Number(origin[0]);
     const originY = Number(origin[1]);
@@ -91,10 +96,11 @@ export class LoadGeoTiffUseCase {
       const values = new Float32Array(source.length);
       for (let row = 0; row < height; row++) {
         const sourceRowOffset = row * width;
-        const targetRowOffset = (height - 1 - row) * width;
+        const targetRowOffset = (resolution[1] < 0 ? height - 1 - row : row) * width;
         for (let col = 0; col < width; col++) {
           const value = Number(source[sourceRowOffset + col]);
-          values[targetRowOffset + col] = Number.isFinite(value) && (nodata === null || value !== nodata) ? value : Number.NaN;
+          const targetCol = resolution[0] < 0 ? width - 1 - col : col;
+          values[targetRowOffset + targetCol] = Number.isFinite(value) && (nodata === null || value !== nodata) ? value : Number.NaN;
         }
       }
       bandValues[bandName] = values;
@@ -141,6 +147,8 @@ export class LoadGeoTiffUseCase {
       maxY: transformedBounds.maxY,
       originX,
       originY,
+      sourceMinX,
+      sourceMinY,
       resX: actualResX,
       resY: actualResY,
       sourceCrs,
@@ -160,7 +168,9 @@ export class LoadGeoTiffUseCase {
   }
 
   private getNoDataValue(image: any): number | null {
-    const nodata = typeof image.getGDALNoData === 'function' ? Number(image.getGDALNoData()) : Number.NaN;
+    const raw = typeof image.getGDALNoData === 'function' ? image.getGDALNoData() : null;
+    if (raw === null || raw === undefined) return null;
+    const nodata = Number(raw);
     return Number.isFinite(nodata) ? nodata : null;
   }
 

@@ -17,7 +17,7 @@ import { LoadOsmParams, OsmElement, OsmNamedArea, boundingBoxOf, checkTagSets, i
 import type { MultiPolygon } from 'geojson';
 import { coastalLandMask } from '../../internal/process-osm-surface/coastline';
 import { OsmProcessingPipeline } from '../../internal/process-osm/pipeline';
-import { selectScopedBoundaryRelations } from '../../internal/process-osm/named-area';
+import { resolveNamedAreaBoundaries } from '../../internal/process-osm/named-area';
 import { blockToElements, resolveWayGeometries } from './osm-pbf-parser';
 
 interface OverpassApiResponse {
@@ -31,6 +31,8 @@ interface OsmExecResult {
   osmDataProcessingMs: number;
   boundariesProcessingMs: number;
   surfaceMask?: MultiPolygon;
+  queryExtent: { west: number; south: number; east: number; north: number };
+  coastlineExtent?: { west: number; south: number; east: number; north: number };
 }
 
 type RequestedLayer = 'roads' | 'buildings' | 'parks' | 'water';
@@ -126,7 +128,7 @@ export class LoadOsmFromPbfUseCase {
 
     const box = isBoundingBoxArea(params.queryArea) ? boundingBoxOf(params.queryArea) : null;
     const boundaryContext = box
-      ? { boundaryRelationIds: new Set<number>(), boundaryWayIds: new Set<number>(), bbox: box }
+      ? { boundaryRelationIds: new Set<number>(), boundaryWayIds: new Set<number>(), bbox: box, geocodeExtent: box }
       : await this.collectBoundaryContext(pbfFileUrl, params.queryArea as OsmNamedArea);
     const bbox = boundaryContext.bbox;
 
@@ -159,11 +161,16 @@ export class LoadOsmFromPbfUseCase {
       `[autk-db] PBF filter summary: boundaries=${grouped.boundaries.elements.length}, parks+water=${grouped.parksWater.elements.length}, roads=${grouped.roads.elements.length}, buildings=${grouped.buildings.elements.length}, total=${filteredElements.length}`
     );
 
-    const coastlines = filteredElements.filter(element => element.type === 'way' && element.tags?.natural === 'coastline');
-    const surfaceMask = coastalLandMask(coastlines, bbox);
+    // Classify the full geocode envelope before clipping thematic candidates.
+    // Coasts outside areas (including neighboring land) must not be discarded.
+    const coastlineExtent = boundaryContext.geocodeExtent;
+    const coastlines = candidates.elements.filter(element => element.type === 'way' && element.tags?.natural === 'coastline'
+      && (!coastlineExtent || !element.geometry || this.wayIntersectsBbox(element, coastlineExtent)));
+    const surfaceMask = coastlineExtent ? coastalLandMask(coastlines, coastlineExtent) : undefined;
+    if (!coastlineExtent) console.warn('[autk-db] No complete geocode boundary in PBF; coastal water is not generated. Include the geocode region and all its bbox coastlines in the extract.');
     const combined = this.mergeResponses(
       this.mergeResponses(grouped.boundaries, grouped.parksWater),
-      this.mergeResponses(this.mergeResponses(grouped.roads, grouped.buildings), { elements: coastlines }),
+      this.mergeResponses(grouped.roads, grouped.buildings),
     );
     const { osmData, boundariesData } = box
       ? { osmData: combined, boundariesData: this.pipeline.boundingBoxBoundary(box) }
@@ -188,6 +195,8 @@ export class LoadOsmFromPbfUseCase {
         { source: 'osm', name: `${outputTableName}_boundaries`, columns },
       ],
       surfaceMask,
+      queryExtent: bbox,
+      coastlineExtent,
       osmElementCount: osmData.elements.length,
       boundaryElementCount: boundariesData.elements.length,
       osmDataProcessingMs,
@@ -212,7 +221,7 @@ export class LoadOsmFromPbfUseCase {
   private async collectBoundaryContext(
     pbfFileUrl: string,
     queryArea: OsmNamedArea,
-  ): Promise<{ boundaryRelationIds: Set<number>; boundaryWayIds: Set<number>; bbox: Bbox }> {
+  ): Promise<{ boundaryRelationIds: Set<number>; boundaryWayIds: Set<number>; bbox: Bbox; geocodeExtent?: Bbox }> {
     console.log('[autk-db] PBF pass 1/3: boundary discovery started');
     const names = new Set([queryArea.geocodeArea, ...queryArea.areas]);
     const elements: OsmElement[] = [];
@@ -238,14 +247,14 @@ export class LoadOsmFromPbfUseCase {
     });
     await this.collectRequiredNodes(pbfFileUrl, requiredNodeIds, elements);
     resolveWayGeometries(elements);
-    const selected = selectScopedBoundaryRelations(elements, queryArea);
+    const { relations: selected, geocodeExtent } = resolveNamedAreaBoundaries(elements, queryArea);
     const boundaryRelationIds = new Set(selected.map(relation => relation.id));
     const boundaryWayIds = new Set(selected.flatMap(relation => (relation.members ?? [])
       .filter(member => member.type === 'way').map(member => member.ref)));
     const bbox = this.pipeline.computeBboxFromElements(elements.filter(element => element.type === 'way' && boundaryWayIds.has(element.id)));
     if (!bbox) throw new Error('Failed to compute bounding box from scoped boundary elements');
     console.log(`[autk-db] PBF scoped boundary discovery finished (${boundaryRelationIds.size} relations, ${boundaryWayIds.size} ways)`);
-    return { boundaryRelationIds, boundaryWayIds, bbox };
+    return { boundaryRelationIds, boundaryWayIds, bbox, geocodeExtent };
   }
 
   // Pass 3: collect candidate thematic relations + ways and required node ids

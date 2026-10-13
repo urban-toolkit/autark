@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['autk*/test/**/*.test.ts'],
+    include: ['autk*/test/**/*.test.ts', 'usecases/test/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/._*'],
   },
 });

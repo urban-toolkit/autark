@@ -126,8 +126,12 @@ export type LoadOsmParams = {
     /** Public layers to retain; may be empty for tag-only loads. Surface is always constructed as a workspace mask, hidden unless requested. */
     layers: Array<LayerType>;
   };
-  /** Named boundaries or a WGS84 bbox. Surface excludes sea when coastline reconstruction succeeds;
-   * otherwise the full query area is used with a warning. Buildings retain complete original parts. */
+  /** Named boundaries or a WGS84 bbox. Named coastline collection/classification uses the geocode bbox,
+   * including neighboring coasts regardless of jurisdiction. Water adds bbox(areas) minus classified land;
+   * generated context has properties.generated = 'coastline'. Missing/invalid coastlines never imply sea.
+   * PBFs must cover the geocode bbox with complete coastlines; no supplemental network requests are made.
+   * Surface excludes sea when reconstruction succeeds; otherwise the full query area is used with a warning.
+   * Buildings retain complete original parts. */
   queryArea: OsmQueryArea;
   /** Overpass-only tag-selected layers, clipped to the mandatory surface. Each set requires one geometry type. */
   tagSets?: OsmTagSet[];

@@ -1,8 +1,9 @@
-import { FeatureCollection } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 
 import { AutkDb } from '@urban-toolkit/autk-db';
+import { MANHATTAN_AREA, MANHATTAN_PBF } from './config';
 
-const URL = (import.meta as any).env.BASE_URL;
+const URL = import.meta.env.BASE_URL;
 
 export class UrbaneData {
     public db!: AutkDb;
@@ -14,13 +15,11 @@ export class UrbaneData {
 
     public async loadBaseData(datasets: string[]): Promise<void> {
         await this.db.loadOsm({
-            pbfFileUrl: `${URL}data/mnt.osm.pbf`,
-            queryArea: { geocodeArea: 'New York', areas: ['Manhattan Island'] },
+            pbfFileUrl: `${URL}data/${MANHATTAN_PBF}`,
+            queryArea: MANHATTAN_AREA,
             outputTableName: 'table_osm',
             autoLoadLayers: {
-                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
-                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
-                >,
+                layers: ['surface', 'parks', 'water', 'roads', 'buildings'],
             },
         });
 
