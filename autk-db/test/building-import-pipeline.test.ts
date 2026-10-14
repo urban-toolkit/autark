@@ -330,9 +330,7 @@ describe('building relations preserve original way ownership', () => {
   });
 
   it.each([
-    { members: [{ type: 'relation' as const, ref: 999, role: 'part' }, { type: 'way' as const, ref: 10, role: 'part' }], error: /unsupported member 999/ },
-    { members: [{ type: 'way' as const, ref: 10, role: 'inner' }], error: /unsupported member 10/ },
-    { members: [{ type: 'way' as const, ref: 20, role: 'roof' }, { type: 'way' as const, ref: 10, role: 'part' }], error: /unsupported member 20.*role roof/ },
+    { members: [{ type: 'relation' as const, ref: 999, role: 'part' }, { type: 'way' as const, ref: 10, role: 'part' }], error: /missing or unusable geometry for relations 999/ },
     { members: [{ type: 'way' as const, ref: 10, role: 'part' }, { type: 'way' as const, ref: 10, role: 'outline' }], error: /conflicting roles for way 10/ },
     { members: [{ type: 'node' as const, ref: 100, role: 'label' }], error: /no way members/ },
     { members: [], error: /no way members/ },
@@ -355,27 +353,103 @@ describe('building relations preserve original way ownership', () => {
     expect(output.features.some(feature => feature.id === 40)).toBe(true);
   });
 
-  it.each(['api', 'pbf'])('public %s import survives unsupported roof members and completes all layers', async source => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const elements = structuredClone(syntheticElements);
-    elements.push({ type: 'relation', id: 15931242, tags: { type: 'building' }, members: [
-      { type: 'way', ref: 20, role: 'roof' }, { type: 'way', ref: 10, role: 'part' },
-    ] }, { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 30, role: 'part' }] });
-    if (source === 'pbf') {
-      const bytes = await encodeBuildingPbf(elements);
-      vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(bytes)));
-    } else {
-      resolveWayGeometries(elements);
-      vi.spyOn(LoadOsmFromOverpassApiUseCase.prototype as any, 'fetchCombinedOsmData').mockResolvedValue({ elements });
-    }
-    const result = await client.loadOsm({ queryArea: { geocodeArea: 'Fixture', areas: ['Test District'] },
-      ...(source === 'pbf' ? { pbfFileUrl: '/roof.pbf' } : {}), autoLoadLayers: { layers: ['surface', 'buildings', 'roads', 'water', 'parks'] } });
-    expect(result.layers).toHaveLength(5);
-    const output = await client.getLayer('table_osm_buildings');
-    expect(output.features.map(feature => feature.id)).toEqual([30]);
-    expect(output.features[0].properties?.osmRelation?.id).toBe('601');
-    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Skipping OSM building relation 15931242.*unsupported member 20.*role roof/));
-    expect(client.getTablesMetadata().some(table => ['table_osm', 'table_osm_boundaries'].includes(table.name))).toBe(false);
+  describe('Simple 3D Buildings relations', () => {
+    const ring = (id: number, start: number, coordinates: number[][], tags: Record<string, string> = {}): OsmElement[] => [
+      { type: 'way', id, tags, nodes: [...coordinates.map((_, i) => start + i), start] },
+      ...coordinates.map(([lon, lat], i) => ({ type: 'node' as const, id: start + i, lon, lat })),
+    ];
+    const load = async (source: string, elements: OsmElement[]) => {
+      if (source === 'pbf') {
+        const bytes = await encodeBuildingPbf(elements);
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(bytes)));
+      } else {
+        resolveWayGeometries(elements);
+        vi.spyOn(LoadOsmFromOverpassApiUseCase.prototype as any, 'fetchCombinedOsmData').mockResolvedValue({ elements });
+      }
+      return client.loadOsm({ queryArea: { geocodeArea: 'Fixture', areas: ['Test District'] },
+        ...(source === 'pbf' ? { pbfFileUrl: '/relations.pbf' } : {}), autoLoadLayers: { layers: ['surface', 'buildings', 'roads', 'water', 'parks'] } });
+    };
+
+    it.each(['api', 'pbf'])('public %s import reads multipolygon outline and part members like ways', async source => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const elements = structuredClone(syntheticElements);
+      elements.push(
+        ...ring(711, 7110, [[1, 5], [3, 5], [3, 6.5], [1, 6.5]]),
+        ...ring(721, 7210, [[1, 5], [2, 5], [2, 6], [1, 6]]),
+        ...ring(722, 7220, [[1.25, 5.25], [1.75, 5.25], [1.75, 5.75], [1.25, 5.75]]),
+        ...ring(730, 7300, [[2, 5], [3, 5], [3, 6], [2, 6]], { 'building:part': 'yes', height: '20' }),
+        ...ring(740, 7400, [[2.25, 5.25], [2.75, 5.25], [2.75, 5.75], [2.25, 5.75]], { 'building:part': 'yes', height: '30' }),
+        { type: 'relation', id: 710, tags: { type: 'multipolygon', building: 'office', name: 'Outline' },
+          members: [{ type: 'way', ref: 711, role: 'outer' }] },
+        // Relation 20 shares its number with way 20, which stays a building of its own.
+        { type: 'relation', id: 20, tags: { type: 'multipolygon', 'building:part': 'yes', height: '40' },
+          members: [{ type: 'way', ref: 721, role: 'outer' }, { type: 'way', ref: 722, role: 'inner' }] },
+        { type: 'relation', id: 700, tags: { type: 'building', name: 'Peoples Gas Building' }, members: [
+          { type: 'relation', ref: 710, role: 'outline' }, { type: 'relation', ref: 20, role: 'part' }, { type: 'way', ref: 730, role: 'part' },
+        ] },
+      );
+      expect((await load(source, elements)).layers).toHaveLength(5);
+      const output = await client.getLayer('table_osm_buildings');
+      const building = output.features.find(feature => feature.properties?.osmRelation?.id === '700')!;
+      expect(building).toBeDefined();
+      expect(building.properties?.name).toBe('Peoples Gas Building');
+      expect(building.properties?.osmRelation.members).toEqual([{ id: '710', role: 'outline', type: 'relation' },
+        { id: '20', role: 'part', type: 'relation' }, { id: '730', role: 'part' }]);
+      // Way 740 lies inside the multipolygon outline, so it joins by outline containment.
+      expect(building.properties?.osmRelation.inferredParts).toEqual([{ id: '740', method: 'outline-containment' }]);
+      expect(building.properties?.parts.map((part: any) => [part.id, part.height])).toEqual([[20, '40'], [710, undefined], [730, '20'], [740, '30']]);
+      expect(building.geometry).toMatchObject({ type: 'GeometryCollection', geometries: [
+        { type: 'Polygon', coordinates: [expect.any(Array), expect.any(Array)] }, // The multipolygon part keeps its hole.
+        { type: 'Polygon', coordinates: [expect.any(Array)] },
+        { type: 'Polygon', coordinates: [expect.any(Array)] },
+        { type: 'Polygon', coordinates: [expect.any(Array)] },
+      ] });
+      expect(output.features.find(feature => feature.id === 10)?.properties?.parts.map((part: any) => part.id)).toEqual([10, 20]);
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/Skipping OSM building relation 700/));
+    });
+
+    it.each(['api', 'pbf'])('public %s import reads roof and column members as parts and completes all layers', async source => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const elements = structuredClone(syntheticElements);
+      elements.push(
+        ...ring(81, 810, [[4, 4], [5, 4], [5, 4.5], [4, 4.5]], { building: 'roof', height: '6' }),
+        ...ring(83, 830, [[1.5, 1.5], [2.5, 1.5], [2.5, 2.5], [1.5, 2.5]]),
+        { type: 'way', id: 82, tags: { highway: 'footway', footway: 'sidewalk' }, nodes: [820, 821, 822] },
+        ...[[1, 0.5], [3, 0.5], [5, 0.5]].map(([lon, lat], i) => ({ type: 'node' as const, id: 820 + i, lon, lat })),
+        { type: 'relation', id: 15931242, tags: { type: 'building', name: 'Willis Tower' }, members: [
+          { type: 'way', ref: 10, role: 'part' }, { type: 'way', ref: 20, role: 'column' }, { type: 'way', ref: 81, role: 'roof' },
+          // An open way and an untagged area add nothing and do not drop the building.
+          { type: 'way', ref: 82, role: 'roof' }, { type: 'way', ref: 83, role: 'inner' },
+        ] },
+        { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 30, role: 'part' }] },
+      );
+      expect((await load(source, elements)).layers).toHaveLength(5);
+      const output = await client.getLayer('table_osm_buildings');
+      expect(output.features.map(feature => feature.id).sort()).toEqual([10, 30]);
+      const tower = output.features.find(feature => feature.properties?.osmRelation?.id === '15931242')!;
+      expect(tower.properties?.name).toBe('Willis Tower');
+      expect(tower.properties?.parts.map((part: any) => [part.id, part.height])).toEqual([[10, '12'], [20, '25'], [81, '6']]);
+      for (const feature of output.features) {
+        expect(feature.properties?.parts.some((part: any) => [82, 83].includes(part.id))).toBe(false);
+      }
+      expect(output.features.find(feature => feature.id === 30)?.properties?.osmRelation?.id).toBe('601');
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/Skipping OSM building relation 15931242/));
+      expect(client.getTablesMetadata().some(table => ['table_osm', 'table_osm_boundaries'].includes(table.name))).toBe(false);
+    });
+
+    it.each(['api', 'pbf'])('public %s import leaves an ordinary building beside 3D building relations unchanged', async source => {
+      await client.setWorkspace(`ordinary_${source}_${workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const elements = structuredClone(syntheticElements);
+      elements.push(...ring(91, 910, [[0.2, 8], [0.8, 8], [0.8, 9], [0.2, 9]], { building: 'yes', height: '7' }),
+        { type: 'relation', id: 600, tags: { type: 'building' }, members: [{ type: 'way', ref: 10, role: 'part' }, { type: 'way', ref: 20, role: 'roof' }] });
+      await load(source, elements);
+      const output = await client.getLayer('table_osm_buildings');
+      expect(output.features.find(feature => feature.id === 91)).toEqual({ type: 'Feature', id: 91,
+        geometry: { type: 'GeometryCollection', geometries: [{ type: 'Polygon', coordinates: [[[0.2, 9], [0.8, 9], [0.8, 8], [0.2, 8], [0.2, 9]]] }] },
+        properties: { height: '7', building: 'yes', building_id: 91,
+          parts: [{ building: 'yes', height: '7', __autk_layer: 'buildings', id: 91, geometryIndex: 0 }] } });
+    });
   });
 
   it('still assembles genuine multipolygon relations with inner rings as polygons with holes', async () => {
