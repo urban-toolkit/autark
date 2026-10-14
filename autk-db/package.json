@@ -1,6 +1,6 @@
 {
   "name": "@urban-toolkit/autk-db",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "keywords": [
     "urban",
     "data management"
@@ -48,7 +48,7 @@
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@osmix/pbf": "^0.0.10",
     "@turf/turf": "^7.4.0",
-    "@urban-toolkit/autk-core": "4.1.0",
+    "@urban-toolkit/autk-core": "4.1.1",
     "apache-arrow": "^21.2.0",
     "geotiff": "^3.0.5"
   }
