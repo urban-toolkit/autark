@@ -1,96 +1,96 @@
-# Importação de dados OSM no Autark
+# OSM data import in Autark
 
-Este documento explica a implementação atual de `AutkDb.loadOsm()`, tanto pela API Overpass quanto por arquivo PBF. Inclui aquisição, representação intermediária, construção de geometrias, relações, agrupamento de edifícios, recorte, exportação e limpeza.
+This document explains the current implementation of `AutkDb.loadOsm()`, both through the Overpass API and from a PBF file. It covers acquisition, intermediate representation, geometry construction, relations, building grouping, clipping, export and cleanup.
 
-**Referência:** código consolidado no commit `37f8a34`. Os diagramas descrevem o comportamento implementado, não funcionalidades planejadas.
+**Reference:** code consolidated in commit `37f8a34`. The diagrams describe the implemented behavior, not planned features.
 
-> **Ideia central:** API e PBF têm aquisição diferente, mas convergem para o mesmo modelo de elementos OSM e para o mesmo processamento espacial. Compartilhar o processamento não torna snapshots diferentes ou arquivos incompletos automaticamente equivalentes.
+> **Core idea:** API and PBF differ in acquisition, but converge on the same model of OSM elements and the same spatial processing. Sharing the processing does not automatically make different snapshots or incomplete files equivalent.
 
-## Índice
+## Contents
 
-1. [Visão geral](#1-visão-geral)
-2. [Conceitos e parâmetros](#2-conceitos-e-parâmetros)
-3. [Aquisição via Overpass](#3-aquisição-via-overpass)
-4. [Aquisição via PBF](#4-aquisição-via-pbf)
-5. [Separação e normalização comuns](#5-separação-e-normalização-comuns)
-6. [Classificação temática](#6-classificação-temática)
-7. [BBox e sistema de coordenadas](#7-bbox-e-sistema-de-coordenadas)
-8. [Construção das geometrias dos ways](#8-construção-das-geometrias-dos-ways)
-9. [Construção de geometrias de relações](#9-construção-de-geometrias-de-relações)
-10. [Consolidação de buildings](#10-consolidação-de-buildings)
-11. [Construção da surface](#11-construção-da-surface)
-12. [Filtragem e recorte final](#12-filtragem-e-recorte-final)
-13. [Exportação e uso pelo mapa](#13-exportação-e-uso-pelo-mapa)
-14. [Temporários, erros e limpeza](#14-temporários-erros-e-limpeza)
-15. [Paridade entre fontes e diagnóstico](#15-paridade-entre-fontes-e-diagnóstico)
-16. [Testes e mapa do código](#16-testes-e-mapa-do-código)
+1. [Overview](#1-overview)
+2. [Concepts and parameters](#2-concepts-and-parameters)
+3. [Acquisition via Overpass](#3-acquisition-via-overpass)
+4. [Acquisition via PBF](#4-acquisition-via-pbf)
+5. [Common separation and normalization](#5-common-separation-and-normalization)
+6. [Thematic classification](#6-thematic-classification)
+7. [BBox and coordinate system](#7-bbox-and-coordinate-system)
+8. [Construction of way geometries](#8-construction-of-way-geometries)
+9. [Construction of relation geometries](#9-construction-of-relation-geometries)
+10. [Building consolidation](#10-building-consolidation)
+11. [Surface construction](#11-surface-construction)
+12. [Final filtering and clipping](#12-final-filtering-and-clipping)
+13. [Export and use by the map](#13-export-and-use-by-the-map)
+14. [Temporaries, errors and cleanup](#14-temporaries-errors-and-cleanup)
+15. [Source parity and diagnosis](#15-source-parity-and-diagnosis)
+16. [Tests and code map](#16-tests-and-code-map)
 
-## 1. Visão geral
+## 1. Overview
 
 ```mermaid
 flowchart TD
-    A[AutkDb.loadOsm] --> B{pbfFileUrl foi informado?}
-    B -->|Não| C[Consultar Overpass ou reutilizar cache]
-    B -->|Sim| D[Ler e selecionar elementos do PBF]
-    C --> E[Elementos OSM: nodes, ways, relations]
+    A[AutkDb.loadOsm] --> B{Was pbfFileUrl given?}
+    B -->|No| C[Query Overpass or reuse the cache]
+    B -->|Yes| D[Read and select PBF elements]
+    C --> E[OSM elements: nodes, ways, relations]
     D --> E
-    E --> F[Separar dados temáticos e fronteiras]
-    F --> G[Normalizar e inserir no DuckDB]
-    G --> H[Calcular bbox das fronteiras]
-    H --> I[Extrair camadas solicitadas e surface obrigatória]
-    I --> J[Construir geometrias e transformar CRS]
-    J --> K{Camada}
-    K -->|Buildings| L[Validar partes e consolidar entidades]
-    K -->|Surface| M[Polygonizar geometria-base e aplicar máscara costeira]
-    K -->|Parks / water / roads| N[Concluir extração temática]
-    L --> O[Filtrar ou recortar pela surface obrigatória]
+    E --> F[Separate thematic data and boundaries]
+    F --> G[Normalize and insert into DuckDB]
+    G --> H[Compute the boundaries bbox]
+    H --> I[Extract requested layers and mandatory surface]
+    I --> J[Build geometries and transform CRS]
+    J --> K{Layer}
+    K -->|Buildings| L[Validate parts and consolidate entities]
+    K -->|Surface| M[Polygonize base geometry and apply coastal mask]
+    K -->|Parks / water / roads| N[Finish thematic extraction]
+    L --> O[Filter or clip by the mandatory surface]
     M --> O
     N --> O
-    O --> P[Manter tabelas finais e atualizar metadados]
-    P --> Q[Limpar staging bruto]
-    Q --> R[getLayer: exportar GeoJSON]
+    O --> P[Keep final tables and update metadata]
+    P --> Q[Clean raw staging]
+    Q --> R[getLayer: export GeoJSON]
 ```
 
-Se o visualizador não renderizar Mermaid, o fluxo essencial é:
+If the viewer does not render Mermaid, the essential flow is:
 
 ```text
-Overpass ── consultas + cache ─────┐
-                                 ├─ elementos OSM ── DuckDB ── camadas finais
-PBF ── decoder + seleção local ───┘                         │
-                                                          └─ GeoJSON ── mapa
+Overpass ── queries + cache ───────┐
+                                 ├─ OSM elements ── DuckDB ── final layers
+PBF ── decoder + local selection ─┘                         │
+                                                          └─ GeoJSON ── map
 ```
 
-### As representações ao longo do processo
+### Representations along the process
 
-| Momento | Representação | Exemplo |
+| Moment | Representation | Example |
 |---|---|---|
-| Fonte API | JSON Overpass; ways com coordenadas inline | `nodes: [1,2,3,1]`, `geometry: [{lat,lon}, ...]` |
-| Fonte PBF | Blocos binários comprimidos | String table, nodes, dense nodes, refs em deltas |
-| Após leitura | Objetos `OsmElement` | `{type: 'way', id, tags, nodes, geometry}` |
-| Staging bruto | Tabelas DuckDB de elementos | `table_osm`, `table_osm_boundaries` |
-| Extração temática | Uma geometria por way selecionado, mais áreas de relações aplicáveis | `table_osm_water` |
-| Buildings consolidados | Uma linha por entidade, com partes originais | `GeometryCollection` + `properties.parts` |
-| Exportação | `FeatureCollection` | Uma feature por linha armazenada |
-| Renderização | Buffers de posições e índices | Extrusão de altura e triangulação fora da importação |
+| API source | Overpass JSON; ways with inline coordinates | `nodes: [1,2,3,1]`, `geometry: [{lat,lon}, ...]` |
+| PBF source | Compressed binary blocks | String table, nodes, dense nodes, delta-encoded refs |
+| After reading | `OsmElement` objects | `{type: 'way', id, tags, nodes, geometry}` |
+| Raw staging | DuckDB element tables | `table_osm`, `table_osm_boundaries` |
+| Thematic extraction | One geometry per selected way, plus applicable relation areas | `table_osm_water` |
+| Consolidated buildings | One row per entity, with original parts | `GeometryCollection` + `properties.parts` |
+| Export | `FeatureCollection` | One feature per stored row |
+| Rendering | Position and index buffers | Height extrusion and triangulation outside the import |
 
-## 2. Conceitos e parâmetros
+## 2. Concepts and parameters
 
-### Vocabulário OSM
+### OSM vocabulary
 
-| Conceito | Significado | Não confundir com |
+| Concept | Meaning | Not to be confused with |
 |---|---|---|
-| **Node** | ID e coordenadas de um ponto OSM | Um vértice de um mesh GPU |
-| **Way** | Sequência ordenada de referências a nodes | Necessariamente um polígono: pode ser uma linha aberta |
-| **Relation** | Lista de membros, tipos, roles e tags | Uma geometria pronta ou uma união dos membros |
-| **Role** | Papel de um membro, como `outer`, `inner`, `outline`, `part` | Tag temática do way |
-| **BBox** | Retângulo que limita uma extensão | A fronteira administrativa real |
-| **Surface** | Polígonos construídos a partir das fronteiras solicitadas | Um modelo de elevação ou terreno raster |
-| **Building feature** | Entidade armazenada com suas partes | Uma parte isolada ou todos os edifícios que se tocam |
-| **Snapshot** | Estado dos dados OSM usado na aquisição | Um conjunto de dados necessariamente igual ao OSM atual |
+| **Node** | ID and coordinates of an OSM point | A vertex of a GPU mesh |
+| **Way** | Ordered sequence of node references | Necessarily a polygon: it can be an open line |
+| **Relation** | List of members, types, roles and tags | A ready geometry or a union of the members |
+| **Role** | A member's function, such as `outer`, `inner`, `outline`, `part` | The way's thematic tag |
+| **BBox** | Rectangle bounding an extent | The real administrative boundary |
+| **Surface** | Polygons built from the requested boundaries | An elevation model or raster terrain |
+| **Building feature** | Stored entity with its parts | An isolated part or all buildings that touch each other |
+| **Snapshot** | State of the OSM data used in acquisition | A dataset necessarily equal to current OSM |
 
-IDs OSM são separados por tipo: um node e um way podem ter o mesmo número. Por isso, a mesclagem das respostas identifica elementos por **`(type, id)`**, e o staging preserva a coluna `kind`.
+OSM IDs are separated by type: a node and a way can have the same number. That is why merging responses identifies elements by **`(type, id)`**, and staging keeps the `kind` column.
 
-### Exemplo pela API
+### Example through the API
 
 ```ts
 await db.loadOsm({
@@ -106,7 +106,7 @@ await db.loadOsm({
 });
 ```
 
-### Exemplo por PBF
+### Example from PBF
 
 ```ts
 await db.loadOsm({
@@ -115,7 +115,7 @@ await db.loadOsm({
     geocodeArea: 'New York',
     areas: ['Battery Park City', 'Financial District'],
   },
-  // Neste extrato, New York é incompleta: aviso + seleção só pelos nomes de areas.
+  // In this extract New York is incomplete: warning + selection by the areas names only.
   outputTableName: 'table_osm',
   autoLoadLayers: {
     layers: ['surface', 'parks', 'water', 'roads', 'buildings'],
@@ -123,26 +123,26 @@ await db.loadOsm({
 });
 ```
 
-| Parâmetro | Efeito atual |
+| Parameter | Current effect |
 |---|---|
-| `pbfFileUrl` | Escolhe o importador PBF. Sem ele, usa Overpass. Não é fallback automático. |
-| `queryArea.geocodeArea` | Região administrativa que restringe `areas` em Overpass e, quando sua geometria é utilizável, em PBF. Sem esse limite no arquivo, o PBF avisa e seleciona só pelos nomes exatos de `areas`. |
-| `queryArea.areas` | Nomes exatos das relações de fronteira a buscar. |
-| `queryArea.bbox` | Alternativa às áreas nomeadas: `[west, south, east, north]` em WGS84, para Overpass ou PBF. |
-| `autoLoadLayers.layers` | Camadas públicas extraídas, na ordem informada. Surface sempre é construída; se omitida, fica escondida da listagem de layers. |
-| `autoLoadLayers.coordinateFormat` | CRS declarado da entrada; padrão `EPSG:4326`. Não muda o CRS dos dados na fonte. |
-| `outputTableName` | Prefixo das tabelas; padrão `table_osm`. |
-| `tagSets` | Camadas Overpass selecionadas por tags, cada conjunto com `type` obrigatório: `points`, `polylines` ou `polygons`. Todas passam pela surface. Não aceita `pbfFileUrl`. |
-| `forceRefresh` | Ignora o cache Overpass. Não completa nem atualiza o arquivo PBF. |
-| `onProgress` | Recebe fases do carregamento; não é uma porcentagem de progresso. |
+| `pbfFileUrl` | Chooses the PBF importer. Without it, Overpass is used. It is not an automatic fallback. |
+| `queryArea.geocodeArea` | Administrative region that restricts `areas` in Overpass and, when its geometry is usable, in PBF. Without that boundary in the file, PBF warns and selects only by the exact `areas` names. |
+| `queryArea.areas` | Exact names of the boundary relations to fetch. |
+| `queryArea.bbox` | Alternative to named areas: `[west, south, east, north]` in WGS84, for Overpass or PBF. |
+| `autoLoadLayers.layers` | Public layers extracted, in the given order. Surface is always built; if omitted, it stays hidden from the layer listing. |
+| `autoLoadLayers.coordinateFormat` | Declared CRS of the input; default `EPSG:4326`. Does not change the CRS of the data at the source. |
+| `outputTableName` | Table prefix; default `table_osm`. |
+| `tagSets` | Overpass layers selected by tags, each set with a mandatory `type`: `points`, `polylines` or `polygons`. All of them go through the surface. Does not accept `pbfFileUrl`. |
+| `forceRefresh` | Ignores the Overpass cache. Does not complete or update the PBF file. |
+| `onProgress` | Receives the loading phases; it is not a progress percentage. |
 
-O workspace usa `{ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 }` por padrão para armazenamento; a grade representa 1 cm porque esse CRS é métrico. Para alterar o CRS, use `setWorkspace(nome, { coordinateFormat, precisionGrid })` e forneça os dois valores, antes de carregar tabelas no workspace. A grade é expressa nas unidades do CRS: não use `0.01` para `EPSG:4326`. A API pública usa o workspace corrente; opções internas também recebem seu nome explicitamente. As geometrias vetoriais carregadas são normalizadas nessa grade após a transformação de CRS; resultados de recortes e máscaras costeiras também usam a grade. Isso pode alterar coordenadas e a ordem dos vértices de anéis. As partes de edifícios são normalizadas individualmente, sem dissolução ou reordenação dos componentes de `GeometryCollection`, preservando `geometryIndex` e atributos. Uma grade que colapse uma geometria de entrada ou uma parte inteira é rejeitada; componentes pequenos/buracos podem desaparecer dentro da tolerância. Raster mantém resolução própria. Os recortes são transacionais, sem retry; `loadGeojson` também desfaz a criação/substituição da tabela e seu registro quando houver erro.
+The workspace uses `{ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 }` by default for storage; the grid represents 1 cm because this CRS is metric. To change the CRS, use `setWorkspace(name, { coordinateFormat, precisionGrid })` and provide both values, before loading tables into the workspace. The grid is expressed in the CRS units: do not use `0.01` for `EPSG:4326`. The public API uses the current workspace; internal options also receive its name explicitly. Loaded vector geometries are normalized to this grid after the CRS transformation; results of clips and coastal masks also use the grid. This can change coordinates and the vertex order of rings. Building parts are normalized individually, without dissolving or reordering the `GeometryCollection` components, preserving `geometryIndex` and attributes. A grid that collapses an input geometry or a whole part is rejected; small components/holes may disappear within the tolerance. Raster keeps its own resolution. Clips are transactional, with no retry; `loadGeojson` also undoes the creation/replacement of the table and its registration when there is an error.
 
-**Pré-condições:** `db.init()` deve ter sido executado. OSM deve ser carregado antes de camadas não OSM no mesmo workspace, pois estabelece o contexto espacial.
+**Preconditions:** `db.init()` must have been run. OSM must be loaded before non-OSM layers in the same workspace, since it establishes the spatial context.
 
-A seleção pública aceita áreas nomeadas ou `queryArea: { bbox: [west, south, east, north] }`, tanto por Overpass quanto por PBF. A bbox é validada antes de HTTP/leitura: quatro coordenadas finitas dentro dos limites WGS84, `west < east` e `south < north`. Cruzamento do antimeridiano não é suportado. O filtro Overpass seleciona candidatos; não promete uma consulta geométrica exaustiva de tudo que intersecta a caixa.
+The public selection accepts named areas or `queryArea: { bbox: [west, south, east, north] }`, both through Overpass and PBF. The bbox is validated before HTTP/reading: four finite coordinates within the WGS84 limits, `west < east` and `south < north`. Antimeridian crossing is not supported. The Overpass filter selects candidates; it does not promise an exhaustive geometric query of everything that intersects the box.
 
-### Camadas por tags e tipo explícito
+### Layers by tags and explicit type
 
 ```ts
 await db.loadOsm({
@@ -150,506 +150,506 @@ await db.loadOsm({
   autoLoadLayers: { layers: [] },
   tagSets: [{ name: 'escolas', type: 'points', tags: [{ key: 'amenity', value: 'school' }] }],
 });
-// Apenas table_osm_escolas_points, se houver features após a filtragem.
+// Only table_osm_escolas_points, if there are features after filtering.
 ```
 
-Cada conjunto exige um único tipo e não converte geometrias: `points` aceita nodes, `polylines` aceita ways lineares e `polygons` aceita ways de área e relações `type=multipolygon`. Uma escola cadastrada somente como área não aparece em um conjunto `points`. Filtros usam OR, por presença da chave ou valor exato; não há regex. Ways abertas são linhas. Ways fechadas também são linhas quando `area=no` ou quando possuem `highway`, `barrier`, `railway` ou `waterway` sem `area=yes`; outras ways fechadas são áreas. Relações de outros tipos não geram features.
+Each set requires a single type and does not convert geometries: `points` accepts nodes, `polylines` accepts linear ways and `polygons` accepts area ways and `type=multipolygon` relations. A school mapped only as an area does not appear in a `points` set. Filters use OR, by key presence or exact value; there is no regex. Open ways are lines. Closed ways are also lines when `area=no` or when they have `highway`, `barrier`, `railway` or `waterway` without `area=yes`; other closed ways are areas. Relations of other types do not produce features.
 
-A aquisição conserva membros para montar as relações, mas a camada final passa pela surface, incluindo a máscara costeira: pontos externos são excluídos; linhas e áreas são recortadas; resultados vazios e componentes incompatíveis com o tipo são descartados. Isso impede que um membro auxiliar inteiramente externo sobreviva como uma feature independente. Um membro interno com tags próprias ainda pode ser uma feature; não há deduplicação semântica entre uma relação e seus membros.
+Acquisition keeps members to assemble relations, but the final layer goes through the surface, including the coastal mask: external points are excluded; lines and areas are clipped; empty results and components incompatible with the type are discarded. This prevents an auxiliary member that is entirely external from surviving as an independent feature. An internal member with its own tags can still be a feature; there is no semantic deduplication between a relation and its members.
 
-Há no máximo 8 conjuntos, nomes únicos em formato de identificador minúsculo (até 32 caracteres) e 1–64 filtros por conjunto. Chaves têm até 255 caracteres e formato `[A-Za-z0-9][A-Za-z0-9_:.-]*`; valores têm 1–255 caracteres, sem controles. Parâmetros inválidos e combinação com PBF são recusados antes da aquisição. Ways inválidas ou sem todas as coordenadas são omitidas com aviso; a reconstrução de relações mantém os limites existentes da seção 9. Erros SQL e colapso na grade de precisão são propagados.
+There are at most 8 sets, unique names in lowercase identifier format (up to 32 characters) and 1 to 64 filters per set. Keys have up to 255 characters and the format `[A-Za-z0-9][A-Za-z0-9_:.-]*`; values have 1 to 255 characters, without control characters. Invalid parameters and combination with PBF are refused before acquisition. Invalid ways or ways without all their coordinates are omitted with a warning; relation reconstruction keeps the existing limits of section 9. SQL errors and precision grid collapse are propagated.
 
-Um conjunto produz apenas `<outputTableName>_<name>_<type>`. Se ficar vazio após o recorte, não há tabela nem timing. Reload remove tabelas antigas de outros tipos do mesmo conjunto; conjuntos omitidos na nova chamada não são removidos. Substituição, normalização e recorte de cada conjunto são transacionais, restaurando tabela/metadados anteriores em caso de erro; a carga OSM inteira não é uma transação única. A exportação por elemento usa a proveniência explícita atual, sem inferência por `refs`. Nodes explícitos preservam tags mesmo quando já foram emitidos como vértices de ways, sem reordenar os elementos. `read_json` usa tipos de colunas explícitos para não depender de uma amostra inicial composta apenas por nodes.
+A set produces only `<outputTableName>_<name>_<type>`. If it is empty after clipping, there is no table and no timing. A reload removes old tables of other types of the same set; sets omitted in the new call are not removed. Replacement, normalization and clipping of each set are transactional, restoring the previous table/metadata on error; the whole OSM load is not a single transaction. Per-element export uses the current explicit provenance, without inference from `refs`. Explicit nodes keep their tags even when they were already emitted as way vertices, without reordering the elements. `read_json` uses explicit column types so as not to depend on an initial sample made only of nodes.
 
-Exemplo na gallery: [`osm-tag-sets.ts`](../gallery/src/autk-map/osm-tag-sets.ts), baseado em `osm-layers-pbf.ts`, usando Overpass e os mesmos limites nomeados de Lower Manhattan.
+Gallery example: [`osm-tag-sets.ts`](../gallery/src/autk-map/osm-tag-sets.ts), based on `osm-layers-pbf.ts`, using Overpass and the same named boundaries of Lower Manhattan.
 
-## 3. Aquisição via Overpass
+## 3. Acquisition via Overpass
 
-Responsável: [`LoadOsmFromOverpassApiUseCase`](../autk-db/src/use-cases/load-osm-overpass/use-case.ts).
+Responsible: [`LoadOsmFromOverpassApiUseCase`](../autk-db/src/use-cases/load-osm-overpass/use-case.ts).
 
 ### 3.1 Cache
 
-Antes de consultar o servidor:
+Before querying the server:
 
-1. Procura uma entrada para o escopo, áreas e camadas solicitadas.
-2. Se necessário, tenta uma entrada de dados completos como superset.
-3. Entradas expiram após **24 horas**.
-4. `forceRefresh: true` ignora essas entradas.
+1. Looks for an entry for the requested scope, areas and layers.
+2. If needed, tries a full data entry as a superset.
+3. Entries expire after **24 hours**.
+4. `forceRefresh: true` ignores these entries.
 
-O cache usa a Cache API do navegador quando disponível. Chaves de áreas nomeadas têm versão `v4`, invalidando respostas antigas com escopo incorreto, inclusive supersets. Bboxes mantêm `v3`, pois sua seleção não mudou; têm chaves próprias por coordenadas e camadas. Ambas incluem os dados necessários à máscara costeira e às relações `type=building`.
+The cache uses the browser's Cache API when available. Named area keys have version `v4`, invalidating old responses with an incorrect scope, including supersets. Bboxes keep `v3`, since their selection did not change; they have their own keys by coordinates and layers. Both include the data needed for the coastal mask and for `type=building` relations.
 
-Para `tagSets`, um sufixo próprio `tag-sets-v1` inclui tipos geométricos e seletores canônicos. Nomes/ordem dos conjuntos não alteram a aquisição; mudar o tipo ou os filtros altera a chave. O superset tradicional não contém todos os nodes/tags arbitrários e nunca atende uma consulta com conjuntos.
+For `tagSets`, its own suffix `tag-sets-v1` includes the geometric types and canonical selectors. Names/order of the sets do not change acquisition; changing the type or the filters changes the key. The traditional superset does not contain all arbitrary nodes/tags and never serves a query with sets.
 
-> Cache recente não significa dados iguais ao PBF. Pode representar outro momento do OSM, e uma entrada completa reutilizada pode conter mais candidatos que uma consulta temática específica.
+> A recent cache does not mean data equal to the PBF. It can represent another moment of OSM, and a reused full entry can contain more candidates than a specific thematic query.
 
-### 3.2 Fronteiras primeiro
+### 3.2 Boundaries first
 
-A consulta encontra a região por nome e, dentro dela, as relações de limite OSM correspondentes aos nomes pedidos (`boundary=administrative`, `boundary=place` e outros limites nomeados). Cada relação gera sua área por `map_to_area`; fronteiras, grupos temáticos e todos os tiles usam essa mesma seleção. Não é feita uma segunda busca global por uma área homônima. Busca também os ways membros dessas relações.
+The query finds the region by name and, inside it, the OSM boundary relations matching the requested names (`boundary=administrative`, `boundary=place` and other named boundaries). Each relation produces its area through `map_to_area`; boundaries, thematic groups and all tiles use this same selection. No second global search for a homonymous area is made. It also fetches the member ways of these relations.
 
 ```text
 geocodeArea
-    └─ áreas nomeadas
-          ├─ relações de fronteira → out body
-          └─ ways membros         → out geom qt
+    └─ named areas
+          ├─ boundary relations → out body
+          └─ member ways        → out geom qt
 ```
 
-- `out body` entrega tags e referências de membros da relação.
-- `out geom qt` entrega ways com coordenadas inline.
-- A bbox utilizada para dividir consultas de buildings é calculada **somente a partir das fronteiras**.
-- Parques, água e edifícios não devem ampliar essa bbox de aquisição.
-- Para bbox pública, não há consulta administrativa: um way retangular sintético estabelece as fronteiras e a extensão.
-- Nos dois casos, uma consulta adicional coleta `natural=coastline` na extensão da área, preservando ways completos e sua direção.
+- `out body` delivers the tags and member references of the relation.
+- `out geom qt` delivers ways with inline coordinates.
+- The bbox used to split the building queries is computed **only from the boundaries**.
+- Parks, water and buildings must not enlarge this acquisition bbox.
+- For a public bbox, there is no administrative query: a synthetic rectangular way establishes the boundaries and the extent.
+- In both cases, an additional query collects `natural=coastline` in the area's extent, keeping complete ways and their direction.
 
-A implementação exige a tag `boundary` e confere a presença dos nomes solicitados. Não restringe seu valor a `administrative`: Battery Park City e Financial District, por exemplo, usam `boundary=place`. O critério de escopo é um node membro dentro da região, como em `relation(area)` do Overpass, não contenção integral do limite solicitado; relações selecionadas permanecem completas. Nomes homônimos dentro da própria região continuam podendo corresponder a mais de uma relação.
+The implementation requires the `boundary` tag and checks the presence of the requested names. It does not restrict its value to `administrative`: Battery Park City and Financial District, for example, use `boundary=place`. The scope criterion is a member node inside the region, as in Overpass's `relation(area)`, not full containment of the requested boundary; selected relations remain complete. Homonymous names inside the region itself can still match more than one relation.
 
-### 3.3 Consultas temáticas
+### 3.3 Thematic queries
 
-| Grupo | Aquisição | Observação |
+| Group | Acquisition | Note |
 |---|---|---|
-| Fronteiras | Uma consulta para áreas nomeadas; sintéticas para bbox | Mesmo sem solicitar a camada `surface` |
-| Coastlines | Uma consulta pela extensão da área | Sempre, independentemente das camadas públicas |
-| Parks + water | Uma consulta conjunta, com os seletores ativos | Pode solicitar apenas um desses temas |
-| Roads | Uma consulta de ways | Relações de roads não são reconstruídas como áreas |
-| Buildings | Normalmente quatro consultas, numa grade 2 × 2 | Combina filtro de área com bbox de cada tile |
-| Tag sets | Uma consulta adicional para todos os conjuntos | Nodes somente para `points`; ways para linhas/áreas; relações multipolígonas e seus membros somente quando há `polygons` |
+| Boundaries | One query for named areas; synthetic for bbox | Even without requesting the `surface` layer |
+| Coastlines | One query over the area's extent | Always, regardless of the public layers |
+| Parks + water | One joint query, with the active selectors | Can request only one of these themes |
+| Roads | One query of ways | Road relations are not reconstructed as areas |
+| Buildings | Normally four queries, in a 2 × 2 grid | Combines the area filter with each tile's bbox |
+| Tag sets | One additional query for all sets | Nodes only for `points`; ways for lines/areas; multipolygon relations and their members only when there are `polygons` |
 
-Com as cinco camadas, sem cache e com extensão disponível, são normalmente **oito consultas de dados para áreas nomeadas**: fronteiras, coastlines, parks/water, roads e quatro tiles de buildings. Para bbox são sete, sem a busca de fronteiras. Consultas de status e retries são adicionais.
+With the five layers, no cache and an available extent, there are normally **eight data queries for named areas**: boundaries, coastlines, parks/water, roads and four building tiles. For a bbox there are seven, without the boundary search. Status queries and retries are additional.
 
-Nos tiles de buildings, a relação pode aparecer em mais de uma resposta. A mesclagem remove repetições por `(type, id)`.
+In the building tiles, a relation can appear in more than one response. Merging removes repetitions by `(type, id)`.
 
-### 3.4 Relações e seus membros
+### 3.4 Relations and their members
 
-Para buildings, as consultas incluem relações com:
+For buildings, the queries include relations with:
 
-- `building` aceito;
-- `building:part` aceito;
-- **`type=building`**, mesmo sem as duas tags anteriores.
+- an accepted `building`;
+- an accepted `building:part`;
+- **`type=building`**, even without the two previous tags.
 
-Depois buscam `way(r.dataRelations...)`: os ways membros das relações selecionadas. Esses membros podem não ter tags próprias ou estar fora do tile.
+Then they fetch `way(r.dataRelations...)`: the member ways of the selected relations. These members may have no tags of their own or be outside the tile.
 
-A mesma ideia de coleta de ways membros é usada nas consultas de relações de parks/water. A coleta não equivale a resolver recursivamente qualquer relação aninhada.
+The same idea of collecting member ways is used in the parks/water relation queries. The collection is not equivalent to recursively resolving any nested relation.
 
-### 3.5 Rede, retries e cache do resultado
+### 3.5 Network, retries and result cache
 
-A implementação:
+The implementation:
 
-- usa POST para não depender do tamanho de uma URL;
-- consulta o status do Overpass para esperar por slots;
-- mantém pausa de 3 segundos entre requisições temáticas;
-- tenta novamente após erros de rede e HTTP `429`, `503` e `504`;
-- usa backoff com jitter;
-- reduz o timeout declarado da consulta após falhas consecutivas de rede/`504`;
-- não grava o resultado combinado no cache quando algum grupo solicitado retorna vazio.
+- uses POST so as not to depend on the size of a URL;
+- queries the Overpass status to wait for slots;
+- keeps a 3 second pause between thematic requests;
+- retries after network errors and HTTP `429`, `503` and `504`;
+- uses backoff with jitter;
+- reduces the declared timeout of the query after consecutive network/`504` failures;
+- does not write the combined result to the cache when any requested group returns empty.
 
-Limites declarados das consultas: 128 MiB para fronteiras e 256 MiB para grupos/tiles temáticos. Eles não são o limite `maximum_object_size` do leitor JSON do DuckDB.
+Declared query limits: 128 MiB for boundaries and 256 MiB for thematic groups/tiles. They are not the `maximum_object_size` limit of DuckDB's JSON reader.
 
-Ao final, as respostas são mescladas e seguem para o processamento comum.
+At the end, the responses are merged and go on to the common processing.
 
-## 4. Aquisição via PBF
+## 4. Acquisition via PBF
 
-Responsáveis: [`LoadOsmFromPbfUseCase`](../autk-db/src/use-cases/load-osm-pbf/use-case.ts) e [`osm-pbf-parser.ts`](../autk-db/src/use-cases/load-osm-pbf/osm-pbf-parser.ts).
+Responsible: [`LoadOsmFromPbfUseCase`](../autk-db/src/use-cases/load-osm-pbf/use-case.ts) and [`osm-pbf-parser.ts`](../autk-db/src/use-cases/load-osm-pbf/osm-pbf-parser.ts).
 
-Para bbox pública, o importador usa diretamente a extensão fornecida e dispensa as fases de descoberta administrativa e cálculo de bbox das fronteiras. A coleta temática existente também conserva coastlines e seus nodes, mesmo sem surface na lista pública. Relações selecionadas mantêm todos os membros disponíveis no arquivo. Coastlines ausentes/incompletas acionam o fallback da surface, não uma busca externa automática.
+For a public bbox, the importer directly uses the given extent and skips the phases of administrative discovery and boundary bbox computation. The existing thematic collection also keeps coastlines and their nodes, even without surface in the public list. Selected relations keep all the members available in the file. Missing/incomplete coastlines trigger the surface fallback, not an automatic external search.
 
-### 4.1 Decodificação
+### 4.1 Decoding
 
-`@osmix/pbf` lê os blocos do stream. O parser local converte:
+`@osmix/pbf` reads the blocks of the stream. The local parser converts:
 
-| Estrutura PBF | Conversão |
+| PBF structure | Conversion |
 |---|---|
-| String table | Índices de strings → nomes/valores de tags e roles |
-| Nodes regulares | ID, latitude, longitude e tags |
-| Dense nodes | Acumulação dos deltas de IDs/coordenadas e leitura das tags compactadas |
-| Ways | Acumulação dos deltas das referências de nodes |
-| Relations | Acumulação das referências e associação entre membro, tipo e role |
+| String table | String indices → tag and role names/values |
+| Regular nodes | ID, latitude, longitude and tags |
+| Dense nodes | Accumulation of the ID/coordinate deltas and reading of the packed tags |
+| Ways | Accumulation of the node reference deltas |
+| Relations | Accumulation of the references and association between member, type and role |
 
-Um way inicialmente contém referências, não uma geometria pronta. Após coletar os nodes, `resolveWayGeometries()` faz a resolução das coordenadas.
+A way initially contains references, not a ready geometry. After collecting the nodes, `resolveWayGeometries()` resolves the coordinates.
 
-**Limitação importante:** esse resolvedor omite coordenadas de nodes não encontrados; não recupera dados ausentes do arquivo. Portanto, completar referências na origem é essencial, e a leitura de um PBF não deve ser tomada como prova de completude geométrica.
+**Important limitation:** this resolver omits the coordinates of nodes that are not found; it does not recover data missing from the file. Therefore, completing the references at the source is essential, and reading a PBF should not be taken as proof of geometric completeness.
 
-### 4.2 Três fases lógicas — seis leituras do arquivo
+### 4.2 Three logical phases, six file reads
 
-Os logs chamam o procedimento de três passes, mas cada fase pode fazer mais de uma leitura do stream:
+The logs call the procedure three passes, but each phase can read the stream more than once:
 
-| Fase lógica | Leituras atuais | Produto |
+| Logical phase | Current reads | Product |
 |---|---:|---|
-| 1. Descoberta das fronteiras | 1 | Relações com tag `boundary` e nomes da região e das áreas solicitadas |
-| 2. Escopo e bbox das fronteiras | 2 | Ways/nodes, reconstrução do polígono da região, seleção por pertencimento de nodes e bbox somente das fronteiras selecionadas |
-| 3. Coleta temática | 3 | Relações candidatas, depois ways, depois nodes necessários |
-| **Total** | **6** | Elementos selecionados com geometria resolvida |
+| 1. Boundary discovery | 1 | Relations with a `boundary` tag and the names of the region and of the requested areas |
+| 2. Scope and boundary bbox | 2 | Ways/nodes, reconstruction of the region polygon, selection by node membership and bbox of the selected boundaries only |
+| 3. Thematic collection | 3 | Candidate relations, then ways, then required nodes |
+| **Total** | **6** | Selected elements with resolved geometry |
 
-Cada leitura chama `fetch(pbfFileUrl)` e decodifica o stream. Isso não significa necessariamente seis downloads completos pela rede: a resposta pode vir de cache HTTP. O importador, porém, não guarda sozinho uma única cópia binária para reutilização entre as leituras.
+Each read calls `fetch(pbfFileUrl)` and decodes the stream. This does not necessarily mean six full downloads over the network: the response can come from the HTTP cache. The importer, however, does not by itself keep a single binary copy for reuse between reads.
 
 ```mermaid
 flowchart LR
-    A[PBF] --> B[Encontrar região e limites OSM por nome]
-    B --> C[Coletar seus ways]
-    C --> D[Coletar nodes, aplicar escopo da região e calcular bbox selecionada]
-    D --> E[Coletar relações temáticas]
-    E --> F[Coletar ways temáticos e membros]
-    F --> G[Coletar nodes necessários]
-    G --> H[Resolver geometry dos ways]
-    H --> I[Filtrar e agrupar elementos]
+    A[PBF] --> B[Find region and OSM boundaries by name]
+    B --> C[Collect their ways]
+    C --> D[Collect nodes, apply region scope and compute selected bbox]
+    D --> E[Collect thematic relations]
+    E --> F[Collect thematic ways and members]
+    F --> G[Collect required nodes]
+    G --> H[Resolve way geometry]
+    H --> I[Filter and group elements]
 ```
 
-### 4.3 Seleção dos candidatos
+### 4.3 Candidate selection
 
-Primeiro entram relações de fronteira ou relações que correspondem aos temas solicitados. Seus membros do tipo way são registrados.
+First come boundary relations or relations matching the requested themes. Their way members are recorded.
 
-Depois entram ways que:
+Then come ways that:
 
-1. pertencem à fronteira;
-2. pertencem a uma relação candidata; ou
-3. correspondem às tags temáticas solicitadas.
+1. belong to the boundary;
+2. belong to a candidate relation; or
+3. match the requested thematic tags.
 
-Em seguida são coletados os nodes referenciados por esses ways.
+Next, the nodes referenced by these ways are collected.
 
-A implementação usa filtros probabilísticos `IdFilter` para vários conjuntos de presença. Eles reduzem o custo de rastrear IDs, mas podem ter falsos positivos e conservar candidatos adicionais. Não substituem a validação posterior da geometria ou da identidade de um building.
+The implementation uses probabilistic `IdFilter` filters for several presence sets. They reduce the cost of tracking IDs, but can have false positives and keep additional candidates. They do not replace the later validation of a building's geometry or identity.
 
-### 4.4 Filtro espacial e preservação de membros
+### 4.4 Spatial filter and member preservation
 
 ```text
-way candidato
-    ├─ é fronteira? → conservar
-    └─ sua bbox sobrepõe a bbox das fronteiras? → marcar como intersectante
+candidate way
+    ├─ is it a boundary? → keep
+    └─ does its bbox overlap the boundaries bbox? → mark as intersecting
 
-relação candidata
-    ├─ é fronteira? → conservar
-    └─ tem algum way membro intersectante? → conservar relação e membros disponíveis
+candidate relation
+    ├─ is it a boundary? → keep
+    └─ does it have any intersecting member way? → keep relation and available members
 ```
 
-Depois são conservados os nodes dos ways retidos.
+Then the nodes of the retained ways are kept.
 
-O teste `wayIntersectsBbox()` compara retângulos de extensão. **Não é um teste exato de interseção geométrica nem de pertencimento ao polígono administrativo.**
+The `wayIntersectsBbox()` test compares extent rectangles. **It is not an exact test of geometric intersection nor of membership in the administrative polygon.**
 
-O arquivo pode conter todos os membros de uma relação, inclusive os exteriores à área, ou apenas alguns. O importador preserva membros disponíveis; não faz uma consulta Overpass automática para completar os ausentes.
+The file can contain all members of a relation, including those outside the area, or only some. The importer keeps the available members; it does not make an automatic Overpass query to complete the missing ones.
 
-### 4.5 Agrupamento antes do fluxo comum
+### 4.5 Grouping before the common flow
 
-Os elementos são organizados em fronteiras, parks/water, roads e buildings; esses grupos são mesclados por `(type, id)`.
+The elements are organized into boundaries, parks/water, roads and buildings; these groups are merged by `(type, id)`.
 
-No agrupamento, fronteiras têm prioridade. Entre temas, buildings vêm antes de roads e parks/water. Nodes necessários acompanham os respectivos grupos.
+In grouping, boundaries have priority. Among themes, buildings come before roads and parks/water. Required nodes go with their groups.
 
-Por fim, o importador entrega o conjunto combinado ao mesmo `OsmProcessingPipeline` usado pelo Overpass.
+Finally, the importer hands the combined set to the same `OsmProcessingPipeline` used by Overpass.
 
-**Mesmo critério quando o escopo está disponível:** o PBF tenta aplicar `geocodeArea` antes de definir fronteiras e bbox. Reconstrói a região com segmentos abertos/revertidos, componentes desconectadas e holes, e seleciona relações de limite OSM cujo nome corresponde a `areas` e que têm algum node membro dentro dessa geometria. Homônimos fora da região ou dentro de seus holes não ampliam a bbox.
+**Same criterion when the scope is available:** PBF tries to apply `geocodeArea` before defining boundaries and bbox. It reconstructs the region with open/reversed segments, disconnected components and holes, and selects OSM boundary relations whose name matches `areas` and which have some member node inside that geometry. Homonyms outside the region or inside its holes do not enlarge the bbox.
 
-**Fallback para extratos incompletos:** se a região estiver ausente ou sua geometria não puder ser usada, o PBF emite `console.warn` e seleciona apenas as relações de limite com nomes exatos de `areas` presentes no arquivo, incluindo `boundary=place`. Não consulta Overpass para completar o escopo e não abandona o carregamento por falta dessa região. Nesse caso podem ser incluídos homônimos de outras regiões dentro do extrato; use arquivo completo ou `queryArea.bbox` se precisar evitar essa ambiguidade. Nomes solicitados em `areas` que não existam continuam causando erro. O arquivo `lower_mnt.osm.pbf` da galeria tem geometria incompleta de New York; seu exemplo nomeado usa esse fallback com aviso.
+**Fallback for incomplete extracts:** if the region is missing or its geometry cannot be used, PBF emits `console.warn` and selects only the boundary relations with exact `areas` names present in the file, including `boundary=place`. It does not query Overpass to complete the scope and does not abandon loading for lack of that region. In this case homonyms from other regions inside the extract can be included; use a complete file or `queryArea.bbox` if you need to avoid that ambiguity. Names requested in `areas` that do not exist still cause an error. The gallery's `lower_mnt.osm.pbf` file has an incomplete New York geometry; its named example uses this fallback with a warning.
 
-## 5. Separação e normalização comuns
+## 5. Common separation and normalization
 
-Responsável: [`OsmProcessingPipeline`](../autk-db/src/internal/process-osm/pipeline.ts).
+Responsible: [`OsmProcessingPipeline`](../autk-db/src/internal/process-osm/pipeline.ts).
 
-### 5.1 Separar fronteiras dos dados temáticos
+### 5.1 Separating boundaries from thematic data
 
-`splitCombinedResponse()` identifica as relações dos nomes solicitados e seus ways/nodes.
+`splitCombinedResponse()` identifies the relations of the requested names and their ways/nodes.
 
-| Dataset | Conteúdo |
+| Dataset | Content |
 |---|---|
-| `osmData` | Nodes, ways e relações que não são as relações das fronteiras solicitadas |
-| `boundariesData` | Ways das fronteiras e seus nodes |
+| `osmData` | Nodes, ways and relations that are not the relations of the requested boundaries |
+| `boundariesData` | Boundary ways and their nodes |
 
-Os ways de fronteira e seus nodes também podem continuar em `osmData`. O que é removido desse dataset são as relações de fronteira identificadas.
+Boundary ways and their nodes can also remain in `osmData`. What is removed from that dataset are the identified boundary relations.
 
-Isso não perde necessariamente uma tag temática de um way que também pertence à fronteira.
+This does not necessarily lose a thematic tag of a way that also belongs to the boundary.
 
-### 5.2 Uniformizar API e PBF
+### 5.2 Unifying API and PBF
 
 ```text
-Overpass: way + nodes[] + geometry[] inline
+Overpass: way + nodes[] + inline geometry[]
                     │
-                    ├─ emitir registros de nodes pelas coordenadas inline
-                    └─ emitir registro do way com refs[]
+                    ├─ emit node records from the inline coordinates
+                    └─ emit the way record with refs[]
 
-PBF: nodes reais + way + geometry[] resolvida
+PBF: real nodes + way + resolved geometry[]
                     │
-                    ├─ emitir nodes uma única vez por ID
-                    └─ emitir registro do way com refs[]
+                    ├─ emit nodes once per ID
+                    └─ emit the way record with refs[]
 ```
 
-Os nodes sintetizados a partir de `geometry[]` mantêm os IDs OSM referenciados pelo way. Não são novos IDs de vértices inventados para o mapa.
+Nodes synthesized from `geometry[]` keep the OSM IDs referenced by the way. They are not new vertex IDs invented for the map.
 
-### 5.3 Schema do staging bruto
+### 5.3 Raw staging schema
 
 ```text
 <workspace>.table_osm
 <workspace>.table_osm_boundaries
 ```
 
-| Coluna | Tipo | Uso |
+| Column | Type | Use |
 |---|---|---|
-| `kind` | `VARCHAR` | `node`, `way` ou `relation` |
-| `id` | `BIGINT` | ID OSM no namespace indicado por `kind` |
-| `tags` | `MAP(VARCHAR, VARCHAR)` | Tags originais e classificação derivada |
-| `refs` | `BIGINT[]` | Nodes de um way ou membros de uma relação |
-| `lat`, `lon` | `DOUBLE` | Coordenadas de nodes |
-| `ref_roles` | `VARCHAR[]` | Roles dos membros, alinhados com `refs` |
-| `ref_types` | `VARCHAR[]` | Tipos dos membros, alinhados com `refs` |
+| `kind` | `VARCHAR` | `node`, `way` or `relation` |
+| `id` | `BIGINT` | OSM ID in the namespace given by `kind` |
+| `tags` | `MAP(VARCHAR, VARCHAR)` | Original tags and derived classification |
+| `refs` | `BIGINT[]` | Nodes of a way or members of a relation |
+| `lat`, `lon` | `DOUBLE` | Node coordinates |
+| `ref_roles` | `VARCHAR[]` | Member roles, aligned with `refs` |
+| `ref_types` | `VARCHAR[]` | Member types, aligned with `refs` |
 
-As linhas são serializadas em JSON temporário, registradas no VFS do DuckDB e inseridas no schema. As fronteiras são inseridas com `ignoreTags: true`, pois seu uso é geométrico.
+The rows are serialized into temporary JSON, registered in DuckDB's VFS and inserted into the schema. Boundaries are inserted with `ignoreTags: true`, since their use is geometric.
 
-A estrutura bruta **não possui ainda uma coluna `geometry` por elemento**. Essa geometria é construída na extração de cada camada.
+The raw structure **does not yet have a `geometry` column per element**. That geometry is built in the extraction of each layer.
 
-## 6. Classificação temática
+## 6. Thematic classification
 
-A classificação adiciona a tag interna `__autk_layer`. Quando um elemento corresponde a mais de uma categoria, a precedência é:
+Classification adds the internal tag `__autk_layer`. When an element matches more than one category, the precedence is:
 
 ```text
 buildings > roads > parks > water
 ```
 
-| Camada | Critérios resumidos |
+| Layer | Summary criteria |
 |---|---|
-| Buildings | `building` ou `building:part` com valor não excluído; ou `type=building` |
-| Roads | Possui `highway`, não tem `area=yes` e não está na lista de exclusão |
-| Parks | Valores selecionados de `leisure`, `landuse` ou `natural` |
-| Water | Valores selecionados de `natural` ou `water` |
-| Surface | Ways das fronteiras; não depende de classificação temática |
+| Buildings | `building` or `building:part` with a value that is not excluded; or `type=building` |
+| Roads | Has `highway`, does not have `area=yes` and is not in the exclusion list |
+| Parks | Selected values of `leisure`, `landuse` or `natural` |
+| Water | Selected values of `natural` or `water` |
+| Surface | Boundary ways; does not depend on thematic classification |
 
-As listas efetivas estão em [`consts.ts`](../autk-db/src/consts.ts):
+The effective lists are in [`consts.ts`](../autk-db/src/consts.ts):
 
-| Regra | Valores atuais |
+| Rule | Current values |
 |---|---|
 | Parks / `leisure` | `dog_park`, `park`, `playground`, `recreation_ground` |
 | Parks / `landuse` | `wood`, `grass`, `forest`, `orchard`, `village_green`, `vineyard`, `cemetery`, `meadow` |
 | Parks / `natural` | `wood`, `grass`, `grassland`, `forest`, `scrub`, `heath`, `meadow` |
 | Water / `natural` | `water`, `wetland`, `strait`, `spring` |
 | Water / `water` | `pond`, `reservoir`, `lagoon`, `stream_pool`, `lake`, `pool`, `canal`, `river` |
-| Roads excluídos | `cycleway`, `elevator`, `footway`, `steps`, `pedestrian`, `proposed`, `construction`, `abandoned`, `platform`, `raceway` |
-| Buildings excluídos | `shed`, `garage`, `garages`, `carport`, `hut`, `kiosk`, `toilets`, `service`, `transformer_tower`, `sty`, `container` |
+| Excluded roads | `cycleway`, `elevator`, `footway`, `steps`, `pedestrian`, `proposed`, `construction`, `abandoned`, `platform`, `raceway` |
+| Excluded buildings | `shed`, `garage`, `garages`, `carport`, `hut`, `kiosk`, `toilets`, `service`, `transformer_tower`, `sty`, `container` |
 
-Essas regras são específicas do toolkit. Não significam que todo elemento OSM classificado como água, vegetação ou construção será importado.
+These rules are specific to the toolkit. They do not mean that every OSM element classified as water, vegetation or construction will be imported.
 
-**Exceção importante para buildings:** ways membros de relações `type=building` entram na extração mesmo sem tags próprias. Assim, a relação consegue fornecer identidade e atributos gerais a partes não classificáveis isoladamente.
+**Important exception for buildings:** member ways of `type=building` relations enter the extraction even without tags of their own. This way the relation can provide identity and general attributes to parts that cannot be classified on their own.
 
-## 7. BBox e sistema de coordenadas
+## 7. BBox and coordinate system
 
-Após inserir o staging, `AutkDb.loadOsm()` calcula a bbox da tabela de fronteiras.
+After inserting the staging, `AutkDb.loadOsm()` computes the bbox of the boundaries table.
 
 ```text
-nodes das fronteiras em EPSG:4326
+boundary nodes in EPSG:4326
         │
         ├─ MIN(lon), MIN(lat)
         └─ MAX(lon), MAX(lat)
                   │
-                  └─ transformação para o CRS do workspace, quando necessária
+                  └─ transformation to the workspace CRS, when needed
 ```
 
-Essa bbox estabelece o contexto do workspace quando ele ainda não tem bbox. A rotina atual transforma os dois cantos extremos; não densifica as bordas para calcular a extensão em qualquer projeção arbitrária.
+This bbox establishes the workspace context when it does not have a bbox yet. The current routine transforms the two extreme corners; it does not densify the edges to compute the extent in any arbitrary projection.
 
-| Conceito | Exemplo | Etapa |
+| Concept | Example | Stage |
 |---|---|---|
-| Bbox geográfica de aquisição | Graus, `south/west/north/east` | Tiles Overpass e filtro de candidatos PBF |
-| Bbox do workspace | Coordenadas no CRS armazenado | Extração/recorte espacial |
-| Surface | Polígono(s) administrativos | Filtragem/recorte final |
+| Geographic acquisition bbox | Degrees, `south/west/north/east` | Overpass tiles and PBF candidate filter |
+| Workspace bbox | Coordinates in the stored CRS | Spatial extraction/clipping |
+| Surface | Administrative polygon(s) | Final filtering/clipping |
 
-Os nomes `minLon` e `minLat` do tipo `BoundingBox` também são usados quando os valores já são X/Y projetados. Não devem ser interpretados automaticamente como graus.
+The names `minLon` and `minLat` of the `BoundingBox` type are also used when the values are already projected X/Y. They must not be automatically interpreted as degrees.
 
-Ways são transformados com `ST_Transform(..., always_xy := true)`. A ordem de entrada é longitude/X, latitude/Y.
+Ways are transformed with `ST_Transform(..., always_xy := true)`. The input order is longitude/X, latitude/Y.
 
-## 8. Construção das geometrias dos ways
+## 8. Construction of way geometries
 
-Responsável: [`LOAD_LAYER_QUERY`](../autk-db/src/use-cases/load-osm-layer/queries.ts).
+Responsible: [`LOAD_LAYER_QUERY`](../autk-db/src/use-cases/load-osm-layer/queries.ts).
 
-Para cada camada, a consulta:
+For each layer, the query:
 
-1. seleciona seus ways;
-2. expande `refs`, preservando o índice de cada referência;
-3. encontra os nodes por ID, restringindo a busca a `kind='node'`;
-4. cria pontos a partir de longitude/latitude;
-5. ordena os pontos pelo índice original do way;
-6. constrói linha ou polígono e transforma o CRS.
+1. selects its ways;
+2. expands `refs`, keeping the index of each reference;
+3. finds the nodes by ID, restricting the search to `kind='node'`;
+4. creates points from longitude/latitude;
+5. orders the points by the original index in the way;
+6. builds a line or polygon and transforms the CRS.
 
 ```text
 Way 10: refs = [101, 102, 103, 104, 101]
                     │
                     ▼
-(id do way, ref, posição)
+(way id, ref, position)
 (10, 101, 0)
 (10, 102, 1)
 (10, 103, 2)
 (10, 104, 3)
 (10, 101, 4)
-                    │ join com nodes
+                    │ join with nodes
                     ▼
-pontos ordenados → ST_MakeLine → ST_MakePolygon, quando aplicável
+ordered points → ST_MakeLine → ST_MakePolygon, when applicable
 ```
 
-| Camada | Geometria inicial |
+| Layer | Initial geometry |
 |---|---|
-| Buildings / parks / water | Polygon se a primeira e última referência coincidem e há mais de três refs; caso contrário, LineString |
+| Buildings / parks / water | Polygon if the first and last references coincide and there are more than three refs; otherwise, LineString |
 | Roads | LineString |
-| Surface | LineString, mesmo para um way fechado; a polygonização ocorre depois |
+| Surface | LineString, even for a closed way; polygonization happens later |
 
-As tabelas extraídas inicialmente têm `id`, `properties`, `refs` e `geometry`.
+The extracted tables initially have `id`, `properties`, `refs` and `geometry`.
 
-Para parks/water, a bbox fornecida é usada na interseção geométrica durante a extração. Roads/surface são construídas como linhas sem esse mesmo recorte na expressão SQL; o tratamento final pela surface ocorre em etapa posterior.
+For parks/water, the given bbox is used in the geometric intersection during extraction. Roads/surface are built as lines without that same clip in the SQL expression; the final treatment by the surface happens in a later stage.
 
-No fluxo público OSM, **buildings não recebem bbox para cortar suas partes antes da consolidação**.
+In the public OSM flow, **buildings do not receive a bbox to cut their parts before consolidation**.
 
-A montagem por join não é uma certificação geral de completude das referências. Dados de origem incompletos precisam ser investigados; a validação posterior de buildings detecta geometria inutilizável, mas não consegue descobrir toda coordenada ausente se o resultado ainda parecer topologicamente válido.
+Assembly by join is not a general certification of reference completeness. Incomplete source data needs to be investigated; the later building validation detects unusable geometry, but cannot discover every missing coordinate if the result still looks topologically valid.
 
-## 9. Construção de geometrias de relações
+## 9. Construction of relation geometries
 
-Responsável: [`LoadOsmLayerUseCase`](../autk-db/src/use-cases/load-osm-layer/use-case.ts).
+Responsible: [`LoadOsmLayerUseCase`](../autk-db/src/use-cases/load-osm-layer/use-case.ts).
 
-### 9.1 Áreas compostas de ways
+### 9.1 Areas composed of ways
 
-Parks, water e relações de buildings que não são `type=building` podem gerar geometrias de área.
+Parks, water and building relations that are not `type=building` can produce area geometries.
 
 ```text
-Relação multipolygon
-    ├─ ways outer ── juntar segmentos por endpoints ── anéis exteriores
-    └─ ways inner ── juntar segmentos por endpoints ── buracos
+Multipolygon relation
+    ├─ outer ways ── join segments by endpoints ── exterior rings
+    └─ inner ways ── join segments by endpoints ── holes
                                                         │
                                                         ▼
                                                 Polygon / MultiPolygon
 ```
 
-Os endpoints são comparados pelas referências dos nodes. Segmentos podem ser invertidos para encaixar; o node de junção repetido é removido ao concatenar.
+Endpoints are compared by node references. Segments can be reversed to fit; the repeated junction node is removed when concatenating.
 
-- Role `outer` ou vazia: candidato a anel exterior.
-- Role `inner`: candidato a buraco.
-- Um anel exterior produz Polygon; vários produzem MultiPolygon.
-- Para vários exteriores, a associação de um buraco usa teste de ponto no anel.
-- A geometria montada é transformada para o workspace e, quando há bbox, intersectada com ela.
+- Role `outer` or empty: candidate exterior ring.
+- Role `inner`: candidate hole.
+- One exterior ring produces a Polygon; several produce a MultiPolygon.
+- For several exteriors, the association of a hole uses a point in ring test.
+- The assembled geometry is transformed to the workspace and, when there is a bbox, intersected with it.
 
-### 9.2 Limites dessa reconstrução
+### 9.2 Limits of this reconstruction
 
-Não há reconstrução genérica recursiva de relações aninhadas. A rotina de área considera membros do tipo way.
+There is no generic recursive reconstruction of nested relations. The area routine considers way members.
 
-Também **não existe aqui uma regra universal de “qualquer membro ausente rejeita toda a relação”**:
+There is also **no universal rule here that "any missing member rejects the whole relation"**:
 
-- segmentos sem ways/nodes disponíveis são ignorados na montagem dos anéis;
-- cadeias que não fecham não viram anéis;
-- sem anel exterior, a relação é omitida e contabilizada no aviso;
-- um buraco sem exterior correspondente pode ser omitido com aviso;
-- se sobrarem anéis fechados, pode existir um resultado parcial.
+- segments without available ways/nodes are ignored in ring assembly;
+- chains that do not close do not become rings;
+- without an exterior ring, the relation is omitted and counted in the warning;
+- a hole without a matching exterior can be omitted with a warning;
+- if closed rings remain, a partial result can exist.
 
-Isso é diferente da política mais conservadora de ownership de buildings descrita abaixo. Não se deve assumir que uma área de água reconstruída está completa apenas porque gerou um Polygon.
+This differs from the more conservative building ownership policy described below. One must not assume that a reconstructed water area is complete just because it produced a Polygon.
 
-### 9.3 `type=building` é ownership, não multipolygon extra
+### 9.3 `type=building` is ownership, not an extra multipolygon
 
-Uma relação `type=building` é tratada separadamente:
+A `type=building` relation is treated separately:
 
 ```text
-Relação type=building
-    ├─ identidade e atributos gerais
-    └─ associação dos ways originais
+type=building relation
+    ├─ identity and general attributes
+    └─ association of the original ways
 
-Não gera um segundo polígono sobreposto aos próprios ways.
+It does not produce a second polygon overlapping its own ways.
 ```
 
-Essa distinção evita armazenar/renderizar uma área adicional que duplica componentes do edifício.
+This distinction avoids storing/rendering an additional area that duplicates building components.
 
-## 10. Consolidação de buildings
+## 10. Building consolidation
 
-Responsável: [`ProcessOsmBuildingsUseCase`](../autk-db/src/internal/process-osm-buildings/use-case.ts).
+Responsible: [`ProcessOsmBuildingsUseCase`](../autk-db/src/internal/process-osm-buildings/use-case.ts).
 
-### 10.1 Ordem das decisões
+### 10.1 Order of decisions
 
 ```mermaid
 flowchart TD
-    A[Geometrias originais, ordenadas por ID] --> B[Rejeitar IDs duplicados]
-    B --> C[Excluir partes explicitamente subterrâneas]
-    C --> D[Omitir geometrias inutilizáveis com aviso]
-    D --> E[Ler ownership das relações type=building]
-    E --> F[Excluir relações subterrâneas, incompletas ou conflitantes]
-    F --> G[Associar órfãs por containment único de outline]
-    G --> H[Agrupar apenas os ways restantes por interseção]
-    H --> I[Definir ID mínimo por grupo]
-    I --> J[Coletar partes originais em GeometryCollection]
-    J --> K[Substituir a tabela em transação]
+    A[Original geometries, ordered by ID] --> B[Reject duplicate IDs]
+    B --> C[Exclude explicitly underground parts]
+    C --> D[Omit unusable geometries with a warning]
+    D --> E[Read ownership of type=building relations]
+    E --> F[Exclude underground, incomplete or conflicting relations]
+    F --> G[Associate orphans by unique outline containment]
+    G --> H[Group only the remaining ways by intersection]
+    H --> I[Set the minimum ID per group]
+    I --> J[Collect original parts into a GeometryCollection]
+    J --> K[Replace the table in a transaction]
 ```
 
-### 10.2 Validação e omissão
+### 10.2 Validation and omission
 
-| Situação | Comportamento |
+| Situation | Behavior |
 |---|---|
-| Parte `location=underground` | Excluída antes de ownership/clustering, com aviso |
-| Relação `location=underground` | Relação e membros são excluídos dessa camada |
-| Geometria ausente, inválida, vazia ou não Polygon/MultiPolygon | Parte omitida, com aviso; coordenadas não são reparadas |
-| Relação com membro ausente/inutilizável | Relação e seus membros são omitidos, evitando building parcial |
-| Parte intencionalmente excluída por ser subterrânea | Não é tratada como falha de geometria; os membros de superfície podem permanecer |
-| Mesmo way pertencendo a relações distintas | Relações afetadas são omitidas, com aviso; não se escolhe um dono arbitrário |
-| IDs duplicados ou falha SQL/transacional | Erro propagado |
-| Nested member, role não suportada (incluindo `roof`), roles conflitantes ou relação sem ways | Aviso e omissão da relação e de todos os seus ways diretos; outros edifícios continuam |
+| `location=underground` part | Excluded before ownership/clustering, with a warning |
+| `location=underground` relation | Relation and members are excluded from this layer |
+| Missing, invalid, empty or non Polygon/MultiPolygon geometry | Part omitted, with a warning; coordinates are not repaired |
+| Relation with a missing/unusable member | Relation and its members are omitted, avoiding a partial building |
+| Part intentionally excluded for being underground | Not treated as a geometry failure; the surface members can remain |
+| Same way belonging to distinct relations | Affected relations are omitted, with a warning; no arbitrary owner is chosen |
+| Duplicate IDs or SQL/transaction failure | Error propagated |
+| Nested member, unsupported role (including `roof`), conflicting roles or relation without ways | Warning and omission of the relation and of all its direct ways; other buildings continue |
 
-Na leitura de ownership, roles aceitas de ways são vazia, `part`, `outline` e `outer`. Membros node, como labels, não viram partes geométricas. Referências repetidas com a mesma role são deduplicadas. Membership inválida é marcada com um motivo para omissão, mantendo todos os IDs dos ways diretos, inclusive os posteriores ao membro inválido. A consolidação registra `console.warn` com o ID da relação e o motivo e impede que seus membros reapareçam como edifícios parciais/independentes. Erros de banco/transação e invariantes internos continuam sendo propagados; não há um catch genérico que esconda falhas da camada inteira.
+When reading ownership, the accepted way roles are empty, `part`, `outline` and `outer`. Node members, such as labels, do not become geometric parts. Repeated references with the same role are deduplicated. Invalid membership is marked with a reason for omission, keeping all the IDs of the direct ways, including those after the invalid member. Consolidation logs `console.warn` with the relation ID and the reason and prevents its members from reappearing as partial/independent buildings. Database/transaction errors and internal invariants are still propagated; there is no generic catch hiding failures of the whole layer.
 
-**Não excluem por si só:** altura zero, `layer` negativo ou `building:levels:underground`. A exclusão específica desta etapa exige `location=underground`.
+**Not excluded on their own:** zero height, negative `layer` or `building:levels:underground`. The specific exclusion of this stage requires `location=underground`.
 
-### 10.3 Ownership explícito
+### 10.3 Explicit ownership
 
-Uma relação pode associar partes desconectadas ou sem tags próprias:
+A relation can associate disconnected parts or parts without tags of their own:
 
 ```text
-Relação R
-    ├─ way A: corpo principal
-    ├─ way B: componente do teto
-    └─ way C: parte distante
+Relation R
+    ├─ way A: main body
+    ├─ way B: roof component
+    └─ way C: distant part
 
-Resultado: uma feature com [A, B, C], sem exigir A ∩ C.
+Result: one feature with [A, B, C], without requiring A ∩ C.
 ```
 
-Relações distintas permanecem entidades distintas mesmo quando suas geometrias se sobrepõem.
+Distinct relations remain distinct entities even when their geometries overlap.
 
-### 10.4 Partes órfãs e inferência conservadora
+### 10.4 Orphan parts and conservative inference
 
-Uma parte sem ownership explícito pode ser incorporada a uma relação se:
+A part without explicit ownership can be incorporated into a relation if:
 
-1. tiver `building:part` preenchido e diferente de `no`;
-2. sua geometria inteira for coberta por um outline original;
-3. os outlines que a cobrem pertencerem a **uma única relação utilizável de superfície**.
+1. it has `building:part` filled in and different from `no`;
+2. its whole geometry is covered by an original outline;
+3. the outlines covering it belong to **a single usable surface relation**.
 
-O teste é `ST_Covers(outline, part)`: respeita buracos e permite contato com a borda.
+The test is `ST_Covers(outline, part)`: it respects holes and allows contact with the edge.
 
-São outlines candidatos:
+Candidate outlines are:
 
-- membros com role `outline`; ou
-- membros com role vazia/`outer`, tag `building` preenchida e diferente de `no`, sem indicação ativa de `building:part`.
+- members with role `outline`; or
+- members with an empty/`outer` role, a `building` tag filled in and different from `no`, and no active `building:part` indication.
 
-Não se usam partes comuns ou partes já inferidas como novos outlines.
+Ordinary parts or already inferred parts are not used as new outlines.
 
-| Caso | Associação inferida? |
+| Case | Inferred association? |
 |---|---|
-| Parte inteira dentro de um único building | Sim |
-| Contato com borda, ainda totalmente coberta | Sim |
-| Vários outlines da mesma relação cobrem a parte | Sim, a relação é contada uma vez |
-| Dois buildings distintos cobrem a parte | Não; aviso de ambiguidade |
-| Apenas sobreposição parcial | Não |
-| Parte num buraco do outline | Não |
-| Building independente sem tag de parte | Não |
-| Parte já pertencente a outra relação | Não se sobrescreve ownership |
+| Whole part inside a single building | Yes |
+| Contact with the edge, still fully covered | Yes |
+| Several outlines of the same relation cover the part | Yes, the relation is counted once |
+| Two distinct buildings cover the part | No; ambiguity warning |
+| Only partial overlap | No |
+| Part in a hole of the outline | No |
+| Independent building without a part tag | No |
+| Part already belonging to another relation | Ownership is not overwritten |
 
-A inferência é registrada separadamente em `osmRelation.inferredParts`; os membros originais da relação não são falsificados.
+The inference is recorded separately in `osmRelation.inferredParts`; the original members of the relation are not falsified.
 
-### 10.5 Clustering dos elementos restantes
+### 10.5 Clustering of the remaining elements
 
-Ways ainda sem ownership usam `computeIntersectingClusterIds()`:
+Ways still without ownership use `computeIntersectingClusterIds()`:
 
 ```text
-A intersecta B; B intersecta C
+A intersects B; B intersects C
                 ↓
          cluster [A, B, C]
 
-Mesmo se A não intersectar C diretamente.
+Even if A does not intersect C directly.
 ```
 
-É agrupamento por componentes conexos de interseção 2D, com índice espacial. Não considera automaticamente nome, endereço, altura, layer ou identidade cadastral.
+It is grouping by connected components of 2D intersection, with a spatial index. It does not automatically consider name, address, height, layer or cadastral identity.
 
-**Limitação conhecida:** ways de superfície sem associação explícita ainda podem unir entidades independentes por contatos transitivos. Remover conectores subterrâneos e preservar relações reduz casos demonstrados, mas não prova identidade semântica para todo OSM.
+**Known limitation:** surface ways without an explicit association can still join independent entities through transitive contacts. Removing underground connectors and preserving relations reduces the demonstrated cases, but does not prove semantic identity for all of OSM.
 
-### 10.6 Armazenamento canônico
+### 10.6 Canonical storage
 
 ```text
-Antes: uma linha por parte
+Before: one row per part
 
-id   geometria   atributos
+id   geometry    attributes
 10   Polygon A   height=12
 20   Polygon B   height=25
 
-Depois: uma linha por building
+After: one row per building
 
 id=10
 building_id=10
@@ -660,246 +660,246 @@ properties.parts=[
 ]
 ```
 
-O ID normalmente é o **menor ID das partes retidas**, inclusive partes inferidas. Não é um índice de cluster ou obrigatoriamente o ID da relação. Se uma relação com geometria própria e um way compartilham o mesmo número, a relação recebe uma chave interna negativa para evitar colisão; sua identidade OSM real permanece na proveniência. Portanto, `building_id` deve ser tratado como chave opaca de agrupamento.
+The ID is normally the **smallest ID of the retained parts**, including inferred parts. It is not a cluster index nor necessarily the relation ID. If a relation with its own geometry and a way share the same number, the relation receives a negative internal key to avoid a collision; its real OSM identity remains in the provenance. Therefore, `building_id` must be treated as an opaque grouping key.
 
-As partes são ordenadas por ID. Os índices `geometryIndex` apontam para as geometrias da collection na mesma ordem.
+The parts are ordered by ID. The `geometryIndex` indices point to the geometries of the collection in the same order.
 
-Atributos próprios ficam nas partes. Atributos idênticos em todas as partes podem ser promovidos ao nível do building; tags gerais da relação também são incorporadas. Na resolução para renderização, os atributos da parte têm precedência sobre os gerais, incluindo grupos alternativos de tags de altura/base.
+Own attributes stay in the parts. Attributes identical in all parts can be promoted to the building level; general relation tags are also incorporated. In the resolution for rendering, part attributes take precedence over general ones, including alternative groups of height/base tags.
 
 ```text
 properties.osmRelation
     ├─ id: string
-    ├─ members: IDs/roles originais
-    ├─ properties: tags originais da relação
-    └─ inferredParts: IDs associados por outline-containment, quando houver
+    ├─ members: original IDs/roles
+    ├─ properties: original relation tags
+    └─ inferredParts: IDs associated by outline-containment, when present
 ```
 
-**Não há união geométrica, convex hull ou coluna persistente `agg_geometry`.** O arquivo temporário de mapeamento contém IDs e atributos, não uma segunda cópia das coordenadas. A collection é construída a partir das geometrias da tabela de origem.
+**There is no geometric union, convex hull or persistent `agg_geometry` column.** The temporary mapping file contains IDs and attributes, not a second copy of the coordinates. The collection is built from the geometries of the source table.
 
-“Preservar a geometria original” aqui significa não unir ou recortar as partes na consolidação. As coordenadas passam pela transformação de CRS e pela grade de precisão do workspace; a representação dos anéis pode mudar. A normalização ocorre individualmente por componente e mantém os índices das partes, sem dissolver polígonos sobrepostos.
+"Preserving the original geometry" here means not uniting or clipping the parts during consolidation. The coordinates go through the CRS transformation and the workspace precision grid; the ring representation can change. Normalization happens individually per component and keeps the part indices, without dissolving overlapping polygons.
 
-## 11. Construção da surface
+## 11. Surface construction
 
-Responsável: [`PolygonizeOsmSurfaceUseCase`](../autk-db/src/internal/process-osm-surface/use-case.ts).
+Responsible: [`PolygonizeOsmSurfaceUseCase`](../autk-db/src/internal/process-osm-surface/use-case.ts).
 
 ```text
 table_osm_boundaries
-        │ extrair ways como linhas
+        │ extract ways as lines
         ▼
-table_osm_surface, inicialmente linear
-        │ exportar para GeoJSON
+table_osm_surface, initially linear
+        │ export to GeoJSON
         │ Turf polygonize
         ▼
-polígonos fechados
-        │ registrar JSON temporário no DuckDB
+closed polygons
+        │ register temporary JSON in DuckDB
         ▼
-table_osm_surface, substituída por polígonos
+table_osm_surface, replaced by polygons
 ```
 
-A polygonização constrói a geometria-base: polígonos administrativos para áreas nomeadas ou um retângulo sintético para bbox. Nos dois casos, [`coastalLandMask`](../autk-db/src/internal/process-osm-surface/coastline.ts) reconstrói a região terrestre na extensão geográfica e a surface final é a interseção dessa máscara com a geometria-base.
+Polygonization builds the base geometry: administrative polygons for named areas or a synthetic rectangle for a bbox. In both cases, [`coastalLandMask`](../autk-db/src/internal/process-osm-surface/coastline.ts) reconstructs the land region in the geographic extent and the final surface is the intersection of this mask with the base geometry.
 
-A reconstrução preserva a direção OSM (terra à esquerda), recorta segmentos à extensão, divide as bordas nos encontros, polygoniza e classifica faces. Anéis desconectados são organizados por contenção para preservar ilhas e buracos. Na reconstrução, coordenadas da rede da máscara são quantizadas a `1e-10` graus; depois da projeção, máscara, superfície e camadas temáticas/buildings são normalizadas na grade do workspace. Coastline ausente, incompleta, ambígua ou inválida gera `console.warn` e conserva a geometria-base inteira. Assim, uma bbox inteiramente marítima sem coastline também usa o retângulo. Lagos/rios não são subtraídos: permanecem disponíveis para `water`. Erros de rede, leitura e banco não são tratados como fallback costeiro.
+The reconstruction keeps the OSM direction (land on the left), clips segments to the extent, splits the edges where they meet, polygonizes and classifies faces. Disconnected rings are organized by containment to preserve islands and holes. In the reconstruction, the coordinates of the mask network are quantized to `1e-10` degrees; after projection, mask, surface and thematic/building layers are normalized to the workspace grid. A missing, incomplete, ambiguous or invalid coastline produces `console.warn` and keeps the whole base geometry. Thus, an entirely maritime bbox without coastline also uses the rectangle. Lakes/rivers are not subtracted: they remain available for `water`. Network, reading and database errors are not treated as a coastal fallback.
 
-| Sem solicitar `surface` | Solicitando `surface` |
+| Without requesting `surface` | Requesting `surface` |
 |---|---|
-| Surface é construída e mantida como máscara interna | Surface é construída e exposta como camada pública |
-| Não aparece em `getLayersMetadata()` nem nos timings por layer | Aparece na listagem e nos timings |
-| Outras camadas são filtradas/recortadas normalmente | Mesmo recorte/filtragem |
+| Surface is built and kept as an internal mask | Surface is built and exposed as a public layer |
+| Does not appear in `getLayersMetadata()` nor in the per-layer timings | Appears in the listing and in the timings |
+| Other layers are filtered/clipped normally | Same clipping/filtering |
 
-A máscara interna permanece registrada e pode ser inspecionada por `getTablesMetadata()`/`getLayer()`. `workspaceCropLayer` continua apontando para ela para restringir cargas posteriores. **Mudança de comportamento:** omitir surface não desativa mais o clipping final.
+The internal mask stays registered and can be inspected with `getTablesMetadata()`/`getLayer()`. `workspaceCropLayer` keeps pointing to it to restrict later loads. **Behavior change:** omitting surface no longer disables the final clipping.
 
-A `surface` não mantém necessariamente IDs de ways: sua tabela polygonizada armazena geometria e propriedades dos polígonos resultantes.
+The `surface` does not necessarily keep way IDs: its polygonized table stores the geometry and properties of the resulting polygons.
 
-## 12. Filtragem e recorte final
+## 12. Final filtering and clipping
 
-Após extrair as camadas e construir a surface obrigatória, `AutkDb.loadOsm()` processa as outras camadas contra ela, independentemente da exposição pública da máscara.
+After extracting the layers and building the mandatory surface, `AutkDb.loadOsm()` processes the other layers against it, regardless of the public exposure of the mask.
 
-### Dois contratos diferentes
+### Two different contracts
 
-| Camada | Excluir features externas? | Cortar a geometria da feature que cruza a fronteira? |
+| Layer | Exclude external features? | Cut the geometry of a feature that crosses the boundary? |
 |---|---:|---:|
-| Buildings | Sim | **Não** |
-| Parks | Sim | Sim |
-| Water | Sim | Sim |
-| Roads | Sim | Sim |
-| Tag sets: points | Sim | Não se aplica |
-| Tag sets: polylines / polygons | Sim | Sim, descartando componentes de outra dimensão |
+| Buildings | Yes | **No** |
+| Parks | Yes | Yes |
+| Water | Yes | Yes |
+| Roads | Yes | Yes |
+| Tag sets: points | Yes | Not applicable |
+| Tag sets: polylines / polygons | Yes | Yes, discarding components of another dimension |
 
 ```text
-Building que atravessa a surface:
+Building crossing the surface:
 
-       dentro | fora
-     ┌────────┼──────┐
-     │        │      │
-     └────────┼──────┘
+       inside | outside
+     ┌────────┼───────┐
+     │        │       │
+     └────────┼───────┘
               │
 
-Resultado: conservar o building INTEIRO.
+Result: keep the WHOLE building.
 ```
 
-Para buildings, basta que a collection intersecte alguma geometria da surface. Partes fora da surface podem permanecer quando pertencem ao mesmo building que a intersecta.
+For buildings, it is enough for the collection to intersect some surface geometry. Parts outside the surface can remain when they belong to the same building that intersects it.
 
-Para as outras camadas:
+For the other layers:
 
-1. removem-se features sem interseção;
-2. a geometria é intersectada com a união dos polígonos da surface;
-3. removem-se resultados vazios.
+1. features without intersection are removed;
+2. the geometry is intersected with the union of the surface polygons;
+3. empty results are removed.
 
-Esse caminho usa `ST_MakeValid` e `ST_Union_Agg` na preparação do recorte. Isso **não é a união das partes de buildings**: a consolidação de buildings continua sem união/reparo, e a filtragem deles não altera sua geometria.
+This path uses `ST_MakeValid` and `ST_Union_Agg` to prepare the clip. This **is not the union of building parts**: building consolidation remains without union/repair, and their filtering does not change their geometry.
 
-Se uma camada já sofreu interseção com a bbox, ela pode passar por um segundo recorte, agora pela surface real.
+If a layer was already intersected with the bbox, it can go through a second clip, now by the real surface.
 
-## 13. Exportação e uso pelo mapa
+## 13. Export and use by the map
 
-`db.getLayer()` consulta a tabela e monta uma `FeatureCollection`.
+`db.getLayer()` queries the table and assembles a `FeatureCollection`.
 
-| Elemento | Exportação |
+| Element | Export |
 |---|---|
-| Linha armazenada | Uma feature |
-| `geometry` | Serializada com `ST_AsGeoJSON` |
-| `id` | `Feature.id`, quando a tabela fornece esse campo |
-| `properties` | Atributos armazenados |
-| Tipo de camada | `__autk_layer` na raiz da collection |
-| Marker interno no nível da feature | Removido pelo use case de exportação |
+| Stored row | One feature |
+| `geometry` | Serialized with `ST_AsGeoJSON` |
+| `id` | `Feature.id`, when the table provides this field |
+| `properties` | Stored attributes |
+| Layer type | `__autk_layer` at the root of the collection |
+| Internal marker at the feature level | Removed by the export use case |
 
-A exportação padrão não cria uma segunda representação agrupada: o building já está consolidado no banco.
+The default export does not create a second grouped representation: the building is already consolidated in the database.
 
-### 13.1 Exportação opt-in por elemento OSM
+### 13.1 Opt-in export per OSM element
 
-`await db.getLayer('table_osm_buildings', { osmElements: true })` separa os elementos retidos, sem mudar o armazenamento ou a exportação padrão. Cada feature usa `id: 'way/201'` ou `'relation/201'`, as tags próprias do elemento e `properties.osm_type`/`osm_id`; edifícios incluem `building_id` para recuperar a associação ao grupo. As chaves de identidade geradas prevalecem sobre tags de mesmo nome.
+`await db.getLayer('table_osm_buildings', { osmElements: true })` separates the retained elements, without changing the storage or the default export. Each feature uses `id: 'way/201'` or `'relation/201'`, the element's own tags and `properties.osm_type`/`osm_id`; buildings include `building_id` to recover the association with the group. The generated identity keys take precedence over tags of the same name.
 
-A coluna interna JSON `__autk_osm_elements` preserva tipo/ID, tags de origem e índice do componente, sem duplicar coordenadas. Na consolidação, o índice acompanha `geometryIndex`; na exportação, a geometria vem do componente atualmente armazenado. Não se infere identidade pelo tamanho de `refs`. Relações multipolígonas com geometria própria são exportadas como elementos; relações `type=building` de associação não geram uma geometria/feature duplicada. Tags de uma relação proprietária não são inventadas como tags de seus membros.
+The internal JSON column `__autk_osm_elements` keeps type/ID, source tags and component index, without duplicating coordinates. In consolidation, the index follows `geometryIndex`; in export, the geometry comes from the currently stored component. Identity is not inferred from the size of `refs`. Multipolygon relations with their own geometry are exported as elements; association `type=building` relations do not produce a duplicate geometry/feature. The tags of an owning relation are not invented as tags of its members.
 
-As coordenadas já estão transformadas, normalizadas e filtradas/recortadas segundo os contratos da camada; esse modo não recupera a geometria OSM anterior ao recorte nem elementos omitidos por invalidade. Surface, raster, tabelas não OSM e tabelas sem proveniência suficiente mantêm a exportação comum. `updateTable` invalida conservadoramente a proveniência de toda a camada, evitando atribuir tags/índices antigos à geometria alterada; recarregar OSM restaura o modo. Bbox e marker de raiz permanecem como na exportação padrão. A ordem por elemento é `building_id` quando aplicável, tipo OSM e ID numérico.
+The coordinates are already transformed, normalized and filtered/clipped according to the contracts of the layer; this mode does not recover the OSM geometry before clipping nor elements omitted for being invalid. Surface, raster, non-OSM tables and tables without sufficient provenance keep the common export. `updateTable` conservatively invalidates the provenance of the whole layer, avoiding the assignment of old tags/indices to the changed geometry; reloading OSM restores the mode. Bbox and root marker remain as in the default export. The per-element order is `building_id` when applicable, OSM type and numeric ID.
 
-**CRS:** `getLayer()` exporta as coordenadas armazenadas; não faz automaticamente uma conversão de volta para WGS84. No workspace padrão, o resultado usado pelo mapa tem coordenadas projetadas `EPSG:3395`.
+**CRS:** `getLayer()` exports the stored coordinates; it does not automatically convert back to WGS84. In the default workspace, the result used by the map has projected `EPSG:3395` coordinates.
 
-Na renderização, `TriangulatorBuildings` resolve as partes por `geometryIndex`, herda atributos gerais e extruda alturas. Essa extrusão não é uma etapa de importação no DuckDB.
+In rendering, `TriangulatorBuildings` resolves the parts by `geometryIndex`, inherits general attributes and extrudes heights. This extrusion is not an import stage in DuckDB.
 
-Uma altura ausente pode ter fallback de renderização quando configurado; altura explicitamente zero ou inválida não é substituída silenciosamente por altura aleatória.
+A missing height can have a rendering fallback when configured; an explicitly zero or invalid height is not silently replaced by a random height.
 
-Identidades diferentes precisam ser distinguidas:
+Different identities need to be distinguished:
 
-| Identidade | Exemplo | Significado |
+| Identity | Example | Meaning |
 |---|---|---|
-| ID OSM de parte | `289386871` | Way original |
-| ID OSM da relação | String em `osmRelation.id` | Associação declarada no OSM |
-| `Feature.id` padrão / `building_id` | Normalmente o menor ID retido; negativo em colisões entre namespaces | Building armazenado |
-| `Feature.id` com `osmElements` | `way/289386871` | Identidade OSM explícita |
-| Índice de seleção do mapa | Posição de um componente/feature no carregamento | Não necessariamente um ID OSM |
+| OSM ID of a part | `289386871` | Original way |
+| OSM ID of the relation | String in `osmRelation.id` | Association declared in OSM |
+| Default `Feature.id` / `building_id` | Normally the smallest retained ID; negative on collisions between namespaces | Stored building |
+| `Feature.id` with `osmElements` | `way/289386871` | Explicit OSM identity |
+| Map selection index | Position of a component/feature in loading | Not necessarily an OSM ID |
 
-Para investigar seleção, compare as partes da feature selecionada e seu ownership, não apenas o número exibido pelo picking.
+To investigate selection, compare the parts of the selected feature and their ownership, not just the number shown by picking.
 
-## 14. Temporários, erros e limpeza
+## 14. Temporaries, errors and cleanup
 
-### Ciclo de vida das tabelas
+### Table lifecycle
 
-| Recurso | Durante a importação | No sucesso |
+| Resource | During the import | On success |
 |---|---|---|
-| `table_osm` | Staging bruto temático | Removido |
-| `table_osm_boundaries` | Staging das fronteiras | Removido |
-| Temporárias SQL de refs/nodes | Auxílio na montagem das camadas | Reutilizadas/substituídas; associadas à conexão DuckDB |
-| `table_osm_surface` | Linhas, depois polígonos e máscara costeira | Mantida; escondida das layers públicas quando não solicitada |
-| `table_osm_parks`, `_water`, `_roads` | Camadas temáticas | Mantidas |
-| `table_osm_buildings` | Partes, depois entities consolidadas | Mantida |
-| JSON de mapeamento de buildings | IDs e atributos para consolidar | Arquivo VFS removido em `finally` |
+| `table_osm` | Thematic raw staging | Removed |
+| `table_osm_boundaries` | Boundary staging | Removed |
+| SQL temporaries for refs/nodes | Help assembling the layers | Reused/replaced; tied to the DuckDB connection |
+| `table_osm_surface` | Lines, then polygons and coastal mask | Kept; hidden from the public layers when not requested |
+| `table_osm_parks`, `_water`, `_roads` | Thematic layers | Kept |
+| `table_osm_buildings` | Parts, then consolidated entities | Kept |
+| Building mapping JSON | IDs and attributes to consolidate | VFS file removed in `finally` |
 
-### Garantias e limites
+### Guarantees and limits
 
-- A substituição da tabela de buildings usa `BEGIN TRANSACTION`, `COMMIT` e `ROLLBACK`.
-- A importação completa de todas as camadas **não é uma única transação**.
-- Após o importador devolver suas tabelas brutas, `AutkDb.loadOsm()` envolve registro, bbox, extração e recorte em `try/finally`.
-- Esse `finally` tenta remover as duas tabelas brutas tanto no sucesso quanto após erro de processamento.
-- Se um DROP falha, há aviso; os metadados daquela tabela são mantidos, e a limpeza da outra é tentada.
-- A limpeza não remove deliberadamente as camadas finais já criadas e não mascara o erro original de processamento.
-- Falhas dentro do importador, **antes de ele retornar as tabelas**, não estão cobertas por esse mesmo `finally`.
-- Subprocessos têm seus próprios temporários e estratégias de limpeza. Não existe uma garantia geral de rollback/remoção de todo recurso intermediário para qualquer ponto de falha; por exemplo, a polygonização da surface tem uma sequência própria de DROP, registro e recriação.
+- Replacing the buildings table uses `BEGIN TRANSACTION`, `COMMIT` and `ROLLBACK`.
+- The complete import of all layers **is not a single transaction**.
+- After the importer returns its raw tables, `AutkDb.loadOsm()` wraps registration, bbox, extraction and clipping in `try/finally`.
+- That `finally` tries to remove the two raw tables both on success and after a processing error.
+- If a DROP fails, there is a warning; the metadata of that table is kept, and cleanup of the other one is attempted.
+- Cleanup deliberately does not remove the final layers already created and does not mask the original processing error.
+- Failures inside the importer, **before it returns the tables**, are not covered by that same `finally`.
+- Subprocesses have their own temporaries and cleanup strategies. There is no general guarantee of rollback/removal of every intermediate resource for any failure point; for example, surface polygonization has its own sequence of DROP, registration and recreation.
 
-### Métricas retornadas
+### Returned metrics
 
-`loadOsm()` retorna contagens de elementos, tempos de processamento e entradas por camada solicitada. A surface interna não solicitada não acrescenta uma entrada aos timings.
+`loadOsm()` returns element counts, processing times and entries per requested layer. The internal surface, when not requested, does not add an entry to the timings.
 
-Para camadas temáticas tradicionais, a `featureCount` de cada entrada é medida logo após a extração, **antes** do recorte final; para surface, também antes de sua polygonização. Não é necessariamente a contagem final obtida por `getLayer()`. Entradas de `tagSets` incluem `tagSet` e contam as features **depois** do clipping e da remoção de componentes incompatíveis; seu tempo inclui extração, normalização e recorte, sem HTTP.
+For traditional thematic layers, the `featureCount` of each entry is measured right after extraction, **before** the final clip; for surface, also before its polygonization. It is not necessarily the final count obtained by `getLayer()`. `tagSets` entries include `tagSet` and count the features **after** clipping and the removal of incompatible components; their time includes extraction, normalization and clipping, without HTTP.
 
-## 15. Paridade entre fontes e diagnóstico
+## 15. Source parity and diagnosis
 
-### O que é comum e o que é diferente
+### What is common and what is different
 
-| Aspecto | Overpass | PBF |
+| Aspect | Overpass | PBF |
 |---|---|---|
-| Fonte | Resposta remota, normalmente do estado atual | Snapshot contido no arquivo |
-| Cache específico | Cache combinado com TTL de 24h | Não usa esse cache; pode haver cache HTTP do arquivo |
-| Descoberta do escopo | Relações de limite OSM por nome dentro de `geocodeArea`, convertidas com `map_to_area` | Mesmo critério com geometria de região utilizável; caso contrário, aviso e fallback aos nomes de limites de `areas` |
-| Pré-seleção espacial | Filtros Overpass de área e tiles de buildings | Sobreposição de bbox de ways e retenção de relações/membros |
-| Geometria inicial dos ways | Inline na resposta | Resolvida a partir de nodes |
-| Membros externos | Ways membros retornados pelas consultas | Somente membros disponíveis no arquivo |
-| Normalização e staging | Pipeline comum | Pipeline comum |
-| Construção de camadas e CRS | Código comum | Código comum |
-| Ownership e consolidação | Código comum | Código comum |
-| Recorte e exportação | Código comum | Código comum |
+| Source | Remote response, normally of the current state | Snapshot contained in the file |
+| Specific cache | Combined cache with a 24h TTL | Does not use that cache; there can be an HTTP cache of the file |
+| Scope discovery | OSM boundary relations by name inside `geocodeArea`, converted with `map_to_area` | Same criterion with a usable region geometry; otherwise, a warning and fallback to the boundary names of `areas` |
+| Spatial preselection | Overpass area filters and building tiles | Overlap of way bboxes and retention of relations/members |
+| Initial way geometry | Inline in the response | Resolved from nodes |
+| External members | Member ways returned by the queries | Only members available in the file |
+| Normalization and staging | Common pipeline | Common pipeline |
+| Layer construction and CRS | Common code | Common code |
+| Ownership and consolidation | Common code | Common code |
+| Clipping and export | Common code | Common code |
 
-### Condições para igualdade
+### Conditions for equality
 
-A comparação deve controlar:
+The comparison must control:
 
-1. mesmo snapshot OSM;
-2. mesmas fronteiras, não apenas nomes semelhantes;
-3. mesmas camadas, ordem e parâmetros;
-4. mesmo CRS de entrada e workspace;
-5. referências completas de ways, nodes e relações relevantes;
-6. ausência de respostas antigas no cache;
-7. equivalência dos candidatos efetivamente adquiridos.
+1. same OSM snapshot;
+2. same boundaries, not just similar names;
+3. same layers, order and parameters;
+4. same input and workspace CRS;
+5. complete references of the relevant ways, nodes and relations;
+6. absence of old responses in the cache;
+7. equivalence of the candidates actually acquired.
 
-A última condição importa porque os seletores espaciais dos dois importadores não são implementações idênticas. Um teste de bbox local não equivale por definição ao filtro de área do Overpass.
+The last condition matters because the spatial selectors of the two importers are not identical implementations. A local bbox test is not by definition equivalent to the Overpass area filter.
 
-**A garantia exercitada pelos testes atuais é:** para entradas selecionadas equivalentes, as duas representações de fonte passam pela API pública e produzem o mesmo conteúdo de camadas. Isso não é uma certificação de identidade entre qualquer consulta live e qualquer PBF arbitrário.
+**The guarantee exercised by the current tests is:** for equivalent selected inputs, the two source representations go through the public API and produce the same layer content. This is not a certification of identity between any live query and any arbitrary PBF.
 
-A comparação de collections deve normalizar a ordem das features quando necessário. `getLayer()` não promete uma ordenação global por ID.
+Comparing collections must normalize the order of features when necessary. `getLayer()` does not promise a global ordering by ID.
 
-### Dois exemplos investigados
+### Two investigated examples
 
-| Sintoma | Causa encontrada | Tratamento |
+| Symptom | Cause found | Treatment |
 |---|---|---|
-| Seleção de building abrangia entidades diferentes entre API e PBF | Overpass não coletava relações somente `type=building`, perdendo ownership | Seletores agrupados/tiled corrigidos e cache versionado |
-| Topo e corpo de um mesmo building separados | Ways `building:part` ausentes da relação, mas contidos no outline | Associação por containment único, com proveniência |
-| Área de água menor no PBF | Upper New York Bay, relação `2389632`, com 45 dos 59 ways membros ausentes no arquivo investigado | Não inventar coordenadas; obter um extrato completo/equivalente |
+| Building selection covered different entities between API and PBF | Overpass did not collect relations that were only `type=building`, losing ownership | Grouped/tiled selectors fixed and versioned cache |
+| Top and body of the same building separated | `building:part` ways missing from the relation, but contained in the outline | Association by unique containment, with provenance |
+| Smaller water area in the PBF | Upper New York Bay, relation `2389632`, with 45 of the 59 member ways missing in the investigated file | Do not invent coordinates; obtain a complete/equivalent extract |
 
-O caso da água é uma observação sobre `gallery/public/data/lower_mnt.osm.pbf`, não uma regra universal de PBF. Um arquivo diferente pode ter todas as referências necessárias.
+The water case is an observation about `gallery/public/data/lower_mnt.osm.pbf`, not a universal PBF rule. A different file can have all the needed references.
 
-### Roteiro para investigar uma diferença
+### Checklist to investigate a difference
 
 ```text
-1. Comparar parâmetros e origem/snapshot
-2. Conferir cache e forceRefresh
-3. Comparar relações de fronteira e bbox
-4. Comparar elementos por (type, id), tags e membros
-5. Conferir completude dos refs dos ways e das relações
-6. Comparar geometrias antes de consolidação/recorte
-7. Comparar ownership explícito e inferredParts
-8. Comparar camadas finais por IDs, partes, geometria e atributos
-9. Só então investigar triangulação, picking e renderização
+1. Compare parameters and source/snapshot
+2. Check cache and forceRefresh
+3. Compare boundary relations and bbox
+4. Compare elements by (type, id), tags and members
+5. Check the completeness of the refs of ways and relations
+6. Compare geometries before consolidation/clipping
+7. Compare explicit ownership and inferredParts
+8. Compare final layers by IDs, parts, geometry and attributes
+9. Only then investigate triangulation, picking and rendering
 ```
 
-Não é suficiente comparar contagens totais ou imagens: duas camadas podem ter a mesma contagem e associar partes a entidades diferentes.
+Comparing total counts or images is not enough: two layers can have the same count and associate parts with different entities.
 
-## 16. Testes e mapa do código
+## 16. Tests and code map
 
-### Testes relacionados à importação
+### Tests related to the import
 
-| Arquivo | Cobertura relevante |
+| File | Relevant coverage |
 |---|---|
-| [`building-import-pipeline.test.ts`](../autk-db/test/building-import-pipeline.test.ts) | Decoder PBF, fronteiras, bbox, normalização, staging, relações, importação pública, recorte, limpeza e paridade das cinco camadas |
-| [`building-model.test.ts`](../autk-db/test/building-model.test.ts) | Consolidação, WKB, atributos, ownership inferido, ambiguidades e exclusão subterrânea |
-| [`building-roundtrip.test.ts`](../autk-db/test/building-roundtrip.test.ts) | Import/export/update GeoJSON, IDs e validação de geometrias; é uma rota de importação distinta do OSM |
-| [`building-api.test.ts`](../autk-db/test/building-api.test.ts) | API pública e integração de camadas de buildings |
-| [`geometry-collection.test.ts`](../autk-db/test/geometry-collection.test.ts) | Predicados e comportamento espacial de collections no DuckDB |
-| [`spatial-join-features.test.ts`](../autk-db/test/spatial-join-features.test.ts) | Joins por entidade, preservação de IDs e ausência de matches |
+| [`building-import-pipeline.test.ts`](../autk-db/test/building-import-pipeline.test.ts) | PBF decoder, boundaries, bbox, normalization, staging, relations, public import, clipping, cleanup and parity of the five layers |
+| [`building-model.test.ts`](../autk-db/test/building-model.test.ts) | Consolidation, WKB, attributes, inferred ownership, ambiguities and underground exclusion |
+| [`building-roundtrip.test.ts`](../autk-db/test/building-roundtrip.test.ts) | GeoJSON import/export/update, IDs and geometry validation; it is an import route distinct from OSM |
+| [`building-api.test.ts`](../autk-db/test/building-api.test.ts) | Public API and integration of building layers |
+| [`geometry-collection.test.ts`](../autk-db/test/geometry-collection.test.ts) | Predicates and spatial behavior of collections in DuckDB |
+| [`spatial-join-features.test.ts`](../autk-db/test/spatial-join-features.test.ts) | Joins by entity, preservation of IDs and absence of matches |
 
-A paridade usa uma fixture sintética comprimida e o snapshot real selecionado do PBF da gallery, reapresentado como relações e ways inline do Overpass. As respostas remotas são adaptadas nos testes; DuckDB, montagem, CRS, consolidação, recorte e exportação são reais.
+Parity uses a compressed synthetic fixture and the real selected snapshot of the gallery PBF, presented again as Overpass relations and inline ways. The remote responses are adapted in the tests; DuckDB, assembly, CRS, consolidation, clipping and export are real.
 
-Isso **não executa uma consulta live completa ao Overpass**, nem valida picking/GPU no navegador.
+This **does not run a complete live Overpass query**, nor does it validate picking/GPU in the browser.
 
-Comandos na raiz:
+Commands at the root:
 
 ```bash
 npm test -- autk-db/test/building-import-pipeline.test.ts
@@ -908,38 +908,38 @@ make verify
 make package-validate
 ```
 
-Os testes de banco usam DuckDB-WASM em Node e precisam de acesso à extensão spatial. Não presumir execução offline sem provisionamento dessa extensão.
+The database tests use DuckDB-WASM in Node and need access to the spatial extension. Do not assume offline execution without provisioning that extension.
 
-### Onde encontrar cada etapa
+### Where to find each stage
 
-| Responsabilidade | Código |
+| Responsibility | Code |
 |---|---|
-| Orquestração pública, contexto, filtro final e limpeza bruta | [`autk-db/src/db.ts`](../autk-db/src/db.ts): `loadOsm`, `clipLayerToLayer` |
-| Consultas, tiles, cache e retries da API | [`load-osm-overpass/use-case.ts`](../autk-db/src/use-cases/load-osm-overpass/use-case.ts) |
-| Leituras e seleção do PBF | [`load-osm-pbf/use-case.ts`](../autk-db/src/use-cases/load-osm-pbf/use-case.ts) |
-| Decoder de elementos e resolução de ways | [`osm-pbf-parser.ts`](../autk-db/src/use-cases/load-osm-pbf/osm-pbf-parser.ts) |
-| Separação, classificação e normalização | [`process-osm/pipeline.ts`](../autk-db/src/internal/process-osm/pipeline.ts) |
-| Schema e inserção do staging | [`load-osm-overpass/queries.ts`](../autk-db/src/use-cases/load-osm-overpass/queries.ts) |
-| Regras temáticas | [`consts.ts`](../autk-db/src/consts.ts) |
-| Bbox das fronteiras | [`get-osm-bbox/`](../autk-db/src/internal/get-osm-bbox/) |
-| SQL de extração de ways | [`load-osm-layer/queries.ts`](../autk-db/src/use-cases/load-osm-layer/queries.ts) |
-| Configuração por camada | [`osm-processing-config.ts`](../autk-db/src/use-cases/load-osm-layer/osm-processing-config.ts) |
-| Montagem de relações e leitura de ownership | [`load-osm-layer/use-case.ts`](../autk-db/src/use-cases/load-osm-layer/use-case.ts) |
-| Consolidação e inferência de buildings | [`process-osm-buildings/use-case.ts`](../autk-db/src/internal/process-osm-buildings/use-case.ts) |
-| SQL de containment e GeometryCollection | [`process-osm-buildings/queries.ts`](../autk-db/src/internal/process-osm-buildings/queries.ts) |
-| Clustering 2D dos ways restantes | [`autk-core/src/utils-geojson.ts`](../autk-core/src/utils-geojson.ts): `computeIntersectingClusterIds` |
-| Polygonização da surface | [`process-osm-surface/use-case.ts`](../autk-db/src/internal/process-osm-surface/use-case.ts) |
-| Exportação de GeoJSON | [`get-layer/`](../autk-db/src/use-cases/get-layer/) |
-| Associação geometria/atributos para renderização | [`autk-core/src/building-feature.ts`](../autk-core/src/building-feature.ts) |
+| Public orchestration, context, final filter and raw cleanup | [`autk-db/src/db.ts`](../autk-db/src/db.ts): `loadOsm`, `clipLayerToLayer` |
+| API queries, tiles, cache and retries | [`load-osm-overpass/use-case.ts`](../autk-db/src/use-cases/load-osm-overpass/use-case.ts) |
+| PBF reads and selection | [`load-osm-pbf/use-case.ts`](../autk-db/src/use-cases/load-osm-pbf/use-case.ts) |
+| Element decoder and way resolution | [`osm-pbf-parser.ts`](../autk-db/src/use-cases/load-osm-pbf/osm-pbf-parser.ts) |
+| Separation, classification and normalization | [`process-osm/pipeline.ts`](../autk-db/src/internal/process-osm/pipeline.ts) |
+| Staging schema and insertion | [`load-osm-overpass/queries.ts`](../autk-db/src/use-cases/load-osm-overpass/queries.ts) |
+| Thematic rules | [`consts.ts`](../autk-db/src/consts.ts) |
+| Boundaries bbox | [`get-osm-bbox/`](../autk-db/src/internal/get-osm-bbox/) |
+| Way extraction SQL | [`load-osm-layer/queries.ts`](../autk-db/src/use-cases/load-osm-layer/queries.ts) |
+| Per-layer configuration | [`osm-processing-config.ts`](../autk-db/src/use-cases/load-osm-layer/osm-processing-config.ts) |
+| Relation assembly and ownership reading | [`load-osm-layer/use-case.ts`](../autk-db/src/use-cases/load-osm-layer/use-case.ts) |
+| Building consolidation and inference | [`process-osm-buildings/use-case.ts`](../autk-db/src/internal/process-osm-buildings/use-case.ts) |
+| Containment and GeometryCollection SQL | [`process-osm-buildings/queries.ts`](../autk-db/src/internal/process-osm-buildings/queries.ts) |
+| 2D clustering of the remaining ways | [`autk-core/src/utils-geojson.ts`](../autk-core/src/utils-geojson.ts): `computeIntersectingClusterIds` |
+| Surface polygonization | [`process-osm-surface/use-case.ts`](../autk-db/src/internal/process-osm-surface/use-case.ts) |
+| GeoJSON export | [`get-layer/`](../autk-db/src/use-cases/get-layer/) |
+| Geometry/attribute association for rendering | [`autk-core/src/building-feature.ts`](../autk-core/src/building-feature.ts) |
 
-### Resumo dos contratos
+### Summary of the contracts
 
-- API e PBF convergem para o mesmo processamento depois da aquisição.
-- Referências, tipos e roles são essenciais; não basta coletar polygons com tags de building.
-- `type=building` fornece ownership e atributos, não uma geometria sobreposta extra.
-- Um building armazena suas partes originais numa única feature.
-- Partes órfãs só recebem ownership inferido quando a contenção é inequívoca.
-- Buildings são filtrados pela surface, mas não cortados.
-- Outras camadas podem sofrer recorte e reparo no caminho de clipping.
-- Dados ausentes ou snapshots diferentes impedem afirmar paridade absoluta.
-- Importação, análise espacial e renderização são etapas distintas.
+- API and PBF converge on the same processing after acquisition.
+- References, types and roles are essential; collecting polygons with building tags is not enough.
+- `type=building` provides ownership and attributes, not an extra overlapping geometry.
+- A building stores its original parts in a single feature.
+- Orphan parts receive inferred ownership only when containment is unambiguous.
+- Buildings are filtered by the surface, but not cut.
+- Other layers can be clipped and repaired in the clipping path.
+- Missing data or different snapshots prevent claiming absolute parity.
+- Import, spatial analysis and rendering are distinct stages.
