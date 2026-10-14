@@ -83,3 +83,11 @@ export const EXCLUDED_ROADS_VALUES = ['cycleway', 'elevator', 'footway', 'steps'
  * Removes minor service structures and auxiliary buildings from default building extraction.
  */
 export const EXCLUDED_BUILDING_VALUES = ['shed', 'garage', 'garages', 'carport', 'hut', 'kiosk', 'toilets', 'service', 'transformer_tower', 'sty', 'container'] as const;
+
+/**
+ * Roles that list a way or multipolygon as an outline or part of an OSM `type=building` relation.
+ *
+ * A member with another role (such as `roof` or `column`) is a part only when the building layer
+ * selects it by its own tags; any other such member adds nothing.
+ */
+export const OSM_BUILDING_MEMBER_ROLES: readonly string[] = ['', 'part', 'outline', 'outer'];

@@ -2,14 +2,15 @@ import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import type { Geometry } from 'geojson';
 import { computeIntersectingClusterIds } from '@urban-toolkit/autk-core';
 import { Column } from '../../interfaces';
-import { DEFAULT_WORKSPACE_NAME, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, OSM_BUILDING_MEMBER_ROLES, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { ProcessOsmBuildingsParams } from './interfaces';
 import { SELECT_BUILDING_GEOMETRY_QUERY, SELECT_ORPHAN_OUTLINE_OWNERS_QUERY, COLLECT_BUILDING_PARTS_QUERY } from './queries';
 
 /**
  * Collects original OSM building parts into one stored feature per building.
- * Explicit building relations own their member ways, including disconnected parts.
+ * Explicit building relations own their member ways and multipolygons, including disconnected parts;
+ * a member with a role other than outline or part is a part only when it is a building by its own tags.
  * Orphan building:part ways covered by one relation outline inherit its ownership.
  * Remaining unassociated ways retain intersection-based grouping; shapes are never unioned.
  * Building IDs are minimum internal part keys, normally the minimum source ID, not transient cluster indices.
@@ -36,6 +37,8 @@ export class ProcessOsmBuildingsUseCase {
     const hasOsmMetadata = inputColumns.some(column => column.name === OSM_ELEMENT_METADATA_COLUMN);
     const rows = (await this.conn.query(SELECT_BUILDING_GEOMETRY_QUERY(qualifiedTableName, hasOsmMetadata))).toArray();
     const typesById = new Map(rows.map(row => [String(row.id), row.osm_type]));
+    // Multipolygon members resolve by OSM ID; their internal key is negated when it collides with a way ID.
+    const relationKeys = new Map(rows.filter(row => row.osm_type === 'relation').map(row => [String(row.osm_id), String(row.id)]));
     if (new Set(rows.map(row => String(row.id))).size !== rows.length) {
       throw new Error('OSM building part IDs must be unique');
     }
@@ -44,7 +47,7 @@ export class ProcessOsmBuildingsUseCase {
     for (const row of rows) {
       const properties = row.properties_json == null ? {} : JSON.parse(row.properties_json);
       if (properties.location === 'underground') {
-        if (row.osm_type === 'way') undergroundPartIds.add(String(row.id));
+        undergroundPartIds.add(String(row.id));
         console.warn(`[autk-db] Skipping OSM building part ${String(row.id)} in ${qualifiedTableName}: location=underground is excluded from the surface building layer.`);
         continue;
       }
@@ -60,12 +63,22 @@ export class ProcessOsmBuildingsUseCase {
     }
 
     const itemsById = new Map(items.map(item => [item.id, item]));
+    // A key stands only for a row of the member's own type: way and relation IDs never satisfy each other.
+    const isType = (member: { id: string; type?: string }) => typesById.get(member.id) === (member.type ?? 'way');
+    // Parts by internal key. A member with another role (roof, column, ...) is a part only when the building
+    // layer selects it by its own tags; anything else, such as a roof line or an untagged area, adds nothing.
+    // Invalid membership keeps all members for omission, even when their last role would normally be ignored.
+    const relations = (params.relations ?? []).map(relation => ({ relation, members: relation.members
+      .map(member => ({ ...member, osmId: member.id,
+        id: member.type === 'relation' ? relationKeys.get(member.id) ?? `relation/${member.id}` : member.id }))
+      .filter(member => relation.skipReason !== undefined || OSM_BUILDING_MEMBER_ROLES.includes(member.role)
+        || (isType(member) && itemsById.get(member.id)?.properties.__autk_layer === 'buildings')) }));
     const ownership = new Map<string, string>();
     const relationProperties = new Map<string, Record<string, unknown>>();
     const skippedRelations = new Set<string>();
-    for (const relation of params.relations ?? []) {
+    for (const { relation, members } of relations) {
       if (relationProperties.has(relation.id)) throw new Error(`Duplicate OSM building relation ${relation.id}`);
-      const skipReason = relation.skipReason ?? (relation.members.length === 0 ? 'no way members' : undefined);
+      const skipReason = relation.skipReason ?? (members.length === 0 ? 'no way members' : undefined);
       if (skipReason) {
         skippedRelations.add(relation.id);
         console.warn(`[autk-db] Skipping OSM building relation ${relation.id} in ${qualifiedTableName}: ${skipReason}; all direct member ways omitted to avoid a partial building.`);
@@ -74,19 +87,22 @@ export class ProcessOsmBuildingsUseCase {
         skippedRelations.add(relation.id);
         console.warn(`[autk-db] Skipping OSM building relation ${relation.id} in ${qualifiedTableName}: location=underground is excluded from the surface building layer.`);
       }
-      const unusableMembers = relation.members.filter(member => (!itemsById.has(member.id) || typesById.get(member.id) !== 'way')
-        && !undergroundPartIds.has(member.id));
+      const unusableMembers = members.filter(member => (!itemsById.has(member.id) || !isType(member))
+        && !(undergroundPartIds.has(member.id) && isType(member)));
       if (unusableMembers.length > 0) {
         skippedRelations.add(relation.id);
-        console.warn(`[autk-db] Skipping OSM building relation ${relation.id} in ${qualifiedTableName}: missing or unusable geometry for ways ${unusableMembers.map(member => member.id).join(', ')}; all member ways omitted to avoid a partial building.`);
+        const ways = unusableMembers.filter(member => !member.type).map(member => member.osmId);
+        const multipolygons = unusableMembers.filter(member => member.type).map(member => member.osmId);
+        const unusable = [ways.length ? `ways ${ways.join(', ')}` : '', multipolygons.length ? `relations ${multipolygons.join(', ')}` : ''];
+        console.warn(`[autk-db] Skipping OSM building relation ${relation.id} in ${qualifiedTableName}: missing or unusable geometry for ${unusable.filter(Boolean).join(' and ')}; all member ways omitted to avoid a partial building.`);
       }
-      for (const member of relation.members) {
-        if (typesById.get(member.id) === 'relation') continue; // A relation cannot satisfy an absent way with the same ID.
+      for (const member of members) {
+        if (typesById.has(member.id) && !isType(member)) continue; // A relation cannot satisfy an absent way with the same ID.
         const owner = ownership.get(member.id);
         if (owner && owner !== relation.id) {
           skippedRelations.add(owner);
           skippedRelations.add(relation.id);
-          console.warn(`[autk-db] Skipping OSM building relations ${owner}, ${relation.id} in ${qualifiedTableName}: way ${member.id} has conflicting ownership; all member ways omitted.`);
+          console.warn(`[autk-db] Skipping OSM building relations ${owner}, ${relation.id} in ${qualifiedTableName}: ${member.type ?? 'way'} ${member.osmId} has conflicting ownership; all member ways omitted.`);
         } else {
           ownership.set(member.id, relation.id);
         }
@@ -100,10 +116,10 @@ export class ProcessOsmBuildingsUseCase {
     const retainedItems = items.filter(item => !skippedRelations.has(ownership.get(item.id)!));
     // Only explicit outlines (or untyped/outer members tagged as whole buildings) define containment.
     // Never use ordinary member parts, invalid/skipped relations or inferred parts as new outlines.
-    const outlines = (params.relations ?? []).filter(relation => !skippedRelations.has(relation.id))
-      .flatMap(relation => relation.members.filter(member => {
+    const outlines = relations.filter(({ relation }) => !skippedRelations.has(relation.id))
+      .flatMap(({ relation, members }) => members.filter(member => {
         const item = itemsById.get(member.id);
-        if (!item || typesById.get(item.id) !== 'way') return false;
+        if (!item || !isType(member)) return false;
         const tags = item.properties;
         return member.role === 'outline' || ((member.role === '' || member.role === 'outer')
           && !!tags.building && tags.building !== 'no' && (!tags['building:part'] || tags['building:part'] === 'no'));

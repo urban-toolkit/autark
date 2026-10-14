@@ -1,5 +1,5 @@
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
-import { DEFAULT_WORKSPACE_NAME, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, OSM_BUILDING_MEMBER_ROLES, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 
 type Params = {
   tableName: string;
@@ -208,18 +208,20 @@ const GET_WATER = (tableName: string) => `
 
 /**
  * SQL producer that selects building ways from a raw OSM table.
+ * Outline and part members of building relations join even untagged; members with other roles join only by their own tags.
  */
 const GET_BUILDINGS = (tableName: string) => `
   CREATE OR REPLACE TEMP TABLE buildings AS
     WITH relation_members AS (
-      SELECT UNNEST(refs) AS member_id, UNNEST(ref_types) AS member_type
+      SELECT UNNEST(refs) AS member_id, UNNEST(ref_types) AS member_type, UNNEST(ref_roles) AS member_role
       FROM ${tableName}
       WHERE kind = 'relation' AND map_extract(tags, 'type')[1] = 'building'
     )
     SELECT id, tags, refs FROM ${tableName} w
       WHERE kind = 'way' AND (
         map_extract(tags, '__autk_layer')[1] = 'buildings'
-        OR EXISTS (SELECT 1 FROM relation_members m WHERE m.member_type = 'way' AND m.member_id = w.id)
+        OR EXISTS (SELECT 1 FROM relation_members m WHERE m.member_type = 'way' AND m.member_id = w.id
+          AND COALESCE(m.member_role, '') IN (${OSM_BUILDING_MEMBER_ROLES.map(role => `'${role}'`).join(', ')}))
       );
 `;
 
