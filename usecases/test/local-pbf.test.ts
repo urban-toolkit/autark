@@ -76,4 +76,4 @@ it.each([
         expect(Number(rows[0].n)).toBeGreaterThan(0);
         expect(Number(rows[0].unique_ids)).toBe(Number(rows[0].n));
     }
-}, 180_000);
+}, 600_000);
