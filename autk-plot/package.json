@@ -32,27 +32,16 @@
     "doc:watch": "typedoc --options typedoc.json --watch"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.71.1",
-    "@typescript-eslint/parser": "^8.71.1",
-    "eslint": "^10.12.0",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.13.0",
-    "prettier": "^3.9.9",
-    "ts-loader": "^9.6.2",
+    "prettier": "^3.9.10",
     "typedoc": "^0.28.20",
-    "typedoc-plugin-markdown": "^4.13.1",
-    "typedoc-theme-oxide": "^0.3.0",
+    "typedoc-plugin-markdown": "^4.14.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-dts": "^5.1.2"
   },
   "dependencies": {
     "@types/d3": "^7.4.3",
-    "@turf/turf": "^7.4.0",
     "@urban-toolkit/autk-core": "4.1.0",
-    "d3": "^7.9.0",
-    "vega": "^6.4.0",
-    "vega-embed": "^7.3.0",
-    "vega-lite": "^6.5.0"
+    "d3": "^7.9.0"
   }
 }

@@ -26,6 +26,8 @@ try {
     const imports = specifiers.map((name, i) => `import * as pkg${i} from '${name}';`).join('\n');
     writeFileSync(resolve(consumer, 'index.ts'), `${imports}\nconsole.log(${specifiers.map((_, i) => `pkg${i}`).join(', ')});\n
         export function configureRenderSizes(map: import('@urban-toolkit/autk-map').AutkMap) {
+            const debug: import('@urban-toolkit/autk-map').TerrainDebugOptions = { showMesh: true };
+            map.updateTerrainDebug(debug);
             map.updateRenderInfo('lines', { renderInfo: { polylinesWidth: 12 } });
             map.updateRenderInfo('points', { renderInfo: { pointSize: 120 } });
         }
@@ -57,9 +59,28 @@ try {
         assert.equal(compute.ComputeGpgpu, ComputeGpgpu);
     `);
     execFileSync(process.execPath, [resolve(consumer, 'node.mjs')], { cwd: consumer, stdio: 'inherit' });
-    await build({ root: consumer, configFile: false,
-        build: { outDir: resolve(consumer, 'dist'), rolldownOptions: { input: resolve(consumer, 'index.ts') } },
+    const bundle = await build({ root: consumer, configFile: false,
+        build: {
+            outDir: resolve(consumer, 'dist'),
+            emptyOutDir: true,
+            rolldownOptions: {
+                input: resolve(consumer, 'index.ts'),
+                output: {
+                    codeSplitting: {
+                        groups: [{ name: 'dependencies', test: /[\\/]node_modules[\\/]/,
+                            maxSize: 350_000, entriesAware: true }],
+                    },
+                },
+            },
+        },
     });
+    for (const output of Array.isArray(bundle) ? bundle : [bundle]) {
+        for (const chunk of output.output) {
+            if (chunk.type === 'chunk' && Buffer.byteLength(chunk.code) > 500_000) {
+                throw new Error(`${chunk.fileName}: browser chunk exceeds Vite's default 500 kB limit`);
+            }
+        }
+    }
     console.log('Isolated package types, Node imports, and browser bundle passed.');
 } finally {
     rmSync(consumer, { recursive: true, force: true });

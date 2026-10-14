@@ -1,14 +1,36 @@
 import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { loadConfigFromFile } from 'vite';
 import { describe, expect, it } from 'vitest';
 
-it('cleans every workspace before removing root tools and preserves the lockfile', () => {
-  const commands = execFileSync('make', ['-n', 'clean'], { encoding: 'utf8' });
-  expect(commands).not.toContain('package-lock.json');
-  expect(commands.trim().split('\n').at(-1)).toBe('./node_modules/.bin/rimraf node_modules');
-  for (const dir of ['autk-core', 'autk-map', 'autk-db', 'autk-plot', 'autk-compute', 'autk', 'gallery', 'usecases']) {
-    expect(commands).toContain(`cd ${dir} && .././node_modules/.bin/rimraf dist build node_modules`);
+it('cleans every workspace without installed tools and preserves sources and the lockfile', () => {
+  const fixture = mkdtempSync(resolve(tmpdir(), 'autark-clean-'));
+  const workspaces = ['autk-core', 'autk-map', 'autk-db', 'autk-plot', 'autk-compute', 'autk', 'gallery', 'usecases'];
+  try {
+    writeFileSync(resolve(fixture, 'package-lock.json'), '{}');
+    for (const dir of workspaces) {
+      for (const artifact of ['dist', 'build', 'node_modules']) {
+        mkdirSync(resolve(fixture, dir, artifact), { recursive: true });
+        writeFileSync(resolve(fixture, dir, artifact, 'fixture'), '');
+      }
+      writeFileSync(resolve(fixture, dir, 'source.ts'), '');
+    }
+    execFileSync('make', ['-f', resolve('Makefile'), 'clean'], { cwd: fixture });
+    mkdirSync(resolve(fixture, 'node_modules'));
+    execFileSync('make', ['-f', resolve('Makefile'), 'clean'], { cwd: fixture });
+    execFileSync('make', ['-f', resolve('Makefile'), 'clean'], { cwd: fixture });
+    expect(existsSync(resolve(fixture, 'node_modules'))).toBe(false);
+    expect(existsSync(resolve(fixture, 'package-lock.json'))).toBe(true);
+    for (const dir of workspaces) {
+      expect(existsSync(resolve(fixture, dir, 'source.ts'))).toBe(true);
+      for (const artifact of ['dist', 'build', 'node_modules']) {
+        expect(existsSync(resolve(fixture, dir, artifact))).toBe(false);
+      }
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
   }
 });
 

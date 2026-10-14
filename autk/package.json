@@ -65,7 +65,7 @@
     "@urban-toolkit/autk-plot": "4.1.0"
   },
   "devDependencies": {
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-dts": "^5.1.2"

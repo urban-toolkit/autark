@@ -36,16 +36,9 @@
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
-    "@types/rbush": "^4.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.71.1",
-    "@typescript-eslint/parser": "^8.71.1",
-    "eslint": "^10.12.0",
-    "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.9.9",
-    "tsx": "^4.23.15",
+    "prettier": "^3.9.10",
     "typedoc": "^0.28.20",
-    "typedoc-plugin-markdown": "^4.13.1",
-    "typedoc-theme-oxide": "^0.3.0",
+    "typedoc-plugin-markdown": "^4.14.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-dts": "^5.1.2"
@@ -54,11 +47,9 @@
     "@types/emscripten": "^1.41.6",
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@osmix/pbf": "^0.0.10",
-    "@osmix/shared": "^0.0.13",
     "@turf/turf": "^7.4.0",
     "@urban-toolkit/autk-core": "4.1.0",
     "apache-arrow": "^21.2.0",
-    "geotiff": "^3.0.5",
-    "rbush": "^4.0.1"
+    "geotiff": "^3.0.5"
   }
 }

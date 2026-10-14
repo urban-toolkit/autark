@@ -56,7 +56,7 @@ for (const dir of packageDirs) {
     cwd: packageDir,
     encoding: 'utf8',
   });
-  const [packResult] = JSON.parse(packJson);
+  const [packResult] = Object.values(JSON.parse(packJson));
   const packedFiles = new Set(packResult.files.map((file) => file.path));
 
   if (![...packedFiles].some((file) => file.startsWith('dist/'))) {

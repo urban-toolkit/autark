@@ -48,7 +48,7 @@ npm run build --workspace=usecases
 npm run preview --workspace=usecases
 ```
 
-Production builds include the index and all three `src/<case>/main.html` pages. Local datasets are copied from `public/data`. Relative page links and Vite's `BASE_URL` support deployment under a configured base path.
+Production builds include the index and all three `src/<case>/main.html` pages. Local datasets are copied from `public/data`. Relative page links and Vite's `BASE_URL` support deployment under a configured base path. Rolldown splits dependencies and built workspace libraries into cacheable chunks with a 350 kB target, preserving which pages import each dependency. The default Vite 500 kB warning limit remains unchanged; this is chunk splitting, not lazy loading or a reduction in total downloaded code.
 
 Tests cover pure data preparation, orchestration using mocked Autark facades, and real loading of Urbane's local administrative PBF through DuckDB. PBF tests check all three local datasets, reject unexpected remote OSM requests, and verify geocode-wide coastal classification, geographic scope and representative land/water probes. Tests do not validate real GPU execution or remote data availability.
 

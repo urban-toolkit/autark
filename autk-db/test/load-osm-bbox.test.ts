@@ -60,7 +60,7 @@ async function provide(elements: OsmElement[], source: string): Promise<void> {
 }
 
 describe('OSM surface is mandatory, coastal and shared by both sources', () => {
-  it.each(['api', 'pbf'])('loads bbox with %s, filters whole buildings and retains an internal mask for later imports', async source => {
+  it.each(['api', 'pbf'])('loads bbox with %s, discards partially contained buildings and retains an internal mask for later imports', async source => {
     await client.setWorkspace(`bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([...structuredClone(syntheticElements), ...extra], source);
     const result = await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/bbox.pbf' } : {}),
@@ -72,21 +72,57 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     expect(booleanPointInPolygon(point([2, 8]), surface.features[0] as any)).toBe(true);
     expect(booleanPointInPolygon(point([8, 8]), surface.features[0] as any)).toBe(false);
     const buildings = await client.getLayer('table_osm_buildings');
+    // Keep the grouped building, removing only its member outside the bbox.
     const building = buildings.features.find(feature => feature.properties?.osmRelation?.id === '600')!;
-    expect(building.properties?.parts.map((part: any) => [part.id, part.geometryIndex])).toEqual([[10, 0], [50, 1]]);
-    expect(building.geometry).toMatchObject({ type: 'GeometryCollection', geometries: [expect.any(Object), { type: 'Polygon' }] });
-    if (building.geometry.type !== 'GeometryCollection') throw new Error('Expected building parts');
-    expect((await conn.query(`SELECT ST_Equals(ST_GeomFromGeoJSON('${JSON.stringify(building.geometry.geometries[1])}'),
-      ST_GeomFromText('POLYGON((20 20,21 20,21 21,20 21,20 20))')) same_geometry`)).toArray()[0].same_geometry).toBe(true);
+    expect(building.properties?.parts.map((part: any) => [part.id, part.geometryIndex])).toEqual([[10, 0]]);
+    expect(building.geometry).toMatchObject({ type: 'GeometryCollection', geometries: [expect.any(Object)] });
+    expect(buildings.features.map(feature => feature.id)).not.toContain(20); // crosses coastal surface
     expect(buildings.features.map(feature => feature.id)).not.toContain(30);
     expect(buildings.features.map(feature => feature.id)).not.toContain(40);
     const road = await client.getLayer('table_osm_roads');
-    expect(road.features[0].geometry).toMatchObject({ type: 'LineString', coordinates: [[-1, 3], [9, 3]] });
+    expect(road.features[0].geometry).toMatchObject({ type: 'LineString', coordinates: [[0, 3], [5, 3]] });
     expect((await client.getLayer('table_osm_water')).features).toHaveLength(2); // explicit lake + inferred coastal water
     await client.loadGeojson({ outputTableName: 'later', layerType: 'points', coordinateFormat: 'EPSG:4326',
       geojsonObject: { type: 'FeatureCollection', features: [2, 8].map(x => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [x, 8] }, properties: {} })) } });
     expect((await client.getLayer('later')).features).toHaveLength(1);
     expect(client.getTablesMetadata().some(table => ['table_osm', 'table_osm_boundaries'].includes(table.name))).toBe(false);
+  });
+
+  it.each(['api', 'pbf'])('reindexes surviving grouped building parts and OSM element export through %s', async source => {
+    await client.setWorkspace(`reindexed_bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    const elements = structuredClone(syntheticElements);
+    for (const element of elements) {
+      if (element.type !== 'node') continue;
+      if (element.id >= 100 && element.id <= 103) element.lon! += 20;
+      if (element.id >= 500 && element.id <= 503) { element.lon! -= 20; element.lat! -= 20; }
+    }
+    elements.push({ type: 'relation', id: 600, tags: { type: 'building' }, members: [
+      { type: 'way', ref: 10, role: 'part' }, { type: 'way', ref: 50, role: 'part' },
+    ] });
+    await provide(elements, source);
+    await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/reindexed.pbf' } : {}),
+      autoLoadLayers: { layers: ['buildings'] } });
+    const building = (await client.getLayer('table_osm_buildings')).features.find(feature => feature.properties?.osmRelation?.id === '600')!;
+    expect(building.properties?.parts.map((part: any) => [part.id, part.geometryIndex])).toEqual([[50, 0]]);
+    if (building.geometry.type !== 'GeometryCollection') throw new Error('Expected building parts');
+    expect(building.geometry.geometries).toHaveLength(1);
+    expect((await conn.query(`SELECT ST_Equals(ST_GeomFromGeoJSON('${JSON.stringify(building.geometry.geometries[0])}'),
+      ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')) AS unchanged`)).toArray()[0].unchanged).toBe(true);
+    const exported = await client.getLayer('table_osm_buildings', { osmElements: true });
+    expect(exported.features.some(feature => feature.id === 'way/10')).toBe(false);
+    expect(exported.features.find(feature => feature.id === 'way/50')?.geometry).toEqual(
+      building.geometry.type === 'GeometryCollection' ? building.geometry.geometries[0] : null);
+  });
+
+  it.each(['api', 'pbf'])('keeps only fully contained bbox buildings without cutting them through %s', async source => {
+    await client.setWorkspace(`contained_bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await provide(structuredClone(syntheticElements), source);
+    await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/contained.pbf' } : {}),
+      autoLoadLayers: { layers: ['buildings'] } });
+    const buildings = await client.getLayer('table_osm_buildings');
+    expect(buildings.features.map(feature => feature.id).sort()).toEqual([10, 40]);
+    expect(buildings.features.find(feature => feature.id === 10)?.properties?.parts).toHaveLength(2);
+    expect(buildings.features.map(feature => feature.id)).not.toContain(30); // crosses bbox
   });
 
   it.each(['api', 'pbf'])('intersects administrative geometry with coastline for %s and exposes requested surface', async source => {
@@ -166,6 +202,14 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     const mask = (await conn.query(`SELECT bool_and(ST_IsValid(geometry)) AS valid_geometry
       FROM ${client.getCurrentWorkspace()}.table_osm_surface`)).toArray()[0];
     expect(mask.valid_geometry).toBe(true);
+    for (const layer of ['roads', 'parks', 'water']) {
+      const outside = (await conn.query(`SELECT COUNT(*) AS cnt
+        FROM ${client.getCurrentWorkspace()}.table_osm_${layer},
+          (SELECT ST_Union_Agg(geometry) AS mask FROM ${client.getCurrentWorkspace()}.table_osm_surface) surface
+        WHERE properties['generated'] IS DISTINCT FROM 'coastline'
+          AND NOT ST_IsEmpty(ST_Difference(geometry, surface.mask))`)).toArray()[0];
+      expect(Number(outside.cnt), `${layer} must be clipped to surface`).toBe(0);
+    }
   }, 120_000);
 
   it('clears internal-mask metadata when explicitly removing the surface', async () => {

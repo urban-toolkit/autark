@@ -40,7 +40,7 @@ import { deleteRasterPayload } from './raster-store';
 import { LoadJsonParams, LoadJsonUseCase } from './use-cases/load-json';
 import { LoadOsmLayerParams, LoadOsmLayerUseCase } from './use-cases/load-osm-layer';
 import { LoadOsmFromOverpassApiUseCase, LoadOsmParams, OsmLoadTimings } from './use-cases/load-osm-overpass';
-import { checkTagSets, isBoundingBoxArea } from './use-cases/load-osm-overpass/interfaces';
+import { checkTagSets } from './use-cases/load-osm-overpass/interfaces';
 import { LoadOsmFromPbfUseCase } from './use-cases/load-osm-pbf';
 import { OsmProcessingPipeline } from './internal/process-osm/pipeline';
 import { PolygonizeOsmSurfaceUseCase } from './internal/process-osm-surface/use-case';
@@ -294,7 +294,8 @@ export class AutkDb {
      * Named coastlines use the geocode bbox, not only the selected areas. Requested
      * water also includes bbox(areas) minus classified land, marked generated=coastline.
      * Missing/invalid coastal data never generates presumed sea. Surface stays hidden
-     * unless requested; other layers/tag sets use it as a crop and whole buildings are filtered.
+     * unless requested; other layers/tag sets use it as a crop. Building parts remain
+     * uncut; parts not fully covered by the surface are discarded and survivors reindexed.
      *
      * @param params - Area query, optional output table name, and required layer extraction settings.
      * @returns Timing breakdown for OSM download and layer extraction.
@@ -366,9 +367,6 @@ export class AutkDb {
             let surfaceLayerName: string | null = null;
             let classifiedLandJson: string | null = null;
             const clippableLayerNames: string[] = [];
-            // Bbox selection already bounds OSM roads. Do not apply the coastal
-            // land mask to them or bridges and other water crossings disappear.
-            const preserveBboxRoads = isBoundingBoxArea(params.queryArea);
 
             const requestedLayers = params.autoLoadLayers.layers;
             const layers = [...new Set([...requestedLayers, 'surface' as const])];
@@ -441,12 +439,8 @@ export class AutkDb {
 
             if (surfaceLayerName && clippableLayerNames.length > 0) {
                 for (const layerName of clippableLayerNames) {
-                    if (preserveBboxRoads && layerName.endsWith('_roads')) {
-                        await this.clipLayerToBoundingBox(layerName, osmBoundingBox, this.currentWorkspace);
-                    } else {
-                        const cropGeometry = !layerName.endsWith('_buildings');
-                        await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
-                    }
+                    const cropGeometry = !layerName.endsWith('_buildings');
+                    await this.clipLayerToLayer(layerName, surfaceLayerName, this.currentWorkspace, cropGeometry);
                     await this.refreshStoredBoundingBox(layerName);
                 }
             }
@@ -1235,6 +1229,48 @@ export class AutkDb {
         const table = workspaceData.tables.find(item => item.name === layerTableName);
         const intersection = 'ST_Intersection(ST_MakeValid(l.geometry), crop.geom)';
         const clipped = table && this.isPolygonalTable(table) ? `ST_CollectionExtract(${intersection}, 3)` : intersection;
+
+        if (!cropGeometry && table?.type === 'buildings' && table.source === 'osm') {
+            // Only expand buildings that need filtering. Expanding every collection
+            // duplicates large JSON payloads and exhausts DuckDB-Wasm memory on city imports.
+            const surface = `(SELECT ST_Union_Agg(ST_MakeValid(geometry)) FROM ${qualifiedCropLayer})`;
+            if (transactional) await this.conn!.query('BEGIN TRANSACTION');
+            try {
+                await this.conn!.query(`
+      CREATE TEMP TABLE contained_building_parts AS
+      WITH parts AS (
+        SELECT l.id, p.value AS properties, p.key::INTEGER AS old_index,
+          ST_GeomFromGeoJSON(json_extract(ST_AsGeoJSON(l.geometry),
+            '$.geometries[' || (p.value->>'geometryIndex') || ']')) AS geometry,
+          json_extract(l.${OSM_ELEMENT_METADATA_COLUMN},
+            '$[' || (p.value->>'geometryIndex') || ']') AS osm_element
+        FROM (SELECT * FROM ${qualifiedLayer} WHERE NOT ST_CoveredBy(geometry, ${surface})) l,
+          LATERAL json_each(l.properties, '$.parts') p
+      ), retained AS (
+        SELECT *, row_number() OVER (PARTITION BY id ORDER BY old_index) - 1 AS geometry_index
+        FROM parts
+        WHERE ST_CoveredBy(geometry, ${surface})
+      )
+      SELECT id, ST_GeomFromGeoJSON(json_object('type', 'GeometryCollection',
+          'geometries', to_json(list(ST_AsGeoJSON(geometry)::JSON ORDER BY geometry_index)))) AS geometry,
+        to_json(list(json_merge_patch(properties, json_object('geometryIndex', geometry_index)) ORDER BY geometry_index)) AS parts,
+        to_json(list(json_merge_patch(osm_element, json_object('geometryIndex', geometry_index)) ORDER BY geometry_index)) AS osm_elements
+      FROM retained GROUP BY id;
+      UPDATE ${qualifiedLayer} AS l SET geometry = p.geometry,
+        properties = json_merge_patch(l.properties, json_object('parts', p.parts)),
+        ${OSM_ELEMENT_METADATA_COLUMN} = p.osm_elements
+      FROM contained_building_parts p WHERE l.id = p.id;
+      DELETE FROM ${qualifiedLayer}
+      WHERE NOT ST_CoveredBy(geometry, ${surface}) AND id NOT IN (SELECT id FROM contained_building_parts);
+      DROP TABLE contained_building_parts;
+    `);
+                if (transactional) await this.conn!.query('COMMIT');
+            } catch (error) {
+                if (transactional) await this.conn!.query('ROLLBACK');
+                throw error;
+            }
+            return;
+        }
 
         if (!cropGeometry) {
             await this.conn!.query(`

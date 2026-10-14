@@ -43,12 +43,11 @@
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
-    "@types/earcut": "^3.0.0",
     "@types/geojson": "^7946.0.16",
     "@types/rbush": "^4.0.0",
+    "prettier": "^3.9.10",
     "typedoc": "^0.28.20",
-    "typedoc-plugin-markdown": "^4.13.1",
-    "typedoc-theme-oxide": "^0.3.0",
+    "typedoc-plugin-markdown": "^4.14.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-dts": "^5.1.2"

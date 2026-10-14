@@ -36,9 +36,9 @@ it('loads administrative Manhattan without region fallback or layers from neighb
                     geometry.type === 'Polygon' || geometry.type === 'MultiPolygon'
                 ), `${layer} must not contain linear clipping remnants that get filled by the renderer`).toBe(true);
             }
-            // Roads/areas must be clipped. Buildings keep whole indexed parts,
-            // so require intersection rather than destructive footprint clipping.
-            const predicate = layer === 'buildings' ? 'ST_Intersects' : 'ST_CoveredBy';
+            // Roads/areas are clipped; surviving building parts remain uncut
+            // and must be fully contained in the borough.
+            const predicate = 'ST_CoveredBy';
             const rows = await db.rawQuery<Array<{ outside: number }>>({
                 query: `WITH scope AS (
                     SELECT ST_Buffer(ST_Transform(ST_GeomFromGeoJSON('${geometry}'),

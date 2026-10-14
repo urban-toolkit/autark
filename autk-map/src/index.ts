@@ -23,6 +23,9 @@ export { LayerManager } from './layer-manager';
 /** DOM-based UI controller used by the map controller. */
 export { AutkMapUi } from './map-ui';
 
+/** Runtime terrain debugging options accepted by `AutkMap.updateTerrainDebug`. */
+export type { TerrainDebugOptions } from './renderer-terrain';
+
 /** Parameter types for the main `AutkMap` loading and update APIs. */
 export type {
     /** Parameters for loading a GeoJSON feature collection as a map layer. */

@@ -220,7 +220,7 @@ describe('Overpass and PBF source parity', () => {
       expect(client.getTablesMetadata().some(table => table.name === 'parity' || table.name === 'parity_boundaries')).toBe(false);
     }
     for (const layer of layers) expect(exported[0].get(layer)).toEqual(exported[1].get(layer));
-    expect(exported[0].get('buildings').find((feature: any) => feature.properties?.osmRelation?.id === '600')?.properties?.parts.map((part: any) => part.id)).toEqual([10,50]);
+    expect(exported[0].get('buildings').find((feature: any) => feature.properties?.osmRelation?.id === '600')?.properties?.parts.map((part: any) => part.id)).toEqual([10]);
     expect(exported[0].get('buildings').find((feature: any) => feature.id === 20)?.properties?.osmRelation).toBeUndefined();
     for (const layer of ['surface', 'parks', 'water', 'roads']) expect(exported[0].get(layer)).toHaveLength(1);
     expect(exported[0].get('water')[0].id).toBe(60);
@@ -358,6 +358,10 @@ describe('building relations preserve original way ownership', () => {
   it.each(['api', 'pbf'])('public %s import survives unsupported roof members and completes all layers', async source => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const elements = structuredClone(syntheticElements);
+    // Keep the valid relation fully inside the surface; this test targets unsupported roof roles.
+    for (const element of elements) {
+      if (element.type === 'node' && element.id >= 300 && element.id <= 303) element.lon! -= 6;
+    }
     elements.push({ type: 'relation', id: 15931242, tags: { type: 'building' }, members: [
       { type: 'way', ref: 20, role: 'roof' }, { type: 'way', ref: 10, role: 'part' },
     ] }, { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 30, role: 'part' }] });
@@ -598,14 +602,10 @@ describe('building import pipeline — public orchestration', () => {
   it('12. applies surface filtering only after all layers have been extracted', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(pbf)));
     const events: string[] = [];
-    let originalCrossingGeometry: Uint8Array | undefined;
     const extract = LoadOsmLayerUseCase.prototype.exec;
     vi.spyOn(LoadOsmLayerUseCase.prototype, 'exec').mockImplementation(async function (this: LoadOsmLayerUseCase, params) {
       const result = await extract.call(this, params);
       events.push(`extracted:${params.layer}`);
-      if (params.layer === 'buildings') {
-        originalCrossingGeometry = (await conn.query(`SELECT ST_AsWKB(geometry) AS bytes FROM ${client.getCurrentWorkspace()}.${result.name} WHERE id=30`)).toArray()[0].bytes;
-      }
       return result;
     });
     const clip = (client as any).clipLayerToLayer.bind(client);
@@ -619,18 +619,9 @@ describe('building import pipeline — public orchestration', () => {
     expect(filter).toHaveBeenCalledWith('table_osm_buildings', 'table_osm_surface', client.getCurrentWorkspace(), false);
     expect(result.layers.map(layer => layer.layerType)).toEqual(['buildings', 'surface']);
     const output = await client.getLayer('table_osm_buildings');
-    expect(output.features.map(feature => feature.id).sort()).toEqual([10, 30]); // 40 is removed by the actual polygon, 50 by PBF bbox filtering.
+    expect(output.features.map(feature => feature.id).sort()).toEqual([10]); // Crossing 30 and outside 40/50 are discarded.
     expect(output.features.find(feature => feature.id === 10)?.properties?.parts).toHaveLength(2);
-    const ws = client.getCurrentWorkspace();
-    const crossing = (await conn.query(`SELECT ST_Within(b.geometry,s.geometry) AS inside FROM ${ws}.table_osm_buildings b,
-      ${ws}.table_osm_surface s WHERE b.id=30`)).toArray()[0];
-    expect(crossing.inside).toBe(false); // Buildings intersecting the surface remain whole, by contract.
-    expect((await conn.query(`SELECT ST_Equals((ST_Dump(geometry)[1]).geom,
-      ST_ReducePrecision((ST_Dump(ST_GeomFromWKB(from_hex('${Buffer.from(originalCrossingGeometry!).toString('hex')}')))[1]).geom, 0.01)) same_part
-      FROM ${ws}.table_osm_buildings WHERE id=30`)).toArray()[0].same_part).toBe(true);
-    expect(output.features.find(feature => feature.id === 30)?.properties?.parts).toEqual([
-      expect.objectContaining({ id: 30, geometryIndex: 0, height: '8' }),
-    ]);
+    expect(output.features.some(feature => feature.id === 30)).toBe(false);
   });
 
   it('13. exports stable feature IDs, indexed parts and heights after surface filtering', async () => {
@@ -638,7 +629,7 @@ describe('building import pipeline — public orchestration', () => {
     await client.loadOsm({ pbfFileUrl: '/fixture.pbf', queryArea: { geocodeArea: 'Fixture', areas: ['Test District'] },
       autoLoadLayers: { layers: ['surface', 'buildings'] } });
     const output = await client.getLayer('table_osm_buildings');
-    expect(output.features.map(feature => feature.id).sort()).toEqual([10, 30]);
+    expect(output.features.map(feature => feature.id).sort()).toEqual([10]);
     for (const feature of output.features) {
       expect(feature.geometry?.type).toBe('GeometryCollection');
       if (feature.geometry?.type !== 'GeometryCollection') throw new Error('Expected canonical building collection');
@@ -648,7 +639,7 @@ describe('building import pipeline — public orchestration', () => {
     const building = output.features.find(feature => feature.id === 10)!;
     expect(building.geometry).toMatchObject({ type: 'GeometryCollection', geometries: [expect.any(Object), expect.any(Object)] });
     expect(building.properties?.parts.map((part: any) => [part.id, part.geometryIndex, part.height])).toEqual([[10, 0, '12'], [20, 1, '25']]);
-    expect(await client.getTable('table_osm_buildings')).toHaveLength(2);
+    expect(await client.getTable('table_osm_buildings')).toHaveLength(1);
     expect(client.getTablesMetadata().find(table => table.name === 'table_osm_buildings')?.columns.some(column => column.name === 'agg_geometry')).toBe(false);
   });
 

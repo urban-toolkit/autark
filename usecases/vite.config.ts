@@ -16,7 +16,17 @@ export function pluginWatchNodeModules(modules: string[]) {
 
 export default defineConfig({
   build: {
-    rollupOptions: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{
+            name: 'dependencies',
+            test: /[\\/](?:node_modules|dist)[\\/]/,
+            maxSize: 350_000,
+            entriesAware: true,
+          }],
+        },
+      },
       input: {
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         niteroi: fileURLToPath(new URL('./src/niteroi/main.html', import.meta.url)),

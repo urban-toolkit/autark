@@ -7,9 +7,9 @@ const destination = resolve(process.argv[2] ?? '.cache/npm-release');
 mkdirSync(destination, { recursive: true });
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const packages = dirs.map(dir => {
-    const [packed] = JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', destination], {
+    const [packed] = Object.values(JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', destination], {
         cwd: resolve(dir), encoding: 'utf8',
-    }));
+    })));
     return { dir, name: packed.name, version: packed.version, filename: packed.filename, integrity: packed.integrity };
 });
 writeFileSync(resolve(destination, 'manifest.json'), JSON.stringify({

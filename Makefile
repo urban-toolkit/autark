@@ -1,7 +1,6 @@
 .PHONY: lint test typecheck build package-validate docs verify dev gallery usecases clean
 
 CONCURRENTLY := ./node_modules/.bin/concurrently
-RIMRAF := ./node_modules/.bin/rimraf
 
 APP ?= gallery
 
@@ -64,13 +63,4 @@ usecases:
 	$(MAKE) dev APP=usecases$(if $(OPEN), OPEN=$(OPEN))
 
 clean:
-	$(CONCURRENTLY) \
-		"cd autk-core && ../$(RIMRAF) dist build node_modules" \
-		"cd autk-map && ../$(RIMRAF) dist build node_modules" \
-		"cd autk-db && ../$(RIMRAF) dist build node_modules" \
-		"cd autk-plot && ../$(RIMRAF) dist build node_modules" \
-		"cd autk-compute && ../$(RIMRAF) dist build node_modules" \
-		"cd autk && ../$(RIMRAF) dist build node_modules" \
-		"cd gallery && ../$(RIMRAF) dist build node_modules" \
-		"cd usecases && ../$(RIMRAF) dist build node_modules"
-	$(RIMRAF) node_modules
+	rm -rf $(foreach package,autk-core autk-map autk-db autk-plot autk-compute autk gallery usecases,$(addprefix $(package)/,dist build node_modules)) node_modules
