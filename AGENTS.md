@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Language
+- Write all authored material in US English (en-US), regardless of the conversation language. This includes documentation, code comments, commit messages, PR titles/descriptions/comments, release notes, and other written artifacts.
+- Never post PR messages in Brazilian Portuguese (pt-BR).
+
 ## Project Overview
 **Autark** is a modular and serverless toolkit for urban visual analytics, built in TypeScript with WebGPU acceleration.
 
