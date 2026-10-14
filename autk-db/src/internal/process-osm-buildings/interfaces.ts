@@ -1,7 +1,8 @@
 /** Explicit building ownership; relations carry metadata, not a second geometry. */
 export interface OsmBuildingRelation {
   id: string;
-  members: Array<{ id: string; role: string }>;
+  /** OSM member IDs and roles; `type` marks a multipolygon member, whose ID is a relation ID. */
+  members: Array<{ id: string; role: string; type?: 'relation' }>;
   properties: Record<string, unknown>;
   /** Invalid source membership: omit the whole relation and its direct way members. */
   skipReason?: string;

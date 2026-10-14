@@ -420,7 +420,7 @@ The effective lists are in [`consts.ts`](../autk-db/src/consts.ts):
 
 These rules are specific to the toolkit. They do not mean that every OSM element classified as water, vegetation or construction will be imported.
 
-**Important exception for buildings:** member ways of `type=building` relations enter the extraction even without tags of their own. This way the relation can provide identity and general attributes to parts that cannot be classified on their own.
+**Important exception for buildings:** member ways of `type=building` relations with an empty, `part`, `outline` or `outer` role enter the extraction even without tags of their own. This way the relation can provide identity and general attributes to parts that cannot be classified on their own. A member way with another role, such as `roof` or `column`, enters only by its own tags.
 
 ## 7. BBox and coordinate system
 
@@ -569,13 +569,14 @@ flowchart TD
 | `location=underground` part | Excluded before ownership/clustering, with a warning |
 | `location=underground` relation | Relation and members are excluded from this layer |
 | Missing, invalid, empty or non Polygon/MultiPolygon geometry | Part omitted, with a warning; coordinates are not repaired |
-| Relation with a missing/unusable member | Relation and its members are omitted, avoiding a partial building |
+| Relation with a missing/unusable outline or part | Relation and its members are omitted, avoiding a partial building |
 | Part intentionally excluded for being underground | Not treated as a geometry failure; the surface members can remain |
 | Same way belonging to distinct relations | Affected relations are omitted, with a warning; no arbitrary owner is chosen |
 | Duplicate IDs or SQL/transaction failure | Error propagated |
-| Nested member, unsupported role (including `roof`), conflicting roles or relation without ways | Warning and omission of the relation and of all its direct ways; other buildings continue |
+| Member with another role (such as `roof` or `column`) | Becomes a part when the building layer selects it by its own tags; otherwise it adds nothing, without omitting the relation |
+| Conflicting roles or relation without members to draw | Warning and omission of the relation and of all its direct ways; other buildings continue |
 
-When reading ownership, the accepted way roles are empty, `part`, `outline` and `outer`. Node members, such as labels, do not become geometric parts. Repeated references with the same role are deduplicated. Invalid membership is marked with a reason for omission, keeping all the IDs of the direct ways, including those after the invalid member. Consolidation logs `console.warn` with the relation ID and the reason and prevents its members from reappearing as partial/independent buildings. Database/transaction errors and internal invariants are still propagated; there is no generic catch hiding failures of the whole layer.
+When reading ownership, ways and multipolygons with an empty, `part`, `outline` or `outer` role are parts or outlines. A member with another role, such as `roof` or `column`, becomes a part when the building layer selects it by its own `building` or `building:part` tags; the others (roof `ridge` lines, untagged areas) add nothing and do not become independent buildings. Node members, such as labels, do not become geometric parts. Repeated references with the same role are deduplicated. Invalid membership is marked with a reason for omission, keeping all the IDs of the direct ways, including those after the invalid member. Consolidation logs `console.warn` with the relation ID and the reason and prevents its members from reappearing as partial/independent buildings. Database/transaction errors and internal invariants are still propagated; there is no generic catch hiding failures of the whole layer.
 
 **Not excluded on their own:** zero height, negative `layer` or `building:levels:underground`. The specific exclusion of this stage requires `location=underground`.
 
@@ -669,7 +670,7 @@ Own attributes stay in the parts. Attributes identical in all parts can be promo
 ```text
 properties.osmRelation
     ├─ id: string
-    ├─ members: original IDs/roles
+    ├─ members: original IDs/roles (type: 'relation' marks a multipolygon member)
     ├─ properties: original relation tags
     └─ inferredParts: IDs associated by outline-containment, when present
 ```

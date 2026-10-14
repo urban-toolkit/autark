@@ -166,7 +166,8 @@ export class LoadOsmLayerUseCase {
 
   /**
    * Reads building ownership and general tags without constructing relation footprints.
-   * Member ways remain the only coordinate representation. Invalid membership is
+   * Member ways and multipolygons remain the only coordinate representation; every role is kept,
+   * and ProcessOsmBuildingsUseCase decides which members are parts. Invalid membership is
    * marked for whole-relation omission, retaining all direct way IDs to prevent
    * those parts from reappearing as unrelated or partially reconstructed buildings.
    */
@@ -181,19 +182,18 @@ export class LoadOsmLayerUseCase {
       const refs = Array.from(row.refs as Iterable<unknown>, String);
       const roles = this.toStringArray(row.ref_roles);
       const types = this.toStringArray(row.ref_types);
-      const members = new Map<string, { id: string; role: string }>();
+      const members = new Map<string, OsmBuildingRelation['members'][number]>();
       let skipReason: string | undefined;
       refs.forEach((id, index) => {
         if (types[index] === 'node') return; // Labels/entrances are not geometry parts.
         const role = roles[index] ?? '';
-        if (types[index] !== 'way' || !['', 'part', 'outline', 'outer'].includes(role)) {
-          skipReason ??= `unsupported member ${id} (${types[index]}, role ${role})`;
+        // Simple 3D Buildings lists a multipolygon as an outline or part like a way; IDs are typed.
+        const relation = types[index] === 'relation';
+        const key = relation ? `relation/${id}` : id;
+        if (members.has(key) && members.get(key)!.role !== role) {
+          skipReason ??= `conflicting roles for ${relation ? 'relation' : 'way'} ${id}`;
         }
-        if (types[index] !== 'way') return;
-        if (members.has(id) && members.get(id)!.role !== role) {
-          skipReason ??= `conflicting roles for way ${id}`;
-        }
-        members.set(id, { id, role });
+        members.set(key, relation ? { id, role, type: 'relation' } : { id, role });
       });
       return { id: String(row.id), members: [...members.values()], properties: this.parseTags(row.tags_json), skipReason };
     });

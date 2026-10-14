@@ -3,7 +3,8 @@ import { OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 /** Selects original parts in deterministic order for the existing OSM clustering rule. */
 export const SELECT_BUILDING_GEOMETRY_QUERY = (qualifiedTableName: string, hasOsmMetadata = false) => `
   SELECT id, CAST(properties AS JSON) AS properties_json, CAST(ST_AsGeoJSON(geometry) AS JSON) AS geometry_json, ST_IsValid(geometry) AS valid_geometry, ST_IsEmpty(geometry) AS empty_geometry,
-    ${hasOsmMetadata ? `json_extract_string(${OSM_ELEMENT_METADATA_COLUMN}, '$[0].osm_type')` : "'way'"} AS osm_type
+    ${hasOsmMetadata ? `json_extract_string(${OSM_ELEMENT_METADATA_COLUMN}, '$[0].osm_type')` : "'way'"} AS osm_type,
+    ${hasOsmMetadata ? `json_extract_string(${OSM_ELEMENT_METADATA_COLUMN}, '$[0].osm_id')` : 'CAST(id AS VARCHAR)'} AS osm_id
   FROM ${qualifiedTableName}
   ORDER BY id
 `;
