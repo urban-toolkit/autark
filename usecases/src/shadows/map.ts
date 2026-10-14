@@ -21,7 +21,10 @@ export class ShadowsMap {
             if (layer.name === 'table_osm_roads') continue;
             const collection = layer.name === ROADS_LAYER ? roads
                 : layer.name === BUILDINGS_LAYER ? buildings : await getLayer(layer.name);
-            this.map.loadCollection(layer.name, { collection, type: layer.type });
+            this.map.loadCollection(layer.name, {
+                collection, type: layer.type,
+                loadConfig: layer.type === 'buildings' ? { buildingsZeroHeight: true } : undefined,
+            });
         }
         this.map.updateRenderInfo(BUILDINGS_LAYER, { isPick: true });
         this.map.updateRenderInfo(ROADS_LAYER, { isPick: true, isColorMap: true });

@@ -38,6 +38,9 @@ it('resolves joined month attributes for plot binning, map and compute without c
         await db.spatialQuery({ tableRootName: 'roads', tableJoinName: 'shadows', near: { distance: 200 },
             groupBy: [{ column: code, aggregateFn: 'avg' }] });
     }
+    await db.removeLayer('shadows');
+    expect(db.getLayersMetadata().some(layer => layer.name === 'shadows')).toBe(false);
+    expect(db.getTablesMetadata().some(table => table.name === 'shadows')).toBe(false);
     const roads = await db.getLayer('roads');
     expect(roads.features.map(feature => feature.id).sort()).toEqual(segmentIds);
     expect(new Set(roads.features.map(feature => feature.id)).size).toBe(roads.features.length);

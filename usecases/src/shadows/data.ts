@@ -37,6 +37,7 @@ export class ShadowsData {
                 groupBy: [{ column: code, aggregateFn: 'avg' }],
             });
         }
+        await this.db.removeLayer('shadows');
         const roads = await this.db.getLayer(ROADS_LAYER);
         clearRoadsCompute(roads);
         return { roads, buildings: await this.db.getLayer(BUILDINGS_LAYER) };
