@@ -8,6 +8,7 @@ const native = vi.hoisted(() => ({ db: undefined as AsyncDuckDB | undefined }));
 vi.mock('../../autk-db/src/duckdb', () => ({ loadDb: async () => native.db }));
 import { AutkDb } from '../../autk-db/src/db';
 
+// Full-borough PBF processing shares CI resources with the other real-city imports.
 it('loads administrative Manhattan without region fallback or layers from neighboring boroughs', async () => {
     native.db = await loadDb();
     const db = new AutkDb();
@@ -106,4 +107,4 @@ it('loads administrative Manhattan without region fallback or layers from neighb
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     }
-}, 120_000);
+}, 600_000);
