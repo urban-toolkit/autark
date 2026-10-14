@@ -5,11 +5,11 @@ Rank Manhattan neighborhoods/buildings using weighted indicators and approximate
 ## Pipeline
 
 1. `data.ts`: load `mnt-administrative-geocode-coastlines.osm.pbf`, `mnt_neighs.geojson` and seven `*_manhattan_clean.csv` files from `public/data`. OSM loading uses `geocodeArea: 'New York'` and `areas: ['Manhattan']`, configured in `config.ts`. Both names refer to complete `boundary=administrative` relations in the regional-snapshot PBF, which also retains coastlines across the New York City bbox.
-2. Use `AutkDb.spatialQuery` to count/normalize points per neighborhood and attach neighborhood names to buildings.
+2. Use `AutkDb.spatialQuery` to count/normalize points per neighborhood and attach neighborhood matches to buildings under `properties.sjoin.matches[].properties.ntaname`.
 3. `compute.ts`: run `ComputeRender` from road viewpoints, treating the background as the sky class. Store the visible sky fraction as `compute.skyViewFactor` and persist roads back to the DB.
 4. Average/normalize road sky fractions per neighborhood. Prepare score inputs from normalized counts and sky exposure, invert arrest/noise inputs, and run a weighted sum in `ComputeGpgpu`.
 5. `map.ts` renders neighborhoods/roads/buildings. `plot.ts` creates a linked table and parallel-coordinates plot. `app.ts` coordinates their selections.
-6. Drill-down derives `active_buildings` for selected neighborhood names, counts nearby points within **300 m** of building centroids, joins nearby road sky exposure, and recomputes scores.
+6. Drill-down derives `active_buildings` by checking those nested matches against the selected neighborhood names, retaining each building once even when it matches multiple selected neighborhoods. It counts nearby points within **300 m** of building centroids, joins nearby road sky exposure, and recomputes scores. The map and linked plots receive the same selected building collection.
 7. Recompute weights in place; drill-up removes the derived buildings layer and restores neighborhood selection.
 
 `config.ts` defines datasets/default weights. `ui.ts` creates sliders and controls, awaits operations, reports interaction errors and restores controls in `finally`. The app also rejects overlapping asynchronous operations; failed data/compute loading does not prematurely change the current level or weights.

@@ -141,6 +141,18 @@ describe('Urbane operation state', () => {
         return app;
     }
 
+    it('shows the selected building collection in both the map and linked plots after drill-down', async () => {
+        const app = await init();
+        const selectedBuildings = buildings();
+        mocks.urbaneData.loadActiveBuildings.mockResolvedValueOnce(selectedBuildings);
+        await app.drillDown('none');
+        expect(mocks.urbaneData.loadActiveBuildings).toHaveBeenCalledWith(app.datasets, ['Neighborhood'], 300);
+        expect(mocks.urbaneMap.showBuildings).toHaveBeenCalledWith(selectedBuildings);
+        expect(mocks.urbanePlots.show).toHaveBeenLastCalledWith('active_buildings', app.datasets, selectedBuildings, expect.any(Function));
+        expect(mocks.urbaneMap.updateThematic).toHaveBeenLastCalledWith('active_buildings', selectedBuildings, 'none');
+        expect(app.currentLevel).toBe('active_buildings');
+    });
+
     it('failed drill-down preserves the level and permits retry', async () => {
         const app = await init();
         mocks.urbaneData.loadActiveBuildings.mockRejectedValueOnce(new Error('Data failed'));

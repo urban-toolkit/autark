@@ -80,7 +80,11 @@ export class UrbaneData {
             query: `
                 SELECT geometry, properties, building_id
                 FROM   table_osm_buildings
-                WHERE  properties->'sjoin'->>'ntaname' IN (${inList})
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM json_each(properties->'sjoin'->'matches') AS neighborhood_match
+                    WHERE neighborhood_match.value->'properties'->>'ntaname' IN (${inList})
+                )
             `,
             output: { type: 'CREATE_TABLE', tableName: 'active_buildings', source: 'osm', tableType: 'buildings' },
         });
