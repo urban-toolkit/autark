@@ -1,6 +1,6 @@
 # Autark 4.1.1 — migration notes
 
-Status: **release candidate; not yet published**. This coordinated release updates `@urban-toolkit/autk-core`, `autk-map`, `autk-db`, `autk-plot`, `autk-compute` and the `autk` umbrella package to 4.1.1. Internal dependencies are pinned to 4.1.1.
+Status: **published on 2026-10-14**. All six packages are public as `latest` 4.1.1. Their integrity and provenance match release commit `1faf032b4fe83189246b9966c0ef324f5821c731`; all six Git tags point to that commit. The coordinated packages are `@urban-toolkit/autk-core`, `autk-map`, `autk-db`, `autk-plot`, `autk-compute` and the `autk` umbrella package. Internal dependencies are pinned to 4.1.1.
 
 ```bash
 npm install @urban-toolkit/autk@4.1.1
@@ -16,7 +16,7 @@ The requested patch version includes changes to OSM surface filtering and raster
 - When coastline classification succeeds, requested water layers can include sea context within the selected areas' bounding box, marked with `properties.generated = 'coastline'`. Missing or invalid coastline data never implies sea.
 - **Change from 4.1.0:** bbox roads now use the mandatory surface crop too. Bridge and other over-water segments outside that surface may be removed; do not assume the previous bbox-only road filtering behavior.
 
-See the [OSM import guide](OSM-IMPORT.md) for supported membership and surface rules.
+See the [OSM import guide](https://github.com/urban-toolkit/autark/blob/1faf032b4fe83189246b9966c0ef324f5821c731/.doc/OSM-IMPORT.md) for supported membership and surface rules.
 
 ## Raster joins and value resolution
 
@@ -46,11 +46,12 @@ Workspace development and CI use Node 26.11.1 and npm 12.2.0. Tooling and depend
 - [x] Clean `npm ci` and `make verify` passed with Node 26.11.1 / npm 12.2.0: 455 tests across 40 files, lint, builds, typechecks and package validation. The clean snapshot excludes untracked macOS metadata files, not tests. npm audit reported zero known vulnerabilities.
 - [x] All six 4.1.1 tarballs passed isolated consumer declaration checks, Node imports and browser bundling.
 - [x] Eleven hardware WebGPU compute cases passed in Chrome 155.0.8059.41 on Apple Metal 3.
-- [ ] Browser/GPU visual inspection of the updated examples completed.
-- [ ] Release commit's main-push CI succeeded and its exact artifacts were staged.
-- [ ] Maintainer approved all six npm stages with 2FA.
-- [ ] Public integrity/provenance and `latest` tags verified; all six Git tags finalized.
-- [ ] Clean public-registry installation and GitHub Release marked Latest verified.
-- [ ] `NPM_RELEASE_ENABLED` restored to `false`.
+- [x] Real-data Chrome/WebGPU smoke checks and screenshot inspection passed for Shadows and Urbane. Shadows loaded 1,305 buildings and 19,400 road segments without the measurement-point layer; Urbane's Chelsea-Hudson Yards drill-down returned 256 buildings. These were targeted checks, not exhaustive interaction or scientific validation.
+- [x] [Release commit's main-push CI](https://github.com/urban-toolkit/autark/actions/runs/38634528733) succeeded; its exact artifacts passed independent hash/manifest checks and were [staged successfully](https://github.com/urban-toolkit/autark/actions/runs/38635185768).
+- [x] Maintainer approved all six npm stages with 2FA.
+- [x] Public integrity/provenance and `latest` tags verified against the original CI artifacts and release commit; [all six Git tags finalized](https://github.com/urban-toolkit/autark/actions/runs/38637567945).
+- [x] Clean public-registry umbrella installation passed declaration checks, Node imports and browser bundling. All six installed package integrities matched CI; `npm audit signatures` verified 301 registry signatures and 128 attestations.
+- [x] [GitHub Release](https://github.com/urban-toolkit/autark/releases/tag/%40urban-toolkit/autk%404.1.1) published and verified as Latest.
+- [x] `NPM_RELEASE_ENABLED` restored to `false`.
 
 Publication follows the [staged release procedure](NPM-RELEASE.md). No public release should be announced until all six npm packages and matching Git tags are verified.

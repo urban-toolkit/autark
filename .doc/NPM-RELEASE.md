@@ -2,7 +2,7 @@
 
 ## Current safety state
 
-Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. The coordinated 4.1.0 release is public, its six Git tags are finalized, and `NPM_RELEASE_ENABLED` is restored to `false`. See the [completed release verification](RELEASE-4.1.0.md#release-verification).
+Publication is disabled unless the GitHub repository variable `NPM_RELEASE_ENABLED` is exactly `true`. Keep it absent or `false` outside an explicitly authorized release. Neither CI nor `release:prepare` publishes or submits stages. The coordinated 4.1.1 release is public, its six Git tags are finalized, and `NPM_RELEASE_ENABLED` is restored to `false`. See the [completed release verification](RELEASE-4.1.1.md#release-verification).
 
 This procedure uses staged publishing, not direct publishing. GitHub only submits artifacts; a maintainer approves them on npm with 2FA. Git tags are created in a separate workflow after all selected versions are public and their integrity has been verified.
 
