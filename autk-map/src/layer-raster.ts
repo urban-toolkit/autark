@@ -326,6 +326,15 @@ export class RasterLayer extends Layer {
                 return;
             }
 
+            const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
+
+            // One color function for the whole raster: a d3 scale built per cell
+            // kept the main thread busy for seconds on a large raster.
+            const colorOf = ColorMap.getColorFunction(
+                this._layerRenderInfo.colormap.config.interpolator,
+                effectiveDomain,
+            );
+
             for (let i = 0; i < rasterValues.length; i++) {
                 const d = rasterValues[i];
                 const offset = i * 4;
@@ -337,13 +346,7 @@ export class RasterLayer extends Layer {
                     continue;
                 }
 
-                const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
-
-                const color = ColorMap.getColor(
-                    d,
-                    this._layerRenderInfo.colormap.config.interpolator,
-                    effectiveDomain,
-                );
+                const color = colorOf(d);
                 const alpha = computeAlphaByte(d, transferContext);
 
                 rasterData[offset] = color.r;

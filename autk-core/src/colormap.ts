@@ -91,6 +91,38 @@ export class ColorMap {
     }
 
     /**
+     * Builds the color function of one scheme and domain, for coloring many
+     * values. Each call returns what `getColor(value, color, domain)` returns,
+     * but the d3 scale is built once, not once per value, and each color
+     * string the scale gives is parsed once: a scheme has few distinct colors.
+     *
+     * @param color - Interpolator identifier to sample.
+     * @param domain - Optional explicit domain used to parameterize the scale.
+     * @returns Function from a value to its color in RGBA object form.
+     * @throws Never throws.
+     * @example
+     * const colorOf = ColorMap.getColorFunction(ColorMapInterpolator.SEQ_VIRIDIS);
+     * colorOf(0.5); // → { r: 33, g: 145, b: 140, alpha: 1 }
+     */
+    public static getColorFunction(
+        color: ColorMapInterpolator,
+        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+    ): (value: number) => ColorRGB {
+        const interpolator = ColorMap.buildInterpolator(color, domain);
+        const parsed = new Map<string, ColorRGB>();
+        return (value: number) => {
+            const css = interpolator(value);
+            let rgb = parsed.get(css);
+            if (rgb === undefined) {
+                const { r, g, b } = d3_color.rgb(css);
+                rgb = { r, g, b, alpha: 1 };
+                parsed.set(css, rgb);
+            }
+            return { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 1 };
+        };
+    }
+
+    /**
      * Builds a flat RGBA texture array for GPU upload from a color scheme.
      *
      * @param color - Interpolator identifier to sample.
