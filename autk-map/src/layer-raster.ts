@@ -26,14 +26,10 @@ import {
     computeAlphaByte,
 } from '@urban-toolkit/autk-core';
 
-import type {
+import type { 
     TransferFunction,
-    RequiredTransferFunction,
-    ColorMapInterpolator,
-    ColorRGB,
+    RequiredTransferFunction
 } from '@urban-toolkit/autk-core';
-
-import { rgb } from 'd3';
 
 import { Layer } from "./layer";
 
@@ -42,36 +38,6 @@ import { Renderer } from "./renderer";
 import { Pipeline } from "./pipeline";
 
 import { PipelineTriangleRaster } from "./pipeline-triangle-raster";
-
-/**
- * Builds, once for a whole raster, the color function `ColorMap.getColor`
- * applies to one value: the same d3 scale (`ColorMap.buildInterpolator`) for
- * every cell, and each color string the scale gives parsed once, since a
- * scheme gives at most a few thousand distinct colors. `getColor` builds a
- * scale and parses its string on every call, which kept the main thread busy
- * for seconds on a large raster.
- *
- * @param interpolator Interpolator identifier of the layer's colormap.
- * @param domain Numeric domain the scale maps from.
- * @returns Function from a cell value to the color `getColor` gives it.
- */
-function rasterColorFunction(
-    interpolator: ColorMapInterpolator,
-    domain: [number, number] | [number, number, number],
-): (value: number) => ColorRGB {
-    const scale: (value: number) => string = ColorMap['buildInterpolator'](interpolator, domain);
-    const parsed = new Map<string, ColorRGB>();
-    return (value: number) => {
-        const css = scale(value);
-        let color = parsed.get(css);
-        if (color === undefined) {
-            const { r, g, b } = rgb(css);
-            color = { r, g, b, alpha: 1 };
-            parsed.set(css, color);
-        }
-        return color;
-    };
-}
 
 /**
  * Raster layer implementation backed by triangulated geometry and texture data.
@@ -362,7 +328,10 @@ export class RasterLayer extends Layer {
 
             const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
 
-            const colorOf = rasterColorFunction(
+            // One color function for the whole raster: getColor builds a d3 scale
+            // and parses a color string on every call, which kept the main
+            // thread busy for seconds on a large raster.
+            const colorOf = ColorMap.getColorFunction(
                 this._layerRenderInfo.colormap.config.interpolator,
                 effectiveDomain,
             );
