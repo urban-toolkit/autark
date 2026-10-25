@@ -20,6 +20,7 @@
     "@urban-toolkit/autk-db": "4.1.1",
     "@urban-toolkit/autk-map": "4.1.1",
     "@urban-toolkit/autk-plot": "4.1.1",
-    "@urban-toolkit/autk-compute": "4.1.1"
+    "@urban-toolkit/autk-compute": "4.1.1",
+    "d3": "^7.9.0"
   }
 }
