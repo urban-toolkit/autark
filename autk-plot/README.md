@@ -96,6 +96,10 @@ Every transform records weighted relations between its inputs and outputs, from 
 * `registerTransform(definition)`: Adds a transform with provenance, used as `{ preset: 'registered', name }`. `checkTransformReport` checks its six provenance invariants.
 * `registerPlot(definition)`: Turns plain D3 drawing code into a chart, used as `{ type: 'registered', plot: name }`. The code only annotates its selectable marks (class `autkMark`, with their own row as D3 datum); selection, linking and the segregated view come with it, and the painted part is inferred from the geometry of the marks. `checkPlot` checks its six drawing invariants.
 
+### Tests
+
+The transform baselines run with the repository's Vitest suite. The plot tests draw and select in a real DOM, so they run in headless Chrome: run `npm run test:browser --workspace=@urban-toolkit/autk-plot` from the repository root (local sources through Vite, no downloaded fixtures; requires Node with built-in WebSocket support and Chrome; set `CHROME_BIN` if Chrome is not at the default macOS, Linux or Windows path). They keep Vitest's API; `test/harness.ts` runs them in the page with Vitest's own `expect`. `test/baselines/` holds the outputs of the original autk-plot 4.1.1, which the baseline tests compare against.
+
 ## Resources
 
 - [Documentation](https://autarkjs.org/introduction.html)
