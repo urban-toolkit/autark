@@ -1,0 +1,2091 @@
+{
+ "binning-1d quantitative (histogram-brush)": {
+  "preset": "binning-1d",
+  "rows": [
+   {
+    "label": "1.1M-4.8M",
+    "order": 0,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     17
+    ]
+   },
+   {
+    "label": "4.8M-8.5M",
+    "order": 1,
+    "value": 3,
+    "count": 3,
+    "autkIds": [
+     13,
+     14,
+     35
+    ]
+   },
+   {
+    "label": "8.5M-12M",
+    "order": 2,
+    "value": 5,
+    "count": 5,
+    "autkIds": [
+     2,
+     4,
+     6,
+     25,
+     36
+    ]
+   },
+   {
+    "label": "12M-16M",
+    "order": 3,
+    "value": 12,
+    "count": 12,
+    "autkIds": [
+     1,
+     3,
+     5,
+     11,
+     15,
+     16,
+     18,
+     20,
+     23,
+     24,
+     27,
+     34
+    ]
+   },
+   {
+    "label": "16M-20M",
+    "order": 4,
+    "value": 6,
+    "count": 6,
+    "autkIds": [
+     0,
+     7,
+     8,
+     10,
+     26,
+     29
+    ]
+   },
+   {
+    "label": "20M-23M",
+    "order": 5,
+    "value": 3,
+    "count": 3,
+    "autkIds": [
+     21,
+     22,
+     32
+    ]
+   },
+   {
+    "label": "23M-27M",
+    "order": 6,
+    "value": 6,
+    "count": 6,
+    "autkIds": [
+     12,
+     19,
+     28,
+     30,
+     31,
+     33
+    ]
+   },
+   {
+    "label": "27M-31M",
+    "order": 7,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     9
+    ]
+   },
+   {
+    "label": "35M-38M",
+    "order": 9,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     37
+    ]
+   }
+  ]
+ },
+ "binning-1d categorical (histogram-brush-landuse)": {
+  "preset": "binning-1d",
+  "rows": [
+   {
+    "label": "Commercial",
+    "order": 0,
+    "value": 4,
+    "count": 4,
+    "autkIds": [
+     0,
+     11,
+     12,
+     17
+    ]
+   },
+   {
+    "label": "Mixed",
+    "order": 1,
+    "value": 14,
+    "count": 14,
+    "autkIds": [
+     1,
+     2,
+     3,
+     4,
+     6,
+     8,
+     9,
+     10,
+     16,
+     25,
+     31,
+     35,
+     36,
+     37
+    ]
+   },
+   {
+    "label": "Residential",
+    "order": 2,
+    "value": 20,
+    "count": 20,
+    "autkIds": [
+     5,
+     7,
+     13,
+     14,
+     15,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     26,
+     27,
+     28,
+     29,
+     30,
+     32,
+     33,
+     34
+    ]
+   }
+  ]
+ },
+ "binning-1d with sum reducer": {
+  "preset": "binning-1d",
+  "rows": [
+   {
+    "label": "1.1M-7.3M",
+    "order": 0,
+    "value": 17346.3301043,
+    "count": 2,
+    "autkIds": [
+     13,
+     17
+    ]
+   },
+   {
+    "label": "7.3M-13M",
+    "order": 1,
+    "value": 213021.46157329998,
+    "count": 10,
+    "autkIds": [
+     2,
+     3,
+     4,
+     6,
+     14,
+     16,
+     20,
+     25,
+     35,
+     36
+    ]
+   },
+   {
+    "label": "13M-20M",
+    "order": 2,
+    "value": 354203.20609130006,
+    "count": 15,
+    "autkIds": [
+     0,
+     1,
+     5,
+     7,
+     8,
+     10,
+     11,
+     15,
+     18,
+     23,
+     24,
+     26,
+     27,
+     29,
+     34
+    ]
+   },
+   {
+    "label": "20M-26M",
+    "order": 3,
+    "value": 221261.55188440005,
+    "count": 8,
+    "autkIds": [
+     12,
+     19,
+     21,
+     22,
+     28,
+     31,
+     32,
+     33
+    ]
+   },
+   {
+    "label": "26M-32M",
+    "order": 4,
+    "value": 78793.2877702,
+    "count": 2,
+    "autkIds": [
+     9,
+     30
+    ]
+   },
+   {
+    "label": "32M-38M",
+    "order": 5,
+    "value": 32721.0971792,
+    "count": 1,
+    "autkIds": [
+     37
+    ]
+   }
+  ]
+ },
+ "binning-2d (heatmatrix-click)": {
+  "preset": "binning-2d",
+  "rows": [
+   {
+    "x": "16M-23M",
+    "y": "Commercial",
+    "xOrder": 2,
+    "yOrder": 0,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     0
+    ]
+   },
+   {
+    "x": "8.5M-16M",
+    "y": "Mixed",
+    "xOrder": 1,
+    "yOrder": 1,
+    "value": 8,
+    "count": 8,
+    "autkIds": [
+     1,
+     2,
+     3,
+     4,
+     6,
+     16,
+     25,
+     36
+    ]
+   },
+   {
+    "x": "8.5M-16M",
+    "y": "Residential",
+    "xOrder": 1,
+    "yOrder": 2,
+    "value": 8,
+    "count": 8,
+    "autkIds": [
+     5,
+     15,
+     18,
+     20,
+     23,
+     24,
+     27,
+     34
+    ]
+   },
+   {
+    "x": "16M-23M",
+    "y": "Residential",
+    "xOrder": 2,
+    "yOrder": 2,
+    "value": 6,
+    "count": 6,
+    "autkIds": [
+     7,
+     21,
+     22,
+     26,
+     29,
+     32
+    ]
+   },
+   {
+    "x": "16M-23M",
+    "y": "Mixed",
+    "xOrder": 2,
+    "yOrder": 1,
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     8,
+     10
+    ]
+   },
+   {
+    "x": "23M-31M",
+    "y": "Mixed",
+    "xOrder": 3,
+    "yOrder": 1,
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     9,
+     31
+    ]
+   },
+   {
+    "x": "8.5M-16M",
+    "y": "Commercial",
+    "xOrder": 1,
+    "yOrder": 0,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     11
+    ]
+   },
+   {
+    "x": "23M-31M",
+    "y": "Commercial",
+    "xOrder": 3,
+    "yOrder": 0,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     12
+    ]
+   },
+   {
+    "x": "1.1M-8.5M",
+    "y": "Residential",
+    "xOrder": 0,
+    "yOrder": 2,
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     13,
+     14
+    ]
+   },
+   {
+    "x": "1.1M-8.5M",
+    "y": "Commercial",
+    "xOrder": 0,
+    "yOrder": 0,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     17
+    ]
+   },
+   {
+    "x": "23M-31M",
+    "y": "Residential",
+    "xOrder": 3,
+    "yOrder": 2,
+    "value": 4,
+    "count": 4,
+    "autkIds": [
+     19,
+     28,
+     30,
+     33
+    ]
+   },
+   {
+    "x": "1.1M-8.5M",
+    "y": "Mixed",
+    "xOrder": 0,
+    "yOrder": 1,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     35
+    ]
+   },
+   {
+    "x": "31M-38M",
+    "y": "Mixed",
+    "xOrder": 4,
+    "yOrder": 1,
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     37
+    ]
+   }
+  ]
+ },
+ "sort (table-click)": {
+  "preset": "sort",
+  "rows": [
+   {
+    "shape_area": 38312378.2439,
+    "ntaname": "Central Park",
+    "cdtaname": "MN64 Central Park (JIA 64 Equivalent)",
+    "shape_leng": 32721.0971792,
+    "boroname": "Manhattan",
+    "ntatype": 9,
+    "nta2020": "MN6491",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "CntrlPk",
+    "cdta2020": "MN64",
+    "autkIds": [
+     37
+    ]
+   },
+   {
+    "shape_area": 29671753.3197,
+    "ntaname": "Chelsea-Hudson Yards",
+    "cdtaname": "MN04 Chelsea-Hell's Kitchen (CD 4 Approximation)",
+    "shape_leng": 40095.236706,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0401",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Chls_HdsYd",
+    "cdta2020": "MN04",
+    "autkIds": [
+     9
+    ]
+   },
+   {
+    "shape_area": 11542590.3767,
+    "ntaname": "Chinatown-Two Bridges",
+    "cdtaname": "MN03 Lower East Side-Chinatown (CD 3 Equivalent)",
+    "shape_leng": 16668.1111161,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0301",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Chntwn",
+    "cdta2020": "MN03",
+    "autkIds": [
+     6
+    ]
+   },
+   {
+    "shape_area": 26104503.6338,
+    "ntaname": "East Harlem (North)",
+    "cdtaname": "MN11 East Harlem (CD 11 Equivalent)",
+    "shape_leng": 38698.0510642,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1102",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "EstHrlm_N",
+    "cdta2020": "MN11",
+    "autkIds": [
+     30
+    ]
+   },
+   {
+    "shape_area": 16653940.2784,
+    "ntaname": "East Harlem (South)",
+    "cdtaname": "MN11 East Harlem (CD 11 Equivalent)",
+    "shape_leng": 23396.960257,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1101",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "EstHrlm_S",
+    "cdta2020": "MN11",
+    "autkIds": [
+     29
+    ]
+   },
+   {
+    "shape_area": 13138095.4617,
+    "ntaname": "East Midtown-Turtle Bay",
+    "cdtaname": "MN06 East Midtown-Murray Hill (CD 6 Approximation)",
+    "shape_leng": 16687.5847462,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0604",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "EstMdtwn",
+    "cdta2020": "MN06",
+    "autkIds": [
+     16
+    ]
+   },
+   {
+    "shape_area": 18984761.5581,
+    "ntaname": "East Village",
+    "cdtaname": "MN03 Lower East Side-Chinatown (CD 3 Equivalent)",
+    "shape_leng": 22489.5237874,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0303",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "EstVlg",
+    "cdta2020": "MN03",
+    "autkIds": [
+     8
+    ]
+   },
+   {
+    "shape_area": 19245011.7093,
+    "ntaname": "Financial District-Battery Park City",
+    "cdtaname": "MN01 Financial District-Tribeca (CD 1 Equivalent)",
+    "shape_leng": 45306.3321199,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0101",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "FiDi",
+    "cdta2020": "MN01",
+    "autkIds": [
+     0
+    ]
+   },
+   {
+    "shape_area": 7526916.69977,
+    "ntaname": "Gramercy",
+    "cdtaname": "MN06 East Midtown-Murray Hill (CD 6 Approximation)",
+    "shape_leng": 12096.8909253,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0602",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Grmrcy",
+    "cdta2020": "MN06",
+    "autkIds": [
+     14
+    ]
+   },
+   {
+    "shape_area": 10599574.0092,
+    "ntaname": "Greenwich Village",
+    "cdtaname": "MN02 Greenwich Village-SoHo (CD 2 Equivalent)",
+    "shape_leng": 12973.9498078,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0202",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "GrnwchVlg",
+    "cdta2020": "MN02",
+    "autkIds": [
+     4
+    ]
+   },
+   {
+    "shape_area": 15984383.2347,
+    "ntaname": "Hamilton Heights-Sugar Hill",
+    "cdtaname": "MN09 Morningside Heights-Hamilton Heights (CD 9 Equivalent)",
+    "shape_leng": 17103.3628796,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0903",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "HmltnHts",
+    "cdta2020": "MN09",
+    "autkIds": [
+     26
+    ]
+   },
+   {
+    "shape_area": 23792907.5985,
+    "ntaname": "Harlem (North)",
+    "cdtaname": "MN10 Harlem (CD 10 Equivalent)",
+    "shape_leng": 31863.511594,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1002",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Hrlm_N",
+    "cdta2020": "MN10",
+    "autkIds": [
+     28
+    ]
+   },
+   {
+    "shape_area": 14441227.3216,
+    "ntaname": "Harlem (South)",
+    "cdtaname": "MN10 Harlem (CD 10 Equivalent)",
+    "shape_leng": 16624.4627212,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1001",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Hrlm_S",
+    "cdta2020": "MN10",
+    "autkIds": [
+     27
+    ]
+   },
+   {
+    "shape_area": 18382316.3513,
+    "ntaname": "Hell's Kitchen",
+    "cdtaname": "MN04 Chelsea-Hell's Kitchen (CD 4 Approximation)",
+    "shape_leng": 36275.2815012,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0402",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "HllsKtchn",
+    "cdta2020": "MN04",
+    "autkIds": [
+     10
+    ]
+   },
+   {
+    "shape_area": 7750591.84552,
+    "ntaname": "Highbridge Park",
+    "cdtaname": "MN12 Washington Heights-Inwood (CD 12 Equivalent)",
+    "shape_leng": 27454.0830968,
+    "boroname": "Manhattan",
+    "ntatype": 9,
+    "nta2020": "MN1291",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "HghbrdgPk",
+    "cdta2020": "MN12",
+    "autkIds": [
+     35
+    ]
+   },
+   {
+    "shape_area": 14437615.1412,
+    "ntaname": "Inwood",
+    "cdtaname": "MN12 Washington Heights-Inwood (CD 12 Equivalent)",
+    "shape_leng": 25462.4445264,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1203",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Inwd",
+    "cdta2020": "MN12",
+    "autkIds": [
+     34
+    ]
+   },
+   {
+    "shape_area": 10007466.5221,
+    "ntaname": "Inwood Hill Park",
+    "cdtaname": "MN12 Washington Heights-Inwood (CD 12 Equivalent)",
+    "shape_leng": 25493.1347011,
+    "boroname": "Manhattan",
+    "ntatype": 9,
+    "nta2020": "MN1292",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "InwdHlPk",
+    "cdta2020": "MN12",
+    "autkIds": [
+     36
+    ]
+   },
+   {
+    "shape_area": 16473191.2173,
+    "ntaname": "Lower East Side",
+    "cdtaname": "MN03 Lower East Side-Chinatown (CD 3 Equivalent)",
+    "shape_leng": 22123.0274583,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0302",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "LES",
+    "cdta2020": "MN03",
+    "autkIds": [
+     7
+    ]
+   },
+   {
+    "shape_area": 10734805.3205,
+    "ntaname": "Manhattanville-West Harlem",
+    "cdtaname": "MN09 Morningside Heights-Hamilton Heights (CD 9 Equivalent)",
+    "shape_leng": 17357.2462026,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0902",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Mnhttnvl",
+    "cdta2020": "MN09",
+    "autkIds": [
+     25
+    ]
+   },
+   {
+    "shape_area": 14878105.1605,
+    "ntaname": "Midtown South-Flatiron-Union Square",
+    "cdtaname": "MN05 Midtown-Flatiron-Union Square (CD 5 Approximation)",
+    "shape_leng": 18800.765628,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0501",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "MdtwnSth",
+    "cdta2020": "MN05",
+    "autkIds": [
+     11
+    ]
+   },
+   {
+    "shape_area": 24552509.6358,
+    "ntaname": "Midtown-Times Square",
+    "cdtaname": "MN05 Midtown-Flatiron-Union Square (CD 5 Approximation)",
+    "shape_leng": 21258.4010015,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0502",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Mdtwn_TmSq",
+    "cdta2020": "MN05",
+    "autkIds": [
+     12
+    ]
+   },
+   {
+    "shape_area": 15922767.0212,
+    "ntaname": "Morningside Heights",
+    "cdtaname": "MN09 Morningside Heights-Hamilton Heights (CD 9 Equivalent)",
+    "shape_leng": 17757.8071398,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0901",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "MrngsdHts",
+    "cdta2020": "MN09",
+    "autkIds": [
+     24
+    ]
+   },
+   {
+    "shape_area": 15771152.1046,
+    "ntaname": "Murray Hill-Kips Bay",
+    "cdtaname": "MN06 East Midtown-Murray Hill (CD 6 Approximation)",
+    "shape_leng": 25692.7420589,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0603",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "MryHl_KpBy",
+    "cdta2020": "MN06",
+    "autkIds": [
+     15
+    ]
+   },
+   {
+    "shape_area": 23466536.5079,
+    "ntaname": "Randall's Island",
+    "cdtaname": "MN11 East Harlem (CD 11 Equivalent)",
+    "shape_leng": 32050.1607805,
+    "boroname": "Manhattan",
+    "ntatype": 9,
+    "nta2020": "MN1191",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "RndllsIsl",
+    "cdta2020": "MN11",
+    "autkIds": [
+     31
+    ]
+   },
+   {
+    "shape_area": 12916760.8492,
+    "ntaname": "SoHo-Little Italy-Hudson Square",
+    "cdtaname": "MN02 Greenwich Village-SoHo (CD 2 Equivalent)",
+    "shape_leng": 20252.9064821,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0201",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "SoHo",
+    "cdta2020": "MN02",
+    "autkIds": [
+     3
+    ]
+   },
+   {
+    "shape_area": 5575562.46457,
+    "ntaname": "Stuyvesant Town-Peter Cooper Village",
+    "cdtaname": "MN06 East Midtown-Murray Hill (CD 6 Approximation)",
+    "shape_leng": 11955.5567433,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0601",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "StyTwn",
+    "cdta2020": "MN06",
+    "autkIds": [
+     13
+    ]
+   },
+   {
+    "shape_area": 11989896.2552,
+    "ntaname": "The Battery-Governors Island-Ellis Island-Liberty Island",
+    "cdtaname": "MN01 Financial District-Tribeca (CD 1 Equivalent)",
+    "shape_leng": 49169.681822,
+    "boroname": "Manhattan",
+    "ntatype": 9,
+    "nta2020": "MN0191",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "Btry_GvIsl",
+    "cdta2020": "MN01",
+    "autkIds": [
+     2
+    ]
+   },
+   {
+    "shape_area": 13577181.4049,
+    "ntaname": "Tribeca-Civic Center",
+    "cdtaname": "MN01 Financial District-Tribeca (CD 1 Equivalent)",
+    "shape_leng": 21222.4437187,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0102",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "TriBeCa",
+    "cdta2020": "MN01",
+    "autkIds": [
+     1
+    ]
+   },
+   {
+    "shape_area": 1091249.96594,
+    "ntaname": "United Nations",
+    "cdtaname": "MN06 East Midtown-Murray Hill (CD 6 Approximation)",
+    "shape_leng": 5390.773361,
+    "boroname": "Manhattan",
+    "ntatype": 6,
+    "nta2020": "MN0661",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UN",
+    "cdta2020": "MN06",
+    "autkIds": [
+     17
+    ]
+   },
+   {
+    "shape_area": 20065364.1,
+    "ntaname": "Upper East Side-Carnegie Hill",
+    "cdtaname": "MN08 Upper East Side-Roosevelt Island (CD 8 Equivalent)",
+    "shape_leng": 23778.410348,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0802",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UES_CrngHl",
+    "cdta2020": "MN08",
+    "autkIds": [
+     22
+    ]
+   },
+   {
+    "shape_area": 21500955.6247,
+    "ntaname": "Upper East Side-Lenox Hill-Roosevelt Island",
+    "cdtaname": "MN08 Upper East Side-Roosevelt Island (CD 8 Equivalent)",
+    "shape_leng": 38475.0532075,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0801",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UES_LnxHl",
+    "cdta2020": "MN08",
+    "autkIds": [
+     21
+    ]
+   },
+   {
+    "shape_area": 13645033.1064,
+    "ntaname": "Upper East Side-Yorkville",
+    "cdtaname": "MN08 Upper East Side-Roosevelt Island (CD 8 Equivalent)",
+    "shape_leng": 18113.2933055,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0803",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UES_Yrkvl",
+    "cdta2020": "MN08",
+    "autkIds": [
+     23
+    ]
+   },
+   {
+    "shape_area": 25410668.2689,
+    "ntaname": "Upper West Side (Central)",
+    "cdtaname": "MN07 Upper West Side (CD 7 Approximation)",
+    "shape_leng": 24906.0090118,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0702",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UWS_C",
+    "cdta2020": "MN07",
+    "autkIds": [
+     19
+    ]
+   },
+   {
+    "shape_area": 15797449.0611,
+    "ntaname": "Upper West Side-Lincoln Square",
+    "cdtaname": "MN07 Upper West Side (CD 7 Approximation)",
+    "shape_leng": 19952.4196524,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0701",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UWS_LclnSq",
+    "cdta2020": "MN07",
+    "autkIds": [
+     18
+    ]
+   },
+   {
+    "shape_area": 13200450.2651,
+    "ntaname": "Upper West Side-Manhattan Valley",
+    "cdtaname": "MN07 Upper West Side (CD 7 Approximation)",
+    "shape_leng": 14867.8726733,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0703",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "UWS_MnVly",
+    "cdta2020": "MN07",
+    "autkIds": [
+     20
+    ]
+   },
+   {
+    "shape_area": 24773511.3589,
+    "ntaname": "Washington Heights (North)",
+    "cdtaname": "MN12 Washington Heights-Inwood (CD 12 Equivalent)",
+    "shape_leng": 26731.5961172,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1202",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "WshHts_N",
+    "cdta2020": "MN12",
+    "autkIds": [
+     33
+    ]
+   },
+   {
+    "shape_area": 21026876.3569,
+    "ntaname": "Washington Heights (South)",
+    "cdtaname": "MN12 Washington Heights-Inwood (CD 12 Equivalent)",
+    "shape_leng": 22198.4098239,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN1201",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "WshHts_S",
+    "cdta2020": "MN12",
+    "autkIds": [
+     32
+    ]
+   },
+   {
+    "shape_area": 14417744.1253,
+    "ntaname": "West Village",
+    "cdtaname": "MN02 Greenwich Village-SoHo (CD 2 Equivalent)",
+    "shape_leng": 23882.339337,
+    "boroname": "Manhattan",
+    "ntatype": 0,
+    "nta2020": "MN0203",
+    "borocode": 1,
+    "countyfips": "061",
+    "ntaabbrev": "WstVlg",
+    "cdta2020": "MN02",
+    "autkIds": [
+     5
+    ]
+   }
+  ]
+ },
+ "reduce-series (timeseries-click)": {
+  "preset": "reduce-series",
+  "rows": [
+   {
+    "bucket": "2021",
+    "value": 12.842105263157896,
+    "count": 38,
+    "autkIds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37
+    ]
+   },
+   {
+    "bucket": "2022",
+    "value": 14.81578947368421,
+    "count": 38,
+    "autkIds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37
+    ]
+   },
+   {
+    "bucket": "2023",
+    "value": 16.789473684210527,
+    "count": 38,
+    "autkIds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37
+    ]
+   },
+   {
+    "bucket": "2024",
+    "value": 18.763157894736842,
+    "count": 38,
+    "autkIds": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37
+    ]
+   }
+  ]
+ },
+ "binning-events (temporal-events-click)": {
+  "preset": "binning-events",
+  "rows": [
+   {
+    "bucket": "2024-01-01",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     0
+    ]
+   },
+   {
+    "bucket": "2024-02-04",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     1
+    ]
+   },
+   {
+    "bucket": "2024-07-05",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     1
+    ]
+   },
+   {
+    "bucket": "2024-03-07",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     2
+    ]
+   },
+   {
+    "bucket": "2024-08-08",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     2
+    ]
+   },
+   {
+    "bucket": "2024-01-09",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     2,
+     12
+    ]
+   },
+   {
+    "bucket": "2024-04-10",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     3
+    ]
+   },
+   {
+    "bucket": "2024-09-11",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     3
+    ]
+   },
+   {
+    "bucket": "2024-02-12",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     3,
+     13
+    ]
+   },
+   {
+    "bucket": "2024-07-13",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     3,
+     13
+    ]
+   },
+   {
+    "bucket": "2024-05-13",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     4
+    ]
+   },
+   {
+    "bucket": "2024-06-16",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     5
+    ]
+   },
+   {
+    "bucket": "2024-11-17",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     5
+    ]
+   },
+   {
+    "bucket": "2024-07-19",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     6
+    ]
+   },
+   {
+    "bucket": "2024-12-20",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     6
+    ]
+   },
+   {
+    "bucket": "2024-05-21",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     6,
+     16
+    ]
+   },
+   {
+    "bucket": "2024-08-22",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     7
+    ]
+   },
+   {
+    "bucket": "2024-01-23",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     7
+    ]
+   },
+   {
+    "bucket": "2024-06-24",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     7,
+     17
+    ]
+   },
+   {
+    "bucket": "2024-11-25",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     7,
+     17
+    ]
+   },
+   {
+    "bucket": "2024-09-25",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     8
+    ]
+   },
+   {
+    "bucket": "2024-10-28",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     9
+    ]
+   },
+   {
+    "bucket": "2024-03-01",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     9
+    ]
+   },
+   {
+    "bucket": "2024-11-03",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     10
+    ]
+   },
+   {
+    "bucket": "2024-04-04",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     10
+    ]
+   },
+   {
+    "bucket": "2024-09-05",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     10,
+     20
+    ]
+   },
+   {
+    "bucket": "2024-12-06",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     11
+    ]
+   },
+   {
+    "bucket": "2024-05-07",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     11
+    ]
+   },
+   {
+    "bucket": "2024-10-08",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     11,
+     21
+    ]
+   },
+   {
+    "bucket": "2024-03-09",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     11,
+     21
+    ]
+   },
+   {
+    "bucket": "2024-03-15",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     14
+    ]
+   },
+   {
+    "bucket": "2024-08-16",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     14
+    ]
+   },
+   {
+    "bucket": "2024-01-17",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     14,
+     24
+    ]
+   },
+   {
+    "bucket": "2024-04-18",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     15
+    ]
+   },
+   {
+    "bucket": "2024-09-19",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     15
+    ]
+   },
+   {
+    "bucket": "2024-02-20",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     15,
+     25
+    ]
+   },
+   {
+    "bucket": "2024-07-21",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     15,
+     25
+    ]
+   },
+   {
+    "bucket": "2024-07-27",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     18
+    ]
+   },
+   {
+    "bucket": "2024-12-28",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     18
+    ]
+   },
+   {
+    "bucket": "2024-05-01",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     18,
+     28
+    ]
+   },
+   {
+    "bucket": "2024-08-02",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     19
+    ]
+   },
+   {
+    "bucket": "2024-01-03",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     19
+    ]
+   },
+   {
+    "bucket": "2024-06-04",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     19,
+     29
+    ]
+   },
+   {
+    "bucket": "2024-11-05",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     19,
+     29
+    ]
+   },
+   {
+    "bucket": "2024-11-11",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     22
+    ]
+   },
+   {
+    "bucket": "2024-04-12",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     22
+    ]
+   },
+   {
+    "bucket": "2024-09-13",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     22,
+     32
+    ]
+   },
+   {
+    "bucket": "2024-12-14",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     23
+    ]
+   },
+   {
+    "bucket": "2024-05-15",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     23
+    ]
+   },
+   {
+    "bucket": "2024-10-16",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     23,
+     33
+    ]
+   },
+   {
+    "bucket": "2024-03-17",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     23,
+     33
+    ]
+   },
+   {
+    "bucket": "2024-03-23",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     26
+    ]
+   },
+   {
+    "bucket": "2024-08-24",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     26
+    ]
+   },
+   {
+    "bucket": "2024-01-25",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     26,
+     36
+    ]
+   },
+   {
+    "bucket": "2024-04-26",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     27
+    ]
+   },
+   {
+    "bucket": "2024-09-27",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     27
+    ]
+   },
+   {
+    "bucket": "2024-02-28",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     27,
+     37
+    ]
+   },
+   {
+    "bucket": "2024-07-01",
+    "value": 2,
+    "count": 2,
+    "autkIds": [
+     27,
+     37
+    ]
+   },
+   {
+    "bucket": "2024-07-07",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     30
+    ]
+   },
+   {
+    "bucket": "2024-12-08",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     30
+    ]
+   },
+   {
+    "bucket": "2024-05-09",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     30
+    ]
+   },
+   {
+    "bucket": "2024-08-10",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     31
+    ]
+   },
+   {
+    "bucket": "2024-01-11",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     31
+    ]
+   },
+   {
+    "bucket": "2024-06-12",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     31
+    ]
+   },
+   {
+    "bucket": "2024-11-13",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     31
+    ]
+   },
+   {
+    "bucket": "2024-11-19",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     34
+    ]
+   },
+   {
+    "bucket": "2024-04-20",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     34
+    ]
+   },
+   {
+    "bucket": "2024-09-21",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     34
+    ]
+   },
+   {
+    "bucket": "2024-12-22",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     35
+    ]
+   },
+   {
+    "bucket": "2024-05-23",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     35
+    ]
+   },
+   {
+    "bucket": "2024-10-24",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     35
+    ]
+   },
+   {
+    "bucket": "2024-03-25",
+    "value": 1,
+    "count": 1,
+    "autkIds": [
+     35
+    ]
+   }
+  ]
+ },
+ "binning-events monthly avg": {
+  "preset": "binning-events",
+  "rows": [
+   {
+    "bucket": "2024-01",
+    "value": 18,
+    "count": 10,
+    "autkIds": [
+     0,
+     2,
+     7,
+     12,
+     14,
+     19,
+     24,
+     26,
+     31,
+     36
+    ]
+   },
+   {
+    "bucket": "2024-02",
+    "value": 18.142857142857142,
+    "count": 7,
+    "autkIds": [
+     1,
+     3,
+     13,
+     15,
+     25,
+     27,
+     37
+    ]
+   },
+   {
+    "bucket": "2024-07",
+    "value": 18.8,
+    "count": 10,
+    "autkIds": [
+     1,
+     3,
+     6,
+     13,
+     15,
+     18,
+     25,
+     27,
+     30,
+     37
+    ]
+   },
+   {
+    "bucket": "2024-03",
+    "value": 20.666666666666668,
+    "count": 9,
+    "autkIds": [
+     2,
+     9,
+     11,
+     14,
+     21,
+     23,
+     26,
+     33,
+     35
+    ]
+   },
+   {
+    "bucket": "2024-08",
+    "value": 17,
+    "count": 6,
+    "autkIds": [
+     2,
+     7,
+     14,
+     19,
+     26,
+     31
+    ]
+   },
+   {
+    "bucket": "2024-04",
+    "value": 19,
+    "count": 6,
+    "autkIds": [
+     3,
+     10,
+     15,
+     22,
+     27,
+     34
+    ]
+   },
+   {
+    "bucket": "2024-09",
+    "value": 20,
+    "count": 9,
+    "autkIds": [
+     3,
+     8,
+     10,
+     15,
+     20,
+     22,
+     27,
+     32,
+     34
+    ]
+   },
+   {
+    "bucket": "2024-05",
+    "value": 20,
+    "count": 9,
+    "autkIds": [
+     4,
+     6,
+     11,
+     16,
+     18,
+     23,
+     28,
+     30,
+     35
+    ]
+   },
+   {
+    "bucket": "2024-06",
+    "value": 19,
+    "count": 6,
+    "autkIds": [
+     5,
+     7,
+     17,
+     19,
+     29,
+     31
+    ]
+   },
+   {
+    "bucket": "2024-11",
+    "value": 20.666666666666668,
+    "count": 9,
+    "autkIds": [
+     5,
+     7,
+     10,
+     17,
+     19,
+     22,
+     29,
+     31,
+     34
+    ]
+   },
+   {
+    "bucket": "2024-12",
+    "value": 21,
+    "count": 6,
+    "autkIds": [
+     6,
+     11,
+     18,
+     23,
+     30,
+     35
+    ]
+   },
+   {
+    "bucket": "2024-10",
+    "value": 23,
+    "count": 6,
+    "autkIds": [
+     9,
+     11,
+     21,
+     23,
+     33,
+     35
+    ]
+   }
+  ]
+ },
+ "reduceBuckets": [
+  {
+   "key": "Commercial",
+   "value": 24552509.6358,
+   "count": 4,
+   "autkIds": [
+    0,
+    11,
+    12,
+    17
+   ]
+  },
+  {
+   "key": "Mixed",
+   "value": 38312378.2439,
+   "count": 14,
+   "autkIds": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    8,
+    9,
+    10,
+    16,
+    25,
+    31,
+    35,
+    36,
+    37
+   ]
+  },
+  {
+   "key": "Residential",
+   "value": 26104503.6338,
+   "count": 20,
+   "autkIds": [
+    5,
+    7,
+    13,
+    14,
+    15,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    26,
+    27,
+    28,
+    29,
+    30,
+    32,
+    33,
+    34
+   ]
+  }
+ ]
+}
