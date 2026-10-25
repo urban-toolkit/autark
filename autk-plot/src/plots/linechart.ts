@@ -278,8 +278,8 @@ export class Linechart extends PlotBaseInteractive {
             .join('path')
             .attr('class', 'autk-line')
             .attr('fill', 'none')
-            // autk-plot-new draws the line in the mark color; the original mode keeps its blue.
-            .attr('stroke', this.segregatedEnabled ? PlotStyle.default : '#4472c4')
+            // The line takes the mark color, so the line of the selection stands out.
+            .attr('stroke', PlotStyle.default)
             .attr('stroke-width', 1.5)
             .attr('d', lineGen);
 

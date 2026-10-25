@@ -42,9 +42,8 @@ export class PlotStyle {
     /**
      * Gets the highlight color of plots with the segregated provenance view.
      *
-     * It replaces `highlight` for both partial and whole-mark highlights, so
-     * autk-plot-new is visually distinct from the original autk-plot, which
-     * keeps `highlight`.
+     * It replaces `highlight` for both partial and whole-mark highlights;
+     * `setHighlightColor` sets both.
      *
      * @returns Hex color used for selected marks and mark parts.
      */
