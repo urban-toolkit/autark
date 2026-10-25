@@ -32,7 +32,11 @@ const vitestApi = {
 };
 // Dependencies are found from the test files at startup, so no page reloads in the middle of a file.
 const server = await createServer({ root, configFile: false, logLevel: 'error', plugins: [vitestApi],
-    resolve: { alias: { '@urban-toolkit/autk-core': resolve(root, 'autk-core/src/index.ts') } },
+    // Sources of both packages: the use case modules some tests import use the package name.
+    resolve: { alias: {
+        '@urban-toolkit/autk-core': resolve(root, 'autk-core/src/index.ts'),
+        '@urban-toolkit/autk-plot': resolve(root, 'autk-plot/src/index.ts'),
+    } },
     optimizeDeps: { entries: ['autk-plot/test/harness.ts', ...files.map(file => `autk-plot/test/${file}`)] },
     server: { host: '127.0.0.1', port: 0 } });
 let browser;

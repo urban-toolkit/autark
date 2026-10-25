@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autark (Provenance)</title>
+    <link rel="icon" type="image/svg+xml" href="./img/favicon.svg" />
+    <link rel="stylesheet" href="./main.css" />
+</head>
+<body>
+    <div id="app">
+        <div id="loading-overlay" role="status" aria-live="polite">
+            <div id="loading-box">
+                <div id="loading-spinner"></div>
+                <h2 id="loading-title">Loading</h2>
+                <p id="loading-text"></p>
+                <p id="loading-note"></p>
+            </div>
+        </div>
+
+        <nav id="toolbox" aria-label="Tools">
+            <div class="tool-group" aria-label="Map and transforms">
+                <button type="button" class="tool" data-target="map-pane" data-label="Reset map view" data-icon="map"></button>
+                <button type="button" class="tool" data-drawer="transforms-drawer" data-label="Transforms" data-icon="transforms"></button>
+            </div>
+            <div class="tool-group tool-group-try" aria-label="Try it Yourself">
+                <button type="button" class="tool tool-try" data-drawer="try-drawer" data-label="Try it Yourself" data-icon="lab"></button>
+            </div>
+            <div class="tool-group" id="chart-tools" aria-label="Charts"></div>
+        </nav>
+
+        <section id="map-pane" aria-label="Map">
+            <canvas id="map" aria-label="Manhattan regions"></canvas>
+            <p class="map-hint">Double-click to select</p>
+            <p id="map-status" class="map-status" hidden></p>
+        </section>
+
+        <main id="charts-pane" aria-label="Charts">
+            <header class="pane-head">
+                <div class="pane-title">
+                    <img src="./img/logo.png" alt="" width="30" height="30" />
+                    <h1>autk-plot</h1>
+                    <button type="button" class="button brand try-button" data-drawer="try-drawer" title="Write a transform or bring a plain D3 chart">
+                        <span class="icon" data-icon="lab"></span>Try it Yourself
+                    </button>
+                </div>
+                <p class="pane-subtitle"><strong>Provenance:</strong> linked views that paint only the part of each mark a selection produces</p>
+                <div id="controls" role="group" aria-label="View settings">
+                    <select id="reducer" autocomplete="off" aria-label="Reducer" title="Reducer of the aggregating charts">
+                        <option value="count">Reducer: count</option>
+                        <option value="sum">Reducer: sum</option>
+                        <option value="avg">Reducer: avg</option>
+                    </select>
+                    <select id="filter" autocomplete="off" aria-label="Filter" title="Keep only the regions that meet the filter in every chart">
+                        <option value="">Filter: none</option>
+                    </select>
+                    <button type="button" id="clear" class="button ghost" title="Clear the selection everywhere" aria-label="Clear the selection">
+                        <span class="icon" data-icon="clear"></span><span class="button-label">Clear</span>
+                    </button>
+                </div>
+            </header>
+            <div id="charts" class="chart-grid"></div>
+        </main>
+
+        <aside id="transforms-drawer" class="drawer" aria-label="Transforms" aria-hidden="true">
+            <div class="drawer-head">
+                <div>
+                    <h2>Transforms</h2>
+                    <p>Each transform turns regions into chart rows and records the relations between them. Pick one to see the charts that use it.</p>
+                </div>
+                <button type="button" class="icon-button" data-close title="Close"><span class="icon" data-icon="close"></span></button>
+            </div>
+            <ul id="transform-list" class="transform-list"></ul>
+        </aside>
+
+        <aside id="try-drawer" class="drawer drawer-wide" aria-label="Try it Yourself" aria-hidden="true">
+            <div class="drawer-head">
+                <h2 class="drawer-title"><span class="icon" data-icon="lab"></span>Try it Yourself</h2>
+                <button type="button" class="icon-button" data-close title="Close"><span class="icon" data-icon="close"></span></button>
+            </div>
+            <div class="tabs" role="tablist">
+                <button type="button" role="tab" class="tab" id="tab-chart" data-tab="chart" aria-selected="true" aria-controls="panel-chart">D3 chart</button>
+                <button type="button" role="tab" class="tab" id="tab-transform" data-tab="transform" aria-selected="false" aria-controls="panel-transform" tabindex="-1">Transform</button>
+            </div>
+
+            <section class="lab" id="panel-chart" data-panel="chart" role="tabpanel" aria-labelledby="tab-chart">
+                <div class="lab-flow" role="list" aria-label="How a plain D3 chart becomes a linked autk-plot chart">
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-figure"><a href="https://d3js.org/getting-started" target="_blank" rel="noopener" title="Getting started with D3"><img src="./img/d3-logo.svg" alt="D3: getting started" width="56" height="56" /></a></div>
+                        <strong>Plain D3</strong>
+                    </div>
+                    <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-figure flow-tags"><code>class="autkMark"</code><code>datum = row</code></div>
+                        <strong>Annotate</strong>
+                    </div>
+                    <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-figure"><img src="./img/logo.png" alt="" width="56" height="56" /></div>
+                        <strong>autk-plot contract</strong>
+                    </div>
+                    <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
+                    <div class="flow-step flow-result" role="listitem">
+                        <div class="flow-figure flow-tags"><code>click · brush</code><code>map + 24 charts</code><code>provenance</code></div>
+                        <strong>Linked chart</strong>
+                    </div>
+                </div>
+                <div class="lab-controls">
+                    <label title="An example to start from: it fills the code and the fields">Start from <select id="plab-template"></select></label>
+                    <label title="Region properties the drawing reads, in order: value(row, 0), value(row, 1)… (@transform is the value the rows get)">Fields <input id="plab-columns" spellcheck="false" /></label>
+                    <label title="How the regions become the rows the drawing receives">Rows <select id="plab-rows"></select></label>
+                    <label id="plab-transform-field" title="Any transform of the package, as JSON" hidden>Transform (JSON) <input id="plab-transform" spellcheck="false" placeholder='{"preset":"binning-1d"}' /></label>
+                    <label title="How the chart selects">Select by
+                        <select id="plab-event">
+                            <option value="click">click</option>
+                            <option value="brush">brush</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="code-legend">
+                    <span><code class="sample-line">// Autark</code>Highlighted lines: the only changes to a plain D3 chart</span>
+                    <span><code>autkMark</code>Aqua names: from Autark</span>
+                </div>
+                <textarea id="plab-code" class="code" spellcheck="false" aria-label="D3 chart code"></textarea>
+                <div class="lab-run">
+                    <button type="button" id="plab-run" class="button brand"><span class="icon" data-icon="run"></span>Check and draw</button>
+                </div>
+                <p id="plab-message" class="lab-message"></p>
+                <div class="lab-result">
+                    <div id="plab-plot-box" class="lab-plot"></div>
+                    <ol id="plab-checks" class="lab-checks"></ol>
+                    <div class="lab-design" hidden>
+                        <strong>Provenance view</strong>
+                        <ul id="plab-design"></ul>
+                    </div>
+                </div>
+                <p class="lab-note">Runs only in this browser. In a project: <code>registerPlot</code>, then <code>{ type: 'registered' }</code>.</p>
+            </section>
+
+            <section class="lab" id="panel-transform" data-panel="transform" role="tabpanel" aria-labelledby="tab-transform" hidden>
+                <div class="lab-flow" role="list" aria-label="How regions become the rows of a linked chart through your transform">
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-figure"><span class="icon flow-icon" data-icon="map"></span></div>
+                        <strong>Regions</strong>
+                    </div>
+                    <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-figure flow-tags"><code>run(rows)</code><code>rows + provenance</code></div>
+                        <strong>Your transform</strong>
+                    </div>
+                    <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-figure"><img src="./img/logo.png" alt="" width="56" height="56" /></div>
+                        <strong>autk-plot contract</strong>
+                    </div>
+                    <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
+                    <div class="flow-step flow-result" role="listitem">
+                        <div class="flow-figure flow-tags"><code>click · brush</code><code>map + 24 charts</code><code>provenance</code></div>
+                        <strong>Linked chart</strong>
+                    </div>
+                </div>
+                <div class="lab-controls">
+                    <label title="An example to start from: it fills the code and the fields">Start from <select id="lab-template"></select></label>
+                    <label title="Region properties the transform reads (columns)">Fields <input id="lab-columns" spellcheck="false" /></label>
+                    <label title="Options the transform receives, as JSON (the options argument of run)">Options (JSON) <input id="lab-options" spellcheck="false" /></label>
+                    <label title="Chart that draws the rows, among those that read their shape">Chart <select id="lab-plot"></select></label>
+                </div>
+                <div class="code-legend">
+                    <span><code>lib.collectBuckets</code>Aqua names: Autark building blocks for buckets and provenance</span>
+                </div>
+                <textarea id="lab-code" class="code" spellcheck="false" aria-label="Transform code"></textarea>
+                <div class="lab-run">
+                    <button type="button" id="lab-run" class="button brand"><span class="icon" data-icon="run"></span>Check and draw</button>
+                </div>
+                <p id="lab-message" class="lab-message"></p>
+                <div class="lab-result">
+                    <div id="lab-plot-box" class="lab-plot"></div>
+                    <ol id="lab-checks" class="lab-checks"></ol>
+                </div>
+                <p class="lab-note">Runs only in this browser. In a project: <code>registerTransform</code>, like the moving average of the area chart.</p>
+            </section>
+        </aside>
+    </div>
+    <script type="module" src="./main.ts"></script>
+</body>
+</html>
