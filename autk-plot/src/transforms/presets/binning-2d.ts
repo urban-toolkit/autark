@@ -14,8 +14,10 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { Binning2dTransformConfig } from '../../api';
+import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
-import { reduceBuckets } from '../kernel';
+import { collectBuckets } from '../kernel';
+import { binnedProvenance, indexedBins } from '../provenance';
 import { buildBinMapper } from './binning-1d';
 
 // ---- Executed transform -------------------------------------------------
@@ -31,6 +33,8 @@ export type ExecutedBinning2dTransform = {
     preset: 'binning-2d';
     /** Aggregated cell rows ready for downstream heat-matrix rendering. */
     rows: Binning2dCellRow[];
+    /** Provenance `D0 features → D1 cells → D2 aggregates`, aligned with `rows`. */
+    provenance: TransformProvenance;
 };
 
 /**
@@ -83,7 +87,7 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
     // Composite key separator unlikely to appear in bin labels
     const SEP = '\0';
 
-    const reduced = reduceBuckets({
+    const reduced = collectBuckets({
         rows,
         bucketOf: (row) => {
             const xLabel = xMapper.label(valueAtPath(row, xAttr));
@@ -97,8 +101,27 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
         reducer,
     });
 
+    // Cells are identified by the indices of their x and y bins, empty cells included.
+    const keys = reduced.map(bucket => bucket.key);
+    const xBins = indexedBins(xMapper.labels(), keys.map(key => key.slice(0, key.indexOf(SEP))), 'x');
+    const yBins = indexedBins(yMapper.labels(), keys.map(key => key.slice(key.indexOf(SEP) + 1)), 'y');
+    const cells = new Map<string, ProvenanceId>();
+    for (const [xLabel, xId] of xBins) {
+        for (const [yLabel, yId] of yBins) {
+            cells.set(`${xLabel}${SEP}${yLabel}`, `cell:${xId.slice(2)},${yId.slice(2)}`);
+        }
+    }
+
     return {
         preset: 'binning-2d',
+        provenance: binnedProvenance({
+            rows,
+            buckets: reduced,
+            bins: cells,
+            binLabel: 'cells',
+            rowKeys: keys,
+            reducer,
+        }),
         rows: reduced.map(bucket => {
             const sepIdx = bucket.key.indexOf(SEP);
             const xLabel = bucket.key.slice(0, sepIdx);

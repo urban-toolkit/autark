@@ -5,22 +5,45 @@ import type { EventEmitter } from '@urban-toolkit/autk-core';
 import type { PlotEventRecord } from './types-events';
 
 import { PlotBaseInteractive } from './plot-base-interactive';
+import type { ProvenanceModel } from './provenance';
+import type { FeatureShare } from './types-provenance';
 
 
 import {
+    Areachart,
     Barchart,
+    Boxplot,
+    Bubblechart,
+    Calendar,
+    Hexbin,
     Heatmatrix,
     Linechart,
     ParallelCoordinates,
+    Piechart,
+    Sankey,
     Scatterplot,
     TableVis,
+    Waffle,
+    Stackedbar,
+    Treemap,
+    Sunburst,
+    Radar,
+    Cumulativechart,
+    Chord,
+    Densitychart,
+    Violin,
+    RegisteredPlot,
+    registeredPlot,
 } from './plots';
 
 /**
  * Unified public entrypoint for autk-plot plot creation and interaction.
  *
  * `AutkPlot` wraps plot-specific implementations (`scatterplot`, `barchart`,
- * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`) behind a single constructor
+ * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`, `boxplot`, `sankey`, `pie`, `donut`,
+ * `areachart`, `bubble`, `hexbin`, `calendar`, `waffle`, `stackedbar`, `treemap`,
+ * `sunburst`, `radar`, `ecdf`, `pareto`, `chord`, `density`,
+ * `violin`) behind a single constructor
  * and a stable API for selection and event handling.
  *
  * The wrapper delegates all behavior to the concrete plot instance selected by
@@ -87,6 +110,18 @@ export class AutkPlot {
     }
 
     /**
+     * Gets the provenance graph of the current draw, from source features to marks.
+     *
+     * @returns Provenance graph answering direct and inverse queries.
+     * @example
+     * plot.provenance.direct([0]);              // feature:0 → … → mark
+     * plot.provenance.inverse(['mark:aggregate:4']); // mark → … → features
+     */
+    get provenance(): ProvenanceModel {
+        return this._plot.provenance;
+    }
+
+    /**
      * Gets the plot event dispatcher.
      * @returns Typed event dispatcher exposed by the concrete plot.
      */
@@ -98,12 +133,15 @@ export class AutkPlot {
      * Applies a new selection to the plot as source feature ids.
      *
      * @param selection Source feature ids to highlight/select.
+     * @param shares Optional share of each feature covered by the selection in
+     * the emitting view, as sent in `PlotEventData.shares`.
      * @throws Never throws.
      * @example
      * plot.setSelection([0, 3, 7]);
+     * other.events.on('click', ({ selection, shares }) => plot.setSelection(selection, shares));
      */
-    public setSelection(selection: number[]): void {
-        this._plot.setSelection(selection);
+    public setSelection(selection: number[], shares?: FeatureShare[]): void {
+        this._plot.setSelection(selection, shares);
     }
 
     /**
@@ -127,6 +165,18 @@ export class AutkPlot {
      */
     public draw(): void {
         this._plot.draw();
+    }
+
+    /**
+     * Stops following the host size (`width: 'auto'`) and removes the plot
+     * from its host element.
+     *
+     * @throws Never throws.
+     * @example
+     * plot.destroy();
+     */
+    public destroy(): void {
+        this._plot.destroy();
     }
 
     /**
@@ -171,6 +221,101 @@ export class AutkPlot {
                 const { type, ...plotConfig } = config;
                 void type;
                 return new Heatmatrix({ div, ...plotConfig });
+            }
+            case 'boxplot': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Boxplot({ div, ...plotConfig });
+            }
+            case 'sankey': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Sankey({ div, ...plotConfig });
+            }
+            case 'pie': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Piechart({ div, ...plotConfig }, 0);
+            }
+            case 'donut': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Piechart({ div, ...plotConfig }, 0.55);
+            }
+            case 'areachart': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Areachart({ div, ...plotConfig });
+            }
+            case 'bubble': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Bubblechart({ div, ...plotConfig });
+            }
+            case 'hexbin': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Hexbin({ div, ...plotConfig });
+            }
+            case 'calendar': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Calendar({ div, ...plotConfig });
+            }
+            case 'waffle': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Waffle({ div, ...plotConfig });
+            }
+            case 'stackedbar': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Stackedbar({ div, ...plotConfig });
+            }
+            case 'treemap': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Treemap({ div, ...plotConfig });
+            }
+            case 'sunburst': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Sunburst({ div, ...plotConfig });
+            }
+            case 'radar': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Radar({ div, ...plotConfig });
+            }
+            case 'ecdf': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Cumulativechart({ div, ...plotConfig }, 'ecdf');
+            }
+            case 'pareto': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Cumulativechart({ div, ...plotConfig }, 'pareto');
+            }
+            case 'chord': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Chord({ div, ...plotConfig });
+            }
+            case 'density': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Densitychart({ div, ...plotConfig });
+            }
+            case 'violin': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new Violin({ div, ...plotConfig });
+            }
+            case 'registered': {
+                const { type, ...plotConfig } = config;
+                void type;
+                return new RegisteredPlot({ div, ...plotConfig }, registeredPlot(config.plot));
             }
             default: {
                 throw new Error(`Unsupported plot type: ${config.type}`);
