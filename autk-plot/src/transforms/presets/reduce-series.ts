@@ -17,8 +17,10 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { ReduceSeriesTransformConfig } from '../../api';
+import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
-import { reduceBuckets } from '../kernel';
+import { collectBuckets } from '../kernel';
+import { unnestedProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -30,6 +32,8 @@ export type ExecutedReduceSeriesTransform = {
     preset: 'reduce-series';
     /** Reduced series rows ready for downstream plot rendering. */
     rows: ReduceSeriesBucketRow[];
+    /** Provenance `D0 features → D1 series points → D2 buckets`, aligned with `rows`. */
+    provenance: TransformProvenance;
 };
 
 /**
@@ -68,6 +72,12 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
     /** Intermediate flattened series-point row consumed by `reduceBuckets()`. */
     type PointRow = { autkIds: number[]; __bucket: string; __value: number | null };
     const pointRows: PointRow[] = [];
+    /** Provenance id of each point row, `point:<feature>.<position in its series>`. */
+    const pointIds: ProvenanceId[] = [];
+    const pushPoint = (point: PointRow, index: number) => {
+        pointRows.push(point);
+        pointIds.push(`point:${point.autkIds.join('+')}.${index}`);
+    };
 
     rows.forEach((row, rowIndex) => {
         const ids = Array.isArray(row?.autkIds) ? row.autkIds as number[] : [];
@@ -78,7 +88,7 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
         series.forEach((point: unknown, index: number) => {
             // Plain number — use array index as bucket key.
             if (typeof point === 'number' && Number.isFinite(point)) {
-                pointRows.push({ autkIds: rowAutkIds, __bucket: String(index), __value: point });
+                pushPoint({ autkIds: rowAutkIds, __bucket: String(index), __value: point }, index);
                 return;
             }
 
@@ -99,11 +109,11 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
             const v = Number(valueAtPath(point as Record<string, unknown>, valueAttr));
             if (!Number.isFinite(v)) return;
 
-            pointRows.push({ autkIds: rowAutkIds, __bucket: bucket, __value: v });
+            pushPoint({ autkIds: rowAutkIds, __bucket: bucket, __value: v }, index);
         });
     });
 
-    const reduced = reduceBuckets({
+    const reduced = collectBuckets({
         rows: pointRows,
         bucketOf: (row) => String(row.__bucket ?? ''),
         valueOf: (row) => {
@@ -115,6 +125,14 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
 
     return {
         preset: 'reduce-series',
+        provenance: unnestedProvenance({
+            units: pointRows,
+            unitIds: pointIds,
+            unitLabel: 'series points',
+            buckets: reduced,
+            rowKeys: reduced.map(item => item.key),
+            reducer,
+        }),
         rows: reduced.map(item => ({
             bucket: item.key,
             value: item.value,

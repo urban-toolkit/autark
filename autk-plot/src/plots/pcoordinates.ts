@@ -34,6 +34,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import type { SegregatedPart } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
 
 /**
@@ -254,6 +255,44 @@ export class ParallelCoordinates extends PlotBaseInteractive {
             .style('stroke-width', (d: unknown) => this.isMarkHighlighted(d) ? 3 : 2);
 
         lines.filter((d: unknown) => this.isMarkHighlighted(d)).raise();
+    }
+
+    /**
+     * Polylines are one-to-one with features; they split by the feature shares
+     * sent with a selection from an aggregating view.
+     *
+     * @returns Always `true`.
+     */
+    protected override supportsSegregatedView(): boolean {
+        return true;
+    }
+
+    /**
+     * Draws a highlighted overlay covering the selected fraction of each
+     * polyline's length, starting at the first axis.
+     *
+     * `pathLength = 1` normalizes the length, so the dash pattern `fraction, 1`
+     * paints exactly that fraction without measuring the path.
+     */
+    protected override renderSegregatedMarks(): void {
+        const group = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
+        if (group.empty() || !this.axisPositions) return;
+
+        group
+            .selectAll<SVGPathElement, SegregatedPart>('.autkPartial')
+            .data(this.segregatedParts(), (p) => p.mark)
+            .join('path')
+            .attr('class', 'autkPartial')
+            .attr('data-autk-provenance', (p) => p.mark)
+            .attr('data-autk-units', (p) => `${p.part.selectedUnits}/${p.part.totalUnits}`)
+            .attr('d', (p) => this.path(p.datum))
+            .attr('pathLength', 1)
+            .attr('stroke-dasharray', (p) => `${p.fraction} 1`)
+            .style('fill', 'none')
+            .style('stroke', this.highlightColor)
+            .style('stroke-width', 3)
+            .style('pointer-events', 'none')
+            .raise();
     }
 
     /**

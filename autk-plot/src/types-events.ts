@@ -1,5 +1,7 @@
 import type { SelectionData } from '@urban-toolkit/autk-core';
 
+import type { FeatureShare } from './types-provenance';
+
 /**
  * Interaction events emitted by plot instances.
  *
@@ -28,9 +30,17 @@ export enum PlotEvent {
 /**
  * Payload emitted by all plot interaction events.
  *
- * Reuses the shared `SelectionData` shape from `autk-core`.
+ * Extends the shared `SelectionData` shape from `autk-core`, so consumers that
+ * only read `selection` (e.g. `AutkMap`) keep working.
  */
-export type PlotEventData = SelectionData;
+export type PlotEventData = SelectionData & {
+    /**
+     * Share of each selected feature covered by the selected marks. Present when
+     * the plot aggregates rows, so a receiving one-to-one plot can draw only
+     * that part of each feature's mark.
+     */
+    shares?: FeatureShare[];
+};
 
 /**
  * Event map consumed by the typed plot event emitter.

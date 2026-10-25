@@ -40,6 +40,8 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import { registeredTransform } from '../transforms/registry';
+import type { SegregatedPart } from '../plot-base-interactive';
 
 /**
  * Bar plot implementation supporting categorical values and binned mode.
@@ -66,7 +68,9 @@ export class Barchart extends PlotBaseInteractive {
             config.tickFormats = ['~s', '~s']; 
         }
         if (config.transform) {
-            if (config.transform.preset !== 'binning-1d') {
+            // A registered transform is read like binning-1d when it yields label and value rows.
+            const registered = config.transform.preset === 'registered' && registeredTransform(config.transform.name).shape === 'category-value';
+            if (config.transform.preset !== 'binning-1d' && !registered) {
                 throw new Error('Barchart only supports the binning-1d transform preset.');
             }
 
@@ -131,7 +135,15 @@ export class Barchart extends PlotBaseInteractive {
         this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
 
         const yExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0);
-        this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
+        // An empty result (e.g. everything filtered out) keeps a finite [0, 1] axis.
+        let yMax = Math.max(yExtent[1] ?? 0, 1);
+        // Segregated view with avg/min/max: a subset statistic can exceed every bar,
+        // so the axis also fits the largest unit value it could reach.
+        const reducer = this._provenance.reducer;
+        if (this.segregatedEnabled && reducer && reducer !== 'count' && reducer !== 'sum') {
+            yMax = Math.max(yMax, d3.max(this._provenance.contributions, unit => unit.value) ?? 0);
+        }
+        this.mapY = d3.scaleLinear().domain([0, yMax]).range([height, 0]);
 
         // ---- Axes
         const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
@@ -230,6 +242,66 @@ export class Barchart extends PlotBaseInteractive {
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
+    }
+
+    /**
+     * Bars have a label (`axis[0]`) and a rankable value (`axis[1]`), so they support top-k.
+     *
+     * @returns Always `true`.
+     */
+    protected override supportsTopK(): boolean {
+        return true;
+    }
+
+    /**
+     * Binned bars aggregate many features (direct direction); one-to-one bars
+     * can show the share of their feature sent with a selection (inverse direction).
+     *
+     * @returns Always `true`.
+     */
+    protected override supportsSegregatedView(): boolean {
+        return true;
+    }
+
+    /**
+     * Draws the part of each bar produced by the selection.
+     *
+     * For count and sum, and for one-to-one bars, the part is the selected
+     * fraction of the bar, stacked from its base, so it never changes the bar
+     * total. For avg, min, and max the value of the selected subset is not a
+     * part of the bar; it is drawn as a narrower inner bar instead.
+     */
+    protected override renderSegregatedMarks(): void {
+        const group = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
+        if (group.empty() || !this.mapX || !this.mapY) return;
+
+        const height = this._height - this._margins.top - this._margins.bottom;
+        const band = this.mapX.bandwidth();
+        const xOf = (p: SegregatedPart) => {
+            const val = p.datum ? valueAtPath(p.datum, this.renderAxisAttributes[0]) : 'unknown';
+            return this.mapX(String(val)) || 0;
+        };
+        const widthOf = (p: SegregatedPart) => p.part.additive ? band : band / 2;
+        const yOf = (p: SegregatedPart) => {
+            const barValue = Number(valueAtPath(p.datum, this.renderAxisAttributes[1])) || 0;
+            const value = p.part.additive ? p.fraction * barValue : (p.part.value ?? 0);
+            return this.mapY(Math.max(0, value));
+        };
+
+        group
+            .selectAll<SVGRectElement, SegregatedPart>('.autkPartial')
+            .data(this.segregatedParts(), (p) => p.mark)
+            .join('rect')
+            .attr('class', 'autkPartial')
+            .attr('data-autk-provenance', (p) => p.mark)
+            .attr('data-autk-units', (p) => `${p.part.selectedUnits}/${p.part.totalUnits}`)
+            .attr('x', (p) => xOf(p) + (band - widthOf(p)) / 2)
+            .attr('width', widthOf)
+            .attr('y', yOf)
+            .attr('height', (p) => height - yOf(p))
+            .style('fill', this.highlightColor)
+            .style('stroke', '#2f2f2f')
+            .style('pointer-events', 'none');
     }
 
 }
