@@ -11,8 +11,10 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { Binning1dTransformConfig } from '../../api';
+import type { TransformProvenance } from '../../types-provenance';
 
-import { reduceBuckets } from '../kernel';
+import { collectBuckets } from '../kernel';
+import { binnedProvenance, indexedBins } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -27,6 +29,8 @@ export type ExecutedBinning1dTransform = {
     preset: 'binning-1d';
     /** Binned rows ready for downstream plot rendering. */
     rows: Binning1dBinRow[];
+    /** Provenance `D0 features → D1 bins → D2 aggregates`, aligned with `rows`. */
+    provenance: TransformProvenance;
 };
 
 /**
@@ -67,7 +71,7 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
 
     const mapper = buildBinMapper(rows, valueAttr, numBins);
 
-    const reduced = reduceBuckets({
+    const reduced = collectBuckets({
         rows,
         bucketOf: (row) => mapper.label(valueAtPath(row, valueAttr)),
         valueOf: reducer === 'count' ? undefined : (row) => {
@@ -78,17 +82,27 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
         reducer,
     });
 
+    const binRows = reduced
+        .map(bucket => ({
+            label: bucket.key,
+            order: mapper.order(bucket.key),
+            value: bucket.value,
+            count: bucket.count,
+            autkIds: bucket.autkIds,
+        }))
+        .sort((a, b) => a.order - b.order);
+
     return {
         preset: 'binning-1d',
-        rows: reduced
-            .map(bucket => ({
-                label: bucket.key,
-                order: mapper.order(bucket.key),
-                value: bucket.value,
-                count: bucket.count,
-                autkIds: bucket.autkIds,
-            }))
-            .sort((a, b) => a.order - b.order),
+        rows: binRows,
+        provenance: binnedProvenance({
+            rows,
+            buckets: reduced,
+            bins: indexedBins(mapper.labels(), reduced.map(bucket => bucket.key), 'bin'),
+            binLabel: 'bins',
+            rowKeys: binRows.map(row => row.label),
+            reducer,
+        }),
     };
 }
 
@@ -131,12 +145,13 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
         return {
             label: (v: unknown) => { const s = String(v ?? ''); rank(s); return s; },
             order: (label: string) => rank(label),
+            labels: () => Array.from(insertionOrder.keys()),
         };
     }
 
     const nums = sampleValues.map(Number).filter(Number.isFinite);
     if (nums.length === 0) {
-        return { label: (v: unknown) => String(v ?? ''), order: () => 0 };
+        return { label: (v: unknown) => String(v ?? ''), order: () => 0, labels: () => [] as string[] };
     }
 
     const minValue = Math.min(...nums);
@@ -167,5 +182,6 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
                 : `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
         },
         order: (label: string) => labelToOrder.get(label) ?? 0,
+        labels: () => Array.from(labelToOrder.keys()),
     };
 }

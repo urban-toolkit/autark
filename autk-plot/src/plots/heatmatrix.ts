@@ -28,6 +28,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import type { SegregatedPart } from '../plot-base-interactive';
 
 import type { Binning2dCellRow } from '../transforms';
 
@@ -39,6 +40,11 @@ import type { Binning2dCellRow } from '../transforms';
  * producing one row per unique (x, y) cell.
  */
 export class Heatmatrix extends PlotBaseInteractive {
+
+    /** Band scale mapping x bin labels to pixel positions. */
+    protected mapX!: d3.ScaleBand<string>;
+    /** Band scale mapping y bin labels to pixel positions. */
+    protected mapY!: d3.ScaleBand<string>;
 
     /**
      * Creates a heat matrix instance and performs the initial draw.
@@ -100,8 +106,8 @@ export class Heatmatrix extends PlotBaseInteractive {
             new Map((this._data as Binning2dCellRow[]).map(d => [d.y, d.yOrder])).entries()
         ).sort((a, b) => a[1] - b[1]).map(([label]) => label);
 
-        const mapX = d3.scaleBand().domain(xValues).range([0, width]).padding(0.05);
-        const mapY = d3.scaleBand().domain(yValues).range([0, height]).padding(0.05);
+        const mapX = this.mapX = d3.scaleBand().domain(xValues).range([0, width]).padding(0.05);
+        const mapY = this.mapY = d3.scaleBand().domain(yValues).range([0, height]).padding(0.05);
 
         // ---- Axes
         const xAxisSelection = svg.selectAll<SVGGElement, unknown>('#axisX').data([0]).join('g')
@@ -161,6 +167,56 @@ export class Heatmatrix extends PlotBaseInteractive {
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
+    }
+
+    /**
+     * Cells aggregate many features, so they can show partial contributions.
+     *
+     * @returns Always `true`; the heat matrix requires the `binning-2d` transform.
+     */
+    protected override supportsSegregatedView(): boolean {
+        return true;
+    }
+
+    /**
+     * Draws the part of each cell produced by the selected features.
+     *
+     * For count and sum, a centered inner square covers the selected fraction
+     * of the cell area while the cell keeps its color. For avg, min, and max the
+     * value of the selected subset is not a part of the cell; a half-size inner
+     * square shows it with the same colormap instead.
+     */
+    protected override renderSegregatedMarks(): void {
+        const group = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
+        if (group.empty() || !this.mapX || !this.mapY) return;
+
+        const cellWidth = this.mapX.bandwidth();
+        const cellHeight = this.mapY.bandwidth();
+        const scaleOf = (p: SegregatedPart) => p.part.additive ? Math.sqrt(p.fraction) : 0.5;
+        const xOf = (p: SegregatedPart) =>
+            (this.mapX(String(valueAtPath(p.datum, this.renderAxisAttributes[0]))) ?? 0) + cellWidth * (1 - scaleOf(p)) / 2;
+        const yOf = (p: SegregatedPart) =>
+            (this.mapY(String(valueAtPath(p.datum, this.renderAxisAttributes[1]))) ?? 0) + cellHeight * (1 - scaleOf(p)) / 2;
+        const colorAttribute = this.renderColorAttribute;
+        const fillOf = (p: SegregatedPart) => p.part.additive || !colorAttribute
+            ? this.highlightColor
+            : this.getMarkColor({ ...p.datum, [colorAttribute]: p.part.value });
+
+        group
+            .selectAll<SVGRectElement, SegregatedPart>('.autkPartial')
+            .data(this.segregatedParts(), (p) => p.mark)
+            .join('rect')
+            .attr('class', 'autkPartial')
+            .attr('data-autk-provenance', (p) => p.mark)
+            .attr('data-autk-units', (p) => `${p.part.selectedUnits}/${p.part.totalUnits}`)
+            .attr('x', xOf)
+            .attr('y', yOf)
+            .attr('width', (p) => cellWidth * scaleOf(p))
+            .attr('height', (p) => cellHeight * scaleOf(p))
+            .style('fill', fillOf)
+            .style('stroke', this.highlightColor)
+            .style('stroke-width', 2)
+            .style('pointer-events', 'none');
     }
 
 }

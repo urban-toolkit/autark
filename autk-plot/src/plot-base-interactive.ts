@@ -20,6 +20,35 @@ import { PlotStyle } from './plot-style';
 import { PlotEvent } from './types-events';
 import { PlotBaseData } from './plot-base-data';
 
+import type { PlotEventData } from './types-events';
+import type { FeatureShare, MarkContribution, ProvenanceId, ProvenancePath } from './types-provenance';
+import { markId } from './provenance';
+import { renderProvenancePathView } from './provenance/path-view';
+import { othersLabelOf } from './transforms/top-k';
+
+/**
+ * Part of a rendered mark produced by the selected features (segregated view).
+ */
+export type SegregatedPart = {
+    /** Rendered row bound to the mark. */
+    datum: AutkDatum;
+    /** Mark id of the rendered row. */
+    mark: ProvenanceId;
+    /** Contribution of the selected features to the row. */
+    part: MarkContribution;
+    /**
+     * Fraction of the mark to fill, in `[0, 1]`: selected value over row value
+     * for additive reducers, selected units over row units otherwise.
+     */
+    fraction: number;
+};
+
+/**
+ * Plot drawn last in each host element. A plot replaced in its host stops
+ * following the host size, so it never draws over the new one.
+ */
+const hostOwners = new WeakMap<HTMLElement, PlotBaseInteractive>();
+
 /**
  * Interactive plot base class.
  *
@@ -48,6 +77,14 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     private _brushBehaviors: Map<string, d3.BrushBehavior<unknown>> = new Map();
     /** Suppresses brush handlers during programmatic brush clearing. */
     private _suppressBrushEvents: boolean = false;
+    /** Feature shares received with the last external selection, keyed by feature index. */
+    private _selectionShares: Map<number, FeatureShare> | null = null;
+    /** Whether the provenance path widget was requested (`provenance.path`). */
+    private _pathView: boolean = true;
+    /** Whether the provenance path widget is expanded. */
+    private _pathOpen: boolean = false;
+    /** Observer of the host size with `width: 'auto'`. */
+    private _resizeObserver: ResizeObserver | null = null;
 
     /**
      * Brush combine mode for multi-brush interactions.
@@ -67,7 +104,60 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         super(config);
         this._plotEvents = new EventEmitter();
         this._enabledEvents = config.events ?? [];
-        this._selectionProjection = this.resolveSelectionProjection(config.transform);
+        this._selectionProjection = this.resolveSelectionProjection(config.transform, config.topK ? othersLabelOf(config.topK) !== null : false);
+        this._pathView = config.provenance?.path === true || config.provenance?.path === 'open';
+        this._pathOpen = config.provenance?.path === 'open';
+        hostOwners.set(this._div, this);
+    }
+
+    /**
+     * Stops following the host size and removes the plot from its host.
+     *
+     * @throws Never throws.
+     */
+    public destroy(): void {
+        this._resizeObserver?.disconnect();
+        this._resizeObserver = null;
+        if (hostOwners.get(this._div) === this) {
+            hostOwners.delete(this._div);
+            this._div.replaceChildren();
+        }
+    }
+
+    /**
+     * Redraws at the host width whenever it changes (`width: 'auto'`), at most
+     * once per frame. Starts after the first successful draw, so a plot whose
+     * constructor throws leaves nothing behind. Without `ResizeObserver` the
+     * plot keeps its first width.
+     */
+    private followHostWidth(): void {
+        if (!this._autoWidth || this._resizeObserver || hostOwners.get(this._div) !== this) return;
+        if (typeof ResizeObserver === 'undefined') return;
+        let frame = 0;
+        this._resizeObserver = new ResizeObserver(() => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => this.resizeToHost());
+        });
+        this._resizeObserver.observe(this._div);
+    }
+
+    /**
+     * Redraws at the new host width and keeps the selection. Brush rectangles
+     * are cleared, since their pixels no longer match the new scales; the
+     * features they selected stay selected. A host without layout (hidden, e.g.
+     * in a closed tab) is skipped: the plot keeps its drawing until it shows again.
+     */
+    private resizeToHost(): void {
+        if (hostOwners.get(this._div) !== this) {
+            this.destroy();
+            return;
+        }
+        if (this._div.clientWidth === 0 || this.hostWidth() === this._width) return;
+        this.clearBrushVisuals();
+        this._activeBrushes.clear();
+        this.draw();
+        this.syncSelectedMarksFromFeatures();
+        this.renderSelection();
     }
 
     /**
@@ -95,6 +185,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         this._selectedMarkDatums = new Set();
         this._selectedFeatureIds = new Set();
         this._selectionOrigin = null;
+        this._selectionShares = null;
         this._activeBrushes.clear();
         this.clearBrushVisuals();
         this._brushBehaviors.clear();
@@ -105,9 +196,12 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * Applies an externally authored selection to the plot.
      *
      * @param selection Source feature ids to highlight.
+     * @param shares Optional share of each feature covered by the selection in
+     * the emitting view; one-to-one plots draw only that part of each mark.
      * @throws Never throws.
      */
-    setSelection(selection: number[]): void {
+    setSelection(selection: number[], shares?: FeatureShare[]): void {
+        this._selectionShares = shares ? new Map(shares.map(share => [share.feature, share])) : null;
         this._selectedFeatureIds = new Set(selection);
         this._selectionOrigin = selection.length > 0 ? 'external' : null;
         this.syncSelectedMarksFromFeatures();
@@ -123,6 +217,212 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      */
     protected override afterDataRefresh(): void {
         this.restoreLocalSelectionAfterDraw();
+    }
+
+    /**
+     * Registers the rendered `.autkMark` nodes as provenance stage `M` and
+     * redraws segregated marks for the new geometry.
+     */
+    protected override afterRender(): void {
+        const marks = d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark');
+        const rowIds: ProvenanceId[] = [];
+        marks.each((d) => {
+            const id = this.rowIdOf(d);
+            if (id) rowIds.push(id);
+        });
+        this._provenance.registerMarks(rowIds);
+
+        marks.attr('data-autk-provenance', (d) => {
+            const id = this.rowIdOf(d);
+            return id ? markId(id) : null;
+        });
+        this.renderSegregatedMarks();
+        this.renderProvenancePath();
+        this.followHostWidth();
+    }
+
+    /**
+     * Provenance path of the current selection.
+     *
+     * A local selection starts at the selected marks and goes back to the
+     * source features (inverse query). A selection from another view starts at
+     * the selected features and goes forward to the marks (direct query).
+     *
+     * @returns Query direction and reached stages, or `null` without a selection.
+     */
+    get selectionPath(): { direction: 'direct' | 'inverse'; path: ProvenancePath } | null {
+        if (this._selectedFeatureIds.size === 0 || this._selectionOrigin === null) return null;
+
+        if (this._selectionOrigin === 'local') {
+            const marks: ProvenanceId[] = [];
+            for (const datum of this._selectedMarkDatums) {
+                const id = this.rowIdOf(datum);
+                if (id) marks.push(markId(id));
+            }
+            if (marks.length > 0) return { direction: 'inverse', path: this._provenance.inverse(marks) };
+        }
+        return { direction: 'direct', path: this._provenance.direct(this.selection) };
+    }
+
+    /**
+     * Draws, updates, or removes the provenance path widget under the plot.
+     */
+    protected renderProvenancePath(): void {
+        if (!this._pathView || !this.segregatedEnabled || !this._provenance) {
+            renderProvenancePathView(this._div, null);
+            return;
+        }
+
+        const selected = this.selectionPath;
+        const cardinalities = new Map(this._provenance.cardinalities.map(c => [`${c.source}→${c.target}`, c.cardinality]));
+        // Mark parts by readable label (axis[0] of the row), at most three plus a count of the rest.
+        const segregated = this.segregatedParts();
+        const partLabel = (datum: AutkDatum, mark: ProvenanceId) => {
+            const label = valueAtPath(datum, this.renderAxisAttributes[0]);
+            if (typeof label === 'number' && Number.isFinite(label)) return d3.format('~s')(label);
+            return typeof label === 'string' && label.length > 0 ? label : mark;
+        };
+        // Fractional coverage (density) gives real unit weights: at most two decimals.
+        const units = d3.format('.2~f');
+        const parts = segregated.slice(0, 3).map(p => `${partLabel(p.datum, p.mark)}: ${units(p.part.selectedUnits)}/${units(p.part.totalUnits)}`);
+        if (segregated.length > 3) parts.push(`+${segregated.length - 3}`);
+
+        // Explain entities the selection loses at stages with a note (filter, top-k).
+        const path = selected?.path ?? [];
+        const notes = path.flatMap((step, index) => {
+            if (!step.dropped || !step.note) return [];
+            const label = path[index - 1]?.label ?? 'entities';
+            const noun = step.dropped === 1 ? label.replace(/s$/, '') : label;
+            return [`${step.dropped} ${noun} excluded at ${step.stage} — ${step.note}`];
+        });
+
+        renderProvenancePathView(this._div, {
+            open: this._pathOpen,
+            direction: selected?.direction ?? null,
+            path,
+            cardinalities,
+            parts,
+            notes,
+            width: this._width,
+            onToggle: () => {
+                this._pathOpen = !this._pathOpen;
+                this.renderProvenancePath();
+            },
+        });
+    }
+
+    /** Whether rendered rows aggregate features (`aggregated` projection) rather than being one per feature. */
+    protected get aggregatesRows(): boolean {
+        return this._selectionProjection === 'aggregated';
+    }
+
+    /**
+     * Whether the plot draws the segregated view, regardless of the current
+     * selection. Plots may use it to lay out scales that fit partial marks.
+     */
+    protected get segregatedEnabled(): boolean {
+        return this.supportsSegregatedView();
+    }
+
+    /**
+     * Highlight color of the plot: the provenance color for plots with the
+     * segregated view, the plain highlight color for plots without it.
+     */
+    protected get highlightColor(): string {
+        return this.segregatedEnabled ? PlotStyle.provenance : PlotStyle.highlight;
+    }
+
+    /**
+     * Whether marks currently show only their selected part (segregated view).
+     *
+     * Requires the view to be enabled and supported by the plot, and a
+     * selection that came from another view: aggregated rows split by the
+     * selected features (direct direction), or one-to-one rows split by the
+     * feature shares sent along with the selection (inverse direction). A local
+     * selection picks whole marks, so it keeps the whole-mark highlight.
+     */
+    protected get segregatedActive(): boolean {
+        if (!this.segregatedEnabled) return false;
+        if (this._selectionOrigin !== 'external' || this._selectedFeatureIds.size === 0) return false;
+        return this._selectionProjection === 'aggregated' || this._selectionShares !== null;
+    }
+
+    /**
+     * Builds the event payload for the current selection.
+     *
+     * Aggregating plots add the share of each selected feature covered by the
+     * selected marks, so receiving one-to-one plots can split their marks.
+     *
+     * @returns Selected source ids, plus shares when rows are aggregated.
+     */
+    protected selectionEventData(): PlotEventData {
+        // Without the segregated view, or for one-to-one rows, the payload is the selection alone.
+        if (!this.segregatedEnabled || this._selectionProjection !== 'aggregated' || this._selectionOrigin !== 'local') {
+            return { selection: this.selection };
+        }
+
+        const rowIds: ProvenanceId[] = [];
+        for (const datum of this._selectedMarkDatums) {
+            const id = this.rowIdOf(datum);
+            if (id) rowIds.push(id);
+        }
+        return { selection: this.selection, shares: this._provenance.featureShares(rowIds) };
+    }
+
+    /**
+     * Whether the plot draws segregated marks. Plots opt in by overriding.
+     *
+     * @returns `true` when `renderSegregatedMarks()` is implemented for the current configuration.
+     */
+    protected supportsSegregatedView(): boolean {
+        return false;
+    }
+
+    /**
+     * Draws, updates, or clears the partial marks of the segregated view from
+     * `segregatedSelection`. Plots that support the view override this hook.
+     */
+    protected renderSegregatedMarks(): void {}
+
+    /**
+     * Part of each rendered row produced by the current external selection.
+     *
+     * Aggregated rows use the contribution of the selected features. One-to-one
+     * rows use the feature shares received with the selection.
+     *
+     * @returns One entry per row that receives at least one selected unit, or
+     * an empty list when the segregated view is inactive.
+     */
+    protected segregatedParts(): SegregatedPart[] {
+        if (!this.segregatedActive) return [];
+
+        const parts: SegregatedPart[] = [];
+        for (const datum of this._data) {
+            const rowId = this.rowIdOf(datum);
+            if (!rowId) continue;
+
+            let part: MarkContribution;
+            if (this._selectionProjection === 'aggregated') {
+                part = this._provenance.contribution(rowId, this._selectedFeatureIds);
+            } else {
+                const share = this._selectionShares?.get(datum.autkIds?.[0] ?? -1);
+                if (!share) continue;
+                part = {
+                    selectedUnits: share.selectedUnits,
+                    totalUnits: share.totalUnits,
+                    value: share.selectedUnits,
+                    totalValue: share.totalUnits,
+                    additive: true,
+                };
+            }
+            if (part.value === null) continue;
+
+            const ratio = part.additive && part.totalValue
+                ? (part.value ?? 0) / part.totalValue
+                : part.selectedUnits / part.totalUnits;
+            parts.push({ datum, mark: markId(rowId), part, fraction: Math.min(1, Math.max(0, ratio)) });
+        }
+        return parts;
     }
 
     /**
@@ -168,7 +468,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         const datum = d as AutkDatum;
 
         if (this.isMarkHighlighted(d)) {
-            return PlotStyle.highlight;
+            return this.highlightColor;
         }
 
         const colorAttribute = this.renderColorAttribute;
@@ -216,6 +516,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     protected isMarkHighlighted(d: unknown): boolean {
         if (d == null || typeof d !== 'object') return false;
 
+        // The segregated view highlights only the selected part, drawn separately.
+        if (this.segregatedActive) return false;
+
         const datum = d as AutkDatum;
 
         if (this._selectionProjection === 'aggregated') {
@@ -256,7 +559,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                 plot.syncSelectedFeaturesFromMarks();
                 plot._selectionOrigin = plot._selectedFeatureIds.size > 0 ? 'local' : null;
                 plot.renderSelection();
-                plot.events.emit(PlotEvent.CLICK, { selection: plot.selection });
+                plot.events.emit(PlotEvent.CLICK, plot.selectionEventData());
             });
         });
 
@@ -292,7 +595,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH, { selection: plot.selection });
+                            plot.events.emit(PlotEvent.BRUSH, plot.selectionEventData());
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH, plot._activeBrushes);
@@ -334,7 +637,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH_X, { selection: plot.selection });
+                            plot.events.emit(PlotEvent.BRUSH_X, plot.selectionEventData());
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH_X, plot._activeBrushes);
@@ -390,7 +693,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH_Y, { selection: plot.selection });
+                            plot.events.emit(PlotEvent.BRUSH_Y, plot.selectionEventData());
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH_Y, plot._activeBrushes);
@@ -407,6 +710,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     protected renderSelection(): void {
         const svgs = d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark');
         this.applyMarkStyles(svgs);
+        this.renderSegregatedMarks();
+        this.renderProvenancePath();
         this.onSelectionUpdated();
     }
 
@@ -753,22 +1058,32 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             this.resolveSelectionFromRects(activeBrushes);
         }
         this.renderSelection();
-        this.events.emit(event, { selection: this.selection });
+        this.events.emit(event, this.selectionEventData());
     }
 
     /**
      * Resolves whether this plot should use bijective or aggregated selection projection.
      *
      * @param transform Optional transform configuration for the plot.
+     * @param gathersRows Whether a top-k cut gathers remaining rows into one aggregated row.
      * @returns Selection projection mode used by interaction logic.
      */
-    private resolveSelectionProjection(transform: PlotTransformConfig | undefined): 'bijective' | 'aggregated' {
+    private resolveSelectionProjection(transform: PlotTransformConfig | undefined, gathersRows: boolean = false): 'bijective' | 'aggregated' {
         const preset = transform?.preset;
         if (
             preset === 'binning-1d' ||
             preset === 'binning-2d' ||
             preset === 'binning-events' ||
-            preset === 'reduce-series'
+            preset === 'reduce-series' ||
+            preset === 'box-stats' ||
+            preset === 'flows' ||
+            preset === 'binning-hex' ||
+            preset === 'hierarchy' ||
+            preset === 'cumulative' ||
+            preset === 'fold' ||
+            preset === 'density' ||
+            preset === 'registered' ||
+            gathersRows
         ) {
             return 'aggregated';
         }
