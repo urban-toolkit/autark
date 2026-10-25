@@ -1,5 +1,5 @@
 /**
- * Plots and transforms added by autk-plot-new: boxplot with `box-stats`
+ * Plots and transforms added to the original catalog: boxplot with `box-stats`
  * (order statistics produced by specific features) and Sankey with `flows`
  * (chain through segments, marks on two stages).
  */
