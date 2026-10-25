@@ -575,6 +575,10 @@ function originOf(mark: Element, box: DOMRect): [number, number] {
  * Draws a plot definition on sample data and checks it against the drawing
  * contract, reporting which invariant each violation breaks.
  *
+ * A host outside the document is attached off screen while the check runs:
+ * a browser measures no geometry outside the document, and the design of the
+ * partial view is inferred from that geometry. It is detached again after.
+ *
  * @param definition Plot to check.
  * @param div Host element for the check drawing (it is left drawn).
  * @param config Plot configuration (collection, attributes, transform, ...).
@@ -582,6 +586,21 @@ function originOf(mark: Element, box: DOMRect): [number, number] {
  * and the segregated view design inferred for each mark family.
  */
 export function checkPlot(definition: PlotDefinition, div: HTMLElement, config: Omit<PlotConfig, 'div'>): ContractReport & { designs: PartialDesign[] } {
+    if (div.isConnected || typeof document === 'undefined' || !document.body) return checkConnected(definition, div, config);
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden';
+    probe.append(div);
+    document.body.append(probe);
+    try {
+        return checkConnected(definition, div, config);
+    } finally {
+        div.remove();
+        probe.remove();
+    }
+}
+
+/** `checkPlot` on a host in the document. */
+function checkConnected(definition: PlotDefinition, div: HTMLElement, config: Omit<PlotConfig, 'div'>): ContractReport & { designs: PartialDesign[] } {
     enforcing = false;
     let plot: RegisteredPlot;
     try {
