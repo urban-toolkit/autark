@@ -9,6 +9,7 @@ import { Triangles2DLayer } from '../src/layer-triangles2D';
 import { SpriteLayer } from '../src/layer-sprite';
 import { PolylineLayer } from '../src/layer-polyline';
 import { Renderer } from '../src/renderer';
+import { PipelineBuildingSSAO } from '../src/pipeline-triangle-ssao';
 import { TerrainRenderer } from '../src/renderer-terrain';
 import { MapEvent } from '../src/types-events';
 
@@ -578,6 +579,17 @@ describe('continuous rendering and teardown', () => {
 
         expect(request).not.toHaveBeenCalled();
         expect(frames.pending).toBe(0);
+    });
+
+    it('releases its renderer\'s shared SSAO textures on destroy', async () => {
+        const release = vi.spyOn(PipelineBuildingSSAO, 'releaseSharedState');
+        const { map } = await idleOnDemandMap();
+        const renderer = (map as unknown as { _renderer: Renderer })._renderer;
+
+        map.destroy();
+
+        expect(release).toHaveBeenCalledTimes(1);
+        expect(release).toHaveBeenCalledWith(renderer);
     });
     it('keeps drawing continuously with explicit options and draw(fps)', async () => {
         const { map, canvas } = await createMap();
