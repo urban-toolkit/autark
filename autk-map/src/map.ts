@@ -79,6 +79,7 @@ import { AutkMapUi } from './map-ui';
 import { MapStyle } from './map-style';
 import { MapCamera } from './map-camera';
 import { FlatMapRenderPath } from './map-flat';
+import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { MapPickingController } from './map-picking';
 import { TerrainMapRenderPath } from './map-terrain';
 import type { TerrainDebugOptions } from './renderer-terrain';
@@ -1003,6 +1004,7 @@ export class AutkMap {
         });
 
         this._ui.destroy();
+        PipelineBuildingSSAO.releaseSharedState(this._renderer);
         this._renderer.destroy();
 
         this._isDestroyed = true;
