@@ -451,13 +451,21 @@ export class AutkMap {
             }
 
             resolvedDomain = ColorMap.resolveDomainFromData(validValues, colorMap);
+            // A categorical color map gives numbers a domain of labels, and the
+            // shader reads a feature's category index in it, as the string branch
+            // stores: the number itself would pick another category's color.
+            const categories = typeof resolvedDomain[0] === 'string' ? resolvedDomain as string[] : null;
             for (let featureIndex = 0; featureIndex < rawValues.length; featureIndex++) {
                 const rawValue = rawValues[featureIndex];
-                if (!storeThematicValue(featureIndex, rawValue ?? 0, rawValue === undefined ? 0 : 1)) {
+                const categoryIndex = categories && rawValue !== undefined ? categories.indexOf(String(rawValue)) : -1;
+                const stored = categories
+                    ? storeThematicValue(featureIndex, Math.max(categoryIndex, 0), categoryIndex >= 0 ? 1 : 0)
+                    : storeThematicValue(featureIndex, rawValue ?? 0, rawValue === undefined ? 0 : 1);
+                if (!stored) {
                     return;
                 }
             }
-        } 
+        }
         else if (dataType === 'string') {
             const rawValues = features.map((feature) => {
                 const resolved = propertyResolver(feature);
