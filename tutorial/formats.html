@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>02 · Urban data formats and sources · Autark tutorial</title>
+  <link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="axes">
+      <circle cx="0" cy="0" r="5"></circle>
+      <line x1="0" y1="0" x2="100" y2="0" stroke="red"></line>
+      <line x1="0" y1="0" x2="0" y2="100" stroke="green"></line>
+    </g>
+  </defs>
+</svg>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#vector">1. Vector data</a></li>
+    <li><a href="#raster">2. Raster data</a></li>
+    <li><a href="#formats">3. Urban data formats</a></li>
+    <li><a href="#sources">4. Urban data sources</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="intro">
+  <p class="meta">Autark tutorial · notebook 02</p>
+  <div class="series-nav">
+    <a href="index.html">01 · Overview</a>
+    <span>02 · Formats and sources</span>
+    <a href="db.html">03 · Data management</a>
+    <a href="map.html">04 · Maps</a>
+    <a href="plot.html">05 · Plots</a>
+    <a href="compute.html">06 · GPU computing</a>
+  </div>
+  <h1>Urban data formats and sources</h1>
+  <p class="lede">What urban data looks like before it reaches Autark: vector and raster models, the formats they travel in (GeoJSON, WKT, GeoTIFF, OSM XML), and where to get them.</p>
+  <p>This page is mostly reading, with a few live cells that open the same sample files the next page loads into a database. Cells run in the page: press <strong>Run</strong>, edit the code, and run again. The Overpass cell in section 4 asks the public server and falls back to a recorded answer if it is unreachable.</p>
+</section>
+
+<section id="vector">
+  <h2><span class="num">1</span>Vector data</h2>
+  <p>Urban datasets that represent features such as parks, roads and buildings are usually in <strong>vector format</strong>. Vector data uses coordinates and geometry (points, lines, polygons) to describe complex structures.</p>
+  <p>The coordinates of a geometry depend on a <strong>coordinate system</strong>. Urban datasets use either a geodetic system (defined over the Earth's surface) or a projected one. With a geodetic system the coordinates are <strong>2D</strong> (longitude, latitude) or <strong>3D</strong> (longitude, latitude, elevation).</p>
+  <p>In the drawings below, the origin is the top-left corner of the drawing area. The first coordinate grows from left to right (red axis) and the second from top to bottom (green axis).</p>
+  <div class="geom"><svg width="110" height="110" role="img" aria-label="Coordinate axes"><g transform="translate(5,5)"><use href="#axes"/></g></svg></div>
+
+  <h3>1.1 Point and MultiPoint</h3>
+  <p>A <strong>Point</strong> is a single spatial coordinate, for example (80, 40). A <strong>MultiPoint</strong> is two or more points, for example (80, 40) and (40, 80).</p>
+  <div class="geom">
+    <svg width="110" height="110" role="img" aria-label="A point at (80, 40)"><g transform="translate(5,5)"><use href="#axes"/>
+      <circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+    <svg width="110" height="110" role="img" aria-label="A MultiPoint with points (80, 40) and (40, 80)"><g transform="translate(5,5)"><use href="#axes"/>
+      <circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="40" cy="80" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+  </div>
+
+  <h3>1.2 LineString and MultiLineString</h3>
+  <p>A <strong>LineString</strong> is a list of connected points, for example (80, 40) to (40, 80). A <strong>MultiLineString</strong> is several LineStrings, here the previous one plus (20, 20) to (20, 60).</p>
+  <div class="geom">
+    <svg width="110" height="110" role="img" aria-label="A LineString"><g transform="translate(5,5)"><use href="#axes"/>
+      <line x1="80" y1="40" x2="40" y2="80" stroke="#333" stroke-width="2"/>
+      <circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="40" cy="80" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+    <svg width="110" height="110" role="img" aria-label="A MultiLineString with two lines"><g transform="translate(5,5)"><use href="#axes"/>
+      <line x1="80" y1="40" x2="40" y2="80" stroke="#333" stroke-width="2"/><line x1="20" y1="20" x2="20" y2="60" stroke="#333" stroke-width="2"/>
+      <circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="40" cy="80" r="6" stroke="#333" fill="#bfbfbf"/>
+      <circle cx="20" cy="20" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="20" cy="60" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+  </div>
+
+  <h3>1.3 Polygon and MultiPolygon</h3>
+  <p>A <strong>Polygon</strong> is a closed sequence of connected points, for example (20, 20), (80, 40), (40, 80), (20, 60), (20, 20). A <strong>MultiPolygon</strong> is several polygons; here a second one is added with (85, 10), (120, 15), (100, 40).</p>
+  <div class="geom">
+    <svg width="110" height="110" role="img" aria-label="A Polygon"><g transform="translate(5,5)"><use href="#axes"/>
+      <polygon points="20,20 80,40 40,80 20,60" stroke="#333" stroke-width="2" fill="#efefef"/>
+      <circle cx="20" cy="20" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/>
+      <circle cx="40" cy="80" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="20" cy="60" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+    <svg width="140" height="110" role="img" aria-label="A MultiPolygon with two polygons"><g transform="translate(5,5)"><use href="#axes"/>
+      <polygon points="20,20 80,40 40,80 20,60" stroke="#333" stroke-width="2" fill="#efefef"/>
+      <polygon points="85,10 120,15 100,40" stroke="#333" stroke-width="2" fill="#efefef"/>
+      <circle cx="20" cy="20" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/>
+      <circle cx="40" cy="80" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="20" cy="60" r="6" stroke="#333" fill="#bfbfbf"/>
+      <circle cx="85" cy="10" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="120" cy="15" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="100" cy="40" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+  </div>
+
+  <h3>1.4 GeometryCollection</h3>
+  <p>A <strong>GeometryCollection</strong> mixes geometry types. This one has a LineString through (20, 20), (80, 40), (40, 80), a Point at (20, 60) and a Polygon with (85, 10), (120, 15), (100, 40).</p>
+  <div class="geom">
+    <svg width="140" height="110" role="img" aria-label="A GeometryCollection"><g transform="translate(5,5)"><use href="#axes"/>
+      <line x1="20" y1="20" x2="80" y2="40" stroke="#333" stroke-width="2"/><line x1="80" y1="40" x2="40" y2="80" stroke="#333" stroke-width="2"/>
+      <polygon points="85,10 120,15 100,40" stroke="#333" stroke-width="2" fill="#efefef"/>
+      <circle cx="20" cy="20" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="80" cy="40" r="6" stroke="#333" fill="#bfbfbf"/>
+      <circle cx="40" cy="80" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="20" cy="60" r="6" stroke="#333" fill="#bfbfbf"/>
+      <circle cx="85" cy="10" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="120" cy="15" r="6" stroke="#333" fill="#bfbfbf"/><circle cx="100" cy="40" r="6" stroke="#333" fill="#bfbfbf"/></g></svg>
+  </div>
+</section>
+
+<section id="raster">
+  <h2><span class="num">2</span>Raster data</h2>
+  <p>The <strong>raster format</strong> describes space as a regular grid of cells, usually called pixels. Each pixel stores a value for the area it covers, such as elevation, temperature or land use. Where vector data describes features through points, lines and polygons, raster data describes a phenomenon as a grid of values over space.</p>
+  <p>A raster dataset is defined by its spatial structure and its cell values: the number of <strong>rows</strong> and <strong>columns</strong>, the <strong>size</strong> of each cell, the geographic <strong>location</strong> of the grid, and the <strong>coordinate system</strong> that places it in space.</p>
+  <div class="geom">
+    <svg width="140" height="140" role="img" aria-label="An empty 4 by 4 raster grid"><g transform="translate(20,20)">
+      <g fill="#efefef" stroke="#333">
+        <rect x="0" y="0" width="25" height="25"/><rect x="25" y="0" width="25" height="25"/><rect x="50" y="0" width="25" height="25"/><rect x="75" y="0" width="25" height="25"/>
+        <rect x="0" y="25" width="25" height="25"/><rect x="25" y="25" width="25" height="25"/><rect x="50" y="25" width="25" height="25"/><rect x="75" y="25" width="25" height="25"/>
+        <rect x="0" y="50" width="25" height="25"/><rect x="25" y="50" width="25" height="25"/><rect x="50" y="50" width="25" height="25"/><rect x="75" y="50" width="25" height="25"/>
+        <rect x="0" y="75" width="25" height="25"/><rect x="25" y="75" width="25" height="25"/><rect x="50" y="75" width="25" height="25"/><rect x="75" y="75" width="25" height="25"/>
+      </g><use href="#axes"/></g></svg>
+  </div>
+  <p>Each cell holds one or more values. A single-band raster may store elevation; a multi-band raster may store several spectral bands of satellite imagery.</p>
+  <div class="geom" id="raster-values"></div>
+  <script>
+    // A 4x4 single-band raster, drawn with plain DOM calls (values are made up).
+    (() => {
+      const vals = [[.03,.12,.21,.31],[.15,.26,.41,.55],[.22,.34,.5,.63],[.29,.44,.61,.86]];
+      const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("width", 140); svg.setAttribute("height", 140); svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "A single-band raster whose cell values darken toward the bottom right");
+      const g = document.createElementNS(ns, "g"); g.setAttribute("transform", "translate(20,20)"); svg.append(g);
+      vals.forEach((row, r) => row.forEach((v, c) => {
+        const rect = document.createElementNS(ns, "rect");
+        for (const [k, x] of Object.entries({x: c * 25, y: r * 25, width: 25, height: 25, stroke: "#333", fill: `hsl(0 0% ${100 - v * 85}%)`})) rect.setAttribute(k, x);
+        g.append(rect);
+      }));
+      g.insertAdjacentHTML("beforeend", '<use href="#axes"/>');
+      document.getElementById("raster-values").append(svg);
+    })();
+  </script>
+</section>
+
+<section id="formats">
+  <h2><span class="num">3</span>Urban data formats</h2>
+  <h3>3.1 GeoJSON</h3>
+  <p><a href="https://geojson.org/">GeoJSON</a> is a JSON-based format for vector data. It can describe a geometry, a feature, or a collection of features, and by default uses the WGS 84 coordinate reference system.</p>
+  <p>Per the specification, a GeoJSON object may be a <strong>Geometry</strong> (a region of space), a <strong>Feature</strong> (a spatially bounded entity) or a <strong>FeatureCollection</strong> (a list of features). The geometry types are Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon and GeometryCollection.</p>
+  <p>A <strong>Feature</strong> has three members: <code>type</code> (<code>"Feature"</code>), <code>properties</code> (descriptive attributes such as names or categories) and <code>geometry</code> (the shape). A <strong>FeatureCollection</strong> has <code>type</code> <code>"FeatureCollection"</code> and a <code>features</code> array; the properties and geometry belong to each feature, not to the collection.</p>
+  <p>This feature-centric structure is the common currency of Autark: every module reads or produces GeoJSON features. Here is a sample file.</p>
+  <figure class="example" data-title="3.1 · Read a GeoJSON file">
+  <script type="text/plain">
+    // d3.json fetches and parses; the return value of a cell is displayed below it.
+    const geojson = await d3.json("data/formats/example.geojson");
+    return geojson;
+  </script>
+  </figure>
+
+  <h3>3.2 Well-known text (WKT)</h3>
+  <p><a href="https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry">Well-Known Text</a> is a human-readable text format for geometry only; it carries no attributes. A WKT object is a geometry type keyword followed by coordinates in parentheses: a <code>POINT</code> has one coordinate pair, a <code>LINESTRING</code> a sequence of pairs, and a <code>POLYGON</code> one exterior ring and optionally interior rings (holes).</p>
+  <figure class="example" data-title="3.2 · Read a WKT file">
+  <script type="text/plain">
+    return await d3.text("data/formats/example.wkt");
+  </script>
+  </figure>
+  <p>Because WKT has no properties, it is usually paired with a tabular format: attributes in CSV columns and the geometry in a dedicated WKT column. This is how many open data portals publish geometry.</p>
+  <figure class="example" data-title="3.2 · CSV with a WKT column">
+  <script type="text/plain">
+    const rows = await d3.csv("data/formats/example.csv");
+    table(rows);
+  </script>
+  </figure>
+
+  <h3>3.3 GeoTIFF</h3>
+  <p><a href="https://www.ogc.org/standards/geotiff/">GeoTIFF</a> is a raster format based on TIFF that stores georeferenced rasters. A GeoTIFF has two parts: the <strong>raster values</strong>, a grid of pixels each holding one or more values, and the <strong>georeferencing metadata</strong> (coordinate reference system, spatial extent, pixel resolution) that relates those pixels to real-world coordinates.</p>
+  <figure class="example" data-title="3.3 · Read GeoTIFF metadata">
+  <script type="text/plain">
+    // GeoTIFF is supplied by the runner from the installed geotiff package.
+    const buffer = await d3.buffer("data/formats/example.tif");
+    const tiff = await GeoTIFF.fromArrayBuffer(buffer);
+    const image = await tiff.getImage();
+    return {
+      width: image.getWidth(),
+      height: image.getHeight(),
+      bbox: image.getBoundingBox(),
+      origin: image.getOrigin(),
+      resolution: image.getResolution(),
+      geoKeys: image.getGeoKeys(),
+    };
+  </script>
+  </figure>
+</section>
+
+<section id="sources">
+  <h2><span class="num">4</span>Urban data sources</h2>
+  <h3>4.1 OpenStreetMap</h3>
+  <p><a href="https://www.openstreetmap.org/">OpenStreetMap (OSM)</a> is an open, collaboratively maintained source of vector data about natural and built environments, created by a global community and free to use and share. It is widely used in GIS, urban studies, navigation and spatial analysis.</p>
+  <p>OSM has three structures: <strong>nodes</strong>, <strong>ways</strong> and <strong>relations</strong>. A node is a single position, like a GeoJSON Point. A way is an ordered list of nodes and can be a line or an area, like a LineString or Polygon. A relation groups nodes, ways or other relations into a more complex entity. Every element has <strong>tags</strong>, key-value pairs that say what it is.</p>
+  <p>OSM is commonly distributed as <strong>OSM XML</strong> (text, readable, good for small files) and <strong>PBF</strong> (the same information in compact binary). A small XML example:</p>
+  <figure class="example" data-title="4.1 · An OSM XML file">
+  <script type="text/plain">
+    const text = await d3.text("data/formats/example.osm");
+    const xml = new DOMParser().parseFromString(text, "application/xml");
+    out.append(xmlView(xml));
+  </script>
+  </figure>
+  <p>The <a href="https://wiki.openstreetmap.org/wiki/Overpass_API"><strong>Overpass API</strong></a> returns only the elements you ask for, such as the roads, buildings or points of interest in an area, as XML or JSON. Its <a href="https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide">query language</a> selects elements of interest. This query asks for every cafe node in a bounding box:</p>
+  <figure class="example" data-title="4.1 · Query Overpass">
+  <script type="text/plain">
+    const query = `
+      [out:xml];
+      node["amenity"="cafe"](40.0,-3.1,40.1,-3.0);
+      out;
+    `;
+    // withFallback() tries the public server and, if it fails, uses the copy recorded in data/osm/.
+    const text = await withFallback(async () => {
+      const response = await fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: "data=" + encodeURIComponent(query),
+      });
+      if (!response.ok) throw new Error(`Overpass answered ${response.status}`);
+      return response.text();
+    });
+    const xml = new DOMParser().parseFromString(text, "application/xml");
+    out.append(xmlView(xml));
+  </script>
+  </figure>
+  <p>OSM data can also be downloaded as prepared extracts such as those from <a href="https://download.geofabrik.de/"><strong>Geofabrik</strong></a>: snapshots for predefined regions (countries, states, cities) instead of live queries.</p>
+
+  <h3>4.2 Open data portals</h3>
+  <p>Cities and public agencies publish urban datasets through open data portals such as <a href="https://opendata.cityofnewyork.us/"><strong>NYC Open Data</strong></a>: transportation, land use, buildings, public services, infrastructure, environment and demographic indicators.</p>
+  <p>Depending on the dataset the information may be vector or raster, and is commonly distributed as CSV with WKT columns or as GeoJSON. These portals are important sources because the data is structured, regularly updated and georeferenced.</p>
+
+  <div class="next-page">Next: <a href="db.html">03 · Urban data management with Autark DB →</a></div>
+</section>
+
+<section id="credits">
+  <h2>Credits</h2>
+  <p>Adapted from the Observable notebook <a href="https://observablehq.com/d/ec93e4d1a4632c03">02. Urban Data Formats and Sources</a>, produced for the tutorial <em>Urban Data Analytics with <a href="https://autarkjs.org">Autark</a></em> at SIBGRAPI 2026. See the <a href="index.html#authors">author list</a>.</p>
+</section>
+</main>
+</div>
+<script type="module" src="tutorial.js"></script>
+</body>
+</html>

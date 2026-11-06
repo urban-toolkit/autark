@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Urbane in the browser · Autark</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+  #app { width: 100%; height: 100%; }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  /* top-right controls */
+  #controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; align-items: center; z-index: 11; }
+  #controls button, #controls select {
+    height: 42px; background: #fff; border: 1px solid #ccc; border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.1); cursor: pointer; font-size: 14px; font-family: inherit;
+  }
+  #controls button { min-width: 42px; padding: 0 12px; display: flex; align-items: center; gap: 6px; }
+  #controls button:disabled { opacity: .5; cursor: not-allowed; }
+  #controls select { width: 150px; padding: 0 10px; }
+
+  /* title + level badge (top-left) */
+  #title { position: absolute; top: 10px; left: 64px; z-index: 11; background: #fff; border: 1px solid #ccc;
+    border-radius: 8px; padding: 8px 14px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+  #title b { font-size: 16px; }
+  #title span { display: block; font-size: 12px; color: #666; margin-top: 2px; }
+
+  /* weights panel */
+  #weightsPanel { position: fixed; bottom: 20px; left: 20px; width: 402px; height: 270px; display: flex;
+    flex-direction: column; gap: 8px; padding: 12px 16px 14px; background: #fff; border: 1px solid #ccc;
+    border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.13); z-index: 12; box-sizing: border-box; }
+  #weightsPanelTitle { font-size: 12px; font-weight: 600; color: #555; text-align: center; letter-spacing: .04em; text-transform: uppercase; }
+  #weightsSliders { display: flex; gap: 10px; align-items: flex-start; }
+  .weight-col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 44px; }
+  .weight-value { font-size: 11px; color: #666; font-family: monospace; }
+  .weight-slider { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 100px; cursor: pointer; accent-color: #555; }
+  .weight-label { font-size: 10px; color: #555; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+  #weightsCompute { margin-top: 4px; width: 100%; padding: 6px 0; font-size: 12px; font-weight: 600; color: #fff;
+    background: #555; border: none; border-radius: 5px; cursor: pointer; letter-spacing: .03em; }
+  #weightsCompute:hover { background: #333; }
+  #weightsCompute:disabled { opacity: .5; cursor: wait; }
+
+  /* floating plot panel */
+  #plot { position: fixed; z-index: 10; background: #fff; opacity: .9; border: 1px solid #bfbfbf; border-radius: 10px 10px 0 0;
+    right: 20px; top: 64px; }
+  .hidden-plot, .hidden-plot * { visibility: hidden !important; }
+  #plotBar { width: 100%; height: 30px; cursor: move; background: #bfbfbf; border-radius: 10px 10px 0 0; box-shadow: 0 1px 3px #666; }
+  #plotBodyParallel, #plotBodyTable { margin: 5px; width: 800px; height: 420px; }
+  #plot svg { width: calc(100% - 10px); height: calc(100% - 10px); border: none !important; }
+  .tick line { stroke-width: 1px; stroke: #dfdfdf; }
+  .title { font-size: 12px; fill: #333; }
+
+  /* pipeline log (what ran, how long) */
+  #log { position: fixed; bottom: 20px; left: 440px; z-index: 12; background: rgba(255,255,255,.95); border: 1px solid #ccc;
+    border-radius: 8px; padding: 10px 14px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.13); max-width: 380px; }
+  #log.collapsed ol { display: none; }
+  #log h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #555; cursor: pointer; }
+  #log ol { margin: 8px 0 0; padding-left: 20px; line-height: 1.55; color: #333; }
+  #log li code { font-size: 11px; color: #7a3e00; }
+  #log li .t { float: right; margin-left: 14px; color: #888; font-family: monospace; }
+
+  #toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 16px;
+    border-radius: 6px; font-size: 14px; z-index: 9000; display: none; }
+
+  /* loading overlay */
+  #loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,.96); display: flex; align-items: center;
+    justify-content: center; z-index: 9999; }
+  #loading-overlay.hidden { display: none; }
+  #loading-box { text-align: center; max-width: 440px; padding: 32px; }
+  #loading-spinner { width: 36px; height: 36px; border: 3px solid #e0e0e0; border-top-color: #555; border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 16px; }
+  #loading-overlay.error #loading-spinner { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-title { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  #loading-overlay.error #loading-title { color: #c0392b; }
+  #loading-text { font-size: 14px; color: #555; margin: 0 0 6px; }
+  #loading-note { font-size: 12px; color: #999; margin: 0; }
+</style>
+<link rel="stylesheet" href="tutorial.css">
+<script type="module" src="shell.js"></script>
+</head>
+<body class="app-page">
+<div id="app">
+  <div id="loading-overlay">
+    <div id="loading-box">
+      <div id="loading-spinner"></div>
+      <h2 id="loading-title">Loading Urbane</h2>
+      <p id="loading-text">Starting…</p>
+      <p id="loading-note"></p>
+    </div>
+  </div>
+
+  <canvas></canvas>
+
+  <div id="title"><b>Urbane, in the browser</b><span id="levelName">Level: neighborhoods · click one or more, then ▾ to drill down</span></div>
+
+  <div id="controls">
+    <button id="levelBtn" title="Drill into buildings">▾ <span id="levelBtnText">Drill down</span></button>
+    <select id="thematicSelect" title="Color the map by…"></select>
+    <button id="plotToggle" title="Show or hide the linked views">◔ Views</button>
+  </div>
+
+  <div id="weightsPanel">
+    <div id="weightsPanelTitle">Dataset weights (sum ≤ 1)</div>
+    <div id="weightsSliders"></div>
+  </div>
+
+  <div id="log"><h4>Pipeline ▸</h4><ol id="logList"></ol></div>
+
+  <div id="plot">
+    <div id="plotBar"></div>
+    <div id="plotBodyParallel"></div>
+    <div id="plotBodyTable"></div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Urbane on Autark. Everything below is the whole application:
+//   autk-db       OSM + GeoJSON + CSV  →  DuckDB tables, spatial joins
+//   autk-compute  sky exposure per road (render analysis)  +  weighted score (GPGPU)
+//   autk-map      3D WebGPU city, picking, thematic color
+//   autk-plot     parallel coordinates + table, linked to the map
+// Adapted from the standalone tutorial; Autark is resolved from this repository's workspace.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+import {db as dbm, compute, map as mapm, plot as plotm, core} from "@urban-toolkit/autk";
+const {AutkDb} = dbm, {ComputeGpgpu, ComputeRender} = compute;
+const {AutkMap, MapEvent} = mapm, {AutkPlot, PlotEvent} = plotm, {ColorMapDomainStrategy} = core;
+
+const $ = s => document.querySelector(s);
+const DATA = "data/urbane/";
+const DATASETS = ["arrest", "new_building", "noise", "restaurants", "school", "subway", "tree"];
+const INVERTED = new Set(["arrest", "noise"]);            // more arrests / noise ⇒ worse, so score 1 − x
+const SCORE = "compute.score", SKY_ROAD = "compute.skyViewFactor", SKY_NEIGH = "sjoin.avg.skyExposure";
+const pretty = s => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+const state = {
+  level: "neighborhoods", selected: [], distance: 300,
+  weights: [0.3, 0.2, 0, 0.5, 0, 0, 0], skyWeight: 0,
+};
+
+// ---------- loading overlay + pipeline log ----------
+function setLoading(text, note = "") { $("#loading-text").textContent = text; $("#loading-note").textContent = note; }
+function showError(err) {
+  console.error(err);
+  const o = $("#loading-overlay"); o.classList.remove("hidden"); o.classList.add("error");
+  $("#loading-title").textContent = "Loading error";
+  setLoading(String(err?.message ?? err), "Needs a WebGPU-enabled browser and the Vite server: make tutorial.");
+}
+async function step(label, code, fn) {
+  setLoading(label);
+  const t0 = performance.now(), r = await fn();
+  const li = document.createElement("li");
+  li.innerHTML = `${label.replace(/…$/, "")} <code>${code}</code><span class="t">${((performance.now() - t0) / 1000).toFixed(1)} s</span>`;
+  $("#logList").append(li);
+  return r;
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; setTimeout(() => t.style.display = "none", 2500); }
+
+// ---------- data (autk-db) ----------
+const db = new AutkDb();
+async function loadBaseData() {
+  await db.loadOsm({
+    pbfFileUrl: DATA + "mnt.osm.pbf",
+    // A bounding box [west, south, east, north] around Manhattan. (Naming the area, as the 2.x use case did,
+    // does not work with autk 4.x on this extract: its "Manhattan" boundary is incomplete, so everything is clipped away.)
+    queryArea: {bbox: [-74.0260, 40.6990, -73.9000, 40.8830]},
+    outputTableName: "table_osm",
+    autoLoadLayers: {layers: ["surface", "parks", "water", "roads", "buildings"], dropOsmTable: true},
+  });
+  await db.loadGeojson({geojsonFileUrl: "data/shared/mnt_neighs.geojson", outputTableName: "neighborhoods"});
+  // tag every building with the neighborhood it falls in
+  await db.spatialQuery({tableRootName: "table_osm_buildings", tableJoinName: "neighborhoods"});
+  for (const name of DATASETS) {
+    await db.loadCsv({csvFileUrl: `${DATA}${name}_manhattan_clean.csv`, outputTableName: name,
+      geometryColumns: {latColumnName: "latitude", longColumnName: "longitude"}});
+    // count points per neighborhood (normalized to 0..1)
+    await db.spatialQuery({tableRootName: "neighborhoods", tableJoinName: name,
+      groupBy: [{column: "key", aggregateFn: "count", normalize: true}]});
+  }
+}
+
+// ---------- analysis (autk-compute) ----------
+async function computeRoadSkyView(buildings, roads) {
+  const r = await new ComputeRender().run({
+    layers: [{id: "table_osm_buildings", collection: buildings, type: "buildings"}],
+    viewpoints: {collection: roads, sampling: {directions: 1}},
+    aggregation: {type: "classes", includeBackground: true, backgroundLayerType: "sky"},
+    tileSize: 64,
+  });
+  return {...r, features: r.features.map(f => ({...f, properties: {...f.properties,
+    compute: {...(f.properties?.compute ?? {}), skyViewFactor: Number(f.properties?.compute?.render?.classes?.sky ?? 0)}}}))};
+}
+function decorateSky(fc) {
+  for (const f of fc.features) {
+    const avg = ((f.properties.sjoin ??= {}).avg ??= {});
+    avg.skyExposure ??= avg["table_osm_roads.compute.skyViewFactor"] ?? 0;
+    avg.skyExposure_norm ??= avg["table_osm_roads.compute.skyViewFactor_norm"] ?? 0;
+  }
+  return fc;
+}
+async function computeScore(fc) {
+  decorateSky(fc);
+  for (const f of fc.features) {
+    const v = DATASETS.map(d => { const x = f.properties.sjoin?.count?.[`${d}_norm`] ?? 0; return INVERTED.has(d) ? 1 - x : x; });
+    v.push(f.properties.sjoin?.avg?.skyExposure_norm ?? 0);
+    f.properties.scoreInputs = v;
+  }
+  // The score is a weighted sum evaluated on the GPU, once per feature.
+  return new ComputeGpgpu().run({
+    collection: fc,
+    variableMapping: {vals: "scoreInputs"},
+    attributeArrays: {vals: DATASETS.length + 1},
+    uniformArrays: {weights: [...state.weights, state.skyWeight]},
+    resultField: "score",
+    wgslBody: `var s = 0.0; for (var i = 0u; i < vals_length; i++) { s += vals[i] * weights[i]; } return s;`,
+  });
+}
+
+// ---------- views (autk-map + autk-plot) ----------
+let map, parallel, table, neighs, activeBuildings, roadsWithSky;
+const current = () => state.level === "neighborhoods" ? neighs : activeBuildings;
+
+function reloadPlots() {
+  $("#plotBodyParallel").innerHTML = ""; $("#plotBodyTable").innerHTML = "";
+  const attrs = [...DATASETS.map(d => `sjoin.count.${d}`), SKY_NEIGH, SCORE];
+  const labels = [...DATASETS, "sky exposure", "score"];
+  const nb = state.level === "neighborhoods";
+  const title = `${state.level.replace("_", " ")} characteristics`;
+  parallel = new AutkPlot($("#plotBodyParallel"), {type: "parallel-coordinates", collection: current(),
+    attributes: {axis: attrs}, labels: {axis: labels, title}, width: 790, events: [PlotEvent.BRUSH_Y]});
+  table = new AutkPlot($("#plotBodyTable"), {type: "table", collection: current(),
+    attributes: {axis: [nb ? "ntaname" : "addr:street", ...attrs]}, labels: {axis: ["Id", ...labels], title}, width: 790, events: [PlotEvent.CLICK]});
+  // plots → map and the other plot
+  table.events.on(PlotEvent.CLICK, ({selection}) => { map.setHighlightedIds(state.level, selection); parallel.setSelection(selection); onSelect(selection); });
+  parallel.events.on(PlotEvent.BRUSH_Y, ({selection}) => { map.setHighlightedIds(state.level, selection); table.setSelection(selection); onSelect(selection); });
+}
+const onSelect = sel => { if (state.level === "neighborhoods") state.selected = sel; };
+
+function setThematic(column) {
+  const lvl = state.level;
+  if (column === "none") { map.updateRenderInfo(lvl, {isColorMap: false}); map.draw(); return; }
+  const sky = column === SKY_NEIGH || column === SKY_ROAD;
+  map.updateColorMap(lvl, {colorMap: {domainSpec: sky ? {type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95]} : {type: ColorMapDomainStrategy.MIN_MAX}}});
+  map.updateThematic(lvl, {collection: current(), property: `properties.${column}`});
+  map.updateRenderInfo(lvl, {isColorMap: true});
+  map.draw();
+}
+
+// ---------- interaction ----------
+async function drillDown() {
+  if (!state.selected.length) { toast("Select at least one neighborhood on the map first."); return; }
+  const names = [...new Set(state.selected.map(i => neighs.features[i]?.properties?.ntaname).filter(Boolean))];
+  const inList = names.map(n => `'${n.replace(/'/g, "''")}'`).join(", ");
+  state.level = "active_buildings";
+  await db.rawQuery({
+    query: `SELECT geometry, properties, building_id FROM table_osm_buildings WHERE properties->'sjoin'->'matches'->0->'properties'->>'ntaname' IN (${inList})`,
+    output: {type: "CREATE_TABLE", tableName: "active_buildings", source: "osm", tableType: "buildings"},
+  });
+  for (const d of DATASETS)   // for buildings, count what is within `distance` meters
+    await db.spatialQuery({tableRootName: "active_buildings", tableJoinName: d, near: {distance: state.distance, useCentroid: true},
+      groupBy: [{column: "key", aggregateFn: "count", normalize: true}]});
+  await db.spatialQuery({tableRootName: "active_buildings", tableJoinName: "table_osm_roads", near: {distance: 300, useCentroid: true},
+    groupBy: [{column: "compute.skyViewFactor", aggregateFn: "avg", normalize: true}]});
+  activeBuildings = await computeScore(await db.getLayer("active_buildings"));
+
+  map.loadCollection("active_buildings", {collection: activeBuildings, type: "buildings"});
+  map.updateRenderInfo("table_osm_buildings", {isSkip: true});
+  map.updateRenderInfo("neighborhoods", {isSkip: true, isPick: false});
+  map.updateRenderInfo("active_buildings", {isSkip: false, isPick: true});
+  map.draw(); reloadPlots(); setThematic($("#thematicSelect").value);
+}
+async function drillUp() {
+  state.level = "neighborhoods"; state.selected = [];
+  await db.removeLayer("active_buildings");
+  map.removeLayer("active_buildings");
+  map.updateRenderInfo("table_osm_buildings", {isSkip: false, isPick: false});
+  map.updateRenderInfo("neighborhoods", {isSkip: false, isPick: true});
+  map.draw(); reloadPlots(); setThematic($("#thematicSelect").value);
+}
+async function recompute(weights) {
+  state.weights = weights.slice(0, DATASETS.length); state.skyWeight = weights[DATASETS.length] ?? 0;
+  const scored = await computeScore(await db.getLayer(state.level));
+  if (state.level === "neighborhoods") neighs = scored; else activeBuildings = scored;
+  reloadPlots(); setThematic($("#thematicSelect").value);
+}
+
+function initUi() {
+  const btn = $("#levelBtn"), sel = $("#thematicSelect");
+  const syncBtn = () => {
+    const down = state.level === "neighborhoods";
+    $("#levelBtn").firstChild.textContent = down ? "▾ " : "▴ ";
+    $("#levelBtnText").textContent = down ? "Drill down" : "Back to neighborhoods";
+    $("#levelName").textContent = down ? "Level: neighborhoods · click one or more, then ▾ to drill down"
+      : `Level: buildings in ${state.selected.length} neighborhood(s) · score uses POIs within ${state.distance} m`;
+  };
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try { await (state.level === "neighborhoods" ? drillDown() : drillUp()); } catch (e) { console.error(e); toast("Error: " + e.message); }
+    syncBtn(); btn.disabled = false;
+  });
+  [["none", "None"], [SCORE, "Score"], ...DATASETS.map(d => [`sjoin.count.${d}`, pretty(d)]), [SKY_NEIGH, "Sky Exposure"]]
+    .forEach(([v, t]) => sel.append(new Option(t, v)));
+  sel.addEventListener("change", () => setThematic(sel.value));
+
+  const box = $("#weightsSliders");
+  [...state.weights, state.skyWeight].forEach((w, i) => {
+    const col = document.createElement("div"); col.className = "weight-col";
+    const val = Object.assign(document.createElement("span"), {className: "weight-value", textContent: w.toFixed(2)});
+    const s = Object.assign(document.createElement("input"), {type: "range", min: 0, max: 1, step: 0.01, value: w, className: "weight-slider"});
+    s.addEventListener("input", () => {   // keep the weights summing to at most 1
+      const others = [...document.querySelectorAll(".weight-slider")].filter(x => x !== s).reduce((a, x) => a + +x.value, 0);
+      const max = +Math.max(0, 1 - others).toFixed(2);
+      if (+s.value > max) s.value = max;
+      val.textContent = (+s.value).toFixed(2);
+    });
+    const name = Object.assign(document.createElement("span"), {className: "weight-label", textContent: [...DATASETS.map(pretty), "Sky Exposure"][i]});
+    col.append(val, s, name); box.append(col);
+  });
+  const go = Object.assign(document.createElement("button"), {id: "weightsCompute", textContent: "Compute Score"});
+  go.addEventListener("click", async () => {
+    go.disabled = true;
+    try { await recompute([...document.querySelectorAll(".weight-slider")].map(x => +x.value)); } finally { go.disabled = false; }
+    sel.value = SCORE; setThematic(SCORE);
+  });
+  $("#weightsPanel").append(go);
+
+  // draggable plot panel
+  const plot = $("#plot"), bar = $("#plotBar"); let sx = 0, sy = 0;
+  plot.classList.add("hidden-plot");
+  $("#plotToggle").addEventListener("click", () => plot.classList.toggle("hidden-plot"));
+  bar.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; bar.setPointerCapture(e.pointerId); });
+  bar.addEventListener("pointermove", e => {
+    if (!bar.hasPointerCapture(e.pointerId)) return;
+    plot.style.right = "auto";
+    plot.style.left = plot.offsetLeft + e.clientX - sx + "px"; plot.style.top = plot.offsetTop + e.clientY - sy + "px";
+    sx = e.clientX; sy = e.clientY;
+  });
+  $("#log h4").addEventListener("click", () => $("#log").classList.toggle("collapsed"));
+}
+
+// ---------- main ----------
+try {
+  if (!navigator.gpu) throw new Error("WebGPU is not available in this browser.");
+  await step("Starting the in-browser database…", "new AutkDb().init()", () => db.init());
+  await step("Loading Manhattan (OSM), neighborhoods and 7 urban datasets…", "db.loadOsm · loadGeojson · loadCsv · spatialQuery", loadBaseData);
+
+  const buildings = await db.getLayer("table_osm_buildings"), roads = await db.getLayer("table_osm_roads");
+  // The sky-exposure pass is the slowest step and its answer never changes, so it is kept in this browser
+  // (localStorage) after the first run. Add ?fresh to the URL to recompute it on the GPU.
+  const SKY_KEY = "urbane-sky-v1", fresh = new URLSearchParams(location.search).has("fresh");
+  let cached = null;
+  try { const c = JSON.parse(localStorage.getItem(SKY_KEY)); if (!fresh && Array.isArray(c) && c.length === roads.features.length) cached = c; } catch {}
+  if (cached) {
+    roadsWithSky = await step("Sky exposure of every road (cached from the first run; ?fresh recomputes)…", "localStorage", async () => ({...roads,
+      features: roads.features.map((f, i) => ({...f, properties: {...f.properties, compute: {...(f.properties?.compute ?? {}), skyViewFactor: cached[i]}}}))}));
+  } else {
+    roadsWithSky = await step("Sky exposure of every road, rendered on the GPU…", "ComputeRender", () => computeRoadSkyView(buildings, roads));
+    try { localStorage.setItem(SKY_KEY, JSON.stringify(roadsWithSky.features.map(f => +f.properties.compute.skyViewFactor.toFixed(4)))); } catch {}
+  }
+  await db.updateTable({tableName: "table_osm_roads", data: roadsWithSky, strategy: "replace"});
+
+  await step("Averaging sky exposure per neighborhood…", "spatialQuery(avg)", () => db.spatialQuery({
+    tableRootName: "neighborhoods", tableJoinName: "table_osm_roads",
+    groupBy: [{column: SKY_ROAD, aggregateFn: "avg", normalize: true}]}));
+  neighs = await step("Scoring neighborhoods with a WGSL kernel…", "ComputeGpgpu", async () => computeScore(await db.getLayer("neighborhoods")));
+
+  map = new AutkMap($("canvas"));
+  await step("Initializing the WebGPU map…", "new AutkMap().init()", () => map.init());
+  await step("Uploading layers to the GPU…", "map.loadCollection", async () => {
+    for (const t of db.getLayersMetadata()) {
+      if (t.type === "points") continue;
+      map.loadCollection(t.name, {collection: t.name === "neighborhoods" ? neighs : await db.getLayer(t.name), type: t.type});
+    }
+    map.updateRenderInfo("table_osm_buildings", {isPick: false});
+    map.updateRenderInfo("neighborhoods", {opacity: 0.75, isPick: true, isSkip: true});
+    // roads colored by their sky exposure
+    map.updateColorMap("table_osm_roads", {colorMap: {domainSpec: {type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95]}}});
+    map.updateThematic("table_osm_roads", {collection: roadsWithSky, property: `properties.${SKY_ROAD}`});
+    map.updateRenderInfo("table_osm_roads", {isColorMap: true});
+    map.draw();
+  });
+  reloadPlots();
+  // map → plots
+  map.events.on(MapEvent.PICKING, ({selection, layerId}) => {
+    if (layerId !== state.level) return;
+    table?.setSelection(selection); parallel?.setSelection(selection); onSelect(selection);
+  });
+  initUi();
+  $("#loading-overlay").classList.add("hidden");
+  window.urbane = {db, map, state, get neighs() { return neighs; }};   // handy in the console during class
+} catch (e) { showError(e); }
+</script>
+</body>
+</html>

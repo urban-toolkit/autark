@@ -1,0 +1,62 @@
+{
+  "85d884bd9b220918.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 19444,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"natural\"=\"coastline\"](40.704,-74.0225,40.7185,-74.012);)->.dataWays; (.dataWays; ); out geom qt;"
+  },
+  "fe64615c8190a184.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 683982,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"leisure\"~\"^(dog_park|park|playground|recreation_ground)$\"](40.704,-74.0225,40.7185,-74.012); way[\"landuse\"~\"^(w"
+  },
+  "4b2cc224cd122beb.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 43078,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"natural\"=\"coastline\"](40.7,-74.0225,40.7185,-74.0005);)->.dataWays; (.dataWays; ); out geom qt;"
+  },
+  "7e23c063d623100e.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 1032799,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"highway\"][\"area\"!=\"yes\"][\"highway\"!~\"^(cycleway|elevator|footway|steps|pedestrian|proposed|construction|abandon"
+  },
+  "7e26c0dfc8bb3ea5.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 869958,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"building\"][\"building\"!~\"^(shed|garage|garages|carport|hut|kiosk|toilets|service|transformer_tower|sty|container"
+  },
+  "3a31c8c3563aff6a.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 1234889,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"building\"][\"building\"!~\"^(shed|garage|garages|carport|hut|kiosk|toilets|service|transformer_tower|sty|container"
+  },
+  "f5df1ff6a0abfd0a.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 410995,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"building\"][\"building\"!~\"^(shed|garage|garages|carport|hut|kiosk|toilets|service|transformer_tower|sty|container"
+  },
+  "ae347672a4f1d09a.json.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 1418556,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"building\"][\"building\"!~\"^(shed|garage|garages|carport|hut|kiosk|toilets|service|transformer_tower|sty|container"
+  },
+  "3d07a84e56c2520e.json.gz": {
+    "recorded": "2026-11-06",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 1108513,
+    "query": "[out:json][timeout:60][maxsize:268435456]; (way[\"leisure\"~\"^(dog_park|park|playground|recreation_ground)$\"](40.7,-74.0225,40.7185,-74.0005); way[\"landuse\"~\"^(wood|grass|forest|orchard|village_green|vineyard|cemetery|meadow)$\"](40.7,-74.0225,40.7185,-74.0005); way[\"natural\"~\"^(wood|grass|grassland|forest|scrub|heath|meadow)$\"](40.7,-74.0225,40.7185,-74.0005); way[\"natural\"~\"^(water|wetland|strait|spring)$\"](40.7,-74.0225,40.7185,-74.0005); way[\"water\"~\"^(pond|reservoir|lagoon|stream_pool|lake|pool|canal|river)$\"](40.7,-74.0225,40.7185,-74.0005);)->.dataWays; (relation[\"leisure\"~\"^(dog_park|park|playground|recreation_ground)$\"](40.7,-74.0225,40.7185,-74.0005); relation[\"landuse\"~\"^(wood|grass|forest|orchard|village_green|vineyard|cemetery|meadow)$\"](40.7,-74.0225,40.7185,-74.0005); relation[\"natural\"~\"^(wood|grass|grassland|forest|scrub|heath|meadow)$\"](40.7,-74.0225,40.7185,-74.0005); relation[\"natural\"~\"^(water|wetland|strait|spring)$\"](40.7,-74.0225,40.7185,-74.0005); relation[\"water\"~\"^(pond|reservoir|lagoon|stream_pool|lake|pool|canal|river)$\"](40.7,-74.0225,40.7185,-74.0005);)->.dataRelations; way(r.dataRelations)->.dataRelationWays; (.dataRelations;); out body; (.dataWays; .dataRelationWays;); out geom qt;"
+  },
+  "23a46f6462a6bca2.xml.gz": {
+    "recorded": "2026-11-05",
+    "mirror": "https://overpass.openstreetmap.fr/api/interpreter",
+    "bytes": 419,
+    "query": "[out:xml]; node[\"amenity\"=\"cafe\"](40.0,-3.1,40.1,-3.0); out;"
+  }
+}

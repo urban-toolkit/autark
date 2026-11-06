@@ -1,0 +1,4 @@
+prop0,prop1,wkt
+value0,,"POINT (102 0.5)"
+value0,0.0,"LINESTRING (102 0, 103 1, 104 0, 105 1)"
+value0,"{""nested"":""value1""}","POLYGON ((100 0, 101 0, 101 1, 100 1, 100 0))"

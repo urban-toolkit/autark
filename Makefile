@@ -1,4 +1,4 @@
-.PHONY: lint test typecheck build package-validate docs verify dev gallery usecases clean
+.PHONY: lint test typecheck build package-validate docs verify dev gallery usecases tutorial clean
 
 CONCURRENTLY := ./node_modules/.bin/concurrently
 
@@ -61,6 +61,9 @@ gallery:
 
 usecases:
 	$(MAKE) dev APP=usecases$(if $(OPEN), OPEN=$(OPEN))
+
+tutorial: build
+	cd tutorial && ../node_modules/.bin/vite$(if $(OPEN), --open=$(OPEN))
 
 clean:
 	rm -rf $(foreach package,autk-core autk-map autk-db autk-plot autk-compute autk gallery usecases,$(addprefix $(package)/,dist build node_modules)) node_modules

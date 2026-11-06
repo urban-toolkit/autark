@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>04 · Geographical data visualization · Autark tutorial</title>
+  <link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#lifecycle">1. Lifecycle of a map</a></li>
+    <li><a href="#layers">2. Layers</a></li>
+    <li><a href="#osm">3. Connecting OSM layers</a></li>
+    <li><a href="#raster">4. Raster layers</a></li>
+    <li><a href="#thematic">5. Thematic data</a></li>
+    <li><a href="#interactions">6. Interactions</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="intro">
+  <p class="meta">Autark tutorial · notebook 04</p>
+  <div class="series-nav">
+    <a href="index.html">01 · Overview</a>
+    <a href="formats.html">02 · Formats and sources</a>
+    <a href="db.html">03 · Data management</a>
+    <span>04 · Maps</span>
+    <a href="plot.html">05 · Plots</a>
+    <a href="compute.html">06 · GPU computing</a>
+  </div>
+  <h1>Geographical data visualization with Autark Map</h1>
+  <p class="lede">Draw 2D and 3D urban layers with WebGPU straight from GeoJSON, with no tile server and no backend.</p>
+  <p><code>autk-map</code> is the rendering module of <a href="https://autarkjs.org/">Autark</a>. This page goes from an empty canvas to an interactive map and covers the main things the module offers: layers, OpenStreetMap data, rasters, thematic color and picking. The module does not care where a GeoJSON <code>FeatureCollection</code> comes from. When you combine it with <code>autk-db</code>, <code>autk-compute</code> and <code>autk-plot</code>, every call you learn here stays the same; only the origin of the data changes.</p>
+
+  <h3>WebGPU check</h3>
+  <p><code>navigator.gpu</code> is the entry point of the WebGPU API. When it is missing, the browser does not implement WebGPU and <code>autk-map</code> cannot run. <code>navigator.gpu.requestAdapter()</code> asks for an <strong>adapter</strong>, a handle to one physical GPU (or a software fallback). It can resolve to <code>null</code> even when the API exists, typically because hardware acceleration is off. The next step, <code>adapter.requestDevice()</code>, gives the <strong>device</strong> that allocates buffers and submits work; <code>map.init()</code> does that for you.</p>
+  <aside class="note">Every example on this page needs <strong>WebGPU</strong>: a recent Chrome, Edge or Safari. Cells share state through <code>ctx</code>; run them in order or use <strong>Run all above ▶▶</strong>.</aside>
+  <figure class="example" data-title="0.1 · WebGPU check">
+  <script type="text/plain">
+    if (!navigator.gpu) return "WebGPU is not available in this browser. Switch to a recent Chrome, Edge or Safari.";
+    const adapter = await navigator.gpu.requestAdapter();
+    return adapter
+      ? "WebGPU is available. You are good to go."
+      : "The browser exposes WebGPU but returned no adapter. Check that hardware acceleration is enabled.";
+  </script>
+  </figure>
+
+  <h3>Data</h3>
+  <p>The examples use three datasets of Manhattan, bundled inside <code>tutorial/data/</code>: the neighborhood polygons, a CSV of noise complaints with latitude and longitude, and OpenStreetMap roads and buildings. Load the first two once; later cells reuse them.</p>
+  <aside class="note"><code>autk-map</code> expects projected coordinates in meters, not longitude/latitude degrees. The standalone examples below project both datasets to Web Mercator (EPSG:3857) with D3. All layers in a map must use the same coordinate system. Later examples load data through <code>autk-db</code>, which already projects it to the workspace CRS (EPSG:3395 by default); do not project those results again.</aside>
+  <figure class="example" data-title="0.2 · Load neighborhoods and noise events">
+  <script type="text/plain">
+    // D3 normally produces screen pixels (Y down). This configuration produces
+    // Web Mercator meters (Y north), matching autk-map's coordinate convention.
+    const project = d3.geoMercator().scale(6378137).translate([0, 0]).reflectY(true);
+    ctx.neighborhoods = await d3.json("data/shared/mnt_neighs.geojson");
+    for (const feature of ctx.neighborhoods.features) {
+      // This dataset contains MultiPolygons; preserve every polygon, ring, and hole.
+      feature.geometry.coordinates = feature.geometry.coordinates.map(polygon =>
+        polygon.map(ring => ring.map(coordinate => project(coordinate))));
+    }
+    const rows = await d3.csv("data/map/mnt_noise.csv", d3.autoType);
+    // Project the points with the same CRS as the neighborhood polygons.
+    ctx.noise = {
+      type: "FeatureCollection",
+      features: rows.map(r => ({
+        type: "Feature",
+        properties: {key: r.key, date: r.date},
+        geometry: {type: "Point", coordinates: project([r.longitude, r.latitude])},
+      })),
+    };
+    return {neighborhoods: ctx.neighborhoods.features.length, noiseEvents: ctx.noise.features.length};
+  </script>
+  </figure>
+</section>
+
+<section id="lifecycle">
+  <h2><span class="num">1</span>The lifecycle of a map</h2>
+  <p>Every <code>autk-map</code> program has the same five steps:</p>
+  <ol>
+    <li>Put a <code>&lt;canvas&gt;</code> on the page.</li>
+    <li><code>new AutkMap(canvas)</code> creates the map controller: renderer, camera, layer manager, events and a small built-in UI.</li>
+    <li><code>await map.init()</code> acquires the WebGPU device and sizes everything to the canvas.</li>
+    <li><code>map.loadCollection(id, {collection})</code> turns a <code>FeatureCollection</code> into a GPU layer. Call it once per layer.</li>
+    <li><code>map.draw()</code> starts rendering. By default the map draws once and then only when something changes.</li>
+  </ol>
+  <figure class="example" data-title="1.1 · The first map" data-needs="0.2">
+  <script type="text/plain">
+    if (!ctx.neighborhoods) throw new Error("Run the data cell first.");
+    const {AutkMap} = autk.map;
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    map.loadCollection("neighborhoods", {collection: ctx.neighborhoods});
+    map.draw();
+    ctx.firstMap = map;
+  </script>
+  </figure>
+  <p>Use the map with the mouse:</p>
+  <div class="table-wrap"><table class="fields">
+    <tr><th>Input</th><th>Effect</th></tr>
+    <tr><td>Drag</td><td>Pan</td></tr>
+    <tr><td>Shift + drag</td><td>Rotate and tilt</td></tr>
+    <tr><td>Mouse wheel or pinch</td><td>Zoom around the pointer</td></tr>
+    <tr><td>Double-click</td><td>Pick a feature, once picking is enabled on a layer (Section 6)</td></tr>
+    <tr><td><code>s</code></td><td>Cycle through the built-in base styles</td></tr>
+    <tr><td><code>r</code></td><td>Reset the camera</td></tr>
+  </table></div>
+  <p>The button in the top-left corner of the map opens the built-in layer menu. Each layer has three toggles: visibility, thematic coloring and picking. Everything the menu does is also available from code, which is what the rest of the page is about. The map object is a plain value, so any later cell can inspect it, for example the layers it holds:</p>
+  <figure class="example" data-title="1.2 · Inspect the layers" data-needs="1.1">
+  <script type="text/plain">
+    if (!ctx.firstMap) throw new Error("Run the previous cell first.");
+    return ctx.firstMap.layerManager.layers.map(layer => ({
+      id: layer.layerInfo.id,
+      type: layer.layerInfo.typeLayer,
+      zIndex: layer.layerInfo.zIndex,
+      opacity: layer.layerRenderInfo.opacity,
+    }));
+  </script>
+  </figure>
+</section>
+
+<section id="layers">
+  <h2><span class="num">2</span>Layers</h2>
+  <p>A layer is a GeoJSON collection plus a <strong>type</strong> that tells the renderer how to draw it:</p>
+<pre><code>map.loadCollection(layerId, {collection, type, property, loadConfig})</code></pre>
+  <ul>
+    <li><code>layerId</code> is a unique string. Every later update (style, thematic data, picking, removal) addresses the layer by this id.</li>
+    <li><code>collection</code> is the <code>FeatureCollection</code>.</li>
+    <li><code>type</code> is optional for plain vector data and is inferred from the geometry. Physical types are never inferred; you ask for them.</li>
+    <li><code>property</code> is required for rasters and optional otherwise (Sections 4 and 5).</li>
+    <li><code>loadConfig</code> holds geometry options applied while the mesh is built, such as <code>buildingsZeroHeight</code>.</li>
+  </ul>
+  <div class="table-wrap"><table class="fields">
+    <tr><th>Type</th><th>Geometry</th><th>Notes</th></tr>
+    <tr><td><code>surface</code>, <code>parks</code>, <code>water</code></td><td>polygons</td><td>physical layers that build the base map</td></tr>
+    <tr><td><code>roads</code></td><td>lines</td><td>physical; width follows the OSM <code>highway</code> tag</td></tr>
+    <tr><td><code>buildings</code></td><td>polygons</td><td>physical; extruded in 3D</td></tr>
+    <tr><td><code>points</code>, <code>polylines</code>, <code>polygons</code></td><td>matching geometry</td><td>generic layers for your own data; inferred when <code>type</code> is omitted</td></tr>
+    <tr><td><code>raster</code></td><td>grid</td><td>needs <code>property</code> (Section 4)</td></tr>
+  </table></div>
+  <p><strong>Stacking.</strong> Physical layers always stack in the order surface, parks, water, roads, buildings, no matter when you load them. Generic layers go on top of the physical ones, in the order you loaded them.</p>
+  <p><strong>Origin.</strong> The first layer you load defines the shared scene origin, so load the layer that covers your study area first. The default camera operates at a meter scale; loading longitude/latitude degrees directly would make the geometry effectively invisible.</p>
+  <p>The cell below loads the neighborhoods first, so they frame the map, and stacks the noise events on top as a <code>points</code> layer. Open the layer menu in the top-left corner and toggle the two layers.</p>
+  <figure class="example" data-title="2.1 · Several layers" data-needs="0.2">
+  <script type="text/plain">
+    if (!ctx.neighborhoods) throw new Error("Run the data cell first.");
+    const {AutkMap} = autk.map;
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    map.loadCollection("neighborhoods", {collection: ctx.neighborhoods});
+    map.loadCollection("noise", {collection: ctx.noise, type: "points"});
+    map.draw();
+  </script>
+  </figure>
+</section>
+
+<section id="osm">
+  <h2><span class="num">3</span>Connecting OSM layers</h2>
+  <p>Autark also supports OpenStreetMap natively. <code>autk-db</code> fetches the data for an area and builds the base layers of a city map: surface, parks, water, roads and buildings. Under the hood it queries the Overpass API and converts the answer into the feature-centric model, so every building, street or park becomes a feature of a <code>FeatureCollection</code>, exactly like the ones loaded from files. That is what makes the two sources interchangeable: the map does not care whether a collection came from OSM or from a file, and both are loaded with the same <code>loadCollection()</code> call.</p>
+  <p>The loop below is the usual pattern. <code>getLayersMetadata()</code> lists the layers in the database with their names and types, and each one goes to the map under that type.</p>
+  <aside class="note">The original notebook read a prepared OSM extract (<code>lower_mnt.osm.pbf</code>) that is not part of this repository. This cell asks the Overpass API for a bounding box around Battery Park City and the Financial District instead. If the public server is busy or unreachable, it uses the answers recorded in <code>data/osm/</code> and works offline (add <code>?overpass=offline</code> to the URL to skip the live server).</aside>
+  <figure class="example" data-title="3.1 · OSM base map">
+  <script type="text/plain">
+    const {db: dbm, map: mapm} = autk;
+    const db = new dbm.AutkDb();
+    await db.init();
+
+    const status = document.createElement("p");
+    status.className = "status";
+    out.append(status);
+
+    await withFallback(() => db.loadOsm({
+      queryArea: {bbox: [-74.0225, 40.7000, -74.0005, 40.7185]},
+      outputTableName: "lower_mnt",
+      autoLoadLayers: {layers: ["surface", "parks", "water", "roads", "buildings"]},
+      onProgress: phase => { status.textContent = "OpenStreetMap: " + phase.replaceAll("-", " ") + "…"; },
+    }));
+    status.remove();
+    ctx.osmDb = db;
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new mapm.AutkMap(canvas);
+    await map.init();
+    for (const {name, type} of db.getLayersMetadata()) {
+      map.loadCollection(name, {collection: await db.getLayer(name), type});
+    }
+    map.draw();
+  </script>
+  </figure>
+</section>
+
+<section id="raster">
+  <h2><span class="num">4</span>Raster layers</h2>
+  <p>Raster layers represent gridded data such as temperature or density. <code>autk-map</code> renders a raster layer from a <code>FeatureCollection</code> whose cell values are stored in feature properties, together with a <strong>property path</strong> that tells the renderer which band to read. GeoTIFF files can be loaded with <code>autk-db</code>, and so can the heatmaps it builds with <code>buildHeatmap()</code>.</p>
+  <p>The example builds a heatmap of Manhattan noise events (count of events within 700 m of each grid cell) and renders it under the neighborhoods. Raster layers need <code>type: "raster"</code> and <code>property: "band_1"</code>. <code>updateColorMap()</code> with a <code>PERCENTILE</code> domain trims the extremes so most cells map to a readable range of colors.</p>
+  <figure class="example" data-title="4.1 · Noise heatmap" data-needs="0.2">
+  <script type="text/plain">
+    const {AutkDb} = autk.db, {AutkMap} = autk.map, {ColorMapDomainStrategy} = autk.core;
+
+    const db = new AutkDb();
+    await db.init();
+    await db.loadGeojson({geojsonFileUrl: new URL("data/shared/mnt_neighs.geojson", location.href).href, outputTableName: "neighborhood"});
+    await db.loadCsv({
+      csvFileUrl: new URL("data/map/mnt_noise.csv", location.href).href,
+      outputTableName: "noise",
+      geometryColumns: true,
+    });
+    await db.buildHeatmap({
+      tableJoinName: "noise",
+      outputTableName: "heatmap",
+      near: {distance: 700},
+      grid: {rows: 100, columns: 15},
+      groupBy: [{column: "*", aggregateFn: "count"}],
+    });
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    for (const {name, type} of db.getTablesMetadata()) {
+      const collection = await db.getLayer(name);
+      map.loadCollection(name, type === "raster"
+        ? {collection, type, property: "band_1"}
+        : {collection, type});
+    }
+    map.updateColorMap("heatmap", {
+      colorMap: {domainSpec: {type: ColorMapDomainStrategy.PERCENTILE, params: [5, 99]}},
+    });
+    map.draw();
+  </script>
+  </figure>
+</section>
+
+<section id="thematic">
+  <h2><span class="num">5</span>Thematic data</h2>
+  <p>Thematic rendering maps a feature attribute to color. The attribute does not have to live on the feature itself: <code>autk-map</code> treats any value reachable through a property path as thematic input. It can be an intrinsic attribute of the geometry, or urban data that has been projected onto the feature, for instance by a spatial join in <code>autk-db</code> or a computation in <code>autk-compute</code>.</p>
+  <p>The workflow has four steps:</p>
+  <ol>
+    <li>Load the layer with <code>loadCollection()</code>.</li>
+    <li>Configure the color map with <code>updateColorMap()</code>.</li>
+    <li>Point to the source property with <code>updateThematic()</code>.</li>
+    <li>Turn thematic display on with <code>isColorMap</code> in <code>updateRenderInfo()</code>.</li>
+  </ol>
+
+  <h3>5.1 Categorical attributes</h3>
+  <p>Categorical palettes assign one color per class; use them for labels such as road types. It helps to first fold the raw values into a small, ordered set of groups so the palette domain stays stable. Here the roads of the OSM base map are grouped into <code>primary</code>, <code>secondary</code> and <code>other</code> under <code>properties.compute.highwayGroup</code>, and the <code>USER</code> domain fixes the order of the classes.</p>
+  <figure class="example" data-title="5.1 · Road classes" data-needs="3.1">
+  <script type="text/plain">
+    if (!ctx.osmDb) throw new Error("Run cell 3.1 first.");
+    const {AutkMap} = autk.map, {ColorMapInterpolator, ColorMapDomainStrategy} = autk.core;
+
+    const roads = await ctx.osmDb.getLayer("lower_mnt_roads");
+    const group = h => (["motorway", "trunk", "primary"].includes(h) ? "primary"
+      : ["secondary", "tertiary"].includes(h) ? "secondary" : "other");
+    for (const f of roads.features) {
+      const tag = f.properties.highway ?? f.properties.tags?.highway;
+      f.properties.compute = {highwayGroup: group(tag)};
+    }
+    ctx.roads = roads;
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    map.loadCollection("roads", {collection: roads, type: "roads"});
+
+    map.updateColorMap("roads", {
+      colorMap: {
+        interpolator: ColorMapInterpolator.CAT_OBSERVABLE10,
+        domainSpec: {type: ColorMapDomainStrategy.USER, params: ["primary", "secondary", "other"]},
+      },
+    });
+    map.updateThematic("roads", {collection: roads, property: "properties.compute.highwayGroup"});
+    map.updateRenderInfo("roads", {isColorMap: true});
+    map.draw();
+  </script>
+  </figure>
+
+  <h3>5.2 Diverging attributes</h3>
+  <p>Diverging palettes suit signed or centered quantities, or any attribute with a meaningful midpoint that separates two regimes. The <code>PERCENTILE</code> domain trims outliers so most of the distribution maps to a clear range of colors. Neighborhood properties in this file are strings, so the cell converts <code>shape_area</code> to a number first.</p>
+  <figure class="example" data-title="5.2 · Neighborhood area" data-needs="0.2">
+  <script type="text/plain">
+    if (!ctx.neighborhoods) throw new Error("Run the data cell first.");
+    const {AutkMap} = autk.map, {ColorMapInterpolator, ColorMapDomainStrategy} = autk.core;
+
+    const collection = ctx.neighborhoods;
+    for (const f of collection.features) f.properties.shape_area = +f.properties.shape_area;
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    map.loadCollection("neighborhoods", {collection});
+    map.updateColorMap("neighborhoods", {
+      colorMap: {
+        interpolator: ColorMapInterpolator.DIV_RED_BLUE,
+        domainSpec: {type: ColorMapDomainStrategy.PERCENTILE},
+      },
+    });
+    map.updateThematic("neighborhoods", {collection, property: "properties.shape_area"});
+    map.updateRenderInfo("neighborhoods", {isColorMap: true});
+    map.draw();
+  </script>
+  </figure>
+
+  <h3>5.3 Spatial joins</h3>
+  <p>A spatial join attaches an aggregate from a second table to each feature of a base layer. A common use is counting point events, such as noise complaints, inside a buffer around each polygon or line. The cell below joins the noise events to the OSM buildings of the area, counting events within 1000 m of each building. The result is stored under <code>properties.sjoin.count.noise</code>, a property path <code>autk-map</code> reads directly, so the buildings are colored by the number of nearby complaints.</p>
+  <figure class="example" data-title="5.3 · Noise near buildings" data-needs="3.1">
+  <script type="text/plain">
+    if (!ctx.osmDb) throw new Error("Run cell 3.1 first.");
+    const {AutkMap} = autk.map;
+    const db = ctx.osmDb;
+
+    await db.loadCsv({
+      csvFileUrl: new URL("data/map/mnt_noise.csv", location.href).href,
+      outputTableName: "noise",
+      geometryColumns: true,
+    });
+    await db.spatialQuery({
+      tableRootName: "lower_mnt_buildings",
+      tableJoinName: "noise",
+      near: {distance: 1000},
+      groupBy: [{column: "key", aggregateFn: "count"}],
+    });
+    await db.removeLayer("noise");
+
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    for (const {name, type} of db.getLayersMetadata()) {
+      map.loadCollection(name, {collection: await db.getLayer(name), type});
+    }
+    const buildings = await db.getLayer("lower_mnt_buildings");
+    map.updateThematic("lower_mnt_buildings", {collection: buildings, property: "properties.sjoin.count.noise"});
+    map.updateRenderInfo("lower_mnt_buildings", {isColorMap: true});
+    map.draw();
+  </script>
+  </figure>
+</section>
+
+<section id="interactions">
+  <h2><span class="num">6</span>Interactions</h2>
+  <p><code>autk-map</code> exposes three complementary interaction mechanisms. They share the same render-info flags and the same event bus, so they can be combined in any order:</p>
+  <ul>
+    <li><strong>Picking</strong>: pointer-driven selection that emits events through <code>map.events.on()</code>.</li>
+    <li><strong>Programmatic highlight and skip</strong>: direct control over which components stand out (<code>setHighlightedIds()</code>) or are hidden (<code>setSkippedIds()</code>).</li>
+    <li><strong>Layer visibility</strong>: show, hide or fully remove a layer (<code>isSkip</code> in <code>updateRenderInfo()</code>, <code>removeLayer()</code>).</li>
+  </ul>
+  <p>Enable picking on a layer with <code>isPick: true</code>, then double-click a neighborhood. <code>MapEvent.PICKING</code> delivers <code>{layerId, selection}</code>, where <code>selection</code> holds indices into the original collection. The cell highlights the picked features and lists their names; use the buttons to hide or restore the picked ones. The same selection arrays are what <code>autk-plot</code> emits and consumes, which is how maps and charts are linked.</p>
+  <figure class="example" data-title="6.1 · Picking, highlight and skip" data-needs="0.2">
+  <script type="text/plain">
+    if (!ctx.neighborhoods) throw new Error("Run the data cell first.");
+    const {AutkMap, MapEvent} = autk.map;
+    const collection = ctx.neighborhoods;
+
+    const info = document.createElement("p");
+    info.className = "status";
+    info.textContent = "Double-click a neighborhood.";
+    const hide = document.createElement("button");
+    hide.textContent = "Hide picked";
+    const showBtn = document.createElement("button");
+    showBtn.textContent = "Show all";
+    const box = document.createElement("div");
+    box.style.cssText = "position: relative; width: 100%; height: 480px;";
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width: 100%; height: 100%; display: block;";
+    box.append(canvas);
+    out.append(info, hide, showBtn, box);
+
+    const map = new AutkMap(canvas);
+    await map.init();
+    map.loadCollection("neighborhoods", {collection});
+    map.updateRenderInfo("neighborhoods", {isPick: true});
+
+    let picked = [];
+    map.events.on(MapEvent.PICKING, ({layerId, selection}) => {
+      picked = selection;
+      map.setHighlightedIds(layerId, selection);
+      info.textContent = selection.length
+        ? "Picked: " + selection.map(i => collection.features[i].properties.ntaname).join(", ")
+        : "Nothing picked.";
+    });
+    hide.onclick = () => { map.setSkippedIds("neighborhoods", picked); };
+    showBtn.onclick = () => { map.clearSkippedIds("neighborhoods"); map.clearHighlightedIds("neighborhoods"); };
+    map.draw();
+  </script>
+  </figure>
+  <p>Base styles are also available from code: <code>map.style.setPredefinedStyle("light")</code> accepts <code>default</code>, <code>light</code>, <code>google</code>, <code>apple</code>, <code>osm</code> and <code>poster</code>, the same presets the <code>s</code> key cycles through.</p>
+</section>
+
+<section id="credits">
+  <h2>Credits</h2>
+  <p>Adapted from the Observable notebook <a href="https://observablehq.com/@autarkjs/04-geographical-data-visualization">04. Geographical Data Visualization</a>, produced for the tutorial <em>Urban Data Analytics with <a href="https://autarkjs.org">Autark</a></em> at SIBGRAPI 2026. See the <a href="index.html#authors">author list</a>. The original used prepared, projected data files that are not public; this version uses Manhattan neighborhoods and noise events from the repository and OpenStreetMap through <code>autk-db</code>.</p>
+</section>
+</main>
+</div>
+<script type="module" src="tutorial.js"></script>
+</body>
+</html>

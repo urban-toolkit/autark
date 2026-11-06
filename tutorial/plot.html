@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>05 · Abstract data visualization · Autark tutorial</title>
+  <link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#basics">1. Autark Plot</a></li>
+    <li><a href="#transform">2. Data transformation</a></li>
+    <li><a href="#interaction">3. Interactions</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="intro">
+  <p class="meta">Autark tutorial · notebook 05</p>
+  <div class="series-nav">
+    <a href="index.html">01 · Overview</a>
+    <a href="formats.html">02 · Formats and sources</a>
+    <a href="db.html">03 · Data management</a>
+    <a href="map.html">04 · Maps</a>
+    <span>05 · Plots</span>
+    <a href="compute.html">06 · GPU computing</a>
+  </div>
+  <h1>Abstract data visualization with Autark Plot</h1>
+  <p class="lede">D3-based charts that read feature properties directly, and that emit and receive selections so several views stay linked.</p>
+  <p>Autark is a modular toolkit for building urban visual analytics applications in the browser. Its modules share a common data model, so data retrieved from a spatial database, processed by a computation pipeline, displayed on a map and explored through charts stays connected throughout an application.</p>
+  <p>This page introduces <strong><code>autk-plot</code></strong>, the module for abstract data visualizations: reusable charts for distributions, relationships, categories and temporal patterns. Charts are not isolated outputs; they emit selections and react to selections produced by other charts or by an <code>autk-map</code> view. We introduce the data model, create a first chart, transform feature attributes into aggregated chart data, and connect several plots through interaction events.</p>
+  <aside class="note">Cells share state through <code>ctx</code>; run them in order or use <strong>Run all above ▶▶</strong>. This page needs no network connection and no WebGPU.</aside>
+</section>
+
+<section id="basics">
+  <h2><span class="num">1</span>Autark Plot</h2>
+  <h3>1.1 What it is</h3>
+  <p><code>autk-plot</code> is a D3-based charting module for attributes stored in GeoJSON feature collections. A plot receives a container element and a configuration object: the chart type, the input collection, the attributes to encode, and optional labels, dimensions, transformations and interaction events. Supported chart types include scatter plots, bar charts, line charts, tables, heat matrices and parallel-coordinates plots, each mapping feature properties to visual channels such as position, color, size or category.</p>
+  <p>It reads values straight from <code>feature.properties</code>, with no separate table or data frame, so it works equally on data returned by <code>autk-db</code> and on data already loaded in <code>autk-map</code>. A typical configuration specifies:</p>
+  <ul>
+    <li>a <strong>chart type</strong>, such as <code>"scatterplot"</code> or <code>"barchart"</code>;</li>
+    <li>a GeoJSON <strong>feature collection</strong>;</li>
+    <li>the feature-property names used as <strong>attributes</strong>;</li>
+    <li>human-readable <strong>labels</strong> for axes and titles;</li>
+    <li>optional <strong>transformations</strong>, such as binning or aggregation; and</li>
+    <li>optional <strong>events</strong> that enable clicks or brushing.</li>
+  </ul>
+
+  <h3>1.2 The feature-centric model</h3>
+  <p>Autark takes the <strong>geographical feature</strong> as the atomic unit of the toolkit. Many urban visual analytics systems get complicated because data and interaction operate at different levels of abstraction: a database returns rows, a renderer consumes buffers, a user interaction produces a pixel coordinate or a brush box. Autark collapses these levels into one principle: <strong>all modules operate on features</strong>.</p>
+  <img class="fig" src="data/plot/feature.png" width="600" alt="A feature is a geometry, a set of named attributes and an identifier">
+  <p>A <strong>feature</strong> is a triple <code>f = (g, A, id)</code> where <code>g</code> is the geometry, <code>A</code> the set of named attributes and <code>id</code> the unique identifier. A <strong>collection</strong> is <code>C = {f1, f2, ..., fn}</code> and a <strong>selection</strong> is a subset of feature identifiers <code>S</code> drawn from that collection. This is why the same objects flow across modules:</p>
+  <ul>
+    <li><code>autk-db</code> returns a feature collection;</li>
+    <li><code>autk-map</code> renders feature geometries;</li>
+    <li><code>autk-plot</code> binds to feature properties;</li>
+    <li><code>autk-compute</code> consumes features to produce data;</li>
+    <li>interactions return selections of features.</li>
+  </ul>
+
+  <h3>1.3 First example</h3>
+  <p>A plot starts from a GeoJSON <code>FeatureCollection</code>. We use the neighborhoods of Manhattan. Inspecting one feature shows its properties; two of them, <code>shape_leng</code> (perimeter) and <code>shape_area</code> (area), are enough for a scatter plot.</p>
+  <figure class="example" data-title="1.3 · Load the neighborhoods">
+  <script type="text/plain">
+    const neighs = await d3.json("data/shared/mnt_neighs.geojson");
+    ctx.neighs = neighs;
+    return {
+      features: neighs.features.length,
+      properties: Object.keys(neighs.features[0].properties),
+    };
+  </script>
+  </figure>
+  <p>To create a chart use the <code>AutkPlot</code> constructor with two arguments: an HTML container that determines where the chart is rendered, and a configuration object. <code>type</code> picks the chart (<code>"scatterplot"</code>), <code>collection</code> supplies the features, <code>attributes.axis</code> maps property names to the x and y axes, <code>labels</code> gives readable axis labels and a title, and <code>width</code> and <code>height</code> are in pixels.</p>
+  <figure class="example" data-title="1.3 · A scatter plot" data-needs="1.3">
+  <script type="text/plain">
+    if (!ctx.neighs) throw new Error("Run the previous cell first.");
+    const {AutkPlot} = autk.plot;
+
+    const container = document.createElement("div");
+    out.append(container);
+
+    new AutkPlot(container, {
+      type: "scatterplot",
+      collection: ctx.neighs,
+      attributes: {
+        axis: ["shape_leng", "shape_area"],
+      },
+      labels: {
+        axis: ["Perimeter", "Area"],
+        title: "Perimeter vs Area",
+      },
+      width: 800,
+      height: 420,
+      margins: {left: 25, right: 20, top: 50, bottom: 64},
+    });
+  </script>
+  </figure>
+</section>
+
+<section id="transform">
+  <h2><span class="num">2</span>Data transformation</h2>
+  <p><code>autk-plot</code> may need to pre-process a <code>FeatureCollection</code> before drawing. A bar chart, for example, usually cannot use the raw collection, since it needs binned, sorted or aggregated values rather than one mark per feature. The <code>transform</code> option lets you bin, sort, aggregate arrays and reduce time series without leaving the charting API.</p>
+  <h3>2.1 The <code>@transform</code> placeholder</h3>
+  <p>The <code>@transform</code> placeholder tells the plot where the output of a transformation goes in the chart configuration. A transform computes new values, and those must be connected to one of the chart's visual channels. Instead of naming a property of the original collection, write <code>@transform</code> to say that this channel receives the derived result.</p>
+  <p>With <code>binning-1d</code>, the transform produces an aggregated value for each bin, so <code>@transform</code> goes in <code>attributes.axis[1]</code>, where the bar height reads those computed values.</p>
+  <figure class="example" data-title="2.1 · A histogram with binning-1d" data-needs="1.3">
+  <script type="text/plain">
+    if (!ctx.neighs) throw new Error("Run cell 1.3 first.");
+    const {AutkPlot} = autk.plot;
+
+    const container = document.createElement("div");
+    out.append(container);
+
+    new AutkPlot(container, {
+      type: "barchart",
+      collection: ctx.neighs,
+      attributes: {axis: ["shape_area", "@transform"]},
+      labels: {
+        axis: ["Area range", "Count"],
+        title: "Area histogram",
+      },
+      transform: {
+        preset: "binning-1d",
+        options: {bins: 12, reducer: "count"},
+      },
+      width: 800,
+      height: 420,
+      margins: {left: 25, right: 20, top: 50, bottom: 64},
+    });
+  </script>
+  </figure>
+</section>
+
+<section id="interaction">
+  <h2><span class="num">3</span>Interactions</h2>
+  <p><code>autk-plot</code> supports coordinated views through interaction events. A plot emits an event when the user selects marks, and other plots, maps or interface elements can react to that selection.</p>
+  <h3>3.1 Mouse events</h3>
+  <p>Enable the interactions a plot needs through its <code>events</code> option:</p>
+  <ul>
+    <li><code>PlotEvent.CLICK</code>: emitted when the user clicks a mark.</li>
+    <li><code>PlotEvent.BRUSH</code>: emitted while drawing a rectangle selection.</li>
+    <li><code>PlotEvent.BRUSH_X</code>: emitted when brushing horizontally.</li>
+    <li><code>PlotEvent.BRUSH_Y</code>: emitted when brushing vertically.</li>
+  </ul>
+  <h3>3.2 Linked visualizations</h3>
+  <p>Register a callback with <code>plot.events.on(event, callback)</code>. The callback receives an object with <code>selection</code>, an array of indices of features in the original GeoJSON collection:</p>
+<pre><code>p01.events.on(PlotEvent.BRUSH, ({selection}) => {
+  console.log(selection);
+});</code></pre>
+  <p>Because both plots below use the same neighborhood collection, a selection generated by one plot can be applied directly to the other with <code>setSelection()</code>. Brush the scatter plot to select neighborhoods, or click a bar, and the other view highlights the same features.</p>
+  <figure class="example" data-title="3.2 · Two linked plots" data-needs="1.3">
+  <script type="text/plain">
+    if (!ctx.neighs) throw new Error("Run cell 1.3 first.");
+    const {AutkPlot, PlotEvent} = autk.plot;
+
+    // Two containers, one above the other.
+    const grid = document.createElement("div");
+    grid.className = "plotgrid";
+    const scatterDiv = document.createElement("div");
+    const barDiv = document.createElement("div");
+    grid.append(scatterDiv, barDiv);
+    out.append(grid);
+
+    const p01 = new AutkPlot(scatterDiv, {
+      type: "scatterplot",
+      collection: ctx.neighs,
+      attributes: {axis: ["shape_leng", "shape_area"]},
+      labels: {
+        axis: ["Perimeter", "Area"],
+        title: "Brush points to select neighborhoods",
+      },
+      width: 640,
+      height: 360,
+      margins: {left: 25, right: 10, top: 50, bottom: 70},
+      events: [PlotEvent.BRUSH],
+    });
+
+    const p02 = new AutkPlot(barDiv, {
+      type: "barchart",
+      collection: ctx.neighs,
+      attributes: {axis: ["shape_area", "@transform"]},
+      labels: {
+        axis: ["Area range", "Neighborhood count"],
+        title: "Click bars to select neighborhoods",
+      },
+      transform: {
+        preset: "binning-1d",
+        options: {bins: 12, reducer: "count"},
+      },
+      width: 640,
+      height: 360,
+      margins: {left: 25, right: 10, top: 50, bottom: 70},
+      events: [PlotEvent.CLICK],
+    });
+
+    // The link: a selection in one plot is applied to the other.
+    p01.events.on(PlotEvent.BRUSH, ({selection}) => {
+      p02.setSelection(selection);
+    });
+    p02.events.on(PlotEvent.CLICK, ({selection}) => {
+      p01.setSelection(selection);
+    });
+  </script>
+  </figure>
+  <div class="next-page">Next: <a href="compute.html">06 · GPU computing with Autark Compute →</a></div>
+</section>
+
+<section id="credits">
+  <h2>Credits</h2>
+  <p>Adapted from the Observable notebook <a href="https://observablehq.com/d/f0de5fb1ed4de556">05. Abstract Data Visualization</a>, produced for the tutorial <em>Urban Data Analytics with <a href="https://autarkjs.org">Autark</a></em> at SIBGRAPI 2026. See the <a href="index.html#authors">author list</a>.</p>
+</section>
+</main>
+</div>
+<script type="module" src="tutorial.js"></script>
+</body>
+</html>

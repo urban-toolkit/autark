@@ -1,0 +1,16 @@
+<osm version="0.6" generator="example">
+  <node id="1" lat="40.0000" lon="-3.0000">
+    <tag k="amenity" v="cafe"/>
+    <tag k="name" v="Sample Cafe"/>
+  </node>
+
+  <node id="2" lat="40.0005" lon="-3.0005"/>
+  <node id="3" lat="40.0010" lon="-3.0010"/>
+
+  <way id="10">
+    <nd ref="2"/>
+    <nd ref="3"/>
+    <tag k="highway" v="residential"/>
+    <tag k="name" v="Sample Street"/>
+  </way>
+</osm>

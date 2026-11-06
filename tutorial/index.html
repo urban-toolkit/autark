@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Urban data analytics with Autark</title>
+  <link rel="stylesheet" href="tutorial.css">
+  <script type="module" src="shell.js"></script>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#abstract">Abstract</a></li>
+    <li><a href="#agenda">Notebooks</a></li>
+    <li><a href="#run">Running it</a></li>
+    <li><a href="#authors">Authors</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="intro">
+  <p class="meta">SIBGRAPI 2026 tutorial · every example is editable</p>
+  <div class="series-nav">
+    <span>01 · Overview</span>
+    <a href="formats.html">02 · Formats and sources</a>
+    <a href="db.html">03 · Data management</a>
+    <a href="map.html">04 · Maps</a>
+    <a href="plot.html">05 · Plots</a>
+    <a href="compute.html">06 · GPU computing</a>
+  </div>
+  <h1>Urban data analytics with Autark</h1>
+  <p class="lede">A hands-on tour of <a href="https://autarkjs.org">Autark</a>, a serverless toolkit for urban visual analytics that runs entirely in the web browser: spatial data management, GPU computation, 3D maps and linked charts.</p>
+  <div class="hero-actions">
+    <a class="button primary" href="formats.html">Start learning <span aria-hidden="true">→</span></a>
+    <a class="button secondary" href="#agenda">Explore the chapters</a>
+  </div>
+  <p>Read, edit, and run the original Observable tutorial right here. Every code example is live: change it, press <strong>Run</strong> (or ⌘/Ctrl + Enter), and explore the result. Cells share state like a notebook; follow them in order or use <strong>Run all above ▶▶</strong>.</p>
+</section>
+
+<section id="abstract">
+  <h2>Abstract</h2>
+  <p>Building urban visual analytics (VA) systems is often a cumbersome, time-consuming task. They must reconcile heterogeneous data sources, perform expensive computations over city geometry, and coordinate multiple linked views. These systems are traditionally assembled as architectures composed of many independent services, which makes them difficult to deploy, reproduce, and share. Recent browser technologies are changing this picture, bringing analytical databases and general-purpose GPU computation directly to the client.</p>
+  <p><a href="https://autarkjs.org/">Autark</a> is a serverless toolkit that occupies this new design space, consolidating spatial data management, GPU-accelerated computation, 3D map rendering, and abstract charts into a single lightweight framework that runs entirely in the web browser. This tutorial presents urban VA through the lens of Autark. We introduce the feature-centric model that unifies data exchange across the toolkit, describe its four modules, and build applications of increasing complexity. It aims to propose the first structured material for building serverless urban visual analytics systems with Autark.</p>
+</section>
+
+<section id="agenda">
+  <h2>Notebooks</h2>
+  <p>Read them in this order. The numbering follows the Observable notebooks; the times are from the original SIBGRAPI 2026 schedule (29 September 2026).</p>
+  <div class="chapter-grid">
+    <a class="chapter-card" href="formats.html">
+      <div class="chapter-card-top"><span class="module">02 · Formats</span><span>20 min</span></div>
+      <h3>Start with urban data</h3>
+      <p>Vector and raster models, GeoJSON, WKT, GeoTIFF, OpenStreetMap, and open data sources.</p>
+      <span class="card-link">Explore formats <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="chapter-card" href="db.html">
+      <div class="chapter-card-top"><span class="module">03 · autk-db</span><span>60 min</span></div>
+      <h3>Load, query, and connect</h3>
+      <p>A browser-based spatial database: workspaces, SQL, spatial joins, and heatmaps.</p>
+      <span class="card-link">Work with data <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="chapter-card" href="map.html">
+      <div class="chapter-card-top"><span class="module">04 · autk-map</span><span>60 min</span></div>
+      <h3>Put your data on the map</h3>
+      <p>Build 2D and 3D maps with layers, rasters, thematic color, spatial joins, and picking.</p>
+      <span class="card-link">Create a map <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="chapter-card" href="plot.html">
+      <div class="chapter-card-top"><span class="module">05 · autk-plot</span><span>90 min</span></div>
+      <h3>See patterns across views</h3>
+      <p>Turn feature collections into plots, transform attributes, and connect views through brushing.</p>
+      <span class="card-link">Build linked charts <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="chapter-card" href="compute.html">
+      <div class="chapter-card-top"><span class="module">06 · autk-compute</span><span>60 min</span></div>
+      <h3>Analyze on the GPU</h3>
+      <p>Write per-feature WGSL calculations and use render analysis to measure sky exposure.</p>
+      <span class="card-link">Run a computation <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="chapter-card" href="urbane.html">
+      <div class="chapter-card-top"><span class="module">Urbane</span><span>Case study</span></div>
+      <h3>Bring it all together</h3>
+      <p>A complete application with Manhattan data, GPU analysis, and linked map and chart views. Requires WebGPU; initial loading can take a minute or more.</p>
+      <span class="card-link">Open the application <span aria-hidden="true">→</span></span>
+    </a>
+  </div>
+</section>
+
+<section id="run">
+  <h2>Running it</h2>
+  <p>From the repository root, install the repository dependencies once and start the tutorial:</p>
+<pre><code>npm ci
+make tutorial</code></pre>
+  <p>Open the local URL printed by Vite (normally <a href="http://localhost:5173">http://localhost:5173</a>). Autark is built from this repository and resolved through its workspace packages, just like the gallery and use cases. All sample data is inside <code>tutorial/data/</code>. The runner supplies <code>autk</code>, <code>d3</code> and <code>GeoTIFF</code> to editable cells; no import maps or CDN imports are needed.</p>
+  <p>Cells that load OpenStreetMap try the public Overpass server and fall back to recorded responses in <code>data/osm/</code>. Add <code>?overpass=offline</code> to skip live Overpass requests. DuckDB extensions may still require network access on first use; this is not a guarantee of fully offline operation.</p>
+  <aside class="note">Autark Compute (and Autark Map) need <strong>WebGPU</strong>: Chrome or Edge 113 or later work out of the box; Firefox needs Nightly with WebGPU enabled.</aside>
+</section>
+
+<section id="authors">
+  <h2>Authors</h2>
+  <p>The tutorial <em>Urban Data Analytics with <a href="http://autarkjs.org">Autark</a></em> was presented at <a href="https://sibgrapi.sbc.org.br/2026/">SIBGRAPI 2026</a> by:</p>
+  <ul class="authors">
+    <li>João Rulff (FGV)</li>
+    <li>Lucas Alexandre (UFF)</li>
+    <li>Talisson Souza (UFF)</li>
+    <li>Gustavo Moreira (UIC)</li>
+    <li>Daniel Oliveira (UFF)</li>
+    <li>Harish Doraiswamy (MSR)</li>
+    <li>Fabio Miranda (UIC)</li>
+    <li>Claudio Silva (NYU)</li>
+    <li>Marcos Lage (UFF)</li>
+  </ul>
+  <p>Original notebooks: <a href="https://observablehq.com/@autarkjs/01-urban-data-analytics-with-autark">observablehq.com/@autarkjs</a>.</p>
+</section>
+</main>
+</div>
+</body>
+</html>

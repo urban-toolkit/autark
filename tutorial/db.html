@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>03 · Urban data management · Autark tutorial</title>
+  <link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#basics">1. Autark DB</a></li>
+    <li><a href="#loading">2. Loading data</a></li>
+    <li><a href="#analytical">3. Analytical queries</a></li>
+    <li><a href="#spatial">4. Spatial queries</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="intro">
+  <p class="meta">Autark tutorial · notebook 03</p>
+  <div class="series-nav">
+    <a href="index.html">01 · Overview</a>
+    <a href="formats.html">02 · Formats and sources</a>
+    <span>03 · Data management</span>
+    <a href="map.html">04 · Maps</a>
+    <a href="plot.html">05 · Plots</a>
+    <a href="compute.html">06 · GPU computing</a>
+  </div>
+  <h1>Urban data management with Autark DB</h1>
+  <p class="lede">Load OpenStreetMap, GeoJSON, CSV with WKT and GeoTIFF into a spatial database that runs entirely in the browser, then query it with SQL and spatial joins.</p>
+
+  <h3>How to use this page</h3>
+  <p>The examples are cells of one notebook. They <strong>share state</strong> through <code>ctx</code>: the first cell creates the database and stores it as <code>ctx.db</code>, and later cells reuse it. Run them in order, or press <strong>Run all above ▶▶</strong> on any cell to run everything up to it. Edits to the code are saved in this browser.</p>
+  <aside class="note">The first cell loads DuckDB (about 35 MB, from the local Autark build), so it takes a moment. The spatial extension may require network access on first use. The OpenStreetMap cell in section 2.1 asks the public Overpass server and, if that is busy or unreachable, falls back to a copy of the same answers recorded in <code>data/osm/</code>, so the OSM examples do not depend on the live Overpass server (add <code>?overpass=offline</code> to the URL to skip the live server). The SQL, spatial-join and heatmap cells in 3 and 4 use the OSM tables created in 2.1. The pages must be served over http (see <a href="index.html#run">Running it</a>); they do not work from a file:// URL.</aside>
+</section>
+
+<section id="basics">
+  <h2><span class="num">1</span>Autark DB</h2>
+  <p><strong>Spatial databases</strong> store, index and query geographic data in vector and raster formats. They are needed because conventional databases do not efficiently support the spatial relationships and operations that are central to urban analytics. By combining geometry-aware data types with spatial indexes and query languages, they manage geospatial datasets efficiently. Well-known examples are PostgreSQL with PostGIS, SpatiaLite, and DuckDB with its spatial extension.</p>
+  <p><a href="https://autarkjs.org/autk-db"><strong>Autark DB (<code>autk-db</code>)</strong></a> is the spatial database module of the <a href="https://autarkjs.org/">Autark</a> toolkit. It is powered by DuckDB and runs directly in the browser, with no client-server architecture, so it suits rapid prototyping of urban analytics software. It loads CSV, JSON, GeoJSON, GeoTIFF and OpenStreetMap data, for example from <a href="https://opendata.cityofnewyork.us/">NYC Open Data</a> or <a href="https://openstreetmap.org">OpenStreetMap</a>.</p>
+  <img class="fig" src="data/db/autk-db.png" width="400" alt="Autark DB overview diagram">
+
+  <h3>1.1 Initializing a database</h3>
+  <p>Take the <code>AutkDb</code> class, create an instance and call <code>await db.init()</code>, which prepares DuckDB and loads the spatial extension. The cell runner imports <code>@urban-toolkit/autk</code> from this repository's workspace through Vite and supplies it as <code>autk</code> to every cell. The database is kept in <code>ctx.db</code> so later cells can reuse it.</p>
+  <figure class="example" data-title="1.1 · Create the database">
+  <script type="text/plain">
+    const db = new autk.db.AutkDb();
+    await db.init();
+    ctx.autk = autk;
+    ctx.db = db;
+
+    // getWorkspaces() lists the workspaces the database currently manages.
+    return db.getWorkspaces();
+  </script>
+  </figure>
+
+  <h3>1.2 Workspaces</h3>
+  <p>A workspace is an isolated database context for organizing geospatial tables. A table created in one workspace is not visible in another, which helps when handling several cities or independent analysis scenarios without name conflicts. After initialization there is one workspace, named <code>"autk"</code>.</p>
+  <p>Geometries in a workspace use the coordinate reference system <strong>EPSG:3395</strong> (World Mercator), so data from different sources ends up in one consistent projected system.</p>
+  <figure class="example" data-title="1.2 · The current workspace" data-needs="1.1">
+  <script type="text/plain">
+    if (!ctx.db) throw new Error("Run cell 1.1 first.");
+    return ctx.db.getCurrentWorkspace();
+  </script>
+  </figure>
+  <p><code>setWorkspace()</code> changes the current workspace, creating it if it does not exist. Giving each city its own workspace is a natural way to organize data.</p>
+  <figure class="example" data-title="1.2 · Switch workspace" data-needs="1.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!db) throw new Error("Run cell 1.1 first.");
+    await db.setWorkspace("nyc");
+    return {workspaces: db.getWorkspaces(), current: db.getCurrentWorkspace()};
+  </script>
+  </figure>
+</section>
+
+<section id="loading">
+  <h2><span class="num">2</span>Loading data</h2>
+  <h3>2.1 OpenStreetMap data</h3>
+  <p><code>loadOsm()</code> fetches data from the <strong>Overpass API</strong> or parses a downloaded OSM extract (<code>pbfFileUrl</code>), and stores the extracted layers as named tables. A <a href="https://autarkjs.org/autk-db/loading-data.html#openstreetmap">simple query interface</a> names the area and the layers; since each layer is its own table, it can later be queried, transformed and returned as GeoJSON.</p>
+  <p>The area is either a <strong>bounding box</strong> (<code>{bbox: [west, south, east, north]}</code>, used here) or <strong>named OSM areas</strong> (<code>{geocodeArea: "New York", areas: ["Battery Park City"]}</code>). We use a box because it keeps the download small: the named form first resolves <code>"New York"</code> to the whole state, and then also downloads every coastline inside the state's bounding box, about 10 MB and over a minute of Overpass time, just to cut the water layer for one neighborhood.</p>
+  <figure class="example" data-title="2.1 · Load OpenStreetMap" data-needs="1.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!db) throw new Error("Run cell 1.1 first.");
+    await db.setWorkspace("nyc");
+    // The public Overpass server is often busy. withFallback() tries it live and, if that fails,
+    // answers the same queries from the copy recorded in data/osm/.
+    const status = document.createElement("p");
+    status.className = "status";
+    out.append(status);
+
+    ctx.osm = await withFallback(() => db.loadOsm({
+      // The area is a bounding box, [west, south, east, north] in degrees: Battery Park City.
+      queryArea: {
+        bbox: [-74.0225, 40.7040, -74.0120, 40.7185],
+      },
+      autoLoadLayers: {
+        layers: ["surface", "parks", "water"],
+      },
+      onProgress: phase => { status.textContent = "OpenStreetMap: " + phase.replaceAll("-", " ") + "…"; },
+    }));
+    status.remove();
+    // Tables are named table_osm_<layer>: table_osm_surface, table_osm_parks, table_osm_water.
+    return ctx.osm;
+  </script>
+  </figure>
+
+  <h3>2.2 GeoJSON data</h3>
+  <p><code>loadGeojson()</code> stores a GeoJSON <code>FeatureCollection</code> as a named table; <code>outputTableName</code> names it. The GeoJSON can come as a file URL or as an in-memory object. Afterwards, <code>getLayer()</code> reads a named table of the current workspace back as GeoJSON.</p>
+  <figure class="example" data-title="2.2 · Load GeoJSON" data-needs="1.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!db) throw new Error("Run cell 1.1 first.");
+    await db.setWorkspace("nyc");
+    const mnt = await d3.json("data/db/mnt.geojson");
+    ctx.geojson = await db.loadGeojson({
+      geojsonObject: mnt,
+      outputTableName: "neighs_json",
+    });
+    return ctx.geojson;
+  </script>
+  </figure>
+  <figure class="example" data-title="2.2 · Read the layer back" data-needs="2.2">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.geojson) throw new Error("Run cell 2.2 first.");
+    await db.setWorkspace("nyc");
+    return await db.getLayer("neighs_json");
+  </script>
+  </figure>
+
+  <h3>2.3 CSV with WKT data</h3>
+  <p><code>loadCsv()</code> stores a CSV as a named table. When the file holds geometry as <strong>WKT</strong>, tell it which column through <code>geometryColumns</code>. Here the column <code>wkt</code> becomes the spatial layer at import time.</p>
+  <figure class="example" data-title="2.3 · Load CSV with WKT" data-needs="1.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!db) throw new Error("Run cell 1.1 first.");
+    await db.setWorkspace("nyc");
+    const text = await d3.text("data/db/mnt.csv");
+    const data = d3.csvParseRows(text);
+    ctx.csv = await db.loadCsv({
+      csvObject: data,
+      outputTableName: "neighs_wkt",
+      geometryColumns: {wktColumnName: "wkt"},
+    });
+    return ctx.csv;
+  </script>
+  </figure>
+  <figure class="example" data-title="2.3 · Read the layer back" data-needs="2.3">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.csv) throw new Error("Run cell 2.3 first.");
+    await db.setWorkspace("nyc");
+    return await db.getLayer("neighs_wkt");
+  </script>
+  </figure>
+
+  <h3>2.4 GeoTIFF data</h3>
+  <p><code>loadGeoTiff()</code> stores a raster as a named table; pass the file contents as an <code>ArrayBuffer</code>. Here <code>elevation.tif</code> becomes the raster table <code>terrain</code>. <code>getRaster()</code> reads it back as a raster <code>FeatureCollection</code> for rendering or analysis.</p>
+  <figure class="example" data-title="2.4 · Load a GeoTIFF" data-needs="1.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!db) throw new Error("Run cell 1.1 first.");
+    await db.setWorkspace("nyc");
+    const buffer = await d3.buffer("data/db/elevation.tif");
+    ctx.rasterTable = await db.loadGeoTiff({
+      geotiffArrayBuffer: buffer,
+      outputTableName: "terrain",
+    });
+    return ctx.rasterTable;
+  </script>
+  </figure>
+  <figure class="example" data-title="2.4 · Read the raster back" data-needs="2.4">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.rasterTable) throw new Error("Run cell 2.4 first.");
+    await db.setWorkspace("nyc");
+    return await db.getRaster("terrain");
+  </script>
+  </figure>
+</section>
+
+<section id="analytical">
+  <h2><span class="num">3</span>Analytical queries</h2>
+  <p>Analytical queries use <code>rawQuery()</code>, which runs SQL directly on the tables of the current workspace. Because DuckDB manages the data in the browser, the familiar patterns of filtering, grouping and aggregation work without leaving the page. They support <strong>OLAP-style</strong> workflows, in which datasets are summarized across dimensions and measures. The examples query the park layer loaded in 2.1.</p>
+
+  <h3>3.1 Filtering data</h3>
+  <p>A filter keeps the records that satisfy a condition. This query reads <code>table_osm_parks</code> and keeps parks whose area exceeds a threshold, returning a few descriptive attributes.</p>
+  <figure class="example" data-title="3.1 · Filter" data-needs="2.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.osm) throw new Error("Run cell 2.1 first.");
+    await db.setWorkspace("nyc");
+
+    const sqlFilter = `
+      SELECT
+        json_extract_string(properties, '$.name')    AS name,
+        json_extract_string(properties, '$.leisure') AS leisure,
+        json_extract_string(properties, '$.landuse') AS landuse,
+        ROUND(ST_Area(geometry)) AS area_m2
+      FROM table_osm_parks
+      WHERE geometry IS NOT NULL
+        AND ST_Area(geometry) > 1000
+      ORDER BY area_m2 DESC
+      LIMIT 10
+    `;
+
+    return await db.rawQuery({
+      query: sqlFilter,
+      output: {
+        type: "CREATE_TABLE",
+        tableName: "large_parks",
+        source: "user",
+        tableType: "polygon",
+      },
+    });
+  </script>
+  </figure>
+  <p><code>rawQuery()</code> has different output modes through <code>output</code>. With <code>RETURN_OBJECT</code> the result comes back as an array of JavaScript objects, handy for inspection, summaries and intermediate results. With <code>CREATE_TABLE</code> the result is stored as a new table in the current workspace, named by <code>tableName</code>; optional <code>source</code> and <code>tableType</code> metadata let it be treated as a new dataset for later retrieval or visualization.</p>
+
+  <h3>3.2 Grouping data</h3>
+  <p>Group-by queries summarize data by category. This one counts park features and sums their areas by category, using attributes already present in <code>table_osm_parks</code>.</p>
+  <figure class="example" data-title="3.2 · Group by" data-needs="2.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.osm) throw new Error("Run cell 2.1 first.");
+    await db.setWorkspace("nyc");
+
+    const sqlGroup = `
+      SELECT
+        COALESCE(
+          json_extract_string(properties, '$.leisure'),
+          json_extract_string(properties, '$.landuse'),
+          'unknown'
+        ) AS category,
+        COUNT(*) AS feature_count,
+        ROUND(SUM(ST_Area(geometry))) AS total_area_m2
+      FROM table_osm_parks
+      WHERE geometry IS NOT NULL
+      GROUP BY category
+      ORDER BY total_area_m2 DESC
+    `;
+
+    const rows = await db.rawQuery({query: sqlGroup, output: {type: "RETURN_OBJECT"}});
+    table(rows);
+  </script>
+  </figure>
+</section>
+
+<section id="spatial">
+  <h2><span class="num">4</span>Spatial queries</h2>
+  <h3>4.1 Spatial join</h3>
+  <p><code>spatialQuery()</code> performs a spatial join between two tables already in the current workspace. It takes a <strong>root table</strong> and a <strong>join table</strong> and enriches the root table with information derived from the spatial relationship of their geometries. That answers questions such as how many nearby features surround each polygon, or how values from one layer aggregate into another. Here we count nearby park features around each surface geometry.</p>
+  <figure class="example" data-title="4.1 · Spatial join" data-needs="2.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.osm) throw new Error("Run cell 2.1 first.");
+    await db.setWorkspace("nyc");
+    ctx.spatialJoin = await db.spatialQuery({
+      tableRootName: "table_osm_surface",
+      tableJoinName: "table_osm_parks",
+      groupBy: [
+        {
+          column: "*",
+          aggregateFn: "count",
+          normalize: true,
+        },
+      ],
+    });
+    return ctx.spatialJoin;
+  </script>
+  </figure>
+  <p>The root table is updated in place. Retrieve it with <code>getLayer()</code> to inspect the enriched geometries and properties.</p>
+  <figure class="example" data-title="4.1 · Read the enriched table" data-needs="4.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.spatialJoin) throw new Error("Run cell 4.1 first.");
+    await db.setWorkspace("nyc");
+    return await db.getLayer("table_osm_surface");
+  </script>
+  </figure>
+
+  <h3>4.2 Heatmaps</h3>
+  <p><code>buildHeatmap()</code> builds a regular grid over the workspace extent and aggregates values from a source table into its cells using a spatial proximity rule. Below, each cell of a 40×40 grid stores the number of park features within 200 m, giving a compact raster that can be retrieved with <code>getRaster()</code> for visualization and analysis.</p>
+  <figure class="example" data-title="4.2 · Build a heatmap" data-needs="2.1">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.osm) throw new Error("Run cell 2.1 first.");
+    await db.setWorkspace("nyc");
+    ctx.parksHeatmap = await db.buildHeatmap({
+      tableJoinName: "table_osm_parks",
+      near: {distance: 200},
+      outputTableName: "parks_heatmap",
+      groupBy: [
+        {
+          column: "*",
+          aggregateFn: "count",
+          normalize: true,
+        },
+      ],
+      grid: {rows: 40, columns: 40},
+    });
+    return ctx.parksHeatmap;
+  </script>
+  </figure>
+  <figure class="example" data-title="4.2 · Read the heatmap raster" data-needs="4.2">
+  <script type="text/plain">
+    const {db} = ctx;
+    if (!ctx.parksHeatmap) throw new Error("Run cell 4.2 first.");
+    await db.setWorkspace("nyc");
+    return await db.getRaster("parks_heatmap");
+  </script>
+  </figure>
+  <div class="next-page">Next: <a href="map.html">04 · Geographical data visualization with Autark Map →</a></div>
+</section>
+
+<section id="credits">
+  <h2>Credits</h2>
+  <p>Adapted from the Observable notebook <a href="https://observablehq.com/d/11c567a880a91172">03. Urban Data Management</a>, produced for the tutorial <em>Urban Data Analytics with <a href="https://autarkjs.org">Autark</a></em> at SIBGRAPI 2026. See the <a href="index.html#authors">author list</a>. Map data © OpenStreetMap contributors (ODbL).</p>
+</section>
+</main>
+</div>
+<script type="module" src="tutorial.js"></script>
+</body>
+</html>

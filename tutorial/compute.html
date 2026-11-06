@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>06 · GPU computing · Autark tutorial</title>
+  <link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#basics">1. Autark Compute</a></li>
+    <li><a href="#property">2. Property computation</a></li>
+    <li><a href="#render">3. Render analysis</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="intro">
+  <p class="meta">Autark tutorial · notebook 06</p>
+  <div class="series-nav">
+    <a href="index.html">01 · Overview</a>
+    <a href="formats.html">02 · Formats and sources</a>
+    <a href="db.html">03 · Data management</a>
+    <a href="map.html">04 · Maps</a>
+    <a href="plot.html">05 · Plots</a>
+    <span>06 · GPU computing</span>
+  </div>
+  <h1>GPU computing with Autark Compute</h1>
+  <p class="lede">Custom analysis that runs on the GPU in your browser and attaches its results to the GeoJSON features it describes.</p>
+  <aside class="warn">Autark Compute needs <strong>WebGPU</strong>. It is on by default in Chrome and Edge 113+; Firefox needs Nightly with WebGPU enabled. Section 3 asks the public Overpass server for OpenStreetMap data and falls back to a bundled copy if it cannot be reached. Cells share state through <code>ctx</code>; run them in order or use <strong>Run all above ▶▶</strong>.</aside>
+</section>
+
+<section id="basics">
+  <h2><span class="num">1</span>Autark Compute</h2>
+  <p>Urban analysis often starts with a question about individual features: How compact is this building footprint? What score should we give this street? How much sky is visible from a location? <strong>Autark Compute</strong> (<code>autk-compute</code>) runs custom analysis on the GPU, directly in the browser, and attaches the results to GeoJSON features.</p>
+  <p>This page introduces two workflows: deriving attributes with <code>ComputeGpgpu</code> (the <code>gpgpuPipeline()</code> workflow) and estimating visibility with <code>ComputeRender</code> (<code>renderPipeline()</code>). We start with a small, inspectable dataset. The example is designed for learning; at this scale GPU overhead can outweigh its benefits.</p>
+
+  <h3>1.1 Feature-centric model and GeoJSON data</h3>
+  <p>A GeoJSON <code>Feature</code> combines a geometry with a <code>properties</code> object, and a <code>FeatureCollection</code> groups features. Autark keeps analysis results attached to the feature they describe: a compactness value belongs to a building, and a visibility result belongs to the feature used as a viewpoint.</p>
+<pre><code>{
+  type: "Feature",
+  id: "building-a",
+  geometry: { /* GeoJSON geometry */ },
+  properties: {
+    area: 400,
+    perimeter: 80,
+    compute: { compactness: 0.7854 }
+  }
+}</code></pre>
+  <p>The pipelines return a <em>new</em> collection rather than modifying the original. Keep a reference to the returned collection: downstream cells should use that enriched result.</p>
+
+  <h3>1.2 GPU computation and render analysis</h3>
+  <div class="table-wrap"><table class="fields">
+    <tr><th>Pipeline</th><th>Input</th><th>Analysis</th><th>Result location</th></tr>
+    <tr><td><code>ComputeGpgpu</code></td><td>Feature attributes and a WGSL function</td><td>Computes values independently for each feature</td><td><code>properties.compute</code></td></tr>
+    <tr><td><code>ComputeRender</code></td><td>Scene layers and viewpoints</td><td>Renders sampled views and aggregates visible content</td><td><code>properties.compute.render</code> on the viewpoints</td></tr>
+  </table></div>
+  <p>Use <code>autk-db</code> for filtering, grouping, joins and operations that are naturally SQL. Use <code>autk-compute</code> for custom per-feature GPU formulas or view-based analysis.</p>
+
+  <h3>1.3 First example</h3>
+  <p>We compute a floor-area proxy, <strong>footprint area × number of floors</strong>, for a sample of 64 buildings from Battery Park City in lower Manhattan. Each building has its area in square meters, perimeter in meters and number of floors (from the OSM <code>building:levels</code> tag).</p>
+  <figure class="example" data-title="1.3 · Load the sample buildings">
+  <script type="text/plain">
+    ctx.sampleBuildings = await d3.json("data/compute/lower_mnt_buildings.geojson");
+    return {buildings: ctx.sampleBuildings.features.length, first: ctx.sampleBuildings.features[0]};
+  </script>
+  </figure>
+  <p>The computation itself:</p>
+  <figure class="example" data-title="1.3 · Floor-area proxy" data-needs="1.3, WebGPU">
+  <script type="text/plain">
+    if (!ctx.sampleBuildings) throw new Error("Run the previous cell first.");
+    const {compute} = autk;
+
+    const gpgpu = new compute.ComputeGpgpu();
+    const floorAreas = await gpgpu.run({
+      collection: ctx.sampleBuildings,
+      variableMapping: {area: "area", floors: "floors"},
+      resultField: "floorArea",
+      wgslBody: "return area * floors;",
+    });
+    ctx.floorAreas = floorAreas;
+
+    table(floorAreas.features.map(f => ({
+      building: f.id,
+      area: f.properties.area,
+      floors: f.properties.floors,
+      floorArea: f.properties.compute.floorArea,
+    })));
+  </script>
+  </figure>
+</section>
+
+<section id="property">
+  <h2><span class="num">2</span>Property computation</h2>
+  <h3>2.1 The pipeline configuration</h3>
+  <p>The cell above multiplies each measured footprint area by its floor count. Because the inputs come from real buildings, the output varies with both footprint size and height. The configuration has four parts: <code>collection</code> selects the input features; <code>variableMapping</code> exposes <code>area</code> and <code>floors</code> to WGSL; <code>wgslBody</code> defines the calculation; and <code>resultField</code> stores the result at <code>properties.compute.floorArea</code>.</p>
+
+  <h3>2.2 Mapping feature attributes with <code>variableMapping</code></h3>
+  <p>The mapping keys are WGSL variable names; the values are paths into the input feature. For example <code>{area: "shape_area"}</code> makes the property <code>shape_area</code> available as <code>area</code> inside WGSL. Both <code>"area"</code> and <code>"properties.area"</code> are valid paths.</p>
+  <p>Mapped scalar values are 32-bit floats. <strong>Missing numeric inputs fall back to zero</strong>, so validate required attributes before running a calculation:</p>
+  <figure class="example" data-title="2.2 · Validate inputs" data-needs="1.3">
+  <script type="text/plain">
+    if (!ctx.sampleBuildings) throw new Error("Run cell 1.3 first.");
+    for (const feature of ctx.sampleBuildings.features) {
+      const {area, perimeter} = feature.properties;
+      if (!Number.isFinite(area) || area <= 0 ||
+          !Number.isFinite(perimeter) || perimeter <= 0) {
+        throw new Error("Invalid measurements for " + feature.id);
+      }
+    }
+    return "All " + ctx.sampleBuildings.features.length + " buildings have a positive area and perimeter.";
+  </script>
+  </figure>
+
+  <h3>2.3 Writing WGSL expressions</h3>
+  <p>WGSL is the shader language of WebGPU. The string passed as <code>wgslBody</code> is the body of a function; the pipeline supplies the mapped inputs. Use floating-point literals such as <code>1.0</code>, and return a value on every branch.</p>
+<pre><code>wgslBody: `
+  if (perimeter &lt;= 0.0) { return -1.0; }
+  return (4.0 * 3.1415927 * area) / (perimeter * perimeter);
+`</code></pre>
+  <p>Here <code>-1.0</code> is an explicit sentinel for an invalid perimeter. Exclude or label it in a visualization rather than treating it as a real compactness value, and validate area too when working with external data.</p>
+
+  <h3>2.4 Scalar and multi-column outputs</h3>
+  <p>Use <code>resultField</code> when returning one <code>f32</code>. Use <code>outputColumns</code> when returning an <code>array&lt;f32, N&gt;</code>; the array length and order must match the declared columns. This computes two related measures in one pass:</p>
+  <figure class="example" data-title="2.4 · Two outputs in one pass" data-needs="1.3, WebGPU">
+  <script type="text/plain">
+    if (!ctx.sampleBuildings) throw new Error("Run cell 1.3 first.");
+    const {compute} = autk;
+
+    const gpgpu = new compute.ComputeGpgpu();
+    const buildingMetrics = await gpgpu.run({
+      collection: ctx.sampleBuildings,
+      variableMapping: {area: "area", floors: "floors"},
+      outputColumns: ["floorArea", "footprintPerFloor"],
+      wgslBody: `
+        var result: array<f32, 2>;
+        result[0] = area * floors;
+        result[1] = area / max(floors, 1.0);
+        return result;
+      `,
+    });
+
+    // The original OSM-derived measurements remain next to both GPU outputs.
+    table(buildingMetrics.features.map(f => ({
+      building: f.id,
+      area: f.properties.area,
+      floors: f.properties.floors,
+      floorArea: f.properties.compute.floorArea,
+      footprintPerFloor: f.properties.compute.footprintPerFloor,
+    })));
+  </script>
+  </figure>
+
+  <h3>2.5 Example: computing building compactness</h3>
+  <p>For a footprint with area <strong>A</strong> and perimeter <strong>P</strong>, define compactness as <strong>C = 4πA / P²</strong>. A circle has C = 1, a square has C = π/4 ≈ 0.7854, and an elongated rectangle has a smaller value. The measure describes shape, not size or building quality.</p>
+  <p>The cell computes compactness for every building in the sample. A value near 1 means a compact footprint; lower values mean elongated footprints or multipart buildings with more boundary per unit area. The collection keeps the original OSM tags and geometry and adds the result at <code>properties.compute.compactness</code>.</p>
+  <figure class="example" data-title="2.5 · Building compactness" data-needs="1.3, WebGPU">
+  <script type="text/plain">
+    if (!ctx.sampleBuildings) throw new Error("Run cell 1.3 first.");
+    const {compute} = autk;
+
+    const gpgpu = new compute.ComputeGpgpu();
+    const compactBuildings = await gpgpu.run({
+      collection: ctx.sampleBuildings,
+      variableMapping: {area: "area", perimeter: "perimeter"},
+      resultField: "compactness",
+      wgslBody: `
+        if (perimeter <= 0.0) { return -1.0; }
+        return (4.0 * 3.1415927 * area) / (perimeter * perimeter);
+      `,
+    });
+
+    table(compactBuildings.features.map(f => ({
+      building: f.id,
+      area: f.properties.area,
+      perimeter: f.properties.perimeter,
+      compactness: f.properties.compute.compactness,
+    })));
+  </script>
+  </figure>
+</section>
+
+<section id="render">
+  <h2><span class="num">3</span>Render analysis</h2>
+  <h3>3.1 The render pipeline</h3>
+  <p>Attribute computation asks what we can derive from a feature's stored values. Render analysis asks what can be <em>seen</em> from a location. The engine renders a scene from sampled camera positions, counts visible content, and attaches aggregated results to viewpoint features.</p>
+
+  <h3>3.2 Defining the scene and viewpoints</h3>
+  <p>A render analysis begins with the scene: a list of <code>FeatureCollection</code> objects the pipeline can draw. Here the scene is the buildings of Battery Park City and the Financial District in New York City (a bounding box around them), and the viewpoints are the roads there. After loading the data with <code>autk-db</code>, <code>getLayer()</code> returns the building and road layers.</p>
+  <aside class="note">The original notebook loaded a prepared OSM extract (<code>lower_mnt.osm.pbf</code>) so it ran without a network. That file is not part of this repository, so this cell asks the Overpass API for the same two areas. If the public server is busy or unreachable, the cell uses the copy of the same answers recorded in <code>data/osm/</code>, so it also works offline (add <code>?overpass=offline</code> to the URL to skip the live server). <code>loadOsm()</code> also accepts <code>pbfFileUrl</code> if you have an extract.</aside>
+  <figure class="example" data-title="3.2 · Load buildings and roads">
+  <script type="text/plain">
+    const {db: dbm} = autk;
+    const skyDb = new dbm.AutkDb();
+    await skyDb.init();
+    // withFallback() tries the public Overpass server and, if it fails, uses the copy in data/osm/.
+    const status = document.createElement("p");
+    status.className = "status";
+    out.append(status);
+
+    await withFallback(() => skyDb.loadOsm({
+      // A bounding box, [west, south, east, north], around Battery Park City and the Financial District.
+      queryArea: {bbox: [-74.0225, 40.7000, -74.0005, 40.7185]},
+      outputTableName: "sky_example",
+      autoLoadLayers: {layers: ["roads", "buildings"]},
+      onProgress: phase => { status.textContent = "OpenStreetMap: " + phase.replaceAll("-", " ") + "…"; },
+    }));
+    status.remove();
+
+    ctx.skyBuildings = await skyDb.getLayer("sky_example_buildings");
+    ctx.skyRoads = await skyDb.getLayer("sky_example_roads");
+    return {buildings: ctx.skyBuildings.features.length, roads: ctx.skyRoads.features.length};
+  </script>
+  </figure>
+  <p>The buildings become the scene. The pipeline also needs a <code>viewpoints</code> collection, which fixes where each camera goes. Each road feature is sampled at its centerline midpoint, which becomes the camera location, and <code>sampling.directions</code> sets the viewing directions. With one direction the output is a fast first-pass exposure estimate for every road feature.</p>
+<pre><code>const layers = [{id: "buildings", collection: pbfBuildings, type: "buildings"}];
+const viewpoints = {collection: pbfRoads, sampling: {directions: 1}};</code></pre>
+
+  <h3>3.3 Aggregating render results</h3>
+  <p>Next, choose how the rendered pixels are aggregated. This choice decides the metric returned for each viewpoint, such as the visible share of a class or the set of visible objects.</p>
+  <p>This example treats pixels not covered by a scene layer as sky. With class aggregation, that uncovered background contributes to the <code>sky</code> class. By contrast, <code>{type: "objects"}</code> reports the individual visible objects; to match object results back to source data, give each scene layer a stable <code>objectIdProperty</code>.</p>
+  <p>Camera settings control the field of view and clipping distances. <code>tileSize</code> sets the resolution of each sample and must be a multiple of eight. The camera extent, sampling strategy, scene completeness and resolution all influence the result.</p>
+<pre><code>const aggregation = {
+  type: "classes",
+  includeBackground: true,
+  backgroundLayerType: "sky",
+};</code></pre>
+  <p>The sky component is at <code>properties.compute.render.classes.sky</code>. Object aggregation writes to <code>properties.compute.render.objects</code>. Inspect the output before choosing fields for a table or color scale, and during validation keep a missing result distinct from a measured zero.</p>
+
+  <h3>3.4 Example: measuring sky exposure</h3>
+  <p>We now have what a render analysis needs: a scene built from the buildings and a set of viewpoints sampled from the roads. The cell runs <code>ComputeRender</code> with the <code>layers</code>, <code>viewpoints</code> and <code>aggregation</code> options above, using class aggregation with sky as the background layer.</p>
+  <figure class="example" data-title="3.4 · Sky exposure per road" data-needs="3.2, WebGPU">
+  <script type="text/plain">
+    if (!ctx.skyBuildings) throw new Error("Run cell 3.2 first.");
+    const {compute} = autk;
+
+    const layers = [{id: "buildings", collection: ctx.skyBuildings, type: "buildings"}];
+    const viewpoints = {collection: ctx.skyRoads, sampling: {directions: 1}};
+    const aggregation = {type: "classes", includeBackground: true, backgroundLayerType: "sky"};
+
+    const render = new compute.ComputeRender();
+    const roadsWithSky = await render.run({layers, viewpoints, aggregation, tileSize: 64});
+    ctx.roadsWithSky = roadsWithSky;
+
+    // Each feature now carries properties.compute.render.classes; `sky` is the fraction of sampled
+    // pixels that no building covered: a per-road estimate of sky exposure.
+    return roadsWithSky.features[0].properties.compute.render.classes;
+  </script>
+  </figure>
+  <p>The render pipeline returns a new collection of viewpoint features enriched with render metrics. Here are the ten roads with the most sky:</p>
+  <figure class="example" data-title="3.4 · Roads with the most sky" data-needs="3.4">
+  <script type="text/plain">
+    if (!ctx.roadsWithSky) throw new Error("Run cell 3.4 first.");
+    const rows = ctx.roadsWithSky.features
+      .map(f => ({road: f.properties.name ?? f.id, sky: f.properties.compute?.render?.classes?.sky}))
+      .filter(r => Number.isFinite(r.sky))
+      .sort((a, b) => b.sky - a.sky)
+      .slice(0, 10);
+    table(rows);
+  </script>
+  </figure>
+  <div class="next-page">That is the end of the notebooks included so far. Back to the <a href="index.html">overview</a>.</div>
+</section>
+
+<section id="credits">
+  <h2>Credits</h2>
+  <p>Adapted from the Observable notebook <a href="https://observablehq.com/d/27d0c1cd102b0c90">06. GPU Computing</a>, produced for the tutorial <em>Urban Data Analytics with <a href="https://autarkjs.org">Autark</a></em> at SIBGRAPI 2026. See the <a href="index.html#authors">author list</a>. The building sample is derived from OpenStreetMap data © OpenStreetMap contributors (ODbL).</p>
+</section>
+</main>
+</div>
+<script type="module" src="tutorial.js"></script>
+</body>
+</html>
