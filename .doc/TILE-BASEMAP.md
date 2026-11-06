@@ -25,7 +25,7 @@ Out of scope: vector tiles, WMS/WMTS capability parsing, tile prefetching for of
 | Cache | per-layer `Imagery` objects by `[x,y,level]` | LRU by `(provider,level,x,y)` over a fixed GPU texture pool | LRU by `(source,z,x,y)`; `texture.destroy()` on eviction |
 | Requests | scheduler: 50 total, 18 per server, retry when a request returns nothing | async jobs; re-requesting a queued tile moves it to the front | concurrency limit, last-requested first, abort tiles that left the view |
 | Missing tile | parent imagery | nearest loaded ancestor with a UV offset and scale | same |
-| Mercator on a lat/lon grid | GPU reprojection onto a 2×64 grid | not needed (geodetic chunks) | a gridded quad per tile, V from 3857 |
+| Mercator on a lat/lon grid | GPU reprojection onto a 2×64 grid | not needed (geodetic chunks) | a quad per tile with corners projected into the map CRS; extra rows only for EPSG:4326 at low zoom |
 | Layer options | alpha, brightness, contrast, hue, gamma, `colorToAlpha`, `rectangle` | enabled, ZIndex, blend, adjustments | `opacity`, `isSkip` now; adjustments later |
 
 Sources: CesiumJS reference for `ImageryLayer`, `UrlTemplateImageryProvider`, `Globe`, `RequestScheduler`; OpenSpace `modules/globebrowsing/src` (`tileprovider/`, `memoryawaretilecache`, `asynctiledataprovider`, `renderableglobe`). Ideas only; no code is taken from either.
@@ -102,16 +102,24 @@ The map's local plane is the workspace CRS minus the shared origin. Tiles are EP
 | 40° | 4,865,942 m | 4,838,471 m | 27,471 m |
 | 60° | 8,399,738 m | 8,362,699 m | 37,039 m |
 
-That is far more than a pixel at any useful zoom, so tiles cannot be placed as plain rectangles.
+The offset is far more than a pixel at any useful zoom, so a tile cannot simply be drawn at its 3857 position. But the offset is carried by the corners: each corner is projected into the map CRS, and the texture is sampled linearly in the tile's own 3857 space. What remains is how far the true map y departs from linear between the corners, and that is small.
 
 Each tile is a quad with `R` rows (each row two vertices):
 1. Row `i` has Mercator-3857 y linear in `i` (so texture V is linear in `i`).
 2. Its latitude comes from the closed-form inverse of the spherical formula.
 3. The vertex position uses the forward formula for the target CRS (3395 ellipsoidal, 3857 identity, 4326 degrees), minus the origin.
 
-Only forward formulas are needed for drawing. An inverse (map coordinates to lon/lat) is needed only for the four footprint corners, where a few Newton iterations on 3395 are enough.
+Only forward formulas are needed for drawing. An inverse (map coordinates to lon/lat) is needed only for the four footprint corners, where a few fixed-point iterations on 3395 are enough.
 
-`R` depends on zoom and CRS. For 3395 a handful of rows keeps error far below a pixel. For 4326 the warp is large at low zoom, so `R` grows as `z` shrinks, up to 64. The exact table is chosen by a test that bounds the error at 0.25 pixel.
+**Rows needed.** Measured as the largest gap between the true map y and linear interpolation between row vertices, in pixels of a 512-pixel tile, with a bound of 1/8 pixel (a 256-pixel tile on a high-density screen is a 512-pixel tile on screen):
+
+| CRS | rows by zoom |
+|---|---|
+| EPSG:3857 | 1 at every zoom |
+| EPSG:3395 | 4, 4, 2, 2, 2 for zoom 0 to 4; 1 from zoom 5 |
+| EPSG:4326 | 64, 64, 64, 32, 16, 16, 8, 8, 4, 4, 2, 2 for zoom 0 to 11; 1 from zoom 12 |
+
+So for the default CRS the cost of the warp is essentially nothing: one quad per tile, with four rows only at the few lowest zooms. EPSG:4326 needs the rows because latitude in degrees is far from linear in Mercator y at low zoom. A test recomputes this error for every CRS and zoom and fails if the table lets it reach 1/8 pixel, and checks that neighbouring tiles share edge vertices exactly.
 
 ## Components
 
@@ -122,6 +130,7 @@ All in `autk-map/src` unless noted. Pure modules come first so they can be teste
 | `tile-index.ts` | `TileIndex {z,x,y}`, `key()`, `parent()`, `ancestor(k)`, lon/lat bounds, 3857 helpers | no |
 | `tile-source.ts` | `TileSource` type, template expansion, validation, `TILE_SOURCES` | no |
 | `tile-projection.ts` | lon/lat to 3395/3857/4326 forward, inverse for corners | no |
+| `tile-geometry.ts` | vertices, texture coordinates and indices of one tile, with the row table above | no |
 | `tile-selection.ts` | camera → ground footprint → zoom → tile list, with a tile-count cap | no |
 | `tile-cache.ts` | LRU keyed by `(source,z,x,y)`; entry state `loading | ready | missing`; eviction hook | no |
 | `tile-loader.ts` | queue with concurrency limit, last-requested-first, dedupe, `AbortController`, `createImageBitmap`, backoff for failed tiles | no |
