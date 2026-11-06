@@ -60,6 +60,9 @@ export type {
     LayerThematic,
 } from './types-layers';
 
+/** Types for drawing three raster bands as a true-color RGB image. */
+export type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
+
 /** Abstract base class returned by layer lookup and picking APIs. */
 export { Layer } from './layer';
 

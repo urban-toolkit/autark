@@ -161,7 +161,7 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `loadCollection(id, params)`: Loads a GeoJSON or raster-derived collection as a map layer.
 * `loadMesh(id, params)`: Loads prebuilt mesh geometry directly.
 * `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
-* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions.
+* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions, or the three bands of an RGB image.
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.
 * `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
@@ -170,6 +170,35 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.
 * `destroy()`: Releases event handlers and GPU resources.
+
+## Raster layers
+
+A raster layer draws one band of a GeoTIFF-derived collection through the layer color map. The collection comes from `AutkDb.getLayer()` (or `getRaster()`) after `loadGeoTiff()`.
+
+```ts
+map.loadCollection('elevation', { collection, type: 'raster', property: 'band_1' });
+```
+
+A raster alone is enough to start a map: the map origin and camera are taken from the collection `bbox`, so no vector layer has to be loaded first.
+
+Satellite and aerial imagery has red, green and blue bands that should be shown as they are. Pass the three band paths to draw a true-color image; the color map and transfer function do not apply.
+
+```ts
+map.loadCollection('imagery', {
+    collection,
+    type: 'raster',
+    property: ['band_1', 'band_2', 'band_3'],
+    // Optional: band values mapped to 0 and 255.
+    loadConfig: { rgbRange: [0, 3000] },
+});
+
+// Later, with different bands or range:
+map.updateRaster('imagery', { collection, property: ['band_4', 'band_3', 'band_2'], rgbRange: [0, 3000] });
+```
+
+Bands already stored as 8-bit values (0 to 255) are shown unchanged. Other data, such as reflectance up to 10000, is stretched from its smallest to its largest value unless `rgbRange` is given. A pixel where any band has no data stays transparent.
+
+`loadGeoTiff()` limits a raster to one million cells by default and logs a warning when it resamples a larger image; raise `maxRasterCells` to keep more detail.
 
 ## Resources
 
