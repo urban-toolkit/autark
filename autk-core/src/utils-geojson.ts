@@ -40,17 +40,39 @@ export function isFeatureCollection(data: unknown): data is FeatureCollection {
 }
 
 /**
+ * Reads a collection's declared GeoJSON `bbox` as a named 2D bounding box.
+ *
+ * Accepts both the 2D (`[minX, minY, maxX, maxY]`) and 3D
+ * (`[minX, minY, minZ, maxX, maxY, maxZ]`) forms and returns `null` when the
+ * member is absent or not finite.
+ */
+function declaredBoundingBox(geojson: FeatureCollection): BoundingBox | null {
+    const bbox = geojson.bbox;
+    if (!Array.isArray(bbox) || bbox.length < 4) return null;
+    const [minLon, minLat, maxLon, maxLat] = (bbox.length >= 6
+        ? [bbox[0], bbox[1], bbox[3], bbox[4]]
+        : [bbox[0], bbox[1], bbox[2], bbox[3]]).map(Number) as [number, number, number, number];
+    return [minLon, minLat, maxLon, maxLat].every(Number.isFinite)
+        ? { minLon, minLat, maxLon, maxLat }
+        : null;
+}
+
+/**
  * Computes a spatial origin from a feature collection's bounding-box center.
  *
+ * The box comes from the feature geometries. Collections without geometry,
+ * such as a GeoTIFF-derived raster whose features carry `geometry: null`, fall
+ * back to their declared GeoJSON `bbox`.
+ *
  * @param geojson - Feature collection to summarize.
- * @returns The `[longitude, latitude]` center, or `[0, 0]` when no usable geometry is present.
+ * @returns The `[longitude, latitude]` center, or `[0, 0]` when neither geometry nor a declared `bbox` is present.
  * @throws Never throws.
  * @example
  * const origin = computeOrigin(fc);
  * // origin → [151.2, -33.8]
  */
 export function computeOrigin(geojson: FeatureCollection): [number, number] {
-    const bbox = computeBoundingBox(geojson);
+    const bbox = computeBoundingBox(geojson) ?? declaredBoundingBox(geojson);
     if (!bbox) return [0, 0];
     return [
         (bbox.minLon + bbox.maxLon) * 0.5,
