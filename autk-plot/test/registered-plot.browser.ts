@@ -3,8 +3,8 @@
  *
  * Interactions, linking, and the segregated view come from the annotations
  * alone. The generic part rules are checked on their geometry, the drawing
- * validator on one broken drawing per invariant, and a D3 treemap written as
- * a lab template against the built-in treemap: same selection, same parts.
+ * validator on one broken drawing per invariant, and a treemap written in
+ * plain D3 against the built-in treemap: same selection, same parts.
  */
 
 import * as d3 from 'd3';
@@ -13,13 +13,64 @@ import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import * as next from '../src';
 import type { AutkDatum, PlotDefinition, PlotEventData, UnifiedPlotConfig } from '../src';
 
-import { LAB_PLOT, plotDefinitionOf, plotLabConfig } from '../../usecases/src/provenance/lab-plot';
+import { LAB_PLOT, plotDefinitionOf, plotLabConfig, transformConfigOf, transformFields } from '../../usecases/src/provenance/lab-plot';
 import { PLOT_LAB_TEMPLATES } from '../../usecases/src/provenance/lab-plot-templates';
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
-import { installSvgBBox } from './svg-geometry';
+import { effectiveBox, installSvgBBox } from './svg-geometry';
 
 const regions = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
+
+/** A template transform as the page gives it: through the Transform list and the options field. */
+const roundTrip = (transform: Parameters<typeof transformFields>[0]) => {
+    const { choice, options } = transformFields(transform);
+    return transformConfigOf(choice, options);
+};
 const BARS = { attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' as const } };
+
+/** A treemap in plain D3 over the rows of the hierarchy transform, written as a developer would. */
+const D3_TREEMAP = `// Treemap in plain D3, over the rows of the "hierarchy" preset.
+// No painting code: the parts come from the geometry, as for any user plot.
+return {
+  draw({ group, rows, width, height }) {
+    // Tree from the rows (key, parent, level, value).
+    const nodes = new Map(rows.map(r => [r.key, { row: r, children: [] }]));
+    const root = { row: null, children: [] };
+    rows.forEach(r => (r.parent ? nodes.get(r.parent) : root).children.push(nodes.get(r.key)));
+    const depth = d3.max(rows, r => r.level + 1);
+
+    const tree = d3.hierarchy(root, n => (n.children.length ? n.children : undefined))
+      .sum(n => (n.children.length === 0 && n.row ? Math.max(0, n.row.value) : 0))
+      .sort((a, b) => b.value - a.value);
+    d3.treemap()
+      .size([width, height])
+      .paddingOuter(2)
+      .paddingTop(n => (n.depth > 0 && n.depth < depth ? 14 : 2))
+      .paddingInner(2)
+      .round(true)(tree);
+
+    const groups = tree.descendants().filter(n => n.data.row && n.data.row.level < depth - 1);
+    group.selectAll('rect.frame').data(groups).join('rect')
+      .attr('class', 'frame autkContext') // Autark: a row drawn only as context
+      .attr('x', n => n.x0).attr('y', n => n.y0)
+      .attr('width', n => n.x1 - n.x0).attr('height', n => n.y1 - n.y0)
+      .attr('fill', '#f6f8fa').attr('stroke', '#d0d7de')
+      .property('__data__', n => n.data.row);       // Autark: after the geometry, the datum becomes the row
+    group.selectAll('text.frame').data(groups.filter(n => n.x1 - n.x0 > 30)).join('text')
+      .attr('class', 'frame')
+      .attr('x', n => n.x0 + 4).attr('y', n => n.y0 + 10)
+      .style('font', '600 10px sans-serif')
+      .text(n => n.data.row.label);
+
+    const leaves = tree.leaves().filter(n => n.data.row);
+    const box = new Map(leaves.map(n => [n.data.row, n]));
+    group.selectAll('rect.autkMark').data(leaves.map(n => n.data.row)).join('rect') // Autark: binds the rows themselves
+      .attr('class', 'autkMark')                                                     // Autark
+      .attr('x', r => box.get(r).x0).attr('y', r => box.get(r).y0)
+      .attr('width', r => box.get(r).x1 - box.get(r).x0)
+      .attr('height', r => box.get(r).y1 - box.get(r).y0);
+  },
+};
+`;
 
 /** Bars of category-value rows, drawn as user code would. */
 function bars(name: string, part?: string): PlotDefinition {
@@ -239,21 +290,21 @@ describe('plot lab templates', () => {
     const indexOf = (title: string) => PLOT_LAB_TEMPLATES.findIndex(t => t.title.startsWith(title));
     const configOf = (index: number) => {
         const t = PLOT_LAB_TEMPLATES[index];
-        const { type, ...config } = plotLabConfig(t.columns, t.transform ? JSON.stringify(t.transform) : '', t.event, t.title, t.margins);
+        const { type, ...config } = plotLabConfig(t.columns, roundTrip(t.transform), t.event, t.title, t.margins);
         void type;
         return config;
     };
     const checkTemplate = (index: number) =>
         next.checkPlot(plotDefinitionOf(PLOT_LAB_TEMPLATES[index].code), document.createElement('div'), { ...configOf(index), collection: withSyntheticEvents(regions()), width: 480, height: 280 });
 
-    test('the lollipop, the line, the beeswarm, and the D3 treemap honor the contract, each with its inferred design', () => {
-        const rules = ['Lollipop', 'Line', 'Box plot', 'HTML table', 'Beeswarm', 'Treemap'].map(title => {
+    test('the D3 examples of the lab honor the contract, each with its inferred design', () => {
+        const rules = ['Lollipop', 'Line', 'Box plot', 'HTML table', 'Beeswarm'].map(title => {
             const report = checkTemplate(indexOf(title));
             expect(report, title).toMatchObject({ violations: [], skipped: [] });
             return report.designs.map(d => `${d.kind}:${d.rule}${d.axis ? ':' + d.axis : ''}`).join(' ');
         });
-        // The lollipop point slides along its stick; the line points slide down; 1:1 dots and color-free leaves show the fraction.
-        expect(rules).toEqual(['point:position:x', 'point:position:y', 'rect:members:y', 'html:glyph', 'point:glyph', 'rect:glyph']);
+        // The lollipop point slides along its stick; the line points slide down; the boxes span their members; table rows and 1:1 dots show the fraction.
+        expect(rules).toEqual(['point:position:x', 'point:position:y', 'rect:members:y', 'html:glyph', 'point:glyph']);
     });
 
     test('no template draws an element with NaN geometry, marks and context alike', () => {
@@ -265,15 +316,24 @@ describe('plot lab templates', () => {
         }
     });
 
+    test('the Transform list and the options field give back the transform of every template', () => {
+        for (const template of PLOT_LAB_TEMPLATES) expect(roundTrip(template.transform), template.title).toEqual(template.transform);
+        expect(transformFields({ preset: 'registered', name: 'moving-average', options: { halfWindow: 3 } })).toEqual({ choice: 'registered:moving-average', options: '{"halfWindow":3}' });
+        expect(transformConfigOf('binning-1d', ' ')).toEqual({ preset: 'binning-1d' });
+        expect(transformConfigOf('', '{"bins": 6}')).toBeNull();
+        expect(() => transformConfigOf('binning-1d', '{bins')).toThrow();
+        expect(() => transformConfigOf('binning-1d', '[6]')).toThrow(/JSON object/);
+    });
+
     test('the broken example is refused on invariants 1 and 2', () => {
         expect(new Set(checkTemplate(indexOf('A common mistake')).violations.map(v => v.invariant))).toEqual(new Set([1, 2]));
     });
 
     test('equivalence: the D3 treemap selects and paints exactly like the built-in treemap', () => {
-        const config = { attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'hierarchy' as const }, events: [next.PlotEvent.CLICK], margins: PLOT_LAB_TEMPLATES[indexOf('Treemap')].margins };
+        const config = { attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'hierarchy' as const }, events: [next.PlotEvent.CLICK], margins: { left: 10, right: 10, top: 40, bottom: 10 } };
         const builtIn = document.createElement('div');
         const original = new next.AutkPlot(builtIn, { type: 'treemap', collection: regions(), width: 480, height: 280, ...config });
-        next.registerPlot(plotDefinitionOf(PLOT_LAB_TEMPLATES[indexOf('Treemap')].code));
+        next.registerPlot(plotDefinitionOf(D3_TREEMAP));
         const custom = mount({ plot: LAB_PLOT, ...config });
 
         const byMark = (div: HTMLElement, selector: string) => new Map(Array.from(div.querySelectorAll(selector))
@@ -304,15 +364,14 @@ describe('plot lab templates', () => {
         const customParts = byMark(custom.div, '.autkPartial');
         expect([...customParts.keys()].sort()).toEqual([...originalParts.keys()].sort());
         for (const [mark, copy] of customParts) {
-            const [x, y, w, h] = box(customMarks.get(mark)!);
-            const s = Number(/scale\(([^)]+)\)/.exec(copy.getAttribute('transform')!)![1]);
-            const [px, py, pw, ph] = box(originalParts.get(mark)!);
+            const drawn = effectiveBox(copy)!;
+            const builtInPart = effectiveBox(originalParts.get(mark))!;
             expect(copy.getAttribute('data-autk-units')).toBe(originalParts.get(mark)!.getAttribute('data-autk-units'));
-            // The scaled copy of the leaf covers the built-in inner rectangle.
-            expect(x + w / 2 - (w * s) / 2).toBeCloseTo(px, 9);
-            expect(y + h / 2 - (h * s) / 2).toBeCloseTo(py, 9);
-            expect(w * s).toBeCloseTo(pw, 9);
-            expect(h * s).toBeCloseTo(ph, 9);
+            // The part of the D3 leaf covers the built-in inner rectangle.
+            expect(drawn.x).toBeCloseTo(builtInPart.x, 9);
+            expect(drawn.y).toBeCloseTo(builtInPart.y, 9);
+            expect(drawn.width).toBeCloseTo(builtInPart.width, 9);
+            expect(drawn.height).toBeCloseTo(builtInPart.height, 9);
         }
     });
 });

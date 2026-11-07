@@ -12,6 +12,7 @@ import * as next from '../src';
 import type { AutkDatum, PlotTransformConfig, ProvenancePair } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents, withSyntheticSeries } from './fixtures';
+import { effectiveBox } from './svg-geometry';
 import type { Collection } from './fixtures';
 
 /** Builds source rows exactly as `PlotBaseData.buildSourceRows()` does. */
@@ -153,7 +154,7 @@ describe('segregated barchart', () => {
         const plot = new next.AutkPlot(div, { ...histogram(), ...config });
         const bar = (mark: string) => div.querySelector<SVGRectElement>(`.autkMark[data-autk-provenance="${mark}"]`)!;
         const partials = () => Array.from(div.querySelectorAll<SVGRectElement>('.autkPartial'));
-        const height = (node: Element) => Number(node.getAttribute('height'));
+        const height = (node: Element) => effectiveBox(node)!.height;
         return { div, plot, bar, partials, height };
     };
 
@@ -189,7 +190,7 @@ describe('segregated barchart', () => {
             transform: { preset: 'binning-1d', options: { bins: 10, reducer: 'avg', value: 'shape_leng' } },
         });
         plot.setSelection([0]);
-        const width = (node: Element) => Number(node.getAttribute('width'));
+        const width = (node: Element) => effectiveBox(node)!.width;
         expect(width(partials()[0])).toBeCloseTo(width(bar('mark:aggregate:4')) / 2);
     });
 

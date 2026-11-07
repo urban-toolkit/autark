@@ -7,6 +7,14 @@
  * part the automatic rule would draw. A plot agrees when all its measured
  * parts match; the table documents where the automatic design reproduces the
  * hand-made one and where it does not.
+ *
+ * Built-in plots rewritten as plot definitions (bar chart, scatter plot,
+ * bubble chart, heat matrix, hexbin, waffle, pie, donut) paint their parts
+ * with the design space itself, so for them this comparison is no longer
+ * between two independent drawings: their hand-made parts were recorded
+ * before the rewrite, and `native-snapshot.test.ts` checks them against that
+ * recording. Parts are measured as drawn (a partial slice may be its slice
+ * clipped by a circle).
  */
 
 import { beforeAll, describe, expect, test } from 'vitest';
@@ -15,7 +23,7 @@ import * as next from '../src';
 import type { AutkDatum, PartialDesign, PlotType, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
-import { installSvgBBox } from './svg-geometry';
+import { effectiveSector, installSvgBBox } from './svg-geometry';
 
 const collection = () => withSyntheticEvents(loadGalleryCollection('mnt_neighs_proj_landuse.geojson'));
 const events = { axis: ['sjoin.collect.noise', '@transform'] };
@@ -114,8 +122,9 @@ function agrees(mark: Element, partial: Element, design: PartialDesign, r: numbe
             return close(pSize, size * r) && close(pAnchor, anchor) && close(pCross, cross);
         }
         case 'angle': {
-            const m = next.parseSector(mark.getAttribute('d'));
-            const p = next.parseSector(partial.getAttribute('d'));
+            const m = effectiveSector(mark);
+            // As drawn: a partial slice may be its slice clipped by a circle.
+            const p = effectiveSector(partial);
             if (!m || !p) return false;
             if (design.mode === 'sweep') {
                 return close(p.start, m.start) && close(p.inner, m.inner) && close(p.outer, m.outer) && close(p.sweep, m.sweep * clamped);

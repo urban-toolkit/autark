@@ -37,10 +37,15 @@ const newSuite = (name: string): Suite => ({ kind: 'suite', name, items: [], bef
 let root = newSuite('');
 let current = root;
 
-/** Fills `$key` from an object case and `%s` from any case, as Vitest's `test.each`. */
+/**
+ * Fills `$key` from an object case and `%s` from any case, as Vitest's `test.each`: an array case
+ * fills each `%s` with its next item.
+ */
 function title(name: string, testCase: unknown): string {
-    let text = name.replace(/%s/g, String(testCase));
-    if (testCase && typeof testCase === 'object') {
+    const items = Array.isArray(testCase) ? testCase : [testCase];
+    let next = 0;
+    let text = name.replace(/%s/g, () => String(items[next++]));
+    if (testCase && typeof testCase === 'object' && !Array.isArray(testCase)) {
         text = text.replace(/\$(\w+)/g, (match, key: string) => key in testCase ? String((testCase as Record<string, unknown>)[key]) : match);
     }
     return text;
@@ -63,8 +68,12 @@ function register(name: string, fn: Fn): void {
 }
 
 export const test = Object.assign(register, {
-    each: <T>(cases: readonly T[]) => (name: string, fn: (testCase: T) => unknown) => {
-        cases.forEach(testCase => register(title(name, testCase), () => fn(testCase)));
+    // An array case is spread over the arguments of the test, as in Vitest.
+    each: <T>(cases: readonly T[]) => (name: string, fn: (...args: T extends readonly unknown[] ? T : [T]) => unknown) => {
+        cases.forEach(testCase => {
+            const args = (Array.isArray(testCase) ? testCase : [testCase]) as T extends readonly unknown[] ? T : [T];
+            register(title(name, testCase), () => fn(...args));
+        });
     },
 });
 export const it = test;

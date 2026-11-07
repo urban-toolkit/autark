@@ -15,6 +15,11 @@ import * as next from '../src';
 import type { CumulativeRow, FlowRow, FoldCellRow, HierarchyNodeRow, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
+import { effectiveBox, effectiveSector } from './svg-geometry';
+import type { EffectiveBox } from './svg-geometry';
+
+/** Center of a drawn box. */
+const centerOf = (box: EffectiveBox) => [box.x + box.width / 2, box.y + box.height / 2];
 
 const regions = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
 const props = () => regions().features.map(f => f.properties!);
@@ -55,14 +60,17 @@ const last = <T>(list: T[]) => list[list.length - 1];
 /** Bound datum of a DOM mark. */
 const datumOf = <T>(el: Element) => (el as unknown as { __data__: T }).__data__;
 
-/** Plot-specific fields of the concrete plot, read by the tests. */
-const internals = (plot: next.AutkPlot) => plot.instance as unknown as {
-    boxes: Map<object, { x0: number; y0: number; x1: number; y1: number }>;
-    spans: Map<object, { a0: number; a1: number; b0: number; b1: number }>;
-    layout: Map<object, { kind: string; range?: { start: number; end: number }; source?: { start: number; end: number }; target?: { start: number; end: number } }>;
-    radius: number;
-    mapShare: (share: number) => number;
-};
+/** Element drawn for a row: its mark, or its context element (a treemap group frame). */
+const drawnOf = (div: HTMLElement, row: object) => Array.from(div.querySelectorAll('.autkMark, .autkContext')).find(e => datumOf(e) === row);
+
+/** Rectangle drawn for a row, as corners. */
+function boxOf(div: HTMLElement, row: object) {
+    const box = effectiveBox(drawnOf(div, row))!;
+    return { x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height };
+}
+
+/** Ring segment drawn for a row. */
+const spanOf = (div: HTMLElement, row: object) => effectiveSector(drawnOf(div, row))!;
 
 // ---------------------------------------------------------------------------
 // Hierarchy: chained partitions
@@ -131,9 +139,9 @@ describe('stacked bars (two-level hierarchy)', () => {
         const partial = partialOf(leaf)!;
         const mark = marks().find(m => datumOf(m) === leaf)!;
         expect(units(partial)).toEqual([chosen.length, leaf.autkIds.length]);
-        expect(Number(partial.getAttribute('height'))).toBeCloseTo(Number(mark.getAttribute('height')) * chosen.length / leaf.autkIds.length);
-        const bottom = (el: Element) => Number(el.getAttribute('y')) + Number(el.getAttribute('height'));
-        expect(bottom(partial)).toBeCloseTo(bottom(mark));
+        const part = effectiveBox(partial)!;
+        expect(part.height).toBeCloseTo(Number(mark.getAttribute('height')) * chosen.length / leaf.autkIds.length);
+        expect(part.y + part.height).toBeCloseTo(Number(mark.getAttribute('y')) + Number(mark.getAttribute('height')));
     });
 
     test('a non-additive reducer is rejected: segments must add up', () => {
@@ -151,14 +159,13 @@ describe('treemap and sunburst (hierarchy)', () => {
     });
 
     test('treemap: leaves are the marks, inside the frame of their parent', () => {
-        const { plot, marks, rows } = mount(tree('treemap'));
+        const { div, plot, marks, rows } = mount(tree('treemap'));
         const nodes = rows<HierarchyNodeRow>();
         const leaves = nodes.filter(r => r.level === 1);
         expect(marks()).toHaveLength(leaves.length);
-        const boxes = internals(plot).boxes;
         for (const leaf of leaves) {
-            const box = boxes.get(leaf)!;
-            const parent = boxes.get(nodes.find(n => n.key === leaf.parent)!)!;
+            const box = boxOf(div, leaf);
+            const parent = boxOf(div, nodes.find(n => n.key === leaf.parent)!);
             expect(box.x0).toBeGreaterThanOrEqual(parent.x0);
             expect(box.x1).toBeLessThanOrEqual(parent.x1);
             expect(box.y0).toBeGreaterThanOrEqual(parent.y0);
@@ -168,25 +175,24 @@ describe('treemap and sunburst (hierarchy)', () => {
     });
 
     test('treemap segregated view: the inner rectangle covers the selected fraction of the leaf', () => {
-        const { plot, rows, partialOf } = mount(tree('treemap'));
+        const { div, plot, rows, partialOf } = mount(tree('treemap'));
         const leaf = rows<HierarchyNodeRow>().find(r => r.level === 1 && r.autkIds.length >= 2)!;
         const chosen = splitRow(plot, leaf);
-        const box = internals(plot).boxes.get(leaf)!;
-        const partial = partialOf(leaf)!;
-        const area = Number(partial.getAttribute('width')) * Number(partial.getAttribute('height'));
+        const box = boxOf(div, leaf);
+        const part = effectiveBox(partialOf(leaf))!;
+        const area = part.width * part.height;
         expect(area / ((box.x1 - box.x0) * (box.y1 - box.y0))).toBeCloseTo(chosen.length / leaf.autkIds.length);
     });
 
     test('sunburst: every node is a mark, children span the angle of their parent', () => {
-        const { plot, marks, rows } = mount(tree('sunburst'));
+        const { div, plot, marks, rows } = mount(tree('sunburst'));
         const nodes = rows<HierarchyNodeRow>();
         expect(marks()).toHaveLength(nodes.length);
-        const spans = internals(plot).spans;
         for (const parent of nodes.filter(r => r.level === 0)) {
             const children = nodes.filter(r => r.parent === parent.key);
-            const span = spans.get(parent)!;
-            expect(d3.sum(children, c => spans.get(c)!.a1 - spans.get(c)!.a0)).toBeCloseTo(span.a1 - span.a0);
-            for (const child of children) expect(spans.get(child)!.b0).toBeCloseTo(span.b1);
+            const span = spanOf(div, parent);
+            expect(d3.sum(children, c => spanOf(div, c).sweep)).toBeCloseTo(span.sweep);
+            for (const child of children) expect(spanOf(div, child).inner).toBeCloseTo(span.outer);
         }
         // Marks span two stages: leaves (D1) and parents (D2).
         expect(last(plot.provenance.relations).source).toBe('D1+D2');
@@ -194,13 +200,14 @@ describe('treemap and sunburst (hierarchy)', () => {
     });
 
     test('sunburst segregated view: r² = r₀² + f(r₁² − r₀²) for every touched ring', () => {
-        const { plot, rows, partialOf } = mount(tree('sunburst'));
+        const { div, plot, rows, partialOf } = mount(tree('sunburst'));
         const leaf = rows<HierarchyNodeRow>().find(r => r.level === 1 && r.autkIds.length >= 2)!;
         const chosen = splitRow(plot, leaf);
-        const span = internals(plot).spans.get(leaf)!;
+        const span = spanOf(div, leaf);
         const f = chosen.length / leaf.autkIds.length;
-        const radii = Array.from(partialOf(leaf)!.getAttribute('d')!.matchAll(/A([\d.]+),/g)).map(m => Number(m[1]));
-        expect(radii).toContainEqual(expect.closeTo(Math.sqrt(span.b0 ** 2 + f * (span.b1 ** 2 - span.b0 ** 2)), 3));
+        const part = effectiveSector(partialOf(leaf))!;
+        expect(part.inner).toBeCloseTo(span.inner);
+        expect(part.outer).toBeCloseTo(Math.sqrt(span.inner ** 2 + f * (span.outer ** 2 - span.inner ** 2)), 3);
     });
 
     test('clicking a parent ring selects all its features, fully covered within their level', () => {
@@ -247,14 +254,15 @@ describe('radar (fold: unfold by measure, then partition)', () => {
     });
 
     test('segregated view: the subset polygon averages the selected features only', () => {
-        const { plot, rows, partialOf } = mount(radar());
+        const { plot, rows, partialOf, marks } = mount(radar());
         const cell = rows<FoldCellRow>().find(c => c.autkIds.length >= 3)!;
+        // Distance to the center per unit of value, as drawn.
+        const vertex = marks().find(m => datumOf(m) === cell)!;
+        const radius = Math.hypot(...centerOf(effectiveBox(vertex)!)) / cell.value;
         const chosen = splitRow(plot, cell);
         const values = normalized(cell.measure);
         const expected = d3.mean(chosen, i => values[i])!;
-        const partial = partialOf(cell)!;
-        const [x, y] = [Number(partial.getAttribute('cx')), Number(partial.getAttribute('cy'))];
-        expect(Math.hypot(x, y)).toBeCloseTo(expected * internals(plot).radius, 3);
+        expect(Math.hypot(...centerOf(effectiveBox(partialOf(cell))!))).toBeCloseTo(expected * radius, 3);
     });
 
     test('a feature is fully covered within a measure when its cell is clicked', () => {
@@ -304,8 +312,11 @@ describe('ECDF and Pareto (cumulative: partition, then prefix)', () => {
     });
 
     test('ECDF segregated view: the subset curve is the selected share of the whole', () => {
-        const { plot, rows, partialOf } = mount(ecdf());
+        const { plot, rows, partialOf, marks } = mount(ecdf());
         const points = rows<CumulativeRow>().filter(r => r.kind === 'point');
+        // Height of a share, as drawn: the last point is at 100%, and 0% is the bottom (point heights are linear in share).
+        const [p0, p1] = [marks()[0], marks()[marks().length - 1]].map(m => [datumOf<CumulativeRow>(m).share, centerOf(effectiveBox(m)!)[1]]);
+        const mapShare = (s: number) => p0[1] + (s - p0[0]) * (p1[1] - p0[1]) / (p1[0] - p0[0]);
         const chosen = [0, 5, 9];
         plot.setSelection(chosen);
         const areas = props().map(p => p.shape_area as number);
@@ -315,7 +326,7 @@ describe('ECDF and Pareto (cumulative: partition, then prefix)', () => {
             if (selectedUpTo === 0) {
                 expect(partial).toBeUndefined();
             } else {
-                expect(Number(partial!.getAttribute('cy'))).toBeCloseTo(internals(plot).mapShare(selectedUpTo / areas.length));
+                expect(centerOf(effectiveBox(partial)!)[1]).toBeCloseTo(mapShare(selectedUpTo / areas.length));
             }
         }
     });
@@ -360,14 +371,14 @@ describe('chord (pairs of categories)', () => {
         const { plot, marks, rows } = mount(chord());
         const all = rows<FlowRow>();
         expect(marks()).toHaveLength(all.length);
-        const layout = internals(plot).layout;
+        // As drawn: the sweep of each arc, and the sweeps of both ends of each ribbon.
+        const drawn = (row: FlowRow) => marks().find(m => datumOf(m) === row)!;
         for (const node of all.filter(r => r.kind === 'node')) {
-            const range = layout.get(node)!.range!;
             const ends = all.filter(r => r.kind === 'link').flatMap(link => {
-                const box = layout.get(link)!;
-                return [link.source === node.key ? box.source! : null, link.target === node.key ? box.target! : null].filter(Boolean);
-            }) as { start: number; end: number }[];
-            expect(d3.sum(ends, e => e.end - e.start)).toBeCloseTo(range.end - range.start);
+                const ribbon = next.parseRibbon(drawn(link).getAttribute('d'))!;
+                return [link.source === node.key ? ribbon.source[1] : null, link.target === node.key ? ribbon.target[1] : null].filter(v => v !== null);
+            }) as number[];
+            expect(d3.sum(ends)).toBeCloseTo(effectiveSector(drawn(node))!.sweep);
         }
         expectInverseMatchesAutkIds(plot, all);
     });

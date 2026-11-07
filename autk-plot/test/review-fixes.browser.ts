@@ -12,6 +12,7 @@ import type { AutkDatum, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
 import type { Collection } from './fixtures';
+import { effectiveBox } from './svg-geometry';
 
 /** Builds a collection of point features with the given properties. */
 function collectionOf(properties: Record<string, unknown>[]): Collection {
@@ -64,9 +65,9 @@ describe('review fixes', () => {
             margins,
         });
         plot.setSelection([1]);
-        const part = div.querySelector('.autkPartial')!;
-        expect(num(part, 'y')).toBeGreaterThanOrEqual(0);
-        expect(num(part, 'y') + num(part, 'height')).toBeLessThanOrEqual(height - margins.top - margins.bottom + 1e-6);
+        const part = effectiveBox(div.querySelector('.autkPartial'))!;
+        expect(part.y).toBeGreaterThanOrEqual(0);
+        expect(part.y + part.height).toBeLessThanOrEqual(height - margins.top - margins.bottom + 1e-6);
     });
 
     test('4 · flows keeps distinct links when labels contain "→"', () => {
