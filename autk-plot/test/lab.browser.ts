@@ -12,8 +12,9 @@ import { afterEach, describe, expect, test } from 'vitest';
 import * as next from '../src';
 import type { AutkDatum, TransformDefinition, UnifiedPlotConfig } from '../src';
 
-import { LAB_TRANSFORM, LIB, setupLab } from '../../usecases/src/provenance/lab-transform';
+import { LAB_TRANSFORM, setupLab, transformDefinitionOf } from '../../usecases/src/provenance/lab-transform';
 import type { LabPlotConfig } from '../../usecases/src/provenance/lab-transform';
+import { withDailyComplaints } from '../../usecases/src/provenance/data';
 import { LAB_TEMPLATES } from '../../usecases/src/provenance/lab-transform-templates';
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
 
@@ -22,8 +23,7 @@ const withEvents = () => withSyntheticEvents(regions());
 
 /** Evaluates a template as the lab does. */
 function definitionOf(index: number): TransformDefinition {
-    const returned = new Function('lib', LAB_TEMPLATES[index].code)(LIB);
-    return { ...returned, name: LAB_TRANSFORM };
+    return transformDefinitionOf(LAB_TEMPLATES[index].code);
 }
 
 /** Columns and options of a template, parsed as the lab does. */
@@ -109,11 +109,14 @@ describe('lab templates', () => {
             attributes: { axis: [...columns, '@transform'] },
             transform: { preset: 'registered', name: LAB_TRANSFORM, options },
         } as UnifiedPlotConfig);
-        const data = plot.instance['_data'] as unknown as { label: string; y: number }[];
-        const labels = data.map(row => row.label);
-        expect(labels).toEqual(labels.slice().sort());
+        const data = plot.instance['_data'] as unknown as { bucket: string; value: number }[];
+        // Points are drawn in week order.
+        const xs = Array.from(plot.instance['_div'].querySelectorAll('.autkMark'))
+            .map(m => ({ x: Number((m as Element).getAttribute('cx')), bucket: (m as unknown as { __data__: { bucket: string } }).__data__.bucket }))
+            .sort((a, b) => a.x - b.x).map(p => p.bucket);
+        expect(xs).toEqual(xs.slice().sort());
         const total = withEvents().features.reduce((sum, f) => sum + (f.properties!.sjoin.collect.noise as unknown[]).length, 0);
-        expect(data.reduce((sum, row) => sum + row.y, 0)).toBe(total);
+        expect(data.reduce((sum, row) => sum + row.value, 0)).toBe(total);
     });
 
     test('the broken example is refused on the inverse query and the sums', () => {
@@ -153,6 +156,41 @@ describe('lab controls', () => {
         click();
         expect(checks()).toEqual(['pass', 'pass', 'pass', 'fail', 'pass', 'fail']);
         expect(drawn[drawn.length - 1]).toBeNull();
+    });
+
+    test('reduce-series averages the daily series of the regions, which the page builds from the complaints', () => {
+        labDom();
+        const drawn: (LabPlotConfig | null)[] = [];
+        const collection = withDailyComplaints(withEvents());
+        setupLab(collection, config => { drawn.push(config); return undefined; });
+        const select = document.querySelector<HTMLSelectElement>('#lab-template')!;
+        select.value = String(LAB_TEMPLATES.findIndex(t => t.title.endsWith('(reduce-series)')));
+        select.dispatchEvent(new Event('change'));
+        const message = () => document.querySelector('#lab-message')!.textContent ?? '';
+        expect(message()).toMatch(/No chart of this page uses reduce-series\. Here it averages the daily complaints/);
+        document.querySelector<HTMLButtonElement>('#lab-run')!.click();
+        expect(message()).toBe('Contract met: linked to the map and the 24 charts (close the drawer to see them).');
+        expect(drawn[drawn.length - 1]).toMatchObject({ type: 'linechart', attributes: { axis: ['noise_daily', '@transform'] } });
+
+        // Each day: the complaints of that day over the regions (every region has every day).
+        const series = next.run(collection.features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[],
+            { preset: 'reduce-series', options: { timestamp: 'day', value: 'complaints', reducer: 'avg' } }, ['noise_daily']);
+        const total = collection.features.reduce((sum, f) => sum + (f.properties!.sjoin.collect.noise as unknown[]).length, 0);
+        const days = (collection.features[0].properties!.noise_daily as unknown[]).length;
+        expect(series.rows).toHaveLength(days);
+        const average = (series.rows as unknown as { value: number }[]).reduce((sum, row) => sum + row.value, 0);
+        expect(average * collection.features.length).toBeCloseTo(total, 6);
+    });
+
+    test('a transform that gives no rows says so, instead of showing an empty chart as a success', () => {
+        labDom();
+        // Regions with no daily series: reduce-series finds no points.
+        setupLab(withEvents(), () => undefined);
+        const select = document.querySelector<HTMLSelectElement>('#lab-template')!;
+        select.value = String(LAB_TEMPLATES.findIndex(t => t.title.endsWith('(reduce-series)')));
+        select.dispatchEvent(new Event('change'));
+        document.querySelector<HTMLButtonElement>('#lab-run')!.click();
+        expect(document.querySelector('#lab-message')!.textContent).toBe('Contract met, but with these fields and options the transform gives no rows: nothing to draw.');
     });
 
     test('code that does not run or does not return a definition is explained, not drawn', () => {

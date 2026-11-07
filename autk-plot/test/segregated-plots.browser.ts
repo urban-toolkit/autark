@@ -13,6 +13,7 @@ import * as next from '../src';
 import type { FeatureShare, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
+import { effectiveBox } from './svg-geometry';
 
 const number = (node: Element | null | undefined, attribute: string) => Number(node?.getAttribute(attribute));
 
@@ -51,8 +52,8 @@ describe('heatmatrix (N:1)', () => {
         const cellNode = mark(`mark:${cell}`);
         expect(partials()).toHaveLength(1);
         expect(square.getAttribute('data-autk-units')).toBe(`1/${totalUnits}`);
-        const areaRatio = (number(square, 'width') * number(square, 'height')) / (number(cellNode, 'width') * number(cellNode, 'height'));
-        expect(areaRatio).toBeCloseTo(1 / totalUnits);
+        const [part, whole] = [effectiveBox(square)!, effectiveBox(cellNode)!];
+        expect((part.width * part.height) / (whole.width * whole.height)).toBeCloseTo(1 / totalUnits);
     });
 
     test('avg: half-size inner square colored by the subset value', () => {
@@ -61,7 +62,7 @@ describe('heatmatrix (N:1)', () => {
         plot.setSelection([0]);
 
         const [square] = partials();
-        expect(number(square, 'width')).toBeCloseTo(number(mark(`mark:${cell}`), 'width') / 2);
+        expect(effectiveBox(square)!.width).toBeCloseTo(effectiveBox(mark(`mark:${cell}`))!.width / 2);
         expect((square as SVGElement).style.fill).not.toBe('');
     });
 });
@@ -72,7 +73,7 @@ describe('linechart (N:N)', () => {
         plot.setSelection([3]);
 
         const buckets = plot.provenance.direct([3])[2].ids;
-        expect(div.querySelector('.autkPartialLine')).not.toBeNull();
+        expect(div.querySelector('.autkPartialSeries')).not.toBeNull();
         expect(partials().map(p => p.getAttribute('data-autk-provenance')).sort()).toEqual(buckets.map(id => `mark:${id}`).sort());
         for (const node of partials()) {
             const id = node.getAttribute('data-autk-provenance')!.slice('mark:'.length);
@@ -128,7 +129,7 @@ describe('one-to-one plots receiving shares (1:N inverse direction)', () => {
         const { plot, partials } = mount({ type: 'scatterplot', collection: collection(), attributes: { axis: ['shape_area', 'shape_leng'] } });
         plot.setSelection(ids, shares);
 
-        const radius = (id: string) => number(partials().find(p => p.getAttribute('data-autk-provenance') === id), 'r');
+        const radius = (id: string) => effectiveBox(partials().find(p => p.getAttribute('data-autk-provenance') === id))!.width / 2;
         expect(radius('mark:feature:0')).toBeCloseTo(5 * Math.sqrt(1 / 4));
         expect(radius('mark:feature:3')).toBeCloseTo(5);
     });
@@ -144,7 +145,7 @@ describe('one-to-one plots receiving shares (1:N inverse direction)', () => {
         plot.setSelection(ids, shares);
 
         const part = partials().find(p => p.getAttribute('data-autk-provenance') === 'mark:feature:0');
-        expect(number(part, 'height')).toBeCloseTo(number(mark('mark:feature:0'), 'height') / 4);
+        expect(effectiveBox(part)!.height).toBeCloseTo(effectiveBox(mark('mark:feature:0'))!.height / 4);
     });
 
     test('table: covered rows pinned to the top and filled up to the share', () => {
@@ -160,7 +161,11 @@ describe('one-to-one plots receiving shares (1:N inverse direction)', () => {
         const { plot, partials } = mount({ type: 'parallel-coordinates', collection: collection(), attributes: { axis: ['shape_area', 'shape_leng'] } });
         plot.setSelection(ids, shares);
 
-        const dash = (id: string) => partials().find(p => p.getAttribute('data-autk-provenance') === id)?.getAttribute('stroke-dasharray');
+        const dash = (id: string) => {
+            const part = partials().find(p => p.getAttribute('data-autk-provenance') === id) as SVGElement | undefined;
+            // A browser serializes a dash array style with commas ("0.25, 1").
+            return part ? (part.getAttribute('stroke-dasharray') ?? part.style.strokeDasharray).replace(/,\s*/g, ' ') : undefined;
+        };
         expect(dash('mark:feature:0')).toBe('0.25 1');
         expect(dash('mark:feature:3')).toBe('1 1');
     });

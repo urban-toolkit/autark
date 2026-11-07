@@ -81,34 +81,37 @@ describe('a transform registered outside the core: moving average', () => {
     });
 
     test('each day averages the events of its 7-day window', () => {
-        const { rows } = mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: MA });
+        const { div } = mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: MA });
+        // Rows as drawn, in day order.
+        const rows = () => Array.from(div.querySelectorAll('.autkMark')).map(m => (m as unknown as { __data__: { value: number } }).__data__);
         const dates = withEvents().features.flatMap(f => (f.properties!.sjoin.collect.noise as { date: string }[]).map(e => Math.floor(new Date(e.date).getTime() / DAY)));
         const first = Math.min(...dates);
         expect(rows()).toHaveLength(Math.max(...dates) - first + 1);
         rows().forEach((row, k) => {
             const day = first + k;
             const expected = dates.filter(d => Math.abs(d - day) <= 3).length / 7;
-            expect(row.y).toBeCloseTo(expected, 12);
+            expect(row.value).toBeCloseTo(expected, 12);
         });
     });
 
     test('the area chart gets the segregated view with no change to the plot', () => {
         const { div, plot } = mount({ type: 'areachart', collection: withEvents(), attributes: events, transform: MA });
         plot.setSelection([0, 1, 2]);
-        expect(div.querySelector('.autkPartialArea')).not.toBeNull();
+        expect(Array.from(div.querySelectorAll<SVGPathElement>('.autkPartialSeries')).some(p => p.style.fill !== 'none')).toBe(true);
         expect(plot.provenance.cardinalities.map(c => c.cardinality)).toEqual(['1:N', 'N:N', '1:1', 'N:N']);
     });
 
     test('a selected day covers each region by the exact share of its event weight', () => {
-        const { div, plot, rows, rowId } = mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: MA, events: [next.PlotEvent.CLICK] });
+        const { div, plot, rowId } = mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: MA, events: [next.PlotEvent.CLICK] });
         const emitted: PlotEventData[] = [];
         plot.events.on(next.PlotEvent.CLICK, data => emitted.push(data));
         const marks = Array.from(div.querySelectorAll('.autkMark'));
+        const rows = () => marks.map(m => (m as unknown as { __data__: { bucket: string; autkIds: number[] } }).__data__);
         const index = rows().findIndex(r => r.autkIds.length > 0);
         marks[index].dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
         // A region's share: events within 3 days of the selected day, over all its spread inside the range.
-        const day = Math.floor(new Date(`2024-${rows()[index].label}T00:00:00Z`).getTime() / DAY);
+        const day = Math.floor(new Date(`${rows()[index].bucket}T00:00:00Z`).getTime() / DAY);
         for (const share of emitted[0].shares!) {
             const own = (withEvents().features[share.feature].properties!.sjoin.collect.noise as { date: string }[])
                 .map(e => Math.floor(new Date(e.date).getTime() / DAY));

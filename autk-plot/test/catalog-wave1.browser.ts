@@ -16,6 +16,7 @@ import * as next from '../src';
 import type { BinningHexRow, FeatureShare, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
+import { effectiveBox, effectiveSector } from './svg-geometry';
 
 const regions = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
 const withEvents = () => withSyntheticEvents(regions());
@@ -48,14 +49,9 @@ function splitFirstRow(plot: next.AutkPlot, rows: Array<{ autkIds: number[] }>) 
     return { row, chosen };
 }
 
-/** Plot-specific fields of the concrete plot, read by the tests. */
-const internals = (plot: next.AutkPlot) => plot.instance as unknown as {
-    outerRadius: number;
-    innerRatio: number;
-    mapX: { (category: string): number | undefined; bandwidth(): number };
-    radiusOf: (d: unknown) => number;
-    cell: number;
-};
+/** Line (unfilled) or area (filled) drawn through the selected parts. */
+const subsetSeries = (div: HTMLElement, filled: boolean) => Array.from(div.querySelectorAll<SVGPathElement>('.autkPartialSeries'))
+    .find(path => (path.style.fill !== 'none') === filled) ?? null;
 
 const units = (el: Element) => el.getAttribute('data-autk-units')!.split('/').map(Number);
 
@@ -78,27 +74,29 @@ describe('pie and donut (partition, N:1)', () => {
     });
 
     test('segregated view: the inner slice covers the selected fraction of the slice area', () => {
-        const { plot, partials, rows } = mount(pie());
+        const { plot, partials, rows, marks } = mount(pie());
         const { row, chosen } = splitFirstRow(plot, rows());
         const partial = partials().find(p => p.getAttribute('data-autk-provenance') === `mark:${plot.instance['rowIdOf'](row)}`)!;
         expect(units(partial)).toEqual([chosen.length, row.autkIds.length]);
 
         // Same angles, outer radius √f · R, so the area is f of the slice.
-        const R = internals(plot).outerRadius;
-        const radii = Array.from(partial.getAttribute('d')!.matchAll(/A([\d.]+),/g)).map(m => Number(m[1]));
-        expect(radii[0]).toBeCloseTo(R * Math.sqrt(chosen.length / row.autkIds.length), 3);
+        const slice = effectiveSector(marks().find(m => m.getAttribute('data-autk-provenance') === partial.getAttribute('data-autk-provenance')))!;
+        const part = effectiveSector(partial)!;
+        expect([part.start, part.sweep, part.inner]).toEqual([slice.start, slice.sweep, 0]);
+        expect(part.outer).toBeCloseTo(slice.outer * Math.sqrt(chosen.length / row.autkIds.length), 3);
     });
 
     test('donut: the inner slice grows from the hole, r² = r₀² + f(R² − r₀²)', () => {
-        const { plot, partials, rows } = mount(pie('donut'));
+        const { plot, partials, rows, marks } = mount(pie('donut'));
         const { row, chosen } = splitFirstRow(plot, rows());
         const partial = partials().find(p => p.getAttribute('data-autk-provenance') === `mark:${plot.instance['rowIdOf'](row)}`)!;
-        const R = internals(plot).outerRadius;
-        const r0 = R * (internals(plot).innerRatio);
+        const slice = effectiveSector(marks().find(m => m.getAttribute('data-autk-provenance') === partial.getAttribute('data-autk-provenance')))!;
+        const [R, r0] = [slice.outer, slice.inner];
+        expect(r0 / R).toBeCloseTo(0.55);
         const f = chosen.length / row.autkIds.length;
-        const radii = Array.from(partial.getAttribute('d')!.matchAll(/A([\d.]+),/g)).map(m => Number(m[1]));
-        expect(radii).toContainEqual(expect.closeTo(Math.sqrt(r0 * r0 + f * (R * R - r0 * r0)), 3));
-        expect(radii).toContainEqual(expect.closeTo(r0, 3));
+        const part = effectiveSector(partial)!;
+        expect(part.outer).toBeCloseTo(Math.sqrt(r0 * r0 + f * (R * R - r0 * r0)), 3);
+        expect(part.inner).toBeCloseTo(r0, 3);
     });
 
     test('non-additive reducers are rejected: slices must add up to the whole', () => {
@@ -137,15 +135,36 @@ describe('area chart (unnest then partition, N:N)', () => {
     test('segregated view: the selected subset gets its own area for additive reducers', () => {
         const { div, plot, rows } = mount(area());
         splitFirstRow(plot, rows());
-        expect(div.querySelector('.autkPartialArea')).not.toBeNull();
-        expect(div.querySelector('.autkPartialLine')).not.toBeNull();
+        expect(subsetSeries(div, true)).not.toBeNull();
+        expect(subsetSeries(div, false)).not.toBeNull();
     });
 
     test('avg is not a part of the total, so only the subset line is drawn', () => {
         const { div, plot, rows } = mount(area('avg'));
         splitFirstRow(plot, rows());
-        expect(div.querySelector('.autkPartialArea')).toBeNull();
-        expect(div.querySelector('.autkPartialLine')).not.toBeNull();
+        expect(subsetSeries(div, true)).toBeNull();
+        expect(subsetSeries(div, false)).not.toBeNull();
+    });
+
+    test('avg: each moved point sits at the subset average, inside the plot (the value axis covers every average)', () => {
+        const { div, plot, marks } = mount(area('avg'));
+        // Height of a value, as drawn: bucket points are linear in their average.
+        const drawn = marks().map(m => [Number((m as unknown as { __data__: { value: number } }).__data__.value), effectiveBox(m)!.y + effectiveBox(m)!.height / 2]);
+        const [p0, p1] = [drawn[0], drawn.find(d => d[0] !== drawn[0][0])!];
+        const yOf = (v: number) => p0[1] + (v - p0[0]) * (p1[1] - p0[1]) / (p1[0] - p0[0]);
+        const height = Number(div.querySelector('.autkClear')!.getAttribute('height'));
+
+        const chosen = [0, 1, 2, 3, 4, 5];
+        plot.setSelection(chosen);
+        const points = Array.from(div.querySelectorAll('.autkPartial'));
+        expect(points.length).toBeGreaterThan(0);
+        for (const point of points) {
+            const average = plot.provenance.contribution(point.getAttribute('data-autk-provenance')!.slice('mark:'.length), new Set(chosen)).value!;
+            const y = effectiveBox(point)!.y + effectiveBox(point)!.height / 2;
+            expect(y).toBeCloseTo(yOf(average), 6);
+            expect(y).toBeGreaterThanOrEqual(0);
+            expect(y).toBeLessThanOrEqual(height);
+        }
     });
 });
 
@@ -188,11 +207,11 @@ describe('bubble chart (identity, 1:1)', () => {
     });
 
     test('inverse direction: the inner disc covers the share of the bubble area', () => {
-        const { plot, partials } = mount(bubble());
+        const { div, plot, partials } = mount(bubble());
         const share: FeatureShare = { feature: 3, selectedUnits: 1, totalUnits: 4 };
         plot.setSelection([3], [share]);
-        const bubbleRadius = Number(internals(plot).radiusOf(plot.instance['_data'][3]));
-        expect(Number(partials()[0].getAttribute('r'))).toBeCloseTo(bubbleRadius * Math.sqrt(1 / 4));
+        const mark = div.querySelector('.autkMark[data-autk-provenance="mark:feature:3"]');
+        expect(effectiveBox(partials()[0])!.width / 2).toBeCloseTo(effectiveBox(mark)!.width / 2 * Math.sqrt(1 / 4));
     });
 
     test('a size attribute is required', () => {
@@ -240,10 +259,12 @@ describe('hexbin (partition into hexagons, N:1)', () => {
         const partial = partials().find(p => p.getAttribute('data-autk-provenance') === `mark:${plot.instance['rowIdOf'](row)}`)!;
         expect(units(partial)).toEqual([chosen.length, row.autkIds.length]);
 
-        // Corner distance from the center is √f · radius.
+        // Centered on the hexagon, corner distance (half the height of a pointy-top hexagon) √f · radius.
         const hex = row as unknown as BinningHexRow;
-        const [x, y] = partial.getAttribute('d')!.slice(1).split('L')[0].split(',').map(Number);
-        expect(Math.hypot(x - hex.cx, y - hex.cy)).toBeCloseTo(30 * Math.sqrt(chosen.length / row.autkIds.length), 1);
+        const box = effectiveBox(partial)!;
+        expect(box.x + box.width / 2).toBeCloseTo(hex.cx, 1);
+        expect(box.y + box.height / 2).toBeCloseTo(hex.cy, 1);
+        expect(box.height / 2).toBeCloseTo(30 * Math.sqrt(chosen.length / row.autkIds.length), 1);
     });
 });
 
@@ -290,7 +311,8 @@ describe('calendar (unnest then partition, N:N)', () => {
     test('one mark per day with events, in the row of its weekday', () => {
         const { div, plot, marks, rows } = mount(calendar());
         expect(marks()).toHaveLength(rows().length);
-        const cell = internals(plot).cell;
+        // Day cells are squares of one size.
+        const cell = Number(marks()[0].getAttribute('width'));
         rows().forEach((row, index) => {
             const weekday = new Date(`${row.bucket}T00:00:00Z`).getUTCDay();
             expect(Number(marks()[index].getAttribute('y'))).toBeCloseTo(weekday * cell);
@@ -304,15 +326,15 @@ describe('calendar (unnest then partition, N:N)', () => {
     });
 
     test('segregated view: a day fills the share of its events from the selection', () => {
-        const { plot, partials, rows } = mount(calendar());
+        const { plot, partials, rows, marks } = mount(calendar());
         const row = rows().find(r => r.autkIds.length >= 2)!;
         plot.setSelection([row.autkIds[0]]);
         const partial = partials().find(p => p.getAttribute('data-autk-provenance') === `mark:${plot.instance['rowIdOf'](row)}`)!;
         const [selected, total] = units(partial);
         expect(selected).toBeGreaterThan(0);
         expect(selected).toBeLessThan(total);
-        const cell = internals(plot).cell;
-        expect(Number(partial.getAttribute('width'))).toBeCloseTo(cell * Math.sqrt(selected / total));
+        const cell = Number(marks()[0].getAttribute('width'));
+        expect(effectiveBox(partial)!.width).toBeCloseTo(cell * Math.sqrt(selected / total));
     });
 
     test('other resolutions are rejected: cells are days', () => {

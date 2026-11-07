@@ -16,6 +16,7 @@ import * as next from '../src';
 import type { DensityPointRow, FeatureShare, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
+import { effectiveBox } from './svg-geometry';
 
 const regions = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
 const lengths = () => regions().features.map(f => f.properties!.shape_leng as number);
@@ -46,12 +47,6 @@ const violin = (): UnifiedPlotConfig => ({
     transform: { preset: 'density' },
     events: [next.PlotEvent.CLICK],
 });
-
-/** Plot-specific fields of the concrete plot, read by the tests. */
-const internals = (plot: next.AutkPlot) => plot.instance as unknown as {
-    mapY: (density: number) => number;
-    widthPerDensity: number;
-};
 
 /** Area under a curve sampled at `[x, y]` points (trapezoids). */
 const integral = (curve: [number, number][]) => d3.sum(curve.slice(1), ([x, y], i) => (x - curve[i][0]) * (y + curve[i][1]) / 2);
@@ -96,18 +91,21 @@ describe('density chart', () => {
 
     test('segregated view: the subset curve is the density of the selected features, under the total', () => {
         const { plot, points, partialOf, div } = mount(density(H));
+        // Height of a density, as drawn: two points of different densities fix the linear scale.
+        const drawn = Array.from(div.querySelectorAll('.autkMark')).map(m => [(m as unknown as { __data__: DensityPointRow }).__data__.value, effectiveBox(m)!.y + effectiveBox(m)!.height / 2]);
+        const [q0, q1] = [drawn[0], drawn.find(d => d[0] !== drawn[0][0])!];
+        const mapY = (v: number) => q0[1] + (v - q0[0]) * (q1[1] - q0[1]) / (q1[0] - q0[0]);
         const chosen = [0, 3, 7, 12];
         plot.setSelection(chosen);
         const values = lengths();
-        const mapY = internals(plot).mapY;
         for (const point of points()) {
             const expected = d3.sum(chosen, i => kernel((point.x - values[i]) / H)) / (values.length * H);
             expect(expected).toBeLessThanOrEqual(point.value + 1e-15);
             const partial = partialOf(point);
             if (expected === 0) expect(partial).toBeNull();
-            else expect(Number(partial!.getAttribute('cy'))).toBeCloseTo(mapY(expected), 6);
+            else expect(effectiveBox(partial)!.y + effectiveBox(partial)!.height / 2).toBeCloseTo(mapY(expected), 6);
         }
-        expect(div.querySelector('.autkPartialArea')).not.toBeNull();
+        expect(Array.from(div.querySelectorAll<SVGPathElement>('.autkPartialSeries')).some(p => p.style.fill !== 'none')).toBe(true);
     });
 
     test('inverse direction: selecting points covers each feature by the part of its kernel mass', () => {
@@ -153,31 +151,34 @@ describe('density chart', () => {
             const disc = target.div.querySelectorAll('.autkPartial')[shares.indexOf(share)];
             expect(disc).toBeDefined();
         }
-        const radii = Array.from(target.div.querySelectorAll('.autkPartial')).map(d => Number(d.getAttribute('r')));
+        const radii = Array.from(target.div.querySelectorAll('.autkPartial')).map(d => effectiveBox(d)!.width / 2);
         expect(radii.every(r => r > 0 && r < 5)).toBe(true);
     });
 });
 
 describe('violin plot', () => {
     test('one violin per land use; each strip is as wide as the density there', () => {
-        const { plot, points, div } = mount(violin());
+        const { points, div } = mount(violin());
         const groups = new Set(landuses());
         expect(new Set(points().map(p => p.group))).toEqual(groups);
-        const perDensity = internals(plot).widthPerDensity;
-        for (const strip of Array.from(div.querySelectorAll('.autkMark'))) {
+        // One width per unit of density, shared by every violin.
+        const strips = Array.from(div.querySelectorAll('.autkMark'));
+        const widest = d3.greatest(strips, s => Number(s.getAttribute('width')))!;
+        const perDensity = Number(widest.getAttribute('width')) / (2 * (widest as unknown as { __data__: DensityPointRow }).__data__.value);
+        for (const strip of strips) {
             const point = (strip as unknown as { __data__: DensityPointRow }).__data__;
             expect(Number(strip.getAttribute('width'))).toBeCloseTo(2 * point.value * perDensity, 6);
         }
     });
 
     test('segregated view: the inner violin is the density of the selected features of each land use', () => {
-        const { plot, points, partialOf } = mount(violin());
+        const { plot, points, partialOf, div } = mount(violin());
         const point = points().find(p => p.autkIds.length >= 3)!;
         plot.setSelection([point.autkIds[0]]);
         const partial = partialOf(point)!;
         const contribution = plot.provenance.contribution(plot.instance['rowIdOf'](point) as string, new Set([point.autkIds[0]]));
-        const perDensity = internals(plot).widthPerDensity;
-        expect(Number(partial.getAttribute('width'))).toBeCloseTo(2 * contribution.value! * perDensity, 6);
+        const strip = Array.from(div.querySelectorAll('.autkMark')).find(s => (s as unknown as { __data__: DensityPointRow }).__data__ === point)!;
+        expect(effectiveBox(partial)!.width).toBeCloseTo(Number(strip.getAttribute('width')) * contribution.value! / point.value, 6);
         expect(contribution.value!).toBeLessThan(point.value);
     });
 

@@ -6,6 +6,9 @@ import { describe, expect, test } from 'vitest';
 
 import * as next from '../src';
 import type { UnifiedPlotConfig } from '../src';
+import { renderProvenancePathView } from '../src/provenance/path-view';
+import type { ProvenancePathViewState } from '../src/provenance/path-view';
+import type { ProvenanceCardinality } from '../src/types-provenance';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
 
@@ -98,5 +101,37 @@ describe('provenance path widget', () => {
         const div = document.createElement('div');
         new next.AutkPlot(div, histogram());
         expect(div.querySelector('.autk-provenance')).toBeNull();
+    });
+});
+
+/** Steps of an open widget, as `from→to cardinality`, for a path and its relations. */
+function stepsOf(direction: 'direct' | 'inverse', stages: string[], cardinalities: [string, ProvenanceCardinality][]): string[] {
+    const host = document.createElement('div');
+    const state: ProvenancePathViewState = {
+        open: true,
+        direction,
+        path: stages.map(stage => ({ stage, label: stage.toLowerCase(), ids: ['x'] })),
+        cardinalities: new Map(cardinalities),
+        parts: [],
+        notes: [],
+        width: 400,
+        onToggle: () => undefined,
+    };
+    renderProvenancePathView(host, state);
+    return Array.from(host.querySelectorAll('.autk-provenance-step')).map((step, index) => `${stages[index]}→${stages[index + 1]} ${step.textContent!.slice(1)}`);
+}
+
+describe('provenance path widget: cardinalities', () => {
+    test('each step shows the cardinality of its relation, read backwards in an inverse path', () => {
+        const relations: [string, ProvenanceCardinality][] = [['D0→D1', 'N:1'], ['D1→M', '1:1']];
+        expect(stepsOf('direct', ['D0', 'D1', 'M'], relations)).toEqual(['D0→D1 N:1', 'D1→M 1:1']);
+        expect(stepsOf('inverse', ['M', 'D1', 'D0'], relations)).toEqual(['M→D1 1:1', 'D1→D0 1:N']);
+    });
+
+    test('when the marks draw an earlier stage, the step into M names the stage the relation starts at', () => {
+        // A treemap: the marks are the leaves (D1), not the groups (D2).
+        const relations: [string, ProvenanceCardinality][] = [['D0→D1', 'N:1'], ['D1→D2', 'N:1'], ['D1→M', '1:1']];
+        expect(stepsOf('direct', ['D0', 'D1', 'D2', 'M'], relations)).toEqual(['D0→D1 N:1', 'D1→D2 N:1', 'D2→M 1:1 (D1)']);
+        expect(stepsOf('inverse', ['M', 'D2', 'D1', 'D0'], relations)).toEqual(['M→D2 1:1 (D1)', 'D2→D1 1:N', 'D1→D0 1:N']);
     });
 });
