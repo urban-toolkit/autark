@@ -360,6 +360,7 @@ export abstract class Pipeline {
                 layer.layerRenderInfo.colormap.config.interpolator,
                 undefined,
                 isCategoricalDomain ? computedDomain : undefined,
+                layer.layerRenderInfo.colormap.config.colors,
             ),
             useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
             useHighlight: Boolean(layer.layerRenderInfo.isPick),

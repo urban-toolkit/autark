@@ -162,6 +162,12 @@ export type ColorMapConfig = {
   interpolator: ColorMapInterpolator;
   /** Strategy used to derive the domain passed to the interpolator. */
   domainSpec: ColorMapDomainSpec;
+  /**
+   * Explicit colors for a categorical interpolator, in domain order. They replace the colors of the named scheme,
+   * so a map can use its own palette; a category past the last color gets the last color. Ignored by sequential
+   * and diverging interpolators.
+   */
+  colors?: ColorHEX[];
 };
 
 /**

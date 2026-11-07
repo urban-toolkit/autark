@@ -773,6 +773,9 @@ export class AutkMap {
         const mergedColorMap: ColorMapConfig = {
             interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQ_BLUES,
             domainSpec: colorMap.domainSpec ?? currentConfig.domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
+            // Explicit colors belong to the scheme they were given with: a patch that names a new interpolator
+            // without colors drops them, so the new scheme is not overridden by the old palette.
+            colors: 'colors' in colorMap ? colorMap.colors : colorMap.interpolator ? undefined : currentConfig.colors,
         };
 
         const nextColormap = {

@@ -557,11 +557,12 @@ export class AutkMapUi {
 
         const interpolator = this._activeLayer.layerRenderInfo.colormap.config.interpolator;
         const labels       = this._activeLayer.layerRenderInfo.colormap.computedLabels ?? [];
-        const categoricalSize = ColorMap.getCategoricalSchemeSize(interpolator);
+        const colors       = this._activeLayer.layerRenderInfo.colormap.config.colors;
+        const categoricalSize = ColorMap.getCategoricalSchemeSize(interpolator, colors);
         const isCategorical   = categoricalSize !== null;
         const res             = isCategorical ? categoricalSize : 100;
         const slc             = isCategorical ? Math.min(labels.length, categoricalSize) : 100;
-        const colorMap     = ColorMap.getColorArray(interpolator, res).slice(0, slc);
+        const colorMap     = ColorMap.getColorArray(interpolator, res, undefined, colors).slice(0, slc);
 
         const svg       = d3.select(this._legend).append('svg').attr('width', width).attr('height', innerHeight);
         const rectWidth = innerWidth / colorMap.length;

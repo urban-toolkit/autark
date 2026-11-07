@@ -84,8 +84,8 @@ export class ColorMap {
      * const c = ColorMap.getColor(0.5, ColorMapInterpolator.SEQ_VIRIDIS);
      * // c → { r: 33, g: 144, b: 141, alpha: 1 }
      */
-    public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
-        const interpolator = ColorMap.buildInterpolator(color, domain);
+    public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain, colors?: string[]): ColorRGB {
+        const interpolator = ColorMap.buildInterpolator(color, domain, colors);
         const { r, g, b } = d3_color.rgb(interpolator(value));
         return { r, g, b, alpha: 1 };
     }
@@ -108,8 +108,9 @@ export class ColorMap {
     public static getColorFunction(
         color: ColorMapInterpolator,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        colors?: string[],
     ): (value: number) => ColorRGB {
-        const interpolator = ColorMap.buildInterpolator(color, domain);
+        const interpolator = ColorMap.buildInterpolator(color, domain, colors);
         const parsed = new Map<string, ColorRGB>();
         return (value: number) => {
             const css = interpolator(value);
@@ -139,14 +140,15 @@ export class ColorMap {
         color: ColorMapInterpolator,
         res: number = DEFAULT_COLORMAP_RESOLUTION,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        colors?: string[],
     ): ColorTEX {
         if (res <= 0) { return []; }
         if (res === 1) {
-            const { r, g, b } = d3_color.rgb(ColorMap.buildInterpolator(color, domain)(0.5));
+            const { r, g, b } = d3_color.rgb(ColorMap.buildInterpolator(color, domain, colors)(0.5));
             return [r, g, b, 1];
         }
 
-        const interpolator = ColorMap.buildInterpolator(color, domain);
+        const interpolator = ColorMap.buildInterpolator(color, domain, colors);
         const tex: number[] = [];
         for (let id = 0; id < res; id++) {
             const { r, g, b } = d3_color.rgb(interpolator(id / (res - 1)));
@@ -171,14 +173,15 @@ export class ColorMap {
         color: ColorMapInterpolator,
         res: number = DEFAULT_COLORMAP_RESOLUTION,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        colors?: string[],
     ): ColorRGB[] {
         if (res <= 0) { return []; }
         if (res === 1) {
-            const { r, g, b } = d3_color.rgb(ColorMap.buildInterpolator(color, domain)(0.5));
+            const { r, g, b } = d3_color.rgb(ColorMap.buildInterpolator(color, domain, colors)(0.5));
             return [{ r, g, b, alpha: 1 }];
         }
 
-        const interpolator = ColorMap.buildInterpolator(color, domain);
+        const interpolator = ColorMap.buildInterpolator(color, domain, colors);
         const result: ColorRGB[] = [];
         for (let id = 0; id < res; id++) {
             const { r, g, b } = d3_color.rgb(interpolator(id / (res - 1)));
@@ -271,8 +274,9 @@ export class ColorMap {
      * ColorMap.getCategoricalSchemeSize(ColorMapInterpolator.CAT_SET1);  // 9
      * ColorMap.getCategoricalSchemeSize(ColorMapInterpolator.SEQ_VIRIDIS);  // null
      */
-    public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
+    public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator, colors?: string[]): number | null {
         if (!ColorMap.isCategorical(interpolator)) return null;
+        if (colors && colors.length > 0) return colors.length;
         return (d3_scheme[interpolator] as string[]).length;
     }
 
@@ -446,9 +450,11 @@ export class ColorMap {
     private static buildInterpolator(
         color: ColorMapInterpolator,
         domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        colors?: string[],
     ): (t: number) => string {
         if (ColorMap.isCategorical(color)) {
-            const scheme = d3_scheme[color] as string[];
+            // Explicit colors replace the scheme's own, in domain order; a category past the last color gets the last.
+            const scheme = colors && colors.length > 0 ? colors : d3_scheme[color] as string[];
             const n = domain?.length ?? scheme.length;
             return (t: number) => {
                 const idx = Math.min(Math.round(t * (n - 1)), scheme.length - 1);
