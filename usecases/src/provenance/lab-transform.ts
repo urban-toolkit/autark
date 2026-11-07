@@ -23,6 +23,8 @@ import type { Collection } from './data';
 
 /** Name the lab's transform is registered under; redefining replaces it. */
 export const LAB_TRANSFORM = 'try-it-yourself';
+/** Name the lab's chart is registered under (`LAB_PLOT` of lab-plot.ts). */
+export const LAB_PLOT_NAME = 'try-it-yourself-chart';
 
 /** The contract invariants, in plain words. */
 const INVARIANTS: Invariant[] = [
@@ -93,6 +95,30 @@ export function plainMessage(message: string, collection: Collection): string {
         .replace(/attributes\.axis/g, 'the Fields')
         .replace(/attributes\.color/g, 'the color field');
     return /does not exist in the source data/.test(message) ? `${plain} Region properties: ${regionProperties(collection).join(', ')}.` : plain;
+}
+
+/**
+ * What the lab tells about the name a definition declares. The lab registers every definition
+ * under its own name, so a name that a project would refuse still runs here.
+ *
+ * @param name Name the code declares.
+ * @param kind `chart` (registerPlot) or `transform` (registerTransform).
+ * @returns A sentence to add to the message, empty when the name would be accepted.
+ */
+export function projectNameNote(name: unknown, kind: 'chart' | 'transform'): string {
+    const register = kind === 'chart' ? 'registerPlot' : 'registerTransform';
+    if (typeof name !== 'string' || name.trim() === '') return ` In a project, give it a name: ${register} needs one.`;
+    let existing: object | undefined;
+    try {
+        existing = kind === 'chart'
+            ? (next.hasRegisteredPlot(name) && name !== LAB_PLOT_NAME ? next.registeredPlot(name) : undefined)
+            : (name !== LAB_TRANSFORM ? next.registeredTransform(name) : undefined);
+    } catch {
+        existing = undefined;
+    }
+    if (!existing) return '';
+    // Built-in definitions are frozen.
+    return ` In a project, "${name}" ${Object.isFrozen(existing) ? 'is a built-in name' : 'is already registered by this page'}: ${register} needs another one.`;
 }
 
 /**
@@ -266,7 +292,9 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
         if (definition.run(source, parsed, cols).rows.length === 0) {
             return say('Contract met, but with these fields and options the transform gives no rows: nothing to draw.', 'error');
         }
-        say('Contract met: linked to the map and the 24 charts (close the drawer to see them).', 'ok');
+        // The person's own code is told about its name; a template is what autk-plot registers.
+        const note = code.value === LAB_TEMPLATES[loaded].code ? '' : projectNameNote((evaluateChart(code.value) as { name?: unknown }).name, 'transform');
+        say(`Contract met: linked to the map and the 24 charts (close the drawer to see them).${note}`, 'ok');
     };
 
     // Examples, then the code of the built-in transforms: a developer's transform is written like them.
@@ -330,7 +358,8 @@ export function renderChecks(
         if (broken.length > 0) {
             const details = document.createElement('ul');
             const lines = broken.slice(0, SHOWN_VIOLATIONS).map(v => v.message);
-            if (broken.length > SHOWN_VIOLATIONS) lines.push(`… and ${broken.length - SHOWN_VIOLATIONS} more of the same problem`);
+            // A capped report does not know how many more there are.
+            if (broken.length > SHOWN_VIOLATIONS) lines.push(report.truncated ? '… and more of the same problem' : `… and ${broken.length - SHOWN_VIOLATIONS} more of the same problem`);
             details.append(...lines.map(text => {
                 const line = document.createElement('li');
                 line.textContent = text;

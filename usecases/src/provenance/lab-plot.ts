@@ -14,7 +14,7 @@ import { attachHighlighter } from './code-editor';
 import { PLOT_HEIGHT } from './config';
 import { BUILT_IN_TRANSFORM_TEMPLATES } from './lab-builtin-templates';
 import { movingAverage } from './moving-average';
-import { mayReplaceCode, plainMessage, regionProperties, renderChecks } from './lab-transform';
+import { LAB_PLOT_NAME, mayReplaceCode, plainMessage, projectNameNote, regionProperties, renderChecks } from './lab-transform';
 import type { Invariant, LabPlotConfig } from './lab-transform';
 import { PLOT_LAB_TEMPLATES } from './lab-plot-templates';
 import type { PlotLabTemplate } from './lab-plot-templates';
@@ -27,7 +27,7 @@ import type { Collection } from './data';
 const CHECK_WIDTH = 480;
 
 /** Name the lab's plot is registered under; redefining replaces it. */
-export const LAB_PLOT = 'try-it-yourself-chart';
+export const LAB_PLOT = LAB_PLOT_NAME;
 
 /** The drawing contract, in plain words. */
 const PLOT_INVARIANTS: Invariant[] = [
@@ -310,6 +310,14 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
         const { type, ...checked } = config;
         void type;
         const report = next.checkPlot(definition, probe, { ...checked, collection, width, height: PLOT_HEIGHT });
+        // Marks that all sit at the same place usually read a field that does not exist (the
+        // scale gives no position): the contract holds, but the chart shows nothing.
+        const boxes = Array.from(probe.querySelectorAll('.autkMark')).map(mark => {
+            const box = mark.getBoundingClientRect();
+            return [box.x, box.y, box.width, box.height].map(Math.round).join(',');
+        });
+        // Without a layout (no size anywhere) there is nothing to compare.
+        const samePlace = boxes.length > 1 && new Set(boxes).size === 1 && boxes[0] !== '0,0,0,0' && !boxes[0].endsWith(',0,0');
         probe.remove();
 
         renderChecks(checks, report, PLOT_INVARIANTS, SKIPPED);
@@ -330,7 +338,12 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
         }
         const error = draw(config);
         if (error) return say(`The chart refused the configuration: ${plainMessage(error, collection)}`, 'error');
-        say('Contract met: linked to the map and the 24 charts (close the drawer to see them).', 'ok');
+        const notes = [
+            samePlace ? ' Every mark is drawn at the same place: a field may not exist (read fields with value(row, i), which follows nested properties such as sjoin.count.noise).' : '',
+            // The person's own code is told about its name; a template is what autk-plot registers.
+            code.value === PLOT_LAB_TEMPLATES[loaded].code ? '' : projectNameNote((evaluateChart(code.value) as { name?: unknown }).name, 'chart'),
+        ].join('');
+        say(`Contract met: linked to the map and the 24 charts (close the drawer to see them).${notes}`, 'ok');
     };
 
     // D3 examples, then the code of the built-in charts: a developer's chart is written like them.

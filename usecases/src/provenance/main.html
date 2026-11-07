@@ -44,7 +44,7 @@
                         <span class="icon" data-icon="lab"></span>Try it Yourself
                     </button>
                 </div>
-                <p class="pane-subtitle"><strong>Provenance:</strong> select regions in any chart or on the map, and every linked chart paints in aqua only the part of its marks they produce, or with avg the statistic of the selection (the map shows the selected regions in blue)</p>
+                <p class="pane-subtitle" title="With the avg reducer, the aqua mark is the average of the selected regions. The map shows the selected regions in blue"><strong>Provenance:</strong> select in any chart or on the map; linked charts paint in aqua the part of each mark the selection produces</p>
                 <div id="controls" role="group" aria-label="View settings">
                     <select id="reducer" autocomplete="off" aria-label="Reducer" title="How the charts that group regions reduce each group: count its regions, or sum or average their perimeter (shape_leng). Charts that cannot draw a reducer keep counting: slices, flows and accumulations must add up, and a waffle square is one region. With avg, the part of a mark is the average of the selected regions, drawn as a smaller inner mark. Changing it draws the charts again and clears the selection">
                         <option value="count">Reducer: count of regions</option>
@@ -137,7 +137,7 @@
                         <ul id="plab-design"></ul>
                     </div>
                 </div>
-                <p class="lab-note">Runs only in this browser. In a project: <code>registerPlot</code>, then <code>{ type: 'registered' }</code>.</p>
+                <p class="lab-note">Runs only in this browser. In a project: <code>registerPlot</code>, then <code>{ type: 'registered', plot: name }</code>.</p>
             </section>
 
             <section class="lab" id="panel-transform" data-panel="transform" role="tabpanel" aria-labelledby="tab-transform" hidden>

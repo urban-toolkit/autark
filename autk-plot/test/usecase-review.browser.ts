@@ -12,7 +12,7 @@ import * as next from '../src';
 import { LAB_PLOT, optionsOfChoice, plotDefinitionOf, plotLabConfig, setupPlotLab } from '../../usecases/src/provenance/lab-plot';
 import { PLOT_LAB_TEMPLATES } from '../../usecases/src/provenance/lab-plot-templates';
 import { movingAverage } from '../../usecases/src/provenance/moving-average';
-import { LAB_TRANSFORM, plainMessage, regionProperties, setupLab } from '../../usecases/src/provenance/lab-transform';
+import { LAB_TRANSFORM, plainMessage, projectNameNote, regionProperties, setupLab } from '../../usecases/src/provenance/lab-transform';
 import type { LabPlotConfig } from '../../usecases/src/provenance/lab-transform';
 import { LAB_TEMPLATES } from '../../usecases/src/provenance/lab-transform-templates';
 import { PLOTS, withReducer } from '../../usecases/src/provenance/plot';
@@ -197,6 +197,42 @@ describe('Try it Yourself, found by the newcomer walkthrough', () => {
 
     test('a transform no chart of the page runs takes the options of its Transform tab template', () => {
         expect(JSON.parse(optionsOfChoice('reduce-series'))).toMatchObject({ timestamp: 'day', value: 'complaints', reducer: 'avg' });
+    });
+
+    test('edited code is told when a project would refuse its name; a template is not', () => {
+        expect(projectNameNote(undefined, 'chart')).toBe(' In a project, give it a name: registerPlot needs one.');
+        expect(projectNameNote('barchart', 'chart')).toBe(' In a project, "barchart" is a built-in name: registerPlot needs another one.');
+        expect(projectNameNote('binning-1d', 'transform')).toBe(' In a project, "binning-1d" is a built-in name: registerTransform needs another one.');
+        expect(projectNameNote('moving-average', 'transform')).toBe(' In a project, "moving-average" is already registered by this page: registerTransform needs another one.');
+        expect(projectNameNote('my-bars', 'chart')).toBe('');
+        const lab = plotLab();
+        lab.run();
+        expect(lab.element('#plab-message').textContent).toBe('Contract met: linked to the map and the 24 charts (close the drawer to see them).');
+        lab.element<HTMLTextAreaElement>('#plab-code').value = lab.element<HTMLTextAreaElement>('#plab-code').value.replace('return {', "return {\n  name: 'barchart',");
+        lab.run();
+        expect(lab.element('#plab-message').textContent).toMatch(/"barchart" is a built-in name/);
+    });
+
+    test('marks that all sit at one place are pointed out: a field may not exist', () => {
+        // Positions need a layout: jsdom has none, so this runs in Chrome (autark's browser tests).
+        const sized = document.createElement('div');
+        sized.style.width = '10px';
+        document.body.append(sized);
+        const layout = sized.getBoundingClientRect().width > 0;
+        sized.remove();
+        if (!layout) return;
+        const lab = plotLab();
+        lab.change('#plab-transform', '');
+        lab.element<HTMLInputElement>('#plab-columns').value = 'shape_area, shape_leng';
+        lab.element<HTMLTextAreaElement>('#plab-code').value = `return {
+  draw({ group, rows, width, height }) {
+    const y = d3.scaleLinear([0, 10], [height, 0]);
+    group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark')
+      .attr('cx', width / 2).attr('cy', d => y(d['no.such.field'])).attr('r', 3);
+  },
+};`;
+        lab.run();
+        expect(lab.element('#plab-message').textContent).toMatch(/Every mark is drawn at the same place: a field may not exist/);
     });
 
     test('the Fields are named as on the page in every message', () => {

@@ -46,7 +46,7 @@ export const PLOTS: LinkedPlot[] = [
             labels: { axis: ['day', 'complaints'], title: 'Noise complaints per day' },
             transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'day' } },
             height: PLOT_HEIGHT,
-            margins: { left: 60, right: 20, top: 40, bottom: 70 },
+            margins: { left: 60, right: 20, top: 40, bottom: 80 },
         },
     },
     {
@@ -158,7 +158,7 @@ export const PLOTS: LinkedPlot[] = [
             // A transform registered by the case study itself, outside the package (moving-average.ts).
             transform: { preset: 'registered', name: 'moving-average', options: { timestamp: 'date', halfWindow: 3 } },
             height: PLOT_HEIGHT,
-            margins: { left: 60, right: 20, top: 40, bottom: 70 },
+            margins: { left: 60, right: 20, top: 40, bottom: 80 },
         },
     },
     {
