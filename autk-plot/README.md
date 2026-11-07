@@ -98,6 +98,71 @@ The 24 built-in plots and the 12 built-in transforms are registered with the sam
 * `registerTransform(definition)`: Adds a transform with provenance, used as `{ preset: 'registered', name }`. Its rows have one of eleven shapes (`category-value`, `series`, `hierarchy`, `flows`…), and every plot that reads that shape draws them. `checkTransformReport` checks its six provenance invariants.
 * `registerPlot(definition)`: Turns plain D3 drawing code into a chart, used as `{ type: 'registered', plot: name }`. The code only annotates its selectable marks (class `autkMark`, with their own row as D3 datum); selection, linking and the segregated view come with it, and the painted part is inferred from the geometry of the marks. Only `name` and `draw` are required; optional fields declare the design of the painted part, the series to redraw, the transforms and reducers the plot reads, and the style of a highlighted mark, and the drawing context offers axes, formats, a legend and tick counts. `checkPlot` checks its six drawing invariants.
 
+### Writing a chart
+
+A chart is plain D3 code. `draw` receives the rendered rows and a marks group; bind the rows themselves to the selectable marks and give them the class `autkMark`:
+
+```ts
+import * as d3 from 'd3';
+import { AutkPlot, PlotEvent, registerPlot } from '@urban-toolkit/autk-plot';
+
+registerPlot({
+  name: 'dots',
+  draw({ group, rows, value, width, height, axisX, axisY }) {
+    // value(row, i) reads the i-th field of attributes.axis, nested paths included ('sjoin.count.noise').
+    const x = d3.scaleLinear(d3.extent(rows, row => Number(value(row, 0))) as [number, number], [0, width]);
+    const y = d3.scaleLinear(d3.extent(rows, row => Number(value(row, 1))) as [number, number], [height, 0]);
+    axisX(d3.axisBottom(x));
+    axisY(d3.axisLeft(y));
+    group.selectAll('circle').data(rows).join('circle')
+      .attr('class', 'autkMark')
+      .attr('cx', row => x(Number(value(row, 0))))
+      .attr('cy', row => y(Number(value(row, 1))))
+      .attr('r', 4);
+  },
+});
+
+new AutkPlot(container, {
+  type: 'registered', plot: 'dots', collection,
+  attributes: { axis: ['population', 'income'] },
+  events: [PlotEvent.BRUSH],
+});
+```
+
+`width` and `height` are the drawing area inside the margins (`margins` in the config). Besides `group` and `rows`, the context gives `html` (a container for HTML marks), `fields`, `format(i)`, `axisLabels`, `legend` and `tickCount`. Autark colors the marks (gray, and the selection color); style anything else by state with `markStyle`. Optional fields declare the transforms and reducers the chart reads (`transforms`, `requiresTransform`, `reducers`), the design of the painted part (`design`, or `drawPart`), and defaults and checks of the config (`defaults`, `validate`).
+
+### Writing a transform
+
+A transform turns one row per feature into the rows a chart draws, with their provenance: stages `D1…Dn`, weighted relations from the features (`D0`) to the rows, one id per row (`rowIds`), the units each row reduces (`contributions`), and the reducer. Public blocks build it: `collectBuckets` groups and reduces rows, and `binnedProvenance`, `unnestedProvenance` and `rowwiseProvenance` record the relations of a partition, of an unnest then partition, and of one row per feature.
+
+```ts
+import { AutkPlot, binnedProvenance, collectBuckets, indexedBins, registerTransform } from '@urban-toolkit/autk-plot';
+
+registerTransform({
+  name: 'by-initial',
+  shape: 'category-value', // { label, value } rows: bar, pie, donut and waffle charts read them
+  run(rows, options, columns) {
+    const buckets = collectBuckets({
+      rows, reducer: 'count', valueOf: undefined,
+      bucketOf: row => String(row[columns[0]] ?? '').charAt(0) || null,
+    });
+    const keys = buckets.map(bucket => bucket.key);
+    return {
+      rows: buckets.map(bucket => ({ label: bucket.key, value: bucket.value, autkIds: bucket.autkIds })),
+      provenance: binnedProvenance({ rows, buckets, bins: indexedBins(keys, keys, 'initial'), binLabel: 'initials', rowKeys: keys, reducer: 'count' }),
+    };
+  },
+});
+
+new AutkPlot(container, {
+  type: 'barchart', collection,
+  attributes: { axis: ['name', '@transform'] },
+  transform: { preset: 'registered', name: 'by-initial' },
+});
+```
+
+The sources of the built-in transforms (`src/transforms/presets`) are written the same way.
+
 ### Tests
 
 The transform baselines run with the repository's Vitest suite. The plot tests draw and select in a real DOM, so they run in headless Chrome: run `npm run test:browser --workspace=@urban-toolkit/autk-plot` from the repository root (local sources through Vite, no downloaded fixtures; requires Node with built-in WebSocket support and Chrome; set `CHROME_BIN` if Chrome is not at the default macOS, Linux or Windows path). They keep Vitest's API; `test/harness.ts` runs them in the page with Vitest's own `expect`. `test/baselines/` holds the outputs of the original autk-plot 4.1.1, which the baseline tests compare against, and the snapshots of the hand-written plots each built-in plot reproduces (`natives.json`, recorded in Chrome; record again only on purpose with `AUTK_RECORD=1`).
