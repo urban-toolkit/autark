@@ -1060,6 +1060,29 @@ export class AutkMap {
     }
 
     /**
+     * Skips rendering for exactly the provided component ids of a vector layer, and draws every other one.
+     *
+     * `setSkippedIds` toggles, so what it does depends on what was skipped before; this does not. Use it to apply a
+     * filter: pass the ids to hide, and repeat the call as often as the filter changes.
+     *
+     * @param id Layer identifier.
+     * @param selection Component ids to skip; all others are shown.
+     * @returns Nothing. Non-vector layers are ignored.
+     * @throws Never throws.
+     * @example
+     * map.replaceSkippedIds('parks', [3, 5, 8]); // only these are hidden
+     * map.replaceSkippedIds('parks', []);        // all are shown
+     */
+    replaceSkippedIds(id: string, selection: number[]): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if (!(layer instanceof VectorLayer)) {
+            return;
+        }
+
+        layer.replaceSkippedIds(selection);
+    }
+
+    /**
      * Clears skipped rendering state for a vector layer.
      *
      * @param id Layer identifier.
