@@ -415,15 +415,7 @@ export class TerrainMapRenderPath {
         ];
 
         for (const [x, y] of corners) {
-            const direction = this.camera.getWorldRayDirection(x, y);
-            const groundDistance = Math.abs(direction[2]) > 1e-6
-                ? -eye[2] / direction[2]
-                : Number.POSITIVE_INFINITY;
-            const distance = groundDistance > 0
-                ? Math.min(groundDistance, maxRayDistance)
-                : maxRayDistance;
-
-            points.push([eye[0] + direction[0] * distance, eye[1] + direction[1] * distance]);
+            points.push(this.camera.getGroundPoint(x, y, maxRayDistance));
         }
 
         if (points.length === 0) {

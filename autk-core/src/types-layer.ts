@@ -24,7 +24,8 @@ export type LayerType =
   | 'points'
   | 'polygons'
   | 'polylines'
-  | 'raster';
+  | 'raster'
+  | 'tiles';
 
 /** All `LayerType` values as a readonly array, in union definition order. */
 export const LAYER_TYPE_VALUES: readonly LayerType[] = [
@@ -38,6 +39,7 @@ export const LAYER_TYPE_VALUES: readonly LayerType[] = [
   'polygons',
   'polylines',
   'raster',
+  'tiles',
 ] as const;
 
 /**
