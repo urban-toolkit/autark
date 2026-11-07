@@ -138,7 +138,13 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
     flex-direction: column;
     gap: 6px;
     padding: 10px 0;
-    background: var(--surface);
+    /* A soft shadow at an edge says more tools are there to scroll to (short windows). */
+    background:
+        linear-gradient(var(--surface) 40%, transparent) center top / 100% 28px no-repeat local,
+        linear-gradient(transparent, var(--surface) 60%) center bottom / 100% 28px no-repeat local,
+        radial-gradient(farthest-side at 50% 0, rgba(31, 35, 40, 0.14), transparent) center top / 100% 10px no-repeat scroll,
+        radial-gradient(farthest-side at 50% 100%, rgba(31, 35, 40, 0.14), transparent) center bottom / 100% 10px no-repeat scroll,
+        var(--surface);
     border-right: 1px solid var(--line);
     overflow-y: auto;
     overflow-x: visible;
@@ -327,7 +333,8 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
 /* Interaction: the same pattern in the interface lilac. */
 .chip.interaction { border-color: var(--brand); background: var(--brand-tint); color: var(--brand-strong); }
 .card-body { overflow-x: auto; }
-.card.focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+/* A chart reached from a tool: only its outline, until a click elsewhere. */
+.card.focus { border-color: var(--brand-strong); }
 .chart-grid.filtering .card:not(.match) { opacity: 0.28; }
 
 .table-box .autk-table-container {
@@ -356,7 +363,7 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
     z-index: 10;
 }
 .drawer.open { transform: none; visibility: visible; transition: transform 0.22s ease; }
-.drawer-wide { width: min(980px, 100vw); }
+.drawer-wide { width: min(1060px, 100vw); }
 
 .drawer-head {
     display: flex;
@@ -391,7 +398,13 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
 .transform:focus-visible { outline: 2px solid var(--brand-ring); outline-offset: 1px; }
 .transform.active { border-color: var(--brand); background: var(--brand-soft); }
 .transform-name { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-weight: 600; font-size: 13px; color: var(--brand-strong); }
-.transform-relations { margin-left: 6px; font-size: 11px; color: var(--muted); }
+.transform-group { margin: 10px 2px 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.transform-group:first-child { margin-top: 0; }
+.transform-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; }
+.transform-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.transform-facts { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+.transform-relations { font-size: 11px; color: var(--muted); }
+.used-by button.see-code { margin-left: auto; border-color: var(--brand); color: var(--brand-strong); }
 .transform p { margin: 4px 0 6px; font-size: 13px; color: var(--ink-soft); }
 .used-by { display: flex; flex-wrap: wrap; gap: 4px; }
 .used-by button {
@@ -476,8 +489,12 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
     font-size: 12px;
     color: var(--muted);
 }
-.lab-controls input { width: 180px; }
-.lab-controls label[hidden] { display: none; }
+.lab-controls input { width: 170px; }
+/* Long template and transform names stay one line: the select shows them cut, the list in full. */
+.lab-controls select { max-width: 240px; }
+.lab-rows { align-self: center; color: var(--muted); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+#plab-options, #lab-options { width: 150px; }
+.lab-controls input:disabled { background: var(--canvas); color: var(--muted); }
 
 /* Code editor: a colored copy of the code (code-editor.ts) drawn behind a transparent text area. */
 /* The editor paints the dark background, also under the text area's scrollbars. */
@@ -612,6 +629,7 @@ textarea.code::selection { background: rgba(143, 162, 204, 0.35); color: transpa
         position: sticky;
         top: 0;
         flex-direction: row;
+        background: var(--surface);
         padding: 6px 8px;
         border-right: 0;
         border-bottom: 1px solid var(--line);

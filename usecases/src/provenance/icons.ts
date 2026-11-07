@@ -40,6 +40,7 @@ const PATHS: Record<string, string> = {
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
     arrow: '<path d="M4 12h15M13 6l6 6-6 6"/>',
     run: '<path d="M8 5.5v13l10-6.5z" fill="currentColor"/>',
+    code: '<path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15"/>',
 };
 
 /**

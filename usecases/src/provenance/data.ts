@@ -6,7 +6,9 @@
  * the region that contains it, at the nested path used by
  * `gallery/src/autk-plot/temporal-events-click.ts` (`sjoin.collect.noise`).
  * The gallery builds the same attribute with an autk-db spatial join; here it
- * is a point-in-polygon test, so the case study needs no database.
+ * is a point-in-polygon test, so the case study needs no database. The
+ * complaints per day of each region are also kept as a numeric series
+ * (`noise_daily`).
  * This module does not access the DOM.
  */
 
@@ -64,11 +66,12 @@ function isoLocal(date: string): string | null {
 
 /**
  * Attaches the complaints inside each region as `sjoin.collect.noise`, and
- * their number as `sjoin.count.noise`, as the gallery spatial join does.
+ * their number as `sjoin.count.noise`, as the gallery spatial join does,
+ * and their daily series (`withDailyComplaints`).
  *
  * @param collection Regions in EPSG:3395.
  * @param csv Contents of `noise_manhattan_clean.csv`.
- * @returns The same collection, with an event list on every feature.
+ * @returns The same collection, with an event list and a daily series on every feature.
  */
 export function withNoiseEvents(collection: Collection, csv: string): Collection {
     const polygons = collection.features.map(feature => {
@@ -100,6 +103,44 @@ export function withNoiseEvents(collection: Collection, csv: string): Collection
             ...(feature.properties ?? {}),
             sjoin: { collect: { noise: events[index] }, count: { noise: events[index].length } },
         };
+    });
+    return withDailyComplaints(collection);
+}
+
+/** One day in milliseconds. */
+const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Attaches the complaints of each region per day as `noise_daily`: one point
+ * `{ day: 'YYYY-MM-DD', complaints }` for every day from the first complaint
+ * to the last, zero on the days a region had none. Every region then has a
+ * numeric series over the same days, the input `reduce-series` reduces (Try
+ * it Yourself); no chart of the page reads it. Days are the UTC days of the
+ * complaint times, as in `binning-events`.
+ *
+ * @param collection Regions with their complaints as `sjoin.collect.noise`.
+ * @returns The same collection, with a daily series on every feature.
+ */
+export function withDailyComplaints(collection: Collection): Collection {
+    const dayOf = (date: string): number => Math.floor(new Date(date).getTime() / DAY);
+    const perRegion = collection.features.map(feature => {
+        const counts = new Map<number, number>();
+        const events = (feature.properties?.sjoin?.collect?.noise ?? []) as { date: string }[];
+        for (const { date } of events) {
+            const day = dayOf(date);
+            if (Number.isFinite(day)) counts.set(day, (counts.get(day) ?? 0) + 1);
+        }
+        return counts;
+    });
+    const days = perRegion.flatMap(counts => [...counts.keys()]);
+    const first = Math.min(...days);
+    const last = Math.max(...days);
+    collection.features.forEach((feature, index) => {
+        const series = days.length === 0 ? [] : Array.from({ length: last - first + 1 }, (_, offset) => ({
+            day: new Date((first + offset) * DAY).toISOString().slice(0, 10),
+            complaints: perRegion[index].get(first + offset) ?? 0,
+        }));
+        feature.properties = { ...(feature.properties ?? {}), noise_daily: series };
     });
     return collection;
 }

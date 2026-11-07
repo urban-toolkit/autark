@@ -1,11 +1,11 @@
 /**
  * What the workspace shows about each chart and transform: names, relation
  * types, and one-line descriptions. Which charts use which transform is read
- * from the plot configurations, so the two never drift apart.
+ * from the plot configurations (and their plot defaults), so the two never
+ * drift apart.
  */
 
-import { PLOTS } from './plot';
-import type { LinkedPlot } from './plot';
+import { PLOTS, transformOfChart } from './plot';
 
 /** Presentation of one chart card, by the id of its container. */
 export type ChartCard = {
@@ -42,44 +42,47 @@ export const CHARTS: Record<string, ChartCard> = {
     violin: { title: 'Violin (real weights)', relation: 'N:N', icon: 'violin' },
 };
 
-/** One transform of the package (or registered by this case study). */
+/**
+ * What the workspace says about a transform beyond its definition: the
+ * relation types it composes (the provenance model, as in the report) and
+ * one line on how regions become rows. Its label and row shape are read from
+ * the registry, where the 12 built-in transforms and the one this page
+ * registers are defined the same way.
+ */
 export type TransformEntry = {
-    /** Preset name, or the registered name. */
+    /** Registered name: `{ preset: name }` for a built-in, `{ preset: 'registered', name }` for the page's. */
     name: string;
+    /** Who registered it: the package, or this page with `registerTransform`. */
+    origin: 'built-in' | 'page';
     /** Relation types it composes (see the provenance model). */
     relations: string;
     description: string;
 };
 
 export const TRANSFORMS: TransformEntry[] = [
-    { name: 'sort', relations: 'R1 identity', description: 'Orders the rows: each region stays one mark.' },
-    { name: 'binning-1d', relations: 'R2 partition', description: 'Groups regions by a value range or a category and reduces each group.' },
-    { name: 'binning-2d', relations: 'R2 partition', description: 'Groups regions into the cells of a grid of two attributes.' },
-    { name: 'binning-hex', relations: 'R2 partition', description: 'Groups points into hexagonal cells.' },
-    { name: 'binning-events', relations: 'R3 unnest · R2 partition', description: 'Unnests the events of each region and counts them per time bucket.' },
-    { name: 'reduce-series', relations: 'R3 unnest · R2 partition', description: 'Unnests the series of each region and reduces each bucket.' },
-    { name: 'hierarchy', relations: 'R5 chained partition', description: 'Nests categories: each level partitions the one below.' },
-    { name: 'fold', relations: 'R6 unnest by attribute', description: 'One unit per measure, for profiles of several measures.' },
-    { name: 'cumulative', relations: 'R2 · R7 accumulation', description: 'Each bin counts in every point from it on: ECDF and Pareto.' },
-    { name: 'flows', relations: 'R3 · R2 · R8 pairs', description: 'Links the categories a region crosses between columns.' },
-    { name: 'box-stats', relations: 'R9 partition with roles', description: 'Quartiles per group; each member keeps its role (median, outlier).' },
-    { name: 'density', relations: 'R10 fractional coverage', description: 'Kernel density: each region spreads a real weight over the curve.' },
-    { name: 'moving-average', relations: 'R3 · R10, registered', description: 'A 7-day moving average registered outside the core with registerTransform.' },
+    { name: 'sort', origin: 'built-in', relations: 'R1 identity', description: 'Orders the rows: each region stays one mark.' },
+    { name: 'binning-1d', origin: 'built-in', relations: 'R2 partition', description: 'Groups regions by a value range or a category and reduces each group.' },
+    { name: 'binning-2d', origin: 'built-in', relations: 'R2 partition', description: 'Groups regions into the cells of a grid of two attributes.' },
+    { name: 'binning-hex', origin: 'built-in', relations: 'R2 partition', description: 'Groups points into hexagonal cells.' },
+    { name: 'binning-events', origin: 'built-in', relations: 'R4 (R3 unnest · R2 partition)', description: 'Unnests the events of each region and counts them per time bucket.' },
+    { name: 'reduce-series', origin: 'built-in', relations: 'R4 (R3 unnest · R2 partition)', description: 'Unnests the series of each region and reduces each bucket.' },
+    { name: 'hierarchy', origin: 'built-in', relations: 'R5 chained partition', description: 'Nests categories: each level partitions the one below.' },
+    { name: 'fold', origin: 'built-in', relations: 'R6 unnest by attribute · R2', description: 'One unit per measure, reduced per category: profiles of several measures.' },
+    { name: 'cumulative', origin: 'built-in', relations: 'R2 · R7 accumulation', description: 'Each bin counts in every point from it on: ECDF and Pareto.' },
+    { name: 'flows', origin: 'built-in', relations: 'R3 · R2 · R8 pairs', description: 'Links the categories a region crosses between columns.' },
+    { name: 'box-stats', origin: 'built-in', relations: 'R9 partition with roles', description: 'Quartiles per group; each member keeps its role (median, outlier).' },
+    { name: 'density', origin: 'built-in', relations: 'R10 fractional coverage', description: 'Kernel density: each region spreads a real weight over the curve.' },
+    { name: 'moving-average', origin: 'page', relations: 'R3 · R10 fractional coverage', description: 'Each complaint spreads over the 7 days around it (moving-average.ts).' },
 ];
 
-/** Name of the transform a plot uses, as listed in `TRANSFORMS`. */
-function transformOf(plot: LinkedPlot): string | null {
-    const transform = plot.config.transform;
-    if (!transform) return null;
-    return transform.preset === 'registered' ? transform.name : transform.preset;
-}
-
-/** Container ids of the charts that use each transform. */
+/** Container ids of the charts of the page that run each transform, their own or their plot's default. */
 export function chartsByTransform(): Map<string, string[]> {
     const users = new Map<string, string[]>(TRANSFORMS.map(entry => [entry.name, []]));
     for (const plot of PLOTS) {
-        const name = transformOf(plot);
-        if (name) users.get(name)?.push(plot.div.slice(1));
+        const transform = transformOfChart(plot);
+        if (!transform) continue;
+        const name = transform.preset === 'registered' ? (transform as { name: string }).name : transform.preset;
+        users.get(name)?.push(plot.div.slice(1));
     }
     return users;
 }

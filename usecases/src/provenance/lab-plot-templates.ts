@@ -1,24 +1,46 @@
 /**
- * Starting points of Try it Yourself (D3 chart): ordinary D3 drawing code that a developer
- * edits in the page. Each one is the body of a function that receives `d3`
- * and returns `{ draw, drawPart? }`. Lines marked `// Autark` are the only
- * changes from the plain D3 version of the chart.
+ * Starting points of Try it Yourself (D3 chart). Each one is the body of a
+ * function of `d3`, `autk` and `core` (`lab-scope.ts`) that returns a plot
+ * definition. Two groups:
+ * - D3 examples: ordinary D3 charts, where the lines the editor highlights
+ *   (`code-editor.ts`) are the only changes from the plain D3 version;
+ * - the 24 built-in charts: the very code autk-plot registers
+ *   (`lab-builtin-templates.ts`, generated from `src/plots`), with the fields
+ *   and data of the same chart on this page. They use the same contract as any
+ *   D3 chart: a developer's chart is written like them.
  */
 
-import type { PlotMargins, PlotTransformConfig } from '@urban-toolkit/autk-plot';
+import * as next from '@urban-toolkit/autk-plot';
+import type { PlotMargins, PlotTransformConfig, TopKConfig } from '@urban-toolkit/autk-plot';
+
+import { BUILT_IN_TEMPLATES } from './lab-builtin-templates';
+import { evaluateChart } from './lab-scope';
+import { PLOTS } from './plot';
+
+/** How the lab chart selects. */
+export type LabEvent = 'click' | 'brush' | 'brush-x' | 'brush-y';
 
 /** One plot lab template: its code and the config it is drawn with. */
 export type PlotLabTemplate = {
     title: string;
+    /** Group of the Start from list. */
+    group: 'example' | 'built-in';
+    /** Title of the chart drawn, when it is not the template title. */
+    chartTitle?: string;
     columns: string;
     transform: PlotTransformConfig | null;
-    event: 'click' | 'brush';
+    event: LabEvent;
     margins: PlotMargins;
+    /** Top-k cut of the chart on the page, kept so the chart draws what its title says. */
+    topK?: TopKConfig;
+    /** Axis labels of the chart on the page, kept while the fields are the template's. */
+    axisLabels?: string[];
     code: string;
 };
 
-const LOLLIPOP = `// Lollipop: the classic D3 example, with the regions grouped by district.
-// The lines marked "// Autark" are the only differences from plain D3 code.
+const LOLLIPOP = `// Lollipop in plain D3: the regions of each district (N:1).
+// No painting code: Autark finds that the x of each dot follows the value,
+// and slides the dot along its stick to the value of the selection.
 return {
   draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
     const data = rows;                   // Autark: instead of d3.csv(...)
@@ -42,17 +64,15 @@ return {
       .attr('cx', d => x(d.value))
       .attr('cy', d => y(d.label))
       .attr('r', 7);
-    // Provenance view with no code: Autark sees that the x of the dot follows the
-    // value and slides it along the stick to the value of the selection.
   },
 };
 `;
 
-const LINE = `// Complaints per day in plain D3: points (the marks) and the line through them.
-// No painting code: Autark finds from the geometry that the height of the
-// points follows the value, and draws the second line of the selection itself.
+const LINE = `// Line in plain D3: the complaints per day (N:N), points and the line through them.
+// No painting code: Autark finds that the height of each point follows the
+// value, and draws the line of the selection itself.
 return {
-  draw({ group, rows, width, height }) {
+  draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
     const data = rows.slice().sort((a, b) => a.bucket.localeCompare(b.bucket));
     const x = d3.scalePoint(data.map(d => d.bucket), [0, width]);
     const y = d3.scaleLinear([0, d3.max(data, d => d.value)], [height, 0]).nice();
@@ -63,14 +83,14 @@ return {
     group.append('g').call(d3.axisLeft(y).ticks(5));
 
     group.append('path')
-      .attr('class', 'autkSeries')       // Autark: the line through the points
+      .attr('class', 'autkSeries')       // Autark: the line through the marks
       .attr('fill', 'none')
       .attr('stroke', '#bbb')
       .attr('stroke-width', 2)
       .attr('d', d3.line(d => x(d.bucket), d => y(d.value))(data));
 
     group.selectAll('circle').data(rows).join('circle')
-      .attr('class', 'autkMark')         // Autark
+      .attr('class', 'autkMark')         // Autark: each point is a selectable mark
       .attr('cx', d => x(d.bucket))
       .attr('cy', d => y(d.value))
       .attr('r', 3.5);
@@ -78,11 +98,11 @@ return {
 };
 `;
 
-const BOXPLOT = `// Box plot in plain D3: each box goes from the first to the third quartile.
-// No painting code: Autark finds that the edges follow q1 and q3, recovers
-// the axis scale, and draws each selected region at its own value.
+const BOXPLOT = `// Box plot in plain D3: the areas of the regions of each land use (N:1).
+// No painting code: Autark finds that the edges of each box follow q1 and q3,
+// and draws each selected region at its own value.
 return {
-  draw({ group, rows, width, height }) {
+  draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
     const x = d3.scaleBand(rows.map(d => d.category), [0, width]).padding(0.35);
     const y = d3.scaleLinear([0, d3.max(rows, d => d.whiskerHigh)], [height, 0]).nice();
     const middle = d => x(d.category) + x.bandwidth() / 2;
@@ -99,7 +119,7 @@ return {
       .attr('stroke', '#999');
 
     group.selectAll('rect.box').data(rows).join('rect')
-      .attr('class', 'box autkMark')     // Autark
+      .attr('class', 'box autkMark')     // Autark: each box is a selectable mark
       .attr('x', d => x(d.category))
       .attr('width', x.bandwidth())
       .attr('y', d => y(d.q3))
@@ -115,10 +135,10 @@ return {
 `;
 
 const TABLE = `// Table in plain D3, as HTML: one row per region (1:1).
-// No painting code: select bars in another chart, and each row fills from
-// the left up to the part of the region the selection covers.
+// No painting code: each row fills from the left up to the part of its
+// region that a selection in another chart covers.
 return {
-  draw({ html, rows, fields }) {          // Autark: the HTML container sits below the SVG
+  draw({ html, rows, fields }) {          // Autark: HTML marks go in the html container (with no SVG marks, it takes the place of the SVG)
     const table = html.append('table')
       .style('border-collapse', 'collapse')
       .style('width', '100%')
@@ -138,11 +158,11 @@ return {
 };
 `;
 
-const BEESWARM = `// Beeswarm: one dot per region, spread by area without overlapping.
-// Each dot is a region (1:1). Select bars in another chart: each dot paints
-// the part of its region that the selection covers.
+const BEESWARM = `// Beeswarm in plain D3: one dot per region (1:1), spread by area without overlapping.
+// No painting code: each dot paints the part of its region that a selection
+// in another chart covers.
 return {
-  draw({ group, rows, width, height, value }) { // Autark
+  draw({ group, rows, width, height, value }) { // Autark: receives the rows and the marks group
     const area = d => +value(d);                 // Autark: reads the first of the "Fields"
 
     const x = d3.scaleLog(d3.extent(rows, area), [0, width]).nice();
@@ -150,7 +170,7 @@ return {
       .attr('transform', 'translate(0,' + height + ')')
       .call(d3.axisBottom(x).ticks(5, '~s'));
 
-    // The simulation works on copies, so the rows stay untouched. // Autark
+    // Autark: the simulation works on copies, so the rows stay untouched.
     const nodes = rows.map(d => ({ x: x(area(d)), y: height / 2 }));
     d3.forceSimulation(nodes)
       .force('x', d3.forceX((_n, i) => x(area(rows[i]))).strength(1))
@@ -160,7 +180,7 @@ return {
       .tick(200);
 
     group.selectAll('circle').data(rows).join('circle')
-      .attr('class', 'autkMark')                 // Autark
+      .attr('class', 'autkMark')                 // Autark: each dot is a selectable mark
       .attr('transform', (_d, i) => 'translate(' + nodes[i].x + ',' + nodes[i].y + ')')
       .attr('r', 4.5);
     // Placed with transform, as is common in D3: the brush follows them.
@@ -168,57 +188,12 @@ return {
 };
 `;
 
-const TREEMAP = `// Treemap in plain D3, over the rows of the "hierarchy" preset.
-// It is the drawing of the built-in treemap: the equivalence test shows the
-// same selection and painted fractions, with no painting code at all.
+const BROKEN = `// Bars in plain D3, sorted by value, with a common mistake on purpose.
+// Click "Check and draw" to see the contract refuse it, then fix it.
 return {
-  draw({ group, rows, width, height }) {
-    // Tree from the rows (key, parent, level, value).
-    const nodes = new Map(rows.map(r => [r.key, { row: r, children: [] }]));
-    const root = { row: null, children: [] };
-    rows.forEach(r => (r.parent ? nodes.get(r.parent) : root).children.push(nodes.get(r.key)));
-    const depth = d3.max(rows, r => r.level + 1);
-
-    const tree = d3.hierarchy(root, n => (n.children.length ? n.children : undefined))
-      .sum(n => (n.children.length === 0 && n.row ? Math.max(0, n.row.value) : 0))
-      .sort((a, b) => b.value - a.value);
-    d3.treemap()
-      .size([width, height])
-      .paddingOuter(2)
-      .paddingTop(n => (n.depth > 0 && n.depth < depth ? 14 : 2))
-      .paddingInner(2)
-      .round(true)(tree);
-
-    const groups = tree.descendants().filter(n => n.data.row && n.data.row.level < depth - 1);
-    group.selectAll('rect.frame').data(groups).join('rect')
-      .attr('class', 'frame autkContext') // Autark: a row drawn only as context
-      .attr('x', n => n.x0).attr('y', n => n.y0)
-      .attr('width', n => n.x1 - n.x0).attr('height', n => n.y1 - n.y0)
-      .attr('fill', '#f6f8fa').attr('stroke', '#d0d7de')
-      .property('__data__', n => n.data.row);       // Autark: after the geometry, the datum becomes the row
-    group.selectAll('text.frame').data(groups.filter(n => n.x1 - n.x0 > 30)).join('text')
-      .attr('class', 'frame')
-      .attr('x', n => n.x0 + 4).attr('y', n => n.y0 + 10)
-      .style('font', '600 10px sans-serif')
-      .text(n => n.data.row.label);
-
-    const leaves = tree.leaves().filter(n => n.data.row);
-    const box = new Map(leaves.map(n => [n.data.row, n]));
-    group.selectAll('rect.autkMark').data(leaves.map(n => n.data.row)).join('rect') // Autark: binds the rows themselves
-      .attr('class', 'autkMark')                                                     // Autark
-      .attr('x', r => box.get(r).x0).attr('y', r => box.get(r).y0)
-      .attr('width', r => box.get(r).x1 - box.get(r).x0)
-      .attr('height', r => box.get(r).y1 - box.get(r).y0);
-  },
-};
-`;
-
-const BROKEN = `// Bars sorted by value, with a common mistake on purpose.
-// Click "Check and draw" to see the validator refuse it, then fix it.
-return {
-  draw({ group, rows, width, height }) {
-    // MISTAKE: "{ ...d }" creates new objects. D3 draws them, but the marks do
-    // not carry the Autark rows: nothing would link the selection to the regions.
+  draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
+    // MISTAKE: "{ ...d }" binds copies to the marks. Autark finds the regions
+    // of a mark by the row object it receives, so a copy links to nothing.
     // Fix: const data = rows.slice().sort((a, b) => b.value - a.value);
     const data = rows.map(d => ({ ...d })).sort((a, b) => b.value - a.value);
 
@@ -227,15 +202,17 @@ return {
     group.append('g').call(d3.axisLeft(y).ticks(5));
 
     group.selectAll('rect.autkMark').data(data).join('rect')
-      .attr('class', 'autkMark')
+      .attr('class', 'autkMark')         // Autark: each bar is a selectable mark
       .attr('x', d => x(d.label)).attr('width', x.bandwidth())
       .attr('y', d => y(d.value)).attr('height', d => height - y(d.value));
   },
 };
 `;
 
-export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
+/** Ordinary D3 charts adapted to Autark. */
+const EXAMPLES: PlotLabTemplate[] = [
     {
+        group: 'example',
         title: 'Lollipop by district (N:1)',
         columns: 'cdta2020, @transform',
         transform: { preset: 'binning-1d' },
@@ -244,6 +221,7 @@ export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
         code: LOLLIPOP,
     },
     {
+        group: 'example',
         title: 'Line of complaints per day (N:N)',
         columns: 'sjoin.collect.noise, @transform',
         transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'monthday' } },
@@ -252,6 +230,7 @@ export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
         code: LINE,
     },
     {
+        group: 'example',
         title: 'Box plot of areas by land use (N:1)',
         columns: 'landuse, shape_area',
         transform: { preset: 'box-stats' },
@@ -260,6 +239,7 @@ export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
         code: BOXPLOT,
     },
     {
+        group: 'example',
         title: 'HTML table of the regions (1:1)',
         columns: 'ntaname, landuse, shape_area',
         transform: null,
@@ -268,6 +248,7 @@ export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
         code: TABLE,
     },
     {
+        group: 'example',
         title: 'Beeswarm of areas (1:1)',
         columns: 'shape_area',
         transform: null,
@@ -276,15 +257,8 @@ export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
         code: BEESWARM,
     },
     {
-        title: 'Treemap in plain D3 (same as the built-in)',
-        columns: 'landuse, cdta2020',
-        transform: { preset: 'hierarchy' },
-        event: 'click',
-        margins: { left: 10, right: 10, top: 40, bottom: 10 },
-        code: TREEMAP,
-    },
-    {
-        title: 'A common mistake (the validator refuses it)',
+        group: 'example',
+        title: 'A common mistake (the contract refuses it)',
         columns: 'landuse, @transform',
         transform: { preset: 'binning-1d' },
         event: 'click',
@@ -292,3 +266,37 @@ export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [
         code: BROKEN,
     },
 ];
+
+/** Event of the lab chart for the event of a chart on the page. */
+const LAB_EVENTS: Partial<Record<next.PlotEvent, LabEvent>> = {
+    [next.PlotEvent.CLICK]: 'click',
+    [next.PlotEvent.BRUSH]: 'brush',
+    [next.PlotEvent.BRUSH_X]: 'brush-x',
+    [next.PlotEvent.BRUSH_Y]: 'brush-y',
+};
+
+/** The definition a built-in template returns. */
+const definitionOf = (code: string) => evaluateChart(code) as { name: string; label?: string };
+
+/** The 24 built-in charts, in the order of the page, each with the fields and data of its chart there. */
+const BUILT_INS: PlotLabTemplate[] = PLOTS.map(plot => {
+    const template = BUILT_IN_TEMPLATES.find(t => definitionOf(t.code).name === plot.config.type);
+    if (!template) throw new Error(`No built-in template for ${plot.config.type}.`);
+    const label = definitionOf(template.code).label ?? plot.config.type;
+    const title = plot.config.labels?.title;
+    return {
+        group: 'built-in',
+        title: title ? `${label}: ${title}` : label,
+        chartTitle: title ?? label,
+        columns: (plot.config.attributes?.axis ?? []).join(', '),
+        transform: plot.config.transform ?? null,
+        event: LAB_EVENTS[plot.event] ?? 'click',
+        margins: plot.config.margins ?? { left: 50, right: 20, top: 40, bottom: 40 },
+        ...(plot.config.topK ? { topK: plot.config.topK } : {}),
+        ...(plot.config.labels?.axis ? { axisLabels: plot.config.labels.axis } : {}),
+        code: template.code,
+    };
+});
+
+/** Every template: the D3 examples first (the page starts from the first one), then the built-in charts. */
+export const PLOT_LAB_TEMPLATES: PlotLabTemplate[] = [...EXAMPLES, ...BUILT_INS];

@@ -27,13 +27,14 @@ function dayOf(value: unknown): number | null {
     return Number.isFinite(time) ? Math.floor(time / DAY) * DAY : null;
 }
 
-/** Bucket label of a day: `MM-DD`, which sorts in time order within a year. */
+/** Bucket label of a day: `YYYY-MM-DD`, like the `day` resolution of `binning-events`. */
 function bucketOf(day: number): string {
-    return new Date(day).toISOString().slice(5, 10);
+    return new Date(day).toISOString().slice(0, 10);
 }
 
 export const movingAverage: TransformDefinition = {
     name: 'moving-average',
+    label: '7-day moving average',
     shape: 'series',
     run(rows, options, columns) {
         const eventsAttr = columns[0] ?? '';
