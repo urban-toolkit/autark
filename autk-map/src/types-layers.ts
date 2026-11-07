@@ -72,6 +72,11 @@ export interface LayerRenderInfo {
     colormap: LayerColormap;
     /** Pending canvas-relative pick coordinates `[x, y]` in CSS pixels, if any. */
     pickedComps?: number[];
+    /**
+     * Pending canvas-relative hover coordinates `[x, y]` in CSS pixels, if any. Resolved like `pickedComps`, but it
+     * only reports the feature under the pointer: nothing is highlighted. A pending `pickedComps` goes first.
+     */
+    hoverComps?: number[];
 }
 
 /** Render-ready layer payload produced by loaders and triangulation steps. */

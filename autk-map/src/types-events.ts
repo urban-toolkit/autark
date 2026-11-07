@@ -14,6 +14,8 @@
 export enum MapEvent {
   /** Selection payload emitted when features are picked from a layer. */
   PICKING = 'picking',
+  /** The feature under the pointer, emitted as the pointer moves over the map once hover is enabled. */
+  HOVER = 'hover',
 }
 
 /**
@@ -40,6 +42,26 @@ export interface MapEventData extends SelectionData {
 }
 
 /**
+ * Payload emitted when the pointer rests over, or leaves, a feature of the pick layer.
+ *
+ * It is emitted only after `AutkMap.setHover(true)`, at most about ten times a second while the pointer moves, and
+ * once with `id: null` when the pointer leaves the canvas, starts a drag or zooms.
+ */
+export interface HoverEventData {
+  /** Identifier of the layer that was read, or an empty string when there is none. */
+  layerId: string;
+  /** Component id (the feature's position in its layer) under the pointer, or `null` when there is none. */
+  id: number | null;
+  /** Pointer position relative to the canvas, in CSS pixels. */
+  x: number;
+  /** Pointer position relative to the canvas, in CSS pixels. */
+  y: number;
+}
+
+/**
  * Typed event-bus payload map for `MapEvent` listeners.
  */
-export type MapEventRecord = Record<MapEvent, MapEventData>;
+export type MapEventRecord = {
+  [MapEvent.PICKING]: MapEventData;
+  [MapEvent.HOVER]: HoverEventData;
+};

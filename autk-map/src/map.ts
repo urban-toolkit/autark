@@ -53,6 +53,7 @@ import {
 } from '@urban-toolkit/autk-core';
 
 import type { ElevationValidationStats } from '@urban-toolkit/autk-core';
+import { MapEvent } from './types-events';
 import type { MapEventRecord } from './types-events';
 
 import {
@@ -1040,6 +1041,38 @@ export class AutkMap {
         }
 
         layer.clearHighlightedIds();
+    }
+
+    /**
+     * Turns hover tracking on or off.
+     *
+     * While it is on, the map reads the feature of the pick layer under the pointer as the pointer moves over the canvas,
+     * and emits {@link MapEvent.HOVER} with it. It reads at most about ten times a second (each read renders one frame),
+     * waits until the pointer moves again, and stops while the map is dragged or zoomed. It needs a layer with picking
+     * on. Off by default, so a map that does not use it pays nothing.
+     *
+     * @param enabled Whether to track the pointer.
+     * @returns Nothing.
+     * @example
+     * map.updateRenderInfo('parks', { isPick: true });
+     * map.setHover(true);
+     * map.events.on(MapEvent.HOVER, ({ id }) => console.log(id));
+     */
+    setHover(enabled: boolean): void {
+        this._mouseEvents.setHoverEnabled(enabled);
+    }
+
+    /**
+     * Reports that nothing is hovered any more: drops a hover read in flight and emits {@link MapEvent.HOVER} with
+     * `id: null`.
+     *
+     * The map calls it when the pointer leaves the canvas or the view moves.
+     *
+     * @returns Nothing.
+     */
+    clearHover(): void {
+        this._picking.invalidateHover();
+        this._mapEvents.emit(MapEvent.HOVER, { layerId: this.activePickingLayer?.layerInfo.id ?? '', id: null, x: 0, y: 0 });
     }
 
     /**
