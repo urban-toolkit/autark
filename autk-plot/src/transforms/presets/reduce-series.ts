@@ -1,22 +1,18 @@
 /**
  * Reduce-series transform preset.
  *
- * Flattens feature-level series arrays into individual points, groups them
- * by their exact timestamp (no time-resolution binning), and reduces each
- * group to a single value across features. Source feature provenance
- * (`autkIds`) is merged across all points that share the same timestamp.
- *
- * Accepts two element formats inside the series array:
- *   - Plain numbers: the array index is used as the bucket key.
- *   - Objects: `timestamp` and `value` sub-fields are read (configurable).
- *     Timestamps are normalised and parsed as dates; the raw normalised string
- *     is used as the bucket key so sort order is preserved.
+ * Flattens the series arrays nested in each row into points, groups them by their exact timestamp
+ * (no resolution binning), and reduces each group to a single value across features, merging the
+ * source features (`autkIds`) of its points. A plain number is keyed by its array index; an object
+ * gives its `timestamp` and `value` fields (configurable), and its normalized timestamp string is
+ * the bucket key, so sort order is preserved.
  */
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { ReduceSeriesTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -24,9 +20,7 @@ import { unnestedProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runReduceSeries`.
- */
+/** Result produced by `runReduceSeries`. */
 export type ExecutedReduceSeriesTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'reduce-series';
@@ -36,12 +30,7 @@ export type ExecutedReduceSeriesTransform = {
     provenance: TransformProvenance;
 };
 
-/**
- * A single reduce-series bucket row ready for plot rendering.
- *
- * `bucket` is either the array index (plain-number series) or the normalised
- * timestamp string for object-based series.
- */
+/** A single reduce-series bucket row ready for plot rendering. */
 export type ReduceSeriesBucketRow = {
     /** Timestamp or index key identifying the reduced bucket. */
     bucket: string;
@@ -59,17 +48,17 @@ export type ReduceSeriesBucketRow = {
  * Runs a reduce-series transform and returns plot-ready rows.
  *
  * @param rows Input feature rows containing series arrays.
- * @param config Transform configuration controlling timestamp/value extraction and reduction.
+ * @param options Transform options (`transform.options`): timestamp and value fields, and reducer.
  * @param columns Ordered source columns; `columns[0]` is the series attribute.
- * @returns Executed reduced-series transform payload.
+ * @returns Rows of the `series` shape and their provenance.
  */
-export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransformConfig, columns: string[]): ExecutedReduceSeriesTransform {
+export function runReduceSeries(rows: AutkDatum[], options: NonNullable<ReduceSeriesTransformConfig['options']>, columns: string[]): Omit<ExecutedReduceSeriesTransform, 'preset'> {
     const seriesAttr = columns[0] ?? '';
-    const timestampAttr = config.options?.timestamp ?? 'timestamp';
-    const valueAttr = config.options?.value ?? 'value';
-    const reducer = config.options?.reducer ?? 'avg';
+    const timestampAttr = options.timestamp ?? 'timestamp';
+    const valueAttr = options.value ?? 'value';
+    const reducer = options.reducer ?? 'avg';
 
-    /** Intermediate flattened series-point row consumed by `reduceBuckets()`. */
+    /** Flattened series point, reduced by `collectBuckets`. */
     type PointRow = { autkIds: number[]; __bucket: string; __value: number | null };
     const pointRows: PointRow[] = [];
     /** Provenance id of each point row, `point:<feature>.<position in its series>`. */
@@ -98,12 +87,12 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
             const raw = valueAtPath(point as Record<string, unknown>, timestampAttr);
             if (raw === null || raw === undefined) return;
 
-            // Normalise space-separated ISO strings the same way binning-events does.
+            // Normalize space-separated ISO strings the same way binning-events does.
             const normalized = typeof raw === 'string' ? raw.replace(' ', 'T') : raw;
             const date = normalized instanceof Date ? normalized : new Date(normalized as string | number);
             if (!Number.isFinite(date.getTime())) return;
 
-            // Use the normalised raw string as the bucket key (no resolution binning).
+            // The normalized string is the bucket key (no resolution binning).
             const bucket = typeof normalized === 'string' ? normalized : String(raw);
 
             const v = Number(valueAtPath(point as Record<string, unknown>, valueAttr));
@@ -124,7 +113,6 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
     });
 
     return {
-        preset: 'reduce-series',
         provenance: unnestedProvenance({
             units: pointRows,
             unitIds: pointIds,
@@ -141,3 +129,13 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
         })),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** The series nested in each row, reduced at each timestamp: one row per timestamp. */
+export const reduceSeries: TransformDefinition = {
+    name: 'reduce-series',
+    label: 'Series reduced by time',
+    shape: 'series',
+    run: runReduceSeries,
+};

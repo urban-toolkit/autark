@@ -10,44 +10,23 @@ import type { FeatureShare } from './types-provenance';
 
 
 import {
-    Areachart,
-    Barchart,
-    Boxplot,
-    Bubblechart,
-    Calendar,
-    Hexbin,
-    Heatmatrix,
-    Linechart,
-    ParallelCoordinates,
-    Piechart,
-    Sankey,
-    Scatterplot,
-    TableVis,
-    Waffle,
-    Stackedbar,
-    Treemap,
-    Sunburst,
-    Radar,
-    Cumulativechart,
-    Chord,
-    Densitychart,
-    Violin,
     RegisteredPlot,
     registeredPlot,
+    hasRegisteredPlot,
 } from './plots';
 
 /**
  * Unified public entrypoint for autk-plot plot creation and interaction.
  *
- * `AutkPlot` wraps plot-specific implementations (`scatterplot`, `barchart`,
- * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`, `boxplot`, `sankey`, `pie`, `donut`,
- * `areachart`, `bubble`, `hexbin`, `calendar`, `waffle`, `stackedbar`, `treemap`,
- * `sunburst`, `radar`, `ecdf`, `pareto`, `chord`, `density`,
- * `violin`) behind a single constructor
- * and a stable API for selection and event handling.
+ * `AutkPlot` draws any registered plot (the built-in `scatterplot`, `barchart`,
+ * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`, `boxplot`, `sankey`, `pie`,
+ * `donut`, `areachart`, `bubble`, `hexbin`, `calendar`, `waffle`, `stackedbar`, `treemap`,
+ * `sunburst`, `radar`, `ecdf`, `pareto`, `chord`, `density`, `violin`, or a user plot through
+ * `{ type: 'registered', plot }`) behind a single constructor and a stable API for selection and
+ * event handling.
  *
- * The wrapper delegates all behavior to the concrete plot instance selected by
- * `config.type` while exposing a plot-agnostic interface to consumers.
+ * Every plot is a definition drawn by `RegisteredPlot`; the wrapper delegates all behavior to it
+ * while exposing a plot-agnostic interface.
  *
  * @example
  * const plot = new AutkPlot(plotDiv, {
@@ -62,7 +41,7 @@ import {
  * });
  */
 export class AutkPlot {
-    /** Concrete plot implementation selected from the discriminated config. */
+    /** Plot drawing the configured definition. */
     private _plot: PlotBaseInteractive;
     /** Active plot type handled by this wrapper instance. */
     private _type: PlotType;
@@ -90,12 +69,12 @@ export class AutkPlot {
     }
 
     /**
-     * Gets the underlying concrete plot instance.
+     * Gets the underlying plot instance.
      *
-     * This is mainly useful for advanced scenarios that require direct access
-     * to implementation-specific behavior.
+     * This is mainly useful for advanced scenarios that require direct access to the drawing
+     * (its data, scales, and selection state).
      *
-     * @returns Internal plot implementation instance.
+     * @returns The plot instance that draws the plot.
      */
     get instance(): PlotBaseInteractive {
         return this._plot;
@@ -123,7 +102,7 @@ export class AutkPlot {
 
     /**
      * Gets the plot event dispatcher.
-     * @returns Typed event dispatcher exposed by the concrete plot.
+     * @returns Typed event dispatcher of the plot.
      */
     get events(): EventEmitter<PlotEventRecord> {
         return this._plot.events;
@@ -157,7 +136,7 @@ export class AutkPlot {
     }
 
     /**
-     * Triggers a synchronous redraw of the underlying plot implementation.
+     * Triggers a synchronous redraw of the plot.
      *
      * @throws Never throws.
      * @example
@@ -180,145 +159,26 @@ export class AutkPlot {
     }
 
     /**
-     * Instantiates the concrete plot class from a discriminated config.
-     *
-     * This method is intentionally centralized so plot type dispatch remains
-     * explicit and easy to audit.
+     * Draws the registered definition named by the configuration: `config.plot`
+     * for `{ type: 'registered' }`, or the built-in plot `config.type`.
      *
      * @param div Host HTML element where the plot should render.
      * @param config Discriminated plot configuration.
-     * @returns Concrete plot instance matching `config.type`.
-     * @throws If `config.type` is not supported.
+     * @returns Plot instance drawing that definition.
+     * @throws If no plot is registered under the name.
      */
     private createPlot(div: HTMLElement, config: UnifiedPlotConfig): PlotBaseInteractive {
         switch (config.type) {
-            case 'scatterplot': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Scatterplot({ div, ...plotConfig });
-            }
-            case 'barchart': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Barchart({ div, ...plotConfig });
-            }
-            case 'parallel-coordinates': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new ParallelCoordinates({ div, ...plotConfig });
-            }
-            case 'table': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new TableVis({ div, ...plotConfig });
-            }
-            case 'linechart': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Linechart({ div, ...plotConfig });
-            }
-            case 'heatmatrix': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Heatmatrix({ div, ...plotConfig });
-            }
-            case 'boxplot': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Boxplot({ div, ...plotConfig });
-            }
-            case 'sankey': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Sankey({ div, ...plotConfig });
-            }
-            case 'pie': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Piechart({ div, ...plotConfig }, 0);
-            }
-            case 'donut': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Piechart({ div, ...plotConfig }, 0.55);
-            }
-            case 'areachart': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Areachart({ div, ...plotConfig });
-            }
-            case 'bubble': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Bubblechart({ div, ...plotConfig });
-            }
-            case 'hexbin': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Hexbin({ div, ...plotConfig });
-            }
-            case 'calendar': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Calendar({ div, ...plotConfig });
-            }
-            case 'waffle': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Waffle({ div, ...plotConfig });
-            }
-            case 'stackedbar': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Stackedbar({ div, ...plotConfig });
-            }
-            case 'treemap': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Treemap({ div, ...plotConfig });
-            }
-            case 'sunburst': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Sunburst({ div, ...plotConfig });
-            }
-            case 'radar': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Radar({ div, ...plotConfig });
-            }
-            case 'ecdf': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Cumulativechart({ div, ...plotConfig }, 'ecdf');
-            }
-            case 'pareto': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Cumulativechart({ div, ...plotConfig }, 'pareto');
-            }
-            case 'chord': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Chord({ div, ...plotConfig });
-            }
-            case 'density': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Densitychart({ div, ...plotConfig });
-            }
-            case 'violin': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Violin({ div, ...plotConfig });
-            }
             case 'registered': {
                 const { type, ...plotConfig } = config;
                 void type;
                 return new RegisteredPlot({ div, ...plotConfig }, registeredPlot(config.plot));
             }
             default: {
-                throw new Error(`Unsupported plot type: ${config.type}`);
+                // Built-in plots are definitions registered like user plots.
+                const { type, ...plotConfig } = config;
+                if (!hasRegisteredPlot(type)) throw new Error(`Unsupported plot type: ${type}`);
+                return new RegisteredPlot({ div, ...plotConfig }, registeredPlot(type));
             }
         }
     }

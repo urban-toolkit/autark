@@ -19,12 +19,22 @@ import type {
 
 import { cardinality, compose, image, transpose } from './relations';
 
-/** Returns the provenance id of a source feature index. */
+/**
+ * Provenance id of a source feature.
+ *
+ * @param index Source feature index.
+ * @returns Id `feature:<index>`.
+ */
 export function featureId(index: number): ProvenanceId {
     return `feature:${index}`;
 }
 
-/** Returns the provenance id of the mark that renders a row. */
+/**
+ * Provenance id of the mark that renders a row.
+ *
+ * @param rowId Provenance id of the row.
+ * @returns Id `mark:<rowId>`.
+ */
 export function markId(rowId: ProvenanceId): ProvenanceId {
     return `mark:${rowId}`;
 }

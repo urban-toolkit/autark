@@ -1,16 +1,16 @@
 /**
  * Hierarchy transform preset.
  *
- * Groups rows by an ordered list of categorical columns, from the top level
- * down (e.g. district → land use). Each level partitions the level below, so a
- * row falls in exactly one node per level and every node reduces the rows
- * under it. Used by stacked and grouped bars, treemaps, and sunbursts.
+ * Groups rows by an ordered list of categorical columns, from the top level down (e.g. group →
+ * category). Each level partitions the level below, so a row falls in exactly one node per level
+ * and every node reduces the rows under it. Read by the stacked bar chart, treemap, and sunburst.
  */
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { HierarchyTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -19,9 +19,7 @@ import { hierarchyProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runHierarchy`.
- */
+/** Result produced by `runHierarchy`. */
 export type ExecutedHierarchyTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'hierarchy';
@@ -62,17 +60,17 @@ type HierarchyUnit = Row & { autkIds: number[]; __key: string; __value: number |
  * Runs a hierarchy transform and returns the nodes of every level.
  *
  * @param rows Input feature rows.
- * @param config Transform configuration with reducer and optional value column.
+ * @param options Transform options (`transform.options`) with reducer and optional value column.
  * @param columns Categorical columns, top level first.
- * @returns Nodes sorted by level, then by path.
+ * @returns Rows of the `hierarchy` shape and their provenance, with the depth.
  * @throws If no column is given.
  */
-export function runHierarchy(rows: AutkDatum[], config: HierarchyTransformConfig, columns: string[]): ExecutedHierarchyTransform {
+export function runHierarchy(rows: AutkDatum[], options: NonNullable<HierarchyTransformConfig['options']>, columns: string[]): Omit<ExecutedHierarchyTransform, 'preset'> {
     if (columns.length === 0) {
         throw new Error('hierarchy: at least one column is required.');
     }
-    const reducer = config.options?.reducer ?? 'count';
-    const valueAttr = config.options?.value ?? '';
+    const reducer = options.reducer ?? 'count';
+    const valueAttr = options.value ?? '';
     const depth = columns.length;
 
     const levelUnits: HierarchyUnit[][] = columns.map(() => []);
@@ -116,7 +114,6 @@ export function runHierarchy(rows: AutkDatum[], config: HierarchyTransformConfig
     const nodeId = (key: string) => `node:${key}`;
 
     return {
-        preset: 'hierarchy',
         rows: nodeRows,
         depth,
         provenance: hierarchyProvenance({
@@ -139,3 +136,13 @@ function comparePaths(a: string[], b: string[]): number {
     }
     return a.length - b.length;
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Rows grouped by categorical columns, from the top level down: one row per node. */
+export const hierarchy: TransformDefinition = {
+    name: 'hierarchy',
+    label: 'Hierarchy of columns',
+    shape: 'hierarchy',
+    run: runHierarchy,
+};

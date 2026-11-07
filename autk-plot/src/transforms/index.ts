@@ -1,9 +1,9 @@
 /**
  * Transform pipeline entry point and re-exports.
  *
- * Exposes the shared transform kernel, all preset runners, and the top-level
- * `run` dispatcher. Internal modules and the public API import from here
- * instead of from individual preset files.
+ * Exposes the shared transform kernel, the registry of transforms (built-in and user-defined,
+ * registered the same way), and the top-level `run`. Internal modules and the public API import
+ * from here instead of from individual preset files.
  */
 
 import type { AutkDatum } from '../types-plot';
@@ -21,20 +21,10 @@ import type { ExecutedCumulativeTransform } from './presets/cumulative';
 import type { ExecutedFoldTransform } from './presets/fold';
 import type { ExecutedDensityTransform } from './presets/density';
 
-import { runBinning1d } from './presets/binning-1d';
-import { runBinning2d } from './presets/binning-2d';
-import { runSort } from './presets/sort';
-import { runBinningEvents } from './presets/binning-events';
-import { runReduceSeries } from './presets/reduce-series';
-import { runBoxStats } from './presets/box-stats';
-import { runFlows } from './presets/flows';
-import { runBinningHex } from './presets/binning-hex';
-import { runHierarchy } from './presets/hierarchy';
-import { runCumulative } from './presets/cumulative';
-import { runFold } from './presets/fold';
-import { runDensity } from './presets/density';
-import { runRegistered } from './registry';
+import { runTransform } from './registry';
 import type { ExecutedRegisteredTransform } from './registry';
+/** Registers the built-in transforms written as definitions. */
+import './built-in';
 
 // ---- Public row types ---------------------------------------------------
 
@@ -51,10 +41,11 @@ export type { CumulativeRow, ExecutedCumulativeTransform } from './presets/cumul
 export type { FoldCellRow, ExecutedFoldTransform } from './presets/fold';
 export type { DensityPointRow, ExecutedDensityTransform } from './presets/density';
 
-// ---- Extension: user-defined transforms and provenance building blocks ---
+// ---- Extension ----------------------------------------------------------
+// User-defined transforms and provenance building blocks.
 
-export { registerTransform, unregisterTransform, registeredTransform, shapeFields } from './registry';
-export type { RowShape, TransformDefinition, TransformOutput, ExecutedRegisteredTransform } from './registry';
+export { registerTransform, unregisterTransform, registeredTransform, shapeFields, shapeOutput } from './registry';
+export type { RowShape, ShapeExtras, TransformDefinition, TransformOutput, ExecutedRegisteredTransform } from './registry';
 export { collectBuckets } from './kernel';
 export type { CollectedBucket } from './kernel';
 export {
@@ -95,28 +86,17 @@ export type ExecutedPlotTransform =
 // ---- Top-level dispatcher -----------------------------------------------
 
 /**
- * Runs a plot transform config through the preset pipeline.
+ * Runs the transform of a plot configuration: the registered definition named
+ * by `preset` (or by `name`, for `preset: 'registered'`), built-in or user.
  *
  * @param rows Input rows to transform.
- * @param config Transform configuration selecting the preset runner.
- * @param columns Ordered source columns passed to the chosen preset.
- * @returns Executed transform payload tagged with its preset discriminator.
- * @throws Never throws. Falls through to the last preset when unrecognized.
+ * @param config Transform configuration naming the transform and its options.
+ * @param columns Ordered source columns passed to the transform.
+ * @returns Rows and provenance of the transform, tagged with its preset.
+ * @throws If no transform is registered under the name, or its output is malformed.
  * @example
  * const result = run(data, { preset: 'binning-1d', options: { bins: 10 } }, ['area']);
  */
 export function run(rows: AutkDatum[], config: PlotTransformConfig, columns: string[]): ExecutedPlotTransform {
-    if (config.preset === 'binning-1d') return runBinning1d(rows, config, columns);
-    if (config.preset === 'binning-2d') return runBinning2d(rows, config, columns);
-    if (config.preset === 'sort') return runSort(rows, config, columns);
-    if (config.preset === 'binning-events') return runBinningEvents(rows, config, columns);
-    if (config.preset === 'box-stats') return runBoxStats(rows, config, columns);
-    if (config.preset === 'flows') return runFlows(rows, config, columns);
-    if (config.preset === 'binning-hex') return runBinningHex(rows, config, columns);
-    if (config.preset === 'hierarchy') return runHierarchy(rows, config, columns);
-    if (config.preset === 'cumulative') return runCumulative(rows, config, columns);
-    if (config.preset === 'fold') return runFold(rows, config, columns);
-    if (config.preset === 'density') return runDensity(rows, config, columns);
-    if (config.preset === 'registered') return runRegistered(rows, config, columns);
-    return runReduceSeries(rows, config, columns);
+    return runTransform(rows, config, columns) as ExecutedPlotTransform;
 }

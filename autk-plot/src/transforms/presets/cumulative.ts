@@ -1,12 +1,10 @@
 /**
  * Cumulative transform preset.
  *
- * Partitions rows by one column into ordered bars and accumulates them: point
- * `k` reduces the rows of bars `0…k`. Numeric columns give an empirical
- * cumulative distribution (bars ordered by value); categorical columns ordered
- * by reduced value, largest first, give a Pareto chart.
- *
- * Only additive reducers apply: a point is the sum of the bars before it.
+ * Partitions rows by one column into ordered bars and accumulates them: point `k` reduces the rows
+ * of bars `0…k`. Numeric columns give an empirical cumulative distribution (bars ordered by
+ * value); categorical columns ordered by reduced value, largest first, give a Pareto chart. Only
+ * additive reducers apply: a point is the sum of the bars before it.
  */
 
 import * as d3 from 'd3';
@@ -15,6 +13,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { CumulativeTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -27,9 +26,7 @@ const DEFAULT_BINS = 50;
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runCumulative`.
- */
+/** Result produced by `runCumulative`. */
 export type ExecutedCumulativeTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'cumulative';
@@ -39,7 +36,7 @@ export type ExecutedCumulativeTransform = {
     numeric: boolean;
     /** Sum of all bar values, the value of the last point. */
     total: number;
-    /** Provenance `D0 features → D1 bars → D2 cumulative points`, aligned with `rows`. */
+    /** Provenance `D0 features → D1 bins → D2 points`, aligned with `rows`. */
     provenance: TransformProvenance;
 };
 
@@ -69,23 +66,24 @@ export type CumulativeRow = {
  * Runs a cumulative transform and returns bars and cumulative points.
  *
  * @param rows Input feature rows.
- * @param config Transform configuration: additive reducer, value column, bins, and order.
+ * @param options Transform options (`transform.options`): additive reducer, value column, bins, and order.
  * @param columns `columns[0]` is the column to partition.
- * @returns Bars and points in bar order, with the grand total.
+ * @returns Rows of the `cumulative` shape and their provenance, with whether the column is
+ * numeric and the total.
  * @throws If the reducer is not additive.
  */
-export function runCumulative(rows: AutkDatum[], config: CumulativeTransformConfig, columns: string[]): ExecutedCumulativeTransform {
+export function runCumulative(rows: AutkDatum[], options: NonNullable<CumulativeTransformConfig['options']>, columns: string[]): Omit<ExecutedCumulativeTransform, 'preset'> {
     const attr = columns[0] ?? '';
-    const reducer = config.options?.reducer ?? 'count';
+    const reducer = options.reducer ?? 'count';
     if (reducer !== 'count' && reducer !== 'sum') {
         throw new Error('cumulative: only additive reducers (count or sum) can be accumulated.');
     }
-    const valueAttr = config.options?.value;
+    const valueAttr = options.value;
 
     const raw = rows.map(row => valueAtPath(row, attr));
     const present = raw.filter(v => v !== null && v !== undefined && v !== '');
     const numeric = present.length > 0 && present.every(v => Number.isFinite(Number(v)));
-    const order = config.options?.order ?? (numeric ? 'key' : 'value');
+    const order = options.order ?? (numeric ? 'key' : 'value');
 
     // Bar key, label, and upper edge of each row.
     const format = d3.format('~s');
@@ -93,7 +91,7 @@ export function runCumulative(rows: AutkDatum[], config: CumulativeTransformConf
     if (numeric) {
         const values = present.map(Number);
         const distinct = new Set(values).size;
-        const bins = config.options?.bins ?? (distinct <= MAX_EXACT_STEPS ? 0 : DEFAULT_BINS);
+        const bins = options.bins ?? (distinct <= MAX_EXACT_STEPS ? 0 : DEFAULT_BINS);
         const [lo, hi] = d3.extent(values) as [number, number];
         const width = (hi - lo) / Math.max(1, bins) || 1;
         barOf = (value) => {
@@ -156,7 +154,6 @@ export function runCumulative(rows: AutkDatum[], config: CumulativeTransformConf
 
     const outputRows = [...bars, ...points];
     return {
-        preset: 'cumulative',
         rows: outputRows,
         numeric,
         total,
@@ -168,3 +165,13 @@ export function runCumulative(rows: AutkDatum[], config: CumulativeTransformConf
         }),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Ordered bars of one column and their running total: one row per bar and one per point. */
+export const cumulative: TransformDefinition = {
+    name: 'cumulative',
+    label: 'Cumulative distribution',
+    shape: 'cumulative',
+    run: runCumulative,
+};

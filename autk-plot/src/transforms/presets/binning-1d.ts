@@ -1,8 +1,8 @@
 /**
  * Binning-1d transform preset.
  *
- * Aggregates a single numeric or categorical column into fixed-width bins,
- * preserving source feature provenance (`autkIds`) on every output row.
+ * Groups rows by one column, by category or by equal-width numeric range, and reduces each bin,
+ * keeping the source features (`autkIds`) of every bin.
  */
 
 import * as d3 from 'd3';
@@ -11,6 +11,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { Binning1dTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -18,12 +19,7 @@ import { binnedProvenance, indexedBins } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runBinning1d`.
- *
- * Carries the fixed attribute tuple `['label', 'value']` and the binned rows
- * ready for bar-plot rendering.
- */
+/** Result produced by `runBinning1d`. */
 export type ExecutedBinning1dTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-1d';
@@ -33,12 +29,7 @@ export type ExecutedBinning1dTransform = {
     provenance: TransformProvenance;
 };
 
-/**
- * A single bin row ready for plot rendering.
- *
- * `label` is either a category string or a formatted numeric range such as `"1k-2k"`.
- * `order` is the numeric sort key for the bin (bin index for quantitative, insertion order for categorical).
- */
+/** A single bin row ready for plot rendering. */
 export type Binning1dBinRow = {
     /** Bin label — category string or formatted numeric range such as `"1k-2k"`. */
     label: string;
@@ -57,17 +48,18 @@ export type Binning1dBinRow = {
 /**
  * Runs a binning-1d transform and returns plot-ready rows.
  *
- * Detects whether the value attribute is categorical or quantitative, builds a
- * bin-label mapper, then groups rows by bin label and reduces using the specified reducer.
+ * Detects whether the attribute is categorical or quantitative, builds a bin-label mapper, then
+ * groups rows by bin label and reduces them with the configured reducer.
  *
- * @param rows - Input feature data to bin.
- * @param config - Transform configuration, including reducer, bin count, and optional value column.
- * @param columns - Ordered attribute names; `columns[0]` is the value axis attribute.
+ * @param rows Input feature rows.
+ * @param options Transform options (`transform.options`): reducer, bin count, and value column.
+ * @param columns `columns[0]` is the column to bin.
+ * @returns Rows of the `category-value` shape and their provenance.
  */
-export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig, columns: string[]): ExecutedBinning1dTransform {
+export function runBinning1d(rows: AutkDatum[], options: NonNullable<Binning1dTransformConfig['options']>, columns: string[]): Omit<ExecutedBinning1dTransform, 'preset'> {
     const valueAttr = columns[0] ?? '';
-    const reducer = config.options?.reducer ?? 'count';
-    const numBins = config.options?.bins ?? 10;
+    const reducer = options.reducer ?? 'count';
+    const numBins = options.bins ?? 10;
 
     const mapper = buildBinMapper(rows, valueAttr, numBins);
 
@@ -75,7 +67,7 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
         rows,
         bucketOf: (row) => mapper.label(valueAtPath(row, valueAttr)),
         valueOf: reducer === 'count' ? undefined : (row) => {
-            const col = config.options?.value ?? valueAttr;
+            const col = options.value ?? valueAttr;
             const v = Number(valueAtPath(row, col));
             return Number.isFinite(v) ? v : null;
         },
@@ -93,7 +85,6 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
         .sort((a, b) => a.order - b.order);
 
     return {
-        preset: 'binning-1d',
         rows: binRows,
         provenance: binnedProvenance({
             rows,
@@ -111,13 +102,14 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
 /**
  * Builds label and order mappers for a single axis attribute.
  *
- * Detects whether the attribute is categorical or quantitative. Categorical
- * attributes map to their string representation; quantitative attributes are
- * divided into `numBins` fixed-width ranges with SI-formatted boundaries.
+ * Detects whether the attribute is categorical or quantitative. Categorical attributes map to
+ * their string representation; quantitative attributes are divided into `numBins` fixed-width
+ * ranges with SI-formatted boundaries.
  *
- * @param rows - Input data used to infer the attribute's type and numeric range.
- * @param attr - Dot-path attribute name to map.
- * @param numBins - Number of equal-width bins for quantitative attributes.
+ * @param rows Input rows used to infer the attribute's type and numeric range.
+ * @param attr Dot-path attribute name to map.
+ * @param numBins Number of equal-width bins for quantitative attributes.
+ * @returns The bin label of a value, the sort order of a label, and every label in order.
  */
 export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number) {
     const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
@@ -185,3 +177,13 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
         labels: () => Array.from(labelToOrder.keys()),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Rows binned by one column (categories, or equal-width ranges of numbers): one row per bin. */
+export const binning1d: TransformDefinition = {
+    name: 'binning-1d',
+    label: 'Bins of one column',
+    shape: 'category-value',
+    run: runBinning1d,
+};

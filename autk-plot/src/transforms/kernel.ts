@@ -1,5 +1,8 @@
 import type { TransformReducer } from '../api';
 
+/** The reducers a bucket can apply. */
+const REDUCERS: readonly TransformReducer[] = ['count', 'sum', 'avg', 'min', 'max'];
+
 /**
  * Minimum row shape expected by `reduceBuckets`.
  *
@@ -47,7 +50,8 @@ type ReduceBucketsOptions = {
  *
  * @param options Aggregation configuration with `rows`, `bucketOf`, `valueOf`, and `reducer`.
  * @returns Reduced buckets with merged `autkIds` for selection linking.
- * @throws Never throws. Rows with null keys or non-finite values are skipped.
+ * @throws If the reducer is not one of count, sum, avg, min, max. Rows with null keys or non-finite
+ * values are skipped.
  * @example
  * const buckets = reduceBuckets({
  *   rows: data,
@@ -71,10 +75,14 @@ export function reduceBuckets(options: ReduceBucketsOptions): ReducedBucket[] {
  *
  * @param options Aggregation configuration with `rows`, `bucketOf`, `valueOf`, and `reducer`.
  * @returns Reduced buckets with their counted member rows.
- * @throws Never throws. Rows with null keys or non-finite values are skipped.
+ * @throws If the reducer is not one of count, sum, avg, min, max. Rows with null keys or non-finite
+ * values are skipped.
  */
 export function collectBuckets(options: ReduceBucketsOptions): CollectedBucket[] {
     const { rows, bucketOf, reducer } = options;
+    if (reducer !== undefined && !REDUCERS.includes(reducer)) {
+        throw new Error(`Unknown reducer "${String(reducer)}" (expected ${REDUCERS.join(', ')}).`);
+    }
     // Only an own `valueOf` counts: every object literal inherits Object.prototype.valueOf,
     // which would otherwise be called on each row when the option is left out.
     const valueOf = Object.prototype.hasOwnProperty.call(options, 'valueOf') ? options.valueOf : undefined;

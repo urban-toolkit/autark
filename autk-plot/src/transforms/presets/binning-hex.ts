@@ -1,13 +1,10 @@
 /**
- * Hexagonal binning transform preset.
+ * Binning-hex transform preset.
  *
- * Maps two numeric columns to a `width × height` pixel area, inset by one
- * hexagon radius so edge hexagons stay inside it, assigns every row
- * to the hexagon of a regular pointy-top grid that contains it, and reduces a
- * value column within each hexagon. Rows with a non-finite x or y are skipped.
- *
- * Each row is one feature and falls in exactly one hexagon, so features and
- * hexagons relate `N:1`, like `binning-2d` with hexagonal cells.
+ * Maps two numeric columns to a `width × height` pixel area, inset by one hexagon radius so edge
+ * hexagons stay inside it, assigns every row to the hexagon of a regular pointy-top grid that
+ * contains it, and reduces a value column within each hexagon. Rows with a non-finite x or y are
+ * skipped. Each feature falls in exactly one hexagon (`N:1`), like `binning-2d` with hexagons.
  */
 
 import * as d3 from 'd3';
@@ -16,6 +13,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { BinningHexTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -23,9 +21,7 @@ import { binnedProvenance, indexedBins } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runBinningHex`.
- */
+/** Result produced by `runBinningHex`. */
 export type ExecutedBinningHexTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-hex';
@@ -39,9 +35,7 @@ export type ExecutedBinningHexTransform = {
     provenance: TransformProvenance;
 };
 
-/**
- * A single aggregated hexagon ready for plot rendering.
- */
+/** A single aggregated hexagon ready for plot rendering. */
 export type BinningHexRow = {
     /** Readable hexagon label: its center in data units, e.g. `"12M · 20k"`. */
     label: string;
@@ -106,21 +100,21 @@ function extentOf(rows: AutkDatum[], attr: string): [number, number] {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a hexagonal binning transform and returns plot-ready hexagon rows.
+ * Runs a binning-hex transform and returns plot-ready hexagon rows, sorted by grid position.
  *
- * @param rows Input feature data to aggregate.
- * @param config Transform configuration: reducer, value column, radius, and pixel area.
- * @param columns Ordered attribute names; `columns[0]` is x and `columns[1]` is y.
- * @returns Hexagon rows sorted by grid position, with the data extent used.
+ * @param rows Input feature rows.
+ * @param options Transform options (`transform.options`): reducer, value column, radius, and pixel area.
+ * @param columns `columns[0]` is the x column, `columns[1]` the y column.
+ * @returns Rows of the `binning-hex` shape and their provenance, with the data extent and radius.
  */
-export function runBinningHex(rows: AutkDatum[], config: BinningHexTransformConfig, columns: string[]): ExecutedBinningHexTransform {
+export function runBinningHex(rows: AutkDatum[], options: NonNullable<BinningHexTransformConfig['options']>, columns: string[]): Omit<ExecutedBinningHexTransform, 'preset'> {
     const xAttr = columns[0] ?? '';
     const yAttr = columns[1] ?? '';
-    const valueAttr = config.options?.value;
-    const reducer = config.options?.reducer ?? 'count';
-    const radius = config.options?.radius ?? 14;
-    const width = config.options?.width ?? 800;
-    const height = config.options?.height ?? 500;
+    const valueAttr = options.value;
+    const reducer = options.reducer ?? 'count';
+    const radius = options.radius ?? 14;
+    const width = options.width ?? 800;
+    const height = options.height ?? 500;
 
     const xExtent = extentOf(rows, xAttr);
     const yExtent = extentOf(rows, yAttr);
@@ -162,7 +156,6 @@ export function runBinningHex(rows: AutkDatum[], config: BinningHexTransformConf
     ];
 
     return {
-        preset: 'binning-hex',
         extent: { x: xExtent, y: yExtent },
         radius,
         provenance: binnedProvenance({
@@ -187,3 +180,13 @@ export function runBinningHex(rows: AutkDatum[], config: BinningHexTransformConf
         }),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Rows binned in hexagons by two numeric columns: one row per hexagon. */
+export const binningHex: TransformDefinition = {
+    name: 'binning-hex',
+    label: 'Hexagonal bins',
+    shape: 'binning-hex',
+    run: runBinningHex,
+};

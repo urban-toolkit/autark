@@ -1,85 +1,61 @@
 /**
- * @fileoverview Bubble chart: a scatter plot whose point area encodes a third attribute.
+ * @fileoverview Bubble chart of three numeric attributes.
  *
- * Takes three numeric attributes: x (`axis[0]`), y (`axis[1]`), and size
- * (`axis[2]`). Bubble area is proportional to the size value. Larger bubbles
- * are drawn first so smaller ones stay visible and clickable. Interactions and
- * the segregated view are those of the scatter plot: an inner disc whose area
- * is the selected fraction of the bubble.
+ * A scatter plot whose bubble area is proportional to the size attribute. Larger bubbles are
+ * drawn first so smaller ones stay visible and clickable. Selection and the partial view are
+ * those of the scatter plot.
  *
  * @example
- * const plot = new AutkPlot(plotDiv, {
+ * new AutkPlot(plotDiv, {
  *   type: 'bubble',
  *   collection: geojson,
  *   attributes: { axis: ['shape_area', 'shape_leng', 'events_count'] },
- *   labels: { axis: ['area', 'perimeter', 'events'], title: 'Regions' },
- *   events: [PlotEvent.BRUSH]
+ *   labels: { axis: ['area', 'perimeter', 'events'], title: 'Features' }
  * });
  */
 
 import * as d3 from 'd3';
 
-import { valueAtPath } from '@urban-toolkit/autk-core';
-
-import type { PlotConfig } from '../api';
 import type { AutkDatum } from '../types-plot';
 
-import { Scatterplot } from './scatterplot';
+import type { PlotDefinition } from './registered';
+import { gridAxes, pointTitle, scatterplot } from './scatterplot';
 
-/** Radius range of bubbles in pixels, from size `0` to the largest size. */
+/** Radius range of the bubbles, in pixels. */
 const RADIUS_RANGE: [number, number] = [2, 16];
 
-/**
- * Scatter plot with bubble area proportional to a third attribute.
- */
-export class Bubblechart extends Scatterplot {
+/** Points of three numeric attributes (`axis[0]` on x, `axis[1]` on y, `axis[2]` as area). */
+export const bubblechart: PlotDefinition = {
+    ...scatterplot,
+    name: 'bubble',
+    label: 'Bubble chart',
+    validate: config => {
+        if ((config.attributes?.axis?.length ?? 0) < 3) throw new Error('Bubble chart requires x, y, and size attributes.');
+    },
 
-    /**
-     * Size scale, rebuilt on every render. Declared without an initializer:
-     * the scatter plot constructor draws before subclass fields would be set.
-     */
-    declare protected sizeScale: d3.ScalePower<number, number> | undefined;
+    draw(context) {
+        const { group, rows, value } = context;
+        const [x, y] = gridAxes(context);
 
-    /**
-     * Creates a bubble chart and performs the initial draw.
-     *
-     * @param config Plot configuration with three numeric axis attributes.
-     * @throws If fewer than three axis attributes are given.
-     */
-    constructor(config: PlotConfig) {
-        if ((config.attributes?.axis?.length ?? 0) < 3) {
-            throw new Error('Bubble chart requires x, y, and size attributes.');
-        }
-        super(config);
-    }
+        const sizes = rows.map(row => Number(value(row, 2))).filter(v => Number.isFinite(v) && v >= 0);
+        const size = d3.scaleSqrt([0, d3.max(sizes) || 1], RADIUS_RANGE);
+        const radius = (row: AutkDatum) => {
+            const v = Number(value(row, 2));
+            return Number.isFinite(v) && v >= 0 ? size(v) : RADIUS_RANGE[0];
+        };
 
-    /**
-     * Builds the size scale, renders the scatter plot, and draws larger
-     * bubbles first.
-     */
-    public override render(): void {
-        const sizeAttr = this.renderAxisAttributes[2];
-        const sizes = this._data.map(d => Number(valueAtPath(d, sizeAttr))).filter(v => Number.isFinite(v) && v >= 0);
-        this.sizeScale = d3.scaleSqrt().domain([0, d3.max(sizes) || 1]).range(RADIUS_RANGE);
-
-        super.render();
-
-        d3.select(this._div).selectAll<SVGCircleElement, AutkDatum>('.autkMark')
+        group.selectAll('circle.autkMark')
+            .data(rows)
+            .join('circle')
+            .attr('class', 'autkMark')
+            .attr('cx', row => x(Number(value(row, 0)) || 0))
+            .attr('cy', row => y(Number(value(row, 1)) || 0))
+            .attr('r', radius)
             .style('fill-opacity', 0.8)
             .style('stroke', '#ffffff')
             .style('stroke-width', 0.75)
-            .sort((a, b) => this.radiusOf(b) - this.radiusOf(a));
-    }
-
-    /**
-     * Bubble radius from the size attribute, with area proportional to it.
-     *
-     * @param d Bound datum of the bubble.
-     * @returns Radius in pixels; the smallest radius for missing or negative sizes.
-     */
-    protected override radiusOf(d: AutkDatum): number {
-        const size = Number(valueAtPath(d, this.renderAxisAttributes[2]));
-        if (!this.sizeScale || !Number.isFinite(size) || size < 0) return RADIUS_RANGE[0];
-        return this.sizeScale(size);
-    }
-}
+            .sort((a, b) => radius(b) - radius(a))
+            .append('title')
+            .text(pointTitle(context, 3));
+    },
+};
