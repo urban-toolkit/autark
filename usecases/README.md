@@ -1,10 +1,11 @@
 # Autark case studies
 
-Three complete, browser-based examples demonstrating the published Autark workspace packages:
+Four complete, browser-based examples demonstrating the published Autark workspace packages:
 
 - [Niterói](src/niteroi/README.md): temperature regression and linked plots.
 - [Shadows](src/shadows/README.md): per-building shadow estimation on road segments.
 - [Urbane](src/urbane/README.md): weighted urban indicators and neighborhood/building drill-down.
+- [Provenance](src/provenance/README.md): 24 linked autk-plot charts that paint only the part of each mark a selection produces, and Try it Yourself to write charts and transforms.
 
 ## Run
 
@@ -16,7 +17,7 @@ make dev APP=usecases
 make dev APP=usecases OPEN=/src/niteroi/main.html
 ```
 
-Use a WebGPU-enabled browser (Chrome/Edge), with localhost or HTTPS. All three examples load their OSM data from bundled PBF files in `public/data`; none queries Overpass or OSM geocoding during loading. Raster/CSV/GeoJSON inputs are local too. Library runtime resources (for example DuckDB WASM/extensions) may still require network access unless separately cached/hosted. The active PBF preparation scripts are [`scripts/prepare-usecase-pbf.sh`](scripts/prepare-usecase-pbf.sh) (Niterói/Chicago) and [`scripts/regenerate-manhattan-administrative-pbf.sh`](scripts/regenerate-manhattan-administrative-pbf.sh) (Manhattan); they require complete regional source extracts. OSM data: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under ODbL; regional sources supplied by Geofabrik and BBBike.
+Use a WebGPU-enabled browser (Chrome/Edge), with localhost or HTTPS. Niterói, Shadows and Urbane load their OSM data from bundled PBF files in `public/data` (Provenance reads a Manhattan GeoJSON and a noise complaints CSV from the Autark gallery, also in `public/data`); none queries Overpass or OSM geocoding during loading. Raster/CSV/GeoJSON inputs are local too. Library runtime resources (for example DuckDB WASM/extensions) may still require network access unless separately cached/hosted. The active PBF preparation scripts are [`scripts/prepare-usecase-pbf.sh`](scripts/prepare-usecase-pbf.sh) (Niterói/Chicago) and [`scripts/regenerate-manhattan-administrative-pbf.sh`](scripts/regenerate-manhattan-administrative-pbf.sh) (Manhattan); they require complete regional source extracts. OSM data: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under ODbL; regional sources supplied by Geofabrik and BBBike.
 
 ## Read the code
 
