@@ -39,9 +39,20 @@ import * as d3 from 'd3';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import type { SegregatedPart } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
+import { markId } from '../provenance';
+import { registeredTransform } from '../transforms/registry';
 
 import type { ExecutedPlotTransform } from '../transforms';
+
+/** Point of the selected-subset line of the segregated view. */
+type PartialPoint = {
+    /** Bucket position on the x scale. */
+    x: number;
+    /** Selected-subset value of the bucket, or `null` when it has no selected units. */
+    y: number | null;
+};
 
 /**
  * Line plot that aggregates feature-level series data into a single line.
@@ -50,6 +61,11 @@ import type { ExecutedPlotTransform } from '../transforms';
  * preserves provenance via `autkIds`.
  */
 export class Linechart extends PlotBaseInteractive {
+    /** Linear scale mapping bucket positions to pixel coordinates. */
+    protected xScale!: d3.ScaleLinear<number, number>;
+    /** Linear scale mapping bucket values to pixel coordinates. */
+    protected yScale!: d3.ScaleLinear<number, number>;
+
     /**
      * Creates a line plot instance and renders the initial state.
      *
@@ -65,7 +81,9 @@ export class Linechart extends PlotBaseInteractive {
         if (!config.transform) {
             throw new Error('Linechart requires a transform configuration.');
         }
-        if (config.transform.preset !== 'reduce-series' && config.transform.preset !== 'binning-events') {
+        // A registered transform is read like binning-events when it yields bucket and value rows.
+        const registered = config.transform.preset === 'registered' && registeredTransform(config.transform.name).shape === 'series';
+        if (config.transform.preset !== 'reduce-series' && config.transform.preset !== 'binning-events' && !registered) {
             throw new Error('Linechart only supports reduce-series and binning-events transform presets.');
         }
         else {
@@ -87,22 +105,27 @@ export class Linechart extends PlotBaseInteractive {
      */
     protected override resolveTransformResult(result: ExecutedPlotTransform) {
         const resolved = super.resolveTransformResult(result);
-        if (result.preset !== 'binning-events' && result.preset !== 'reduce-series') {
+        const series = result.preset === 'binning-events' || result.preset === 'reduce-series'
+            || (result.preset === 'registered' && result.shape === 'series');
+        if (!series) {
             return resolved;
         }
 
-        const rows = [...result.rows]
-            .sort((a, b) => this.compareBuckets(a.bucket, b.bucket))
-            .map((item, idx) => ({
-                x: idx,
-                label: this.formatBucketLabel(item.bucket),
-                y: item.value,
-                autkIds: item.autkIds,
-            }));
+        const items = result.rows as unknown as Array<{ bucket: string; value: number; autkIds: number[] }>;
+        const sorted = items
+            .map((item, idx) => ({ item, rowId: result.provenance.rowIds[idx] }))
+            .sort((a, b) => this.compareBuckets(a.item.bucket, b.item.bucket));
+        const rows = sorted.map(({ item }, idx) => ({
+            x: idx,
+            label: this.formatBucketLabel(item.bucket),
+            y: item.value,
+            autkIds: item.autkIds,
+        }));
 
         return {
             rows,
             axisAttributes: ['label', 'y'],
+            rowIds: sorted.map(({ rowId }) => rowId),
         };
     }
 
@@ -154,12 +177,18 @@ export class Linechart extends PlotBaseInteractive {
         // ---- Scales
         const n = Math.max(seriesData.length, 1);
         const allY = seriesData.map((item) => item.y);
+        // Segregated view: count and sum parts lie between 0 and the total, so the axis starts at 0.
+        const reducer = this._provenance.reducer;
+        const zeroBased = this.segregatedEnabled && (reducer === 'count' || reducer === 'sum');
+        if (zeroBased) allY.push(0);
         const yMin = allY.length > 0 ? Math.min(...allY) : 0;
         const yMax = allY.length > 0 ? Math.max(...allY) : 50;
         const yPad = (yMax - yMin) * 0.1 || 1;
 
-        const xScale = d3.scaleLinear().domain([0, n - 1]).range([0, innerW]);
-        const yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerH, 0]);
+        const xScale = this.xScale = d3.scaleLinear().domain([0, n - 1]).range([0, innerW]);
+        // With negative values the axis still extends below them; 0 is only the floor for non-negative data.
+        const yLow = zeroBased && yMin >= 0 ? 0 : yMin - yPad;
+        const yScale = this.yScale = d3.scaleLinear().domain([yLow, yMax + yPad]).range([innerH, 0]);
 
         // ---- Axes
         const xAxis = d3.axisBottom(xScale)
@@ -249,7 +278,8 @@ export class Linechart extends PlotBaseInteractive {
             .join('path')
             .attr('class', 'autk-line')
             .attr('fill', 'none')
-            .attr('stroke', '#4472c4')
+            // The line takes the mark color, so the line of the selection stands out.
+            .attr('stroke', PlotStyle.default)
             .attr('stroke-width', 1.5)
             .attr('d', lineGen);
 
@@ -279,6 +309,72 @@ export class Linechart extends PlotBaseInteractive {
             .text((d) => d);
 
         this.configureSignalListeners();
+    }
+
+    /**
+     * Buckets reduce units from many features, and one feature spreads units
+     * over many buckets, so the line can show partial contributions.
+     *
+     * @returns Always `true`; the line plot requires an aggregating transform.
+     */
+    protected override supportsSegregatedView(): boolean {
+        return true;
+    }
+
+    /**
+     * Draws the line of the selected subset next to the total line.
+     *
+     * Each bucket of the subset line applies the bucket reducer to the units of
+     * the selected features only. For count and sum, a bucket without selected
+     * units is `0`, clamped to the bottom of the plot when `0` is outside the y
+     * domain. For avg, min, and max it is a gap. Buckets with selected units
+     * also get a highlighted dot.
+     */
+    protected override renderSegregatedMarks(): void {
+        const group = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
+        if (group.empty() || !this.xScale || !this.yScale) return;
+
+        const parts = this.segregatedParts();
+        const byMark = new Map(parts.map(p => [p.mark, p]));
+        const additive = parts[0]?.part.additive ?? true;
+        const rows = this._data as Array<{ x: number }>;
+
+        const points: PartialPoint[] = parts.length === 0 ? [] : rows.map(row => {
+            const rowId = this.rowIdOf(row);
+            const part = rowId ? byMark.get(markId(rowId))?.part : undefined;
+            return { x: row.x, y: part?.value ?? (additive ? 0 : null) };
+        });
+
+        const yClamped = this.yScale.copy().clamp(true);
+        const line = d3.line<PartialPoint>()
+            .defined(p => p.y !== null)
+            .x(p => this.xScale(p.x))
+            .y(p => yClamped(p.y ?? 0));
+
+        group
+            .selectAll<SVGPathElement, PartialPoint[]>('.autkPartialLine')
+            .data(points.length > 0 ? [points] : [])
+            .join('path')
+            .attr('class', 'autkPartialLine')
+            .attr('fill', 'none')
+            .attr('stroke', this.highlightColor)
+            .attr('stroke-width', 3)
+            .attr('d', line)
+            .style('pointer-events', 'none');
+
+        group
+            .selectAll<SVGCircleElement, SegregatedPart>('.autkPartial')
+            .data(parts, (p) => p.mark)
+            .join('circle')
+            .attr('class', 'autkPartial')
+            .attr('data-autk-provenance', (p) => p.mark)
+            .attr('data-autk-units', (p) => `${p.part.selectedUnits}/${p.part.totalUnits}`)
+            .attr('cx', (p) => this.xScale((p.datum as { x: number }).x))
+            .attr('cy', (p) => yClamped(p.part.value ?? 0))
+            .attr('r', 4)
+            .style('fill', this.highlightColor)
+            .style('stroke', PlotStyle.provenanceStroke)
+            .style('pointer-events', 'none');
     }
 
     /**

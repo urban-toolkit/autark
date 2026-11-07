@@ -11,8 +11,10 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { BinningEventsTransformConfig, TransformResolution } from '../../api';
+import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
-import { reduceBuckets } from '../kernel';
+import { collectBuckets } from '../kernel';
+import { unnestedProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -24,6 +26,8 @@ export type ExecutedBinningEventsTransform = {
     preset: 'binning-events';
     /** Event bucket rows ready for downstream plot rendering. */
     rows: BinningEventsBucketRow[];
+    /** Provenance `D0 features → D1 events → D2 buckets`, aligned with `rows`. */
+    provenance: TransformProvenance;
 };
 
 /**
@@ -62,6 +66,8 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
     /** Intermediate flattened event row consumed by `reduceBuckets()`. */
     type EventRow = { autkIds: number[]; __bucket: string; __value: number | null };
     const eventRows: EventRow[] = [];
+    /** Provenance id of each event row, `event:<feature>.<position in its array>`. */
+    const eventIds: ProvenanceId[] = [];
 
     rows.forEach((row, rowIndex) => {
         const ids = Array.isArray(row?.autkIds) ? row.autkIds as number[] : [];
@@ -69,7 +75,7 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
         const events = valueAtPath(row, eventsAttr);
         if (!Array.isArray(events)) return;
 
-        events.forEach((event: unknown) => {
+        events.forEach((event: unknown, eventIndex: number) => {
             if (!event || typeof event !== 'object') return;
             const raw = valueAtPath(event as Record<string, unknown>, timestampAttr);
             if (raw === null || raw === undefined) return;
@@ -88,10 +94,11 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
                 __bucket: formatEventBucket(date, resolution),
                 __value: value,
             });
+            eventIds.push(`event:${rowAutkIds.join('+')}.${eventIndex}`);
         });
     });
 
-    const reduced = reduceBuckets({
+    const reduced = collectBuckets({
         rows: eventRows,
         bucketOf: (row) => String(row.__bucket ?? ''),
         valueOf: reducer === 'count' ? undefined : (row) => {
@@ -103,6 +110,14 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
 
     return {
         preset: 'binning-events',
+        provenance: unnestedProvenance({
+            units: eventRows,
+            unitIds: eventIds,
+            unitLabel: 'events',
+            buckets: reduced,
+            rowKeys: reduced.map(item => item.key),
+            reducer,
+        }),
         rows: reduced.map(item => ({
             bucket: item.key,
             value: item.value,

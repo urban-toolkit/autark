@@ -30,9 +30,14 @@ import * as d3 from 'd3';
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { PlotConfig } from '../api';
+import type { AutkDatum } from '../types-plot';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import type { SegregatedPart } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
+
+/** Radius of a point mark in pixels. */
+const POINT_RADIUS = 5;
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
@@ -195,10 +200,52 @@ export class Scatterplot extends PlotBaseInteractive {
             .attr('class', 'autkMark')
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, xAttribute)) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, yAttribute)) || 0 : 0))
-            .attr('r', 5)
+            .attr('r', (d) => this.radiusOf(d))
             .style('fill', PlotStyle.default)
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
+    }
+
+    /**
+     * Radius of the point of a rendered row, in pixels.
+     *
+     * @param _d Bound datum of the point.
+     * @returns The fixed point radius; subclasses may size points by data.
+     */
+    protected radiusOf(_d: AutkDatum): number {
+        return POINT_RADIUS;
+    }
+
+    /**
+     * Points are one-to-one with features; they split by the feature shares
+     * sent with a selection from an aggregating view.
+     *
+     * @returns Always `true`.
+     */
+    protected override supportsSegregatedView(): boolean {
+        return true;
+    }
+
+    /**
+     * Draws a centered inner disc whose area is the selected fraction of the point.
+     */
+    protected override renderSegregatedMarks(): void {
+        const group = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
+        if (group.empty() || !this.mapX || !this.mapY) return;
+
+        const [xAttribute, yAttribute] = this.renderAxisAttributes;
+        group
+            .selectAll<SVGCircleElement, SegregatedPart>('.autkPartial')
+            .data(this.segregatedParts(), (p) => p.mark)
+            .join('circle')
+            .attr('class', 'autkPartial')
+            .attr('data-autk-provenance', (p) => p.mark)
+            .attr('data-autk-units', (p) => `${p.part.selectedUnits}/${p.part.totalUnits}`)
+            .attr('cx', (p) => this.mapX(Number(valueAtPath(p.datum, xAttribute)) || 0))
+            .attr('cy', (p) => this.mapY(Number(valueAtPath(p.datum, yAttribute)) || 0))
+            .attr('r', (p) => this.radiusOf(p.datum) * Math.sqrt(p.fraction))
+            .style('fill', this.highlightColor)
+            .style('pointer-events', 'none');
     }
 }

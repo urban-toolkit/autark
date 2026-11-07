@@ -29,7 +29,8 @@
     "preview": "vite preview",
     "format": "prettier --write .",
     "doc": "typedoc --options typedoc.json",
-    "doc:watch": "typedoc --options typedoc.json --watch"
+    "doc:watch": "typedoc --options typedoc.json --watch",
+    "test:browser": "node test/run-browser.mjs"
   },
   "devDependencies": {
     "prettier": "^3.9.10",

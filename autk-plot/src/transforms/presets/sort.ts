@@ -10,6 +10,9 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { SortTransformConfig } from '../../api';
+import type { TransformProvenance } from '../../types-provenance';
+
+import { rowwiseProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -24,6 +27,8 @@ export type ExecutedSortTransform = {
     preset: 'sort';
     /** Sorted rows preserving their original `autkIds` provenance. */
     rows: AutkDatum[];
+    /** Provenance `D0 features → D1 rows` (one-to-one), aligned with `rows`. */
+    provenance: TransformProvenance;
 };
 
 // ---- Runner -------------------------------------------------------------
@@ -60,5 +65,6 @@ export function runSort(rows: AutkDatum[], config: SortTransformConfig, columns:
     return {
         preset: 'sort',
         rows: sorted,
+        provenance: rowwiseProvenance(sorted),
     };
 }

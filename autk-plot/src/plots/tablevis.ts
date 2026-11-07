@@ -153,8 +153,12 @@ export class TableVis extends PlotBaseInteractive {
      * @param tbody Target tbody selection.
      */
     private renderRows(tbody: d3.Selection<HTMLTableSectionElement, unknown, any, unknown>): void {
-        const selectedRows = this._data.filter((row) => this.isMarkHighlighted(row));
-        const restRows = this._data.filter((row) => !this.isMarkHighlighted(row));
+        // Segregated view: rows covered by the selection are pinned and filled up to their share.
+        const parts = new Map(this.segregatedParts().map((p) => [p.datum as object, p]));
+        const isPinned = (row: AutkDatum) => this.isMarkHighlighted(row) || parts.has(row as object);
+
+        const selectedRows = this._data.filter((row) => isPinned(row));
+        const restRows = this._data.filter((row) => !isPinned(row));
         const displayRows = [...selectedRows, ...restRows];
 
         const numberFormatter = d3.format('');
@@ -166,8 +170,21 @@ export class TableVis extends PlotBaseInteractive {
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
             .style('cursor', 'pointer')
-            .style('background-color', (d) => this.isMarkHighlighted(d) ? PlotStyle.highlight : 'transparent')
-            .style('color', (d) => this.isMarkHighlighted(d) ? '#ffffff' : '#000000');
+            .style('background-color', (d) => this.isMarkHighlighted(d) ? this.highlightColor : 'transparent')
+            .style('color', (d) => {
+                if (this.isMarkHighlighted(d)) return this.segregatedEnabled ? PlotStyle.provenanceText : '#ffffff';
+                return '#000000';
+            })
+            .style('background-image', (d) => {
+                const part = parts.get(d as object);
+                if (!part) return null;
+                const percent = (part.fraction * 100).toFixed(2);
+                return `linear-gradient(to right, ${this.highlightColor} ${percent}%, transparent ${percent}%)`;
+            })
+            .attr('data-autk-units', (d) => {
+                const part = parts.get(d as object);
+                return part ? `${part.part.selectedUnits}/${part.part.totalUnits}` : null;
+            });
 
         rows
             .selectAll('td')
@@ -179,6 +196,16 @@ export class TableVis extends PlotBaseInteractive {
             .style('padding', '6px 8px')
             .style('text-align', 'center')
             .text((d) => typeof d.value === 'number' ? numberFormatter(d.value) : String(d.value));
+    }
+
+    /**
+     * Rows are one-to-one with features; they split by the feature shares sent
+     * with a selection from an aggregating view. Drawing happens in `renderRows`.
+     *
+     * @returns Always `true`.
+     */
+    protected override supportsSegregatedView(): boolean {
+        return true;
     }
 
     /**
