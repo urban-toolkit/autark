@@ -12,7 +12,7 @@
  */
 
 import * as next from '@urban-toolkit/autk-plot';
-import type { PlotEventData, UnifiedPlotConfig } from '@urban-toolkit/autk-plot';
+import type { PlotEventData } from '@urban-toolkit/autk-plot';
 
 import { loadRegions } from './data';
 import type { Collection } from './data';
@@ -20,7 +20,7 @@ import type { LabPlotConfig } from './lab-transform';
 import { ProvenanceMap } from './map';
 import { movingAverage } from './moving-average';
 import { PLOTS, createPlot, withReducer } from './plot';
-import type { PlotSettings } from './plot';
+import type { LinkedPlot, PlotSettings } from './plot';
 
 /** A lab: where its plot is drawn and reported, and the config it last passed. */
 export type Lab = {
@@ -159,7 +159,7 @@ export class ProvenanceApp {
         const event = lab.config.events?.[0] ?? next.PlotEvent.CLICK;
         let plot: next.AutkPlot;
         try {
-            plot = createPlot(lab.box, lab.config as UnifiedPlotConfig, event, this.regions, this.settings);
+            plot = createPlot(lab.box, withReducer(lab.config as LinkedPlot['config'], this.settings.reducer), event, this.regions, this.settings);
         } catch (error) {
             lab.box.replaceChildren();
             return (error as Error).message;

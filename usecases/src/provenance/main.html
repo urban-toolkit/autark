@@ -40,21 +40,21 @@
                 <div class="pane-title">
                     <img src="./img/logo.png" alt="" width="30" height="30" />
                     <h1>autk-plot</h1>
-                    <button type="button" class="button brand try-button" data-drawer="try-drawer" title="Write a transform or bring a plain D3 chart">
+                    <button type="button" class="button brand try-button" data-drawer="try-drawer" title="Bring a plain D3 chart or write a transform, or start from the code of a built-in one">
                         <span class="icon" data-icon="lab"></span>Try it Yourself
                     </button>
                 </div>
-                <p class="pane-subtitle"><strong>Provenance:</strong> linked views that paint only the part of each mark a selection produces</p>
+                <p class="pane-subtitle"><strong>Provenance:</strong> select regions in any chart or on the map, and every linked chart paints in aqua only the part of its marks they produce, or with avg the statistic of the selection (the map shows the selected regions in blue)</p>
                 <div id="controls" role="group" aria-label="View settings">
-                    <select id="reducer" autocomplete="off" aria-label="Reducer" title="Reducer of the aggregating charts">
-                        <option value="count">Reducer: count</option>
-                        <option value="sum">Reducer: sum</option>
-                        <option value="avg">Reducer: avg</option>
+                    <select id="reducer" autocomplete="off" aria-label="Reducer" title="How the charts that group regions reduce each group: count its regions, or sum or average their perimeter (shape_leng). Charts that cannot draw a reducer keep counting: slices, flows and accumulations must add up, and a waffle square is one region. With avg, the part of a mark is the average of the selected regions, drawn as a smaller inner mark. Changing it draws the charts again and clears the selection">
+                        <option value="count">Reducer: count of regions</option>
+                        <option value="sum">Reducer: sum of shape_leng</option>
+                        <option value="avg">Reducer: avg of shape_leng</option>
                     </select>
-                    <select id="filter" autocomplete="off" aria-label="Filter" title="Keep only the regions that meet the filter in every chart">
+                    <select id="filter" autocomplete="off" aria-label="Filter" title="Keep only the regions that meet the filter in every chart (the charts are drawn again and the selection is cleared)">
                         <option value="">Filter: none</option>
                     </select>
-                    <button type="button" id="clear" class="button ghost" title="Clear the selection everywhere" aria-label="Clear the selection">
+                    <button type="button" id="clear" class="button ghost" title="Clear the selection everywhere, and the charts a transform highlights" aria-label="Clear the selection">
                         <span class="icon" data-icon="clear"></span><span class="button-label">Clear</span>
                     </button>
                 </div>
@@ -66,7 +66,7 @@
             <div class="drawer-head">
                 <div>
                     <h2>Transforms</h2>
-                    <p>Each transform turns regions into chart rows and records the relations between them. Pick one to see the charts that use it.</p>
+                    <p>Regions into chart rows, with their provenance. Pick one to see its charts (Esc or Clear to undo).</p>
                 </div>
                 <button type="button" class="icon-button" data-close title="Close"><span class="icon" data-icon="close"></span></button>
             </div>
@@ -84,42 +84,45 @@
             </div>
 
             <section class="lab" id="panel-chart" data-panel="chart" role="tabpanel" aria-labelledby="tab-chart">
-                <div class="lab-flow" role="list" aria-label="How a plain D3 chart becomes a linked autk-plot chart">
+                <div class="lab-flow" role="list" aria-label="How a plain D3 chart becomes a registered chart">
                     <div class="flow-step" role="listitem">
                         <div class="flow-figure"><a href="https://d3js.org/getting-started" target="_blank" rel="noopener" title="Getting started with D3"><img src="./img/d3-logo.svg" alt="D3: getting started" width="56" height="56" /></a></div>
                         <strong>Plain D3</strong>
                     </div>
                     <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
                     <div class="flow-step" role="listitem">
-                        <div class="flow-figure flow-tags"><code>class="autkMark"</code><code>datum = row</code></div>
-                        <strong>Annotate</strong>
+                        <div class="flow-figure flow-tags"><code>draw + autkMark</code><code>registerPlot</code></div>
+                        <strong>Definition</strong>
                     </div>
                     <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
                     <div class="flow-step" role="listitem">
                         <div class="flow-figure"><img src="./img/logo.png" alt="" width="56" height="56" /></div>
-                        <strong>autk-plot contract</strong>
+                        <strong>Drawing contract</strong>
                     </div>
                     <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
                     <div class="flow-step flow-result" role="listitem">
-                        <div class="flow-figure flow-tags"><code>click · brush</code><code>map + 24 charts</code><code>provenance</code></div>
-                        <strong>Linked chart</strong>
+                        <div class="flow-figure flow-tags"><code>click · brush</code><code>map + 24 charts</code><code>partial view</code></div>
+                        <strong>Registered chart</strong>
                     </div>
                 </div>
                 <div class="lab-controls">
-                    <label title="An example to start from: it fills the code and the fields">Start from <select id="plab-template"></select></label>
-                    <label title="Region properties the drawing reads, in order: value(row, 0), value(row, 1)… (@transform is the value the rows get)">Fields <input id="plab-columns" spellcheck="false" /></label>
-                    <label title="How the regions become the rows the drawing receives">Rows <select id="plab-rows"></select></label>
-                    <label id="plab-transform-field" title="Any transform of the package, as JSON" hidden>Transform (JSON) <input id="plab-transform" spellcheck="false" placeholder='{"preset":"binning-1d"}' /></label>
+                    <label title="Code to start from: a D3 example, or the code of any of autk-plot's 24 charts (the same contract). It fills the code and the fields">Start from <select id="plab-template"></select></label>
+                    <label title="Region properties the drawing reads, in order: the first field is value(row, 0), the second value(row, 1)… With a transform, &quot;@transform&quot; stands for the value it computes for each row (such as a count)">Fields <input id="plab-columns" spellcheck="false" /></label>
+                    <label title="Transform that turns the regions into the rows the drawing receives: none (one row per region), one of the 12 of the package, or the one this page registers">Transform <select id="plab-transform"></select></label>
+                    <label title="Options the transform receives, as JSON (transform.options), such as {&quot;bins&quot;: 10}, or {&quot;reducer&quot;: &quot;sum&quot;, &quot;value&quot;: &quot;shape_leng&quot;} to reduce a property instead of counting. With no transform there are no options">Options (JSON) <input id="plab-options" spellcheck="false" placeholder="{}" /></label>
+                    <span id="plab-rows" class="lab-rows" title="Fields of each row the drawing receives (rows), with autkIds: the regions it stands for"></span>
                     <label title="How the chart selects">Select by
                         <select id="plab-event">
                             <option value="click">click</option>
                             <option value="brush">brush</option>
+                            <option value="brush-x">horizontal brush</option>
+                            <option value="brush-y">vertical brush</option>
                         </select>
                     </label>
                 </div>
                 <div class="code-legend">
-                    <span><code class="sample-line">// Autark</code>Highlighted lines: the only changes to a plain D3 chart</span>
-                    <span><code>autkMark</code>Aqua names: from Autark</span>
+                    <span title="The fields of the definition, what draw returns, the mark annotations, and names from Autark"><code class="sample-line">// Autark</code>What Autark adds to plain D3</span>
+                    <span title="From autk-plot and autk-core"><code>autkMark</code>Names from Autark</span>
                 </div>
                 <textarea id="plab-code" class="code" spellcheck="false" aria-label="D3 chart code"></textarea>
                 <div class="lab-run">
@@ -130,7 +133,7 @@
                     <div id="plab-plot-box" class="lab-plot"></div>
                     <ol id="plab-checks" class="lab-checks"></ol>
                     <div class="lab-design" hidden>
-                        <strong>Provenance view</strong>
+                        <strong>Partial view</strong>
                         <ul id="plab-design"></ul>
                     </div>
                 </div>
@@ -138,35 +141,36 @@
             </section>
 
             <section class="lab" id="panel-transform" data-panel="transform" role="tabpanel" aria-labelledby="tab-transform" hidden>
-                <div class="lab-flow" role="list" aria-label="How regions become the rows of a linked chart through your transform">
+                <div class="lab-flow" role="list" aria-label="How plain JavaScript becomes a registered transform">
                     <div class="flow-step" role="listitem">
-                        <div class="flow-figure"><span class="icon flow-icon" data-icon="map"></span></div>
-                        <strong>Regions</strong>
+                        <div class="flow-figure"><span class="icon flow-icon" data-icon="code"></span></div>
+                        <strong>Plain JavaScript</strong>
                     </div>
                     <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
                     <div class="flow-step" role="listitem">
-                        <div class="flow-figure flow-tags"><code>run(rows)</code><code>rows + provenance</code></div>
-                        <strong>Your transform</strong>
+                        <div class="flow-figure flow-tags"><code>shape + run</code><code>rows + provenance</code><code>registerTransform</code></div>
+                        <strong>Definition</strong>
                     </div>
                     <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
                     <div class="flow-step" role="listitem">
                         <div class="flow-figure"><img src="./img/logo.png" alt="" width="56" height="56" /></div>
-                        <strong>autk-plot contract</strong>
+                        <strong>Provenance contract</strong>
                     </div>
                     <span class="icon flow-arrow" data-icon="arrow" aria-hidden="true"></span>
                     <div class="flow-step flow-result" role="listitem">
-                        <div class="flow-figure flow-tags"><code>click · brush</code><code>map + 24 charts</code><code>provenance</code></div>
-                        <strong>Linked chart</strong>
+                        <div class="flow-figure flow-tags"><code>charts of its shape</code><code>click · brush</code><code>map + 24 charts</code></div>
+                        <strong>Registered transform</strong>
                     </div>
                 </div>
                 <div class="lab-controls">
-                    <label title="An example to start from: it fills the code and the fields">Start from <select id="lab-template"></select></label>
-                    <label title="Region properties the transform reads (columns)">Fields <input id="lab-columns" spellcheck="false" /></label>
+                    <label title="Code to start from: an example, or the code of any of autk-plot's 12 transforms (the same contract). It fills the code and the fields">Start from <select id="lab-template"></select></label>
+                    <label title="Region properties the transform reads (the columns argument of run)">Fields <input id="lab-columns" spellcheck="false" /></label>
                     <label title="Options the transform receives, as JSON (the options argument of run)">Options (JSON) <input id="lab-options" spellcheck="false" /></label>
-                    <label title="Chart that draws the rows, among those that read their shape">Chart <select id="lab-plot"></select></label>
+                    <label title="Chart of this page that draws the rows: those that read the row shape the transform declares. Choosing one takes its fields">Chart <select id="lab-plot"></select></label>
                 </div>
                 <div class="code-legend">
-                    <span><code>lib.collectBuckets</code>Aqua names: Autark building blocks for buckets and provenance</span>
+                    <span title="The fields of the definition, the rows (with autkIds) and provenance that run returns, and names from Autark"><code class="sample-line">// Autark</code>What Autark adds to plain JavaScript</span>
+                    <span title="From autk-plot and autk-core"><code>collectBuckets</code>Names from Autark</span>
                 </div>
                 <textarea id="lab-code" class="code" spellcheck="false" aria-label="Transform code"></textarea>
                 <div class="lab-run">
@@ -177,7 +181,7 @@
                     <div id="lab-plot-box" class="lab-plot"></div>
                     <ol id="lab-checks" class="lab-checks"></ol>
                 </div>
-                <p class="lab-note">Runs only in this browser. In a project: <code>registerTransform</code>, like the moving average of the area chart.</p>
+                <p class="lab-note">Runs only in this browser. In a project: <code>registerTransform</code>, then <code>{ preset: 'registered', name }</code>, like the moving average of the area chart.</p>
             </section>
         </aside>
     </div>

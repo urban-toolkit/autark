@@ -7,7 +7,7 @@
  */
 
 import * as next from '@urban-toolkit/autk-plot';
-import type { FilterCondition, TransformReducer, UnifiedPlotConfig } from '@urban-toolkit/autk-plot';
+import type { FilterCondition, PlotTransformConfig, TransformReducer, UnifiedPlotConfig } from '@urban-toolkit/autk-plot';
 
 import { PLOT_HEIGHT } from './config';
 import type { Collection } from './data';
@@ -43,8 +43,8 @@ export const PLOTS: LinkedPlot[] = [
         config: {
             type: 'linechart',
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
-            labels: { axis: ['day (March 2025)', 'complaints'], title: 'Noise complaints per day' },
-            transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'monthday' } },
+            labels: { axis: ['day', 'complaints'], title: 'Noise complaints per day' },
+            transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'day' } },
             height: PLOT_HEIGHT,
             margins: { left: 60, right: 20, top: 40, bottom: 70 },
         },
@@ -90,7 +90,7 @@ export const PLOTS: LinkedPlot[] = [
         name: 'table',
         div: '#table',
         event: next.PlotEvent.CLICK,
-        config: { type: 'table', attributes: { axis: ['ntaname', 'landuse', 'shape_area'] } },
+        config: { type: 'table', attributes: { axis: ['ntaname', 'landuse', 'shape_area'] }, labels: { title: 'Regions by name' } },
     },
     {
         name: 'boxplot',
@@ -118,7 +118,7 @@ export const PLOTS: LinkedPlot[] = [
             margins: { left: 10, right: 10, top: 40, bottom: 10 },
         },
     },
-    // ---- Catalog wave 1: built only from relations the model already had
+    // ---- Regions, partitions and events (R1, R2, R4), and the moving average this page registers (R3 · R10)
     {
         name: 'pie',
         div: '#pie',
@@ -154,7 +154,7 @@ export const PLOTS: LinkedPlot[] = [
         config: {
             type: 'areachart',
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
-            labels: { axis: ['day (March 2025)', 'complaints'], title: '7-day moving average of complaints' },
+            labels: { axis: ['day', 'complaints'], title: '7-day moving average of complaints' },
             // A transform registered by the case study itself, outside the package (moving-average.ts).
             transform: { preset: 'registered', name: 'moving-average', options: { timestamp: 'date', halfWindow: 3 } },
             height: PLOT_HEIGHT,
@@ -211,7 +211,7 @@ export const PLOTS: LinkedPlot[] = [
             margins: { left: 10, right: 20, top: 40, bottom: 10 },
         },
     },
-    // ---- Catalog wave 2: new relations (hierarchy, fold, accumulation, pairs)
+    // ---- Hierarchies, measures, accumulation and pairs (R5 to R8)
     {
         name: 'stacked bars',
         div: '#stacked',
@@ -258,7 +258,7 @@ export const PLOTS: LinkedPlot[] = [
         config: {
             type: 'radar',
             attributes: { axis: ['landuse', 'shape_area', 'shape_leng', 'sjoin.count.noise'] },
-            labels: { title: 'Mean profile of each land use' },
+            labels: { axis: ['land use', 'shape_area', 'shape_leng', 'complaints'], title: 'Mean profile of each land use' },
             transform: { preset: 'fold' },
             height: PLOT_HEIGHT,
             margins: { left: 10, right: 10, top: 40, bottom: 10 },
@@ -303,7 +303,7 @@ export const PLOTS: LinkedPlot[] = [
             margins: { left: 10, right: 10, top: 40, bottom: 10 },
         },
     },
-    // ---- Catalog wave 3: fractional coverage (real weights)
+    // ---- Fractional coverage, with real weights (R10)
     {
         name: 'density',
         div: '#density',
@@ -333,30 +333,37 @@ export const PLOTS: LinkedPlot[] = [
 ];
 
 /**
- * Applies the chosen reducer to aggregating transforms.
- *
- * Bins reduce `shape_leng`. Noise complaints carry no value, so the line
- * chart always counts them.
+ * Transform a chart of the page runs: its own, or the one its plot gives by
+ * default (the table sorts its rows).
+ */
+export function transformOfChart(chart: LinkedPlot): next.PlotTransformConfig | undefined {
+    if (chart.config.transform) return chart.config.transform;
+    const { defaults } = next.registeredPlot(chart.config.type);
+    const given = typeof defaults === 'function' ? defaults({ ...chart.config } as unknown as Parameters<typeof defaults>[0]) : defaults;
+    return given?.transform;
+}
+
+/** Transforms that group regions, whose reducer and value the page sets. */
+const REDUCED_PRESETS = ['binning-1d', 'binning-2d', 'binning-hex', 'hierarchy', 'cumulative', 'flows'];
+
+/**
+ * Applies the chosen reducer to the transforms that group regions: count them, or reduce their
+ * perimeter (`shape_leng`). Noise complaints carry no value, so their charts always count.
+ * A plot that cannot draw the reducer (its definition's `reducers`: slices and flows must add up,
+ * a waffle square is one region) keeps counting, and so does an accumulation, which only adds.
  */
 export function withReducer(config: LinkedPlot['config'], reducer: TransformReducer): LinkedPlot['config'] {
     const transform = config.transform;
-    if (!transform || transform.preset === 'sort' || reducer === 'count') return config;
-    // Slices must add up to the whole, so pies and donuts only take additive reducers.
-    if ((config.type === 'pie' || config.type === 'donut') && reducer !== 'sum') return config;
-    // Each waffle square is one region, so the waffle always counts.
-    if (config.type === 'waffle') return config;
-    // Hierarchies and accumulations must add up, so only the sum applies.
-    if ((transform.preset === 'hierarchy' || transform.preset === 'cumulative') && reducer === 'sum') {
-        return { ...config, transform: { ...transform, options: { ...transform.options, reducer, value: 'shape_leng' } } };
-    }
-    if (transform.preset === 'binning-1d' || transform.preset === 'binning-2d' || transform.preset === 'binning-hex') {
-        return { ...config, transform: { ...transform, options: { ...transform.options, reducer, value: 'shape_leng' } } };
-    }
-    // Sankey widths must add up, so only additive reducers apply.
-    if (transform.preset === 'flows' && reducer === 'sum') {
-        return { ...config, transform: { ...transform, options: { reducer, value: 'shape_leng' } } };
-    }
-    return config;
+    if (!transform || reducer === 'count' || !REDUCED_PRESETS.includes(transform.preset)) return config;
+    if (transform.preset === 'cumulative' && reducer !== 'sum') return config;
+    const name = config.type === 'registered' ? (config as { plot: string }).plot : config.type;
+    const reducers = next.registeredPlot(name).reducers;
+    if (reducers && !reducers.includes(reducer)) return config;
+    // The value axis names what is reduced.
+    const labels = config.labels?.axis
+        ? { ...config.labels, axis: config.labels.axis.map(label => (label === 'regions' ? `${reducer} of shape_leng` : label)) }
+        : config.labels;
+    return { ...config, labels, transform: { ...transform, options: { ...transform.options, reducer, value: 'shape_leng' } } as PlotTransformConfig };
 }
 
 
