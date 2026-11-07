@@ -1,417 +1,148 @@
 /**
- * @fileoverview Line plot visualization for event-based and series data.
+ * @fileoverview Line and area charts of event buckets or reduced series.
  *
- * Provides a D3-based line plot implementation with the following features:
- * - **Single-series rendering**: Aggregates feature-level series points or event buckets into a unified line
- * - **Flexible bucket labeling**: Supports numeric, date, and custom bucket labels
- * - **Selection and linked views**: Uses source feature ids for brush interactions and linked selection across components
- * - **Transform support**: Accepts `binning-events` or `reduce-series` transform presets for flexible aggregation
- *
- * @example
- * // Basic line plot with reduce-series transform
- * const plot = new AutkPlot(plotDiv, {
- *   type: 'linechart',
- *   collection: geojson,
- *   attributes: { axis: ['populationSeries', '@transform'] },
- *   transform: {
- *     preset: 'reduce-series',
- *     options: { timestamp: 'year', value: 'population', reducer: 'avg' }
- *   },
- *   labels: { axis: ['year', 'population'], title: 'Population Over Time' },
- * });
+ * Reads the buckets of a `binning-events`, `reduce-series`, or registered `series` transform, in
+ * bucket order (dates, numbers, then text), one point each, joined by a line. A selection
+ * elsewhere moves each point to the value of the selected subset and redraws the line (and the
+ * area, for count and sum); for avg, min, and max a bucket without selected units is a gap.
  *
  * @example
- * // Line plot with event binning and brush interaction
- * const plot = new AutkPlot(plotDiv, {
+ * new AutkPlot(plotDiv, {
  *   type: 'linechart',
  *   collection: geojson,
  *   attributes: { axis: ['events', '@transform'] },
- *   transform: {
- *     preset: 'binning-events',
- *     options: { value: 'cases', timestamp: 'date', resolution: 'month', reducer: 'sum' }
- *   },
- *   events: [PlotEvent.BRUSH_Y],
+ *   transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'month', reducer: 'sum', value: 'cases' } },
  *   labels: { axis: ['month', 'cases'], title: 'Monthly Cases' }
  * });
  */
+
 import * as d3 from 'd3';
 
 import type { PlotConfig } from '../api';
-
-import { PlotBaseInteractive } from '../plot-base-interactive';
-import type { SegregatedPart } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
-import { markId } from '../provenance';
-import { registeredTransform } from '../transforms/registry';
+import type { AutkDatum } from '../types-plot';
 
-import type { ExecutedPlotTransform } from '../transforms';
+import type { PlotDefinition, PlotDrawContext, PlotSeries } from './registered';
 
-/** Point of the selected-subset line of the segregated view. */
-type PartialPoint = {
-    /** Bucket position on the x scale. */
-    x: number;
-    /** Selected-subset value of the bucket, or `null` when it has no selected units. */
-    y: number | null;
+/** Orders buckets as dates, then as numbers, then as text. */
+function compareBuckets(a: string, b: string): number {
+    const [dateA, dateB] = [new Date(a).getTime(), new Date(b).getTime()];
+    if (Number.isFinite(dateA) && Number.isFinite(dateB)) return dateA - dateB;
+    const [numA, numB] = [Number(a), Number(b)];
+    if (Number.isFinite(numA) && Number.isFinite(numB)) return numA - numB;
+    return a.localeCompare(b);
+}
+
+/** Labels of a series transform: time and value, or bucket and value for events. */
+function seriesLabels(config: PlotConfig): Partial<PlotConfig> {
+    const series = config.transform?.preset === 'reduce-series';
+    return { tickFormats: ['~s', '~s'], labels: { axis: series ? ['time', 'value'] : ['bucket', 'value'], title: series ? 'Series' : 'Events over time' } };
+}
+
+/** Draws the points and the line, and under them the area when `filled`. */
+function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDefinition['design']; series: PlotSeries[] } {
+    const { group, width, height, value, format, axisX, axisY, partRange } = context;
+    const bucket = (row: AutkDatum) => String(value(row, 0));
+    const amount = (row: AutkDatum) => Number(value(row, 1));
+    const rows = context.rows.slice().sort((a, b) => compareBuckets(bucket(a), bucket(b)));
+    const index = new Map(rows.map((row, i) => [row, i]));
+    // Numeric buckets take the x format; other labels are kept as they are.
+    const label = (row: AutkDatum) => {
+        const n = Number(bucket(row));
+        return Number.isFinite(n) && String(n) === bucket(row) ? format(0)(n) : bucket(row);
+    };
+
+    // Parts lie between 0 and their bucket (count, sum), or anywhere in the reduced values (avg, min, max).
+    const values = rows.map(amount);
+    if (partRange) values.push(...(partRange.additive ? [0] : partRange.extent));
+    const [low, high] = values.length > 0 ? [Math.min(...values), Math.max(...values)] : [0, 50];
+    const pad = (high - low) * 0.1 || 1;
+    const x = d3.scaleLinear([0, Math.max(rows.length, 1) - 1], [0, width]);
+    const y = d3.scaleLinear([partRange?.additive && low >= 0 ? 0 : low - pad, high + pad], [height, 0]);
+
+    axisX(d3.axisBottom(x).ticks(Math.min(Math.max(rows.length, 1), 12)).tickFormat(i => (rows[+i] ? label(rows[+i]) : format(0)(+i))))
+        .selectAll('.tick text')
+        .style('font-size', '11px')
+        .attr('transform', 'rotate(-45)')
+        .attr('text-anchor', 'end')
+        .attr('dx', '-0.4em')
+        .attr('dy', '0.4em');
+    axisY(d3.axisLeft(y).ticks(5).tickSizeInner(-width).tickFormat(format(1)));
+
+    const series: PlotSeries[] = [];
+    if (filled) {
+        // The area reaches 0, or the bottom of the plot when 0 is below the axis.
+        const clamped = y.copy().clamp(true);
+        const [bottom, top] = y.domain();
+        const base = clamped(Math.min(Math.max(0, bottom), top));
+        const areaOf = (v: (row: AutkDatum) => number | null) => d3.area<AutkDatum>()
+            .x(row => x(index.get(row)!))
+            .y0(base)
+            .y1(row => clamped(v(row) ?? 0))(rows);
+        const area = group.append('path')
+            .datum(rows)
+            .attr('class', 'autk-area')
+            .attr('d', areaOf(amount))
+            // A gray area lets the parts stand out.
+            .style('fill', PlotStyle.default)
+            .style('fill-opacity', 0.35)
+            .style('pointer-events', 'none');
+        series.push({ element: area.node()!, rows, path: areaOf });
+    }
+
+    const lineOf = (v: (row: AutkDatum) => number | null) => d3.line<AutkDatum>()
+        .defined(row => v(row) !== null)
+        .x(row => x(index.get(row)!))
+        .y(row => y(v(row)!))(rows);
+    const line = group.append('path')
+        .datum(rows)
+        .attr('class', 'autk-line')
+        .attr('fill', 'none')
+        .attr('stroke', PlotStyle.default)
+        .attr('stroke-width', 1.5)
+        .attr('d', lineOf(amount));
+    series.push({ element: line.node()!, rows, path: lineOf });
+
+    group.selectAll('circle.autkMark')
+        .data(rows)
+        .join('circle')
+        .attr('class', 'autkMark')
+        .attr('cx', row => x(index.get(row)!))
+        .attr('cy', row => y(amount(row)))
+        .attr('r', 5)
+        .append('title')
+        .text(row => `${label(row)}: ${d3.format('~s')(amount(row))}`);
+
+    group.selectAll('text.autk-empty')
+        .data(rows.length === 0 ? ['No series data available'] : [])
+        .join('text')
+        .attr('class', 'autk-empty')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#aaa')
+        .text(d => d);
+
+    // A point's value is its height above 0: the part of a bucket sits at the subset value.
+    return { design: { point: { rule: 'position', axis: 'y', baseline: y(0) } }, series };
+}
+
+/** Points of a series transform, one per bucket, joined by a line. */
+export const linechart: PlotDefinition = {
+    name: 'linechart',
+    label: 'Linechart',
+    transforms: ['reduce-series', 'binning-events', 'series'],
+    requiresTransform: true,
+    topK: false,
+    defaults: seriesLabels,
+    draw: context => drawSeries(context, false),
 };
 
-/**
- * Line plot that aggregates feature-level series data into a single line.
- *
- * Rendering rows are generated through shared transform presets and each point
- * preserves provenance via `autkIds`.
- */
-export class Linechart extends PlotBaseInteractive {
-    /** Linear scale mapping bucket positions to pixel coordinates. */
-    protected xScale!: d3.ScaleLinear<number, number>;
-    /** Linear scale mapping bucket values to pixel coordinates. */
-    protected yScale!: d3.ScaleLinear<number, number>;
-
-    /**
-     * Creates a line plot instance and renders the initial state.
-     *
-     * @param config Linechart configuration.
-     * @throws If no transform is configured or if the preset is unsupported.
-     */
-    constructor(config: PlotConfig) {
-        if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) { 
-            config.tickFormats = ['~s', '~s']; 
-        }
-
-        if (!config.transform) {
-            throw new Error('Linechart requires a transform configuration.');
-        }
-        // A registered transform is read like binning-events when it yields bucket and value rows.
-        const registered = config.transform.preset === 'registered' && registeredTransform(config.transform.name).shape === 'series';
-        if (config.transform.preset !== 'reduce-series' && config.transform.preset !== 'binning-events' && !registered) {
-            throw new Error('Linechart only supports reduce-series and binning-events transform presets.');
-        }
-        else {
-            const axis = config.labels?.axis ?? (config.transform.preset === 'reduce-series' ? ['time', 'value'] : ['bucket', 'value']);
-            const title = config.labels?.title ?? (config.transform.preset === 'reduce-series' ? 'Series' : 'Events over time');
-            config.labels = { axis, title };
-        }
-
-        super(config);
-
-        this.draw();
-    }
-
-    /**
-     * Normalizes temporal transform output into the rendered line-series schema.
-     *
-     * @param result Executed transform payload from the shared dispatcher.
-     * @returns Render rows shaped as `{ x, label, y, autkIds }` for line rendering.
-     */
-    protected override resolveTransformResult(result: ExecutedPlotTransform) {
-        const resolved = super.resolveTransformResult(result);
-        const series = result.preset === 'binning-events' || result.preset === 'reduce-series'
-            || (result.preset === 'registered' && result.shape === 'series');
-        if (!series) {
-            return resolved;
-        }
-
-        const items = result.rows as unknown as Array<{ bucket: string; value: number; autkIds: number[] }>;
-        const sorted = items
-            .map((item, idx) => ({ item, rowId: result.provenance.rowIds[idx] }))
-            .sort((a, b) => this.compareBuckets(a.item.bucket, b.item.bucket));
-        const rows = sorted.map(({ item }, idx) => ({
-            x: idx,
-            label: this.formatBucketLabel(item.bucket),
-            y: item.value,
-            autkIds: item.autkIds,
-        }));
-
-        return {
-            rows,
-            axisAttributes: ['label', 'y'],
-            rowIds: sorted.map(({ rowId }) => rowId),
-        };
-    }
-
-    /**
-     * Renders the line plot, including axes, line path, dot marks, and empty state message.
-     *
-     * Synchronizes the SVG DOM with the current series data and attaches interaction listeners.
-     *
-     * @throws If the root SVG element cannot be created.
-     */
-    public render(): void {
-        const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[] }>;
-        const innerW = this._width - this._margins.left - this._margins.right;
-        const innerH = this._height - this._margins.top - this._margins.bottom;
-
-        const svg = d3
-            .select(this._div)
-            .selectAll('#plot')
-            .data([0])
-            .join('svg')
-            .attr('id', 'plot')
-            .style('width', `${this._width}px`)
-            .style('height', `${this._height}px`)
-            .style('visibility', 'visible');
-
-        const node = svg.node();
-        if (!svg || !node) {
-            throw new Error('SVG element could not be created.');
-        }
-
-        svg.attr('width', this._width).attr('height', this._height);
-
-        // ---- Title (optional)
-        if (this._title && this._title.length > 0) {
-            svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
-                .data([this._title])
-                .join('text')
-                .attr('id', 'plotTitle')
-                .attr('class', 'plot-title')
-                .attr('x', this._margins.left + innerW / 2)
-                .attr('y', Math.max(this._margins.top * 0.5, 10))
-                .attr('text-anchor', 'middle')
-                .style('font-weight', '600')
-                .style('visibility', 'visible')
-                .text((d) => d);
-        }
-
-        // ---- Scales
-        const n = Math.max(seriesData.length, 1);
-        const allY = seriesData.map((item) => item.y);
-        // Segregated view: count and sum parts lie between 0 and the total, so the axis starts at 0.
-        const reducer = this._provenance.reducer;
-        const zeroBased = this.segregatedEnabled && (reducer === 'count' || reducer === 'sum');
-        if (zeroBased) allY.push(0);
-        const yMin = allY.length > 0 ? Math.min(...allY) : 0;
-        const yMax = allY.length > 0 ? Math.max(...allY) : 50;
-        const yPad = (yMax - yMin) * 0.1 || 1;
-
-        const xScale = this.xScale = d3.scaleLinear().domain([0, n - 1]).range([0, innerW]);
-        // With negative values the axis still extends below them; 0 is only the floor for non-negative data.
-        const yLow = zeroBased && yMin >= 0 ? 0 : yMin - yPad;
-        const yScale = this.yScale = d3.scaleLinear().domain([yLow, yMax + yPad]).range([innerH, 0]);
-
-        // ---- Axes
-        const xAxis = d3.axisBottom(xScale)
-            .ticks(Math.min(n, 12))
-            .tickFormat((d) => seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
-
-        const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisX')
-            .attr('class', 'x axis')
-            .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
-            .style('visibility', 'visible');
-        xAxisSelection.call(xAxis);
-        xAxisSelection.selectAll<SVGTextElement, unknown>('text')
-            .style('font-size', '11px')
-            .attr('transform', 'rotate(-45)')
-            .attr('text-anchor', 'end')
-            .attr('dx', '-0.4em')
-            .attr('dy', '0.4em');
-        xAxisSelection
-            .selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axisLabels[0]])
-            .join('text')
-            .attr('class', 'axis-label title')
-            .attr('text-anchor', 'end')
-            .attr('x', innerW)
-            .attr('y', this._margins.bottom / 2 + 10)
-            .style('visibility', 'visible')
-            .text((d) => d);
-
-        const yAxis = d3.axisLeft(yScale)
-            .ticks(5)
-            .tickSizeInner(-innerW)
-            .tickFormat(d3.format(this._tickFormats[1]));
-
-        const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisY')
-            .attr('class', 'y axis')
-            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
-            .style('visibility', 'visible');
-        yAxisSelection.call(yAxis);
-        yAxisSelection.selectAll<SVGLineElement, unknown>('.tick line').style('stroke', '#e0e0e0');
-        yAxisSelection
-            .selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axisLabels[1]])
-            .join('text')
-            .attr('class', 'axis-label title')
-            .attr('text-anchor', 'end')
-            .attr('transform', 'rotate(-90)')
-            .attr('y', -this._margins.left / 2 - 7)
-            .attr('x', -this._margins.top)
-            .style('visibility', 'visible')
-            .text((d) => d);
-
-        // ---- Marks group
-        const cGroup = svg
-            .selectAll('.autkBrush')
-            .data([0])
-            .join('g')
-            .attr('class', 'autkBrush autkMarksGroup')
-            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
-
-        cGroup
-            .selectAll('.autkClear')
-            .data([0])
-            .join('rect')
-            .attr('class', 'autkClear')
-            .attr('width', innerW)
-            .attr('height', innerH)
-            .style('fill', 'white')
-            .style('opacity', 0)
-            .style('visibility', 'visible');
-
-        // ---- Line path
-        const lineGen = d3.line<{ x: number; y: number }>()
-            .x((d) => xScale(d.x))
-            .y((d) => yScale(d.y));
-
-        cGroup
-            .selectAll<SVGPathElement, Array<{ x: number; y: number }>>('.autk-line')
-            .data([seriesData])
-            .join('path')
-            .attr('class', 'autk-line')
-            .attr('fill', 'none')
-            // The line takes the mark color, so the line of the selection stands out.
-            .attr('stroke', PlotStyle.default)
-            .attr('stroke-width', 1.5)
-            .attr('d', lineGen);
-
-        // ---- Dots (marks)
-        cGroup
-            .selectAll('.autkMark')
-            .data(seriesData)
-            .join('circle')
-            .attr('class', 'autkMark')
-            .attr('cx', (d) => xScale(d.x))
-            .attr('cy', (d) => yScale(d.y))
-            .attr('r', 5)
-            .style('fill', PlotStyle.default)
-            .style('visibility', 'inherit');
-
-        // ---- Empty state
-        cGroup
-            .selectAll('.autk-empty')
-            .data(seriesData.length === 0 ? ['No series data available'] : [])
-            .join('text')
-            .attr('class', 'autk-empty')
-            .attr('x', innerW / 2)
-            .attr('y', innerH / 2)
-            .attr('text-anchor', 'middle')
-            .style('font-size', '12px')
-            .style('fill', '#aaa')
-            .text((d) => d);
-
-        this.configureSignalListeners();
-    }
-
-    /**
-     * Buckets reduce units from many features, and one feature spreads units
-     * over many buckets, so the line can show partial contributions.
-     *
-     * @returns Always `true`; the line plot requires an aggregating transform.
-     */
-    protected override supportsSegregatedView(): boolean {
-        return true;
-    }
-
-    /**
-     * Draws the line of the selected subset next to the total line.
-     *
-     * Each bucket of the subset line applies the bucket reducer to the units of
-     * the selected features only. For count and sum, a bucket without selected
-     * units is `0`, clamped to the bottom of the plot when `0` is outside the y
-     * domain. For avg, min, and max it is a gap. Buckets with selected units
-     * also get a highlighted dot.
-     */
-    protected override renderSegregatedMarks(): void {
-        const group = d3.select(this._div).select<SVGGElement>('.autkMarksGroup');
-        if (group.empty() || !this.xScale || !this.yScale) return;
-
-        const parts = this.segregatedParts();
-        const byMark = new Map(parts.map(p => [p.mark, p]));
-        const additive = parts[0]?.part.additive ?? true;
-        const rows = this._data as Array<{ x: number }>;
-
-        const points: PartialPoint[] = parts.length === 0 ? [] : rows.map(row => {
-            const rowId = this.rowIdOf(row);
-            const part = rowId ? byMark.get(markId(rowId))?.part : undefined;
-            return { x: row.x, y: part?.value ?? (additive ? 0 : null) };
-        });
-
-        const yClamped = this.yScale.copy().clamp(true);
-        const line = d3.line<PartialPoint>()
-            .defined(p => p.y !== null)
-            .x(p => this.xScale(p.x))
-            .y(p => yClamped(p.y ?? 0));
-
-        group
-            .selectAll<SVGPathElement, PartialPoint[]>('.autkPartialLine')
-            .data(points.length > 0 ? [points] : [])
-            .join('path')
-            .attr('class', 'autkPartialLine')
-            .attr('fill', 'none')
-            .attr('stroke', this.highlightColor)
-            .attr('stroke-width', 3)
-            .attr('d', line)
-            .style('pointer-events', 'none');
-
-        group
-            .selectAll<SVGCircleElement, SegregatedPart>('.autkPartial')
-            .data(parts, (p) => p.mark)
-            .join('circle')
-            .attr('class', 'autkPartial')
-            .attr('data-autk-provenance', (p) => p.mark)
-            .attr('data-autk-units', (p) => `${p.part.selectedUnits}/${p.part.totalUnits}`)
-            .attr('cx', (p) => this.xScale((p.datum as { x: number }).x))
-            .attr('cy', (p) => yClamped(p.part.value ?? 0))
-            .attr('r', 4)
-            .style('fill', this.highlightColor)
-            .style('stroke', PlotStyle.provenanceStroke)
-            .style('pointer-events', 'none');
-    }
-
-    /**
-     * Formats a bucket label for axis rendering.
-     *
-     * Numeric buckets are formatted using the configured x-axis tick format;
-     * all other labels are returned unchanged.
-     *
-     * @param bucket Raw bucket label from the transform result.
-     * @returns Display label used on the x axis.
-     */
-    private formatBucketLabel(bucket: string): string {
-        const numericBucket = Number(bucket);
-        if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-            return d3.format(this._tickFormats[0])(numericBucket);
-        }
-        return bucket;
-    }
-
-    /**
-     * Compares two bucket labels for stable temporal/numeric/string ordering.
-     *
-     * @param a First bucket label.
-     * @param b Second bucket label.
-     * @returns Negative when `a < b`, positive when `a > b`, or zero when equal.
-     */
-    private compareBuckets(a: string, b: string): number {
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        const validDateA = Number.isFinite(dateA.getTime());
-        const validDateB = Number.isFinite(dateB.getTime());
-        if (validDateA && validDateB) { return dateA.getTime() - dateB.getTime(); }
-
-        const numA = Number(a);
-        const numB = Number(b);
-        if (Number.isFinite(numA) && Number.isFinite(numB)) { return numA - numB; }
-
-        return a.localeCompare(b);
-    }
-}
+/** Points of the line chart, with the region under the line filled. */
+export const areachart: PlotDefinition = {
+    ...linechart,
+    name: 'areachart',
+    label: 'Area chart',
+    draw: context => drawSeries(context, true),
+};

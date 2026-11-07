@@ -1,19 +1,16 @@
 /**
- * Heat matrix transform preset.
+ * Binning-2d transform preset.
  *
- * Groups feature rows by a pair of dimensions (x, y) and reduces a numeric value
- * column within each cell. Each axis is handled independently: categorical attributes
- * are grouped by their string value; quantitative attributes are binned into
- * fixed-width ranges using the same bin-boundary format as `binning-1d`.
- *
- * Source feature provenance (`autkIds`) is merged across all rows that fall into
- * the same cell.
+ * Groups rows by a pair of columns (x, y) and reduces a value column within each cell. Each axis
+ * is binned as in `binning-1d`: categories by their string value, numbers by fixed-width range.
+ * The source features (`autkIds`) of all rows in a cell are merged.
  */
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { Binning2dTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -22,12 +19,7 @@ import { buildBinMapper } from './binning-1d';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runBinning2d`.
- *
- * Carries the fixed attribute tuple `['x', 'y', 'value']` and the aggregated
- * cell rows ready for heat matrix rendering.
- */
+/** Result produced by `runBinning2d`. */
 export type ExecutedBinning2dTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-2d';
@@ -37,12 +29,7 @@ export type ExecutedBinning2dTransform = {
     provenance: TransformProvenance;
 };
 
-/**
- * A single aggregated cell ready for plot rendering.
- *
- * `x` and `y` are the bin labels for this cell — either a category string or a
- * formatted numeric range such as `"1k-2k"`.
- */
+/** A single aggregated cell ready for plot rendering. */
 export type Binning2dCellRow = {
     /** Bin label for the x axis — category string or formatted numeric range such as `"1k-2k"`. */
     x: string;
@@ -63,28 +50,28 @@ export type Binning2dCellRow = {
 // ---- Runner -------------------------------------------------------------
 
 /**
- * Runs a heat matrix transform and returns plot-ready cell rows.
+ * Runs a binning-2d transform and returns plot-ready cell rows.
  *
- * Detects whether each axis attribute is categorical or quantitative, builds a
- * bin-label mapper for each axis, then groups rows by the resulting (x, y) label
- * pair and reduces the value column using the specified reducer.
+ * Builds a bin-label mapper for each axis, then groups rows by their (x, y) label pair and
+ * reduces the value column with the configured reducer.
  *
- * @param rows - Input feature data to aggregate.
- * @param config - Transform configuration, including reducer, per-axis bin counts, and optional value column.
- * @param columns - Ordered attribute names; `columns[0]` is the x axis, `columns[1]` is the y axis.
+ * @param rows Input feature rows.
+ * @param options Transform options (`transform.options`): reducer, bins per axis, and value column.
+ * @param columns `columns[0]` is the x column, `columns[1]` the y column.
+ * @returns Rows of the `binning-2d` shape and their provenance.
  */
-export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig, columns: string[]): ExecutedBinning2dTransform {
+export function runBinning2d(rows: AutkDatum[], options: NonNullable<Binning2dTransformConfig['options']>, columns: string[]): Omit<ExecutedBinning2dTransform, 'preset'> {
     const xAttr = columns[0] ?? '';
     const yAttr = columns[1] ?? '';
-    const valueAttr = config.options?.value;
-    const reducer = config.options?.reducer ?? 'count';
-    const binsX = config.options?.binsX ?? 10;
-    const binsY = config.options?.binsY ?? 10;
+    const valueAttr = options.value;
+    const reducer = options.reducer ?? 'count';
+    const binsX = options.binsX ?? 10;
+    const binsY = options.binsY ?? 10;
 
     const xMapper = buildBinMapper(rows, xAttr, binsX);
     const yMapper = buildBinMapper(rows, yAttr, binsY);
 
-    // Composite key separator unlikely to appear in bin labels
+    // Composite key separator unlikely to appear in bin labels.
     const SEP = '\0';
 
     const reduced = collectBuckets({
@@ -113,7 +100,6 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
     }
 
     return {
-        preset: 'binning-2d',
         provenance: binnedProvenance({
             rows,
             buckets: reduced,
@@ -138,3 +124,13 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
         }),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Rows binned by two columns: one row per cell of the grid. */
+export const binning2d: TransformDefinition = {
+    name: 'binning-2d',
+    label: 'Cells of two columns',
+    shape: 'binning-2d',
+    run: runBinning2d,
+};

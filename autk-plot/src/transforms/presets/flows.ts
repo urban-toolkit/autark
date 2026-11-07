@@ -1,15 +1,16 @@
 /**
  * Flows transform preset.
  *
- * Every row follows a path through one category per column (e.g. NTA type →
- * land use → district). Categories become nodes and consecutive steps become
- * links, both reduced over the rows that pass through them.
+ * Every row follows a path through one category per column (e.g. type → category → group).
+ * Categories become nodes and consecutive steps become links, both reduced over the rows that
+ * pass through them.
  */
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { FlowsTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -18,9 +19,7 @@ import { flowProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runFlows`.
- */
+/** Result produced by `runFlows`. */
 export type ExecutedFlowsTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'flows';
@@ -82,17 +81,17 @@ type FlowUnit = Row & { autkIds: number[]; __key: string; __value: number | null
  * Runs a flows transform and returns plot-ready nodes and links.
  *
  * @param rows Input feature rows.
- * @param config Transform configuration with reducer and optional value column.
+ * @param options Transform options (`transform.options`) with reducer and optional value column.
  * @param columns Ordered categorical columns, at least two.
- * @returns Executed flows transform payload.
+ * @returns Rows of the `flows` shape and their provenance.
  * @throws If fewer than two columns are given.
  */
-export function runFlows(rows: AutkDatum[], config: FlowsTransformConfig, columns: string[]): ExecutedFlowsTransform {
+export function runFlows(rows: AutkDatum[], options: NonNullable<FlowsTransformConfig['options']>, columns: string[]): Omit<ExecutedFlowsTransform, 'preset'> {
     if (columns.length < 2) {
         throw new Error('flows: at least two columns are required.');
     }
-    const reducer = config.options?.reducer ?? 'count';
-    const valueAttr = config.options?.value ?? '';
+    const reducer = options.reducer ?? 'count';
+    const valueAttr = options.value ?? '';
 
     const nodeUnits: FlowUnit[] = [];
     const segments: FlowUnit[] = [];
@@ -162,7 +161,6 @@ export function runFlows(rows: AutkDatum[], config: FlowsTransformConfig, column
     const flowRows: FlowRow[] = [...nodeRows, ...linkRows];
 
     return {
-        preset: 'flows',
         rows: flowRows,
         provenance: flowProvenance({
             segments,
@@ -180,3 +178,13 @@ export function runFlows(rows: AutkDatum[], config: FlowsTransformConfig, column
         }),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Paths of the rows through consecutive categorical columns: one row per node and one per link. */
+export const flows: TransformDefinition = {
+    name: 'flows',
+    label: 'Flows between columns',
+    shape: 'flows',
+    run: runFlows,
+};

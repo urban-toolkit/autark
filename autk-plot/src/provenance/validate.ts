@@ -1,20 +1,16 @@
 /**
  * Invariants every transform's provenance must satisfy.
  *
- * The segregated view, the provenance path, and inverse shares trust the
- * provenance a transform declares. These checks turn that trust into a
- * contract: they hold for every built-in preset (see the conformance tests),
- * and a registered transform should pass them on sample data before use.
+ * The segregated view, the provenance path, and inverse shares trust the provenance a transform
+ * declares. These checks hold for every built-in preset; a registered transform should pass them
+ * on sample data before use.
  *
  * 1. One unique id per row.
  * 2. Stages named `D1…Dn` in order, with unique ids; every row id in a stage.
- * 3. Relations chain `D0 → D1 → … → Dn`; pairs point to existing ids, with
- *    finite, non-negative weights.
+ * 3. Relations chain `D0 → D1 → … → Dn` between existing ids, with finite, non-negative weights.
  * 4. Following the relations back from each row reaches exactly its `autkIds`.
- * 5. Contributions go from existing features to existing rows, with finite
- *    values and finite, non-negative weights.
- * 6. For additive reducers, the contributions of each row reduce to its value
- *    (count: number of units; sum: sum of unit values), so painted fractions are right.
+ * 5. Contributions go from existing features to existing rows, with finite values and weights.
+ * 6. For additive reducers, the contributions of each row reduce to its value.
  */
 
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
@@ -22,6 +18,7 @@ import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import type { AutkDatum } from '../types-plot';
 import type { ProvenanceId, TransformProvenance } from '../types-provenance';
 import type { TransformDefinition } from '../transforms/registry';
+import { shapeProblems } from '../transforms/registry';
 
 import { ProvenanceModel, featureId, markId } from './model';
 
@@ -63,12 +60,12 @@ export function checkProvenanceReport(
     if (structure) return { violations: [{ invariant: 0, message: structure }], skipped: [1, 2, 3, 4, 5, 6] };
     const { stages, relations, rowIds, contributions, reducer } = provenance;
 
-    // 1. Row ids
+    // 1. Row ids.
     if (rowIds.length !== rows.length) report(1, `rowIds has ${rowIds.length} ids for ${rows.length} rows`);
     const rowSet = new Set(rowIds);
     if (rowSet.size !== rowIds.length) report(1, 'rowIds are not unique');
 
-    // 2. Stages
+    // 2. Stages.
     const features = new Set(Array.from({ length: featureCount }, (_v, i) => featureId(i)));
     const stageIds = new Map<string, Set<ProvenanceId>>([['D0', features]]);
     stages.forEach((stage, index) => {
@@ -81,7 +78,7 @@ export function checkProvenanceReport(
     const orphan = rowIds.find(id => !inSomeStage.has(id));
     if (orphan !== undefined) report(2, `row id "${orphan}" belongs to no stage`);
 
-    // 3. Relations
+    // 3. Relations.
     if (relations.length !== stages.length) report(3, `${relations.length} relations for ${stages.length} stages (expected one per stage)`);
     relations.forEach((relation, index) => {
         const source = index === 0 ? 'D0' : `D${index}`;
@@ -97,8 +94,7 @@ export function checkProvenanceReport(
         }
     });
 
-    // 4. Inverse query of each row reaches exactly its autkIds.
-    // It needs a well-formed graph, so it is skipped when invariants 1–3 fail.
+    // 4. Inverse queries, which need a well-formed graph: skipped when invariants 1–3 fail.
     if (violations.length > 0) {
         skipped.push(4);
     } else {
@@ -117,7 +113,7 @@ export function checkProvenanceReport(
         });
     }
 
-    // 5. Contributions
+    // 5. Contributions.
     for (const unit of contributions) {
         if (!features.has(unit.source)) { report(5, `contribution from unknown feature "${unit.source}"`); break; }
         if (!rowSet.has(unit.target)) { report(5, `contribution to unknown row "${unit.target}"`); break; }
@@ -128,7 +124,7 @@ export function checkProvenanceReport(
         }
     }
 
-    // 6. Additive reducers: units reduce to the row value
+    // 6. Additive reducers.
     if (reducer === 'count' || reducer === 'sum') {
         const totals = new Map<ProvenanceId, number>();
         for (const unit of contributions) {
@@ -168,8 +164,8 @@ export function checkProvenance(
 }
 
 /**
- * Runs a registered transform on sample data and checks its provenance,
- * reporting which invariant each violation breaks.
+ * Runs a transform (built-in or user) on sample data and checks the shape of
+ * its rows and its provenance, reporting which invariant each violation breaks.
  *
  * Meant for development, tests, and interactive tools: plots only run the
  * cheap structural checks.
@@ -196,6 +192,11 @@ export function checkTransformReport(
     }
     if (!output || !Array.isArray(output.rows) || !output.provenance) {
         return { violations: [{ invariant: 0, message: 'run must return { rows, provenance }' }], skipped: nothingChecked };
+    }
+    // The rows must have the declared shape, or no plot could read them.
+    const malformed = shapeProblems(output, definition.shape);
+    if (malformed.length > 0) {
+        return { violations: malformed.map(message => ({ invariant: 0, message })), skipped: nothingChecked };
     }
     // Arrays of the wrong shape are a malformed result too, not a crash of the check.
     try {

@@ -23,7 +23,8 @@ import {
 } from '@urban-toolkit/autk-core';
 import type { ColorMapDomainSpec, ResolvedDomain } from '@urban-toolkit/autk-core';
 
-import { run, shapeFields } from './transforms';
+import { run } from './transforms';
+import { shapeBinding, transformOf } from './transforms/registry';
 import type { ExecutedPlotTransform } from './transforms';
 
 import type {
@@ -42,12 +43,7 @@ const DEFAULT_WIDTH = 800;
 /** Smallest width of `width: 'auto'`, so the drawing area never collapses. */
 const MIN_AUTO_WIDTH = 160;
 
-/**
- * Normalized transform payload returned by `resolveTransformResult()`.
- *
- * Collapses preset-specific transform outputs into the rendered schema
- * consumed by plot classes.
- */
+/** Rendered rows and bindings of an executed transform, returned by `resolveTransformResult()`. */
 export type ResolvedPlotTransform = {
     /** Render rows stored on `_data` for the current draw cycle. */
     rows: AutkDatum[];
@@ -60,10 +56,10 @@ export type ResolvedPlotTransform = {
 };
 
 /**
- * Base class for shared plot data lifecycle.
+ * Base class of the plot data lifecycle.
  *
- * Normalizes input rows, validates configured bindings, runs transforms, and
- * resolves the active rendered schema used by subclasses during drawing.
+ * Normalizes input rows, validates configured bindings, runs transforms, and resolves the rendered
+ * schema that `RegisteredPlot` draws.
  */
 export abstract class PlotBaseData {
     /** Host element where the plot is rendered. */
@@ -103,7 +99,7 @@ export abstract class PlotBaseData {
     /** Resolved color domain, computed from data after each transform. */
     protected _resolvedDomain: ResolvedDomain | undefined = undefined;
 
-    /** Optional transform config shared by plot implementations that support transformed views. */
+    /** Transform configuration, if any. */
     protected _transformConfig?: PlotTransformConfig;
 
     /** Provenance graph of the current draw cycle, from source features to rendered rows. */
@@ -147,8 +143,12 @@ export abstract class PlotBaseData {
             config.attributes?.color,
         ].includes('@transform');
 
-        if (config.transform?.preset === 'sort' && hasTransformPlaceholder) {
-            throw new Error("PlotBaseData: '@transform' cannot be used with the 'sort' preset.");
+        // A transform whose rows are the source features (sort) gives no value of its own.
+        if (config.transform && hasTransformPlaceholder) {
+            const transform = transformOf(config.transform);
+            if (shapeBinding(transform.shape).oneToOne) {
+                throw new Error(`PlotBaseData: '@transform' cannot be used with the '${transform.name}' preset.`);
+            }
         }
 
         const axisAttributes = config.attributes?.axis;
@@ -194,7 +194,8 @@ export abstract class PlotBaseData {
     }
 
     /**
-     * Whether the plot can render a top-k cut of its rows. Plots opt in by overriding.
+     * Whether the plot can render a top-k cut of its rows. An extension hook for
+     * subclasses; `RegisteredPlot` overrides it.
      *
      * @returns `true` when rows have a label (`axis[0]`) and a rankable value (`axis[1]`).
      */
@@ -265,13 +266,17 @@ export abstract class PlotBaseData {
      * The top-k cut replaces `_data` with its output rows.
      */
     private buildProvenance(): void {
+        if (this._topK && !this.renderAxisAttributes[1]) {
+            throw new Error('PlotBaseData: topK needs a label (attributes.axis[0]) and a value (attributes.axis[1]).');
+        }
         const stages: ProvenanceStage[] = [{ name: 'D0', label: 'features', ids: this._sourceFeatures.map((_f, idx) => featureId(idx)) }];
         const relations: ProvenanceRelation[] = [];
         let contributions: ProvenanceContribution[];
         let reducer: TransformReducer | undefined;
         let rowIds: ProvenanceId[];
 
-        // ---- Filter: kept features form their own stage; excluded ones have no image.
+        // ---- Filter -------------------------------------------------------------
+        // Kept features form their own stage; excluded ones have no image.
         const filtered = this._filter.length > 0;
         const entryId = (index: number) => filtered ? `kept:${index}` : featureId(index);
         if (filtered) {
@@ -289,7 +294,8 @@ export abstract class PlotBaseData {
         }
         const entry = stages[stages.length - 1].name;
 
-        // ---- Transform: its stages are renumbered after the filter stage.
+        // ---- Transform ----------------------------------------------------------
+        // Its stages are renumbered after the filter stage.
         const transform = this._transformProvenance;
         if (transform) {
             const offset = stages.length - 1;
@@ -316,7 +322,8 @@ export abstract class PlotBaseData {
             if (this._topK) reducer = 'sum';
         }
 
-        // ---- Top-k: the cut is a stage after the rendered rows.
+        // ---- Top-k --------------------------------------------------------------
+        // The cut is a stage after the rendered rows.
         if (this._topK) {
             const result = runTopK({
                 rows: this._data,
@@ -464,37 +471,19 @@ export abstract class PlotBaseData {
     abstract render(): void;
 
     /**
-     * Maps a preset-specific executed transform into the rendered row schema
-     * expected by plot implementations.
+     * Maps an executed transform into the rendered row schema that the plot draws.
      *
-     * @param result Executed transform payload returned by the shared dispatcher.
+     * @param result Executed transform.
      * @returns Normalized rendered rows plus any transformed binding metadata.
      */
     protected resolveTransformResult(result: ExecutedPlotTransform): ResolvedPlotTransform {
-        switch (result.preset) {
-            case 'binning-1d':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['label', 'value'] };
-            case 'binning-2d':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['x', 'y'], colorAttribute: 'value' };
-            case 'sort':
-                return { rows: result.rows as AutkDatum[] };
-            case 'binning-events':
-            case 'reduce-series':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['bucket', 'value'] };
-            case 'flows':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['label', 'value'] };
-            case 'box-stats':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['category', 'median'] };
-            case 'hierarchy':
-            case 'cumulative':
-            case 'fold':
-            case 'density':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['label', 'value'] };
-            case 'registered':
-                return { rows: result.rows, axisAttributes: shapeFields(result.shape) };
-            case 'binning-hex':
-                return { rows: result.rows as AutkDatum[], axisAttributes: ['label', 'value'], colorAttribute: 'value' };
-        }
+        // The shape of the transform's rows says which fields the plot reads, for every transform alike.
+        const { axis, color } = shapeBinding(transformOf(result).shape);
+        return {
+            rows: result.rows as AutkDatum[],
+            ...(axis ? { axisAttributes: axis } : {}),
+            ...(color ? { colorAttribute: color } : {}),
+        };
     }
 
     /**

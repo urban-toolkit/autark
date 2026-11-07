@@ -340,7 +340,7 @@ export function hierarchyProvenance(options: {
 }
 
 /**
- * Builds `D0 features → D1 bars → D2 cumulative points` for accumulation presets.
+ * Builds `D0 features → D1 bins → D2 points` for accumulation presets.
  *
  * Features are partitioned into ordered bars (`N:1`), and bar `i` contributes
  * to every point `k ≥ i` (a prefix relation, `N:N`). Point `k` therefore
@@ -382,8 +382,8 @@ export function cumulativeProvenance(options: {
 
     return {
         stages: [
-            { name: 'D1', label: 'bars', ids: bars.map((_bar, index) => barId(index)) },
-            { name: 'D2', label: 'cumulative', ids: bars.map((_bar, index) => pointId(index)) },
+            { name: 'D1', label: 'bins', ids: bars.map((_bar, index) => barId(index)) },
+            { name: 'D2', label: 'points', ids: bars.map((_bar, index) => pointId(index)) },
         ],
         relations: [
             { source: 'D0', target: 'D1', pairs: Array.from(r01.values()) },

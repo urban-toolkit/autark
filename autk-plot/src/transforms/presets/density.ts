@@ -1,15 +1,11 @@
 /**
- * Density transform preset (kernel density estimate).
+ * Density transform preset.
  *
- * Spreads every row over a grid of points along a numeric column with an
- * Epanechnikov kernel, `K(u) = 3/4 · (1 − u²)` for `|u| < 1`. Each row adds
- * `K((x − v) / h) / (n · h)` to the point at `x`, so each group's curve
- * integrates to 1. The kernel has finite support: a row only reaches the
- * points within one bandwidth `h` of its value.
- *
- * This is fractional coverage: a row contributes a real weight to several
- * points (`N:N`, weights in ℝ≥0), and its share of a set of points is the part
- * of its kernel mass that falls in them.
+ * Estimates the kernel density of a numeric column on a grid of points, one curve per group, with
+ * the Epanechnikov kernel `K(u) = 3/4 · (1 − u²)` for `|u| < 1`: each row adds
+ * `K((x − v) / h) / (n · h)` to the point at `x`, so each curve integrates to 1. A row reaches only
+ * the points within one bandwidth `h` of its value, each with a real weight (`N:N`), and its share
+ * of a set of points is the part of its kernel mass that falls in them.
  */
 
 import * as d3 from 'd3';
@@ -18,6 +14,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { DensityTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { ProvenanceContribution, ProvenancePair, TransformProvenance } from '../../types-provenance';
 
 import { featureId } from '../../provenance/model';
@@ -32,9 +29,7 @@ const EPANECHNIKOV_SCALE = Math.sqrt(5);
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runDensity`.
- */
+/** Result produced by `runDensity`. */
 export type ExecutedDensityTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'density';
@@ -70,13 +65,13 @@ export type DensityPointRow = {
  * Runs a kernel density estimate and returns the grid points of every curve.
  *
  * @param rows Input feature rows.
- * @param config Transform configuration: bandwidth and grid size.
+ * @param options Transform options (`transform.options`): bandwidth and grid size.
  * @param columns `[value]` for one curve, or `[group, value]` for one curve per group.
- * @returns Grid points with their densities and the kernel provenance.
+ * @returns Rows of the `density` shape and their provenance, with the groups and the bandwidth.
  */
-export function runDensity(rows: AutkDatum[], config: DensityTransformConfig, columns: string[]): ExecutedDensityTransform {
+export function runDensity(rows: AutkDatum[], options: NonNullable<DensityTransformConfig['options']>, columns: string[]): Omit<ExecutedDensityTransform, 'preset'> {
     const [groupAttr, valueAttr] = columns.length >= 2 ? [columns[0], columns[1]] : [null, columns[0] ?? ''];
-    const pointsPerCurve = Math.max(2, config.options?.points ?? DEFAULT_POINTS);
+    const pointsPerCurve = Math.max(2, options.points ?? DEFAULT_POINTS);
 
     const samples = rows.flatMap((row, index) => {
         const value = Number(valueAtPath(row, valueAttr));
@@ -88,7 +83,7 @@ export function runDensity(rows: AutkDatum[], config: DensityTransformConfig, co
     const values = samples.map(s => s.value);
     const [lo, hi] = (d3.extent(values) as [number | undefined, number | undefined]).map(v => v ?? 0) as [number, number];
     const deviation = d3.deviation(values) ?? 0;
-    const bandwidth = config.options?.bandwidth
+    const bandwidth = options.bandwidth
         ?? (deviation > 0 ? EPANECHNIKOV_SCALE * 1.06 * deviation * values.length ** -0.2 : (hi - lo) / 10 || 1);
 
     // The grid reaches one bandwidth past the data, where every curve is back at zero.
@@ -132,7 +127,6 @@ export function runDensity(rows: AutkDatum[], config: DensityTransformConfig, co
     }
 
     return {
-        preset: 'density',
         rows: outputRows,
         groups,
         bandwidth,
@@ -145,3 +139,13 @@ export function runDensity(rows: AutkDatum[], config: DensityTransformConfig, co
         },
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Kernel density estimate of a numeric column, one curve per group: one row per grid point. */
+export const density: TransformDefinition = {
+    name: 'density',
+    label: 'Kernel density',
+    shape: 'density',
+    run: runDensity,
+};

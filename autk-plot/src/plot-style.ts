@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import type { ColorHEX } from '@urban-toolkit/autk-core';
 
 /**
- * Global style helpers shared by all plot implementations.
+ * Global style helpers shared by every plot.
  *
  * `PlotStyle` centralizes the base and highlighted colors applied to marks
  * during selection updates.
@@ -119,7 +119,7 @@ export class PlotStyle {
      * scheme stays between light and medium tones.
      *
      * Used by aggregated plots colored by value (hexbin, calendar) with the
-     * grey scheme: the smallest value is not white, so it shows on a white
+     * gray scheme: the smallest value is not white, so it shows on a white
      * background, and the largest is not black, so the provenance color drawn
      * over it keeps contrast.
      *
@@ -132,10 +132,10 @@ export class PlotStyle {
     }
 
     /**
-     * Grey shade of the `index`-th of `count` categories, from light to medium.
+     * Gray shade of the `index`-th of `count` categories, from light to medium.
      *
      * Plots that must tell categories apart (stacked bars, radar polygons)
-     * use greys, so the provenance color drawn over them keeps contrast.
+     * use grays, so the provenance color drawn over them keeps contrast.
      *
      * @param index Category position.
      * @param count Number of categories.
@@ -144,5 +144,23 @@ export class PlotStyle {
     public static shade(index: number, count: number): string {
         const t = count <= 1 ? 0.35 : 0.2 + (0.45 * index) / (count - 1);
         return d3.interpolateGreys(t);
+    }
+
+    /**
+     * Gray shades of a list of categories, in list order (see `shade`).
+     *
+     * @param keys Categories, in the order of their shades.
+     * @returns The shade of each category; an unknown one takes the first shade.
+     */
+    public static shades(keys: string[]): (key: string) => string {
+        return key => PlotStyle.shade(Math.max(0, keys.indexOf(key)), keys.length);
+    }
+
+    /**
+     * Gets the color of grid lines (axis ticks drawn across the plot).
+     * @returns Hex color of grid lines.
+     */
+    public static get grid(): ColorHEX {
+        return '#e0e0e0';
     }
 }

@@ -1,16 +1,16 @@
 /**
  * Binning-events transform preset.
  *
- * Flattens nested event arrays from feature properties, buckets them by
- * timestamp at a configurable resolution, and reduces each bucket to a single
- * value. Source feature provenance (`autkIds`) is merged across all events
- * that fall into a bucket.
+ * Flattens the event arrays nested in each row, buckets the events by timestamp at a configurable
+ * resolution, and reduces each bucket to a single value. The source features (`autkIds`) of all
+ * events in a bucket are merged.
  */
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { BinningEventsTransformConfig, TransformResolution } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -18,9 +18,7 @@ import { unnestedProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runBinningEvents`.
- */
+/** Result produced by `runBinningEvents`. */
 export type ExecutedBinningEventsTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-events';
@@ -30,11 +28,7 @@ export type ExecutedBinningEventsTransform = {
     provenance: TransformProvenance;
 };
 
-/**
- * A single event bucket row ready for plot rendering.
- *
- * `bucket` is a formatted string key (e.g. `"2024-03"` for monthly resolution).
- */
+/** A single event bucket row ready for plot rendering. */
 export type BinningEventsBucketRow = {
     /** Formatted bucket identifier (for example `"2024-03"`). */
     bucket: string;
@@ -52,18 +46,18 @@ export type BinningEventsBucketRow = {
  * Runs a binning-events transform and returns plot-ready rows.
  *
  * @param rows Input feature rows containing nested event arrays.
- * @param config Transform configuration controlling timestamp parsing and reduction.
+ * @param options Transform options (`transform.options`) controlling timestamp parsing and reduction.
  * @param columns Ordered source columns; `columns[0]` is the event-array attribute.
- * @returns Executed event-binning transform payload.
+ * @returns Rows of the `series` shape and their provenance.
  */
-export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransformConfig, columns: string[]): ExecutedBinningEventsTransform {
+export function runBinningEvents(rows: AutkDatum[], options: NonNullable<BinningEventsTransformConfig['options']>, columns: string[]): Omit<ExecutedBinningEventsTransform, 'preset'> {
     const eventsAttr = columns[0] ?? '';
-    const timestampAttr = config.options?.timestamp ?? 'timestamp';
-    const valueAttr = config.options?.value ?? 'value';
-    const resolution = config.options?.resolution ?? 'month';
-    const reducer = config.options?.reducer ?? 'count';
+    const timestampAttr = options.timestamp ?? 'timestamp';
+    const valueAttr = options.value ?? 'value';
+    const resolution = options.resolution ?? 'month';
+    const reducer = options.reducer ?? 'count';
 
-    /** Intermediate flattened event row consumed by `reduceBuckets()`. */
+    /** Flattened event, reduced by `collectBuckets`. */
     type EventRow = { autkIds: number[]; __bucket: string; __value: number | null };
     const eventRows: EventRow[] = [];
     /** Provenance id of each event row, `event:<feature>.<position in its array>`. */
@@ -109,7 +103,6 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
     });
 
     return {
-        preset: 'binning-events',
         provenance: unnestedProvenance({
             units: eventRows,
             unitIds: eventIds,
@@ -134,7 +127,7 @@ export function runBinningEvents(rows: AutkDatum[], config: BinningEventsTransfo
  *
  * @param date UTC date to encode into a bucket key.
  * @param resolution Temporal resolution used to derive the key.
- * @returns Bucket label consumed by downstream plot rendering.
+ * @returns Bucket key, e.g. `"2024-03"` for monthly resolution.
  */
 function formatEventBucket(date: Date, resolution: TransformResolution): string {
     /** Left-pads a numeric component to two digits. */
@@ -157,3 +150,13 @@ function formatEventBucket(date: Date, resolution: TransformResolution): string 
     }
     return String(date.getUTCFullYear());
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** The events nested in each row, bucketed by time: one row per time bucket. */
+export const binningEvents: TransformDefinition = {
+    name: 'binning-events',
+    label: 'Events over time',
+    shape: 'series',
+    run: runBinningEvents,
+};

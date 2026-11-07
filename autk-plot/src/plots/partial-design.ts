@@ -1,30 +1,16 @@
 /**
- * @fileoverview Design space of the segregated view, inferred from the drawing.
+ * Design space of the segregated view, inferred from the drawing.
  *
- * A base drawing never says which visual channel encodes the value of a mark:
- * a `<rect>` may be a bar (height), a heatmap cell (color), or a treemap leaf
- * (area). Since each mark binds its row, the channel can be found instead of
- * guessed: the geometric measure that is proportional (or linear) to the row
- * value across all marks of a kind is the channel, and its fit is the evidence.
- * Each channel has a natural way to show the selected part r of a mark:
- *
- * | Channel (evidence)                      | Rule       | Selected part                                        |
- * |-----------------------------------------|------------|------------------------------------------------------|
- * | one mark per unit (`data-autk-feature`) | `units`    | the units of the selected features, whole            |
- * | length ∝ value (rect side)              | `length`   | the mark scaled by r along that side, from its anchor |
- * | band thickness ∝ value (flow, ribbon)   | `band`     | the band narrowed to r from its leading edge         |
- * | sweep ∝ value (sector)                  | `angle`    | thick rings: the inner sector of area r; thin rings: the leading r of the sweep |
- * | stroke width ∝ value                    | `width`    | the stroke r times as wide                           |
- * | position linear in value (points)       | `position` | the point moved to the base by r, and the series line or area through the moved points |
- * | edges linear in two fields (interval)   | `members`  | each selected feature as a point at its own value    |
- * | area ∝ value                            | `area`     | a copy scaled by √r about its center (area r)        |
- * | none, stroke-only marks                 | `trace`    | the first fraction r of the stroke                   |
- * | none                                    | `glyph`    | a copy scaled by √r (shows the fraction, not the value) |
- *
- * Position and members are only used for aggregated rows: moving a one-to-one
- * mark by the share of its feature would draw a value that does not exist.
- * Fits need three distinct values and R² ≥ 0.99; otherwise the next rule applies.
+ * A drawing never says which channel encodes the value of a mark (a `<rect>` may be a bar, a heat
+ * matrix cell, or a treemap leaf), but each mark binds its row, so the channel is found by fitting:
+ * the measure proportional (or linear) to the row value across the marks of a kind, with three
+ * distinct values and R² ≥ 0.99, picks the rule (`PartialRule`), and the part of a mark follows
+ * that channel. With avg, min, or max, the subset value is a statistic drawn on the same channel,
+ * or as a half-size mark of the statistic's color when the color encodes the value. `position`
+ * and `members` apply only to aggregated rows: a one-to-one mark has no partial value to show.
  */
+
+import { format } from 'd3';
 
 import type { AutkDatum } from '../types-plot';
 import type { SegregatedPart } from '../plot-base-interactive';
@@ -95,7 +81,12 @@ const multiply = (m: Matrix, n: Matrix): Matrix => [
     m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5],
 ];
 
-/** Own `transform` of an element (translate and scale; other functions are ignored). */
+/**
+ * Own `transform` of an element (translate and scale; other functions are ignored).
+ *
+ * @param element Element to read.
+ * @returns Affine matrix of the transform.
+ */
 export function ownMatrix(element: Element): Matrix {
     let matrix: Matrix = [1, 0, 0, 1, 0, 0];
     const text = element.getAttribute('transform') ?? '';
@@ -106,13 +97,65 @@ export function ownMatrix(element: Element): Matrix {
     return matrix;
 }
 
-/** Local box of a mark, or `null` when the environment cannot measure it. */
+/** Number in a geometry attribute (`0` when absent, as SVG reads it). */
+const attribute = (element: Element, name: string) => Number(element.getAttribute(name) ?? 0) || 0;
+
+/** Local box of a basic shape from its geometry attributes, or `null` for other elements. */
+function attributeBox(element: Element): Box | null {
+    switch (element.tagName.toLowerCase()) {
+        case 'rect':
+            return { x: attribute(element, 'x'), y: attribute(element, 'y'), width: attribute(element, 'width'), height: attribute(element, 'height') };
+        case 'circle': {
+            const r = attribute(element, 'r');
+            return { x: attribute(element, 'cx') - r, y: attribute(element, 'cy') - r, width: 2 * r, height: 2 * r };
+        }
+        case 'ellipse': {
+            const [rx, ry] = [attribute(element, 'rx'), attribute(element, 'ry')];
+            return { x: attribute(element, 'cx') - rx, y: attribute(element, 'cy') - ry, width: 2 * rx, height: 2 * ry };
+        }
+        case 'line': {
+            const [x1, y1, x2, y2] = ['x1', 'y1', 'x2', 'y2'].map(name => attribute(element, name));
+            return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+        }
+        case 'polygon':
+        case 'polyline':
+            return boxOfPoints((element.getAttribute('points') ?? '').match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi)?.map(Number) ?? []);
+        case 'path': {
+            // Polygons only (absolute M and L, as a hexagon): curves have no box from their numbers.
+            const parsed = commandsOf(element.getAttribute('d'));
+            if (!parsed || !/^M[ML]*Z?$/.test(parsed.letters)) return null;
+            return boxOfPoints(parsed.numbers.flat());
+        }
+        default:
+            return null;
+    }
+}
+
+/** Box of a flat list of coordinates `x0, y0, x1, y1, ...`. */
+function boxOfPoints(numbers: number[]): Box | null {
+    if (numbers.length < 2) return null;
+    const xs = numbers.filter((_n, i) => i % 2 === 0);
+    const ys = numbers.filter((_n, i) => i % 2 === 1);
+    const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
+    return { x: x0, y: y0, width: Math.max(...xs) - x0, height: Math.max(...ys) - y0 };
+}
+
+/**
+ * Local box of a mark, or `null` when the environment cannot measure it.
+ *
+ * Without layout (jsdom has no `getBBox`; a browser measures an empty box
+ * outside the document), basic shapes are measured from their attributes,
+ * which is the box a browser gives them.
+ */
 function localBox(element: SVGGraphicsElement): Box | null {
+    const fallback = attributeBox(element);
     try {
         const box = element.getBBox();
+        const empty = box.width === 0 && box.height === 0 && box.x === 0 && box.y === 0;
+        if (empty && fallback && (fallback.width > 0 || fallback.height > 0)) return fallback;
         return { x: box.x, y: box.y, width: box.width, height: box.height };
     } catch {
-        return null;
+        return fallback;
     }
 }
 
@@ -150,7 +193,12 @@ function sweepOf(p0: Point, p1: Point, large: number, clockwise: boolean): numbe
     return sweep;
 }
 
-/** Parses a d3.arc sector centered on the local origin. */
+/**
+ * Parses a d3.arc sector centered on the local origin.
+ *
+ * @param d Path data.
+ * @returns The sector, or `null` when the path is not one.
+ */
 export function parseSector(d: string | null): Sector | null {
     const parsed = commandsOf(d);
     if (!parsed || !/^MA(LA?)?Z?$/.test(parsed.letters)) return null;
@@ -163,7 +211,13 @@ export function parseSector(d: string | null): Sector | null {
     return { inner, outer, sweep: sweepOf(p0, [x1, y1], large, clockwise), start: angleOf(p0), clockwise };
 }
 
-/** Path of a sector keeping its radii and start, with a new sweep. */
+/**
+ * Path of a sector keeping its radii and start, with a new sweep.
+ *
+ * @param sector Sector to redraw.
+ * @param sweep New sweep, in radians.
+ * @returns Path data.
+ */
 export function sectorPath(sector: Sector, sweep: number): string {
     const end = sector.start + (sector.clockwise ? sweep : -sweep);
     const at = (r: number, a: number) => `${r * Math.cos(a)},${r * Math.sin(a)}`;
@@ -175,7 +229,12 @@ export function sectorPath(sector: Sector, sweep: number): string {
         : `${outer}L0,0Z`;
 }
 
-/** Parses a flow band whose second edge is the first one offset by a constant vector. */
+/**
+ * Parses a flow band whose second edge is the first one offset by a constant vector.
+ *
+ * @param d Path data.
+ * @returns The band, or `null` when the path is not one.
+ */
 export function parseFlow(d: string | null): Flow | null {
     const parsed = commandsOf(d);
     if (!parsed || parsed.letters !== 'MCLCZ') return null;
@@ -188,7 +247,13 @@ export function parseFlow(d: string | null): Flow | null {
     return parallel ? { edge, offset } : null;
 }
 
-/** Path of a flow band with a new offset of its second edge. */
+/**
+ * Path of a flow band with a new offset of its second edge.
+ *
+ * @param flow Band to redraw.
+ * @param ratio Fraction of the offset to keep.
+ * @returns Path data.
+ */
 export function flowPath(flow: Flow, ratio: number): string {
     const [ox, oy] = [flow.offset[0] * ratio, flow.offset[1] * ratio];
     const [p0, c1, c2, p1] = flow.edge;
@@ -197,7 +262,12 @@ export function flowPath(flow: Flow, ratio: number): string {
         + `L${shift(p1)}C${shift(c2)} ${shift(c1)} ${shift(p0)}Z`;
 }
 
-/** Parses a d3.ribbon path: source and target arcs (start and sweep) of one circle. */
+/**
+ * Parses a d3.ribbon path: source and target arcs (start and sweep) of one circle.
+ *
+ * @param d Path data.
+ * @returns The ribbon, or `null` when the path is not one.
+ */
 export function parseRibbon(d: string | null): Ribbon | null {
     const parsed = commandsOf(d);
     if (!parsed || parsed.letters !== 'MAQAQZ') return null;
@@ -212,7 +282,13 @@ export function parseRibbon(d: string | null): Ribbon | null {
     };
 }
 
-/** Path of a ribbon keeping the leading `ratio` of both arcs. */
+/**
+ * Path of a ribbon keeping the leading `ratio` of both arcs.
+ *
+ * @param ribbon Ribbon to redraw.
+ * @param ratio Leading fraction of both arcs to keep.
+ * @returns Path data.
+ */
 export function ribbonPath(ribbon: Ribbon, ratio: number): string {
     const at = (a: number) => `${ribbon.radius * Math.cos(a)},${ribbon.radius * Math.sin(a)}`;
     const arc = ([start, sweep]: [number, number]) => {
@@ -439,7 +515,44 @@ export function inferPartialDesign(
     return Array.from(families, ([kind, infos]) => designOf(kind, infos, aggregated));
 }
 
-/** Kind of a mark, as `inferPartialDesign` classifies it. */
+/**
+ * Design a plot declares for one mark family: the rule, and the parameters it knows. A plot that
+ * knows its channel declares it, since inference needs evidence (three distinct values) that a
+ * small drawing may lack, such as a bar chart of two categories.
+ */
+export type DeclaredDesign = Pick<PartialDesign, 'rule'> & Partial<Pick<PartialDesign, 'axis' | 'anchor' | 'baseline' | 'mode' | 'scale'>>;
+
+/**
+ * Replaces inferred designs by the declared ones.
+ *
+ * Parameters a declaration leaves out are taken from the inferred design when it found the same
+ * rule.
+ *
+ * @param inferred Designs inferred for the mark families present.
+ * @param declared Declared design of each mark family.
+ * @returns One design per mark family present.
+ */
+export function withDeclaredDesigns(inferred: PartialDesign[], declared: Partial<Record<MarkKind, DeclaredDesign>> | undefined): PartialDesign[] {
+    if (!declared) return inferred;
+    return inferred.map(design => {
+        const own = declared[design.kind];
+        if (!own) return design;
+        const agrees = design.rule === own.rule;
+        return {
+            ...(agrees ? design : { kind: design.kind, marks: design.marks }),
+            ...own,
+            reason: agrees ? `declared by the plot; the geometry agrees (${design.reason})` : 'declared by the plot',
+        };
+    });
+}
+
+/**
+ * Kind of a mark, as `inferPartialDesign` classifies it.
+ *
+ * @param element Mark element.
+ * @param colorProperty Mark property the plot colors.
+ * @returns Mark family of the element.
+ */
 export function markKindOf(element: Element, colorProperty: 'fill' | 'stroke' = 'fill'): MarkKind {
     return kindOf(element, colorProperty);
 }
@@ -453,9 +566,14 @@ function htmlBox(element: Element): Box | null {
 /**
  * Background that paints the selected part of an HTML mark.
  *
- * HTML boxes cannot hold a scaled copy, so a part is a fill: from the
- * inferred anchor for `length`, and from the left for every other rule, which
- * covers the fraction of the box's area, as the glyph does.
+ * HTML boxes cannot hold a scaled copy, so a part is a fill: from the inferred anchor for
+ * `length`, and from the left for every other rule, which covers the fraction of the box's area,
+ * as the glyph does.
+ *
+ * @param design Design of the HTML marks.
+ * @param ratio Ratio the part shows.
+ * @param color Color of the part.
+ * @returns CSS background of the mark.
  */
 export function htmlFill(design: Pick<PartialDesign, 'rule' | 'axis' | 'anchor'>, ratio: number, color: string): string {
     const r = Math.min(1, Math.max(0, ratio));
@@ -476,17 +594,22 @@ function opposite(anchor: 'start' | 'end' | 'center'): 'start' | 'end' | 'center
 }
 
 /**
- * Ratio the part shows. Length and position show the selected value over the
- * row value, for any reducer: it may exceed 1 (an average above the row's, or
- * a sum with negative units elsewhere), and a position may even cross the
- * baseline. Other rules show the fraction in `[0, 1]`, since a copy cannot be
- * larger than its mark.
+ * Ratio the part shows.
+ *
+ * Length, area, and position encode the value, so they show the selected value over the row
+ * value, for any reducer: it may exceed 1 (an average above the row's, or a sum with negative
+ * units elsewhere), and a position may even cross the baseline. Other rules show the fraction in
+ * `[0, 1]`.
+ *
+ * @param part Selected part of the mark.
+ * @param rule Rule of the mark family.
+ * @returns Ratio of the part to the mark.
  */
 export function ratioOf(part: SegregatedPart, rule: PartialRule): number {
     const { value, totalValue } = part.part;
-    if ((rule === 'length' || rule === 'position') && value !== null && totalValue) {
+    if ((rule === 'length' || rule === 'area' || rule === 'position') && value !== null && totalValue) {
         const ratio = value / totalValue;
-        return rule === 'length' ? Math.max(0, ratio) : ratio;
+        return rule === 'position' ? ratio : Math.max(0, ratio);
     }
     return part.fraction;
 }
@@ -498,7 +621,13 @@ function strokeWidthOf(element: Element): number {
     return Number.isFinite(width) ? width : 1;
 }
 
-/** Horizontal offset of a member point inside its mark, spread by the golden ratio. */
+/**
+ * Horizontal offset of a member point inside its mark, spread by the golden ratio.
+ *
+ * @param feature Feature id of the point.
+ * @param band Width of the mark in pixels.
+ * @returns Offset from the center of the mark, in pixels.
+ */
 export function memberOffset(feature: number, band: number): number {
     return ((feature * 0.618034) % 1 - 0.5) * band * 0.6;
 }
@@ -507,6 +636,8 @@ export function memberOffset(feature: number, band: number): number {
 export type AutoPartContext = {
     /** Color of the selected part. */
     color: string;
+    /** Color of the outline added to parts that the fill does not set apart. */
+    outline: string;
     /** Clip path container. */
     clips: { append: (id: string, build: (clip: SVGClipPathElement) => void) => void };
     /** Selected features, for the `units` rule. */
@@ -520,10 +651,15 @@ const SVG = 'http://www.w3.org/2000/svg';
 /**
  * Draws the selected part of one mark with an automatic rule.
  *
+ * @param mark Mark element.
+ * @param part Selected part of the mark.
+ * @param design Design of the mark family.
  * @param copy A copy of the mark, already colored, that most rules reshape.
+ * @param context Colors, clip paths, and selected features.
+ * @param statistic Whether the copy is filled with the color of the subset statistic.
  * @returns The elements to insert after the mark (none when the rule draws nothing for it).
  */
-export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, design: PartialDesign, copy: SVGGraphicsElement, context: AutoPartContext): SVGGraphicsElement[] {
+export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, design: PartialDesign, copy: SVGGraphicsElement, context: AutoPartContext, statistic = false): SVGGraphicsElement[] {
     const own = mark.getAttribute('transform') ?? '';
     const r = ratioOf(part, design.rule);
     const clamped = Math.min(1, Math.max(0, r));
@@ -543,8 +679,12 @@ export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, des
             const start = axis === 'y' ? box.y : box.x;
             const anchor = (part.part.totalValue ?? 0) < 0 ? opposite(design.anchor ?? 'end') : design.anchor;
             const pivot = anchor === 'start' ? start : anchor === 'center' ? start + size / 2 : start + size;
-            const [px, py] = axis === 'y' ? [0, pivot] : [pivot, 0];
-            const [sx, sy] = axis === 'y' ? [1, r] : [r, 1];
+            // A statistic of the subset (avg, min, max) is not a slice of the mark:
+            // it is drawn as an inner mark, half as wide, centered across the axis.
+            const across = part.part.additive ? 1 : 0.5;
+            const middle = axis === 'y' ? box.x + box.width / 2 : box.y + box.height / 2;
+            const [px, py] = axis === 'y' ? [middle, pivot] : [pivot, middle];
+            const [sx, sy] = axis === 'y' ? [across, r] : [r, across];
             copy.setAttribute('transform', `translate(${px}, ${py}) scale(${sx}, ${sy}) translate(${-px}, ${-py}) ${own}`.trim());
             copy.style.setProperty('vector-effect', 'non-scaling-stroke');
             return [copy];
@@ -597,6 +737,7 @@ export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, des
                     ? [(r - 1) * (cx - (design.baseline ?? 0)), 0]
                     : [0, (r - 1) * (cy - (design.baseline ?? 0))];
             copy.setAttribute('transform', `translate(${dx}, ${dy}) ${own}`.trim());
+            outline(copy, context.outline);
             return [copy];
         }
         case 'members': {
@@ -612,11 +753,16 @@ export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, des
                 dot.setAttribute('class', 'autkPartial');
                 dot.setAttribute('data-autk-provenance', part.mark);
                 dot.setAttribute('data-autk-feature', String(feature));
+                dot.setAttribute('data-autk-value', String(value));
                 dot.setAttribute('cx', String(design.axis === 'y' ? across : along));
                 dot.setAttribute('cy', String(design.axis === 'y' ? along : across));
                 dot.setAttribute('r', '3.5');
                 dot.style.setProperty('fill', context.color);
                 dot.style.setProperty('pointer-events', 'none');
+                outline(dot, context.outline);
+                const title = mark.ownerDocument.createElementNS(SVG, 'title');
+                title.textContent = `feature ${feature}: ${format('~s')(value)}`;
+                dot.append(title);
                 return dot;
             });
         }
@@ -626,8 +772,12 @@ export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, des
             if (!box) return [];
             const ox = box.x + box.width / 2;
             const oy = box.y + box.height / 2;
-            const s = Math.sqrt(clamped);
+            // Area shows the value (a statistic may exceed the mark); a glyph shows
+            // the fraction or, when its color shows the statistic, is an inner mark
+            // half the size whatever the fraction, so that this color can be read.
+            const s = statistic ? 0.5 : Math.sqrt(design.rule === 'area' ? r : clamped);
             copy.setAttribute('transform', `${own} translate(${ox}, ${oy}) scale(${s}) translate(${-ox}, ${-oy})`.trim());
+            copy.style.setProperty('vector-effect', 'non-scaling-stroke');
             return [copy];
         }
     }
@@ -637,10 +787,23 @@ export function drawAutoPart(mark: SVGGraphicsElement, part: SegregatedPart, des
 let radialCount = 0;
 
 /**
- * Path of the series through the moved points of a `position` design: a
- * line, or an area down to the baseline when the series is filled.
+ * Gives a part the outline added where its fill does not set it apart.
+ *
+ * @param element Part element.
+ * @param color Outline color.
+ */
+export function outline(element: SVGElement, color: string): void {
+    element.style.setProperty('stroke', color);
+    element.style.setProperty('stroke-width', '1');
+}
+
+/**
+ * Path of the series through the moved points of a `position` design: a line, or an area down to
+ * the baseline when the series is filled.
  *
  * @param points Moved centers of every mark of the family, in parent coordinates.
+ * @param design Design of the mark family.
+ * @param filled Whether the series is an area.
  * @returns Path data, or `null` with fewer than two points.
  */
 export function seriesPath(points: [number, number][], design: PartialDesign, filled: boolean): string | null {
@@ -657,7 +820,12 @@ export function seriesPath(points: [number, number][], design: PartialDesign, fi
         : `${line}L${b},${last[1]}L${b},${first[1]}Z`;
 }
 
-/** Center of a mark in its parent's coordinates. */
+/**
+ * Center of a mark in its parent's coordinates.
+ *
+ * @param mark Mark element.
+ * @returns The center, or `null` when the mark cannot be measured.
+ */
 export function centerOf(mark: SVGGraphicsElement): [number, number] | null {
     const box = parentBox(mark);
     return box ? [box.x + box.width / 2, box.y + box.height / 2] : null;

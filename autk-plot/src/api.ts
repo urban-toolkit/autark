@@ -10,9 +10,7 @@ import type { ColorMapInterpolator } from '@urban-toolkit/autk-core';
 import type { PlotEvent } from './types-events';
 
 
-// ---------------------------------------------------------------------------
-// Core / shared types
-// ---------------------------------------------------------------------------
+// ---- Core and shared types ----------------------------------------------
 
 /**
  * Supported plot variants in the unified autk-plot API.
@@ -40,7 +38,7 @@ export type PlotMargins = {
 };
 
 /**
- * Base configuration accepted by all plot implementations.
+ * Base configuration accepted by every plot.
  */
 export type PlotConfig = {
     /** Host HTML element where the plot renders. */
@@ -96,7 +94,8 @@ export type PlotConfig = {
     filter?: FilterCondition | FilterCondition[];
     /**
      * Keeps only the `k` rendered rows with the highest value (`attributes.axis[1]`),
-     * after the transform runs. Supported by the barchart.
+     * after the transform runs. Supported by the bar, pie, and donut charts and by user plots
+     * whose rows have a label and a value (`attributes.axis[0]` and `[1]`).
      */
     topK?: TopKConfig;
 };
@@ -127,7 +126,7 @@ export type TopKConfig = {
 };
 
 /**
- * Provenance options accepted by all plot implementations.
+ * Provenance options accepted by every plot.
  */
 export type PlotProvenanceConfig = {
     /**
@@ -141,16 +140,14 @@ export type PlotProvenanceConfig = {
 /**
  * Configuration passed to `AutkPlot`. Identical to `PlotConfig` minus `div`,
  * which is supplied as a separate constructor argument, plus a `type` discriminant
- * that selects the plot implementation.
+ * that selects the plot.
  */
 export type UnifiedPlotConfig = Omit<PlotConfig, 'div'> & {
-    /** Selects which plot implementation to instantiate. */
+    /** Name of the plot to draw. */
     type: PlotType;
 };
 
-// ---------------------------------------------------------------------------
-// Transform types
-// ---------------------------------------------------------------------------
+// ---- Transform types ----------------------------------------------------
 
 /** Supported reducer names for built-in transform presets. */
 export type TransformReducer = 'count' | 'sum' | 'avg' | 'min' | 'max';
@@ -307,7 +304,7 @@ export type DensityTransformConfig = {
  * Hierarchy preset config.
  *
  * Groups rows by the categorical columns in `PlotConfig.attributes.axis`, from
- * the top level (`axis[0]`) down: e.g. district → land use. Every level is a
+ * the top level (`axis[0]`) down: e.g. group → category. Every level is a
  * partition of the level below, so features, leaves, and parents relate `N:1`
  * along the whole chain.
  */

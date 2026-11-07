@@ -1,10 +1,10 @@
 /**
  * Fold transform preset.
  *
- * Unfolds every row into one unit per numeric measure (`1:N`) and reduces the
- * units per category and measure (`N:1`): e.g. the average area, perimeter,
- * and number of events of the regions of each land use. Measures are rescaled
- * to `[0, 1]` by default so they share one axis, as in a radar chart.
+ * Unfolds every row into one unit per numeric measure (`1:N`) and reduces the units per category
+ * and measure (`N:1`): e.g. the average area, perimeter, and event count of the features of each
+ * category. Measures are rescaled to `[0, 1]` by default so they share one axis, as in a radar
+ * chart.
  */
 
 import * as d3 from 'd3';
@@ -13,6 +13,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { FoldTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { ProvenanceId, TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -21,9 +22,7 @@ import { unnestedProvenance } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runFold`.
- */
+/** Result produced by `runFold`. */
 export type ExecutedFoldTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'fold';
@@ -64,17 +63,17 @@ type FoldUnit = Row & { autkIds: number[]; __key: string; __value: number };
  * Runs a fold transform and returns one cell per category and measure.
  *
  * @param rows Input feature rows.
- * @param config Transform configuration: reducer and normalization.
+ * @param options Transform options (`transform.options`): reducer and normalization.
  * @param columns `columns[0]` is the category; `columns[1…]` are numeric measures.
- * @returns Cells by category, then measure.
+ * @returns Rows of the `fold` shape and their provenance, with the measures and their extents.
  * @throws If no measure column is given.
  */
-export function runFold(rows: AutkDatum[], config: FoldTransformConfig, columns: string[]): ExecutedFoldTransform {
+export function runFold(rows: AutkDatum[], options: NonNullable<FoldTransformConfig['options']>, columns: string[]): Omit<ExecutedFoldTransform, 'preset'> {
     if (columns.length < 2) {
         throw new Error('fold: a category column and at least one measure are required.');
     }
-    const reducer = config.options?.reducer ?? 'avg';
-    const normalize = config.options?.normalize ?? true;
+    const reducer = options.reducer ?? 'avg';
+    const normalize = options.normalize ?? true;
     const [categoryAttr, ...measures] = columns;
 
     const extents = measures.map(measure => {
@@ -115,7 +114,6 @@ export function runFold(rows: AutkDatum[], config: FoldTransformConfig, columns:
     });
 
     return {
-        preset: 'fold',
         measures,
         extents,
         rows: buckets.map(bucket => {
@@ -135,7 +133,7 @@ export function runFold(rows: AutkDatum[], config: FoldTransformConfig, columns:
             unitIds,
             unitLabel: 'measures',
             buckets,
-            bucketLabel: 'cells',
+            bucketLabel: 'category measures',
             rowKeys: buckets.map(bucket => bucket.key),
             reducer,
             // Each feature has one unit per measure: shares are computed per measure.
@@ -143,3 +141,13 @@ export function runFold(rows: AutkDatum[], config: FoldTransformConfig, columns:
         }),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Several numeric measures unfolded and reduced per category: one row per category and measure. */
+export const fold: TransformDefinition = {
+    name: 'fold',
+    label: 'Measures per category',
+    shape: 'fold',
+    run: runFold,
+};

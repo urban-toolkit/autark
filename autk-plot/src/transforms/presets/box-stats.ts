@@ -1,10 +1,10 @@
 /**
  * Box-stats transform preset.
  *
- * Groups rows by a categorical column and summarizes a numeric column per
- * group with quartiles, Tukey whiskers, and outliers. Besides `autkIds`, each
- * summary records which source features are its median and its outliers, since
- * order statistics are produced by specific features rather than by all of them.
+ * Groups rows by a categorical column and summarizes a numeric column per group with quartiles,
+ * Tukey whiskers, and outliers. Besides `autkIds`, each summary records which source features are
+ * its median and its outliers, since order statistics are produced by specific features rather
+ * than by all of them.
  */
 
 import * as d3 from 'd3';
@@ -13,6 +13,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { BoxStatsTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
 import type { TransformProvenance } from '../../types-provenance';
 
 import { collectBuckets } from '../kernel';
@@ -20,9 +21,7 @@ import { binnedProvenance, indexedBins } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runBoxStats`.
- */
+/** Result produced by `runBoxStats`. */
 export type ExecutedBoxStatsTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'box-stats';
@@ -32,9 +31,7 @@ export type ExecutedBoxStatsTransform = {
     provenance: TransformProvenance;
 };
 
-/**
- * A single box summary ready for plot rendering.
- */
+/** A single box summary ready for plot rendering. */
 export type BoxStatsRow = {
     /** Category of the box. */
     category: string;
@@ -66,14 +63,14 @@ export type BoxStatsRow = {
  * Runs a box-stats transform and returns plot-ready box summaries.
  *
  * @param rows Input feature rows.
- * @param config Transform configuration with the whisker multiplier.
+ * @param options Transform options (`transform.options`) with the whisker multiplier.
  * @param columns `columns[0]` is the category column, `columns[1]` the numeric column.
- * @returns Executed box-stats transform payload.
+ * @returns Rows of the `box-stats` shape and their provenance.
  */
-export function runBoxStats(rows: AutkDatum[], config: BoxStatsTransformConfig, columns: string[]): ExecutedBoxStatsTransform {
+export function runBoxStats(rows: AutkDatum[], options: NonNullable<BoxStatsTransformConfig['options']>, columns: string[]): Omit<ExecutedBoxStatsTransform, 'preset'> {
     const categoryAttr = columns[0] ?? '';
     const valueAttr = columns[1] ?? '';
-    const whisker = config.options?.whisker ?? 1.5;
+    const whisker = options.whisker ?? 1.5;
 
     const reduced = collectBuckets({
         rows,
@@ -118,7 +115,6 @@ export function runBoxStats(rows: AutkDatum[], config: BoxStatsTransformConfig, 
 
     const keys = reduced.map(bucket => bucket.key);
     return {
-        preset: 'box-stats',
         rows: boxRows,
         provenance: binnedProvenance({
             rows,
@@ -131,3 +127,13 @@ export function runBoxStats(rows: AutkDatum[], config: BoxStatsTransformConfig, 
         }),
     };
 }
+
+// ---- Definition ---------------------------------------------------------
+
+/** Quartiles, whiskers, and outliers of a numeric column per category: one row per category. */
+export const boxStats: TransformDefinition = {
+    name: 'box-stats',
+    label: 'Box statistics',
+    shape: 'box-stats',
+    run: runBoxStats,
+};

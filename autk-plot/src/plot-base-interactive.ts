@@ -25,6 +25,7 @@ import type { FeatureShare, MarkContribution, ProvenanceId, ProvenancePath } fro
 import { markId } from './provenance';
 import { renderProvenancePathView } from './provenance/path-view';
 import { othersLabelOf } from './transforms/top-k';
+import { shapeBinding, transformOf } from './transforms/registry';
 
 /**
  * Part of a rendered mark produced by the selected features (segregated view).
@@ -205,10 +206,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         this._selectedFeatureIds = new Set(selection);
         this._selectionOrigin = selection.length > 0 ? 'external' : null;
         this.syncSelectedMarksFromFeatures();
-        if (selection.length === 0) {
-            this._activeBrushes.clear();
-            this.clearBrushVisuals();
-        }
+        // A selection from elsewhere replaces this plot's own: its brush no longer describes it.
+        this._activeBrushes.clear();
+        this.clearBrushVisuals();
         this.renderSelection();
     }
 
@@ -276,11 +276,14 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         const selected = this.selectionPath;
         const cardinalities = new Map(this._provenance.cardinalities.map(c => [`${c.source}→${c.target}`, c.cardinality]));
         // Mark parts by readable label (axis[0] of the row), at most three plus a count of the rest.
+        // A second category (the y of a heat matrix cell) tells apart parts of the same first label.
         const segregated = this.segregatedParts();
         const partLabel = (datum: AutkDatum, mark: ProvenanceId) => {
             const label = valueAtPath(datum, this.renderAxisAttributes[0]);
-            if (typeof label === 'number' && Number.isFinite(label)) return d3.format('~s')(label);
-            return typeof label === 'string' && label.length > 0 ? label : mark;
+            const first = typeof label === 'number' && Number.isFinite(label) ? d3.format('~s')(label)
+                : typeof label === 'string' && label.length > 0 ? label : mark;
+            const second = valueAtPath(datum, this.renderAxisAttributes[1]);
+            return typeof second === 'string' && second !== '' && !Number.isFinite(Number(second)) ? `${first} · ${second}` : first;
         };
         // Fractional coverage (density) gives real unit weights: at most two decimals.
         const units = d3.format('.2~f');
@@ -370,7 +373,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     }
 
     /**
-     * Whether the plot draws segregated marks. Plots opt in by overriding.
+     * Whether the plot draws segregated marks. An extension hook for subclasses;
+     * `RegisteredPlot` overrides it.
      *
      * @returns `true` when `renderSegregatedMarks()` is implemented for the current configuration.
      */
@@ -380,7 +384,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
 
     /**
      * Draws, updates, or clears the partial marks of the segregated view from
-     * `segregatedSelection`. Plots that support the view override this hook.
+     * `segregatedSelection` (`RegisteredPlot` overrides it).
      */
     protected renderSegregatedMarks(): void {}
 
@@ -551,6 +555,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         svgs.each(function (d) {
             d3.select(this).on('click', function () {
                 if (d == null || typeof d !== 'object') return;
+                // A click adds the mark to the current selection, or takes it out, also when that
+                // selection came from another view (the map): as in the original module.
                 if (plot._selectedMarkDatums.has(d as object)) {
                     plot._selectedMarkDatums.delete(d as object);
                 } else {
@@ -1069,25 +1075,10 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * @returns Selection projection mode used by interaction logic.
      */
     private resolveSelectionProjection(transform: PlotTransformConfig | undefined, gathersRows: boolean = false): 'bijective' | 'aggregated' {
-        const preset = transform?.preset;
-        if (
-            preset === 'binning-1d' ||
-            preset === 'binning-2d' ||
-            preset === 'binning-events' ||
-            preset === 'reduce-series' ||
-            preset === 'box-stats' ||
-            preset === 'flows' ||
-            preset === 'binning-hex' ||
-            preset === 'hierarchy' ||
-            preset === 'cumulative' ||
-            preset === 'fold' ||
-            preset === 'density' ||
-            preset === 'registered' ||
-            gathersRows
-        ) {
-            return 'aggregated';
-        }
-        return 'bijective';
+        if (gathersRows) return 'aggregated';
+        // Rows that are the source features themselves (sort) map a selection one to one.
+        if (!transform || shapeBinding(transformOf(transform).shape).oneToOne) return 'bijective';
+        return 'aggregated';
     }
 
     /**

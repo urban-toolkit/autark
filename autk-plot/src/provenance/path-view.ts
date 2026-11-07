@@ -66,6 +66,13 @@ function stepCardinality(state: ProvenancePathViewState, from: string, to: strin
         if (target === to && sourceList.includes(from)) return cardinality;
         if (target === from && sourceList.includes(to)) return transposeCardinality(cardinality);
     }
+    // Marks may draw the rows of an earlier stage (D1 of a treemap): the step
+    // then shows the relation into `M` and the stage it starts at.
+    for (const [key, cardinality] of state.cardinalities) {
+        const [sources, target] = key.split('→');
+        if (target !== 'M' || (to !== 'M' && from !== 'M')) continue;
+        return `${to === 'M' ? cardinality : transposeCardinality(cardinality)} (${sources})`;
+    }
     return '';
 }
 
@@ -107,13 +114,14 @@ export function renderProvenancePathView(host: HTMLElement, state: ProvenancePat
         ? `${stages.map((step) => step.ids.length).join(' → ')} · ${state.direction}`
         : 'no selection';
 
-    // ---- Toggle bar, as wide as the plot
+    // ---- Toggle bar ---------------------------------------------------------
+    // As wide as the plot.
     root.selectAll<HTMLButtonElement, ProvenancePathViewState>('.autk-provenance-toggle')
         .data([state])
         .join('button')
         .attr('class', 'autk-provenance-toggle')
         .attr('type', 'button')
-        .attr('title', 'Provenance path')
+        .attr('title', 'Provenance path: how many entities the selection reaches at each stage, from the source features (D0) to the marks (M). direct: the selection came from another view; inverse: from marks selected here, back to the features')
         .attr('aria-expanded', (s) => String(s.open))
         .style('display', 'flex')
         .style('width', '100%')
@@ -129,7 +137,8 @@ export function renderProvenancePathView(host: HTMLElement, state: ProvenancePat
         .html(`${ICON}<span>Provenance</span><span style="color:#8c959f">${summary}</span>`)
         .on('click', (_event, s) => s.onToggle());
 
-    // ---- Path panel: stage chips first, then notes and mark parts
+    // ---- Path panel ---------------------------------------------------------
+    // Stage chips first, then notes and mark parts.
     const row = root.selectAll<HTMLDivElement, ProvenancePathViewState>('.autk-provenance-path')
         .data(state.open ? [state] : [])
         .join('div')
