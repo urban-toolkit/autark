@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
@@ -17,6 +17,8 @@ const chrome = process.env.CHROME_BIN ?? {
 if (!existsSync(chrome)) throw new Error('Chrome not found; set CHROME_BIN to a Chrome executable.');
 // Optional file filter: node autk-plot/test/run-browser.mjs provenance
 const filter = process.argv[2] ?? '';
+// AUTK_RECORD=1 lets a test record a baseline (see native-snapshot.browser.ts); record only on purpose.
+const record = process.env.AUTK_RECORD === '1';
 const files = readdirSync(testDir).filter(name => name.endsWith('.browser.ts') && name.includes(filter)).sort();
 if (files.length === 0) throw new Error(`No browser tests match "${filter}".`);
 await mkdir(resolve(root, '.cache'), { recursive: true });
@@ -102,9 +104,19 @@ try {
         await send('Page.navigate', { url: `http://127.0.0.1:${address.port}/autk-plot/test/browser.html` }, sessionId);
         await loaded;
         const result = await send('Runtime.evaluate', {
-            expression: `import('/autk-plot/test/harness.ts').then(module => module.runFile('/autk-plot/test/${file}'))`,
+            expression: `window.__AUTK_RECORD = ${record}; import('/autk-plot/test/harness.ts').then(module => module.runFile('/autk-plot/test/${file}'))`,
             awaitPromise: true, returnByValue: true,
         }, sessionId);
+        // Record mode: a test leaves what it recorded in window.__autkRecordings ({ path: text }),
+        // which only Node can write; only JSON files of test/baselines are accepted.
+        if (record) {
+            const recordings = await send('Runtime.evaluate', { expression: 'window.__autkRecordings ?? {}', returnByValue: true }, sessionId);
+            for (const [path, text] of Object.entries(recordings.result.value ?? {})) {
+                if (!/^baselines\/[\w.-]+\.json$/.test(path)) throw new Error(`Refused to record ${path}: only test/baselines/*.json.`);
+                await writeFile(resolve(testDir, path), text);
+                console.log(`recorded ${path}`);
+            }
+        }
         await send('Target.closeTarget', { targetId });
         if (result.exceptionDetails) {
             failed += 1;
