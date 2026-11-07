@@ -28,6 +28,12 @@ import type {
 } from './types-layers';
 
 /**
+ * A rectangle `[minX, minY, maxX, maxY]` in the coordinate system of the data the map was given (the workspace
+ * coordinate system, in meters, for data from `AutkDb`), not relative to the map origin.
+ */
+export type MapBounds = [minX: number, minY: number, maxX: number, maxY: number];
+
+/**
  * Parameters for loading a feature collection as a map layer.
  *
  * When `type` is omitted, the map may infer a vector layer type from the

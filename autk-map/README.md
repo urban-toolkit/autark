@@ -168,6 +168,7 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
 * `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
+* `fitBounds(bounds?)`: Moves the camera, looking straight down, so a rectangle (by default the first loaded collection) fits the viewport. A flat map otherwise starts at a fixed height over the middle of the first layer. Opt-in: loading layers does not call it.
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.
 * `destroy()`: Releases event handlers and GPU resources.
 

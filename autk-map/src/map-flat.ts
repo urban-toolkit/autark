@@ -15,6 +15,9 @@ import { MapPickingController } from './map-picking';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { Renderer } from './renderer';
 
+/** Space left around a rectangle that `fitBounds` frames, as a factor of the distance that just fits it. */
+const FIT_MARGIN = 1.08;
+
 /**
  * Coordinates one non-terrain map frame.
  *
@@ -55,6 +58,31 @@ export class FlatMapRenderPath {
      */
     resetCamera(): void {
         this.camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 10000]);
+        this.camera.resize(this.renderer.pixelWidth, this.renderer.pixelHeight);
+    }
+
+    /**
+     * Positions the camera, looking straight down, so a rectangle fits the viewport with a small margin.
+     *
+     * The distance comes from the camera's field of view and the canvas aspect, so the rectangle fits whether the
+     * canvas is wide or tall. The terrain path frames its heightfield the same way.
+     *
+     * @param bounds Rectangle `[minX, minY, maxX, maxY]` relative to the map origin, in the units of the layers.
+     * @returns Nothing. The camera state and viewport matrices are updated.
+     * @throws Never throws.
+     * @example
+     * flatPath.fitBounds([-5000, -3000, 5000, 3000]);
+     */
+    fitBounds(bounds: [number, number, number, number]): void {
+        const width = Math.max(bounds[2] - bounds[0], 1);
+        const height = Math.max(bounds[3] - bounds[1], 1);
+        const centerX = (bounds[0] + bounds[2]) * 0.5;
+        const centerY = (bounds[1] + bounds[3]) * 0.5;
+        const aspect = Math.max(this.renderer.pixelWidth / Math.max(this.renderer.pixelHeight, 1), 1e-6);
+        const halfFovTangent = Math.tan(this.camera.getFovyRadians() * 0.5);
+        const distance = Math.max(height / (2 * halfFovTangent), width / (2 * halfFovTangent * aspect)) * FIT_MARGIN;
+
+        this.camera.resetCamera([0, 1, 0], [centerX, centerY, 0], [centerX, centerY, distance]);
         this.camera.resize(this.renderer.pixelWidth, this.renderer.pixelHeight);
     }
 
