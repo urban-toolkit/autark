@@ -279,10 +279,12 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         // A second category (the y of a heat matrix cell) tells apart parts of the same first label.
         const segregated = this.segregatedParts();
         const partLabel = (datum: AutkDatum, mark: ProvenanceId) => {
-            const label = valueAtPath(datum, this.renderAxisAttributes[0]);
+            // A plot may have one field (a beeswarm): a missing field names nothing.
+            const [firstField, secondField] = this.renderAxisAttributes;
+            const label = firstField ? valueAtPath(datum, firstField) : undefined;
             const first = typeof label === 'number' && Number.isFinite(label) ? d3.format('~s')(label)
                 : typeof label === 'string' && label.length > 0 ? label : mark;
-            const second = valueAtPath(datum, this.renderAxisAttributes[1]);
+            const second = secondField ? valueAtPath(datum, secondField) : undefined;
             return typeof second === 'string' && second !== '' && !Number.isFinite(Number(second)) ? `${first} · ${second}` : first;
         };
         // Fractional coverage (density) gives real unit weights: at most two decimals.
