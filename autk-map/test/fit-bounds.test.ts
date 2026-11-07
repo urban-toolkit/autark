@@ -59,6 +59,35 @@ describe('FlatMapRenderPath.fitBounds', () => {
     });
 });
 
+describe('FlatMapRenderPath.resetCamera', () => {
+    it('returns to the default view when nothing was fitted', () => {
+        const { path, camera } = flatPath(800, 800);
+        path.resetCamera();
+        expect(camera.resetCamera).toHaveBeenCalledWith([0, 1, 0], [0, 0, 0], [0, 0, 10000]);
+    });
+
+    it('returns to the fitted view once a rectangle was fitted, not to the default', () => {
+        const { path, camera } = flatPath(800, 800);
+        path.fitBounds([0, 0, 6000, 1000]);
+        const fitted = camera.resetCamera.mock.calls[0];
+        camera.resetCamera.mockClear();
+        path.resetCamera();
+        expect(camera.resetCamera).toHaveBeenCalledTimes(1);
+        expect(camera.resetCamera.mock.calls[0]).toEqual(fitted);
+    });
+
+    it('fits again for the canvas as it is when reset, so a resized canvas is framed correctly', () => {
+        const camera = { getFovyRadians: () => Math.PI / 2, resetCamera: vi.fn(), resize: vi.fn() };
+        const renderer = { pixelWidth: 800, pixelHeight: 800 };
+        const path = new FlatMapRenderPath(renderer as never, camera as never, {} as never, {} as never);
+        path.fitBounds([0, 0, 6000, 1000]);
+        const square = camera.resetCamera.mock.calls[0][2][2];
+        renderer.pixelWidth = 1600;                                    // the window was made wider
+        path.resetCamera();
+        expect(camera.resetCamera.mock.calls[1][2][2]).toBeCloseTo(square / 2, 6);
+    });
+});
+
 describe('LayerManager bounds', () => {
     it('keeps the bounds of the collection that set the origin, and the origin as before', () => {
         const manager = new LayerManager();

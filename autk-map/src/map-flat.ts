@@ -48,8 +48,12 @@ export class FlatMapRenderPath {
         private readonly picking: MapPickingController,
     ) {}
 
+    /** The rectangle last framed by {@link fitBounds}, which {@link resetCamera} returns to; `null` before one. */
+    private fitted: [number, number, number, number] | null = null;
+
     /**
-     * Resets the main camera to the default flat map view.
+     * Resets the main camera to the default flat map view, or, once {@link fitBounds} has framed a rectangle, to that
+     * framing for the canvas as it is now.
      *
      * @returns Nothing. The camera state and viewport matrices are updated.
      * @throws Never throws.
@@ -57,6 +61,10 @@ export class FlatMapRenderPath {
      * flatPath.resetCamera();
      */
     resetCamera(): void {
+        if (this.fitted) {
+            this.frame(this.fitted);
+            return;
+        }
         this.camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 10000]);
         this.camera.resize(this.renderer.pixelWidth, this.renderer.pixelHeight);
     }
@@ -74,6 +82,12 @@ export class FlatMapRenderPath {
      * flatPath.fitBounds([-5000, -3000, 5000, 3000]);
      */
     fitBounds(bounds: [number, number, number, number]): void {
+        this.fitted = bounds;
+        this.frame(bounds);
+    }
+
+    /** Puts the camera at the height that fits `bounds` in the viewport. */
+    private frame(bounds: [number, number, number, number]): void {
         const width = Math.max(bounds[2] - bounds[0], 1);
         const height = Math.max(bounds[3] - bounds[1], 1);
         const centerX = (bounds[0] + bounds[2]) * 0.5;
