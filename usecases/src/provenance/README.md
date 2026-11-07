@@ -25,7 +25,7 @@ Every chart is created with `width: 'auto'`: it fills its card and redraws when 
 ## Units and approximations
 
 - Complaint times are New York local times, carried as UTC fields; days are the UTC days of those values, as in `binning-events`.
-- The density and violin charts use an Epanechnikov kernel. Near the smallest value the curve extends slightly below it (negative areas), a known boundary effect of kernel density estimates.
+- The density and violin charts use an Epanechnikov kernel. With 38 regions the bandwidth is wide, so near the smallest value the curve extends well below it (negative areas), a known boundary effect of kernel density estimates; a brush on the curve reaches every region whose kernel covers the brushed range, often more regions than the range suggests.
 - The moving average divides every day by the full window; the first and last days of the month have incomplete windows and read lower.
 - A complaint outside every region is dropped; one on a shared border goes to the first region that contains it.
 - The inferred partial view recognizes linear and square-root scales through zero; other scales fall back to a glyph with the area of the fraction.
