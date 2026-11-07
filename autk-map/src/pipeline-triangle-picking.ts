@@ -284,7 +284,8 @@ export class PipelineTrianglePicking extends Pipeline {
      * object-id buffer is rebuilt by walking the layer's component triangle
      * ranges and assigning the same encoded RGB identifier to every vertex index
      * referenced by triangles in that component. Identifier `0` is reserved for
-     * "no hit", so encoded component ids start at `1`.
+     * "no hit", so encoded component ids start at `1`. Vertices of skipped
+     * components keep `0`, so a feature that is hidden cannot be picked.
      *
      * @param layer Vector layer that provides positions, indices, and component
      * triangle boundaries.
@@ -311,6 +312,8 @@ export class PipelineTrianglePicking extends Pipeline {
 
             for (let t = sTri * 3; t < eTri * 3; t++) {
                 const vertexIndex = layer.indices[t];
+                // A skipped feature is not drawn, so it must not be pickable: its vertices keep the "no hit" id.
+                if (layer.skippedVertices[vertexIndex] > 0) { continue; }
                 const base = vertexIndex * 3;
                 this._objectIdsData[base + 0] = color[0];
                 this._objectIdsData[base + 1] = color[1];
