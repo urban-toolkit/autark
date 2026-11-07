@@ -135,3 +135,23 @@ describe('provenance path widget: cardinalities', () => {
         expect(stepsOf('inverse', ['M', 'D2', 'D1', 'D0'], relations)).toEqual(['M→D2 1:1 (D1)', 'D2→D1 1:N', 'D1→D0 1:N']);
     });
 });
+
+describe('provenance path widget: mark parts', () => {
+    test('a plot with one field (a beeswarm) lists its parts when it receives shares', () => {
+        next.registerPlot({
+            name: 'one-field-dots',
+            draw: ({ group, rows }) => { group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark').attr('r', 3); },
+        });
+        try {
+            const div = document.createElement('div');
+            const plot = new next.AutkPlot(div, {
+                type: 'registered', plot: 'one-field-dots', provenance: { path: 'open' },
+                collection: loadGalleryCollection('mnt_neighs_proj.geojson'), attributes: { axis: ['shape_area'] },
+            } as UnifiedPlotConfig);
+            expect(() => plot.setSelection([0, 1], [{ feature: 0, selectedUnits: 1, totalUnits: 3 }, { feature: 1, selectedUnits: 2, totalUnits: 3 }])).not.toThrow();
+            expect(div.querySelector('.autk-provenance-parts')?.textContent).toMatch(/: 0\.33\/1|: 1\/3|\//);
+        } finally {
+            next.unregisterPlot('one-field-dots');
+        }
+    });
+});
