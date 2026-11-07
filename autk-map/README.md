@@ -143,6 +143,28 @@ The poster omits the OpenStreetMap credit text; published uses still require
 appropriate OpenStreetMap attribution. Data loading requires network access to Overpass;
 larger crops may take longer.
 
+### Tile basemaps
+
+`loadTiles` draws web map tiles (satellite imagery or a street map) below the other layers, fetching them as the camera moves:
+
+```ts
+import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
+
+map.loadCollection('neighborhoods', { collection, type: 'polygons' });
+map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
+map.updateRenderInfo('neighborhoods', { opacity: 0.4 });   // let the imagery show through
+```
+
+* **Sources.** Presets are `esriWorldImagery`, `openStreetMap` and `cartoLight`. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown at the bottom right of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
+* **Provider terms.** Presets are conveniences, not licences. OpenStreetMap's public servers forbid heavy use and bulk downloading; use your own server or a commercial provider in production. Esri imagery needs its attribution to stay visible.
+* **Coordinate system.** `crs` is the system of your data: `'EPSG:3395'` (the default, as in `AutkDb` workspaces), `'EPSG:3857'` or `'EPSG:4326'`. Tiles are Web Mercator and are reprojected on the CPU, so there is no extra GPU cost.
+* **Order and origin.** Tile layers sit under every other layer, so a `surface` layer would cover them. The map origin comes from the first data layer; until one is loaded the tiles are not drawn.
+* **Loading.** At most 8 requests run at once; tiles that leave the view are cancelled, 256 tiles are kept in memory (`maxCachedTiles`), and the browser HTTP cache applies as usual. While a tile loads, the nearest loaded ancestor is drawn in its place. Tiles that fail for a transient reason are retried by the layer itself after a delay that doubles with each failure, up to a minute, for as long as they are in view; a definitive error such as 404 is not retried.
+* **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps what is requested and drawn at once: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
+* **Hiding.** Hiding a tile layer (`updateRenderInfo(id, { isSkip: true })`) cancels its queued, in-flight and retrying requests and keeps the textures already loaded, so showing it again draws at once and loads only what is missing.
+* **Statistics.** `map.getTileStats(id)` returns a read-only snapshot: the zoom (and the zoom the view wanted, when the tile cap lowered it), how many selected tiles are drawn with their own image, with an ancestor's or not at all, the request queue, cached textures with an estimated size in bytes, and cumulative counts of requests (retries included, not network transfers), cache reuses and pressure evictions. `map.renderStats` gives the number of frames rendered, the CPU time of the last frame and the average, and the frame rate while rendering. Time is CPU time around preparing and submitting a frame, not GPU time, and the rate is 0 while the map is idle. Reading either does not trigger rendering, so a page can poll them on a timer; a frame count that stops increasing means the map is idle.
+* **Limits.** The camera's far plane (500 km) limits how far you can zoom out before the map is clipped, so continent- and planet-scale views are not supported yet. Terrain draping is also not supported yet. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
+
 ### Render sizing verification
 
 - Interactive example: `gallery/src/autk-map/render-sizing.html` (point/line sliders and picking).
@@ -160,6 +182,8 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `activePickingLayer`: Returns the layer currently configured for picking.
 * `loadCollection(id, params)`: Loads a GeoJSON or raster-derived collection as a map layer.
 * `loadMesh(id, params)`: Loads prebuilt mesh geometry directly.
+* `loadTiles(id, params)`: Loads a tile basemap from a URL template or a preset (`TILE_SOURCES`).
+* `getTileStats(id)`, `renderStats`: Read-only statistics of a tile layer and of rendered frames; neither triggers rendering.
 * `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
 * `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions.
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.

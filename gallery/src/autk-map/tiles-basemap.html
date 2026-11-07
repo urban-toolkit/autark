@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Examples)</title>
+    <link rel="stylesheet" href="/src/autk-map/tiles-basemap.css">
+</head>
+
+<body>
+    <div id="app">
+        <h2>tiles-basemap.ts: satellite basemap explorer</h2>
+        <div id="controls">
+            <div class="group" role="group" aria-label="View">
+                <button id="view-overview" type="button">Overview</button>
+                <button id="view-neighborhood" type="button">Neighborhood</button>
+                <button id="view-tilted" type="button">Tilted</button>
+            </div>
+            <label class="check"><input id="show-tiles" type="checkbox" checked /> Show tiles</label>
+            <label class="slider">Opacity
+                <input id="opacity" type="range" min="0" max="1" step="0.05" value="1" />
+                <output id="opacity-value">100%</output>
+            </label>
+        </div>
+        <div id="stage">
+            <canvas></canvas>
+            <table id="stats" aria-label="Tile layer statistics">
+                <caption id="stats-status">Starting…</caption>
+                <tbody>
+                    <tr><th>Tile zoom / selected</th><td id="stat-selection">-</td></tr>
+                    <tr><th>Ready / fallback / missing</th><td id="stat-drawn">-</td></tr>
+                    <tr><th>Active / queued / waiting</th><td id="stat-requests-now">-</td></tr>
+                    <tr><th>Cached textures / limit</th><td id="stat-cache">-</td></tr>
+                    <tr><th>Texture memory (est.)</th><td id="stat-memory">-</td></tr>
+                    <tr><th>Requests / reuses / evictions</th><td id="stat-counters">-</td></tr>
+                    <tr><th>CPU per frame / frames per second</th><td id="stat-frames">-</td></tr>
+                    <tr><th>Frames rendered</th><td id="stat-frame-count">-</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p id="notes">
+            CPU time is measured around preparing and submitting a frame; it does not include the GPU.
+            The request count includes retries and is not a count of network transfers: the browser may answer from its cache.
+            Memory is the tile pixels only, at 4 bytes each.
+        </p>
+    </div>
+</body>
+<script type="module" src="/src/autk-map/tiles-basemap.ts"></script>
+
+</html>
