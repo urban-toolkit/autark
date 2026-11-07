@@ -28,6 +28,8 @@ export type { TerrainDebugOptions } from './renderer-terrain';
 
 /** Parameter types for the main `AutkMap` loading and update APIs. */
 export type {
+    /** Builds the content of a map tooltip for a feature, from its component id. */
+    TooltipProvider,
     /** A rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map. */
     MapBounds,
     MapOptions,
