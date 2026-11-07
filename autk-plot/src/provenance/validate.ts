@@ -32,7 +32,12 @@ export type ContractViolation = { invariant: number; message: string };
  * Result of checking the contract: violations, and invariants not checked
  * (4 when 1–3 fail, 6 when the reducer is not additive, all when `run` fails).
  */
-export type ContractReport = { violations: ContractViolation[]; skipped: number[] };
+export type ContractReport = {
+    violations: ContractViolation[];
+    skipped: number[];
+    /** Set when there were more violations than the ones reported (they are capped). */
+    truncated?: boolean;
+};
 
 /**
  * Checks the provenance of a transform output against the contract
@@ -52,8 +57,10 @@ export function checkProvenanceReport(
 ): ContractReport {
     const violations: ContractViolation[] = [];
     const skipped: number[] = [];
+    let truncated = false;
     const report = (invariant: number, message: string) => {
         if (violations.length < MAX_VIOLATIONS) violations.push({ invariant, message });
+        else truncated = true;
     };
     // A malformed provenance cannot be checked: report it instead of failing on it.
     const structure = provenanceStructureError(rows, provenance);
@@ -142,7 +149,7 @@ export function checkProvenanceReport(
         skipped.push(6);
     }
 
-    return { violations, skipped };
+    return { violations, skipped, ...(truncated ? { truncated } : {}) };
 }
 
 /**

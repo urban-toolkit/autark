@@ -63,6 +63,7 @@ export function indexedBins(labels: string[], keys: string[], prefix: string): M
  *
  * @param options Input rows, collected buckets, all bins of `D1`, and output row keys.
  * @returns Transform provenance aligned with the output rows.
+ * @throws If a bucket key or a row key has no bin.
  */
 export function binnedProvenance(options: {
     /** Input rows reduced by the preset, one per feature. */
@@ -81,6 +82,10 @@ export function binnedProvenance(options: {
     reducer: TransformReducer;
 }): TransformProvenance {
     const { rows, buckets, bins, binLabel, aggregateLabel = 'aggregates', rowKeys, reducer } = options;
+    const unknown = [...buckets.map(bucket => bucket.key), ...rowKeys].find(key => !bins.has(key));
+    if (unknown !== undefined) {
+        throw new Error(`binnedProvenance: the key "${unknown}" has no bin; every bucket key and row key needs one (indexedBins)`);
+    }
     const aggregateOf = (key: string) => bins.get(key)!.replace(/^[^:]+:/, 'aggregate:');
 
     const r01 = new Map<string, ProvenancePair>();

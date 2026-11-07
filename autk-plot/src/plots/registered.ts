@@ -226,6 +226,9 @@ const builtIns = new Set<string>();
 /** Segregated view rules of `data-autk-part`. */
 const PART_RULES = ['auto', 'shrink', 'fill-y', 'fill-x', 'none'];
 
+/** Space between an axis label and the tick labels of its axis, in pixels. */
+const AXIS_LABEL_GAP = 10;
+
 /** SVG elements with a bounding box, which click, brush, and the part rules can measure. */
 const SHAPE_TAGS = ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text', 'image', 'use', 'g'];
 
@@ -404,6 +407,8 @@ export class RegisteredPlot extends PlotBaseInteractive {
     readonly definition: PlotDefinition;
     /** Violations of the last draw. */
     drawingViolations: ContractViolation[] = [];
+    /** Whether the drawing broke the contract more often than the violations kept. */
+    drawingTruncated = false;
     /** Marks group of the current drawing (kept by reference: every plot's SVG has id `plot`). */
     private _group: SVGGElement | null = null;
     /** Container of HTML marks of the current drawing. */
@@ -501,7 +506,9 @@ export class RegisteredPlot extends PlotBaseInteractive {
             .attr('width', this._width).attr('height', this._height)
             .style('width', `${this._width}px`).style('height', `${this._height}px`)
             // Pages may hide the host until a plot draws (the Autark gallery does).
-            .style('visibility', 'visible');
+            .style('visibility', 'visible')
+            // A drag over labels brushes instead of selecting their text.
+            .style('user-select', 'none');
         svg.selectAll('*').remove();
         const html = d3.select(this._div).selectChildren<HTMLDivElement, number>('div.autk-registered-html')
             .data([0]).join('div')
@@ -583,7 +590,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         // A plot that draws its own brush areas (one per axis) brushes there, not on the whole group.
         if (!svg.selectAll('.autkBrush:not(.autkMarksGroup)').empty()) group.classed('autkBrush', false);
         this.rotateCrowdedTicks(svg.node()!);
-        this.clearAxisLabels(svg.node()!);
+        this.placeAxisLabels(svg.node()!);
         this.applyMarkStyles(d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark'));
         const valueField = this.definition.value ?? fields[1] ?? 'value';
         const valueOf = (row: AutkDatum) => {
@@ -633,10 +640,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
             .attr('class', 'axis-label title')
             // An axis group has fill="none"; page styles still win over this attribute.
             .attr('fill', 'currentColor')
-            .attr('text-anchor', 'end')
+            // Centered on its axis; placeAxisLabels then sets it a gap away from the tick labels.
+            .attr('text-anchor', 'middle')
             .text(this._axisLabels[side === 'x' ? 0 : 1] ?? '');
-        if (side === 'x') label.attr('x', width).attr('y', bottom / 2 + 10);
-        else label.attr('transform', 'rotate(-90)').attr('y', -left / 2 - 7).attr('x', -top);
+        if (side === 'x') label.attr('x', width / 2).attr('y', bottom / 2 + 10);
+        else label.attr('transform', 'rotate(-90)').attr('y', -left / 2 - 7).attr('x', -height / 2);
         return d3.select(g.node()!) as d3.Selection<SVGGElement, unknown, null, undefined>;
     }
 
@@ -660,11 +668,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
     }
 
     /**
-     * Moves an axis label past the tick labels it would cover (long or rotated
-     * ticks), within the margin. Text is measured only in a browser; elsewhere
-     * labels stay where `drawAxis` put them.
+     * Sets each axis label, centered on its axis, one gap past its tick labels: the x label below
+     * them, the y label (rotated) to their left, within the margin. Text is measured only in a
+     * browser; elsewhere labels stay where `drawAxis` put them.
      */
-    private clearAxisLabels(svg: SVGSVGElement): void {
+    private placeAxisLabels(svg: SVGSVGElement): void {
         const { left, bottom } = this._margins;
         for (const side of ['x', 'y'] as const) {
             const label = svg.querySelector<SVGTextElement>(`#axis${side.toUpperCase()} > .axis-label`);
@@ -674,12 +682,14 @@ export class RegisteredPlot extends PlotBaseInteractive {
                 .map(text => text.getBoundingClientRect())
                 .filter(box => box.width > 0 && box.height > 0);
             if (own.width === 0 || ticks.length === 0) continue;
-            const covered = ticks.filter(box => box.left < own.right && box.right > own.left && box.top < own.bottom && box.bottom > own.top);
-            if (covered.length === 0) continue;
             const y = Number(label.getAttribute('y'));
-            // The x label goes below the ticks; the y label (rotated) to their left.
-            if (side === 'x') label.setAttribute('y', String(Math.min(bottom - 4, y + Math.max(...covered.map(box => box.bottom)) - own.top + 2)));
-            else label.setAttribute('y', String(Math.max(-left + own.width + 2, y - (own.right - Math.min(...covered.map(box => box.left))) - 2)));
+            if (side === 'x') {
+                const below = Math.max(...ticks.map(box => box.bottom)) + AXIS_LABEL_GAP;
+                label.setAttribute('y', String(Math.min(bottom - 4, y + below - own.top)));
+            } else {
+                const beside = Math.min(...ticks.map(box => box.left)) - AXIS_LABEL_GAP;
+                label.setAttribute('y', String(Math.max(-left + own.width + 2, y - (own.right - beside))));
+            }
         }
     }
 
@@ -1007,8 +1017,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
      */
     private checkDrawing(): ContractViolation[] {
         const violations: ContractViolation[] = [];
+        this.drawingTruncated = false;
         const report = (invariant: number, message: string) => {
             if (violations.length < 20) violations.push({ invariant, message });
+            else this.drawingTruncated = true;
         };
         const group = this.marksGroup.node();
         const html = this._html;
@@ -1163,5 +1175,5 @@ function checkConnected(definition: PlotDefinition, div: HTMLElement, config: Om
         if (parts === null) skipped.push(6);
         else violations.push(...parts);
     }
-    return { violations, skipped, designs: plot.partialDesigns };
+    return { violations, skipped, ...(plot.drawingTruncated ? { truncated: true } : {}), designs: plot.partialDesigns };
 }

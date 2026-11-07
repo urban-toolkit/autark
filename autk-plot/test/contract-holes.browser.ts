@@ -235,6 +235,32 @@ describe('found by the third newcomer walkthrough', () => {
     });
 });
 
+describe('found on the migrated page', () => {
+    test('a capped report says that there are more violations than the ones it keeps', () => {
+        next.registerPlot({ name: 'no-marks', draw: ({ group, rows }) => { group.selectAll('circle').data(rows).join('circle').attr('r', 2); } });
+        plots.push('no-marks');
+        const many = next.checkPlot(next.registeredPlot('no-marks'), document.createElement('div'), { collection: regions(), attributes: { axis: ['shape_area'] } } as never);
+        expect(many.violations).toHaveLength(20);
+        expect(many.truncated).toBe(true);
+        const few = next.checkPlot(next.registeredPlot('no-marks'), document.createElement('div'), { collection: regions(), attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' } } as never);
+        expect(few.violations.length).toBeLessThan(20);
+        expect(few.truncated).toBeUndefined();
+    });
+
+    test('binnedProvenance names a key that has no bin instead of failing inside', () => {
+        const rows = regions().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[];
+        const buckets = next.collectBuckets({ rows, bucketOf: row => String(row.landuse), valueOf: undefined, reducer: 'count' });
+        const keys = buckets.map(bucket => bucket.key);
+        expect(() => next.binnedProvenance({ rows, buckets, bins: next.indexedBins(keys, keys, 'bin'), binLabel: 'bins', rowKeys: ['X', ...keys.slice(1)], reducer: 'count' }))
+            .toThrow('binnedProvenance: the key "X" has no bin; every bucket key and row key needs one (indexedBins)');
+    });
+
+    test('a drag over the labels of a plot brushes instead of selecting their text', () => {
+        const div = mount({ type: 'parallel-coordinates', attributes: { axis: ['shape_area', 'landuse'] } });
+        expect(div.querySelector<SVGSVGElement>('svg')!.style.userSelect).toBe('none');
+    });
+});
+
 describe('built-ins cannot be changed through a lookup', () => {
     test('the definitions of built-in plots and transforms are frozen, nested objects too', () => {
         const barchart = next.registeredPlot('barchart');
