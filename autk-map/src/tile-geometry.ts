@@ -15,7 +15,7 @@
  */
 
 import type { TileIndex } from './tile-index';
-import { tilesPerAxis } from './tile-index';
+import { tileLonLatBounds, tilesPerAxis } from './tile-index';
 import type { TileCrs } from './tile-projection';
 import { WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from './tile-projection';
 
@@ -71,8 +71,7 @@ export function buildTileGrid(tile: TileIndex, crs: TileCrs, origin: readonly [n
     const rows = tileRowCount(crs, tile.z);
     const n = tilesPerAxis(tile.z);
     const size = (2 * WEB_MERCATOR_EXTENT) / n;
-    const west = (tile.x / n) * 360 - 180;
-    const east = ((tile.x + 1) / n) * 360 - 180;
+    const { west, east } = tileLonLatBounds(tile);
 
     const positions = new Float32Array((rows + 1) * 4);
     const texCoords = new Float32Array((rows + 1) * 4);

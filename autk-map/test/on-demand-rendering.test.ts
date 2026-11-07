@@ -517,6 +517,57 @@ describe('on-demand rendering', () => {
     });
 });
 
+describe('render statistics', () => {
+    it('counts the frames that are rendered, measures their CPU time, and stops counting when the map is idle', async () => {
+        const { map } = await idleOnDemandMap();
+        vi.spyOn(performance, 'now').mockImplementation(() => frames.now);
+        flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame costs 3 ms of CPU
+
+        const first = map.renderStats.frameCount;
+        frames.run(10); // idle: nothing asks for a frame
+        expect(map.renderStats.frameCount).toBe(first);
+
+        for (let i = 0; i < 4; i++) {
+            map.requestRender();
+            frames.run(1);
+        }
+        const busy = map.renderStats;
+        expect(busy.frameCount).toBe(first + 4);
+        expect(busy.lastFrameCpuMs).toBeCloseTo(3, 6);
+        expect(busy.averageFrameCpuMs).toBeGreaterThan(0); // the average also holds the cheaper setup frames
+        expect(busy.averageFrameCpuMs).toBeLessThanOrEqual(3);
+        expect(busy.framesPerSecond).toBeGreaterThan(0);
+
+        frames.run(100); // two seconds of nothing
+        const idle = map.renderStats;
+        expect(idle.frameCount).toBe(busy.frameCount); // a stalled count is how a page sees an idle map
+        expect(idle.framesPerSecond).toBe(0); // and the rate does not keep its last value
+        expect(frames.pending).toBe(0);
+    });
+
+    it('reading the statistics does not ask for a frame', async () => {
+        const { map } = await idleOnDemandMap();
+        const before = renders();
+        for (let i = 0; i < 20; i++) void map.renderStats;
+        frames.run(3);
+        expect(renders() - before).toBe(0);
+        expect(frames.pending).toBe(0);
+    });
+
+    it('does not count a frame that failed', async () => {
+        const { map } = await idleOnDemandMap();
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const before = map.renderStats.frameCount;
+        flatFrames.mockImplementationOnce(() => { throw new Error('device lost'); });
+        map.requestRender();
+        frames.run(2);
+        expect(map.renderStats.frameCount).toBe(before);
+        map.requestRender();
+        frames.run(2);
+        expect(map.renderStats.frameCount).toBe(before + 1);
+    });
+});
+
 describe('continuous rendering and teardown', () => {
     it('adds faint branding even without map controls, tracks resize and cleans up on destroy', async () => {
         const canvas = new FakeCanvas();

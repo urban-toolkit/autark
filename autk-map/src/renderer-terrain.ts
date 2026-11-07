@@ -13,6 +13,7 @@ import terrainPickingFragmentSource from './shaders/terrain-picking.frag.wgsl';
 import terrainVertexSource from './shaders/terrain.vert.wgsl';
 import terrainBoundsReduceSource from './shaders/terrain-bounds-reduce.comp.wgsl';
 import type { Heightfield } from '@urban-toolkit/autk-core';
+import { nextPowerOfTwo } from './utils-math';
 
 /** Number of grid cells per terrain patch side. */
 const PATCH_CELLS = 32;
@@ -1054,19 +1055,6 @@ function normalizePlane(plane: Plane): Plane {
  */
 function rangesOverlap(minA: number, maxA: number, minB: number, maxB: number): boolean {
     return minA < maxB && minB < maxA;
-}
-
-/**
- * Computes the next power-of-two value greater than or equal to `value`.
- *
- * @param value Positive input value.
- * @returns Power-of-two integer greater than or equal to `value`.
- * @throws Never throws.
- * @example
- * nextPowerOfTwo(300); // 512
- */
-function nextPowerOfTwo(value: number): number {
-    return 2 ** Math.ceil(Math.log2(Math.max(1, value)));
 }
 
 /**

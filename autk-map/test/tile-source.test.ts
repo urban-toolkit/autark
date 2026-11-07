@@ -11,7 +11,7 @@ describe('resolveTileSource', () => {
   it('applies defaults', () => {
     expect(resolveTileSource(OSM)).toEqual({
       urlTemplate: OSM.urlTemplate,
-      attribution: OSM.attribution,
+      attribution: [{ text: '© OpenStreetMap contributors' }],
       minZoom: 0,
       maxZoom: 19,
       tileSize: 256,
@@ -42,6 +42,10 @@ describe('resolveTileSource', () => {
     ['both {y} and {reverseY}', { ...OSM, urlTemplate: 'https://e.org/{z}/{x}/{y}/{reverseY}' }, /both/],
     ['no attribution', { ...OSM, attribution: '' }, /attribution/],
     ['a blank attribution', { ...OSM, attribution: '   ' }, /attribution/],
+    ['an empty attribution list', { ...OSM, attribution: [] }, /attribution/],
+    ['an attribution entry without text', { ...OSM, attribution: [{ text: ' ', url: 'https://e.org' }] }, /attribution/],
+    ['an attribution link that is not http(s)', { ...OSM, attribution: { text: 'x', url: 'javascript:alert(1)' } }, /http or https/],
+    ['an attribution link that is not a URL', { ...OSM, attribution: { text: 'x', url: 'not a url' } }, /http or https/],
     ['a fractional zoom', { ...OSM, maxZoom: 3.5 }, /maxZoom must be an integer/],
     ['a negative zoom', { ...OSM, minZoom: -1 }, /minZoom must be an integer/],
     ['zoom limits out of order', { ...OSM, minZoom: 8, maxZoom: 4 }, /greater than maxZoom/],
@@ -49,6 +53,27 @@ describe('resolveTileSource', () => {
     ['{s} without subdomains', { ...OSM, urlTemplate: 'https://{s}.e.org/{z}/{x}/{y}' }, /no subdomains/],
   ] as Array<[string, TileSource, RegExp]>)('rejects %s', (_label, source, message) => {
     expect(() => resolveTileSource(source)).toThrow(message);
+  });
+});
+
+describe('attribution forms', () => {
+  it('accepts a string, an entry with a link, or a list of either', () => {
+    expect(resolveTileSource({ ...OSM, attribution: ' © A ' }).attribution).toEqual([{ text: '© A' }]);
+    expect(resolveTileSource({ ...OSM, attribution: { text: '© A', url: 'https://a.example/legal' } }).attribution)
+      .toEqual([{ text: '© A', url: 'https://a.example/legal' }]);
+    expect(resolveTileSource({ ...OSM, attribution: ['© A', { text: '© B', url: 'http://b.example' }] }).attribution)
+      .toEqual([{ text: '© A' }, { text: '© B', url: 'http://b.example' }]);
+  });
+
+  it('gives the OpenStreetMap-based presets a link to the OSM copyright page', () => {
+    for (const preset of [TILE_SOURCES.openStreetMap, TILE_SOURCES.cartoLight]) {
+      const credits = resolveTileSource(preset).attribution;
+      expect(credits.some((c) => c.text.includes('OpenStreetMap') && c.url === 'https://www.openstreetmap.org/copyright')).toBe(true);
+    }
+  });
+
+  it('keeps every preset valid', () => {
+    for (const preset of Object.values(TILE_SOURCES)) expect(() => resolveTileSource(preset)).not.toThrow();
   });
 });
 

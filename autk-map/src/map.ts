@@ -62,6 +62,7 @@ import {
     UpdateRenderInfoParams,
     UpdateRasterParams,
     UpdateThematicParams,
+    LoadTilesParams,
 } from './api';
 
 import { KeyEvents } from './events-key';
@@ -72,6 +73,10 @@ import { Renderer } from './renderer';
 
 import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
+import { FrameStats } from './frame-stats';
+import type { FrameStatsSnapshot } from './frame-stats';
+import { TileLayer } from './layer-tiles';
+import type { TileLayerStats } from './layer-tiles';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
 import { SpriteLayer } from './layer-sprite';
@@ -132,6 +137,8 @@ export class AutkMap {
     protected _isDestroyed: boolean = false;
     /** Set after the first render-loop error to deduplicate repeated frame failures. */
     protected _renderErrorLogged: boolean = false;
+    /** CPU time and rate of the frames rendered so far. */
+    protected _frameStats: FrameStats = new FrameStats();
     /** Flat render path used when terrain mode is disabled. */
     private _flatRenderPath!: FlatMapRenderPath;
     /** Active terrain render path, or `null` while using flat rendering. */
@@ -310,6 +317,10 @@ export class AutkMap {
                 this.createRasterLayer(id, collection, property);
                 break;
 
+            case 'tiles':
+                console.error(`Layer "${id}": tile layers are loaded with loadTiles(), not loadCollection().`);
+                return;
+
             default:
                 console.error(`Collection of layer ${id} has an unknown layer type: ${sType}.`);
                 break;
@@ -361,6 +372,86 @@ export class AutkMap {
     }
 
     /**
+     * Loads a tile basemap: satellite imagery or a street map fetched as the
+     * camera moves.
+     *
+     * Tiles use the Web Mercator grid. They are drawn below every other layer,
+     * so load vector layers normally and the basemap shows underneath; a
+     * `surface` layer would cover it. Drawing needs the map origin, which the
+     * first loaded data layer defines, so the tiles appear once such a layer
+     * exists. The source attribution is shown on the map.
+     *
+     * Opacity and visibility change through {@link AutkMap.updateRenderInfo}.
+     *
+     * @param id Unique layer identifier.
+     * @param params Tile source and options.
+     * @throws Never throws. Errors, such as an invalid source, are logged to the console.
+     * @example
+     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
+     */
+    loadTiles(id: string, { source, crs, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
+        const layerInfo: LayerInfo = {
+            id,
+            zIndex: this._layerManager.computeZindex('tiles'),
+            typeLayer: 'tiles',
+        };
+        const layerRenderInfo: LayerRenderInfo = {
+            opacity,
+            colormap: { config: this.defaultColorMap() },
+            isColorMap: false,
+            isPick: false,
+            isSkip: false,
+        };
+
+        try {
+            const layer = this._layerManager.addTileLayer(layerInfo, layerRenderInfo, { source, crs, maxCachedTiles, zoomBias, maxTiles });
+            if (!layer) { return; }
+            layer.createPipeline(this._renderer);
+            layer.setChangeListener(() => this.requestRender());
+        } catch (error) {
+            console.error(`Layer "${id}": ${(error as Error).message}`);
+            return;
+        }
+
+        this._ui.refreshLayerList();
+        this.refreshAttribution();
+        this.requestRender();
+    }
+
+    /**
+     * Statistics of a tile layer: what the last selection holds, how many
+     * tiles are ready, drawn from an ancestor or missing, the request queue, the
+     * texture cache and cumulative counters.
+     *
+     * Reading it is cheap and never triggers rendering, so a page can poll it on
+     * a timer without keeping the map busy.
+     *
+     * @param id Tile layer identifier.
+     * @returns The statistics, or `null` if there is no tile layer with that id.
+     * @example
+     * const stats = map.getTileStats('imagery');
+     * if (stats?.idle) console.log('all tiles loaded');
+     */
+    getTileStats(id: string): TileLayerStats | null {
+        const layer = this._layerManager.searchByLayerId(id);
+        return layer instanceof TileLayer ? layer.stats : null;
+    }
+
+    /**
+     * CPU time and rate of the frames this map has rendered.
+     *
+     * Time is measured on the CPU around preparing and submitting a frame, not
+     * on the GPU, so it can look healthy while the GPU is the bottleneck. In
+     * on-demand mode `framesPerSecond` is 0 while the map is idle, and
+     * `frameCount` stops increasing. Reading it never triggers rendering.
+     *
+     * @returns A snapshot of the frame statistics.
+     */
+    get renderStats(): FrameStatsSnapshot {
+        return this._frameStats.snapshot(performance.now());
+    }
+
+    /**
      * Updates the thematic (color-mapped) values of a layer from a feature collection.
      *
      * Normalization to `[0, 1]` (required by the GPU shader) and legend label
@@ -384,7 +475,7 @@ export class AutkMap {
         const layer = this._layerManager.searchByLayerId(id) as VectorLayer | SpriteLayer | null;
 
         if (!layer) { return; }
-        if (layer.layerInfo.typeLayer === 'raster') { return; };
+        if (layer.layerInfo.typeLayer === 'raster' || layer.layerInfo.typeLayer === 'tiles') { return; };
 
         const features = collection.features;
         if (features.length === 0) { return; }
@@ -601,6 +692,7 @@ export class AutkMap {
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
+        if (layer.layerInfo.typeLayer === 'tiles') { return; }
 
         const currentConfig = layer.layerRenderInfo.colormap.config;
 
@@ -662,11 +754,17 @@ export class AutkMap {
         const info = 'renderInfo' in params ? params.renderInfo : params;
 
         const nextInfo: Partial<LayerRenderInfo> = { ...info };
+        if (layer.layerInfo.typeLayer === 'tiles') {
+            // Imagery has no values to color-map and nothing to pick.
+            delete nextInfo.isColorMap;
+            delete nextInfo.isPick;
+            delete nextInfo.colormap;
+        }
 
         let needsLegend = false;
         let needsLayerList = false;
 
-        if ('isColorMap' in info) {
+        if ('isColorMap' in nextInfo) {
             needsLegend = true;
             needsLayerList = true;
         }
@@ -686,6 +784,7 @@ export class AutkMap {
 
         if (needsLegend) { this._ui.refreshLegend(layer); }
         if (needsLayerList) { this._ui.refreshLayerList(); }
+        if ('isSkip' in nextInfo && layer.layerInfo.typeLayer === 'tiles') { this.refreshAttribution(); }
     }
 
     /**
@@ -700,6 +799,7 @@ export class AutkMap {
         this._layerManager.removeLayerById(id);
         this._ui.handleLayerRemoved(id);
         this._ui.refreshLayerList();
+        this.refreshAttribution();
 
         if (removed) {
             this.requestRender();
@@ -1065,7 +1165,10 @@ export class AutkMap {
      */
     private render() {
         try {
+            const start = performance.now();
             this._renderFrame();
+            const end = performance.now();
+            this._frameStats.record(end - start, end);
         } catch (error) {
             if (!this._renderErrorLogged) {
                 console.warn('AutkMap render skipped:', error);
@@ -1383,6 +1486,13 @@ export class AutkMap {
             layer.setChangeListener(() => this.requestRender());
             this.requestRender();
         }
+    }
+
+    /**
+     * Shows the credits of every visible tile layer, without repeats.
+     */
+    private refreshAttribution(): void {
+        this._ui.setAttribution(this._layerManager.visibleAttribution());
     }
 
     /**

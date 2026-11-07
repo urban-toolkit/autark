@@ -160,17 +160,33 @@ export function lonLatToTileCoord(lon: number, lat: number, z: number): { x: num
     };
 }
 
+/** An inclusive rectangle of tiles at one zoom level. */
+export interface TileRange {
+    /** Zoom level. */
+    z: number;
+    /** First column. */
+    x0: number;
+    /** Last column. */
+    x1: number;
+    /** First row. */
+    y0: number;
+    /** Last row. */
+    y1: number;
+}
+
 /**
- * Tiles that overlap a longitude/latitude box at one zoom level.
+ * The tiles that overlap a longitude/latitude box at one zoom level, as a
+ * rectangle. This costs the same however many tiles the box holds, so a caller
+ * can count them before deciding to list them.
  *
  * The box is clamped to the world square. A box that crosses the antimeridian
  * is not wrapped: pass `west > east` as two calls if that is needed.
  *
  * @param bounds - Box in degrees.
  * @param z - Zoom level.
- * @returns Tiles in row-major order, north to south and west to east.
+ * @returns The range, or `null` when the box overlaps no tile.
  */
-export function tilesInBounds(bounds: LonLatBounds, z: number): TileIndex[] {
+export function tileRangeInBounds(bounds: LonLatBounds, z: number): TileRange | null {
     const n = tilesPerAxis(z);
     const nw = lonLatToTileCoord(bounds.west, bounds.north, z);
     const se = lonLatToTileCoord(bounds.east, bounds.south, z);
@@ -180,12 +196,45 @@ export function tilesInBounds(bounds: LonLatBounds, z: number): TileIndex[] {
     const x1 = Math.min(n - 1, Math.ceil(se.x - epsilon) - 1);
     const y0 = Math.max(0, Math.floor(nw.y + epsilon));
     const y1 = Math.min(n - 1, Math.ceil(se.y - epsilon) - 1);
+    return x1 < x0 || y1 < y0 ? null : { z, x0, x1, y0, y1 };
+}
 
+/**
+ * Number of tiles in a range.
+ *
+ * @param range - Tile range.
+ * @returns Columns times rows.
+ */
+export function tileRangeCount(range: TileRange): number {
+    return (range.x1 - range.x0 + 1) * (range.y1 - range.y0 + 1);
+}
+
+/**
+ * Lists the tiles of a range.
+ *
+ * @param range - Tile range.
+ * @returns Tiles in row-major order, north to south and west to east.
+ */
+export function tilesInRange(range: TileRange): TileIndex[] {
     const tiles: TileIndex[] = [];
-    for (let y = y0; y <= y1; y++) {
-        for (let x = x0; x <= x1; x++) tiles.push({ z, x, y });
+    for (let y = range.y0; y <= range.y1; y++) {
+        for (let x = range.x0; x <= range.x1; x++) tiles.push({ z: range.z, x, y });
     }
     return tiles;
+}
+
+/**
+ * Tiles that overlap a longitude/latitude box at one zoom level.
+ *
+ * Lists every tile, so check {@link tileRangeInBounds} first when the box may be large.
+ *
+ * @param bounds - Box in degrees.
+ * @param z - Zoom level.
+ * @returns Tiles in row-major order, north to south and west to east.
+ */
+export function tilesInBounds(bounds: LonLatBounds, z: number): TileIndex[] {
+    const range = tileRangeInBounds(bounds, z);
+    return range ? tilesInRange(range) : [];
 }
 
 /**

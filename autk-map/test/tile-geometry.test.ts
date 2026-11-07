@@ -94,6 +94,31 @@ describe('buildTileGrid', () => {
   });
 });
 
+describe('float32 placement of the generated geometry', () => {
+  // The projection bound below covers the approximation between row vertices.
+  // This covers storing vertex positions as float32 relative to the origin.
+  it.each(TILE_CRS_VALUES)('stays within 1/32 pixel of the double-precision position in %s', (crs) => {
+    const tile = { z: 17, x: 66500, y: 63177 };
+    const [lon, lat] = [3.1, 6.46];
+    const perPixel = (2 * WEB_MERCATOR_EXTENT) / (256 * tilesPerAxis(tile.z)); // Mercator metres per tile pixel
+    const [cx, cy] = lonLatToCrs(crs, lon, lat);
+    // Origins up to about 100 km from the tile (a degree is about 111 km).
+    const distances = crs === 'EPSG:4326' ? [0, 0.01, 1] : [0, 1000, 100_000];
+    for (const distance of distances) {
+      const origin = [cx + distance, cy - distance] as const;
+      const grid = buildTileGrid(tile, crs, origin);
+      const n = tilesPerAxis(tile.z);
+      const lonW = (tile.x / n) * 360 - 180;
+      const latN = mercatorYToLat(WEB_MERCATOR_EXTENT - (tile.y / n) * 2 * WEB_MERCATOR_EXTENT);
+      const [x, y] = lonLatToCrs(crs, lonW, latN);
+      // 4326 is in degrees; express the allowed error in that unit.
+      const unit = crs === 'EPSG:4326' ? 360 / (256 * n) : perPixel;
+      expect(Math.abs(grid.positions[0]! - (x - origin[0]))).toBeLessThan(unit / 32);
+      expect(Math.abs(grid.positions[1]! - (y - origin[1]))).toBeLessThan(unit / 32);
+    }
+  });
+});
+
 describe('tileRowCount', () => {
   it('uses one row for Web Mercator and for 3395 from zoom 5', () => {
     for (let z = 0; z <= 22; z++) expect(tileRowCount('EPSG:3857', z)).toBe(1);
@@ -118,6 +143,8 @@ describe('tileRowCount', () => {
    * latitude inside a tile and the y that linear interpolation between the
    * tile's row vertices gives.
    */
+  const SAMPLES_PER_SUBDIVISION = 16; // includes the midpoint, where linear interpolation is worst
+
   function worstErrorPixels(crs: TileCrs, z: number, rows = tileRowCount(crs, z)): number {
     const n = tilesPerAxis(z);
     const size = (2 * WEB_MERCATOR_EXTENT) / n;
@@ -129,13 +156,16 @@ describe('tileRowCount', () => {
       const yAt = (v: number) => lonLatToCrs(crs, 0, mercatorYToLat(WEB_MERCATOR_EXTENT - (ty + v) * size))[1];
       const perPixel = Math.abs(yAt(0) - yAt(1)) / 512;
       if (perPixel === 0) continue;
-      for (let k = 0; k <= 64; k++) {
-        const v = k / 64;
-        const r = Math.min(rows - 1, Math.floor(v * rows));
+      // Sample inside every subdivision, not only at its vertices: the vertices
+      // agree with the projection by construction, so the error lives between them.
+      for (let r = 0; r < rows; r++) {
         const v0 = r / rows;
         const v1 = (r + 1) / rows;
-        const interpolated = yAt(v0) + (yAt(v1) - yAt(v0)) * ((v - v0) / (v1 - v0));
-        worst = Math.max(worst, Math.abs(interpolated - yAt(v)) / perPixel);
+        for (let k = 1; k < SAMPLES_PER_SUBDIVISION; k++) {
+          const v = v0 + (v1 - v0) * (k / SAMPLES_PER_SUBDIVISION);
+          const interpolated = yAt(v0) + (yAt(v1) - yAt(v0)) * ((v - v0) / (v1 - v0));
+          worst = Math.max(worst, Math.abs(interpolated - yAt(v)) / perPixel);
+        }
       }
     }
     return worst;

@@ -8,6 +8,8 @@
  * and `{reverseY}` for TMS-style sources that count rows from the south.
  */
 
+import { normalizeAttribution } from './attribution';
+import type { TileAttribution, TileCredit } from './attribution';
 import type { TileIndex } from './tile-index';
 import { MAX_TILE_ZOOM, isValidTile, tilesPerAxis } from './tile-index';
 
@@ -18,8 +20,12 @@ export interface TileSource {
      * optionally `{s}` for a subdomain.
      */
     urlTemplate: string;
-    /** Credit shown on the map. Required: providers' terms ask for it. */
-    attribution: string;
+    /**
+     * Credit shown on the map. Required: providers' terms ask for it. Give a
+     * string, a `{ text, url }` entry that links to the provider's page, or a
+     * list of either. Links must be `http` or `https` URLs.
+     */
+    attribution: TileAttribution;
     /** Smallest zoom level the source serves. Defaults to 0. */
     minZoom?: number;
     /** Largest zoom level the source serves. Defaults to 19. */
@@ -36,7 +42,7 @@ export interface TileSource {
 /** A {@link TileSource} with defaults applied and validated. */
 export interface ResolvedTileSource {
     readonly urlTemplate: string;
-    readonly attribution: string;
+    readonly attribution: readonly TileCredit[];
     readonly minZoom: number;
     readonly maxZoom: number;
     readonly tileSize: number;
@@ -55,8 +61,8 @@ const KNOWN_PLACEHOLDERS = new Set(['z', 'x', 'y', 's', 'reverseY']);
  * @param source - Source as written by the application.
  * @returns The resolved source.
  * @throws If the template has unknown or missing placeholders, a zoom limit or
- *   the tile size is invalid, the attribution is empty, or `{s}` is used
- *   without subdomains.
+ *   the tile size is invalid, the attribution is empty or links to something
+ *   other than an `http(s)` URL, or `{s}` is used without subdomains.
  * @example
  * const resolved = resolveTileSource({
  *     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -87,9 +93,7 @@ export function resolveTileSource(source: TileSource): ResolvedTileSource {
         throw new Error('Tile source urlTemplate cannot contain both {y} and {reverseY}.');
     }
 
-    if (typeof source.attribution !== 'string' || source.attribution.trim().length === 0) {
-        throw new Error('Tile source needs an attribution: tile providers require the credit to be shown.');
-    }
+    const attribution = normalizeAttribution(source.attribution);
 
     const minZoom = source.minZoom ?? DEFAULT_MIN_ZOOM;
     const maxZoom = source.maxZoom ?? DEFAULT_MAX_ZOOM;
@@ -114,7 +118,7 @@ export function resolveTileSource(source: TileSource): ResolvedTileSource {
         throw new Error('Tile source urlTemplate uses {s} but no subdomains were given.');
     }
 
-    return { urlTemplate, attribution: source.attribution, minZoom, maxZoom, tileSize, subdomains };
+    return { urlTemplate, attribution, minZoom, maxZoom, tileSize, subdomains };
 }
 
 /**
@@ -157,6 +161,9 @@ export function tileSourceId(source: ResolvedTileSource): string {
     return `${source.urlTemplate}@${source.tileSize}`;
 }
 
+/** Where OpenStreetMap asks credits to link, for access to its licence and origin information. */
+const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
+
 /**
  * Ready-made tile sources.
  *
@@ -179,12 +186,15 @@ export const TILE_SOURCES = {
     },
     openStreetMap: {
         urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: '© OpenStreetMap contributors',
+        attribution: { text: '© OpenStreetMap contributors', url: OSM_COPYRIGHT_URL },
         maxZoom: 19,
     },
     cartoLight: {
         urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-        attribution: '© OpenStreetMap contributors © CARTO',
+        attribution: [
+            { text: '© OpenStreetMap contributors', url: OSM_COPYRIGHT_URL },
+            { text: '© CARTO', url: 'https://carto.com/attributions' },
+        ],
         subdomains: 'abcd',
         maxZoom: 20,
     },

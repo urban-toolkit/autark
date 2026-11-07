@@ -9,6 +9,8 @@
  * consistently.
  */
 
+import type { TileCrs } from './tile-projection';
+import type { TileSource } from './tile-source';
 import {
     FeatureCollection,
     Geometry,
@@ -140,6 +142,43 @@ export interface UpdateRasterParams {
      * Optional transfer function used to derive raster opacity from values.
      */
     transferFunction?: TransferFunction;
+}
+
+/**
+ * Parameters for loading a tile basemap with {@link AutkMap.loadTiles}.
+ *
+ * Tiles are web map tiles in the Web Mercator (EPSG:3857) grid, fetched as the
+ * camera moves and drawn below every other layer.
+ */
+export interface LoadTilesParams {
+    /**
+     * Where the tiles come from: a preset from `TILE_SOURCES` or a custom
+     * URL template. The attribution is required and is shown on the map, as
+     * text or, where the source gives a URL, as a link; the caller is
+     * responsible for following the provider's terms of use.
+     */
+    source: TileSource;
+    /**
+     * Coordinate system of the map's data. Defaults to `'EPSG:3395'`, the
+     * workspace default of `AutkDb`.
+     */
+    crs?: TileCrs;
+    /** Layer opacity from 0 to 1. Defaults to 1. */
+    opacity?: number;
+    /** Tiles kept in memory. Defaults to 256. */
+    maxCachedTiles?: number;
+    /**
+     * Added to the zoom level chosen for the view. Positive values give
+     * sharper tiles and more requests, negative values the opposite.
+     * Defaults to 0.
+     */
+    zoomBias?: number;
+    /**
+     * Most tiles requested and drawn at once. The zoom drops to fit; if the
+     * source's lowest zoom still needs more, only the tiles nearest the view
+     * centre are used. Defaults to 64.
+     */
+    maxTiles?: number;
 }
 
 /**

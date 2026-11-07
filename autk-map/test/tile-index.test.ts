@@ -9,6 +9,9 @@ import {
   tileLonLatBounds,
   tileMercatorBounds,
   tilesInBounds,
+  tileRangeCount,
+  tileRangeInBounds,
+  tilesInRange,
   tilesPerAxis,
   uvInAncestor,
 } from '../src/tile-index';
@@ -154,5 +157,24 @@ describe('metresPerPixel', () => {
 
   it('scales with tile size', () => {
     expect(metresPerPixel(3, 0, 512)).toBeCloseTo(metresPerPixel(3, 0, 256) / 2, 9);
+  });
+});
+
+describe('tile ranges', () => {
+  it('counts a range without listing it', () => {
+    const range = tileRangeInBounds({ west: -179, south: -80, east: 179, north: 80 }, 19)!;
+    expect(tileRangeCount(range)).toBeGreaterThan(1e11);
+  });
+
+  it('lists exactly the tiles it counts, in the order tilesInBounds uses', () => {
+    const bounds = { west: 2.6, south: 6.4, east: 2.7, north: 6.5 };
+    const range = tileRangeInBounds(bounds, 12)!;
+    expect(tilesInRange(range)).toHaveLength(tileRangeCount(range));
+    expect(tilesInRange(range)).toEqual(tilesInBounds(bounds, 12));
+  });
+
+  it('is null for a box that overlaps nothing', () => {
+    expect(tileRangeInBounds({ west: 10, south: 0, east: 5, north: 1 }, 8)).toBeNull();
+    expect(tilesInBounds({ west: 10, south: 0, east: 5, north: 1 }, 8)).toEqual([]);
   });
 });
