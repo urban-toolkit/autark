@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark (Examples)</title>
+    <link rel="stylesheet" href="/src/autk-map/tiles-basemap.css">
+</head>
+
+<body>
+    <div id="app">
+        <h2>terrain-tiles.ts: streamed terrain with satellite imagery</h2>
+        <div id="controls">
+            <div class="group" id="places" role="group" aria-label="Place"></div>
+            <div class="group" role="group" aria-label="View">
+                <button id="view-top" type="button">Top</button>
+                <button id="view-tilted" type="button">Tilted</button>
+                <button id="view-wide" type="button">Wide</button>
+            </div>
+            <div class="group" role="group" aria-label="Vertical scale">
+                <button id="scale-1" type="button">Height ×1</button>
+                <button id="scale-2" type="button">×2</button>
+                <button id="scale-3" type="button">×3</button>
+            </div>
+            <label class="check"><input id="show-tiles" type="checkbox" checked /> Imagery</label>
+            <div class="group" role="group" aria-label="Timings">
+                <button id="timing-reset" type="button" title="Forget the timings so far, then pan or zoom and read the new ones">Reset timings</button>
+                <button id="timing-copy" type="button" title="Copy the statistics and timings as JSON">Copy timings</button>
+            </div>
+        </div>
+        <div id="stage">
+            <canvas></canvas>
+            <table id="stats" aria-label="Terrain tile statistics">
+                <caption id="stats-status">Starting…</caption>
+                <tbody>
+                    <tr><th>Zoom of each window</th><td id="stat-zooms">-</td></tr>
+                    <tr><th>Tiles ready / wanted</th><td id="stat-tiles">-</td></tr>
+                    <tr><th>Active / queued / waiting</th><td id="stat-requests-now">-</td></tr>
+                    <tr><th>Cached tiles / limit</th><td id="stat-cache">-</td></tr>
+                    <tr><th>Requests / reuses / evictions</th><td id="stat-counters">-</td></tr>
+                    <tr><th>Frame CPU ms, last / average</th><td id="stat-frame">-</td></tr>
+                    <tr><th>Terrain update ms, p50 / p95 / p99 / max (frames)</th><td id="stat-update">-</td></tr>
+                    <tr><th>Compose ms, only frames that composed</th><td id="stat-compose">-</td></tr>
+                    <tr><th>Windows composed per such frame</th><td id="stat-windows">-</td></tr>
+                    <tr><th>Upload ms, only frames that uploaded</th><td id="stat-upload">-</td></tr>
+                    <tr><th>Memory bound, height side</th><td id="stat-memory">-</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p id="place-note"></p>
+        <p id="notes">
+            Elevation streams as nested windows around the view: the finest covers a few kilometres, each further one twice the area at half the detail.
+            Coarse tiles load first, so a surface appears quickly and sharpens. The square outline is a vector layer draped on the terrain.
+            The request count includes retries and is not a count of network transfers: the browser may answer from its cache.
+        </p>
+    </div>
+</body>
+<script type="module" src="/src/autk-map/terrain-tiles.ts"></script>
+
+</html>

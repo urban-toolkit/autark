@@ -1,5 +1,5 @@
 import { AutkDb } from '@urban-toolkit/autk-db';
-import { AutkMap } from '@urban-toolkit/autk-map';
+import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
 const ELEVATION_LAYER_ID = 'niteroi_elevation';
@@ -12,21 +12,26 @@ export class TerrainLayersNiteroi {
         this.db = new AutkDb();
         await this.db.init();
 
-        await this.db.loadOsm({
-            queryArea: {
-                geocodeArea: 'Rio de Janeiro',
-                areas: ['Niterói'],
-            },
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                layers: [
-                    'surface',
-                    'parks',
-                    'water',
-                    'roads'
-                ] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
-            },
-        });
+        // `?offline` skips the Overpass request, which can be slow. The elevation and the
+        // buildings are bundled, so the terrain and the imagery still load (no roads, water or parks).
+        const offline = new URLSearchParams(window.location.search).has('offline');
+        if (!offline) {
+            await this.db.loadOsm({
+                queryArea: {
+                    geocodeArea: 'Rio de Janeiro',
+                    areas: ['Niterói'],
+                },
+                outputTableName: 'table_osm',
+                autoLoadLayers: {
+                    layers: [
+                        // No 'surface' layer: it would be drawn over the imagery below.
+                        'parks',
+                        'water',
+                        'roads'
+                    ] as Array<'surface' | 'parks' | 'water' | 'roads' | 'buildings'>,
+                },
+            });
+        }
 
         await this.db.loadGeoTiff({
             geotiffFileUrl: `${URL}data/niteroi-elevation.tif`,
@@ -46,6 +51,9 @@ export class TerrainLayersNiteroi {
 
         await this.map.init();
         await this.loadLayers();
+
+        // Imagery sits under every other layer and is draped over the terrain with them.
+        this.map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
 
         const elevation = await this.db.getRaster(ELEVATION_LAYER_ID);
         this.map.enableTerrainMode(elevation, 'band_1');

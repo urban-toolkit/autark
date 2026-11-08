@@ -47,6 +47,11 @@ h2 {
     cursor: pointer;
 }
 
+#controls button[aria-pressed="true"] {
+    background: #d6e4f5;
+    border-color: #1a4f8b;
+}
+
 #controls button:hover {
     background: #e6e6e6;
 }
