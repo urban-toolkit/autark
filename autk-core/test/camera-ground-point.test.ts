@@ -233,3 +233,72 @@ function pointInPolygon(polygon: Array<[number, number]>, [x, y]: [number, numbe
   }
   return true;
 }
+
+describe('orthographic Camera', () => {
+  function ortho(): Camera {
+    const cam = new Camera();
+    cam.setOrthographicBounds(100, 500, 200, 400);
+    cam.resize(800, 400);
+    return cam;
+  }
+
+  it('keeps its projection when resized or updated', () => {
+    const cam = ortho();
+    const before = Array.from(cam.getViewProjectionMatrix());
+    cam.resize(1600, 800);
+    cam.update();
+    expect(Array.from(cam.getViewProjectionMatrix())).toEqual(before);
+    expect(cam.getViewportWidth()).toBe(1600);
+  });
+
+  it('maps screen positions linearly onto the bounds', () => {
+    const cam = ortho();
+    expect(cam.getGroundPoint(0, 0, 1)).toEqual([100, 200]);
+    expect(cam.getGroundPoint(1, 1, 1)).toEqual([500, 400]);
+    const [x, y] = cam.getGroundPoint(0.25, 0.75, 1);
+    expect(x).toBeCloseTo(200, 9);
+    expect(y).toBeCloseTo(350, 9);
+  });
+
+  it('agrees with points unprojected from the inverse rendering matrix', () => {
+    const cam = ortho();
+    const inverse = mat4.invert(mat4.create(), cam.getViewProjectionMatrix() as unknown as mat4)!;
+    for (const [sx, sy] of [[0.1, 0.2], [0.5, 0.5], [0.9, 0.7]] as const) {
+      const p = vec3.transformMat4(vec3.create(), [sx * 2 - 1, sy * 2 - 1, 0.5], inverse);
+      const [gx, gy] = cam.getGroundPoint(sx, sy, 1);
+      expect(p[0]).toBeCloseTo(gx, 3);
+      expect(p[1]).toBeCloseTo(gy, 3);
+    }
+  });
+
+  it('has a footprint equal to the bounds, whatever the reach', () => {
+    const cam = ortho();
+    expect(cam.getGroundFootprint(1)).toEqual([[100, 200], [500, 200], [500, 400], [100, 400]]);
+    expect(cam.getGroundFootprint(1e9)).toEqual(cam.getGroundFootprint(1));
+  });
+
+  it('has parallel rays that point straight down', () => {
+    const cam = ortho();
+    expect(cam.getWorldRayDirection(0.1, 0.9)).toEqual([0, 0, -1]);
+    expect(cam.getWorldRayDirection(0.8, 0.2)).toEqual([0, 0, -1]);
+  });
+
+  it('draws layers at small negative z, in the same order as before', () => {
+    const cam = ortho();
+    const vp = cam.getViewProjectionMatrix() as unknown as mat4;
+    const depth = (z: number) => vec3.transformMat4(vec3.create(), [300, 300, z], vp)[2];
+    expect(depth(-1)).toBeGreaterThan(0);
+    expect(depth(-1)).toBeLessThan(depth(0));
+    expect(depth(0)).toBeLessThan(depth(50));
+    expect(depth(90)).toBeLessThanOrEqual(1);
+  });
+
+  it('becomes a perspective camera again after resetCamera', () => {
+    const cam = ortho();
+    cam.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 1000]);
+    cam.resize(1600, 1000);
+    cam.update();
+    const [x] = cam.getGroundPoint(1, 0.5, 1e6);
+    expect(x).toBeCloseTo(1000 * Math.tan((45 / 2) * (Math.PI / 180)) * 1.6, 3);
+  });
+});

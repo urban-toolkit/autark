@@ -13,6 +13,11 @@ import { vec3, mat4 } from 'gl-matrix';
 /**
  * Initial camera state used to seed or reset a `Camera` instance.
  */
+/** How far below `z = 0` an orthographic camera still draws, in world units. */
+const ORTHOGRAPHIC_DEPTH_BELOW = 10;
+/** Total depth range of an orthographic camera, in world units. */
+const ORTHOGRAPHIC_DEPTH_RANGE = 100;
+
 export interface CameraData {
     /** World-space up vector. */
     up: number[];
@@ -77,6 +82,8 @@ export class Camera {
     protected mViewMatrix: mat4 = mat4.create();
     private viewportWidth: number = 0;
     private viewportHeight: number = 0;
+    /** Bounds of an orthographic projection, or `null` for the perspective camera. */
+    private orthographic: { left: number; right: number; bottom: number; top: number } | null = null;
 
     private static defaultParams: CameraData = {
         up: [0, 1, 0],
@@ -109,6 +116,7 @@ export class Camera {
      * camera.update();
      */
     public resetCamera(wUp: number[], wLookAt: number[], wEye: number[]): void {
+        this.orthographic = null;
         this.fovy = (45 * Math.PI) / 180.0;
         this.mProjectionMatrix = mat4.create();
         this.mViewMatrix = mat4.create();
@@ -190,6 +198,10 @@ export class Camera {
      * const [gx, gy] = camera.getGroundPoint(0.5, 0.5, 50000); // what the view centre looks at
      */
     public getGroundPoint(x: number, y: number, maxDistance: number): [number, number] {
+        const bounds = this.orthographic;
+        if (bounds) {
+            return [bounds.left + (bounds.right - bounds.left) * x, bounds.bottom + (bounds.top - bounds.bottom) * y];
+        }
         const eye = this.wEye;
         const direction = this.screenCoordToWorldDir(x, y);
         const groundDistance = Math.abs(direction[2]) > 1e-6 ? -eye[2] / direction[2] : Number.POSITIVE_INFINITY;
@@ -214,6 +226,16 @@ export class Camera {
      * const polygon = camera.getGroundFootprint(50000);
      */
     public getGroundFootprint(reach: number): Array<[number, number]> {
+        const bounds = this.orthographic;
+        if (bounds) {
+            // The view is a rectangle of ground; distance from the eye does not limit it.
+            return [
+                [bounds.left, bounds.bottom],
+                [bounds.right, bounds.bottom],
+                [bounds.right, bounds.top],
+                [bounds.left, bounds.top],
+            ];
+        }
         const eye = this.wEye;
         const corners = ([[0, 0], [1, 0], [1, 1], [0, 1]] as const).map(([x, y]) => this.screenCoordToWorldDir(x, y));
         const centre = corners.reduce((sum, c) => vec3.add(sum, sum, c), [0, 0, 0] as vec3);
@@ -236,9 +258,36 @@ export class Camera {
         return polygon;
     }
 
+    /**
+     * Switches the camera to a top-down orthographic projection over a rectangle of ground.
+     *
+     * The camera stays orthographic until {@link resetCamera} is called:
+     * {@link resize} and {@link update} keep the projection, and the ground and
+     * ray helpers follow the bounds. World `z` from -10 to 90 is inside the
+     * depth range, so layers may use small negative `z` values (tile layers draw
+     * at `z = -1`). Depth is `(z + 10) / 100`, the same slope as before, so the
+     * order of layers does not change.
+     *
+     * @param left - World X at the left edge.
+     * @param right - World X at the right edge.
+     * @param bottom - World Y at the bottom edge.
+     * @param top - World Y at the top edge.
+     * @throws Never throws.
+     * @example
+     * camera.setOrthographicBounds(0, 1000, 0, 800);
+     */
     public setOrthographicBounds(left: number, right: number, bottom: number, top: number): void {
+        this.orthographic = { left, right, bottom, top };
         mat4.identity(this.mViewMatrix);
-        mat4.orthoZO(this.mProjectionMatrix, left, right, bottom, top, 0, -100);
+        mat4.orthoZO(
+            this.mProjectionMatrix,
+            left,
+            right,
+            bottom,
+            top,
+            ORTHOGRAPHIC_DEPTH_BELOW,
+            ORTHOGRAPHIC_DEPTH_BELOW - ORTHOGRAPHIC_DEPTH_RANGE,
+        );
         this.wEye = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 100);
         this.wLookAt = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 0);
         this.wUp = vec3.fromValues(0, 1, 0);
@@ -376,6 +425,7 @@ export class Camera {
      * camera.update();  // rebuild matrices after navigation change
      */
     public update(): void {
+        if (this.orthographic) return;
         const aspect = this.viewportWidth / this.viewportHeight;
         mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
         // Reversed-Z: swap near/far so near→1 and far→0 in NDC.
@@ -412,6 +462,8 @@ export class Camera {
      * @throws Never throws.
      */
     protected screenCoordToWorldDir(x: number, y: number): vec3 {
+        // Orthographic rays are parallel and look straight down.
+        if (this.orthographic) return vec3.fromValues(0, 0, -1);
         // The same orthonormal basis `mat4.lookAt` builds for rendering, so a ray
         // through a screen position matches what is drawn there even when the
         // supplied up vector is not perpendicular to the view direction or not unit
