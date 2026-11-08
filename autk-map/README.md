@@ -175,30 +175,29 @@ import { AutkMap, TERRAIN_TILE_SOURCES, TILE_SOURCES } from '@urban-toolkit/autk
 map.loadCollection('neighborhoods', { collection, type: 'polylines' }); // any data layer sets the map origin
 map.enableTerrainTiles({
     source: TERRAIN_TILE_SOURCES.awsTerrarium, // or your own source with its `encoding`
-    crs: 'EPSG:3395',                          // the CRS of your data; default 'EPSG:3395'
+    crs: 'EPSG:3395',                          // the CRS of your data (EPSG:3395 or 3857)
     levels: 6,                                 // optional: nested windows, finest first (at most 8)
     windowSize: 512,                           // optional: samples per window edge (even, at most 2048)
     zoomBias: 0,                               // optional: negative gives coarser terrain, fewer requests
-    maxCachedTiles: 128,                       // optional; raised to what the windows can need at once
+    maxCachedTiles: 128,                       // optional; raised to what the windows can need
     verticalScale: 1,                          // optional: multiplies every height
+    composeBudgetMs: 4,                        // optional: ms of terrain work per frame; the rest waits a frame
 });
 map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery }); // optional: drape imagery
-map.getTerrainTileStats();                                           // read-only statistics, including `timing` (p50/p95/p99) and `memory`
-map.resetTerrainTileTiming();                                        // clear the timings to measure one scenario
+map.getTerrainTileStats();      // statistics, including `memory` and `timing` (p50/p95/p99)
+map.resetTerrainTileTiming();   // clear the timings to measure one scenario
 map.disableTerrainMode();
 ```
 
-* **How it works.** Heights come from nested windows of samples around the view: the finest covers a few kilometres and each further one twice the area at half the detail (level `k` reads tile zoom `finest - k`, with the finest at zoom 14 unless the source stops sooner). The outermost window is the terrain. Coarse tiles load first, so a surface appears quickly and sharpens. Windows move by whole samples, so heights do not swim, and are recomposed only when they move or a tile they read arrives.
-* **Sources.** `TERRAIN_TILE_SOURCES.awsTerrarium` is the public Terrain Tiles on AWS dataset (zooms 0 to 15). Its documentation says those S3 endpoints are meant for efficient networking with EC2 and are not cached by CloudFront, and it states no rate limits, so put your own CDN in front of them for anything beyond development. A custom source is a tile source (`urlTemplate`, `attribution`, zoom limits, `tileSize`) plus `encoding: 'terrarium' | 'mapbox'`. Attribution is required and shown on the map while terrain tiles are active. The provider asks for "Mapzen" plus a statement for each data source used where you are (for example "3DEP data courtesy of the U.S. Geological Survey" in the United States, "© Kartverket" in Norway, or the EU-DEM and Copernicus credit in Europe). The preset shows "Mapzen" and a link to the provider's list of sources and their credits; add the statements for your area yourself: `attribution: [...TERRAIN_TILE_SOURCES.awsTerrarium.attribution, '3DEP data courtesy of the U.S. Geological Survey']`. Following the provider's terms is the caller's job.
-* **Mapbox terrain-RGB.** It needs your own access token in the URL, so it is not bundled. Mapbox documents the URL form, 256-pixel tiles, data up to zoom 15 and the same height formula as `encoding: 'mapbox'`. Its [attribution guide](https://docs.mapbox.com/help/dive-deeper/attribution/) asks for text credits linking to Mapbox, OpenStreetMap and "Improve this map", and for the Mapbox logo, which autk-map does not draw, so add it to your page. The guide does not mention terrain-RGB by name and says some tilesets carry extra credits in their TileJSON, so confirm with Mapbox for this one:
+* **How it works.** Heights come from nested windows around the view: the finest covers a few kilometres and each further one twice the area at half the detail. The outermost window (about 150 km with the defaults) is the terrain. Coarse tiles load first, so a surface appears quickly and sharpens.
+* **Sources.** `awsTerrarium` is the public Terrain Tiles on AWS dataset (zooms 0 to 15). The provider says its S3 endpoints are meant for EC2 networking, are not cached by CloudFront and state no rate limits, so put your own CDN in front for anything beyond development. A custom source is a tile source plus `encoding: 'terrarium' | 'mapbox'`.
+* **Attribution** is required and shown while terrain tiles are active. The provider asks for "Mapzen" plus a statement for each data source used in your area (for example "3DEP data courtesy of the U.S. Geological Survey"). The preset shows "Mapzen" with a link to the list; add your area's statements: `attribution: [...TERRAIN_TILE_SOURCES.awsTerrarium.attribution, '3DEP data courtesy of the U.S. Geological Survey']`.
+* **Mapbox terrain-RGB** needs your token in the URL, so it is not bundled. Its [attribution guide](https://docs.mapbox.com/help/dive-deeper/attribution/) asks for these links and for the Mapbox logo (not drawn by autk-map; confirm the terms for this tileset with Mapbox):
   ```ts
   map.enableTerrainTiles({
       source: {
           urlTemplate: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${token}`,
-          encoding: 'mapbox',
-          tileSize: 256,
-          minZoom: 0,
-          maxZoom: 15,
+          encoding: 'mapbox', tileSize: 256, minZoom: 0, maxZoom: 15,
           attribution: [
               { text: '© Mapbox', url: 'https://www.mapbox.com/about/maps' },
               { text: '© OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' },
@@ -207,8 +206,8 @@ map.disableTerrainMode();
       },
   });
   ```
-* **Vertical scale.** Heights are metres, while the map plane (EPSG:3395) is stretched by about `1/cos(latitude)`. Building heights are not scaled either, so the default keeps them consistent; `verticalScale` exaggerates or corrects. Only metre-based systems (`EPSG:3395`, `EPSG:3857`) are accepted for `crs`.
-* **Limits.** The terrain reaches only as far as the outermost window (about 150 km with the defaults). Detail depends on the source data for the area: the provider lists 30 m in most of the world, 10 m in the United States and finer in a few countries, so where the data is 30 m, zooms above about 12 add smoothness, not detail. Heights are used as given, so datum differences between datasets are not reconciled. Terrain patches of different detail are stitched along their edges, heights and shading alike.
+* **Heights.** Heights are ground metres while the EPSG:3395 plane is stretched by about `1/cos(latitude)`; building heights are not scaled, so `verticalScale` 1 keeps them consistent. Vertical datums are not reconciled.
+* **Limits.** The terrain reaches only as far as the outermost window. Detail depends on the source data (30 m in most of the world, so zooms above about 12 add smoothness, not detail). Stay within about 1,000 km of the map origin. Design, memory and measurements: `.doc/TILE-TERRAIN.md`.
 
 ### Render sizing verification
 
