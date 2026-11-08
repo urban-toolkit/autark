@@ -11,6 +11,7 @@
 
 import type { TileCrs } from './tile-projection';
 import type { TileSource } from './tile-source';
+import type { TerrainTileSource } from './terrain-tile-source';
 import {
     FeatureCollection,
     Geometry,
@@ -179,6 +180,45 @@ export interface LoadTilesParams {
      * centre are used. Defaults to 64.
      */
     maxTiles?: number;
+}
+
+/**
+ * Parameters for `AutkMap.enableTerrainTiles`, which streams terrain elevation
+ * from a web tile service.
+ */
+export interface EnableTerrainTilesParams {
+    /**
+     * Where the elevation tiles come from: a preset from `TERRAIN_TILE_SOURCES`
+     * or a custom source with its `encoding`. The attribution is required and is
+     * shown on the map; the caller is responsible for following the provider's terms.
+     */
+    source: TerrainTileSource;
+    /**
+     * Coordinate system of the map's data. Defaults to `'EPSG:3395'`, the workspace default of `AutkDb`.
+     * Only metre-based systems are accepted: heights are metres, so a map plane in degrees would give a distorted scene.
+     */
+    crs?: Exclude<TileCrs, 'EPSG:4326'>;
+    /**
+     * Nested windows of height samples around the view, finest first; each covers
+     * twice the area of the one before. Fewer are used when the source has too few
+     * zoom levels. Defaults to 6, at most 8.
+     */
+    levels?: number;
+    /** Samples along each window edge, an even number. Defaults to 512. */
+    windowSize?: number;
+    /**
+     * Added to the finest zoom (14, or the source's `maxZoom` when lower).
+     * Negative values give coarser terrain and fewer requests. Defaults to 0.
+     */
+    zoomBias?: number;
+    /** Elevation tiles kept in memory. Defaults to 128. */
+    maxCachedTiles?: number;
+    /**
+     * Multiplies every height. Heights are metres while the map plane is
+     * EPSG:3395 metres, which are stretched by about `1/cos(latitude)`, as are
+     * building heights, so the default keeps them consistent. Defaults to 1.
+     */
+    verticalScale?: number;
 }
 
 /**

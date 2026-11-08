@@ -20,7 +20,8 @@ import { Camera } from '@urban-toolkit/autk-core';
 import { Renderer } from './renderer';
 import { Pipeline } from './pipeline';
 import { VectorLayer } from './layer-vector';
-import type { Heightfield } from '@urban-toolkit/autk-core';
+import { HEIGHT_UNIFORM_BYTES, HEIGHT_UNIFORM_FLOATS, packHeightUniform } from './height-source';
+import type { HeightSource } from './height-source';
 
 /**
  * Picking pipeline for triangle-based vector geometry.
@@ -61,7 +62,7 @@ export class PipelineTrianglePicking extends Pipeline {
     /** Fallback height texture used when terrain mode is disabled. */
     private _dummyTerrainTexture?: GPUTexture;
     /** Reused CPU-side terrain uniform upload buffer. */
-    private _terrainUniformData = new Float32Array(8);
+    private _terrainUniformData = new Float32Array(HEIGHT_UNIFORM_FLOATS);
 
     /** Reused CPU-side upload buffer for positions. */
     private _positionData: Float32Array<ArrayBuffer> | null = null;
@@ -187,12 +188,12 @@ export class PipelineTrianglePicking extends Pipeline {
     createTerrainHeightBindGroup(): void {
         this._terrainUniformBuffer = this._renderer.device.createBuffer({
             label: 'Picking terrain height uniform',
-            size: 8 * Float32Array.BYTES_PER_ELEMENT,
+            size: HEIGHT_UNIFORM_BYTES,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
         this._dummyTerrainTexture = this._renderer.device.createTexture({
             label: 'Picking dummy terrain height texture',
-            size: [2, 2],
+            size: [2, 2, 1],
             format: 'r32float',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         });
@@ -200,7 +201,7 @@ export class PipelineTrianglePicking extends Pipeline {
             label: 'Picking terrain height bind group layout',
             entries: [
                 { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
-                { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'unfilterable-float' } },
+                { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'unfilterable-float', viewDimension: '2d-array' } },
             ],
         });
         this._terrainBindGroup = this._renderer.device.createBindGroup({
@@ -208,7 +209,7 @@ export class PipelineTrianglePicking extends Pipeline {
             layout: this._terrainBindGroupLayout,
             entries: [
                 { binding: 0, resource: { buffer: this._terrainUniformBuffer } },
-                { binding: 1, resource: this._dummyTerrainTexture.createView() },
+                { binding: 1, resource: this._dummyTerrainTexture.createView({ dimension: '2d-array' }) },
             ],
         });
         this.clearTerrainHeightSource();
@@ -217,28 +218,19 @@ export class PipelineTrianglePicking extends Pipeline {
     /**
      * Binds a heightfield texture used to offset 3D picking geometry.
      *
-     * @param source Heightfield metadata used by the vertex shader.
-     * @param heightTextureView GPU texture view containing height samples.
+     * @param source Height source whose level table the vertex shader reads.
+     * @param heightTextureView GPU texture array view containing height samples, one layer per level.
      * @returns Nothing. Calls are ignored before terrain bindings are created.
      * @throws If bind group creation fails.
      * @example
      * pipeline.setTerrainHeightSource(heightfield, terrainHeightTextureView);
      */
-    setTerrainHeightSource(source: Heightfield, heightTextureView: GPUTextureView): void {
+    setTerrainHeightSource(source: HeightSource, heightTextureView: GPUTextureView): void {
         if (!this._terrainUniformBuffer || !this._terrainBindGroupLayout) {
             return;
         }
 
-        this._terrainUniformData.set([
-            source.originX,
-            source.originY,
-            source.cellSizeX,
-            source.cellSizeY,
-            source.width,
-            source.height,
-            1,
-            0,
-        ]);
+        packHeightUniform(source, this._terrainUniformData);
         this._renderer.device.queue.writeBuffer(this._terrainUniformBuffer, 0, this._terrainUniformData);
         this._terrainBindGroup = this._renderer.device.createBindGroup({
             label: 'Picking terrain height bind group',
@@ -263,16 +255,14 @@ export class PipelineTrianglePicking extends Pipeline {
             return;
         }
 
-        this._terrainUniformData.fill(0);
-        this._terrainUniformData[4] = 2;
-        this._terrainUniformData[5] = 2;
+        packHeightUniform(null, this._terrainUniformData);
         this._renderer.device.queue.writeBuffer(this._terrainUniformBuffer, 0, this._terrainUniformData);
         this._terrainBindGroup = this._renderer.device.createBindGroup({
             label: 'Picking terrain height bind group',
             layout: this._terrainBindGroupLayout,
             entries: [
                 { binding: 0, resource: { buffer: this._terrainUniformBuffer } },
-                { binding: 1, resource: this._dummyTerrainTexture.createView() },
+                { binding: 1, resource: this._dummyTerrainTexture.createView({ dimension: '2d-array' }) },
             ],
         });
     }

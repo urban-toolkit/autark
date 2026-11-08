@@ -49,10 +49,11 @@ export function isPermanentStatus(status: number): boolean {
  *
  * @param url - Tile URL.
  * @param signal - Aborts the request.
+ * @param options - Options for `createImageBitmap`. Elevation tiles pass options that keep the stored pixels.
  * @returns The decoded image.
  * @throws {TileLoadError} For a non-success status or an undecodable image.
  */
-export async function fetchTileImage(url: string, signal: AbortSignal): Promise<ImageBitmap> {
+export async function fetchTileImage(url: string, signal: AbortSignal, options?: ImageBitmapOptions): Promise<ImageBitmap> {
     const response = await fetch(url, { signal, mode: 'cors', credentials: 'omit' });
     if (!response.ok) {
         throw new TileLoadError(`Tile request failed with status ${response.status}: ${url}`, {
@@ -62,7 +63,7 @@ export async function fetchTileImage(url: string, signal: AbortSignal): Promise<
     }
     const blob = await response.blob();
     try {
-        return await createImageBitmap(blob);
+        return options ? await createImageBitmap(blob, options) : await createImageBitmap(blob);
     } catch (error) {
         throw new TileLoadError(`Tile could not be decoded: ${url} (${(error as Error).message})`, { permanent: true });
     }
@@ -102,7 +103,8 @@ interface Task {
     cancelled: boolean;
 }
 
-const DEFAULT_MAX_CONCURRENT = 8;
+/** Requests in flight at once when none is given. */
+export const DEFAULT_MAX_CONCURRENT = 8;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 500;
 const DEFAULT_TIMEOUT_MS = 15000;

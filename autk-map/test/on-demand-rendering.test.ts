@@ -10,6 +10,9 @@ import { SpriteLayer } from '../src/layer-sprite';
 import { PolylineLayer } from '../src/layer-polyline';
 import { Renderer } from '../src/renderer';
 import { PipelineBuildingSSAO } from '../src/pipeline-triangle-ssao';
+import { AutkMapUi } from '../src/map-ui';
+import { TERRAIN_TILE_SOURCES } from '../src/terrain-tile-source';
+import { isStreamingHeightSource } from '../src/height-source';
 import { TerrainRenderer } from '../src/renderer-terrain';
 import { MapEvent } from '../src/types-events';
 
@@ -519,9 +522,10 @@ describe('on-demand rendering', () => {
 
 describe('render statistics', () => {
     it('counts the frames that are rendered, measures their CPU time, and stops counting when the map is idle', async () => {
-        const { map } = await idleOnDemandMap();
+        // The fake clock is installed before the setup frames render, so every duration below is deterministic.
         vi.spyOn(performance, 'now').mockImplementation(() => frames.now);
-        flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame costs 3 ms of CPU
+        const { map } = await idleOnDemandMap();
+        flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame now costs 3 ms of CPU; setup frames cost 0
 
         const first = map.renderStats.frameCount;
         frames.run(10); // idle: nothing asks for a frame
@@ -534,8 +538,8 @@ describe('render statistics', () => {
         const busy = map.renderStats;
         expect(busy.frameCount).toBe(first + 4);
         expect(busy.lastFrameCpuMs).toBeCloseTo(3, 6);
-        expect(busy.averageFrameCpuMs).toBeGreaterThan(0); // the average also holds the cheaper setup frames
-        expect(busy.averageFrameCpuMs).toBeLessThanOrEqual(3);
+        expect(busy.averageFrameCpuMs).toBeGreaterThan(0); // the average also holds the free setup frames
+        expect(busy.averageFrameCpuMs).toBeLessThan(3);
         expect(busy.framesPerSecond).toBeGreaterThan(0);
 
         frames.run(100); // two seconds of nothing
@@ -710,6 +714,86 @@ describe('continuous rendering and teardown', () => {
 
         expect(renders() - before).toBe(0);
         expect(frames.pending).toBe(0);
+    });
+});
+
+describe('terrain tiles', () => {
+    /** Tile requests that never answer, and stop when aborted: nothing reaches the network. */
+    function stubTileNetwork(): Array<{ url: string; signal: AbortSignal }> {
+        const requests: Array<{ url: string; signal: AbortSignal }> = [];
+        vi.stubGlobal('fetch', (url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+            requests.push({ url, signal: init.signal });
+            init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }));
+        return requests;
+    }
+
+    it('needs the map origin, which the first data layer defines', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        expect(() => map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium })).toThrow(/origin/);
+    });
+
+    it('rejects an invalid source before creating anything', async () => {
+        const { map } = await createMap();
+        expect(() => map.enableTerrainTiles({ source: { ...TERRAIN_TILE_SOURCES.awsTerrarium, encoding: 'rgb' } as never })).toThrow(/encoding/);
+        expect(terrainPaths).toHaveLength(0);
+        expect(map.getTerrainTileStats()).toBeNull();
+    });
+
+    it('drives the terrain path with a streaming height source, requests coarse tiles first, and credits the source', async () => {
+        const requests = stubTileNetwork();
+        const credits = vi.spyOn(AutkMapUi.prototype, 'setAttribution');
+        const { map } = await idleOnDemandMap();
+
+        map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
+        expect(terrainPaths).toHaveLength(1);
+        const heights = terrainPaths[0].args[5] as Parameters<typeof isStreamingHeightSource>[0];
+        expect(isStreamingHeightSource(heights)).toBe(true);
+        expect(heights.levels).toHaveLength(6);
+
+        expect(requests.length).toBeGreaterThan(0);
+        expect(requests[0]!.url).toMatch(/terrarium\/9\//);
+        const stats = map.getTerrainTileStats();
+        expect(stats).toMatchObject({ levels: 6, windowSize: 64, readyTiles: 0 });
+        expect(stats!.zooms).toEqual([14, 13, 12, 11, 10, 9]);
+        expect(credits.mock.calls.at(-1)![0].some((credit) => credit.text.includes('Mapzen'))).toBe(true);
+
+        (heights as unknown as { destroy(): void }).destroy();
+        expect(requests.every((request) => request.signal.aborted)).toBe(true);
+    });
+
+    it('renders once more when a tile arrives, through the map', async () => {
+        stubTileNetwork();
+        const { map } = await idleOnDemandMap();
+        map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
+        frames.run(3);
+        const requestFrame = (terrainPaths[0].args[6] as () => void);
+        expect(requestFrame).toBeTypeOf('function');
+        const before = renders();
+        requestFrame();
+        frames.run(3);
+        expect(renders() - before).toBe(1);
+        (terrainPaths[0].args[5] as any).destroy();
+    });
+
+    it('forgets the streamed terrain and its credit when terrain mode is disabled or replaced', async () => {
+        stubTileNetwork();
+        const credits = vi.spyOn(AutkMapUi.prototype, 'setAttribution');
+        const { map } = await idleOnDemandMap();
+
+        map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
+        const first = terrainPaths[0].args[5] as any;
+        expect(map.getTerrainTileStats()).not.toBeNull();
+
+        map.enableTerrainMode(raster([10, 20, 30, 40]), 'band');
+        expect(terrainPaths[0].destroy).toHaveBeenCalledOnce();
+        expect(map.getTerrainTileStats()).toBeNull();
+        expect(credits.mock.calls.at(-1)![0]).toEqual([]);
+
+        map.disableTerrainMode();
+        expect(map.getTerrainTileStats()).toBeNull();
+        first.destroy();
     });
 });
 

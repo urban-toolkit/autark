@@ -46,10 +46,19 @@ export type {
     UpdateRenderInfoParams,
     /** Options for continuous or on-demand rendering with `draw()`. */
     MapDrawOptions,
+    /** Parameters for streaming terrain elevation with `enableTerrainTiles()`. */
+    EnableTerrainTilesParams,
 } from './api';
 
 /** Ready-made tile sources for `AutkMap.loadTiles`. Each provider sets its own terms of use. */
 export { TILE_SOURCES } from './tile-source';
+
+/** Ready-made elevation tile sources for `AutkMap.enableTerrainTiles`. */
+export { TERRAIN_TILE_SOURCES } from './terrain-tile-source';
+export type { TerrainTileSource } from './terrain-tile-source';
+export type { DemEncoding } from './dem-decode';
+export type { TerrainMemory, TerrainTileStats, TerrainTiming } from './height-source-tiles';
+export type { TimingSummary } from './terrain-timing';
 
 /** Tile source and coordinate-system types used by `AutkMap.loadTiles`. */
 export type { TileSource, ResolvedTileSource } from './tile-source';

@@ -18,6 +18,8 @@ import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { Renderer } from './renderer';
 import { TerrainRenderer } from './renderer-terrain';
 import type { TerrainDebugOptions } from './renderer-terrain';
+import { StaticHeightSource, isStreamingHeightSource } from './height-source';
+import type { HeightSource } from './height-source';
 import type { Heightfield } from '@urban-toolkit/autk-core';
 
 /** Maximum requested overlay texture dimension before clamping to device limits. */
@@ -40,6 +42,8 @@ export class TerrainMapRenderPath {
     private frozenTerrainOverlayBounds: [number, number, number, number] | null = null;
     /** Camera XY position captured with frozen debug bounds. */
     private frozenTerrainCameraPosition: [number, number] | null = null;
+    /** Height data sampled by terrain, buildings and picking. */
+    private readonly heightSource: HeightSource;
     /** Orthographic camera used to render 2D layers into the terrain overlay. */
     private readonly terrainOverlayCamera: Camera = new Camera();
     /** Runtime terrain debug flags forwarded to the low-level terrain renderer. */
@@ -57,7 +61,7 @@ export class TerrainMapRenderPath {
      * @param layerManager Ordered layer source used for overlays and buildings.
      * @param picking Shared picking helper for readback and event emission.
      * @param style Instance-specific style used for terrain water and overlay colors.
-     * @param heightfield Local-space heightfield sampled by terrain and buildings.
+     * @param heightfield Fixed heightfield, or a height source (possibly streaming), sampled by terrain and buildings.
      * @param requestRender Schedules another frame when GPU work that lands after a frame changes what the next one draws.
      * @throws If renderer overlay texture views cannot be created by the renderer.
      * @example
@@ -74,11 +78,12 @@ export class TerrainMapRenderPath {
         private readonly picking: MapPickingController,
         /** Instance-specific style used for terrain water and overlay colors. */
         private readonly style: MapStyle,
-        /** Local-space height samples used to initialize the terrain renderer. */
-        private readonly heightfield: Heightfield,
+        /** Local-space height samples, or a height source; a heightfield is wrapped in a one-level source. */
+        heightfield: Heightfield | HeightSource,
         /** Schedules another frame when a GPU readback changes what the next frame draws. */
         private readonly requestRender: () => void,
     ) {
+        this.heightSource = 'levels' in heightfield ? heightfield : new StaticHeightSource(heightfield);
         this.fitCameraToTerrainBounds();
         const overlaySize = this.getTerrainOverlayTextureSize();
         this.renderer.configureOverlayTexture(overlaySize, overlaySize);
@@ -104,6 +109,7 @@ export class TerrainMapRenderPath {
         }
 
         this.renderer.start();
+        this.updateStreamingHeights();
         const overlaySize = this.getTerrainOverlayTextureSize();
         const overlayResized = this.renderer.configureOverlayTexture(overlaySize, overlaySize);
         if (overlayResized) {
@@ -140,6 +146,9 @@ export class TerrainMapRenderPath {
             overlayBounds[1],
             overlayBounds[3],
         );
+        // Layers that choose detail by pixels (tile layers) read the viewport, so it
+        // is the pixel rectangle the overlay is drawn into.
+        this.terrainOverlayCamera.resize(overlayPixelRect.width, overlayPixelRect.height);
 
         this.layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && !(layer instanceof Triangles3DLayer)) {
@@ -179,11 +188,11 @@ export class TerrainMapRenderPath {
             (layer): layer is Triangles3DLayer => !layer.layerRenderInfo.isSkip && layer instanceof Triangles3DLayer
         );
         if (visible3DLayers.length > 0) {
-            const heightfield = activeTerrain.heightfield;
+            const heightSource = activeTerrain.heightSource;
             const terrainHeightView = activeTerrain.terrainHeightTextureView;
             const geometryPassEncoder = PipelineBuildingSSAO.beginSharedGeometryPass(this.renderer);
             visible3DLayers.forEach((layer) => {
-                layer.setTerrainHeightSource(heightfield, terrainHeightView);
+                layer.setTerrainHeightSource(heightSource, terrainHeightView);
                 layer.renderSceneGeometry(this.camera, geometryPassEncoder);
             });
             geometryPassEncoder.end();
@@ -204,7 +213,7 @@ export class TerrainMapRenderPath {
     }
 
     /**
-     * Resets the main camera to frame the active heightfield bounds.
+     * Resets the main camera to frame the terrain bounds.
      *
      * @returns Nothing. The camera position and viewport matrices are updated.
      * @throws Never throws.
@@ -274,6 +283,30 @@ export class TerrainMapRenderPath {
         });
         this.terrainRenderer?.destroy();
         this.terrainRenderer = null;
+        if (isStreamingHeightSource(this.heightSource)) {
+            this.heightSource.destroy();
+        }
+    }
+
+    /**
+     * Moves a streaming height source's windows to what the camera looks at.
+     *
+     * Does nothing for a fixed heightfield. The centre is the ground point under
+     * the view centre, kept within a few camera heights so a level view does not
+     * send the windows to the horizon.
+     *
+     * @returns Nothing. The source's version changes when its data does.
+     * @throws Never throws.
+     * @example
+     * terrainPath['updateStreamingHeights']();
+     */
+    private updateStreamingHeights(): void {
+        const source = this.heightSource;
+        if (!isStreamingHeightSource(source)) {
+            return;
+        }
+        const reach = Math.max(Math.abs(this.camera.getEye()[2]) * 8, 1000);
+        source.update(this.camera.getGroundPoint(0.5, 0.5, reach));
     }
 
     /**
@@ -303,14 +336,14 @@ export class TerrainMapRenderPath {
             this.renderer.canvasFormat,
             'depth32float',
             this.renderer.sampleCount,
-            this.heightfield,
+            this.heightSource,
             this.renderer.overlayTextureView,
             this.renderer.overlayPickingTextureView,
         );
     }
 
     /**
-     * Positions the main camera so the heightfield bounds fit the viewport.
+     * Positions the main camera so the terrain bounds fit the viewport.
      *
      * @returns Nothing. The camera is reset and resized using renderer pixels.
      * @throws Never throws.
@@ -318,7 +351,16 @@ export class TerrainMapRenderPath {
      * terrainPath['fitCameraToTerrainBounds']();
      */
     private fitCameraToTerrainBounds(): void {
-        const bounds = this.heightfield.bounds;
+        // A streaming terrain spans a continent-sized window; frame its finest window instead.
+        const finest = this.heightSource.levels[0]!;
+        const bounds = isStreamingHeightSource(this.heightSource)
+            ? [
+                finest.originX,
+                finest.originY,
+                finest.originX + (finest.width - 1) * finest.cellSizeX,
+                finest.originY + (finest.height - 1) * finest.cellSizeY,
+            ]
+            : this.heightSource.bounds;
         const width = Math.max(bounds[2] - bounds[0], 1);
         const height = Math.max(bounds[3] - bounds[1], 1);
         const centerX = (bounds[0] + bounds[2]) * 0.5;
@@ -359,7 +401,7 @@ export class TerrainMapRenderPath {
             terrainDepthPass.end();
 
             const buildingPickingPass = this.renderer.beginPickingRenderPass('load');
-            pendingPick.layer.setTerrainHeightSource(activeTerrain.heightfield, activeTerrain.terrainHeightTextureView);
+            pendingPick.layer.setTerrainHeightSource(activeTerrain.heightSource, activeTerrain.terrainHeightTextureView);
             pendingPick.layer.renderPickingPass(this.camera, buildingPickingPass);
             buildingPickingPass.end();
             return this.picking.enqueuePickingReadback(pendingPick);

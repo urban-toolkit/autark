@@ -63,6 +63,7 @@ import {
     UpdateRasterParams,
     UpdateThematicParams,
     LoadTilesParams,
+    EnableTerrainTilesParams,
 } from './api';
 
 import { KeyEvents } from './events-key';
@@ -87,7 +88,15 @@ import { FlatMapRenderPath } from './map-flat';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { MapPickingController } from './map-picking';
 import { TerrainMapRenderPath } from './map-terrain';
+import { TileHeightSource } from './height-source-tiles';
+import type { TerrainTileStats } from './height-source-tiles';
+import { resolveTerrainTileSource } from './terrain-tile-source';
+import { mergeCredits } from './attribution';
+import type { TileCredit } from './attribution';
 import type { TerrainDebugOptions } from './renderer-terrain';
+
+/** Elevation tile failures written to the console before further ones are muted. */
+const MAX_REPORTED_TERRAIN_ERRORS = 5;
 
 /**
  * Main map controller for rendering, interaction, and layer lifecycle.
@@ -143,6 +152,12 @@ export class AutkMap {
     private _flatRenderPath!: FlatMapRenderPath;
     /** Active terrain render path, or `null` while using flat rendering. */
     private _terrainRenderPath: TerrainMapRenderPath | null = null;
+    /** Streaming terrain heights of the active terrain path, when it uses tiles. */
+    private _terrainTiles: TileHeightSource | null = null;
+    /** Credits of the terrain tile source, shown while terrain tiles are active. */
+    private _terrainCredits: readonly TileCredit[] = [];
+    /** Elevation tile failures reported so far. */
+    private _reportedTerrainErrors = 0;
     /** Shared picking coordinator used by both render paths. */
     private _picking!: MapPickingController;
 
@@ -892,6 +907,7 @@ export class AutkMap {
 
         const heightfield = heightfieldFromRaster(collection, property, this.layerManager.origin);
         this._terrainRenderPath?.destroy();
+        this.clearTerrainTiles();
         this._terrainRenderPath = new TerrainMapRenderPath(
             this._renderer,
             this._camera,
@@ -919,7 +935,119 @@ export class AutkMap {
 
         this._terrainRenderPath.destroy();
         this._terrainRenderPath = null;
+        this.clearTerrainTiles();
         this.requestRender();
+    }
+
+    /**
+     * Enables terrain rendering with elevation streamed from a web tile service.
+     *
+     * Heights come from a stack of nested windows around the view: the finest
+     * covers a few kilometres, each further one twice the area at half the
+     * detail, so the terrain reaches far while staying sharp near the camera.
+     * Tiles are fetched as the camera moves, coarse ones first, so a surface
+     * appears quickly and sharpens. Layers, buildings and picking work as in
+     * {@link AutkMap.enableTerrainMode}; load a tile layer to drape imagery.
+     *
+     * Needs the map origin, which the first loaded data layer defines. Replaces
+     * any terrain already enabled. The source attribution is shown on the map.
+     *
+     * @param params Elevation source and options.
+     * @returns Nothing. Terrain resources are initialized immediately and tiles load in the background.
+     * @throws {Error} If the map origin is not initialized, or the source or an option is invalid.
+     * @example
+     * map.loadCollection('neighborhoods', { collection, type: 'polylines' });
+     * map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
+     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
+     */
+    enableTerrainTiles({ source, crs = 'EPSG:3395', levels, windowSize, zoomBias, maxCachedTiles, verticalScale }: EnableTerrainTilesParams): void {
+        if (!this.layerManager.hasOrigin) {
+            throw new Error('Terrain mode requires at least one map layer to initialize the map origin first.');
+        }
+
+        const resolved = resolveTerrainTileSource(source);
+        const origin = this.layerManager.origin;
+        const heights = new TileHeightSource({
+            source: resolved,
+            crs,
+            origin: [origin[0]!, origin[1]!],
+            centre: [0, 0],
+            levels,
+            windowSize,
+            zoomBias,
+            maxCachedTiles,
+            verticalScale,
+            onChange: () => this.requestRender(),
+            onError: (tile, error, permanent) => {
+                if (this._reportedTerrainErrors >= MAX_REPORTED_TERRAIN_ERRORS) return;
+                this._reportedTerrainErrors++;
+                const reason = error instanceof Error ? error.message : String(error);
+                console.warn(
+                    `Terrain tiles: tile ${tile.z}/${tile.x}/${tile.y} ${permanent ? 'is unavailable' : 'failed to load'}: ${reason}`
+                    + (this._reportedTerrainErrors === MAX_REPORTED_TERRAIN_ERRORS ? ' (further tile errors are not reported)' : ''),
+                );
+            },
+        });
+
+        let path: TerrainMapRenderPath;
+        try {
+            path = new TerrainMapRenderPath(
+                this._renderer,
+                this._camera,
+                this._layerManager,
+                this._picking,
+                this._style,
+                heights,
+                () => this.requestRender(),
+            );
+        } catch (error) {
+            heights.destroy();
+            throw error;
+        }
+
+        this._terrainRenderPath?.destroy();
+        this.clearTerrainTiles();
+        this._terrainRenderPath = path;
+        this._terrainTiles = heights;
+        this._terrainCredits = resolved.attribution;
+        this._reportedTerrainErrors = 0;
+        this.refreshAttribution();
+        this.requestRender();
+    }
+
+    /**
+     * Statistics of the streamed terrain: the zoom of each window, how many
+     * tiles are wanted and ready, samples still missing, and the request queue.
+     * Read-only; it never triggers rendering, so it is safe to poll on a timer.
+     *
+     * @returns The statistics, or `null` when terrain does not stream from tiles.
+     * @throws Never throws.
+     * @example
+     * const stats = map.getTerrainTileStats();
+     */
+    getTerrainTileStats(): TerrainTileStats | null {
+        return this._terrainTiles ? this._terrainTiles.stats : null;
+    }
+
+    /**
+     * Forgets the terrain timings recorded so far, so the next ones describe one scenario.
+     *
+     * @returns Nothing; does nothing when terrain does not stream from tiles.
+     * @throws Never throws.
+     * @example
+     * map.resetTerrainTileTiming(); // then pan, then read map.getTerrainTileStats()?.timing
+     */
+    resetTerrainTileTiming(): void {
+        this._terrainTiles?.resetTiming();
+    }
+
+    /** Forgets the streamed terrain of a terrain path that was just destroyed. */
+    private clearTerrainTiles(): void {
+        this._terrainTiles = null;
+        if (this._terrainCredits.length > 0) {
+            this._terrainCredits = [];
+            this.refreshAttribution();
+        }
     }
 
     /**
@@ -1492,7 +1620,7 @@ export class AutkMap {
      * Shows the credits of every visible tile layer, without repeats.
      */
     private refreshAttribution(): void {
-        this._ui.setAttribution(this._layerManager.visibleAttribution());
+        this._ui.setAttribution(mergeCredits([this._layerManager.visibleAttribution(), this._terrainCredits]));
     }
 
     /**

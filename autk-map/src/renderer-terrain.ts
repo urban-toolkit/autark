@@ -7,12 +7,15 @@
  * visible-bounds reduction pass used by terrain overlay rendering.
  */
 
+import { assignSeams } from './terrain-seams';
+import { traverseQuadtree } from './terrain-quadtree';
 import type { Camera } from '@urban-toolkit/autk-core';
 import terrainFragmentSource from './shaders/terrain.frag.wgsl';
 import terrainPickingFragmentSource from './shaders/terrain-picking.frag.wgsl';
 import terrainVertexSource from './shaders/terrain.vert.wgsl';
 import terrainBoundsReduceSource from './shaders/terrain-bounds-reduce.comp.wgsl';
-import type { Heightfield } from '@urban-toolkit/autk-core';
+import { HEIGHT_UNIFORM_BYTES, finestCellOver, packHeightUniform, isStreamingHeightSource } from './height-source';
+import type { HeightSource } from './height-source';
 import { nextPowerOfTwo } from './utils-math';
 
 /** Number of grid cells per terrain patch side. */
@@ -20,7 +23,7 @@ const PATCH_CELLS = 32;
 /** Number of patch vertices per side. */
 const PATCH_VERTICES = PATCH_CELLS + 1;
 /** Largest quadtree LOD level allowed for terrain blocks. */
-const MAX_LOD_LEVEL = 7;
+const MAX_LOD_LEVEL = 10;
 /** Maximum terrain block instances uploaded in one frame. */
 const MAX_INSTANCES = 4096;
 /** Target projected terrain cell size used by LOD splitting. */
@@ -102,16 +105,16 @@ export interface TerrainStats {
 }
 
 /**
- * Renders heightfield terrain and terrain-specific auxiliary passes.
+ * Renders terrain from a height source and terrain-specific auxiliary passes.
  *
- * The renderer owns GPU resources derived from one heightfield and exposes pass
+ * The renderer owns GPU resources derived from one height source and exposes pass
  * methods used by the terrain map render path.
  */
 export class TerrainRenderer {
     /** Selection statistics from the most recent `update` call. */
     readonly stats: TerrainStats = { selectedBlocks: 0, triangles: 0, culledBlocks: 0 };
-    /** Local-space heightfield bounds as `[minX, minY, maxX, maxY]`. */
-    readonly bounds: [number, number, number, number];
+    /** Local-space terrain bounds as `[minX, minY, maxX, maxY]`. */
+    private _bounds: [number, number, number, number] = [0, 0, 0, 0];
 
     /** Main terrain color pipeline. */
     private readonly pipeline: GPURenderPipeline;
@@ -129,8 +132,16 @@ export class TerrainRenderer {
     private readonly reduceTexturePipeline: GPUComputePipeline;
     /** Compute pipeline that reduces partial bounds buffers. */
     private readonly reduceBufferPipeline: GPUComputePipeline;
-    /** Uniform buffer containing camera, bounds, and heightfield parameters. */
+    /** Uniform buffer containing camera and overlay parameters. */
     private readonly cameraBuffer: GPUBuffer;
+    /** Uniform buffer holding the height level table read by the shared height lookup. */
+    private readonly heightUniformBuffer: GPUBuffer;
+    /** Smallest sample spacing of the finest level; drives LOD splitting. */
+    private finestCell = 1;
+    /** Version of the height source last copied to the GPU, or `-1` before the first copy. */
+    private uploadedVersion = -1;
+    /** Per level, the version last copied to the GPU. */
+    private readonly uploadedLevelVersions: number[] = [];
     /** Bind group used by main, depth, mesh, and bounds passes. */
     private readonly bindGroup: GPUBindGroup;
     /** Bind group used by terrain picking. */
@@ -139,7 +150,7 @@ export class TerrainRenderer {
     private readonly instanceBuffer: GPUBuffer;
     /** Dynamic vertex buffer used to draw frozen overlay bounds. */
     private readonly boundsVertexBuffer: GPUBuffer;
-    /** GPU texture containing heightfield sample values. */
+    /** GPU texture array with one layer of height samples per level. */
     private readonly heightTexture: GPUTexture;
     /** Texture view for `heightTexture`. */
     private readonly heightTextureView: GPUTextureView;
@@ -189,29 +200,33 @@ export class TerrainRenderer {
     private instanceCount = 0;
 
     /**
-     * Creates terrain GPU resources for one heightfield.
+     * Creates terrain GPU resources for one height source.
      *
      * @param device WebGPU device used to allocate buffers, textures, and pipelines.
      * @param colorFormat Color format of the main canvas render target.
      * @param depthFormat Depth format used by terrain render passes.
      * @param sampleCount Multisample count used by color pipelines.
-     * @param _heightfield Local-space height samples used to build the terrain texture.
+     * @param _source Height source used to build the terrain texture.
      * @param overlayTextureView Texture view containing projected map overlay colors.
      * @param overlayPickingTextureView Texture view containing projected map picking ids.
      * @throws If WebGPU resource or pipeline creation fails.
      * @example
-     * const terrain = new TerrainRenderer(device, format, 'depth32float', 4, heightfield, overlayView, pickingView);
+     * const terrain = new TerrainRenderer(device, format, 'depth32float', 4, new StaticHeightSource(heightfield), overlayView, pickingView);
      */
     constructor(
         private readonly device: GPUDevice,
         colorFormat: GPUTextureFormat,
         depthFormat: GPUTextureFormat,
         sampleCount: number,
-        private readonly _heightfield: Heightfield,
+        private readonly _source: HeightSource,
         overlayTextureView: GPUTextureView,
         overlayPickingTextureView: GPUTextureView,
     ) {
-        this.bounds = this._heightfield.bounds;
+        this.heightUniformBuffer = device.createBuffer({
+            label: 'Terrain height level table',
+            size: HEIGHT_UNIFORM_BYTES,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
         this.mesh = createPatchMesh(device);
         this.cameraBuffer = device.createBuffer({
             label: 'Terrain camera uniform buffer',
@@ -228,19 +243,16 @@ export class TerrainRenderer {
             size: 12 * 3 * Float32Array.BYTES_PER_ELEMENT,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
+        const textureWidth = Math.max(..._source.levels.map((level) => level.width));
+        const textureHeight = Math.max(..._source.levels.map((level) => level.height));
         this.heightTexture = device.createTexture({
-            label: 'Terrain height field texture',
-            size: [this._heightfield.width, this._heightfield.height],
+            label: 'Terrain height texture array',
+            size: [textureWidth, textureHeight, _source.levels.length],
             format: 'r32float',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         });
-        this.heightTextureView = this.heightTexture.createView();
-        device.queue.writeTexture(
-            { texture: this.heightTexture },
-            this._heightfield.data,
-            { bytesPerRow: this._heightfield.width * Float32Array.BYTES_PER_ELEMENT, rowsPerImage: this._heightfield.height },
-            { width: this._heightfield.width, height: this._heightfield.height },
-        );
+        this.heightTextureView = this.heightTexture.createView({ dimension: '2d-array' });
+        this.syncHeightSource();
         this.visibleBoundsTexture = device.createTexture({
             label: 'Terrain visible bounds prepass texture',
             size: [BOUNDS_PREPASS_SIZE, BOUNDS_PREPASS_SIZE],
@@ -278,9 +290,10 @@ export class TerrainRenderer {
             label: 'Terrain bind group layout',
             entries: [
                 { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-                { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'unfilterable-float' } },
+                { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'unfilterable-float', viewDimension: '2d-array' } },
                 { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
                 { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+                { binding: 4, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
             ],
         });
         this.bindGroup = device.createBindGroup({
@@ -291,6 +304,7 @@ export class TerrainRenderer {
                 { binding: 1, resource: this.heightTextureView },
                 { binding: 2, resource: overlaySampler },
                 { binding: 3, resource: overlayTextureView },
+                { binding: 4, resource: { buffer: this.heightUniformBuffer } },
             ],
         });
         this.pickingBindGroup = device.createBindGroup({
@@ -301,6 +315,7 @@ export class TerrainRenderer {
                 { binding: 1, resource: this.heightTextureView },
                 { binding: 2, resource: overlaySampler },
                 { binding: 3, resource: overlayPickingTextureView },
+                { binding: 4, resource: { buffer: this.heightUniformBuffer } },
             ],
         });
 
@@ -445,24 +460,75 @@ export class TerrainRenderer {
     }
 
     /**
-     * Returns the heightfield used by this terrain renderer.
+     * Local-space terrain bounds as `[minX, minY, maxX, maxY]`.
      *
-     * @returns Source heightfield passed to the constructor.
+     * Follows the height source: a streaming source moves them with its windows.
+     *
+     * @returns Bounds as of the last `update`.
      * @throws Never throws.
      * @example
-     * const heightfield = terrain.heightfield;
+     * const [minX, minY, maxX, maxY] = terrain.bounds;
      */
-    get heightfield(): Heightfield {
-        return this._heightfield;
+    get bounds(): [number, number, number, number] {
+        return this._bounds;
     }
 
     /**
-     * Returns the GPU texture view containing height samples.
+     * Copies what changed in the height source to the GPU.
+     *
+     * Uploads each level whose version changed, rewrites the level table, and
+     * takes the new bounds and finest sample spacing. Does nothing when the source
+     * has not changed since the last call.
+     *
+     * @returns Nothing.
+     * @throws Never throws.
+     * @example
+     * terrain['syncHeightSource']();
+     */
+    private syncHeightSource(): void {
+        const source = this._source;
+        if (source.version === this.uploadedVersion) {
+            return;
+        }
+        const uploadStart = performance.now();
+        source.levels.forEach((level, layer) => {
+            if (source.levelVersions[layer] === this.uploadedLevelVersions[layer]) {
+                return;
+            }
+            this.device.queue.writeTexture(
+                { texture: this.heightTexture, origin: { x: 0, y: 0, z: layer } },
+                level.data,
+                { bytesPerRow: level.width * Float32Array.BYTES_PER_ELEMENT, rowsPerImage: level.height },
+                { width: level.width, height: level.height },
+            );
+            this.uploadedLevelVersions[layer] = source.levelVersions[layer] ?? 0;
+        });
+        this.device.queue.writeBuffer(this.heightUniformBuffer, 0, packHeightUniform(source));
+        this._bounds = [source.bounds[0], source.bounds[1], source.bounds[2], source.bounds[3]];
+        this.finestCell = Math.min(source.levels[0]!.cellSizeX, source.levels[0]!.cellSizeY);
+        this.uploadedVersion = source.version;
+        if (isStreamingHeightSource(source)) source.recordUpload?.(performance.now() - uploadStart);
+    }
+
+    /**
+     * Returns the height source used by this terrain renderer.
+     *
+     * @returns Height source passed to the constructor.
+     * @throws Never throws.
+     * @example
+     * const source = terrain.heightSource;
+     */
+    get heightSource(): HeightSource {
+        return this._source;
+    }
+
+    /**
+     * Returns the GPU texture array view containing height samples, one layer per level.
      *
      * @returns Texture view suitable for terrain-aware building pipelines.
      * @throws Never throws.
      * @example
-     * layer.setTerrainHeightSource(terrain.heightfield, terrain.terrainHeightTextureView);
+     * layer.setTerrainHeightSource(terrain.heightSource, terrain.terrainHeightTextureView);
      */
     get terrainHeightTextureView(): GPUTextureView {
         return this.heightTextureView;
@@ -500,13 +566,12 @@ export class TerrainRenderer {
         waterColor: readonly [number, number, number],
         options: TerrainDebugOptions = {},
     ): void {
+        this.syncHeightSource();
         const uniform = new Float32Array(48);
         uniform.set(camera.getViewProjectionMatrix(), 0);
         uniform.set([...camera.getEye(), 1], 16);
         uniform.set([0.42, -0.46, -0.78, 0], 20);
-        uniform.set([performance.now() / 1000, MAX_LOD_LEVEL + 1, Math.min(this._heightfield.cellSizeX, this._heightfield.cellSizeY), PATCH_CELLS], 24);
-        uniform.set([this._heightfield.originX, this._heightfield.originY, this._heightfield.cellSizeX, this._heightfield.cellSizeY], 28);
-        uniform.set([this._heightfield.width, this._heightfield.height, this._heightfield.minHeight, this._heightfield.maxHeight], 32);
+        uniform.set([performance.now() / 1000, MAX_LOD_LEVEL + 1, this.finestCell, PATCH_CELLS], 24);
         uniform.set([overlayBounds[0], overlayBounds[1], overlayBounds[2] - overlayBounds[0], overlayBounds[3] - overlayBounds[1]], 36);
         uniform.set(overlayUvRect, 40);
         uniform.set([waterColor[0], waterColor[1], waterColor[2], 0.08], 44);
@@ -745,7 +810,7 @@ export class TerrainRenderer {
         bounds: readonly [number, number, number, number],
         cameraPosition?: readonly [number, number],
     ): void {
-        const z = this._heightfield.maxHeight + 20;
+        const z = this._source.maxHeight + 20;
         const [minX, minY, maxX, maxY] = bounds;
         const values = [
             minX, minY, z, maxX, minY, z,
@@ -780,6 +845,7 @@ export class TerrainRenderer {
      */
     destroy(): void {
         this.heightTexture.destroy();
+        this.heightUniformBuffer.destroy();
         this.visibleBoundsTexture.destroy();
         this.visibleBoundsDepthTexture.destroy();
         this.mesh.vertexBuffer.destroy();
@@ -815,33 +881,44 @@ export class TerrainRenderer {
         const [minX, minY, maxX, maxY] = this.bounds;
         const terrainSize = Math.max(maxX - minX, maxY - minY);
         const rootSize = nextPowerOfTwo(terrainSize);
-        const rootLevel = Math.min(MAX_LOD_LEVEL, Math.max(0, Math.ceil(Math.log2(rootSize / (PATCH_CELLS * Math.min(this._heightfield.cellSizeX, this._heightfield.cellSizeY))))));
-        const stack: BlockCandidate[] = [createBlock(minX, minY, rootSize, rootLevel)];
-        const blocks: BlockCandidate[] = [];
-
-        this.stats.culledBlocks = 0;
-        while (stack.length > 0 && blocks.length < MAX_INSTANCES) {
-            const block = stack.pop()!;
-            if (!rangesOverlap(block.x, block.x + block.size, minX, maxX) || !rangesOverlap(block.y, block.y + block.size, minY, maxY)) {
-                continue;
-            }
-            if (enableCulling && !blockIntersectsFrustum(block, planes, this._heightfield.minHeight, this._heightfield.maxHeight)) {
-                this.stats.culledBlocks += 1;
-                continue;
-            }
-            if (shouldSplitBlock(block, camera, projectionScale, Math.min(this._heightfield.cellSizeX, this._heightfield.cellSizeY))) {
-                const childSize = block.size * 0.5;
-                const childLevel = block.level - 1;
-                stack.push(
-                    createBlock(block.x, block.y, childSize, childLevel),
-                    createBlock(block.x + childSize, block.y, childSize, childLevel),
-                    createBlock(block.x, block.y + childSize, childSize, childLevel),
-                    createBlock(block.x + childSize, block.y + childSize, childSize, childLevel),
-                );
-            } else {
-                blocks.push(block);
+        const rootLevel = Math.min(MAX_LOD_LEVEL, Math.max(0, Math.ceil(Math.log2(rootSize / (PATCH_CELLS * this.finestCell)))));
+        const stack: BlockCandidate[] = [];
+        if (this._source.levels.length === 1) {
+            stack.push(createBlock(minX, minY, rootSize, rootLevel));
+        } else {
+            // A streaming terrain moves, so its roots sit on a fixed grid: patches then keep their
+            // place in the world as the windows shift. A window no wider than a root meets at most two roots per axis.
+            for (let ry = Math.floor(minY / rootSize); ry * rootSize <= maxY; ry += 1) {
+                for (let rx = Math.floor(minX / rootSize); rx * rootSize <= maxX; rx += 1) {
+                    stack.push(createBlock(rx * rootSize, ry * rootSize, rootSize, rootLevel));
+                }
             }
         }
+        const streaming = this._source.levels.length > 1;
+        let culled = 0;
+        const blocks = traverseQuadtree(stack, {
+            create: createBlock,
+            maxLeaves: MAX_INSTANCES,
+            visible: (block) => {
+                if (!rangesOverlap(block.x, block.x + block.size, minX, maxX) || !rangesOverlap(block.y, block.y + block.size, minY, maxY)) {
+                    return false;
+                }
+                if (enableCulling && !blockIntersectsFrustum(block, planes, this._source.minHeight, this._source.maxHeight)) {
+                    culled += 1;
+                    return false;
+                }
+                return true;
+            },
+            // With several levels, a block stops splitting once its vertex spacing is no finer than the
+            // finest data anywhere under it, not only at its centre.
+            wantsSplit: (block) => {
+                if (!shouldSplitBlock(block, camera, projectionScale, this.finestCell)) return false;
+                if (!streaming) return true;
+                return block.size / PATCH_CELLS > finestCellOver(this._source, block.x, block.y, block.x + block.size, block.y + block.size);
+            },
+        });
+        this.stats.culledBlocks = culled;
+        assignSeams(blocks);
         this.lastBlocks.length = 0;
         this.lastBlocks.push(...blocks.sort((a, b) => a.level - b.level));
     }

@@ -23,7 +23,7 @@ import { Renderer } from './renderer';
 
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
-import type { Heightfield } from '@urban-toolkit/autk-core';
+import type { HeightSource } from './height-source';
 
 /**
  * 3D indexed-triangle layer with derived lighting normals.
@@ -188,16 +188,16 @@ export class Triangles3DLayer extends VectorLayer {
     }
 
     /**
-     * Binds a heightfield to the 3D render and picking pipelines.
+     * Binds a height source to the 3D render and picking pipelines.
      *
-     * @param source Heightfield sampled to offset 3D geometry in terrain mode.
-     * @param heightTextureView GPU texture view containing heightfield samples.
+     * @param source Height source sampled to offset 3D geometry in terrain mode.
+     * @param heightTextureView GPU texture array view containing height samples.
      * @returns Nothing. Subsequent render and picking passes use terrain heights.
      * @throws Never throws.
      * @example
-     * layer.setTerrainHeightSource(heightfield, terrainHeightTextureView);
+     * layer.setTerrainHeightSource(source, terrainHeightTextureView);
      */
-    setTerrainHeightSource(source: Heightfield, heightTextureView: GPUTextureView): void {
+    setTerrainHeightSource(source: HeightSource, heightTextureView: GPUTextureView): void {
         (this._pipeline as PipelineBuildingSSAO).setTerrainHeightSource(source, heightTextureView);
         this._pipelinePicking.setTerrainHeightSource(source, heightTextureView);
     }

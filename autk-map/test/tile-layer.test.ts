@@ -185,8 +185,7 @@ describe('TileLayer', () => {
     expect([...used].some((v) => v === 0.5)).toBe(true);
   });
 
-  it('does nothing for a camera without a viewport, which is what the terrain overlay camera is today', () => {
-    // The terrain path draws layers with `new Camera()` plus `setOrthographicBounds` and never resizes it.
+  it('does nothing for an orthographic camera that was never given a viewport', () => {
     const overlay = new Camera();
     overlay.setOrthographicBounds(-1000, 1000, -1000, 1000);
     expect(overlay.getViewportWidth()).toBe(0);
@@ -198,6 +197,19 @@ describe('TileLayer', () => {
     const { pass, calls } = fakePass();
     layer.renderPass(overlay, pass);
     expect(calls).toHaveLength(0);
+  });
+
+  it('selects tiles for the terrain overlay camera once it has a viewport', () => {
+    // The terrain path draws layers with an orthographic camera resized to the overlay's pixel rectangle.
+    const overlay = new Camera();
+    overlay.setOrthographicBounds(-2000, 2000, -1500, 1500);
+    overlay.resize(1600, 1200);
+
+    const { layer } = makeLayer({ maxTiles: 64 });
+    layer.prepareRender(overlay);
+    expect(requests.length).toBeGreaterThan(0);
+    expect(layer.stats.selectedTiles).toBeGreaterThan(0);
+    expect(layer.stats.zoom).not.toBeNull();
   });
 
   it('draws nothing while nothing has loaded', () => {
