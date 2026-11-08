@@ -960,7 +960,7 @@ export class AutkMap {
      * map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
      * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
      */
-    enableTerrainTiles({ source, crs = 'EPSG:3395', levels, windowSize, zoomBias, maxCachedTiles, verticalScale }: EnableTerrainTilesParams): void {
+    enableTerrainTiles({ source, crs = 'EPSG:3395', levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs }: EnableTerrainTilesParams): void {
         if (!this.layerManager.hasOrigin) {
             throw new Error('Terrain mode requires at least one map layer to initialize the map origin first.');
         }
@@ -977,6 +977,7 @@ export class AutkMap {
             zoomBias,
             maxCachedTiles,
             verticalScale,
+            composeBudgetMs,
             onChange: () => this.requestRender(),
             onError: (tile, error, permanent) => {
                 if (this._reportedTerrainErrors >= MAX_REPORTED_TERRAIN_ERRORS) return;

@@ -219,6 +219,8 @@ export interface EnableTerrainTilesParams {
      * building heights, so the default keeps them consistent. Defaults to 1.
      */
     verticalScale?: number;
+    /** Milliseconds of terrain composition per frame before the rest waits for the next frame (default 4; `Infinity` for no limit). */
+    composeBudgetMs?: number;
 }
 
 /**

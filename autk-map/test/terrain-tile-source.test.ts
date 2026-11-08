@@ -39,6 +39,8 @@ function make(extra: Partial<TileHeightSourceOptions> = {}) {
     origin: ORIGIN,
     centre: [0, 0],
     windowSize: 64,
+    // The default budget would make these tests depend on how fast the machine is.
+    composeBudgetMs: Infinity,
     onChange,
     load: async (url, signal) => {
       const [, z, x, y] = /\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(url)!.map(Number) as [number, number, number, number];
@@ -285,5 +287,75 @@ describe('TileHeightSource', () => {
   it('rejects an odd or tiny window', () => {
     expect(() => make({ windowSize: 63 })).toThrow(/even/);
     expect(() => make({ windowSize: 2 })).toThrow(/even/);
+  });
+});
+
+describe('compose budget', () => {
+  /** Every call to the clock advances it by `step` milliseconds, so each composition costs exactly `step`. */
+  function slowClock(step: number) {
+    let t = 0;
+    return vi.spyOn(performance, 'now').mockImplementation(() => (t += step));
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('composes every level the first time, whatever the budget', () => {
+    slowClock(10);
+    const { source } = make({ levels: 3, composeBudgetMs: 4 });
+    expect(source.levels).toHaveLength(3);
+    expect(source.levels.every((level) => level.data.length > 0)).toBe(true);
+    expect(source.stats.pendingLevels).toBe(0);
+    source.destroy();
+  });
+
+  it('composes one out-of-date level per frame when each costs more than the budget, coarsest first, and asks for the next frame', () => {
+    slowClock(10);
+    const { source, onChange } = make({ levels: 3, composeBudgetMs: 4 });
+    onChange.mockClear();
+    const before = [...source.levelVersions];
+    const far = 50 * source.levels[2]!.cellSizeX * 64; // far enough that every level moves
+
+    source.update([far, far]);
+    expect(source.stats.pendingLevels).toBe(2);
+    expect(onChange).toHaveBeenCalled();
+    expect(source.levelVersions.map((v, k) => v > before[k]!)).toEqual([false, false, true]);
+
+    source.update([far, far]);
+    expect(source.stats.pendingLevels).toBe(1);
+    expect(source.levelVersions.map((v, k) => v > before[k]!)).toEqual([false, true, true]);
+
+    source.update([far, far]);
+    expect(source.stats.pendingLevels).toBe(0);
+    expect(source.levelVersions.every((v, k) => v > before[k]!)).toBe(true);
+    expect(source.stats.idle).toBe(false); // tiles are still loading, but nothing waits for composition
+    source.destroy();
+  });
+
+  it('does not starve a fine level that moves every frame', () => {
+    slowClock(10);
+    const { source } = make({ levels: 2, composeBudgetMs: 4 });
+    const step = 2 * source.levels[1]!.cellSizeX; // moves both levels' lattices every update
+    let fine = 0;
+    let coarse = 0;
+    for (let i = 1; i <= 8; i++) {
+      const [f, c] = [source.levelVersions[0]!, source.levelVersions[1]!];
+      source.update([i * step, 0]);
+      if (source.levelVersions[0]! > f) fine++;
+      if (source.levelVersions[1]! > c) coarse++;
+    }
+    expect(fine).toBe(4);
+    expect(coarse).toBe(4);
+    source.destroy();
+  });
+
+  it('spends the whole budget on several cheap levels in one frame', () => {
+    slowClock(0.5); // each composition costs 0.5 ms, so the budget of 4 ms covers all three
+    const { source } = make({ levels: 3, composeBudgetMs: 4 });
+    const before = [...source.levelVersions];
+    const far = 50 * source.levels[2]!.cellSizeX * 64;
+    source.update([far, far]);
+    expect(source.stats.pendingLevels).toBe(0);
+    expect(source.levelVersions.every((v, k) => v > before[k]!)).toBe(true);
+    source.destroy();
   });
 });

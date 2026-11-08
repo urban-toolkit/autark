@@ -34,6 +34,8 @@ export const DEFAULT_TERRAIN_LEVELS = 6;
 export const DEFAULT_TERRAIN_WINDOW_SIZE = 512;
 /** Zoom of the finest level when the source allows it and no bias is given. */
 export const DEFAULT_FINEST_TERRAIN_ZOOM = 14;
+/** Milliseconds of window composition a frame may spend before it leaves the rest for the next frame. */
+export const DEFAULT_COMPOSE_BUDGET_MS = 4;
 /** Tiles kept in memory when none is given. */
 export const DEFAULT_TERRAIN_CACHED_TILES = 128;
 
@@ -57,6 +59,14 @@ export interface TileHeightSourceOptions {
     maxCachedTiles?: number;
     /** Multiplies every height. Defaults to 1. */
     verticalScale?: number;
+    /**
+     * Milliseconds of composition a frame may spend. A frame always composes at least one window that is
+     * out of date, and every window the first time; the others wait for the next frame, longest-waiting
+     * first (coarsest first among equals), so detail fills in over a few frames and a frame never composes
+     * everything at once. A window is never split, so a frame can exceed the budget by one window's cost.
+     * `Infinity` composes everything at once. Defaults to {@link DEFAULT_COMPOSE_BUDGET_MS}.
+     */
+    composeBudgetMs?: number;
     /** Called when a tile arrives, so the map can draw a new frame. */
     onChange?: () => void;
     /** Called when a tile fails for good. */
@@ -121,6 +131,8 @@ export interface TerrainTileStats {
     readyTiles: number;
     /** Samples per level that no loaded tile covers yet, finest first. */
     missingSamples: readonly number[];
+    /** Windows that are out of date and wait for a frame with composition budget. */
+    pendingLevels: number;
     /** `true` when every window is complete and nothing is loading or waiting. */
     idle: boolean;
     /** Request queue and cache counters of the tile store. */
@@ -159,6 +171,10 @@ export class TileHeightSource implements StreamingHeightSource {
     private counter = 0;
     private wantedTiles = 0;
     private readyTiles = 0;
+    private readonly composeBudgetMs: number;
+    /** Per level, consecutive updates in which it was out of date and not composed. */
+    private readonly waiting: number[];
+    private pendingLevels = 0;
     private readonly updateTimes = new TimingWindow();
     private readonly composeTimes = new TimingWindow();
     private readonly uploadTimes = new TimingWindow();
@@ -195,6 +211,9 @@ export class TileHeightSource implements StreamingHeightSource {
         this.composed = new Array(count).fill(undefined);
         this.signatures = new Array(count).fill('');
         this.levelVersions = new Array(count).fill(0);
+        this.waiting = new Array(count).fill(0);
+        const budget = options.composeBudgetMs;
+        this.composeBudgetMs = typeof budget === 'number' && !Number.isNaN(budget) && budget >= 0 ? budget : DEFAULT_COMPOSE_BUDGET_MS;
         this.levelData = new Array(count);
         this.levels = this.levelData;
 
@@ -239,7 +258,8 @@ export class TileHeightSource implements StreamingHeightSource {
             memory: this.memoryBound(),
             readyTiles: this.readyTiles,
             missingSamples: missing,
-            idle: missing.every((m) => m === 0) && store.inFlight === 0 && store.queued === 0 && store.waitingRetries === 0,
+            pendingLevels: this.pendingLevels,
+            idle: this.pendingLevels === 0 && missing.every((m) => m === 0) && store.inFlight === 0 && store.queued === 0 && store.waitingRetries === 0,
             store,
             timing: {
                 update: this.updateTimes.summary(),
@@ -328,11 +348,26 @@ export class TileHeightSource implements StreamingHeightSource {
             const entry = this.store.get(tile);
             return entry?.state === 'ready' ? entry.value : undefined;
         };
+        // Out-of-date levels, longest-waiting first and coarsest first among equals, so coarse coverage comes
+        // early and a fine level that keeps moving is not starved. A level that was never composed always is.
+        const dirty: number[] = [];
+        for (let k = 0; k < count; k++) {
+            if (!this.composed[k] || moved[k] || signatures[k] !== this.signatures[k]) dirty.push(k);
+        }
+        dirty.sort((a, b) => this.waiting[b]! - this.waiting[a]! || b - a);
+
         let changed = false;
         let composeMs = 0;
         let composed = 0;
-        for (let k = 0; k < count; k++) {
-            if (!moved[k] && signatures[k] === this.signatures[k]) continue;
+        let pending = 0;
+        for (const k of dirty) {
+            // A deferred level keeps its old plan and signature, so it is still out of date next frame.
+            if (this.composed[k] && composed > 0 && composeMs >= this.composeBudgetMs) {
+                this.waiting[k]!++;
+                pending++;
+                continue;
+            }
+            this.waiting[k] = 0;
             const composeStart = performance.now();
             const window = composeWindow(plans[k]!, lookup, { verticalScale: this.verticalScale, minZoom: this.minZoom });
             composeMs += performance.now() - composeStart;
@@ -346,6 +381,9 @@ export class TileHeightSource implements StreamingHeightSource {
             changed = true;
         }
         this.store.endFrame();
+        this.pendingLevels = pending;
+        // On-demand rendering draws only when asked, so ask for the frame that will compose the rest.
+        if (pending > 0) this.options.onChange?.();
         if (composed > 0) {
             this.composeTimes.record(composeMs);
             this.composeCounts.record(composed);
