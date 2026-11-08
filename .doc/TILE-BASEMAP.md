@@ -10,7 +10,7 @@ Branch `feat/tile-basemap`, uncommitted. This document describes what exists and
 | Hiding a layer stops its work | Implemented and tested |
 | Statistics API and the gallery explorer (`tiles-basemap`) | Implemented and run in a browser |
 | Browser acceptance of the flat map | Done by the user on 2026-11-07, who reported that it worked fine. No details were recorded, so the softness, tile-cap and idle-frame checks in B were not individually confirmed |
-| Terrain draping | **Not implemented.** In terrain mode a tile layer draws nothing (see Known behaviour). Plan in Remaining work, A |
+| Terrain draping | Implemented in code and unit tested (orthographic camera, overlay viewport, depth range, tests, Niterói example); checked by the user in a browser on 2026-11-07 using the Niterói example with `?offline`, who reported that it works (no details recorded, so softness and clipping were not individually confirmed). See Known behaviour and Remaining work, A |
 | Texture-upload budget | Deferred until measured |
 | Planet-scale views | Out of scope for now (camera far plane is 500 km) |
 | Sharing pipeline setup with the raster pipeline | Deferred |
@@ -178,7 +178,7 @@ Not covered: anything on a real GPU (`pipeline-tiles.ts` only runs against the f
 
 ## Known behaviour
 
-- **Terrain mode.** A tile layer draws nothing and requests nothing: the terrain path's overlay camera is `new Camera()` plus `setOrthographicBounds` and is never resized, so its viewport is 0 and selection returns nothing (pinned by a test). Even with a viewport, the overlay's depth range would clip the layer (see Remaining work, A).
+- **Terrain mode.** Tile layers draw into the terrain overlay like every other non-3D layer. The overlay camera is orthographic: `Camera.setOrthographicBounds` records the bounds, `resize` and `update` keep that projection, and the ground and ray helpers follow the bounds (the footprint is the bounds rectangle, so reach does not apply). The terrain path resizes the overlay camera to the overlay's pixel rectangle each frame, so selection sees pixels per world unit. The depth range is world `z` from -10 to 90 (depth `(z + 10) / 100`), so the layer's slot `z = -1` is inside it. The overlay is at most 4096 px over the visible terrain bounds, so imagery may look soft near the camera over a large terrain (see Remaining work, A, item 7).
 - **Far plane.** The camera's far plane is 500 km, so zooming out past about that height clips the map. Likely the blank map seen when zooming far out.
 - **Tile cap on 2× screens.** A 2× screen asks for one zoom more, which can exceed the default cap of 64 tiles; the cap then lowers the zoom and tiles look softer. The statistics show `wantedZoom` above `zoom` when this happens.
 - **Reach.** A nearly level camera gets imagery only out to 20 camera heights.
@@ -187,15 +187,11 @@ Not covered: anything on a real GPU (`pipeline-tiles.ts` only runs against the f
 
 ### A. Terrain draping
 
-Goal: the same layer, drawn onto terrain. The terrain path already draws every non-3D layer into an offscreen overlay texture with an orthographic camera and drapes that texture over the mesh, so tile drawing itself should work; what is missing is the camera, the depth range and tests.
+Done in code (see Known behaviour): orthographic `Camera` support, overlay viewport, depth range, selection without reach, tests (`camera-ground-point`, `tile-layer`), and the Niterói example, which now drops the OSM `surface` layer (it is drawn above the tiles in the overlay and would hide them) and loads Esri imagery. Not done:
 
-1. **Orthographic support in `Camera`.** `setOrthographicBounds` should record that the camera is orthographic and its bounds. Then `resize()` and `update()` must not rebuild perspective matrices (today `resize()` calls `update()`, which would overwrite the orthographic projection), and `getGroundFootprint`, `getGroundPoint` and `getWorldRayDirection` must follow the bounds: the footprint is the bounds rectangle, ground points interpolate linearly across it, rays are parallel. This also corrects the ray helpers for any orthographic caller.
-2. **Viewport.** `map-terrain.ts` resizes the overlay camera to the overlay pixel rectangle (at most 4096 px) before `prepareRender`, so selection sees pixels per world unit. This replaces the earlier idea of a `viewport` argument on `Layer.prepareRender`, which would touch every layer.
-3. **Depth.** Orthographic depth is `0.01 · z` (`orthoZO(…, 0, -100)`), so the layer's slot `z = -1` maps to −0.01 and is clipped. Move the near plane so negative slots are inside the range (for example `near = 10`, which keeps relative order and keeps 100 world units), and check the terrain path and the raster layers still draw as before.
-4. **Selection bounds.** The overlay bounds are the visible terrain bounds, so reach does not apply; make sure the ortho footprint ignores it.
-5. **Tests.** Camera orthographic tests against rays unprojected from the inverse matrix (as for the perspective camera); `TileLayer` with the real overlay camera setup; the terrain path with a tile layer using the existing terrain mocks in `on-demand-rendering.test.ts`; update the terrain-mode test above to the new behaviour.
-6. **Example.** Draw Niterói imagery in `terrain-layers-niteroi`. That example loads OSM `surface`, which is drawn above the tiles in the overlay and would hide them, so the surface layer has to go or be made translucent.
-7. **Measure.** Overlay sharpness near the camera when the terrain is large (the zoom is chosen for at most 4096 px); consider a finer rectangle near the camera only if it looks soft.
+1. **Browser check** of `terrain-layers-niteroi` (done once, see Status; `?offline` skips the Overpass request): imagery aligned with the terrain and the vector layers, loading progressively, and no clipping when the camera moves.
+2. **Terrain path test** with a tile layer using the existing terrain mocks in `on-demand-rendering.test.ts`.
+3. **Measure.** Overlay sharpness near the camera when the terrain is large (the zoom is chosen for at most 4096 px); consider a finer rectangle near the camera only if it looks soft.
 
 ### B. Browser acceptance (done once)
 

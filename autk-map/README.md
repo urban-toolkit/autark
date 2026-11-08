@@ -163,7 +163,52 @@ map.updateRenderInfo('neighborhoods', { opacity: 0.4 });   // let the imagery sh
 * **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps what is requested and drawn at once: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
 * **Hiding.** Hiding a tile layer (`updateRenderInfo(id, { isSkip: true })`) cancels its queued, in-flight and retrying requests and keeps the textures already loaded, so showing it again draws at once and loads only what is missing.
 * **Statistics.** `map.getTileStats(id)` returns a read-only snapshot: the zoom (and the zoom the view wanted, when the tile cap lowered it), how many selected tiles are drawn with their own image, with an ancestor's or not at all, the request queue, cached textures with an estimated size in bytes, and cumulative counts of requests (retries included, not network transfers), cache reuses and pressure evictions. `map.renderStats` gives the number of frames rendered, the CPU time of the last frame and the average, and the frame rate while rendering. Time is CPU time around preparing and submitting a frame, not GPU time, and the rate is 0 while the map is idle. Reading either does not trigger rendering, so a page can poll them on a timer; a frame count that stops increasing means the map is idle.
-* **Limits.** The camera's far plane (500 km) limits how far you can zoom out before the map is clipped, so continent- and planet-scale views are not supported yet. Terrain draping is also not supported yet. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
+* **Limits.** The camera's far plane (500 km) limits how far you can zoom out before the map is clipped, so continent- and planet-scale views are not supported yet. In terrain mode tiles are draped through the terrain overlay (at most 4096 px over the visible terrain), so they may look soft near the camera over a large terrain. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
+
+### Terrain from tiles
+
+`enableTerrainTiles` streams terrain elevation from a web tile service (Terrarium or Mapbox terrain-RGB PNG tiles) instead of a GeoTIFF. Layers, buildings, picking and tile-layer imagery work as in `enableTerrainMode`.
+
+```ts
+import { AutkMap, TERRAIN_TILE_SOURCES, TILE_SOURCES } from '@urban-toolkit/autk-map';
+
+map.loadCollection('neighborhoods', { collection, type: 'polylines' }); // any data layer sets the map origin
+map.enableTerrainTiles({
+    source: TERRAIN_TILE_SOURCES.awsTerrarium, // or your own source with its `encoding`
+    crs: 'EPSG:3395',                          // the CRS of your data; default 'EPSG:3395'
+    levels: 6,                                 // optional: nested windows, finest first (at most 8)
+    windowSize: 512,                           // optional: samples per window edge (even, at most 2048)
+    zoomBias: 0,                               // optional: negative gives coarser terrain, fewer requests
+    maxCachedTiles: 128,                       // optional; raised to what the windows can need at once
+    verticalScale: 1,                          // optional: multiplies every height
+});
+map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery }); // optional: drape imagery
+map.getTerrainTileStats();                                           // read-only statistics, including `timing` (p50/p95/p99) and `memory`
+map.resetTerrainTileTiming();                                        // clear the timings to measure one scenario
+map.disableTerrainMode();
+```
+
+* **How it works.** Heights come from nested windows of samples around the view: the finest covers a few kilometres and each further one twice the area at half the detail (level `k` reads tile zoom `finest - k`, with the finest at zoom 14 unless the source stops sooner). The outermost window is the terrain. Coarse tiles load first, so a surface appears quickly and sharpens. Windows move by whole samples, so heights do not swim, and are recomposed only when they move or a tile they read arrives.
+* **Sources.** `TERRAIN_TILE_SOURCES.awsTerrarium` is the public Terrain Tiles on AWS dataset (zooms 0 to 15). Its documentation says those S3 endpoints are meant for efficient networking with EC2 and are not cached by CloudFront, and it states no rate limits, so put your own CDN in front of them for anything beyond development. A custom source is a tile source (`urlTemplate`, `attribution`, zoom limits, `tileSize`) plus `encoding: 'terrarium' | 'mapbox'`. Attribution is required and shown on the map while terrain tiles are active. The provider asks for "Mapzen" plus a statement for each data source used where you are (for example "3DEP data courtesy of the U.S. Geological Survey" in the United States, "© Kartverket" in Norway, or the EU-DEM and Copernicus credit in Europe). The preset shows "Mapzen" and a link to the provider's list of sources and their credits; add the statements for your area yourself: `attribution: [...TERRAIN_TILE_SOURCES.awsTerrarium.attribution, '3DEP data courtesy of the U.S. Geological Survey']`. Following the provider's terms is the caller's job.
+* **Mapbox terrain-RGB.** It needs your own access token in the URL, so it is not bundled. Mapbox documents the URL form, 256-pixel tiles, data up to zoom 15 and the same height formula as `encoding: 'mapbox'`. Its [attribution guide](https://docs.mapbox.com/help/dive-deeper/attribution/) asks for text credits linking to Mapbox, OpenStreetMap and "Improve this map", and for the Mapbox logo, which autk-map does not draw, so add it to your page. The guide does not mention terrain-RGB by name and says some tilesets carry extra credits in their TileJSON, so confirm with Mapbox for this one:
+  ```ts
+  map.enableTerrainTiles({
+      source: {
+          urlTemplate: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${token}`,
+          encoding: 'mapbox',
+          tileSize: 256,
+          minZoom: 0,
+          maxZoom: 15,
+          attribution: [
+              { text: '© Mapbox', url: 'https://www.mapbox.com/about/maps' },
+              { text: '© OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' },
+              { text: 'Improve this map', url: 'https://apps.mapbox.com/feedback/' },
+          ],
+      },
+  });
+  ```
+* **Vertical scale.** Heights are metres, while the map plane (EPSG:3395) is stretched by about `1/cos(latitude)`. Building heights are not scaled either, so the default keeps them consistent; `verticalScale` exaggerates or corrects. Only metre-based systems (`EPSG:3395`, `EPSG:3857`) are accepted for `crs`.
+* **Limits.** The terrain reaches only as far as the outermost window (about 150 km with the defaults). Detail depends on the source data for the area: the provider lists 30 m in most of the world, 10 m in the United States and finer in a few countries, so where the data is 30 m, zooms above about 12 add smoothness, not detail. Heights are used as given, so datum differences between datasets are not reconciled. Terrain patches of different detail are stitched along their edges, heights and shading alike.
 
 ### Render sizing verification
 
