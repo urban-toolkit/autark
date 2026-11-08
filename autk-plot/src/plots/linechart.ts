@@ -37,6 +37,7 @@
 import * as d3 from 'd3';
 
 import type { PlotConfig } from '../api';
+import type { BrushExtent } from '../types-events';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 
@@ -76,6 +77,28 @@ export class Linechart extends PlotBaseInteractive {
         this.draw();
     }
 
+    /** Scales of the latest render, from rank (x) and value (y) to pixels. */
+    protected mapX?: d3.ScaleLinear<number, number>;
+    protected mapY?: d3.ScaleLinear<number, number>;
+
+    /**
+     * The brushed box in data units. Points sit at their rank among the buckets, so x is a (fractional) rank, and `xBucket` gives
+     * the raw bucket key at each end, the nearest bucket inside the plot.
+     */
+    protected override brushExtent([x0, y0, x1, y1]: [number, number, number, number], axes: 'x' | 'y' | 'xy'): BrushExtent | undefined {
+        if (!this.mapX || !this.mapY) { return undefined; }
+        const rows = this._data as Array<{ x: number; bucket?: string }>;
+        const last = Math.max(0, (d3.max(rows, row => row.x) ?? 0));
+        const keyAt = (rank: number): string | undefined => rows.find(row => row.x === Math.min(last, Math.max(0, Math.round(rank))))?.bucket;
+        const [a, b] = [this.mapX.invert(x0), this.mapX.invert(x1)].sort((p, q) => p - q);
+        const keys = [keyAt(a), keyAt(b)];
+        return {
+            ...(axes !== 'y' ? { x: [a, b] as [number, number] } : {}),
+            ...(axes !== 'y' && keys[0] !== undefined && keys[1] !== undefined ? { xBucket: keys as [string, string] } : {}),
+            ...(axes !== 'x' ? { y: [this.mapY.invert(y1), this.mapY.invert(y0)] as [number, number] } : {}),
+        };
+    }
+
     /**
      * Normalizes temporal transform output into the rendered line-series schema.
      *
@@ -101,6 +124,7 @@ export class Linechart extends PlotBaseInteractive {
             .sort((a, b) => place.get(a.bucket)! - place.get(b.bucket)!)
             .map(item => ({
                 x: place.get(item.bucket)!,
+                bucket: item.bucket,
                 label: timeLabel ? timeLabel(this.bucketTime(item.bucket)) : this.formatBucketLabel(item.bucket),
                 y: item.value,
                 autkIds: item.autkIds,
@@ -169,6 +193,8 @@ export class Linechart extends PlotBaseInteractive {
 
         const xScale = d3.scaleLinear().domain([0, n - 1]).range([0, innerW]);
         const yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerH, 0]);
+        this.mapX = xScale;
+        this.mapY = yScale;
 
         // ---- Axes
         // Ticks only where a bucket is: with two or three buckets, d3 would also place ticks halfway between them.
