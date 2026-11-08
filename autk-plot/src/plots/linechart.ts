@@ -43,7 +43,8 @@ import { PlotBaseInteractive } from '../plot-base-interactive';
 import type { ExecutedPlotTransform } from '../transforms';
 
 /**
- * Line plot that aggregates feature-level series data into a single line.
+ * Line plot that aggregates feature-level series data into a single line, or into
+ * one line per group when the reduce-series transform groups features (`options.by`).
  *
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
@@ -87,18 +88,24 @@ export class Linechart extends PlotBaseInteractive {
             return resolved;
         }
 
+        // Every group (series) shares one x axis: a bucket's x is its place among all the buckets, in order.
+        const buckets = [...new Set(result.rows.map(item => item.bucket))].sort((a, b) => this.compareBuckets(a, b));
+        const place = new Map(buckets.map((bucket, idx) => [bucket, idx]));
+        const grouped = result.preset === 'reduce-series' && result.rows.some(item => item.group !== undefined);
         const rows = [...result.rows]
-            .sort((a, b) => this.compareBuckets(a.bucket, b.bucket))
-            .map((item, idx) => ({
-                x: idx,
+            .sort((a, b) => place.get(a.bucket)! - place.get(b.bucket)!)
+            .map(item => ({
+                x: place.get(item.bucket)!,
                 label: this.formatBucketLabel(item.bucket),
                 y: item.value,
                 autkIds: item.autkIds,
+                ...('group' in item && item.group !== undefined ? { group: item.group } : {}),
             }));
 
         return {
             rows,
             axisAttributes: ['label', 'y'],
+            ...(grouped ? { colorAttribute: 'group' } : {}),
         };
     }
 
@@ -110,7 +117,9 @@ export class Linechart extends PlotBaseInteractive {
      * @throws If the root SVG element cannot be created.
      */
     public render(): void {
-        const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[] }>;
+        const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[]; group?: string }>;
+        // One line per group; without groups, one line for everything.
+        const lines = d3.group(seriesData, (item) => item.group ?? '');
         const innerW = this._width - this._margins.left - this._margins.right;
         const innerH = this._height - this._margins.top - this._margins.bottom;
 
@@ -147,7 +156,7 @@ export class Linechart extends PlotBaseInteractive {
         }
 
         // ---- Scales
-        const n = Math.max(seriesData.length, 1);
+        const n = Math.max(d3.max(seriesData, (item) => item.x + 1) ?? 1, 1);
         const allY = seriesData.map((item) => item.y);
         const yMin = allY.length > 0 ? Math.min(...allY) : 0;
         const yMax = allY.length > 0 ? Math.max(...allY) : 50;
@@ -160,7 +169,7 @@ export class Linechart extends PlotBaseInteractive {
         // Ticks only where a bucket is: with two or three buckets, d3 would also place ticks halfway between them.
         const xAxis = d3.axisBottom(xScale)
             .tickValues(xScale.ticks(Math.min(n, 12)).filter(Number.isInteger))
-            .tickFormat((d) => seriesData[+d]?.label ?? this.tickFormat(0)(d));
+            .tickFormat((d) => seriesData.find((item) => item.x === +d)?.label ?? this.tickFormat(0)(d));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.x.axis')
@@ -237,15 +246,17 @@ export class Linechart extends PlotBaseInteractive {
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y));
 
+        // A group's line takes the group's color (as `attributes.color` and `categoryColors` give it to the group's marks).
+        const lineColor = (group: string) => (group === '' ? '#4472c4' : this.getMarkColor({ group }));
         cGroup
-            .selectAll<SVGPathElement, Array<{ x: number; y: number }>>('.autk-line')
-            .data([seriesData])
+            .selectAll<SVGPathElement, [string, Array<{ x: number; y: number }>]>('.autk-line')
+            .data([...lines])
             .join('path')
             .attr('class', 'autk-line')
             .attr('fill', 'none')
-            .attr('stroke', '#4472c4')
+            .attr('stroke', ([group]) => lineColor(group))
             .attr('stroke-width', 1.5)
-            .attr('d', lineGen);
+            .attr('d', ([, points]) => lineGen(points));
 
         // ---- Dots (marks)
         cGroup

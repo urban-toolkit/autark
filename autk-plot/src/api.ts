@@ -177,6 +177,11 @@ export type ReduceSeriesTransformConfig = {
         value?: string;
         /** Reducer applied across features sharing the same timestamp. Defaults to `'avg'`. */
         reducer?: TransformReducer;
+        /**
+         * Feature property that names a group. Features with the same value form one series, reduced on their own, so a
+         * line chart draws one line per group instead of one line for all features. Rows then carry a `group`.
+         */
+        by?: string;
     };
 };
 
