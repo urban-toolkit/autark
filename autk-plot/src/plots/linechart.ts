@@ -91,12 +91,17 @@ export class Linechart extends PlotBaseInteractive {
         // Every group (series) shares one x axis: a bucket's x is its place among all the buckets, in order.
         const buckets = [...new Set(result.rows.map(item => item.bucket))].sort((a, b) => this.compareBuckets(a, b));
         const place = new Map(buckets.map((bucket, idx) => [bucket, idx]));
+        // Timestamp buckets get short labels: the date for a span of days, the date and hour for a shorter one.
+        const times = buckets.map(bucket => this.bucketTime(bucket));
+        const isTime = buckets.length > 0 && /^\d{4}-\d{2}-\d{2}/.test(buckets[0]) && times.every(date => Number.isFinite(date.getTime()));
+        const spanDays = isTime ? (times[times.length - 1].getTime() - times[0].getTime()) / 86400000 : 0;
+        const timeLabel = isTime ? d3.utcFormat(spanDays > 4 ? '%b %-d' : '%b %-d %Hh') : null;
         const grouped = result.preset === 'reduce-series' && result.rows.some(item => item.group !== undefined);
         const rows = [...result.rows]
             .sort((a, b) => place.get(a.bucket)! - place.get(b.bucket)!)
             .map(item => ({
                 x: place.get(item.bucket)!,
-                label: this.formatBucketLabel(item.bucket),
+                label: timeLabel ? timeLabel(this.bucketTime(item.bucket)) : this.formatBucketLabel(item.bucket),
                 y: item.value,
                 autkIds: item.autkIds,
                 ...('group' in item && item.group !== undefined ? { group: item.group } : {}),
@@ -301,6 +306,20 @@ export class Linechart extends PlotBaseInteractive {
             return this.tickFormat(0)(numericBucket);
         }
         return bucket;
+    }
+
+    /**
+     * Reads a timestamp bucket key as the date and time written in it, whatever the page's time zone: a key with no
+     * zone is taken as UTC (binning-events writes its keys in UTC, "2024-03-05 14:00"), so its label, written in UTC,
+     * shows the day and hour of the key.
+     *
+     * @param bucket Raw bucket key from the transform result.
+     * @returns The key's instant; an invalid date when the key is not a timestamp.
+     */
+    private bucketTime(bucket: string): Date {
+        const iso = bucket.replace(' ', 'T');
+        const zoned = /(Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+        return new Date(iso.includes('T') && !zoned ? `${iso}Z` : iso);
     }
 
     /**
