@@ -88,6 +88,9 @@ export abstract class PlotBaseData {
     /** Optional transform config shared by plot implementations that support transformed views. */
     protected _transformConfig?: PlotTransformConfig;
 
+    /** Explicit colors for categorical values, in domain order (from config). */
+    protected _categoryColors: string[] | undefined = undefined;
+
     /** Domain specification for color encoding (from config). */
     protected _domainSpec: ColorMapDomainSpec | undefined = undefined;
     /** Color interpolator used for continuous (numeric) color encoding. */
@@ -146,6 +149,7 @@ export abstract class PlotBaseData {
         this._domainSpec = config.domainSpec;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
         this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
+        this._categoryColors = config.categoryColors;
 
         this._transformConfig = config.transform;
     }

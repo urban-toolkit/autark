@@ -79,6 +79,13 @@ export type PlotConfig = {
     colorMapInterpolator?: ColorMapInterpolator;
     /** Color interpolator used when the color attribute contains categorical (string) values. Defaults to `OBSERVABLE10`. */
     categoricalColorMapInterpolator?: ColorMapInterpolator;
+    /**
+     * Explicit colors (any CSS color) for a categorical color attribute, in the order of the color domain
+     * (`domainSpec` with type `USER` fixes that order). They replace the scheme's own colors, so marks can match
+     * colors used elsewhere on the page, such as a map layer. A category past the last color gets the last color, and
+     * an entry that is not a CSS color falls back to the scheme's color. Ignored for a numeric color attribute.
+     */
+    categoryColors?: string[];
 };
 
 /**

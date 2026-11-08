@@ -214,6 +214,17 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                 return PlotStyle.default;
             }
 
+            // Explicit colors replace the scheme's own, in domain order; a category past the last color gets the
+            // last, as with a named scheme. An entry that is not a CSS color falls back to the scheme's color.
+            const explicit = this._categoryColors;
+            if (explicit && explicit.length > 0) {
+                const color = d3.color(explicit[Math.min(idx, explicit.length - 1)] ?? '');
+                if (color) {
+                    const { r, g, b } = color.rgb();
+                    return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+                }
+            }
+
             const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
             const interpolator = this._categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
             const { r, g, b } = ColorMap.getColor(t, interpolator, categories);
