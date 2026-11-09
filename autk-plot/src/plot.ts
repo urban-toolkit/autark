@@ -131,7 +131,7 @@ export class AutkPlot {
 
     /**
      * Runs the config's `overlay` callback again without redrawing the plot, for when the page's own state changed (a shaded
-     * window, say) and the data did not. Only the line chart draws overlays so far.
+     * window, say) and the data did not. Only the line chart and the bar chart draw overlays so far.
      */
     public refreshOverlay(): void {
         this._plot.refreshOverlay();

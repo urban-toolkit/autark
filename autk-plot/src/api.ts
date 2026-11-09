@@ -84,6 +84,19 @@ export type PlotConfig = {
      * a shaded time window. See `PlotOverlay`.
      */
     overlay?: (overlay: PlotOverlay) => void;
+    /**
+     * Bar chart with a color attribute that splits a category into groups (more rows than categories): how the groups' bars
+     * share a category. `overlay` (the default) draws them on top of each other, translucent, to compare distributions;
+     * `side-by-side` gives each group a slice of the band.
+     */
+    groupMode?: 'overlay' | 'side-by-side';
+    /** Bar chart: the gap between bars as a fraction of a band, 0 to 1. Defaults to 0.25. */
+    barPadding?: number;
+    /**
+     * Text of an x axis tick, from the category or bucket key (bar chart, line chart). Return an empty string to leave a tick
+     * unlabeled. Use it for labels in data units, such as the start of a histogram bin.
+     */
+    xTickLabel?: (key: string) => string;
 };
 
 /**
@@ -95,7 +108,10 @@ export type PlotOverlay = {
     /** Size of the plot area in pixels (the layer's origin is its top left corner). */
     width: number;
     height: number;
-    /** Pixel position of an x position (a rank, for the line chart) and of a y value. */
+    /**
+     * Pixel position of an x position and of a y value. The line chart's x position is a rank of its buckets; the bar chart's is
+     * the index of a category, at the left edge of its band.
+     */
     x: (value: number) => number;
     y: (value: number) => number;
     /** For plots whose x positions are ranks of buckets (the line chart): the rank of the first bucket not before `key`, or one past the last. */

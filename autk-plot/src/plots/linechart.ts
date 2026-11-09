@@ -168,7 +168,7 @@ export class Linechart extends PlotBaseInteractive {
      * @throws If the root SVG element cannot be created.
      */
     public render(): void {
-        const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[]; group?: string }>;
+        const seriesData = this._data as Array<{ x: number; bucket: string; label: string; y: number; autkIds: number[]; group?: string }>;
         // One line per group; without groups, one line for everything.
         const lines = d3.group(seriesData, (item) => item.group ?? '');
         const innerW = this._width - this._margins.left - this._margins.right;
@@ -222,7 +222,11 @@ export class Linechart extends PlotBaseInteractive {
         // Ticks only where a bucket is: with two or three buckets, d3 would also place ticks halfway between them.
         const xAxis = d3.axisBottom(xScale)
             .tickValues(xScale.ticks(Math.min(n, 12)).filter(Number.isInteger))
-            .tickFormat((d) => seriesData.find((item) => item.x === +d)?.label ?? this.tickFormat(0)(d));
+            .tickFormat((d) => {
+                const item = seriesData.find((row) => row.x === +d);
+                if (this._xTickLabel && item?.bucket !== undefined) { return this._xTickLabel(item.bucket); }
+                return item?.label ?? this.tickFormat(0)(d);
+            });
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.x.axis')

@@ -38,6 +38,7 @@ import * as d3 from 'd3';
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { PlotConfig } from '../api';
+import type { AutkDatum } from '../types-plot';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 
@@ -74,6 +75,27 @@ export class Barchart extends PlotBaseInteractive {
         super(config);
 
         this.draw();
+    }
+
+    /** Runs the overlay callback again, for when the page's own state changed but the data did not. */
+    public override refreshOverlay(): void {
+        this.drawOverlay();
+    }
+
+    private drawOverlay(): void {
+        const layer = d3.select(this._div).select<SVGGElement>('.autkOverlay').node();
+        if (!this._overlay || !layer || !this.mapX || !this.mapY) { return; }
+        layer.replaceChildren();
+        const domain = this.mapX.domain();
+        const mapX = this.mapX, mapY = this.mapY;
+        this._overlay({
+            layer,
+            width: this._width - this._margins.left - this._margins.right,
+            height: this._height - this._margins.top - this._margins.bottom,
+            // x is the index of a category: the left edge of its band
+            x: i => mapX(domain[Math.max(0, Math.min(domain.length - 1, Math.round(i)))]) ?? 0,
+            y: v => mapY(v),
+        });
     }
 
     /**
@@ -120,11 +142,18 @@ export class Barchart extends PlotBaseInteractive {
         }
 
         // ---- Scales
-        const xDomain = this._data.map((d) => {
-            const val = d ? valueAtPath(d, this.renderAxisAttributes[0]) : 'unknown';
-            return String(val);
-        });
-        this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
+        const keyOf = (d: unknown) => String(d ? valueAtPath(d as AutkDatum, this.renderAxisAttributes[0]) : 'unknown');
+        const xDomain = [...new Set(this._data.map(keyOf))];
+        this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(this._barPadding);
+
+        // With a color attribute and more rows than categories, the rows belong to groups, which share each category's
+        // band. A color attribute with one row per category only colors the bars.
+        const colorAttribute = this.renderColorAttribute;
+        const groupOf = (d: unknown) => (colorAttribute ? String(valueAtPath(d as AutkDatum, colorAttribute)) : '');
+        const groups = [...new Set(this._data.map(groupOf))];
+        const slice = d3.scaleBand().domain(groups).range([0, this.mapX.bandwidth()]);
+        const grouped = !!colorAttribute && this._data.length > xDomain.length;
+        const sideBySide = grouped && this._groupMode === 'side-by-side';
 
         const yExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0);
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
@@ -134,6 +163,7 @@ export class Barchart extends PlotBaseInteractive {
         // a format, which then writes a category that reads as a number.
         const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
             const value = String(d);
+            if (this._xTickLabel) { return this._xTickLabel(value); }
             const numericValue = Number(value);
             return this.hasTickFormat(0) && Number.isFinite(numericValue) && value.trim() !== ''
                 ? this.tickFormat(0, '~s')(numericValue)
@@ -151,10 +181,10 @@ export class Barchart extends PlotBaseInteractive {
         xAxisSelection
             .call(xAxis)
             .selectAll('.tick text')
-            .style('text-anchor', 'end')
-            .attr('dx', '-.8em')
-            .attr('dy', '-.40em')
-            .attr('transform', 'rotate(-90)');
+            .style('text-anchor', this._xTickLabel ? 'middle' : 'end')
+            .attr('dx', this._xTickLabel ? null : '-.8em')
+            .attr('dy', this._xTickLabel ? null : '-.40em')
+            .attr('transform', this._xTickLabel ? null : 'rotate(-90)');
 
         xAxisSelection
             .selectAll<SVGTextElement, string>('.axis-label')
@@ -190,6 +220,16 @@ export class Barchart extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
+        // ---- Overlay (page-drawn marks behind the bars)
+        svg
+            .selectAll('.autkOverlay')
+            .data([0])
+            .join('g')
+            .attr('class', 'autkOverlay')
+            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
+            .style('pointer-events', 'none');
+        this.drawOverlay();
+
         // ---- Bars
         const cGroup = svg
             .selectAll('.autkBrush')
@@ -214,15 +254,13 @@ export class Barchart extends PlotBaseInteractive {
             .data(this._data)
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', (d) => {
-                const val = d ? valueAtPath(d, this.renderAxisAttributes[0]) : 'unknown';
-                return this.mapX(String(val)) || 0;
-            })
+            .attr('x', (d) => (this.mapX(keyOf(d)) || 0) + (sideBySide ? slice(groupOf(d)) || 0 : 0))
             .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0))
             .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0))
-            .attr('width', this.mapX.bandwidth())
+            .attr('width', sideBySide ? slice.bandwidth() : this.mapX.bandwidth())
             .style('fill', d => this.getMarkColor(d))
-            .style('stroke', '#2f2f2f')
+            .style('fill-opacity', grouped && !sideBySide ? 0.5 : 1)
+            .style('stroke', grouped ? 'none' : '#2f2f2f')
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();
