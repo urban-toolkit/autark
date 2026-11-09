@@ -7,6 +7,7 @@ import type {
 import * as d3 from 'd3';
 
 import type { AutkDatum } from './types-plot';
+import type { PlotOverlay } from './api';
 
 import type {
     PlotConfig,
@@ -88,6 +89,12 @@ export abstract class PlotBaseData {
     /** Optional transform config shared by plot implementations that support transformed views. */
     protected _transformConfig?: PlotTransformConfig;
 
+    /** Page-drawn overlay callback (from config). */
+    protected _overlay: ((overlay: PlotOverlay) => void) | undefined = undefined;
+
+    /** Runs the overlay callback again without redrawing the plot. Plots that support overlays override it. */
+    public refreshOverlay(): void { /* no overlay support */ }
+
     /** Domain specification for color encoding (from config). */
     protected _domainSpec: ColorMapDomainSpec | undefined = undefined;
     /** Color interpolator used for continuous (numeric) color encoding. */
@@ -146,6 +153,7 @@ export abstract class PlotBaseData {
         this._domainSpec = config.domainSpec;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
         this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
+        this._overlay = config.overlay;
 
         this._transformConfig = config.transform;
     }

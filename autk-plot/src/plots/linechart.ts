@@ -99,6 +99,28 @@ export class Linechart extends PlotBaseInteractive {
         };
     }
 
+    /** Runs the overlay callback again, for when the page's own state changed but the data did not. */
+    public override refreshOverlay(): void {
+        this.drawOverlay();
+    }
+
+    private drawOverlay(): void {
+        const layer = d3.select(this._div).select<SVGGElement>('.autkOverlay').node();
+        if (!this._overlay || !layer || !this.mapX || !this.mapY) { return; }
+        layer.replaceChildren();
+        const rows = this._data as Array<{ x: number; bucket?: string }>;
+        const sorted = rows.filter(row => row.bucket !== undefined).sort((p, q) => p.x - q.x);
+        const mapX = this.mapX, mapY = this.mapY;
+        this._overlay({
+            layer,
+            width: this._width - this._margins.left - this._margins.right,
+            height: this._height - this._margins.top - this._margins.bottom,
+            x: v => mapX(v),
+            y: v => mapY(v),
+            rankOf: key => sorted.find(row => (row.bucket as string) >= key)?.x ?? (d3.max(rows, row => row.x) ?? 0) + 1,
+        });
+    }
+
     /**
      * Normalizes temporal transform output into the rendered line-series schema.
      *
@@ -252,6 +274,16 @@ export class Linechart extends PlotBaseInteractive {
             .attr('x', -this._margins.top)
             .style('visibility', 'visible')
             .text((d) => d);
+
+        // ---- Overlay (page-drawn marks behind the lines)
+        svg
+            .selectAll('.autkOverlay')
+            .data([0])
+            .join('g')
+            .attr('class', 'autkOverlay')
+            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
+            .style('pointer-events', 'none');
+        this.drawOverlay();
 
         // ---- Marks group
         const cGroup = svg

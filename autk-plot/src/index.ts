@@ -18,6 +18,7 @@ export type {
 	PlotTransformConfig,
 	SortTransformConfig,
 	PlotConfig,
+	PlotOverlay,
 	PlotType,
 	UnifiedPlotConfig,
 } from './api';
