@@ -145,6 +145,20 @@ describe('fitted ground clipping with the real map camera', () => {
 });
 
 describe('LayerManager bounds', () => {
+    it.each([[100, 200, 300, 400], [100, 200, -5, 300, 400, 5]])('frames a geometry-less raster using its declared bbox %j', (...bbox) => {
+        const manager = new LayerManager();
+        const raster = { type: 'FeatureCollection', bbox, features: [{ type: 'Feature', geometry: null, properties: {} }] } as FeatureCollection;
+        manager.initializeOrigin(raster);
+        expect(manager.origin).toEqual([200, 300]);
+        expect(manager.bounds).toEqual([100, 200, 300, 400]);
+        const fit = vi.fn();
+        const map = Object.create(AutkMap.prototype) as any;
+        map._layerManager = manager;
+        map._flatRenderPath = { fitBounds: fit };
+        map.requestRender = vi.fn();
+        map.fitBounds();
+        expect(fit).toHaveBeenCalledWith([-100, -100, 100, 100]);
+    });
     it('keeps the bounds of the collection that set the origin, and the origin as before', () => {
         const manager = new LayerManager();
         expect(manager.bounds).toBeUndefined();

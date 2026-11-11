@@ -580,6 +580,8 @@ export class AutkMapUi {
         const paletteBtn = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
             this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
         });
+        paletteBtn.disabled = !layer.supportsColorMap;
+        if (!layer.supportsColorMap) paletteBtn.title = 'RGB imagery does not use a scalar color map';
 
         const isRaster = layer.layerInfo.typeLayer === 'raster';
         const cursorBtn = isRaster

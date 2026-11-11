@@ -27,6 +27,8 @@ import type {
     LayerThematic 
 } from './types-layers';
 
+import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
+
 /**
  * A rectangle `[minX, minY, maxX, maxY]` in the coordinate system of the data the map was given (the workspace
  * coordinate system, in meters, for data from `AutkDb`), not relative to the map origin.
@@ -51,6 +53,13 @@ export interface LoadCollectionConfig {
      * Optional flag to preserve buildings that lack valid height metadata.
      */
     buildingsZeroHeight?: boolean;
+    /**
+     * Band values that map to 0 and 255 when a raster layer is drawn as an RGB
+     * image (`property` given as three bands). Defaults to `[0, 255]` for 8-bit
+     * imagery and to the smallest and largest channel value of complete, finite RGB pixels otherwise.
+     * Use `[0, 1]` explicitly for normalized floating-point imagery.
+     */
+    rgbRange?: RasterRgbRange;
 }
 
 export interface LoadCollectionParams {
@@ -83,9 +92,12 @@ export interface LoadCollectionParams {
      * immediately as the initial thematic mapping when provided.
      *
      * For raster layers, the path is resolved from the feature properties and
-     * must point to a flat band array such as `band_1`.
+     * must point to a flat band array such as `band_1`, which is drawn through
+     * the layer color map. Pass three paths, such as
+     * `['band_1', 'band_2', 'band_3']`, to draw the bands as a true-color RGB
+     * image instead. The color map does not apply to an RGB raster.
      */
-    property?: string;
+    property?: string | RasterRgbBands;
 }
 
 /**
@@ -131,7 +143,8 @@ export interface LoadMeshParams {
  *
  * Raster updates replace the value source for an existing raster layer. The
  * `property` accessor is resolved from `collection.features[0].properties` and
- * must point to a flat band array such as `band_1`.
+ * must point to a flat band array such as `band_1`, or be three such accessors
+ * to draw the bands as a true-color RGB image.
  */
 export interface UpdateRasterParams {
     /**
@@ -140,12 +153,26 @@ export interface UpdateRasterParams {
     collection: FeatureCollection<Geometry | null>;
     /**
      * Dot-path accessor for the flat raster band array on feature properties.
+     *
+     * Pass three accessors in red, green, blue order, such as
+     * `['band_1', 'band_2', 'band_3']`, to draw them as a true-color RGB image.
+     * Each band must match the existing layer's width times height; updates do not resize the grid.
+     * The bands must have the same length, and the color map and
+     * `transferFunction` do not apply.
      */
-    property: string;
+    property: string | RasterRgbBands;
     /**
      * Optional transfer function used to derive raster opacity from values.
+     * Ignored for an RGB raster.
      */
     transferFunction?: TransferFunction;
+    /**
+     * Band values that map to 0 and 255 for an RGB raster. Defaults to
+     * `[0, 255]` for 8-bit imagery and to the smallest and largest channel value of complete, finite pixels
+     * otherwise, so reflectance data may need an explicit range such as
+     * `[0, 3000]` to look right. Use `[0, 1]` explicitly for normalized imagery.
+     */
+    rgbRange?: RasterRgbRange;
 }
 
 /**

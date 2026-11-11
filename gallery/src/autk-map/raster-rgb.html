@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RGB raster and scalar transitions — Autark Gallery</title>
+    <link rel="stylesheet" href="./raster-rgb.css" />
+</head>
+<body>
+    <main>
+        <a href="../../index.html">← Gallery</a>
+        <h1>RGB raster and scalar transitions</h1>
+        <p>A local, geometry-less raster with red, green, blue, and white quadrants and a transparent center.
+            Try the same image in different ranges, switch to a scalar ramp, and test rejected updates.</p>
+        <div class="controls" aria-label="Raster controls">
+            <button id="rgb">RGB bytes</button>
+            <button id="reflectance">Reflectance + masked outlier</button>
+            <button id="normalized">Normalized RGB [0, 1]</button>
+            <button id="scalar">Scalar band + legend</button>
+            <button id="invalid-size">Reject wrong dimensions</button>
+            <button id="invalid-range">Reject invalid range</button>
+            <button id="fit">Fit / reset</button>
+            <label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="1" /></label>
+        </div>
+        <p id="status" role="status" aria-live="polite">Loading…</p>
+        <div class="map"><canvas aria-label="Raster validation map"></canvas></div>
+        <p>RGB modes should show the same colors and no scalar legend. Scalar mode should show a ramp and legend.
+            Invalid updates should preserve the current picture and show one warning in the console.
+            Pan or zoom, resize the window, then press <kbd>r</kbd> or Fit / reset to frame the complete raster.</p>
+    </main>
+    <script type="module" src="./raster-rgb.ts"></script>
+</body>
+</html>

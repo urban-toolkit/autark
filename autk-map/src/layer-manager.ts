@@ -11,7 +11,7 @@
 
 import { FeatureCollection, Geometry } from 'geojson';
 
-import { computeBoundingBox, computeOrigin, OSM_BASE_LAYER_ORDER } from '@urban-toolkit/autk-core';
+import { resolveCollectionBounds, computeOrigin, OSM_BASE_LAYER_ORDER } from '@urban-toolkit/autk-core';
 import type { LayerType } from '@urban-toolkit/autk-core';
 import type { MapBounds } from './api';
 
@@ -77,7 +77,7 @@ export class LayerManager {
      */
     initializeOrigin(collection: FeatureCollection<Geometry | null>): void {
         this._origin = computeOrigin(collection as FeatureCollection);
-        const box = computeBoundingBox(collection as FeatureCollection);
+        const box = resolveCollectionBounds(collection);
         this._bounds = box ? [box.minLon, box.minLat, box.maxLon, box.maxLat] : undefined;
     }
 

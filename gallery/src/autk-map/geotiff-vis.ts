@@ -36,9 +36,8 @@ export class GeotiffVis {
 
     protected async loadLayers(): Promise<void> {
         for (const layerData of [...this.db.getLayersMetadata(), ...this.db.getRastersMetadata()]) {
-            const geojson = layerData.type === 'raster'
-                ? await this.db.getRaster(layerData.name)
-                : await this.db.getLayer(layerData.name);
+            // getLayer preserves a GeoTIFF's own extent even after OSM establishes workspace bounds.
+            const geojson = await this.db.getLayer(layerData.name);
 
             const propertyPath = layerData.type === 'raster' ? 'band_1' : undefined;
 

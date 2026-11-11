@@ -161,7 +161,7 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `loadCollection(id, params)`: Loads a GeoJSON or raster-derived collection as a map layer.
 * `loadMesh(id, params)`: Loads prebuilt mesh geometry directly.
 * `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
-* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions.
+* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions, or the three bands of an RGB image.
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.
 * `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
@@ -190,6 +190,43 @@ Run the rendering regression in a WebGPU-enabled Chrome installation:
 ```sh
 node autk-compute/test/run-webgpu.mjs /autk-map/test/render-order.webgpu.ts
 ```
+
+## Raster layers
+
+A raster layer draws one band of a GeoTIFF-derived collection through the layer color map. The collection comes from `AutkDb.getLayer()` (or `getRaster()`) after `loadGeoTiff()`.
+
+```ts
+map.loadCollection('elevation', { collection, type: 'raster', property: 'band_1' });
+```
+
+A raster alone is enough to start a map: its declared `bbox` establishes the map origin. Call `map.fitBounds()` after loading to frame it; loading does not move the camera automatically. No vector layer has to be loaded first.
+
+Satellite and aerial imagery has red, green and blue bands that should be shown as they are. Pass the three band paths to draw a true-color image; the color map and transfer function do not apply.
+
+```ts
+map.loadCollection('imagery', {
+    collection,
+    type: 'raster',
+    property: ['band_1', 'band_2', 'band_3'],
+    // Optional: band values mapped to 0 and 255.
+    loadConfig: { rgbRange: [0, 3000] },
+});
+
+// Later, with different bands or range:
+map.updateRaster('imagery', { collection, property: ['band_4', 'band_3', 'band_2'], rgbRange: [0, 3000] });
+```
+
+Values in 0 to 255 are shown unchanged. Other data, such as reflectance up to 10000, is stretched using the smallest and largest channel values of complete, finite RGB pixels unless `rgbRange` is given. A pixel with a nonfinite value in any band stays transparent and does not affect that range. Normalized floating-point imagery in 0 to 1 needs `rgbRange: [0, 1]`; it cannot be distinguished reliably from dark byte imagery. Explicit ranges must have two finite endpoints with min <= max and a finite span.
+
+Each band must contain exactly `rasterResX * rasterResY` samples for the existing layer. Missing bands, mismatched dimensions, and invalid ranges log a warning and leave the image and display mode unchanged. Updates keep the existing grid and geometry; remove and reload a layer to change its dimensions or extent.
+
+Switching to RGB suppresses the scalar domain, legend, and palette control. Colormap updates and transfer functions do not apply to RGB pixels. Switching back to one band restores the previous scalar legend preference, recomputes its domain, and uses the stored scalar colormap and transfer function. Layer opacity works in both modes.
+
+`loadGeoTiff()` limits a raster to one million cells by default and logs a warning when it resamples a larger image; raise `maxRasterCells` to keep more detail.
+
+See the [gallery validation checklist](../.doc/PR-125-GALLERY-VALIDATION.md) for the raster example and all existing gallery regression checks.
+After building, run the RGB browser regression with `node autk-compute/test/run-webgpu.mjs /autk-map/test/raster-rgb.webgpu.ts`
+and the gallery-control smoke test with `node autk-compute/test/run-webgpu.mjs /gallery/test/raster-rgb.webgpu.ts` from the repository root.
 
 ## Resources
 

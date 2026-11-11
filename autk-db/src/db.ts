@@ -727,9 +727,13 @@ export class AutkDb {
         if (!layerTable) throw new Error(`Table ${layerTableName} not found.`);
         if (!isRenderableTable(layerTable)) throw new Error(`Table ${layerTableName} is not a renderable layer.`);
 
-        const featureCollection = layerTable.type === 'raster' && !this.tableHasGeometry(layerTable)
-            ? await this.getRaster(layerTableName) as unknown as FeatureCollection
-            : await this.getLayerUseCase.exec(layerTable, this.currentWorkspace, options);
+        if (layerTable.type === 'raster' && !this.tableHasGeometry(layerTable)) {
+            // A GeoTIFF table already has the bbox of its own extent from getRaster(). The workspace
+            // box would stretch it over the wrong area, and there are no geometries to measure.
+            return await this.getRaster(layerTableName) as unknown as FeatureCollection;
+        }
+
+        const featureCollection = await this.getLayerUseCase.exec(layerTable, this.currentWorkspace, options);
 
         const workspaceData = this.getCurrentWorkspaceData();
         if (workspaceData.workspaceBoundingBox) {

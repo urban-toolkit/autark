@@ -74,6 +74,15 @@ export class RasterLayer extends Layer {
     /** Canonical scalar raster payload used for domain recomputation. */
     protected _rasterValues: Float32Array = new Float32Array(0);
 
+    /** RGB pixels bypass scalar color mapping and its legend. */
+    private _rasterMode: 'scalar' | 'rgb' = 'scalar';
+    /** Scalar legend preference saved while displaying an RGB image. */
+    private _scalarColorMapEnabled = false;
+
+    get rasterMode(): 'scalar' | 'rgb' { return this._rasterMode; }
+
+    override get supportsColorMap(): boolean { return this._rasterMode !== 'rgb'; }
+
     /** Opacity transfer-function configuration used while rebuilding raster RGBA data. */
     protected _transferFunction: RequiredTransferFunction = { ...DEFAULT_TRANSFER_FUNCTION };
 
@@ -132,7 +141,7 @@ export class RasterLayer extends Layer {
         return this._rasterData;
     }
 
-    /** Original scalar raster values (not normalized). */
+    /** Original scalar raster values (not normalized), empty while displaying RGB pixels. */
     get rasterValues(): Float32Array {
         return this._rasterValues;
     }
@@ -291,76 +300,93 @@ export class RasterLayer extends Layer {
             return;
         }
 
-        this._rasterValues = rasterValues;
-
-        const isRGBA = rasterValues.length === this._rasterResX * this._rasterResY * 4;
-        const rasterData = new Float32Array(isRGBA ? rasterValues.length : this._rasterResX * this._rasterResY * 4);
-
-        if (!isRGBA) {
-            const validValues: number[] = [];
-            for (let i = 0; i < rasterValues.length; i++) {
-                if (!isNaN(rasterValues[i])) validValues.push(rasterValues[i]);
-            }
-
-            const colorDomain = this._layerRenderInfo.colormap.computedDomain;
-            const numericDomain = (
-                Array.isArray(colorDomain)
-                && colorDomain.length > 0
-                && colorDomain.every(v => typeof v === 'number')
-            )
-                ? colorDomain as [number, number] | [number, number, number]
-                : null;
-
-            const transferValues = numericDomain
-                ? validValues.filter(v => v >= numericDomain[0] && v <= numericDomain[numericDomain.length - 1])
-                : validValues;
-
-            const transferContext = buildTransferContext(
-                transferValues.length > 0 ? transferValues : validValues,
-                this._transferFunction,
-            );
-
-            if (transferContext.validCount === 0) {
-                rasterData.fill(0);
-                this._rasterData = rasterData;
-                return;
-            }
-
-            const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
-
-            // One color function for the whole raster: getColor builds a d3 scale
-            // and parses a color string on every call, which kept the main
-            // thread busy for seconds on a large raster.
-            const colorOf = ColorMap.getColorFunction(
-                this._layerRenderInfo.colormap.config.interpolator,
-                effectiveDomain,
-            );
-
-            for (let i = 0; i < rasterValues.length; i++) {
-                const d = rasterValues[i];
-                const offset = i * 4;
-                if (isNaN(d)) {
-                    rasterData[offset] = 0;
-                    rasterData[offset + 1] = 0;
-                    rasterData[offset + 2] = 0;
-                    rasterData[offset + 3] = 0;
-                    continue;
-                }
-
-                const color = colorOf(d);
-                const alpha = computeAlphaByte(d, transferContext);
-
-                rasterData[offset] = color.r;
-                rasterData[offset + 1] = color.g;
-                rasterData[offset + 2] = color.b;
-                rasterData[offset + 3] = alpha;
-            }
+        if (rasterValues.length === this._rasterResX * this._rasterResY * 4) {
+            this.loadRgbRaster(rasterValues);
+            return;
         }
-        else {
-            rasterData.set(rasterValues);
+        const wasRgb = this._rasterMode === 'rgb';
+        this._rasterMode = 'scalar';
+        if (wasRgb) this.updateLayerRenderInfo({ isColorMap: this._scalarColorMapEnabled });
+        this._rasterValues = rasterValues;
+        const rasterData = new Float32Array(this._rasterResX * this._rasterResY * 4);
+
+        const validValues: number[] = [];
+        for (let i = 0; i < rasterValues.length; i++) {
+            if (!isNaN(rasterValues[i])) validValues.push(rasterValues[i]);
+        }
+
+        const colorDomain = this._layerRenderInfo.colormap.computedDomain;
+        const numericDomain = (
+            Array.isArray(colorDomain)
+            && colorDomain.length > 0
+            && colorDomain.every(v => typeof v === 'number')
+        )
+            ? colorDomain as [number, number] | [number, number, number]
+            : null;
+
+        const transferValues = numericDomain
+            ? validValues.filter(v => v >= numericDomain[0] && v <= numericDomain[numericDomain.length - 1])
+            : validValues;
+
+        const transferContext = buildTransferContext(
+            transferValues.length > 0 ? transferValues : validValues,
+            this._transferFunction,
+        );
+
+        if (transferContext.validCount === 0) {
+            rasterData.fill(0);
+            this._rasterData = rasterData;
+            return;
+        }
+
+        const effectiveDomain = numericDomain ?? [transferContext.min, transferContext.max] as [number, number];
+
+        // One color function for the whole raster: getColor builds a d3 scale
+        // and parses a color string on every call, which kept the main
+        // thread busy for seconds on a large raster.
+        const colorOf = ColorMap.getColorFunction(
+            this._layerRenderInfo.colormap.config.interpolator,
+            effectiveDomain,
+        );
+
+        for (let i = 0; i < rasterValues.length; i++) {
+            const d = rasterValues[i];
+            const offset = i * 4;
+            if (isNaN(d)) {
+                rasterData[offset] = 0;
+                rasterData[offset + 1] = 0;
+                rasterData[offset + 2] = 0;
+                rasterData[offset + 3] = 0;
+                continue;
+            }
+
+            const color = colorOf(d);
+            const alpha = computeAlphaByte(d, transferContext);
+
+            rasterData[offset] = color.r;
+            rasterData[offset + 1] = color.g;
+            rasterData[offset + 2] = color.b;
+            rasterData[offset + 3] = alpha;
         }
 
         this._rasterData = rasterData;
+    }
+
+    /** Loads a complete RGBA image explicitly, without interpreting its channels as scalar measurements. */
+    loadRgbRaster(rgba: Float32Array): void {
+        const expected = this._rasterResX * this._rasterResY * 4;
+        if (rgba.length !== expected || expected <= 0) {
+            throw new Error(`RGB raster requires ${expected} RGBA values for ${this._rasterResX}x${this._rasterResY} pixels (got ${rgba.length}).`);
+        }
+        const pixels = rgba.slice();
+        if (this._rasterMode !== 'rgb') this._scalarColorMapEnabled = this._layerRenderInfo.isColorMap ?? false;
+        this._rasterMode = 'rgb';
+        this._rasterValues = new Float32Array(0);
+        this._rasterData = pixels;
+        this.updateLayerRenderInfo({
+            isColorMap: false,
+            colormap: { ...this._layerRenderInfo.colormap, computedDomain: undefined, computedLabels: undefined },
+        });
     }
 
     /**
