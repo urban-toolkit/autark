@@ -12,6 +12,7 @@
 import { ColorMap } from '@urban-toolkit/autk-core';
 import type { ColorRGB } from '@urban-toolkit/autk-core';
 import { Layer } from './layer';
+import { legendLabelPlacements } from './legend-labels';
 import { AutkMap } from './map';
 
 import * as d3 from 'd3';
@@ -546,17 +547,12 @@ export class AutkMapUi {
             .style('stroke', (d) => `rgb(${d.r},${d.g},${d.b})`)
             .style('stroke-width', '1px');
 
-        const textData = labels.map((d, i) => ({
-            label: d,
-            pos: isCategorical
-                ? i * rectWidth + rectWidth / 2
-                : i * (innerWidth / (labels.length - 1)),
-        }));
+        const textData = legendLabelPlacements(labels, innerWidth, rectWidth, isCategorical);
 
         g.selectAll('text').data(textData).join('text')
             .text((d) => d.label)
             .attr('x', (d) => d.pos).attr('y', rectH + 12)
-            .style('font-size', '12px').style('fill', '#333').style('text-anchor', 'middle');
+            .style('font-size', '12px').style('fill', '#333').style('text-anchor', (d) => d.anchor);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
