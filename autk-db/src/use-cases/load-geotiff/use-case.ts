@@ -80,6 +80,12 @@ export class LoadGeoTiffUseCase {
     const scale = fullPixelCount > cellLimit ? Math.sqrt(cellLimit / fullPixelCount) : 1;
     const width = Math.max(1, Math.min(fullWidth, Math.floor(fullWidth * scale)));
     const height = Math.max(1, Math.min(fullHeight, Math.floor(fullHeight * scale)));
+    if (scale < 1) {
+      console.warn(
+        `GeoTIFF '${outputTableName}' has ${fullWidth}x${fullHeight} pixels, above the ${cellLimit}-cell limit, `
+        + `so it was resampled to ${width}x${height}. Pass maxRasterCells to keep more detail.`,
+      );
+    }
     const actualResX = (sourceMaxX - sourceMinX) / width;
     const actualResY = (sourceMaxY - sourceMinY) / height;
 

@@ -75,6 +75,8 @@ import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
+import { composeRgbRaster, isRgbBands, toFloat32Band } from './raster-rgb';
+import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
 import { SpriteLayer } from './layer-sprite';
 import { AutkMapUi } from './map-ui';
 import { MapStyle } from './map-style';
@@ -307,8 +309,11 @@ export class AutkMap {
                 break;
 
             case 'raster':
-                if (typeof property !== 'string') { console.error(`Layer "${id}": property path string is required for raster layers.`); return; }
-                this.createRasterLayer(id, collection, property);
+                if (typeof property !== 'string' && !isRgbBands(property)) {
+                    console.error(`Layer "${id}": a band path string, or three band paths for RGB, is required for raster layers.`);
+                    return;
+                }
+                this.createRasterLayer(id, collection, property, loadConfig?.rgbRange);
                 break;
 
             default:
@@ -539,11 +544,12 @@ export class AutkMap {
      * @param id Layer identifier.
      * @param params Update parameters.
      * @param params.collection GeoTIFF-derived feature collection.
-     * @param params.property Dot-path accessor for a flat raster band array on feature properties.
-     * @param params.transferFunction Optional opacity transfer-function configuration.
+     * @param params.property Dot-path accessor for a flat raster band array on feature properties, or three accessors (red, green, blue) to draw an RGB image.
+     * @param params.transferFunction Optional opacity transfer-function configuration. Ignored for RGB.
+     * @param params.rgbRange Optional band values mapped to 0 and 255 for RGB.
      * @throws Never throws. Errors are logged to the console.
      */
-    updateRaster(id: string, { collection, property, transferFunction }: UpdateRasterParams): void {
+    updateRaster(id: string, { collection, property, transferFunction, rgbRange }: UpdateRasterParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || layer.layerInfo.typeLayer !== 'raster') { return; }
 
@@ -558,20 +564,16 @@ export class AutkMap {
             return;
         }
 
-        const resolved = valueAtPath(props, property);
-        const rasterValues = resolved instanceof Float32Array
-            ? resolved
-            : ArrayBuffer.isView(resolved) && !(resolved instanceof DataView)
-                ? new Float32Array(Array.from(resolved as unknown as ArrayLike<number>, (value: number) => {
-                    const numeric = Number(value);
-                    return Number.isFinite(numeric) ? numeric : Number.NaN;
-                }))
-                : Array.isArray(resolved)
-                    ? new Float32Array(resolved.map((value: unknown) => {
-                        const numeric = Number(value);
-                        return Number.isFinite(numeric) ? numeric : Number.NaN;
-                    }))
-                    : null;
+        if (isRgbBands(property)) {
+            this.updateRgbRaster(layer as RasterLayer, id, props, property, rgbRange);
+            return;
+        }
+
+        if (typeof property !== 'string') {
+            console.warn(`Raster update skipped for layer '${id}': expected a band path or three RGB band paths.`);
+            return;
+        }
+        const rasterValues = toFloat32Band(valueAtPath(props, property));
 
         if (!rasterValues || rasterValues.length === 0) {
             console.warn(`Raster update skipped for layer '${id}': invalid raster band '${property}'.`);
@@ -579,6 +581,11 @@ export class AutkMap {
         }
 
         const rasterLayer = layer as RasterLayer;
+        const expected = rasterLayer.rasterResX * rasterLayer.rasterResY;
+        if (rasterValues.length !== expected) {
+            console.warn(`Raster update skipped for layer '${id}': expected ${expected} samples for ${rasterLayer.rasterResX}x${rasterLayer.rasterResY} pixels (got ${rasterValues.length}).`);
+            return;
+        }
         const config = layer.layerRenderInfo.colormap.config;
         const resolvedDomain = ColorMap.resolveDomainFromData(rasterValues, config);
 
@@ -589,14 +596,53 @@ export class AutkMap {
                 computedLabels: ColorMap.computeLabels(resolvedDomain),
             },
         });
-        this._ui.refreshLegend(layer);
-
         if (transferFunction) {
             rasterLayer.setTransferFunction(transferFunction);
         }
 
         rasterLayer.loadRaster(rasterValues);
         rasterLayer.makeLayerDataDirty();
+        this._ui.refreshLegend(layer);
+        this._ui.refreshLayerList();
+    }
+
+    /**
+     * Draws three bands of a raster layer as a true-color RGB image.
+     *
+     * The bands are interleaved into the RGBA payload the raster layer copies
+     * as-is, so the layer color map, domain, legend and transfer function do
+     * not apply.
+     *
+     * @param layer Target raster layer.
+     * @param id Layer identifier, used in warnings.
+     * @param props Feature properties holding the band arrays.
+     * @param bands Dot-path accessors for the red, green and blue bands.
+     * @param range Optional band values mapped to 0 and 255.
+     * @returns Nothing. A warning is logged and the layer is left unchanged when a band is missing or the lengths differ.
+     */
+    private updateRgbRaster(
+        layer: RasterLayer,
+        id: string,
+        props: Record<string, unknown>,
+        bands: RasterRgbBands,
+        range?: RasterRgbRange,
+    ): void {
+        const values = bands.map((band) => toFloat32Band(valueAtPath(props, band)));
+        const missing = bands.filter((_, i) => !values[i] || values[i]!.length === 0);
+        if (missing.length > 0) {
+            console.warn(`Raster update skipped for layer '${id}': invalid raster band(s) ${missing.map((band) => `'${band}'`).join(', ')}.`);
+            return;
+        }
+
+        try {
+            layer.loadRgbRaster(composeRgbRaster(values as [Float32Array, Float32Array, Float32Array], range));
+        } catch (error) {
+            console.warn(`Raster update skipped for layer '${id}': ${(error as Error).message}`);
+            return;
+        }
+        layer.makeLayerDataDirty();
+        this._ui.refreshLegend(layer);
+        this._ui.refreshLayerList();
     }
 
     /**
@@ -610,6 +656,7 @@ export class AutkMap {
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
+        if (layer.layerInfo.typeLayer === 'raster' && (layer as RasterLayer).rasterMode === 'rgb') { return; }
 
         const currentConfig = layer.layerRenderInfo.colormap.config;
 
@@ -1365,10 +1412,16 @@ export class AutkMap {
      *
      * @param layerName Target layer id.
      * @param geotiff GeoTIFF-derived feature collection.
-     * @param property Feature-property path selecting the raster band array.
+     * @param property Feature-property path selecting the raster band array, or three paths for an RGB image.
+     * @param rgbRange Optional band values mapped to 0 and 255 for an RGB image.
      * @returns Nothing. The raster layer is created and initialized.
      */
-    private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, property: string) {
+    private createRasterLayer(
+        layerName: string,
+        geotiff: FeatureCollection<Geometry | null>,
+        property: string | RasterRgbBands,
+        rgbRange?: RasterRgbRange,
+    ) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex('raster'),
@@ -1403,7 +1456,7 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
-        this.updateRaster(layerName, { collection: geotiff, property  });
+        this.updateRaster(layerName, { collection: geotiff, property, rgbRange });
     }
 
     /**

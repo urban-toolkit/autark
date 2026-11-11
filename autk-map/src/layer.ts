@@ -74,6 +74,9 @@ export abstract class Layer {
      */
     get supportsHighlight(): boolean { return false; }
 
+    /** Whether scalar/thematic coloring and its legend apply to the current payload. */
+    get supportsColorMap(): boolean { return true; }
+
     /**
      * Layer identity and ordering metadata.
      *
@@ -110,6 +113,7 @@ export abstract class Layer {
     updateLayerRenderInfo(info: Partial<LayerRenderInfo>): void {
         const canPick = this.supportsPicking && this.supportsHighlight;
         const nextInfo: Partial<LayerRenderInfo> = { ...info };
+        if (!this.supportsColorMap) nextInfo.isColorMap = false;
 
         for (const key of ['pointSize', 'polylinesWidth'] as const) {
             if (!(key in nextInfo)) { continue; }

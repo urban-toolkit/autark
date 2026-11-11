@@ -182,6 +182,8 @@ export { computeOrigin } from './utils-geojson';
 export { computeGeometryCentroid } from './utils-geojson';
 /** Computes the bounding box of a GeoJSON collection or geometry. */
 export { computeBoundingBox } from './utils-geojson';
+/** Geometry bounds with declared collection bbox fallback for geometry-less rasters. */
+export { resolveCollectionBounds } from './utils-geojson';
 /** Type guard that checks whether a value is a GeoJSON FeatureCollection. */
 export { isFeatureCollection } from './utils-geojson';
 /** Returns true when a string matches a shared layer type. */
