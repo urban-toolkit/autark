@@ -90,10 +90,21 @@ export class BuildingPickingVis {
             address: [get('addr:housenumber'), get('addr:street')]
                 .filter(v => v !== '—').join(' ') || '—',
         });
+        this.setSelectionState(true);
     }
 
     protected resetPanel(): void {
-        this.updatePanel({ title: 'Click a building', osmId: '—', type: '—', height: '—', levels: '—', address: '—' });
+        this.updatePanel({ title: 'No building selected', osmId: '—', type: '—', height: '—', levels: '—', address: '—' });
+        this.setSelectionState(false);
+    }
+
+    protected setSelectionState(selected: boolean): void {
+        const label = document.getElementById('info-selection');
+        const help = document.getElementById('info-help');
+        if (label) label.textContent = selected ? 'Selected building' : 'Awaiting selection';
+        if (help) help.textContent = selected
+            ? 'Double-click another building to compare its attributes.'
+            : 'Double-click a building on the map to see its details here.';
     }
 
     protected updatePanel(values: {
@@ -117,10 +128,23 @@ export class BuildingPickingVis {
     }
 }
 
-async function main() {
+async function main(): Promise<void> {
     const canvas = document.querySelector('canvas');
     if (!canvas) throw new Error('No canvas found');
-    const example = new BuildingPickingVis();
-    await example.run(canvas);
+    const status = document.querySelector<HTMLElement>('#map-status');
+    const stage = document.querySelector<HTMLElement>('.map-stage');
+    try {
+        if (status) status.textContent = 'Loading OpenStreetMap data…';
+        await new BuildingPickingVis().run(canvas);
+        if (status) status.textContent = 'Interactive map';
+    } catch (error) {
+        if (status) {
+            status.textContent = 'Unable to load map. Check the console for details.';
+            status.dataset.state = 'error';
+        }
+        console.error('Unable to initialize the building picking example:', error);
+    } finally {
+        stage?.setAttribute('aria-busy', 'false');
+    }
 }
 main();

@@ -49,7 +49,20 @@ async function main(): Promise<void> {
     const canvas = document.querySelector('canvas');
     if (!canvas) throw new Error('No canvas found');
 
-    await new ColormapCategoricalNumeric().run(canvas);
+    const status = document.querySelector<HTMLElement>('#map-status');
+    const stage = document.querySelector<HTMLElement>('.map-stage');
+    try {
+        await new ColormapCategoricalNumeric().run(canvas);
+        if (status) status.textContent = 'Interactive map';
+    } catch (error) {
+        if (status) {
+            status.textContent = 'Unable to load map. Check the console for details.';
+            status.dataset.state = 'error';
+        }
+        console.error('Unable to initialize the numeric categorical example:', error);
+    } finally {
+        stage?.setAttribute('aria-busy', 'false');
+    }
 }
 
 main();
