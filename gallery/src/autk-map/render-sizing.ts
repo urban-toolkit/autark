@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import type { FeatureCollection } from 'geojson';
 import { AutkMap, MapEvent, DEFAULT_POINT_SIZE, DEFAULT_LINE_WIDTH } from '@urban-toolkit/autk-map';
 
@@ -53,4 +54,4 @@ async function main(): Promise<void> {
     map.draw();
 }
 
-main().catch(console.error);
+void runExample(main);

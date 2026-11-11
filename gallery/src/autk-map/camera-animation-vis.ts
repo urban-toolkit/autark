@@ -363,7 +363,7 @@ async function main(): Promise<void> {
         if (status) status.textContent = 'Animation complete';
     } catch (error) {
         if (status) {
-            status.textContent = 'Unable to run example. Check the console for details.';
+            status.textContent = 'Unable to run example.';
             status.dataset.state = 'error';
         }
         console.error('Unable to initialize the camera animation example:', error);

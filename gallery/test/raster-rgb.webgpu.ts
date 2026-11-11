@@ -7,8 +7,10 @@ export async function runWebGpuCases() {
     const parsed = new DOMParser().parseFromString(html, 'text/html');
     parsed.querySelectorAll('script').forEach(script => script.remove());
     document.body.innerHTML = parsed.body.innerHTML;
+    document.body.className = parsed.body.className;
     const style = document.createElement('style');
-    style.textContent = await fetch('/gallery/src/autk-map/raster-rgb.css').then(response => response.text());
+    style.textContent = (await Promise.all(['/gallery/src/autk-map/raster-rgb.css', '/gallery/example.css']
+        .map(path => fetch(path).then(response => response.text())))).join('\n');
     document.head.append(style);
     await import('../src/autk-map/raster-rgb');
     const status = document.querySelector<HTMLElement>('#status')!;
@@ -21,6 +23,9 @@ export async function runWebGpuCases() {
     const click = (id: string) => document.querySelector<HTMLButtonElement>(`#${id}`)!.click();
     const legend = document.querySelector<HTMLElement>('#autkMapLegend')!;
     assert(status.textContent!.includes('300480, 700320'), 'Gallery raster-only origin');
+    assert(document.querySelector('#map-status')?.closest('.panel-header') != null, 'Loading status must be in the map header');
+    assert(document.querySelector('.map-stage')?.getAttribute('aria-busy') === 'false', 'Initialized map must be ready');
+    assert(document.querySelector('canvas')?.getAttribute('aria-describedby') === 'map-help', 'Map must reference its instruction bar');
     click('autkMapUi');
     assert(document.querySelectorAll('#layerListSection button:disabled').length === 1, 'RGB palette should be disabled');
     click('scalar');

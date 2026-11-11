@@ -3,19 +3,41 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Multiple spatial joins</title>
     <link rel="stylesheet" href="/src/autk-map/spatial-join-multi.css">
+    <link rel="stylesheet" href="../../example.css" />
 </head>
 
-<body>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Spatial joins</p>
+            <h1 id="example-title">Multiple spatial joins</h1>
+            <p class="description">Combine results from multiple spatial joins.</p>
+        </section>
     <div id="app">
-        <h2>spatial-join-multi.ts</h2>
-        <canvas> </canvas>
+
+        <section class="map-panel" aria-label="Multiple spatial joins map area">
+            <div class="panel-header"><h2>Multiple spatial joins</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Multiple spatial joins map"> </canvas></div>
+            <div class="panel-footer" id="map-help"><span>Choose complaint type · Scroll to zoom</span></div>
+        </section>
         <select style="margin: 10px;" id="select">
             <option value="noise">Noise Complaint</option>
             <option value="parking">Illegal Parking</option>
         </select>
     </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
 </body>
 <script type="module" src="/src/autk-map/spatial-join-multi.ts"></script>
 

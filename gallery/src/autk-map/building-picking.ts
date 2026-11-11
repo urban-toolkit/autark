@@ -139,7 +139,7 @@ async function main(): Promise<void> {
         if (status) status.textContent = 'Interactive map';
     } catch (error) {
         if (status) {
-            status.textContent = 'Unable to load map. Check the console for details.';
+            status.textContent = 'Unable to load map.';
             status.dataset.state = 'error';
         }
         console.error('Unable to initialize the building picking example:', error);

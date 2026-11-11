@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 
@@ -50,4 +51,4 @@ async function main() {
     const example = new GeotiffVisGeojson();
     await example.run();
 }
-main();
+void runExample(main);

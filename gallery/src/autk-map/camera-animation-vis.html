@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — Camera Animation</title>
+    <title>Autark — Camera animation</title>
     <link rel="stylesheet" href="./camera-animation-vis.css" />
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-<body>
+<body class="gallery-example">
     <a class="skip-link" href="#main">Skip to example</a>
     <header class="site-header">
         <nav class="navigation" aria-label="Main navigation">
@@ -14,7 +15,7 @@
             <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
         </nav>
     </header>
-    <main id="main">
+    <main id="main" class="example-main">
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Camera motion</p>
@@ -30,10 +31,7 @@
             <div class="map-stage" aria-busy="true">
                 <canvas aria-label="Animated map of Manhattan neighborhoods" aria-describedby="map-help"></canvas>
             </div>
-            <div class="panel-footer" id="map-help">
-                <span>The camera sequence starts automatically</span>
-                <span>Scroll to zoom after the animation</span>
-            </div>
+            <div class="panel-footer" id="map-help"><span>Auto animation · Scroll to zoom afterward</span></div>
         </section>
         <aside class="motion-note" aria-labelledby="motion-title">
             <div>

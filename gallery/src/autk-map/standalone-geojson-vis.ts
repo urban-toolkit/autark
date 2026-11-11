@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkMap } from '@urban-toolkit/autk-map';
 
 const URL = (import.meta as any).env.BASE_URL;
@@ -21,10 +22,9 @@ async function main() {
 
     const canvas = document.querySelector('canvas');
     if (!canvas) {
-        console.error('Canvas element not found');
-        return;
+        throw new Error('Canvas element not found');
     }
 
     await example.run(canvas);
 }
-main();
+void runExample(main);

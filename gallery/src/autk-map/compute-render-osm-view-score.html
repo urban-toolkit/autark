@@ -3,94 +3,54 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
-    <link rel="stylesheet" href="/src/autk-map/compute-render-osm-view-score.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — View score</title>
+    <link rel="stylesheet" href="../../example.css" />
 </head>
 
-<body>
-    <div id="app">
-        <h2>compute-render-osm-view-score.ts</h2>
-        <button id="plotToggle" title="Toggle info panel">Info</button>
-        <canvas> </canvas>
-        <div id="plot">
-            <div id="plotBar"></div>
-            <div id="plotBody">
-                <h3 id="info-title">Dataset Average</h3>
-                <div class="info-row"><span>Building id</span><strong id="info-building-id">—</strong></div>
-                <div class="info-row"><span>Estimated height</span><strong id="info-building-height">—</strong></div>
-                <div class="info-row"><span>Parks visibility</span><strong id="info-parks">0.0%</strong></div>
-                <div class="info-row"><span>Water visibility</span><strong id="info-water">0.0%</strong></div>
-                <div class="info-row"><span>Sky visibility</span><strong id="info-sky">0.0%</strong></div>
-                <div class="info-row"><span>View score</span><strong id="info-score">0.000</strong></div>
-                <p id="info-note">View score weights water at 0.25, parks at 0.25, and sky/open view at 0.5.</p>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Render analysis</p>
+            <h1 id="example-title">View score</h1>
+            <p class="description">Visualize view scores in an urban scene.</p>
+        </section>
+    <div id="app" class="example-workspace">
+        <section class="map-panel" aria-label="View score map area">
+            <div class="panel-header"><h2>View score</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="View score map"> </canvas></div>
+            <div class="panel-footer" id="map-help"><span>Double-click to inspect · Scroll to zoom</span></div>
+        </section>
+        <aside id="plot" class="details-panel" aria-labelledby="plot-title">
+            <div class="panel-header"><h2 id="plot-title">View score details</h2></div>
+            <div id="plotBody" class="details-body">
+                <p class="selection-label">View analysis</p>
+                <h3 id="info-title">Dataset average</h3>
+                <p class="selection-help">Double-click a building to inspect its visibility metrics.</p>
+                <dl class="metric-list">
+                    <div><dt>Building ID</dt><dd id="info-building-id">—</dd></div>
+                    <div><dt>Estimated height</dt><dd id="info-building-height">—</dd></div>
+                    <div><dt>Parks visibility</dt><dd id="info-parks">0.0%</dd></div>
+                    <div><dt>Water visibility</dt><dd id="info-water">0.0%</dd></div>
+                    <div><dt>Sky visibility</dt><dd id="info-sky">0.0%</dd></div>
+                </dl>
+                <div class="metric-score"><span>View score</span><strong id="info-score">0.000</strong></div>
+                <p id="info-note" class="selection-help">Water and parks each contribute 25%; sky and open views contribute 50%.</p>
             </div>
-        </div>
+            <p class="data-note">Water 25% · Parks 25% · Sky 50%</p>
+        </aside>
     </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
 </body>
 <script type="module" src="/src/autk-map/compute-render-osm-view-score.ts"></script>
-<script>
-    function floatingPlot() {
-        let startX = 0,
-            startY = 0,
-            dragging = false;
-
-        const plot = document.querySelector('#plot');
-        const bar = document.querySelector('#plotBar');
-        const toggle = document.querySelector('#plotToggle');
-
-        if (!plot || !bar || !toggle) return;
-
-        plot.style.visibility = 'visible';
-        bar.style.touchAction = 'none';
-
-        toggle.addEventListener('click', () => {
-            plot.classList.toggle('hidden-plot');
-        });
-
-        bar.addEventListener('pointerdown', pointerDown);
-        bar.addEventListener('pointermove', pointerMove);
-        bar.addEventListener('pointerup', pointerUp);
-        bar.addEventListener('pointercancel', pointerUp);
-
-        function pointerDown(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-
-            dragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            bar.setPointerCapture(e.pointerId);
-        }
-
-        function pointerMove(e) {
-            if (!dragging) return;
-
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            startX = e.clientX;
-            startY = e.clientY;
-
-            plot.style.top = `${plot.offsetTop + dy}px`;
-            plot.style.left = `${plot.offsetLeft + dx}px`;
-
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-        }
-
-        function pointerUp(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-
-            dragging = false;
-            if (bar.hasPointerCapture(e.pointerId)) {
-                bar.releasePointerCapture(e.pointerId);
-            }
-        }
-    }
-    floatingPlot();
-</script>
 
 </html>

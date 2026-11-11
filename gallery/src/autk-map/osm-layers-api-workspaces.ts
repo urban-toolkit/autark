@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkDb } from '@urban-toolkit/autk-db';
 
@@ -70,4 +71,4 @@ async function main() {
     const example = new OsmLayersApi();
     await example.run(canvas01, canvas02);
 }
-main();
+void runExample(main);

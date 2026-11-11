@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import type { FeatureCollection, Geometry } from 'geojson';
 import { AutkMap, type RasterRgbBands } from '@urban-toolkit/autk-map';
 
@@ -80,4 +81,4 @@ async function main(): Promise<void> {
     describe('RGB bytes');
 }
 
-main().catch(error => { document.querySelector<HTMLElement>('#status')!.textContent = String(error); console.error(error); });
+void runExample(main);

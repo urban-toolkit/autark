@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
@@ -56,7 +57,7 @@ export class MapD3Timeseries {
                 options: { timestamp: 'timestamp', value: 'value', reducer: 'avg' },
             },
             margins: { left: 60, right: 20, top: 50, bottom: 140 },
-            width: 790,
+            width: Math.max(280, this.plotDiv.clientWidth - 40),
             events: [PlotEvent.CLICK],
         });
 
@@ -81,11 +82,10 @@ async function main() {
     const plotBdy = document.querySelector('#plotBody') as HTMLElement;
 
     if (!canvas || !plotBdy) {
-        console.error('Canvas or plot body element not found');
-        return;
+        throw new Error('Canvas or plot body element not found');
     }
 
     await example.run(canvas, plotBdy);
 }
 
-void main();
+void runExample(main);

@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 
@@ -67,4 +68,4 @@ async function main() {
     const example = new ComputeOsm();
     await example.run(canvas);
 }
-main();
+void runExample(main);

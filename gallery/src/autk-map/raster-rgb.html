@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RGB raster and scalar transitions — Autark Gallery</title>
+    <title>Autark — RGB raster and scalar transitions</title>
     <link rel="stylesheet" href="./raster-rgb.css" />
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-<body>
-    <main>
-        <a href="../../index.html">← Gallery</a>
-        <h1>RGB raster and scalar transitions</h1>
-        <p>A local, geometry-less raster with red, green, blue, and white quadrants and a transparent center.
-            Try the same image in different ranges, switch to a scalar ramp, and test rejected updates.</p>
+<body class="gallery-example">
+        <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Raster imagery</p>
+            <h1 id="example-title">RGB raster and scalar transitions</h1>
+            <p class="description">Validate RGB ranges, no-data, scalar legends, and rejected updates with local imagery.</p>
+        </section>
         <div class="controls" aria-label="Raster controls">
             <button id="rgb">RGB bytes</button>
             <button id="reflectance">Reflectance + masked outlier</button>
@@ -22,11 +32,17 @@
             <button id="fit">Fit / reset</button>
             <label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="1" /></label>
         </div>
-        <p id="status" role="status" aria-live="polite">Loading…</p>
-        <div class="map"><canvas aria-label="Raster validation map"></canvas></div>
-        <p>RGB modes should show the same colors and no scalar legend. Scalar mode should show a ramp and legend.
+
+        <div class="map"><section class="map-panel" aria-label="RGB raster and scalar transitions map area">
+            <div class="panel-header"><h2>Raster preview</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Raster validation map"></canvas></div>
+            <div class="panel-footer" id="map-help"><span>Switch modes above · R to reset · Scroll to zoom</span></div>
+        </section></div>
+        <p id="status" class="selection-help" role="status" aria-live="polite">Mode details appear here.</p>
+        <p class="example-note">RGB modes should show the same colors and no scalar legend. Scalar mode should show a ramp and legend.
             Invalid updates should preserve the current picture and show one warning in the console.
             Pan or zoom, resize the window, then press <kbd>r</kbd> or Fit / reset to frame the complete raster.</p>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
     </main>
     <script type="module" src="./raster-rgb.ts"></script>
 </body>

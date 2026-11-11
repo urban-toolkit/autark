@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — Numeric Categorical Colors</title>
+    <title>Autark — Numeric categorical colors</title>
     <link rel="stylesheet" href="./colormap-categorical-numeric.css">
+    <link rel="stylesheet" href="../../example.css" />
 </head>
 
-<body>
+<body class="gallery-example">
     <a class="skip-link" href="#main">Skip to example</a>
     <header class="site-header">
         <nav class="navigation" aria-label="Main navigation">
@@ -16,7 +17,7 @@
             <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
         </nav>
     </header>
-    <main id="main">
+    <main id="main" class="example-main">
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Color maps</p>
@@ -32,10 +33,7 @@
             <div class="map-stage" aria-busy="true">
                 <canvas aria-label="Interactive road map colored by numeric road category" aria-describedby="map-help"></canvas>
             </div>
-            <div class="panel-footer" id="map-help">
-                <span>Scroll to zoom</span>
-                <span>Open the layer menu to explore</span>
-            </div>
+            <div class="panel-footer" id="map-help"><span>Scroll to zoom · Menu for layers</span></div>
         </section>
         <aside class="reading-note" aria-labelledby="reading-title">
             <h2 id="reading-title">What to look for</h2>
