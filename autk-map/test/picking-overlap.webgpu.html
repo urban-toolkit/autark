@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Picking overlap WebGPU regression</title></head>
+<body>
+<pre id="result">Running picking overlap regression…</pre>
+<script type="module">
+// Serve the repository root on localhost and open this page in a WebGPU-enabled browser.
+// This exercises the production fragment shader; CPU tests cover the pipeline's skip-to-zero ID encoding.
+window.pickingOverlapResult = (async () => {
+    const adapter = await navigator.gpu?.requestAdapter();
+    if (!adapter) throw new Error('A WebGPU adapter is required');
+    const device = await adapter.requestDevice();
+    const resources = [];
+    try {
+        device.pushErrorScope('validation');
+        const response = await fetch('../src/shaders/picking.frag.wgsl', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Unable to load picking shader: ${response.status}`);
+        const fragment = device.createShaderModule({ code: await response.text() });
+        const vertex = device.createShaderModule({ code: `
+            struct Output {
+                @builtin(position) position: vec4f,
+                @location(0) color: vec3f,
+            };
+            @vertex fn main(@location(0) position: vec3f, @location(1) color: vec3f) -> Output {
+                var output: Output;
+                output.position = vec4f(position, 1.0);
+                output.color = color;
+                return output;
+            }` });
+        const pipeline = device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module: vertex, entryPoint: 'main', buffers: [{ arrayStride: 24, attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x3' },
+                { shaderLocation: 1, offset: 12, format: 'float32x3' },
+            ] }] },
+            fragment: { module: fragment, entryPoint: 'main', targets: [{ format: 'rgba8unorm' }] },
+            primitive: { topology: 'triangle-list', cullMode: 'none' },
+            // Match the production picking pipeline's reversed depth test.
+            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' },
+        });
+        const color = device.createTexture({ size: [64, 64], format: 'rgba8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+        const depth = device.createTexture({ size: [64, 64], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+        const vertices = device.createBuffer({ size: 6 * 24, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+        const readback = device.createBuffer({ size: 64 * 256, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        resources.push(color, depth, vertices, readback);
+
+        async function pick(frontDepth, frontHidden, rearHidden, frontFirst) {
+            const data = [];
+            for (const [z, id] of [[0.4, rearHidden ? 0 : 1], [frontDepth, frontHidden ? 0 : 2]]) {
+                for (const [x, y] of [[-0.8, -0.8], [0.8, -0.8], [0, 0.8]]) {
+                    data.push(x, y, z, id / 255, 0, 0);
+                }
+            }
+            device.queue.writeBuffer(vertices, 0, new Float32Array(data));
+            const encoder = device.createCommandEncoder();
+            const pass = encoder.beginRenderPass({
+                colorAttachments: [{ view: color.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+                depthStencilAttachment: { view: depth.createView(), depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: 0 },
+            });
+            pass.setPipeline(pipeline);
+            pass.setVertexBuffer(0, vertices);
+            for (const firstVertex of frontFirst ? [3, 0] : [0, 3]) pass.draw(3, 1, firstVertex);
+            pass.end();
+            encoder.copyTextureToBuffer({ texture: color }, { buffer: readback, bytesPerRow: 256 }, [64, 64]);
+            device.queue.submit([encoder.finish()]);
+            await readback.mapAsync(GPUMapMode.READ);
+            const id = new Uint8Array(readback.getMappedRange())[(32 * 64 + 32) * 4];
+            readback.unmap();
+            return id;
+        }
+
+        const checks = [];
+        for (const [name, z, frontFirst] of [
+            ['2D overlap', 0.4, false],
+            ['3D front drawn last', 0.8, false],
+            ['3D front drawn first', 0.8, true],
+        ]) {
+            for (const [state, frontHidden, rearHidden, expected] of [
+                ['visible', false, false, 2],
+                ['front hidden', true, false, 1],
+                ['all hidden', true, true, 0],
+                ['restored', false, false, 2],
+            ]) {
+                const actual = await pick(z, frontHidden, rearHidden, frontFirst);
+                if (actual !== expected) throw new Error(`${name}, ${state}: expected ID ${expected}, got ${actual}`);
+                checks.push(`${name}: ${state}`);
+            }
+        }
+        const error = await device.popErrorScope();
+        if (error) throw new Error(error.message);
+        return { status: 'passed', checks };
+    } finally {
+        for (const resource of resources) resource.destroy();
+        device.destroy();
+    }
+})();
+window.pickingOverlapResult.then(result => {
+    document.querySelector('#result').textContent = JSON.stringify(result, null, 2);
+}, error => {
+    document.querySelector('#result').textContent = `FAILED: ${error.stack}`;
+});
+</script>
+</body>
+</html>
