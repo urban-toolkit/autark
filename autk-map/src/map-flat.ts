@@ -96,7 +96,9 @@ export class FlatMapRenderPath {
         const halfFovTangent = Math.tan(this.camera.getFovyRadians() * 0.5);
         const distance = Math.max(height / (2 * halfFovTangent), width / (2 * halfFovTangent * aspect)) * FIT_MARGIN;
 
-        this.camera.resetCamera([0, 1, 0], [centerX, centerY, 0], [centerX, centerY, distance]);
+        // Keep the fitted ground inside the clipping range, with 10% depth margin for large or narrow-view fits.
+        const far = Math.max(500_000, distance * 1.1);
+        this.camera.resetCamera([0, 1, 0], [centerX, centerY, 0], [centerX, centerY, distance], far);
         this.camera.resize(this.renderer.pixelWidth, this.renderer.pixelHeight);
     }
 

@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AutkMap } from '../src/map';
 import { LayerManager } from '../src/layer-manager';
 import { FlatMapRenderPath } from '../src/map-flat';
+import { MapCamera } from '../src/map-camera';
+import { vec4 } from 'gl-matrix';
 
 /** A flat render path over a fake camera that records where it is put, on a canvas `width` x `height` pixels. */
 function flatPath(width: number, height: number, fovy = Math.PI / 2) {
@@ -85,6 +87,60 @@ describe('FlatMapRenderPath.resetCamera', () => {
         renderer.pixelWidth = 1600;                                    // the window was made wider
         path.resetCamera();
         expect(camera.resetCamera.mock.calls[1][2][2]).toBeCloseTo(square / 2, 6);
+    });
+});
+
+describe('fitted ground clipping with the real map camera', () => {
+    function realPath(width: number, height: number) {
+        const camera = new MapCamera(vi.fn());
+        const renderer = { pixelWidth: width, pixelHeight: height };
+        const path = new FlatMapRenderPath(renderer as never, camera, {} as never, {} as never);
+        return { camera, renderer, path };
+    }
+
+    function expectVisible(camera: MapCamera, bounds: [number, number, number, number]) {
+        for (const x of [bounds[0], bounds[2]]) {
+            for (const y of [bounds[1], bounds[3]]) {
+                const clip = vec4.transformMat4(vec4.create(), [x, y, 0, 1], camera.getViewProjectionMatrix());
+                expect(clip[3]).toBeGreaterThan(0);
+                expect(Math.abs(clip[0] / clip[3])).toBeLessThanOrEqual(1);
+                expect(Math.abs(clip[1] / clip[3])).toBeLessThanOrEqual(1);
+                expect(clip[2] / clip[3]).toBeGreaterThan(0);
+                expect(clip[2] / clip[3]).toBeLessThan(1);
+            }
+        }
+    }
+
+    it.each([
+        { width: 800, height: 800, bounds: [-200000, -200000, 200000, 200000] },
+        { width: 100, height: 800, bounds: [-50000, -500, 50000, 500] },
+    ])('keeps ground visible for bounds $bounds on a $width by $height canvas', ({ width, height, bounds }) => {
+        const { camera, path } = realPath(width, height);
+        path.fitBounds(bounds as [number, number, number, number]);
+        expect(camera.getFar()).toBeGreaterThan(500_000);
+        expect(camera.getFar()).toBeCloseTo(camera.getEye()[2] * 1.1, 0);
+        expectVisible(camera, bounds as [number, number, number, number]);
+    });
+
+    it('recalculates the clipping range when a fitted view is reset after narrowing the canvas', () => {
+        const { camera, renderer, path } = realPath(800, 800);
+        const bounds: [number, number, number, number] = [-50000, -500, 50000, 500];
+        path.fitBounds(bounds);
+        expect(camera.getFar()).toBe(500_000);
+        renderer.pixelWidth = 100;
+        path.resetCamera();
+        expect(camera.getFar()).toBeGreaterThan(500_000);
+        expectVisible(camera, bounds);
+    });
+
+    it('restores the default far plane for smaller fits and ordinary camera resets', () => {
+        const { camera, path } = realPath(800, 800);
+        path.fitBounds([-200000, -200000, 200000, 200000]);
+        path.fitBounds([-500, -500, 500, 500]);
+        expect(camera.getFar()).toBe(500_000);
+        expectVisible(camera, [-500, -500, 500, 500]);
+        camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 10000]);
+        expect(camera.getFar()).toBe(500_000);
     });
 });
 

@@ -172,6 +172,14 @@ export async function runWebGpuCases() {
         overlay.setOrthographicBounds(-6, 6, -6, 6);
         near(rgba(await pixels([layer('lower'), layer('upper')], undefined, [], overlay), 64, 64), [0, 0, 255, 255], 'Terrain overlay order');
         checks.push('terrain overlay plane and ordering');
+
+        map.loadCollection('regional', { collection: square(200000), type: 'polygons' });
+        map.updateRenderInfo('regional', { showBorders: false });
+        map.fitBounds([-200000, -200000, 200000, 200000]);
+        const regional = await pixels([layer('regional')], layer('regional'), [], map.camera);
+        assert(regional[(64 * 128 + 64) * 4] === 1 && regional[(12 * 128 + 12) * 4] === 1,
+            'Large fitted ground is beyond the far clipping plane');
+        checks.push('large-area fitting expands the far clipping plane');
         const validation = await device.popErrorScope();
         if (validation) errors.push(validation.message);
         await device.queue.onSubmittedWorkDone();
