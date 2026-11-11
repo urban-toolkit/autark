@@ -1,0 +1,6 @@
+@import './colormap-categorical.css';
+
+.description {
+    margin: 0 20px 10px;
+    line-height: 1.5;
+}

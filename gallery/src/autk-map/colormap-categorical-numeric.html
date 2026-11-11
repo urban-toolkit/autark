@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autark — Numeric Categorical Colors</title>
+    <link rel="stylesheet" href="/src/autk-map/colormap-categorical-numeric.css">
+</head>
+
+<body>
+    <div id="app">
+        <h2>Numeric Categorical Colors</h2>
+        <p class="description">
+            Road classes use numeric categories in the explicit order <strong>3, 1, 2</strong>.
+            Primary roads (3) should match the first legend swatch, secondary roads (1) the second,
+            and other roads (2) the third. Each category should have a distinct color.
+        </p>
+        <canvas aria-label="Road map colored by numeric road category"></canvas>
+    </div>
+    <script type="module" src="/src/autk-map/colormap-categorical-numeric.ts"></script>
+</body>
+
+</html>
