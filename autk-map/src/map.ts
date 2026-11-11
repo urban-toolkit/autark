@@ -1140,7 +1140,11 @@ export class AutkMap {
 
         const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Polygon Layer');
+            console.error(
+                `Layer "${layerName}" was not created: its ${geojson.features.length} feature(s) gave an empty ${typeLayer} mesh. ` +
+                'Check that the collection has features with polygon or line geometry. A table loaded after the first one ' +
+                "can also be clipped to nothing by the workspace extent, which the first geometry table sets (see AutkDb)."
+            );
             return;
         }
 
@@ -1148,7 +1152,7 @@ export class AutkMap {
         if (typeLayer === 'polygons') {
             layerBorder = TriangulatorPolygons.buildBorder(geojson, this.layerManager.origin);
             if (!layerBorder[0] || !layerBorder[1] || layerBorder[0].length === 0 || layerBorder[1].length === 0) {
-                console.error('Invalid Polygon Layer border.');
+                console.error(`Layer "${layerName}" was not created: its ${geojson.features.length} feature(s) gave an empty border mesh.`);
                 return;
             }
         } else {

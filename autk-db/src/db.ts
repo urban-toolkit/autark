@@ -1101,6 +1101,7 @@ export class AutkDb {
         const table = workspaceData.tables.find((item) => item.name === tableName);
         if (!table || !this.tableHasGeometry(table) || !workspaceData.workspaceBoundingBox) return;
 
+        const rowsBefore = await this.countRows(tableName);
         if (transactional) await this.conn!.query('BEGIN TRANSACTION');
         try {
             await this.clipLayerToBoundingBox(
@@ -1122,6 +1123,22 @@ export class AutkDb {
             if (transactional) await this.conn!.query('ROLLBACK');
             throw error;
         }
+
+        // Clipping is expected (an OSM load is cut to the workspace on purpose), so only a table that ends up with
+        // nothing is reported: that is almost never intended, and nothing else says why a layer later draws empty.
+        if (rowsBefore > 0 && (await this.countRows(tableName)) === 0) {
+            console.warn(
+                `Table "${tableName}" is empty after being clipped to the workspace extent (it had ${rowsBefore} row(s)). ` +
+                'The first geometry table loaded into a workspace sets the extent, and every later table is cut to it, ' +
+                'so load a table that covers the others first, or put the tables in separate workspaces.'
+            );
+        }
+    }
+
+    /** Number of rows of a table of the current workspace. */
+    private async countRows(tableName: string): Promise<number> {
+        const result = await this.conn!.query(`SELECT COUNT(*) AS n FROM ${this.currentWorkspace}.${tableName}`);
+        return Number(result.toArray()[0].n);
     }
 
     /**
