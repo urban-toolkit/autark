@@ -519,9 +519,10 @@ describe('on-demand rendering', () => {
 
 describe('render statistics', () => {
     it('counts the frames that are rendered, measures their CPU time, and stops counting when the map is idle', async () => {
-        const { map } = await idleOnDemandMap();
+        // The fake clock is installed before the setup frames render, so every timestamp shares one clock.
         vi.spyOn(performance, 'now').mockImplementation(() => frames.now);
-        flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame costs 3 ms of CPU
+        const { map } = await idleOnDemandMap();
+        flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame now costs 3 ms of CPU; setup frames cost 0
 
         const first = map.renderStats.frameCount;
         frames.run(10); // idle: nothing asks for a frame
@@ -534,8 +535,8 @@ describe('render statistics', () => {
         const busy = map.renderStats;
         expect(busy.frameCount).toBe(first + 4);
         expect(busy.lastFrameCpuMs).toBeCloseTo(3, 6);
-        expect(busy.averageFrameCpuMs).toBeGreaterThan(0); // the average also holds the cheaper setup frames
-        expect(busy.averageFrameCpuMs).toBeLessThanOrEqual(3);
+        expect(busy.averageFrameCpuMs).toBeGreaterThan(0); // the average also holds the free setup frames
+        expect(busy.averageFrameCpuMs).toBeLessThan(3);
         expect(busy.framesPerSecond).toBeGreaterThan(0);
 
         frames.run(100); // two seconds of nothing
