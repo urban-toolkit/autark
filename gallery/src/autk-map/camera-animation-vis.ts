@@ -1,4 +1,3 @@
-// Common interface for all examples
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { CameraMotion, ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
@@ -327,7 +326,7 @@ interface ExampleRunner {
     run(canvas: HTMLCanvasElement): Promise<void>;
 }
 
-async function main() {
+async function main(): Promise<void> {
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         throw new Error('No canvas found');
@@ -357,6 +356,19 @@ async function main() {
             break;
     }
 
-    await example.run(canvas);
+    const status = document.querySelector<HTMLElement>('#map-status');
+    const stage = document.querySelector<HTMLElement>('.map-stage');
+    try {
+        await example.run(canvas);
+        if (status) status.textContent = 'Animation complete';
+    } catch (error) {
+        if (status) {
+            status.textContent = 'Unable to run example. Check the console for details.';
+            status.dataset.state = 'error';
+        }
+        console.error('Unable to initialize the camera animation example:', error);
+    } finally {
+        stage?.setAttribute('aria-busy', 'false');
+    }
 }
 main();

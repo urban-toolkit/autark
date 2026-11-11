@@ -1,148 +1,412 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Autark Gallery</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 2rem;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: #1f2937;
-            background: #f8fafc;
-        }
-
-        main {
-            max-width: 960px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            margin: 0 0 0.5rem;
-        }
-
-        p {
-            margin: 0 0 2rem;
-            color: #64748b;
-        }
-
-        section {
-            margin-bottom: 2rem;
-            padding: 1.25rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: white;
-        }
-
-        h2 {
-            margin: 0 0 1rem;
-            font-size: 1.25rem;
-        }
-
-        ul {
-            margin: 0;
-            padding-left: 1.25rem;
-            columns: 2;
-            column-gap: 2rem;
-        }
-
-        li {
-            break-inside: avoid;
-            margin-bottom: 0.5rem;
-        }
-
-        a {
-            color: #2563eb;
-            text-decoration: none;
-        }
-
-        a:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 720px) {
-            body {
-                padding: 1rem;
-            }
-
-            ul {
-                columns: 1;
-            }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Explore Autark examples for interactive maps, spatial analysis, and linked charts in the browser." />
+    <title>Gallery — Autark</title>
+    <link rel="stylesheet" href="./index.css" />
 </head>
-
 <body>
-    <main>
-        <h1>Autark Gallery</h1>
-        <section>
-            <h2>autk-map</h2>
-            <ul>
-                <li><a href="/src/autk-map/building-picking.html">building-picking</a></li>
-                <li><a href="/src/autk-map/camera-animation-vis.html">camera-animation-vis</a></li>
-                <li><a href="/src/autk-map/colormap-categorical.html">colormap-categorical</a></li>
-                <li><a href="/src/autk-map/colormap-diverging.html">colormap-diverging</a></li>
-                <li><a href="/src/autk-map/compute-function.html">compute-function</a></li>
-                <li><a href="/src/autk-map/compute-osm-function.html">compute-osm-function</a></li>
-                <li><a href="/src/autk-map/compute-render-osm-sky-exposure.html">compute-render-osm-sky-exposure</a></li>
-                <li><a href="/src/autk-map/compute-render-osm-view-score.html">compute-render-osm-view-score</a></li>
-                <li><a href="/src/autk-map/compute-render-osm-visibility.html">compute-render-osm-visibility</a></li>
-                <li><a href="/src/autk-map/csv-wkt-vis.html">csv-wkt-vis</a></li>
-                <li><a href="/src/autk-map/geojson-boundaries-vis.html">geojson-boundaries-vis</a></li>
-                <li><a href="/src/autk-map/geojson-lines-vis.html">geojson-lines-vis</a></li>
-                <li><a href="/src/autk-map/geojson-vis.html">geojson-vis</a></li>
-                <li><a href="/src/autk-map/geotiff-vis.html">geotiff-vis</a></li>
-                <li><a href="/src/autk-map/geotiff-vis-geojson.html">geotiff-vis-geojson</a></li>
-                <li><a href="/src/autk-map/heatmap-vis.html">heatmap-vis</a></li>
-                <li><a href="/src/autk-map/heatmap-vis-geojson.html">heatmap-vis-geojson</a></li>
-                <li><a href="/src/autk-map/json-wkt-vis.html">json-wkt-vis</a></li>
-                <li><a href="/src/autk-map/layer-opacity.html">layer-opacity</a></li>
-                <li><a href="/src/autk-map/osm-layers-api.html">osm-layers-api</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-bbox.html">osm-layers-api-bbox</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-chicago.html">osm-layers-api-chicago</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-manhattan-parks.html">osm-layers-api-manhattan-parks</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-manhattan-s+p.html">osm-layers-api-manhattan-s+p</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-manhattan-s+w.html">osm-layers-api-manhattan-s+w</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-manhattan-surface.html">osm-layers-api-manhattan-surface</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-manhattan-w+p.html">osm-layers-api-manhattan-w+p</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-manhattan-water.html">osm-layers-api-manhattan-water</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-multi.html">osm-layers-api-multi</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-niteroi.html">osm-layers-api-niteroi</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-paris.html">osm-layers-api-paris</a></li>
-                <li><a href="/src/autk-map/osm-layers-api-workspaces.html">osm-layers-api-workspaces</a></li>
-                <li><a href="/src/autk-map/osm-layers-pbf.html">osm-layers-pbf</a></li>
-                <li><a href="/src/autk-map/osm-layers-pbf-bbox.html">osm-layers-pbf-bbox</a></li>
-                <li><a href="/src/autk-map/osm-tag-sets.html">osm-tag-sets</a></li>
-                <li><a href="/src/autk-map/map-poster.html">map-poster</a></li>
-                <li><a href="/src/autk-map/spatial-join.html">spatial-join</a></li>
-                <li><a href="/src/autk-map/spatial-join-buildings.html">spatial-join-buildings</a></li>
-                <li><a href="/src/autk-map/spatial-join-multi.html">spatial-join-multi</a></li>
-                <li><a href="/src/autk-map/spatial-join-near.html">spatial-join-near</a></li>
-                <li><a href="/src/autk-map/standalone-geojson-vis.html">standalone-geojson-vis</a></li>
-                <li><a href="/src/autk-map/standalone-points-geojson-vis.html">standalone-points-geojson-vis</a></li>
-                <li><a href="/src/autk-map/terrain-layers-niteroi.html">terrain-layers-niteroi</a></li>
+    <a class="skip-link" href="#main">Skip to examples</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="./index.html">Autark<span>Gallery</span></a>
+            <div class="nav-links">
+                <a href="https://autarkjs.org/introduction.html">Guide <span aria-hidden="true">↗</span></a>
+                <a href="https://github.com/urban-toolkit/autark">GitHub <span aria-hidden="true">↗</span></a>
+            </div>
+        </nav>
+    </header>
+    <main id="main">
+        <header class="introduction">
+            <p class="eyebrow">THE AUTARK GALLERY</p>
+            <h1>Explore what you can build.</h1>
+            <p class="description">Interactive maps, spatial analysis, and linked charts.<br class="desktop-break" />
+                Small, focused examples that run entirely in your browser.</p>
+        </header>
+        <div class="browse-tools" hidden>
+            <div class="filters" role="group" aria-label="Filter by module">
+                <button type="button" data-filter="all" aria-pressed="true">All examples</button>
+                <button type="button" data-filter="autk-map" aria-pressed="false">Maps</button>
+                <button type="button" data-filter="autk-plot" aria-pressed="false">Charts</button>
+            </div>
+            <div class="search-field">
+                <label for="example-search">Search examples</label>
+                <input id="example-search" type="search" placeholder="Search examples…" autocomplete="off" />
+            </div>
+        </div>
+        <p id="result-count" class="result-count" role="status">56 examples to explore</p>
+        <section class="example-group" data-module="autk-map" aria-labelledby="autk-map-title">
+            <div class="section-header">
+                <div>
+                    <p class="module-label">autk-map</p>
+                    <h2 id="autk-map-title">Maps &amp; spatial analysis <span class="group-count">45</span></h2>
+                    <p class="section-description">Load, compute, and visualize urban data with WebGPU.</p>
+                </div>
+                <a class="reference-link" href="https://autarkjs.org/autk-map/">Module guide <span aria-hidden="true">↗</span></a>
+            </div>
+            <ul class="example-grid">
+                <li class="example-card" data-keywords="building-picking">
+                    <a href="./src/autk-map/building-picking.html">
+                        <h3>Building picking <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select individual buildings in a 3D scene.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="building-hiding">
+                    <a href="./src/autk-map/building-hiding.html">
+                        <h3>Hide selected buildings <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Hide picked buildings, select what is behind them, and restore the scene.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="camera-animation-vis">
+                    <a href="./src/autk-map/camera-animation-vis.html">
+                        <h3>Camera animation <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Move between views in an urban visualization.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="colormap-categorical">
+                    <a href="./src/autk-map/colormap-categorical.html">
+                        <h3>Categorical colors <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Assign distinct colors to road classes.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="colormap-categorical-numeric">
+                    <a href="./src/autk-map/colormap-categorical-numeric.html">
+                        <h3>Numeric categorical colors <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Use numeric labels as ordered color categories.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="colormap-diverging">
+                    <a href="./src/autk-map/colormap-diverging.html">
+                        <h3>Diverging colors <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore neighborhood areas with a diverging color scale.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="compute-function">
+                    <a href="./src/autk-map/compute-function.html">
+                        <h3>Compute functions <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Compute feature properties and visualize the results.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="compute-osm-function">
+                    <a href="./src/autk-map/compute-osm-function.html">
+                        <h3>Compute with OpenStreetMap <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Apply computation to OpenStreetMap features.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="compute-render-osm-sky-exposure">
+                    <a href="./src/autk-map/compute-render-osm-sky-exposure.html">
+                        <h3>Sky exposure <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore sky exposure across an urban scene.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="compute-render-osm-view-score">
+                    <a href="./src/autk-map/compute-render-osm-view-score.html">
+                        <h3>View score <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Visualize view scores in an urban scene.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="compute-render-osm-visibility">
+                    <a href="./src/autk-map/compute-render-osm-visibility.html">
+                        <h3>Visibility analysis <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore visibility across building features.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="csv-wkt-vis">
+                    <a href="./src/autk-map/csv-wkt-vis.html">
+                        <h3>CSV geometries <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Render geometry stored as WKT in a CSV file.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="geojson-boundaries-vis">
+                    <a href="./src/autk-map/geojson-boundaries-vis.html">
+                        <h3>GeoJSON boundaries <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Draw polygon boundaries from GeoJSON.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="geojson-lines-vis">
+                    <a href="./src/autk-map/geojson-lines-vis.html">
+                        <h3>GeoJSON lines <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Display line features on a map.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="geojson-vis">
+                    <a href="./src/autk-map/geojson-vis.html">
+                        <h3>GeoJSON polygons <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Load and render polygon features.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="geotiff-vis">
+                    <a href="./src/autk-map/geotiff-vis.html">
+                        <h3>GeoTIFF raster <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Display a geospatial raster on the map.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="geotiff-vis-geojson">
+                    <a href="./src/autk-map/geotiff-vis-geojson.html">
+                        <h3>Raster and vector layers <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Combine GeoTIFF imagery with GeoJSON features.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="heatmap-vis">
+                    <a href="./src/autk-map/heatmap-vis.html">
+                        <h3>Heatmap <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore spatial patterns with a heatmap.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="heatmap-vis-geojson">
+                    <a href="./src/autk-map/heatmap-vis-geojson.html">
+                        <h3>Heatmap and GeoJSON <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Combine a heatmap with vector geometry.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="json-wkt-vis">
+                    <a href="./src/autk-map/json-wkt-vis.html">
+                        <h3>JSON geometries <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Render geometry stored as WKT in JSON.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="layer-opacity">
+                    <a href="./src/autk-map/layer-opacity.html">
+                        <h3>Layer opacity <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore transparency across map layers.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api">
+                    <a href="./src/autk-map/osm-layers-api.html">
+                        <h3>OpenStreetMap layers <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Load urban layers through the OpenStreetMap API.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-bbox">
+                    <a href="./src/autk-map/osm-layers-api-bbox.html">
+                        <h3>OpenStreetMap by bounding box <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Load features within a geographic extent.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-chicago">
+                    <a href="./src/autk-map/osm-layers-api-chicago.html">
+                        <h3>Chicago <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore OpenStreetMap layers in Chicago.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-manhattan-parks">
+                    <a href="./src/autk-map/osm-layers-api-manhattan-parks.html">
+                        <h3>Manhattan parks <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore park geometry from OpenStreetMap.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-manhattan-s+p">
+                    <a href="./src/autk-map/osm-layers-api-manhattan-s+p.html">
+                        <h3>Manhattan surface and parks <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Combine surface and park layers.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-manhattan-s+w">
+                    <a href="./src/autk-map/osm-layers-api-manhattan-s+w.html">
+                        <h3>Manhattan surface and water <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Combine surface and water layers.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-manhattan-surface">
+                    <a href="./src/autk-map/osm-layers-api-manhattan-surface.html">
+                        <h3>Manhattan surface <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore surface geometry from OpenStreetMap.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-manhattan-w+p">
+                    <a href="./src/autk-map/osm-layers-api-manhattan-w+p.html">
+                        <h3>Manhattan water and parks <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Combine water and park layers.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-manhattan-water">
+                    <a href="./src/autk-map/osm-layers-api-manhattan-water.html">
+                        <h3>Manhattan water <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore water geometry from OpenStreetMap.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-multi">
+                    <a href="./src/autk-map/osm-layers-api-multi.html">
+                        <h3>Multiple OpenStreetMap areas <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Work with layers across multiple areas.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-niteroi">
+                    <a href="./src/autk-map/osm-layers-api-niteroi.html">
+                        <h3>Niterói <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore OpenStreetMap layers in Niterói.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-paris">
+                    <a href="./src/autk-map/osm-layers-api-paris.html">
+                        <h3>Paris <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore OpenStreetMap layers in Paris.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-api-workspaces">
+                    <a href="./src/autk-map/osm-layers-api-workspaces.html">
+                        <h3>OpenStreetMap workspaces <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Organize OpenStreetMap layers into workspaces.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-pbf">
+                    <a href="./src/autk-map/osm-layers-pbf.html">
+                        <h3>OpenStreetMap from PBF <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Load urban layers from a local PBF dataset.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-layers-pbf-bbox">
+                    <a href="./src/autk-map/osm-layers-pbf-bbox.html">
+                        <h3>PBF by bounding box <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select a geographic extent from a PBF dataset.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="osm-tag-sets">
+                    <a href="./src/autk-map/osm-tag-sets.html">
+                        <h3>OpenStreetMap tag sets <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select features using OpenStreetMap tags.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="map-poster">
+                    <a href="./src/autk-map/map-poster.html">
+                        <h3>Map poster <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Compose an urban map as a poster.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="spatial-join">
+                    <a href="./src/autk-map/spatial-join.html">
+                        <h3>Spatial join <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Count noise reports within neighborhood boundaries.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="spatial-join-buildings">
+                    <a href="./src/autk-map/spatial-join-buildings.html">
+                        <h3>Spatial join with buildings <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Join spatial data to building features.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="spatial-join-multi">
+                    <a href="./src/autk-map/spatial-join-multi.html">
+                        <h3>Multiple spatial joins <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Combine results from multiple spatial joins.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="spatial-join-near">
+                    <a href="./src/autk-map/spatial-join-near.html">
+                        <h3>Nearby features <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore spatial joins based on proximity.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="standalone-geojson-vis">
+                    <a href="./src/autk-map/standalone-geojson-vis.html">
+                        <h3>Standalone GeoJSON <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Render GeoJSON directly with the map library.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="standalone-points-geojson-vis">
+                    <a href="./src/autk-map/standalone-points-geojson-vis.html">
+                        <h3>Standalone points <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Render point features directly from GeoJSON.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="terrain-layers-niteroi">
+                    <a href="./src/autk-map/terrain-layers-niteroi.html">
+                        <h3>Niterói terrain <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore terrain alongside urban map layers.</p>
+                    </a>
+                </li>
             </ul>
         </section>
-
-        <section>
-            <h2>autk-plot</h2>
-            <ul>
-                <li><a href="/src/autk-plot/barchart-click.html">barchart-click</a></li>
-                <li><a href="/src/autk-plot/heatmatrix-click.html">heatmatrix-click</a></li>
-                <li><a href="/src/autk-plot/histogram-brush.html">histogram-brush</a></li>
-                <li><a href="/src/autk-plot/histogram-brush-landuse.html">histogram-brush-landuse</a></li>
-                <li><a href="/src/autk-plot/histogram-rebuild.html">histogram-rebuild</a></li>
-                <li><a href="/src/autk-plot/parallel-coordinates.html">parallel-coordinates</a></li>
-                <li><a href="/src/autk-plot/scatterplot-brush.html">scatterplot-brush</a></li>
-                <li><a href="/src/autk-plot/scatterplot-click.html">scatterplot-click</a></li>
-                <li><a href="/src/autk-plot/table-click.html">table-click</a></li>
-                <li><a href="/src/autk-plot/temporal-events-click.html">temporal-events-click</a></li>
-                <li><a href="/src/autk-plot/timeseries-click.html">timeseries-click</a></li>
+        <section class="example-group" data-module="autk-plot" aria-labelledby="autk-plot-title">
+            <div class="section-header">
+                <div>
+                    <p class="module-label">autk-plot</p>
+                    <h2 id="autk-plot-title">Charts &amp; linked views <span class="group-count">11</span></h2>
+                    <p class="section-description">Explore data through selection, brushing, and interactive plots.</p>
+                </div>
+                <a class="reference-link" href="https://autarkjs.org/autk-plot/">Module guide <span aria-hidden="true">↗</span></a>
+            </div>
+            <ul class="example-grid">
+                <li class="example-card" data-keywords="barchart-click">
+                    <a href="./src/autk-plot/barchart-click.html">
+                        <h3>Bar chart selection <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select bars and explore linked data.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="heatmatrix-click">
+                    <a href="./src/autk-plot/heatmatrix-click.html">
+                        <h3>Heat matrix selection <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select cells in a matrix visualization.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="histogram-brush">
+                    <a href="./src/autk-plot/histogram-brush.html">
+                        <h3>Histogram brushing <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select a range of values in a histogram.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="histogram-brush-landuse">
+                    <a href="./src/autk-plot/histogram-brush-landuse.html">
+                        <h3>Land use histogram <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore land use with a histogram brush.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="histogram-rebuild">
+                    <a href="./src/autk-plot/histogram-rebuild.html">
+                        <h3>Updating a histogram <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Rebuild a histogram as its data changes.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="parallel-coordinates">
+                    <a href="./src/autk-plot/parallel-coordinates.html">
+                        <h3>Parallel coordinates <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore multiple dimensions in a single view.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="scatterplot-brush">
+                    <a href="./src/autk-plot/scatterplot-brush.html">
+                        <h3>Scatterplot brushing <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select groups of points with a brush.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="scatterplot-click">
+                    <a href="./src/autk-plot/scatterplot-click.html">
+                        <h3>Scatterplot selection <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select individual points in a scatterplot.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="table-click">
+                    <a href="./src/autk-plot/table-click.html">
+                        <h3>Table selection <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select rows in a tabular view.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="temporal-events-click">
+                    <a href="./src/autk-plot/temporal-events-click.html">
+                        <h3>Temporal events <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Select events along a timeline.</p>
+                    </a>
+                </li>
+                <li class="example-card" data-keywords="timeseries-click">
+                    <a href="./src/autk-plot/timeseries-click.html">
+                        <h3>Time series selection <span class="card-arrow" aria-hidden="true">↗</span></h3>
+                        <p>Explore and select values over time.</p>
+                    </a>
+                </li>
             </ul>
         </section>
+        <div class="empty-state" hidden>
+            <h2>No matching examples</h2>
+            <p>Try a different search or browse the full collection.</p>
+            <button type="button" id="reset-filters">Show all examples</button>
+        </div>
+        <footer class="page-footer">
+            <span>Built with Autark · Rendered in your browser</span>
+            <a href="https://autarkjs.org/">About Autark <span aria-hidden="true">↗</span></a>
+        </footer>
     </main>
+    <script type="module" src="./index.ts"></script>
 </body>
-
 </html>

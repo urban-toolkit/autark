@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Numeric Categorical Colors</title>
+    <link rel="stylesheet" href="./colormap-categorical-numeric.css">
+</head>
+
+<body>
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Color maps</p>
+            <h1 id="example-title">Numeric categorical colors</h1>
+            <p class="description">Give each road class its own color. Numeric labels are treated as categories,
+                with colors assigned in the order you choose.</p>
+        </section>
+        <section class="map-panel" aria-labelledby="map-title">
+            <div class="panel-header">
+                <h2 id="map-title">Road classes</h2>
+                <p id="map-status" class="map-status" role="status">Loading map…</p>
+            </div>
+            <div class="map-stage" aria-busy="true">
+                <canvas aria-label="Interactive road map colored by numeric road category" aria-describedby="map-help"></canvas>
+            </div>
+            <div class="panel-footer" id="map-help">
+                <span>Scroll to zoom</span>
+                <span>Open the layer menu to explore</span>
+            </div>
+        </section>
+        <aside class="reading-note" aria-labelledby="reading-title">
+            <h2 id="reading-title">What to look for</h2>
+            <p>The legend follows the order <strong>3, 1, 2</strong>:
+                primary roads use the first swatch, secondary roads the second, and other roads the third.
+                Each class should have a distinct color.</p>
+        </aside>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./colormap-categorical-numeric.ts"></script>
+</body>
+
+</html>
