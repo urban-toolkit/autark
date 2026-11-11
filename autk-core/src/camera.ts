@@ -103,17 +103,18 @@ export class Camera {
      * @param wUp - World-space up vector.
      * @param wLookAt - Point to look at in world space.
      * @param wEye - Eye position in world space.
+     * @param far - Far clipping distance; defaults to 500,000 world units.
      * @throws Never throws.
      * @example
      * camera.resetCamera([0, 1, 0], [100, 200, 0], [100, 200, 500]);
      * camera.update();
      */
-    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[]): void {
+    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[], far = 5e5): void {
         this.fovy = (45 * Math.PI) / 180.0;
         this.mProjectionMatrix = mat4.create();
         this.mViewMatrix = mat4.create();
         this.wNear = 1;
-        this.wFar = 5e5;
+        this.wFar = far;
         this.wLookAt = vec3.fromValues(wLookAt[0], wLookAt[1], wLookAt[2]);
         this.wEye = vec3.fromValues(wEye[0], wEye[1], wEye[2]);
         this.updateEyeDirAndLen();

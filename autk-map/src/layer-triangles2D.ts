@@ -245,8 +245,8 @@ export class Triangles2DLayer extends VectorLayer {
     /**
      * Renders the filled geometry and, when present, the border pass.
      *
-     * The border pipeline reuses the layer's current z-index and updates its
-     * vertex buffers whenever the layer data was dirty at the start of the pass.
+     * The border pipeline draws after the fill and updates its vertex buffers
+     * whenever the layer data was dirty at the start of the pass.
      * This preserves synchronization between filled geometry updates and border
      * rendering.
      *
@@ -276,7 +276,6 @@ export class Triangles2DLayer extends VectorLayer {
 
         // Keep hidden border buffers/uniforms synchronized so toggling them back on needs no reload.
         if (this._layerRenderInfo.showBorders !== false) {
-            this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);
             this._pipelineBorder.renderPass(camera, passEncoder);
         }
     }

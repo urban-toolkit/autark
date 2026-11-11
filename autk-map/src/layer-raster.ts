@@ -382,8 +382,7 @@ export class RasterLayer extends Layer {
      *
      * Dirty geometry or raster data trigger raster vertex-buffer and uniform
      * updates before drawing. Dirty render-info state triggers a color-uniform
-     * update. The layer z-index is refreshed on every call before delegating the
-     * draw to the underlying pipeline.
+     * update before delegating the draw to the underlying pipeline.
      *
      * @param camera Active camera used to populate view-dependent uniforms.
      * @param passEncoder Render-pass encoder receiving the draw commands.
@@ -402,7 +401,6 @@ export class RasterLayer extends Layer {
             this._renderInfoIsDirty = false;
         }
 
-        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         this._pipeline.renderPass(camera, passEncoder);
     }
 

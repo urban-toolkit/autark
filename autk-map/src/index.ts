@@ -28,6 +28,8 @@ export type { TerrainDebugOptions } from './renderer-terrain';
 
 /** Parameter types for the main `AutkMap` loading and update APIs. */
 export type {
+    /** A rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map. */
+    MapBounds,
     /** Parameters for loading a GeoJSON feature collection as a map layer. */
     LoadCollectionParams,
     /** Optional geometry-building configuration applied while loading a collection. */

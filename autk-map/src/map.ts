@@ -57,6 +57,7 @@ import {
 import {
     LoadCollectionParams,
     LoadMeshParams,
+    MapBounds,
     MapDrawOptions,
     UpdateColorMapParams,
     UpdateRenderInfoParams,
@@ -863,6 +864,32 @@ export class AutkMap {
      */
     resetCamera(): void {
         (this._terrainRenderPath ?? this._flatRenderPath).resetCamera();
+    }
+
+    /**
+     * Moves the camera, looking straight down, so a rectangle fits the viewport.
+     *
+     * A flat map starts at the middle of its first layer from a fixed height, which can show nothing of a spread-out
+     * collection. Call this after loading the layers to frame them: without an argument it frames the collection that
+     * set the map origin (the first one loaded), otherwise the rectangle given, in the coordinates of the data. In
+     * terrain mode, which frames its heightfield itself, or before any layer is loaded, it does nothing. Nothing
+     * calls it for you, so existing maps keep their view.
+     *
+     * @param bounds Optional rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map.
+     * @returns Nothing. The camera is moved and a frame is requested.
+     * @throws Never throws.
+     * @example
+     * await map.init();
+     * map.loadCollection('parks', { collection });
+     * map.fitBounds();
+     */
+    fitBounds(bounds?: MapBounds): void {
+        if (this._terrainRenderPath || !this._layerManager.hasOrigin) { return; }
+        const world = bounds ?? this._layerManager.bounds;
+        if (!world) { return; }
+        const [originX, originY] = this._layerManager.origin;
+        this._flatRenderPath.fitBounds([world[0] - originX, world[1] - originY, world[2] - originX, world[3] - originY]);
+        this.requestRender();
     }
 
     /**

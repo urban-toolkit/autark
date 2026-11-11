@@ -325,21 +325,19 @@ export abstract class VectorLayer extends Layer {
             this._dataIsDirty = false;
         }
 
-        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         this._pipeline.renderPass(camera, passEncoder);
     }
 
     /**
      * Renders the layer into the picking target.
      *
-     * This pass uses the dedicated picking pipeline and updates its z-index to
-     * match the visible pass before rendering.
+     * This pass uses the dedicated picking pipeline with the same geometry
+     * positions as the visible pass.
      *
      * @param camera Camera providing the current view and projection state.
      * @returns Issues draw commands for the off-screen picking pass.
      */
     renderPickingPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void {
-        this._pipelinePicking.updateZIndex(this._layerInfo.zIndex);
         this._pipelinePicking.renderPass(camera, passEncoder);
     }
 

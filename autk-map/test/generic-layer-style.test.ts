@@ -70,7 +70,7 @@ describe('subdued generic layer defaults', () => {
     const [info, renderInfo, data] = map.createLayer.mock.calls[0];
     const layer = new Triangles2DLayer(info, renderInfo, data);
     map._layerManager.searchByLayerId = () => layer;
-    const pipeline = { renderPass: vi.fn(), updateVertexBuffers: vi.fn(), updateColorUniforms: vi.fn(), updateZIndex: vi.fn() };
+    const pipeline = { renderPass: vi.fn(), updateVertexBuffers: vi.fn(), updateColorUniforms: vi.fn() };
     (layer as any)._pipelineBorder = pipeline;
     // Keep CPU lifecycle/render-state real; only the WebGPU fill boundary is stubbed.
     const fill = vi.spyOn(VectorLayer.prototype, 'renderPass').mockImplementation(function () {

@@ -1,6 +1,5 @@
 @group(1) @binding(0) var<uniform> modelView: mat4x4f;
 @group(1) @binding(1) var<uniform> projection: mat4x4f;
-@group(1) @binding(2) var<uniform> zIndex: f32;
 @group(2) @binding(0) var<uniform> pointSize: f32;
 
 struct VSOut {
@@ -24,7 +23,7 @@ fn main(
     var vsOut: VSOut;
     let worldPosition = inCenter + inLocal * pointSize;
 
-    vsOut.outPosition = projection * modelView * vec4f(worldPosition.x, worldPosition.y, zIndex, 1.0);
+    vsOut.outPosition = projection * modelView * vec4f(worldPosition.x, worldPosition.y, 0.0, 1.0);
     vsOut.outLocal = inLocal;
     vsOut.outThematic = inThematic;
     vsOut.outHighlighted = inHighlighted;

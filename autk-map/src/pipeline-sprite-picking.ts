@@ -161,7 +161,7 @@ export class PipelineSpritePicking extends Pipeline {
         const primitive: GPUPrimitiveState = { frontFace: 'cw', cullMode: 'none', topology: 'triangle-list' };
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: false,
-            depthCompare: 'greater-equal',
+            depthCompare: 'always',
             format: 'depth32float',
         };
         const layout = this._renderer.device.createPipelineLayout({

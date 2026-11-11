@@ -11,8 +11,9 @@
 
 import { FeatureCollection, Geometry } from 'geojson';
 
-import { computeOrigin, OSM_BASE_LAYER_ORDER } from '@urban-toolkit/autk-core';
+import { computeBoundingBox, computeOrigin, OSM_BASE_LAYER_ORDER } from '@urban-toolkit/autk-core';
 import type { LayerType } from '@urban-toolkit/autk-core';
+import type { MapBounds } from './api';
 
 import { 
     LayerData, 
@@ -41,6 +42,8 @@ export class LayerManager {
     protected _layers: Layer[] = [];
     /** World-space origin derived from the bounding box center. */
     protected _origin?: number[];
+    /** World-space bounds of the collection that set the origin. */
+    protected _bounds?: MapBounds;
 
     /** Layer ids of non-OSM, non-buildings layers in insertion order. */
     private _dynamicOrder: string[] = [];
@@ -60,14 +63,22 @@ export class LayerManager {
     get hasOrigin(): boolean { return this._origin !== undefined; }
 
     /**
+     * World-space bounds `[minX, minY, maxX, maxY]` of the collection that set the origin, or `undefined` before one
+     * is loaded or when it had no coordinates.
+     */
+    get bounds(): MapBounds | undefined { return this._bounds; }
+
+    /**
      * Computes the shared scene origin from the provided collection.
      *
      * @param collection Source feature collection.
-     * @returns Nothing. Updates the manager's shared origin in place.
+     * @returns Nothing. Updates the manager's shared origin, and the bounds that go with it, in place.
      * @throws Never throws.
      */
     initializeOrigin(collection: FeatureCollection<Geometry | null>): void {
         this._origin = computeOrigin(collection as FeatureCollection);
+        const box = computeBoundingBox(collection as FeatureCollection);
+        this._bounds = box ? [box.minLon, box.minLat, box.maxLon, box.maxLat] : undefined;
     }
 
     /**

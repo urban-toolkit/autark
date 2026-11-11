@@ -8,6 +8,7 @@ import glsl from 'vite-plugin-glsl';
 
 // All test code is in the repository. Browser state uses an ignored, disposable cache directory.
 const root = fileURLToPath(new URL('../../', import.meta.url));
+const testModule = process.argv[2] ?? '/autk-compute/test/webgpu-cases.ts';
 const chrome = process.env.CHROME_BIN ?? (process.platform === 'darwin'
     ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
 if (!existsSync(chrome)) throw new Error('Chrome not found; set CHROME_BIN to a WebGPU-enabled Chrome executable.');
@@ -74,7 +75,7 @@ try {
     await send('Page.navigate', { url: `http://127.0.0.1:${address.port}/autk-compute/test/webgpu.html` }, sessionId);
     await loaded;
     const result = await send('Runtime.evaluate', {
-        expression: "import('/autk-compute/test/webgpu-cases.ts').then(module => module.runWebGpuCases())",
+        expression: `import(${JSON.stringify(testModule)}).then(module => module.runWebGpuCases())`,
         awaitPromise: true, returnByValue: true,
     }, sessionId);
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? JSON.stringify(result.exceptionDetails));
