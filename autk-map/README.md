@@ -172,6 +172,25 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.
 * `destroy()`: Releases event handlers and GPU resources.
 
+## Layer order and elevation
+
+`LayerInfo.zIndex` controls CPU layer ordering only. Polygons, borders, rasters,
+points, and polylines use a common ground plane and blend in layer order; each
+polygon fill is followed by its border before the next layer is drawn. Adding
+or reordering layers does not raise geometry or change its apparent size.
+
+Buildings retain their actual geometry heights and depth testing, and their
+shared SSAO result is composited over the 2D map. In terrain mode, ordered 2D
+layers are draped through the terrain overlay, and buildings retain terrain
+occlusion. Picking uses the same positions as visible geometry and continues
+to target the active pick-enabled layer.
+
+Run the rendering regression in a WebGPU-enabled Chrome installation:
+
+```sh
+node autk-compute/test/run-webgpu.mjs /autk-map/test/render-order.webgpu.ts
+```
+
 ## Resources
 
 - [Documentation](https://autarkjs.org/introduction.html)

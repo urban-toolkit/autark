@@ -54,6 +54,9 @@ describe('shader-expanded polyline GPU boundary', () => {
         expect(visible.layout.bindGroupLayouts[2].entries[1].buffer.type).toBe('read-only-storage');
         expect(visible.multisample.count).toBe(4);
         expect(picking.multisample.count).toBe(1);
+        for (const pipeline of [visible, picking]) {
+            expect(pipeline.depthStencil).toEqual({ format: 'depth32float', depthWriteEnabled: false, depthCompare: 'always' });
+        }
     });
 
     it('uploads OSM defaults once and only uniforms for explicit width changes in both passes', () => {

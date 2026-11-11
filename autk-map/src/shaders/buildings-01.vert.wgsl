@@ -1,6 +1,5 @@
 @group(1) @binding(0) var<uniform> modelView: mat4x4f;
 @group(1) @binding(1) var<uniform> projection: mat4x4f;
-@group(1) @binding(2) var<uniform> zIndex: f32;
 
 struct TerrainUniform {
     heightOriginCell: vec4<f32>,

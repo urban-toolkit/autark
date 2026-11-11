@@ -31,7 +31,7 @@ function lineLayer(typeLayer: 'polylines' | 'roads' = 'polylines') {
     }, { geometry: data.geometry, components: data.components, polylineAttributes: data.attributes, thematic: [{ value: 4, valid: 1 }, { value: 8, valid: 1 }] });
 }
 
-const pipeline = () => ({ updateColorUniforms: vi.fn(), updateVertexBuffers: vi.fn(), updatePointSize: vi.fn(), updateWidth: vi.fn(), updateZIndex: vi.fn(), renderPass: vi.fn() });
+const pipeline = () => ({ updateColorUniforms: vi.fn(), updateVertexBuffers: vi.fn(), updatePointSize: vi.fn(), updateWidth: vi.fn(), renderPass: vi.fn() });
 
 afterEach(() => vi.restoreAllMocks());
 

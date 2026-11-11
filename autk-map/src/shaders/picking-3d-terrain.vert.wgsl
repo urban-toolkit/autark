@@ -1,6 +1,5 @@
 @group(0) @binding(0) var<uniform> modelView: mat4x4f;
 @group(0) @binding(1) var<uniform> projection: mat4x4f;
-@group(0) @binding(2) var<uniform> zIndex: f32;
 
 struct TerrainUniform {
     heightOriginCell: vec4<f32>,
@@ -38,7 +37,7 @@ fn terrainHeight(xy: vec2<f32>) -> f32 {
 fn main(@location(0) inPosition: vec3f, @location(1) objectId: vec3<f32>) -> VSOut {
     var vsOut: VSOut;
     let terrainZ = terrainHeight(inPosition.xy);
-    vsOut.position = projection * modelView * vec4f(inPosition.x, inPosition.y, inPosition.z + terrainZ + zIndex, 1);
+    vsOut.position = projection * modelView * vec4f(inPosition.x, inPosition.y, inPosition.z + terrainZ, 1);
     vsOut.color = objectId;
 
     return vsOut;

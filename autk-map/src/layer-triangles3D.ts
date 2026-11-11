@@ -155,9 +155,8 @@ export class Triangles3DLayer extends VectorLayer {
      * Renders the layer's scene geometry into the geometry pass.
      *
      * This method keeps normal data current, pushes pending render-info and
-     * vertex-buffer updates to the active pipelines, refreshes the pipeline
-     * z-index from the current layer metadata, and then delegates the draw call
-     * to the SSAO geometry pass implementation.
+     * vertex-buffer updates to the active pipelines, then delegates the draw
+     * call to the SSAO geometry pass implementation at the geometry's elevation.
      *
      * Render-info updates are applied only when flagged dirty. Vertex-buffer
      * uploads are applied to both the main render pipeline and the picking
@@ -183,7 +182,6 @@ export class Triangles3DLayer extends VectorLayer {
             this._dataIsDirty = false;
         }
 
-        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         (this._pipeline as PipelineBuildingSSAO).renderGeometryPass(camera, passEncoder);
     }
 

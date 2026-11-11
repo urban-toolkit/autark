@@ -92,7 +92,7 @@ export class PipelinePolyline extends Pipeline {
                 }],
             },
             primitive: { topology: 'triangle-list', frontFace: 'cw', cullMode: 'none' },
-            depthStencil: { format: 'depth32float', depthWriteEnabled: this.picking, depthCompare: 'greater-equal' },
+            depthStencil: { format: 'depth32float', depthWriteEnabled: false, depthCompare: 'always' },
             multisample: { count: this.picking ? 1 : this._renderer.sampleCount },
         });
     }

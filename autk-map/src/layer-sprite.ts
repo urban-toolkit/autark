@@ -141,13 +141,11 @@ export class SpriteLayer extends Layer {
             this._dataIsDirty = false;
         }
 
-        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         this._pipeline.updatePointSize(this.pointSize);
         this._pipeline.renderPass(camera, passEncoder);
     }
 
     override renderPickingPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void {
-        this._pipelinePicking.updateZIndex(this._layerInfo.zIndex);
         this._pipelinePicking.updatePointSize(this.pointSize);
         this._pipelinePicking.renderPass(camera, passEncoder);
     }

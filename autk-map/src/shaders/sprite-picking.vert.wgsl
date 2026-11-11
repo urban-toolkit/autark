@@ -1,6 +1,5 @@
 @group(0) @binding(0) var<uniform> modelView: mat4x4f;
 @group(0) @binding(1) var<uniform> projection: mat4x4f;
-@group(0) @binding(2) var<uniform> zIndex: f32;
 @group(1) @binding(0) var<uniform> pointSize: f32;
 
 struct VSOut {
@@ -17,7 +16,7 @@ fn main(
 ) -> VSOut {
     var vsOut: VSOut;
     let worldPosition = inCenter + inLocal * pointSize;
-    vsOut.position = projection * modelView * vec4f(worldPosition.x, worldPosition.y, zIndex, 1.0);
+    vsOut.position = projection * modelView * vec4f(worldPosition.x, worldPosition.y, 0.0, 1.0);
     vsOut.color = objectId;
     vsOut.local = inLocal;
     return vsOut;
