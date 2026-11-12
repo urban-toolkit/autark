@@ -28,7 +28,7 @@ Standalone creation now accepts a WGS84 `center: { latitude, longitude }` and an
 
 ## Validation evidence
 
-Final unit validation covers 930 tests across 70 files, including the existing main and PR suites and the added integration regressions. Eight package-validation cases initially failed because the default npm cache was not writable; all nine tests in that file passed when rerun with a writable temporary cache. Focused DPR, validation, rollback, allocation, and renderer tests also passed.
+The final complete unit suite passed all 930 tests across 70 files, including the existing main and PR suites and the added integration regressions. The run used a writable temporary npm cache. Focused DPR, validation, rollback, allocation, and renderer tests also passed.
 
 Real WebGPU tests use native image decode/upload, production pipelines, synthetic local data, and pixel readback. The tile test covers all three supported CRSs, omitted-CRS default behavior, orientation/colors, parent UV cropping, transparent pixels, opacity, adjacent edge coverage through a zoom change, vector drawing order, physical building composition, metadata changes without geometry displacement, hide/show reuse, idle frames, and layer removal.
 
@@ -38,7 +38,7 @@ All 60 gallery pages passed layout and bar-text checks at 1440, 390, and 320 px 
 
 Repository lint, strict checks for the new browser tests, workspace builds/type checks, package artifact validation, and packing all six packages passed. An initial database build encountered a transient output-directory cleanup race; the complete retry passed without source/configuration changes.
 
-Isolated package-consumer installation remains blocked by this environment's npm registry certificate trust (`UNABLE_TO_GET_ISSUER_CERT_LOCALLY`), including with Node's system certificate store enabled. TLS verification was retained, and no project registry/certificate configuration was changed. This check is not claimed as passed.
+Isolated package-consumer installation, strict consumer type checking, Node imports, and browser bundling all passed. An initial registry certificate-trust failure was resolved by supplying the operating system's CA bundle through `NODE_EXTRA_CA_CERTS` for that command. TLS verification remained enabled; no project registry or certificate configuration was changed.
 
 ## Suggested user validation
 
