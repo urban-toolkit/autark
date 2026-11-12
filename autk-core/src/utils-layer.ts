@@ -31,7 +31,8 @@ export function isLayerType(value: string): value is LayerType {
         || value === 'points'
         || value === 'polygons'
         || value === 'polylines'
-        || value === 'raster';
+        || value === 'raster'
+        || value === 'tiles';
 }
 
 /**

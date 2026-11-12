@@ -11,6 +11,8 @@
 
 import { ColorMap } from '@urban-toolkit/autk-core';
 import type { ColorRGB } from '@urban-toolkit/autk-core';
+import { AUTARK_CREDIT, createAttributionElement, mergeCredits } from './attribution';
+import type { TileCredit } from './attribution';
 import { Layer } from './layer';
 import { legendLabelPlacements } from './legend-labels';
 import { AutkMap } from './map';
@@ -57,6 +59,8 @@ export class AutkMapUi {
     protected _onMenuIconClick: ((event: MouseEvent) => void) | null = null;
     /** Branding shown independently of the optional map controls. */
     private _branding: HTMLDivElement | null = null;
+    private _attribution: TileCredit[] = [];
+    private _attributionEl: HTMLElement | null = null;
     private _brandingResizeObserver: ResizeObserver | null = null;
 
     /**
@@ -110,8 +114,12 @@ export class AutkMapUi {
         if (this._legend) {
             const width  = parseInt(this._legend.style.width  || '0', 10) || 0;
             const height = parseInt(this._legend.style.height || '0', 10) || 0;
+            const credits = this._attributionEl;
+            // Narrow maps stack the legend above the credits rather than overlapping them.
+            const creditClearance = credits && credits.offsetWidth + width + 3 * this._uiMargin > this.map.canvas.clientWidth
+                ? credits.offsetHeight + this._uiMargin : 0;
             this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth  - 2 - width  - this._uiMargin) + 'px';
-            this._legend.style.top  = (this.map.canvas.offsetTop  + this.map.canvas.clientHeight - 2 - height - this._uiMargin) + 'px';
+            this._legend.style.top  = (this.map.canvas.offsetTop  + this.map.canvas.clientHeight - 2 - height - this._uiMargin - creditClearance) + 'px';
         }
         if (this._performanceOverlay) {
             this._performanceOverlay.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 92 - this._uiMargin) + 'px';
@@ -120,8 +128,8 @@ export class AutkMapUi {
     }
 
     /**
-     * Adds a faint “made with autark” watermark at the bottom right. Branding is independent of `showUi` and never
-     * intercepts canvas interaction. No animation loop is needed for positioning.
+     * Adds linked Autark and provider credits at the bottom left. Branding is
+     * independent of `showUi`; only the credit strip intercepts pointer events.
      */
     buildBranding(): void {
         if (this._branding || !this.map.canvas.parentElement) return;
@@ -131,12 +139,31 @@ export class AutkMapUi {
         Object.assign(this._branding.style, {
             position: 'absolute', pointerEvents: 'none', zIndex: '10', overflow: 'hidden',
         });
-        this._branding.innerHTML = `<span class="autk-map-credit" style="position:absolute;right:10px;bottom:10px;font:11px system-ui,sans-serif;color:#555;opacity:0.6;white-space:nowrap">made with autark</span>`;
         this.map.canvas.parentElement.appendChild(this._branding);
+        this.renderAttribution();
         if (typeof ResizeObserver !== 'undefined') {
             this._brandingResizeObserver = new ResizeObserver(() => this.handleResize());
             this._brandingResizeObserver.observe(this.map.canvas);
         }
+        this.handleResize();
+    }
+
+    /**
+     * Sets the data-provider credits shown beside the Autark link. An empty list
+     * removes provider credits while retaining Autark's credit.
+     *
+     * @param credits Credits to show, as plain strings or `{ text, url }` entries.
+     */
+    setAttribution(credits: readonly (string | TileCredit)[]): void {
+        this._attribution = credits.map((credit) => (typeof credit === 'string' ? { text: credit } : credit));
+        this.renderAttribution();
+    }
+
+    private renderAttribution(): void {
+        if (!this._branding) return;
+        this._attributionEl?.remove();
+        this._attributionEl = createAttributionElement(document, mergeCredits([[AUTARK_CREDIT], this._attribution]));
+        if (this._attributionEl) this._branding.appendChild(this._attributionEl);
         this.handleResize();
     }
 
@@ -211,6 +238,7 @@ export class AutkMapUi {
         this._brandingResizeObserver?.disconnect();
         this._branding?.remove();
         this._branding = null;
+        this._attributionEl = null;
         this._brandingResizeObserver = null;
 
         this._menuIcon?.remove();
@@ -577,15 +605,20 @@ export class AutkMapUi {
             this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isSkip: !layer.layerRenderInfo.isSkip } });
         });
 
-        const paletteBtn = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
-            this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
-        });
-        paletteBtn.disabled = !layer.supportsColorMap;
-        if (!layer.supportsColorMap) paletteBtn.title = 'RGB imagery does not use a scalar color map';
+        const paletteBtn = layer.layerInfo.typeLayer === 'tiles'
+            ? makeButtonSpacer()
+            : (() => {
+                const button = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
+                    this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
+                });
+                button.disabled = !layer.supportsColorMap;
+                if (!layer.supportsColorMap) button.title = 'RGB imagery does not use a scalar color map';
+                return button;
+            })();
 
-        const isRaster = layer.layerInfo.typeLayer === 'raster';
+        const isRaster = layer.layerInfo.typeLayer === 'raster' || layer.layerInfo.typeLayer === 'tiles';
         const cursorBtn = isRaster
-            ? (() => { const s = document.createElement('span'); s.style.width = '28px'; s.style.flexShrink = '0'; return s; })()
+            ? makeButtonSpacer()
             : this.makeIconButton(CURSOR_SVG, layer.layerRenderInfo.isPick ?? false, () => {
                 this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
             });
@@ -665,4 +698,12 @@ export class AutkMapUi {
         const currentLayer = this.map.layerManager.searchByLayerId(layer.layerInfo.id);
         return currentLayer === layer ? currentLayer : null;
     }
+}
+
+/** An empty element as wide as a layer-row icon button, so rows without that button stay aligned. */
+function makeButtonSpacer(): HTMLSpanElement {
+    const spacer = document.createElement('span');
+    spacer.style.width = '28px';
+    spacer.style.flexShrink = '0';
+    return spacer;
 }

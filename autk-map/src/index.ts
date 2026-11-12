@@ -36,6 +36,8 @@ export type {
     LoadCollectionConfig,
     /** Parameters for loading a prebuilt mesh directly into the map. */
     LoadMeshParams,
+    /** Parameters for loading a tile basemap. */
+    LoadTilesParams,
     /** Parameters for updating raster values and related raster color state. */
     UpdateRasterParams,
     /** Parameters for updating thematic values from a feature collection. */
@@ -47,6 +49,19 @@ export type {
     /** Options for continuous or on-demand rendering with `draw()`. */
     MapDrawOptions,
 } from './api';
+
+/** Ready-made tile sources for `AutkMap.loadTiles`. Each provider sets its own terms of use. */
+export { TILE_SOURCES } from './tile-source';
+
+/** Tile source and coordinate-system types used by `AutkMap.loadTiles`. */
+export type { TileSource, ResolvedTileSource } from './tile-source';
+export type { TileTheme } from './tile-theme';
+export type { TileCredit, TileAttribution } from './attribution';
+
+/** Statistics types returned by `AutkMap.getTileStats` and `AutkMap.renderStats`. */
+export type { TileLayerStats } from './layer-tiles';
+export type { FrameStatsSnapshot } from './frame-stats';
+export type { TileCrs } from './tile-projection';
 
 /** Layer state and configuration types exposed by the map API. */
 export type {

@@ -136,12 +136,39 @@ crop covering Rio de Janeiro, Guanabara Bay and Niterói. The crop remains edita
 title/subtitle controls, road widths, interactive framing and a 2400-pixel-wide PNG export.
 The exporter temporarily redraws the WebGPU map at export resolution rather than scaling the
 on-screen canvas. Every `autk-map`
-canvas includes a faint “made with autark” watermark at the bottom right, even with
-`showUi: false`. It follows canvas resizing and is removed by `destroy()`. It has no logo
-or year and does not intercept pointer events. The poster PNG includes the same watermark.
+canvas includes a bottom-left credit strip, even with `showUi: false`. The “Made with Autark”
+link opens `https://www.autarkjs.org` alongside credits for visible tile imagery. All credit
+links share the same typography and styling, and wrap on narrow maps. Legends stay at the
+bottom right, moving above the credits when needed to avoid overlap. The strip follows
+canvas resizing and is removed by `destroy()`; only the strip intercepts pointer events.
+The poster PNG retains its separately drawn watermark.
 The poster omits the OpenStreetMap credit text; published uses still require
 appropriate OpenStreetMap attribution. Data loading requires network access to Overpass;
 larger crops may take longer.
+
+### Tile basemaps
+
+`loadTiles` draws web map tiles (satellite imagery or a street map) below the other layers, fetching them as the camera moves:
+
+```ts
+import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
+
+map.loadTiles('imagery', {
+    source: TILE_SOURCES.esriWorldImagery,
+    center: { latitude: 40.7831, longitude: -73.9712 },
+    zoom: 12,
+});
+```
+
+* **Sources.** Presets are `esriWorldImagery`, `openStreetMap`, `osmLight`, and `osmDark`. The OSM themes use the standard OSM raster endpoint and apply muted colors on the client. `osmLight` has a pale background and `osmDark` reverses luminance onto a dark background. Roads and labels baked into the images remain; this does not add vector tile styling. Custom raster sources can also set `theme: 'light' | 'dark' | 'original'`. Colors are processed once when a tile is loaded and cached with the texture; overlays and other render pipelines are unchanged. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown beside the Autark link at the bottom left of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
+* **Provider terms.** Presets are conveniences, not licences. OpenStreetMap's public servers forbid heavy use and bulk downloading; use your own server or a commercial provider in production. Esri imagery needs its attribution to stay visible.
+* **Coordinate system.** `crs` is the system of your data: `'EPSG:3395'` (the default, as in `AutkDb` workspaces), `'EPSG:3857'` or `'EPSG:4326'`. Tiles are Web Mercator and are reprojected on the CPU; unsupported CRS values are rejected before creating a layer.
+* **Order and origin.** Tile layers sit under every other layer, so a `surface` layer would cover them. An explicit geographic `center` initializes tile-only maps; otherwise the first data layer establishes the origin. `zoom` requires a center and defaults to 12. Centers are WGS84 coordinates regardless of the output CRS.
+* **Loading.** At most 8 requests run at once; tiles that leave the view are cancelled, the soft cache limit is 256 tiles (`maxCachedTiles`), and the browser HTTP cache applies as usual. While a tile loads, the nearest loaded ancestor is drawn in its place. Tiles that fail for a transient reason are retried by the layer itself after a delay that doubles with each failure, up to a minute, for as long as they are in view; a definitive error such as 404 is not retried.
+* **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps selected tiles; ancestor preloads add requests: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
+* **Hiding.** Hiding a tile layer (`updateRenderInfo(id, { isSkip: true })`) cancels its queued, in-flight and retrying requests and keeps the textures already loaded, so showing it again draws at once and loads only what is missing.
+* **Statistics.** `map.getTileStats(id)` returns a read-only snapshot: the zoom (and the zoom the view wanted, when the tile cap lowered it), how many selected tiles are drawn with their own image, with an ancestor's or not at all, the request queue, cached textures with an estimated size in bytes, and cumulative counts of requests (retries included, not network transfers), cache reuses and pressure evictions. `map.renderStats` gives the number of frames rendered, the CPU time of the last frame and the average, and the frame rate while rendering. Time is CPU time around preparing and submitting a frame, not GPU time, and the rate is 0 while the map is idle. Reading either does not trigger rendering, so a page can poll them on a timer; a frame count that stops increasing means the map is idle.
+* **Limits.** Camera fitting retains automatic far-plane expansion; planet-scale views remain outside the tile feature's scope. Terrain draping is also not supported yet. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
 
 ### Render sizing verification
 
@@ -160,6 +187,8 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `activePickingLayer`: Returns the layer currently configured for picking.
 * `loadCollection(id, params)`: Loads a GeoJSON or raster-derived collection as a map layer.
 * `loadMesh(id, params)`: Loads prebuilt mesh geometry directly.
+* `loadTiles(id, params)`: Loads a tile basemap from a URL template or a preset (`TILE_SOURCES`).
+* `getTileStats(id)`, `renderStats`: Read-only statistics of a tile layer and of rendered frames; neither triggers rendering.
 * `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
 * `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions, or the three bands of an RGB image.
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.
@@ -233,3 +262,5 @@ and the gallery-control smoke test with `node autk-compute/test/run-webgpu.mjs /
 - [Documentation](https://autarkjs.org/introduction.html)
 - [Examples](https://autarkjs.org/gallery/)
 - [Use Cases](https://autarkjs.org/usecases/)
+
+The [tile basemap gallery example](../gallery/src/autk-map/tiles-basemap.html) loads tiles only, with Esri, OSM, and local source choices. The separate [numeric-category overlay example](../gallery/src/autk-map/tiles-categorical.html) adds database-projected roads and a categorical legend. See [.doc/TILE-BASEMAP.md](../.doc/TILE-BASEMAP.md) for lifecycle, validation, tests, and remaining limits.

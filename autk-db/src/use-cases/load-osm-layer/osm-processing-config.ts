@@ -3,7 +3,7 @@ import type { LayerType } from '@urban-toolkit/autk-core';
 /**
  * OSM-specific layer types used by the processing config (excludes `background`).
  */
-export type OsmLayerType = Exclude<LayerType, 'background'>;
+export type OsmLayerType = Exclude<LayerType, 'background' | 'tiles'>;
 
 /**
  * Configuration describing how an OSM layer should be processed.
@@ -37,7 +37,7 @@ export const OSM_PROCESSING_CONFIGS: Record<OsmLayerType, OsmProcessingConfig> =
 
 /**
  * Returns the processing configuration for an OSM `LayerType`, or `null` when the
- * layer is `background` which is not processed.
+ * layer is `background` or `tiles`, which are not processed.
  *
  * @param layer - The layer type to query.
  * @returns The `OsmProcessingConfig` or `null`.
@@ -45,6 +45,6 @@ export const OSM_PROCESSING_CONFIGS: Record<OsmLayerType, OsmProcessingConfig> =
  * const cfg = getOsmProcessingConfig('buildings');
  */
 export function getOsmProcessingConfig(layer: LayerType): OsmProcessingConfig | null {
-  if (layer === 'background') return null;
+  if (layer === 'background' || layer === 'tiles') return null;
   return OSM_PROCESSING_CONFIGS[layer];
 }
