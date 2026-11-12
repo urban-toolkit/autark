@@ -9,6 +9,8 @@
  * consistently.
  */
 
+import type { TileCrs } from './tile-projection';
+import type { TileSource } from './tile-source';
 import {
     FeatureCollection,
     Geometry,
@@ -173,6 +175,57 @@ export interface UpdateRasterParams {
      * `[0, 3000]` to look right. Use `[0, 1]` explicitly for normalized imagery.
      */
     rgbRange?: RasterRgbRange;
+}
+
+/**
+ * Parameters for loading a tile basemap with {@link AutkMap.loadTiles}.
+ *
+ * Tiles are web map tiles in the Web Mercator (EPSG:3857) grid, fetched as the
+ * camera moves and drawn below every other layer.
+ */
+export interface LoadTilesParams {
+    /**
+     * Where the tiles come from: a preset from `TILE_SOURCES` or a custom
+     * URL template. The attribution is required and is shown on the map, as
+     * text or, where the source gives a URL, as a link; the caller is
+     * responsible for following the provider's terms of use.
+     */
+    source: TileSource;
+    /**
+     * Workspace/output coordinate system of the map's data, not the source CRS
+     * of an imported file. Defaults to the shared `DEFAULT_WORKSPACE_COORDINATE_FORMAT`
+     * (`'EPSG:3395'`), also used by `AutkDb`. Pass the workspace's CRS for nondefault
+     * workspaces. Unsupported CRS values are rejected before allocation.
+     */
+    crs?: TileCrs;
+    /**
+     * Optional WGS84 center for the initial view, using named latitude/longitude in degrees.
+     * Initializes a tile-only scene without another data layer. An existing shared origin is preserved.
+     * The point is projected into `crs`; supplying a center explicitly positions the camera.
+     */
+    center?: { latitude: number; longitude: number };
+    /**
+     * Initial Web Mercator zoom (0–30, fractional values allowed); requires `center`.
+     * Defaults to 12 when `center` is supplied. Uses the source tile size and CSS pixels;
+     * device pixel ratio independently controls imagery resolution.
+     */
+    zoom?: number;
+    /** Layer opacity from 0 to 1. Defaults to 1. */
+    opacity?: number;
+    /** Positive safe integer soft cache limit. Defaults to 256. Invalid values are rejected. */
+    maxCachedTiles?: number;
+    /**
+     * Added to the zoom level chosen for the view. Positive values give
+     * sharper tiles and more requests, negative values the opposite.
+     * Defaults to 0.
+     */
+    zoomBias?: number;
+    /**
+     * Positive safe integer cap on selected tiles; ancestor preloads add requests. The zoom drops to fit; if the
+     * source's lowest zoom still needs more, only the tiles nearest the view
+     * centre are used. Defaults to 64.
+     */
+    maxTiles?: number;
 }
 
 /**

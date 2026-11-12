@@ -23,6 +23,10 @@ import {
 
 import { Layer } from './layer';
 import { RasterLayer } from './layer-raster';
+import { mergeCredits } from './attribution';
+import type { TileCredit } from './attribution';
+import { TileLayer } from './layer-tiles';
+import type { TileLayerOptions } from './layer-tiles';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
 import { SpriteLayer } from './layer-sprite';
@@ -37,6 +41,9 @@ import { PolylineLayer } from './layer-polyline';
  * dynamic layers are ordered by insertion, and buildings are always rendered
  * last.
  */
+/** CPU draw-order slot for tile layers. Never used as physical height. */
+export const TILE_LAYER_Z_INDEX = -1;
+
 export class LayerManager {
     /** Registered layers sorted by render order. */
     protected _layers: Layer[] = [];
@@ -91,10 +98,7 @@ export class LayerManager {
      * @throws Never throws. Duplicate ids log an error and return `null`.
      */
     addLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, layerData: LayerData): Layer | null {
-        if (this._layers.some((layer) => layer.layerInfo.id === layerInfo.id)) {
-            console.error(`LayerManager: layer id '${layerInfo.id}' already exists.`);
-            return null;
-        }
+        if (this._hasLayerId(layerInfo.id)) { return null; }
 
         const layer: Layer = layerInfo.typeLayer === 'buildings'
             ? new Triangles3DLayer(layerInfo, layerRender, layerData)
@@ -106,8 +110,38 @@ export class LayerManager {
                         ? new PolylineLayer(layerInfo, layerRender, layerData)
                         : new Triangles2DLayer(layerInfo, layerRender, layerData);
 
-        if (!OSM_BASE_LAYER_ORDER.includes(layerInfo.typeLayer) && layerInfo.typeLayer !== 'buildings') {
-            this._dynamicOrder.push(layerInfo.id);
+        return this._register(layer);
+    }
+
+    /**
+     * Adds a tile layer.
+     *
+     * Tile layers sit below every other layer, in load order, so a basemap
+     * never covers what is drawn on it.
+     *
+     * @param layerInfo Layer identity; `typeLayer` must be `'tiles'`.
+     * @param layerRender Initial render configuration.
+     * @param options Tile source and tuning.
+     * @returns The created layer, or `null` when the id is already used.
+     * @throws If the tile source is invalid.
+     */
+    addTileLayer(layerInfo: LayerInfo, layerRender: LayerRenderInfo, options: TileLayerOptions): TileLayer | null {
+        if (this._hasLayerId(layerInfo.id)) { return null; }
+        const layer = new TileLayer(layerInfo, layerRender, options, () => this._origin);
+        return this._register(layer);
+    }
+
+    /** Reports a duplicate id on the console and returns whether the id is taken. */
+    private _hasLayerId(id: string): boolean {
+        const taken = this._layers.some((layer) => layer.layerInfo.id === id);
+        if (taken) { console.error(`LayerManager: layer id '${id}' already exists.`); }
+        return taken;
+    }
+
+    private _register<L extends Layer>(layer: L): L {
+        const { typeLayer, id } = layer.layerInfo;
+        if (!OSM_BASE_LAYER_ORDER.includes(typeLayer) && typeLayer !== 'buildings' && typeLayer !== 'tiles') {
+            this._dynamicOrder.push(id);
         }
         this._layers.push(layer);
         this._recomputeZIndices();
@@ -148,6 +182,20 @@ export class LayerManager {
     }
 
     /**
+     * Credits of the tile layers that are drawn, without repeats. A hidden or
+     * removed layer is no longer credited.
+     *
+     * @returns Credits in layer order.
+     */
+    visibleAttribution(): TileCredit[] {
+        return mergeCredits(
+            this._layers
+                .filter((layer): layer is TileLayer => layer instanceof TileLayer && !layer.layerRenderInfo.isSkip)
+                .map((layer) => layer.attribution),
+        );
+    }
+
+    /**
      * Returns a preliminary z-index placeholder for a layer type.
      *
      * @param layerType Layer type to place in the render stack.
@@ -178,6 +226,8 @@ export class LayerManager {
 
             if (osmIdx !== -1) {
                 layer.layerInfo.zIndex = osmIdx;
+            } else if (typeLayer === 'tiles') {
+                layer.layerInfo.zIndex = TILE_LAYER_Z_INDEX;
             } else if (typeLayer === 'buildings') {
                 layer.layerInfo.zIndex = buildingsZ;
             } else {

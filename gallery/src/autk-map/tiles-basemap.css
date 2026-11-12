@@ -1,0 +1,9 @@
+.tile-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0; font-size: 13px; }
+.tile-controls label { display: inline-flex; align-items: center; gap: 6px; }
+.tile-metrics { margin-top: 16px; }
+.tile-metrics > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.tile-metrics dd { font-size: 12px; }
+
+/* The statistics panel can make the shared map row taller than the default canvas. */
+.gallery-example #app.tile-workspace .map-stage { min-height: clamp(400px, 58vh, 640px); }
+.gallery-example #app.tile-workspace .map-stage > canvas { position: absolute; inset: 0; height: 100%; }

@@ -17,7 +17,7 @@ await mkdir(resolve(root, '.cache'), { recursive: true });
 const profile = await mkdtemp(resolve(root, '.cache/autk-webgpu-'));
 const server = await createServer({ root, configFile: false, plugins: [glsl()],
     resolve: { alias: { '@urban-toolkit/autk-core': resolve(root, 'autk-core/src/index.ts') } },
-    server: { host: '127.0.0.1', port: 0 } });
+    server: { host: '127.0.0.1', port: 0, watch: { ignored: ['**/.cache/**'] } } });
 let browser;
 let socket;
 try {

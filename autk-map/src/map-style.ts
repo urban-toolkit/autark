@@ -22,9 +22,9 @@ export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm' 
 
 /** Ordered preset ids used for keyboard style cycling. */
 const PRESET_IDS: readonly MapStylePresetId[] = ['apple', 'default', 'light', 'google', 'osm', 'poster'];
-/** Required keys for a valid map style object — derived from `LayerType` minus `raster`. */
+/** Required keys for a valid map style object — derived from `LayerType` minus `raster` and `tiles`. */
 const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = LAYER_TYPE_VALUES.filter(
-  (l): l is Exclude<LayerType, 'raster'> => l !== 'raster',
+  (l): l is Exclude<LayerType, 'raster' | 'tiles'> => l !== 'raster' && l !== 'tiles',
 ) as Array<keyof MapStyleShape>;
 /** Accepts #RGB, #RRGGBB and #RRGGBBAA color literals. */
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;

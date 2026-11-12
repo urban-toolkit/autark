@@ -104,16 +104,17 @@ export class Camera {
      * @param wLookAt - Point to look at in world space.
      * @param wEye - Eye position in world space.
      * @param far - Far clipping distance; defaults to 500,000 world units.
+     * @param near - Near clipping distance; defaults to 1 world unit. Explicit small-unit views may use a smaller value.
      * @throws Never throws.
      * @example
      * camera.resetCamera([0, 1, 0], [100, 200, 0], [100, 200, 500]);
      * camera.update();
      */
-    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[], far = 5e5): void {
+    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[], far = 5e5, near = 1): void {
         this.fovy = (45 * Math.PI) / 180.0;
         this.mProjectionMatrix = mat4.create();
         this.mViewMatrix = mat4.create();
-        this.wNear = 1;
+        this.wNear = near;
         this.wFar = far;
         this.wLookAt = vec3.fromValues(wLookAt[0], wLookAt[1], wLookAt[2]);
         this.wEye = vec3.fromValues(wEye[0], wEye[1], wEye[2]);
@@ -173,6 +174,68 @@ export class Camera {
     public getWorldRayDirection(x: number, y: number): [number, number, number] {
         const direction = this.screenCoordToWorldDir(x, y);
         return [direction[0], direction[1], direction[2]];
+    }
+
+    /**
+     * Finds where the ray through a screen position meets the ground plane (`z = 0`).
+     *
+     * A ray that points away from the ground, or is parallel to it, has no hit;
+     * a hit farther than `maxDistance` is too far to be useful. In both cases the
+     * point `maxDistance` along the ray is returned instead.
+     *
+     * @param x - Normalized screen X (0–1, left to right).
+     * @param y - Normalized screen Y (0–1, bottom to top).
+     * @param maxDistance - Farthest distance along the ray, in world units.
+     * @returns The ground point `[x, y]`.
+     * @throws Never throws.
+     * @example
+     * const [gx, gy] = camera.getGroundPoint(0.5, 0.5, 50000); // what the view centre looks at
+     */
+    public getGroundPoint(x: number, y: number, maxDistance: number): [number, number] {
+        const eye = this.wEye;
+        const direction = this.screenCoordToWorldDir(x, y);
+        const groundDistance = Math.abs(direction[2]) > 1e-6 ? -eye[2] / direction[2] : Number.POSITIVE_INFINITY;
+        const distance = groundDistance > 0 ? Math.min(groundDistance, maxDistance) : maxDistance;
+        return [eye[0] + direction[0] * distance, eye[1] + direction[1] * distance];
+    }
+
+    /**
+     * The ground the camera can see within a distance, as a convex polygon.
+     *
+     * Each side of the view pyramid is a plane through the eye; on the ground it
+     * is a half-plane. The visible ground is the square of half-side `reach`
+     * around the point below the eye, cut by those four half-planes. Unlike the
+     * ground hits of the four corner rays, this also covers what the interior
+     * of the screen sees near the horizon, where a corner ray points above the
+     * ground.
+     *
+     * @param reach - Farthest ground distance from the point below the eye, in world units.
+     * @returns Polygon vertices `[x, y]`, or an empty array when no ground is visible.
+     * @throws Never throws.
+     * @example
+     * const polygon = camera.getGroundFootprint(50000);
+     */
+    public getGroundFootprint(reach: number): Array<[number, number]> {
+        const eye = this.wEye;
+        const corners = ([[0, 0], [1, 0], [1, 1], [0, 1]] as const).map(([x, y]) => this.screenCoordToWorldDir(x, y));
+        const centre = corners.reduce((sum, c) => vec3.add(sum, sum, c), [0, 0, 0] as vec3);
+
+        let polygon: Array<[number, number]> = [
+            [eye[0] - reach, eye[1] - reach],
+            [eye[0] + reach, eye[1] - reach],
+            [eye[0] + reach, eye[1] + reach],
+            [eye[0] - reach, eye[1] + reach],
+        ];
+
+        for (let i = 0; i < 4; i++) {
+            // Plain arrays keep the arithmetic in double precision.
+            const normal = vec3.cross([0, 0, 0] as vec3, corners[i] as vec3, corners[(i + 1) % 4] as vec3);
+            if (vec3.dot(normal, centre) < 0) vec3.negate(normal, normal);
+            // A ground point p is inside this side of the pyramid when normal . (p - eye) >= 0.
+            polygon = clipPolygon(polygon, (p) => normal[0] * (p[0] - eye[0]) + normal[1] * (p[1] - eye[1]) - normal[2] * eye[2]);
+            if (polygon.length === 0) return [];
+        }
+        return polygon;
     }
 
     public setOrthographicBounds(left: number, right: number, bottom: number, top: number): void {
@@ -351,13 +414,20 @@ export class Camera {
      * @throws Never throws.
      */
     protected screenCoordToWorldDir(x: number, y: number): vec3 {
-        const wRight = vec3.create();
-        vec3.normalize(wRight, vec3.cross(wRight, this.wEyeDir, this.wUp));
-        const upOffset = vec3.scale(vec3.create(), this.wUp, Math.tan(this.fovy / 2) * (y - 0.5) * 2);
+        // The same orthonormal basis `mat4.lookAt` builds for rendering, so a ray
+        // through a screen position matches what is drawn there even when the
+        // supplied up vector is not perpendicular to the view direction or not unit
+        // length. The stored view direction is used for the forward axis: the
+        // look-at point can sit only one unit from the eye, which float32 loses at
+        // large heights.
+        const forward = vec3.normalize(vec3.create(), this.wEyeDir);
+        const right = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), forward, this.wUp));
+        const up = vec3.cross(vec3.create(), right, forward);
+        const halfHeight = Math.tan(this.fovy / 2);
         const aspect = this.viewportWidth / this.viewportHeight;
-        const rightOffset = vec3.scale(vec3.create(), wRight, Math.tan(this.fovy / 2) * (x - 0.5) * 2 * aspect);
-        const offset = vec3.add(vec3.create(), upOffset, rightOffset);
-        const dir = vec3.add(vec3.create(), this.wEyeDir, offset);
+        const dir = vec3.clone(forward);
+        vec3.scaleAndAdd(dir, dir, up, halfHeight * (y - 0.5) * 2);
+        vec3.scaleAndAdd(dir, dir, right, halfHeight * (x - 0.5) * 2 * aspect);
         vec3.normalize(dir, dir);
         return dir;
     }
@@ -372,4 +442,21 @@ export class Camera {
         vec3.sub(this.wEyeDir, this.wLookAt, this.wEye);
         vec3.normalize(this.wEyeDir, this.wEyeDir);
     }
+}
+
+/** Keeps the part of a convex polygon where `value(p) >= 0` (Sutherland–Hodgman, one half-plane). */
+function clipPolygon(polygon: ReadonlyArray<[number, number]>, value: (p: [number, number]) => number): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (let i = 0; i < polygon.length; i++) {
+        const a = polygon[i] as [number, number];
+        const b = polygon[(i + 1) % polygon.length] as [number, number];
+        const va = value(a);
+        const vb = value(b);
+        if (va >= 0) out.push(a);
+        if ((va >= 0) !== (vb >= 0)) {
+            const t = va / (va - vb);
+            out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+        }
+    }
+    return out;
 }

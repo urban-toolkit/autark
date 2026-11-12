@@ -17,7 +17,7 @@ export const DEFAULT_INPUT_COORDINATE_FORMAT = 'EPSG:4326';
  *
  * Uses World Mercator so spatial operations can work against a consistent projected CRS.
  */
-export const DEFAULT_WORKSPACE_COORDINATE_FORMAT = 'EPSG:3395';
+export { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '@urban-toolkit/autk-core';
 
 /**
  * Default coordinate grid in workspace units for stored vectors and spatial operation results.

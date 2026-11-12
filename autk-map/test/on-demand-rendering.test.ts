@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CameraMotion, ColorMapInterpolator } from '@urban-toolkit/autk-core';
 import { AutkMap } from '../src/map';
 import { FlatMapRenderPath } from '../src/map-flat';
+import { TileLayer } from '../src/layer-tiles';
 import { RasterLayer } from '../src/layer-raster';
 import { Triangles2DLayer } from '../src/layer-triangles2D';
 import { SpriteLayer } from '../src/layer-sprite';
@@ -517,13 +518,68 @@ describe('on-demand rendering', () => {
     });
 });
 
+describe('render statistics', () => {
+    it('counts the frames that are rendered, measures their CPU time, and stops counting when the map is idle', async () => {
+        // The fake clock is installed before the setup frames render, so every timestamp shares one clock.
+        vi.spyOn(performance, 'now').mockImplementation(() => frames.now);
+        const { map } = await idleOnDemandMap();
+        flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame now costs 3 ms of CPU; setup frames cost 0
+
+        const first = map.renderStats.frameCount;
+        frames.run(10); // idle: nothing asks for a frame
+        expect(map.renderStats.frameCount).toBe(first);
+
+        for (let i = 0; i < 4; i++) {
+            map.requestRender();
+            frames.run(1);
+        }
+        const busy = map.renderStats;
+        expect(busy.frameCount).toBe(first + 4);
+        expect(busy.lastFrameCpuMs).toBeCloseTo(3, 6);
+        expect(busy.averageFrameCpuMs).toBeGreaterThan(0); // the average also holds the free setup frames
+        expect(busy.averageFrameCpuMs).toBeLessThan(3);
+        expect(busy.framesPerSecond).toBeGreaterThan(0);
+
+        frames.run(100); // two seconds of nothing
+        const idle = map.renderStats;
+        expect(idle.frameCount).toBe(busy.frameCount); // a stalled count is how a page sees an idle map
+        expect(idle.framesPerSecond).toBe(0); // and the rate does not keep its last value
+        expect(frames.pending).toBe(0);
+    });
+
+    it('reading the statistics does not ask for a frame', async () => {
+        const { map } = await idleOnDemandMap();
+        const before = renders();
+        for (let i = 0; i < 20; i++) void map.renderStats;
+        frames.run(3);
+        expect(renders() - before).toBe(0);
+        expect(frames.pending).toBe(0);
+    });
+
+    it('does not count a frame that failed', async () => {
+        const { map } = await idleOnDemandMap();
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const before = map.renderStats.frameCount;
+        flatFrames.mockImplementationOnce(() => { throw new Error('device lost'); });
+        map.requestRender();
+        frames.run(2);
+        expect(map.renderStats.frameCount).toBe(before);
+        map.requestRender();
+        frames.run(2);
+        expect(map.renderStats.frameCount).toBe(before + 1);
+    });
+});
+
 describe('continuous rendering and teardown', () => {
-    it('adds faint branding even without map controls, tracks resize and cleans up on destroy', async () => {
+    it('adds linked branding even without map controls, tracks resize and cleans up on destroy', async () => {
         const canvas = new FakeCanvas();
         const parent = { appendChild: vi.fn() };
         Object.assign(canvas, { parentElement: parent });
-        const branding = { style: {}, innerHTML: '', className: '', remove: vi.fn() };
-        Object.assign(documentTarget, { createElement: vi.fn(() => branding) });
+        const makeElement = () => ({ style: {}, className: '', textContent: '', href: '', children: [] as any[],
+            appendChild(child: any) { this.children.push(child); }, remove: vi.fn() });
+        const branding = makeElement();
+        Object.assign(documentTarget, { createElement: vi.fn().mockReturnValueOnce(branding).mockImplementation(makeElement),
+            createTextNode: (text: string) => ({ textContent: text }) });
         const observe = vi.fn();
         const disconnect = vi.fn();
         let resized = () => undefined;
@@ -537,10 +593,13 @@ describe('continuous rendering and teardown', () => {
         map.ui.buildBranding();
 
         expect(parent.appendChild).toHaveBeenCalledOnce();
-        expect(branding.innerHTML).toContain('made with autark');
-        expect(branding.innerHTML).not.toContain('2026');
-        expect(branding.innerHTML).not.toContain('<img');
-        expect(branding.innerHTML).toContain('color:#555;opacity:0.6');
+        const strip = branding.children[0];
+        const link = strip.children[0];
+        expect(link.textContent).toBe('Made with Autark');
+        expect(link.href).toBe('https://www.autarkjs.org');
+        expect(link.target).toBe('_blank');
+        expect(link.rel).toBe('noopener noreferrer');
+        expect(strip.style).toMatchObject({ left: '10px', bottom: '10px' });
         expect(branding.style).toMatchObject({ pointerEvents: 'none', width: '400px', height: '300px' });
         expect(observe).toHaveBeenCalledWith(canvas);
         canvas.offsetWidth = 200;
@@ -759,5 +818,94 @@ describe('terrain mode on demand', () => {
         land();
         await flushPromises();
         expect(requestFrame).toHaveBeenCalledOnce();
+    });
+});
+
+
+describe('transactional tile integration', () => {
+    const source = { urlTemplate: 'https://tiles.example/{z}/{x}/{y}.png', attribution: 'Example' };
+
+    it('removes a failed tile layer and permits retrying the same ID', async () => {
+        const { map } = await createMap();
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const destroy = vi.spyOn(TileLayer.prototype, 'destroy');
+        const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementationOnce(() => { throw new Error('GPU setup failed'); });
+        map.loadTiles('basemap', { source });
+        expect(map.layerManager.searchByLayerId('basemap')).toBeNull();
+        expect(destroy).toHaveBeenCalledTimes(1);
+        expect(map.layerManager.searchByLayerId('parks')).not.toBeNull();
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('GPU setup failed'));
+        create.mockImplementation(() => {});
+        map.loadTiles('basemap', { source });
+        expect(map.layerManager.searchByLayerId('basemap')).toBeInstanceOf(TileLayer);
+        expect(map.layerManager.layers[0]!.layerInfo.id).toBe('basemap');
+        map.destroy();
+    });
+
+    it('rejects invalid configuration without touching existing layers or a duplicate ID', async () => {
+        const { map } = await createMap();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        map.loadTiles('invalid', { source, crs: 'EPSG:9999' as never });
+        map.loadTiles('bad-limit', { source, maxCachedTiles: NaN });
+        expect(create).not.toHaveBeenCalled();
+        const parks = map.layerManager.searchByLayerId('parks');
+        map.loadTiles('parks', { source });
+        expect(map.layerManager.searchByLayerId('parks')).toBe(parks);
+        expect(map.layerManager.layers).toHaveLength(2);
+        map.destroy();
+    });
+});
+
+describe('tile-only geographic views', () => {
+    const source = { urlTemplate: 'https://tiles.example/{z}/{x}/{y}.png', attribution: 'Example' };
+    const center = { latitude: 0, longitude: 0 };
+
+    it('creates a standalone tile map and preserves its origin when adding overlays and another centered view', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        map.loadTiles('imagery', { source, center, zoom: 12 });
+        expect(map.layerManager.layers.map(layer => layer.layerInfo.typeLayer)).toEqual(['tiles']);
+        expect(map.layerManager.origin[0]).toBeCloseTo(0, 6);
+        expect(map.layerManager.origin[1]).toBeCloseTo(0, 6);
+        expect(map.camera.getLookAt()).toEqual([0, 0, 0]);
+        const distance = map.camera.getEye()[2];
+        const origin = [...map.layerManager.origin];
+        map.loadCollection('parks', { collection: square, type: 'polygons' });
+        map.loadTiles('second', { source, center, zoom: 13 });
+        expect(map.layerManager.origin).toEqual(origin);
+        expect(map.camera.getEye()[2]).toBeCloseTo(distance / 2, 3);
+        map.destroy();
+    });
+
+    it('does not initialize an origin on invalid geographic views or failed GPU setup', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => { throw new Error('GPU failure'); });
+        for (const config of [{ zoom: 12 }, { center, zoom: NaN }, { center, zoom: -1 },
+            { center: { latitude: 90, longitude: 0 } }, { center: { latitude: 0, longitude: 181 } }]) {
+            map.loadTiles('invalid', { source, ...config });
+        }
+        expect(create).not.toHaveBeenCalled();
+        map.loadTiles('failed', { source, center, zoom: 12 });
+        expect(map.layerManager.hasOrigin).toBe(false);
+        expect(map.layerManager.layers).toHaveLength(0);
+        map.destroy();
+    });
+
+    it('uses zoom 12 when only a center is supplied and adapts clipping to degree-based coordinates', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        map.loadTiles('imagery', { source, center });
+        const defaultDistance = map.camera.getEye()[2];
+        map.loadTiles('explicit', { source, center, zoom: 12 });
+        expect(map.camera.getEye()[2]).toBe(defaultDistance);
+        map.loadTiles('degrees', { source, center, zoom: 12, crs: 'EPSG:4326' });
+        expect(map.camera.getNear()).toBeLessThan(map.camera.getEye()[2]);
+        expect(map.camera.getNear()).toBeGreaterThan(0);
+        map.destroy();
     });
 });

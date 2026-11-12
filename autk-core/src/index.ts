@@ -9,6 +9,9 @@
  * helpers.
  */
 
+/** Default projected coordinate system shared by database workspaces and map layers. */
+export { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from './defaults';
+
 /** Colormap configuration, domain strategies, and color primitives. */
 // ─── Color mapping ───────────────────────────────────────────────────────────
 
@@ -192,3 +195,6 @@ export { isLayerType } from './utils-layer';
 export { mapGeometryTypeToLayerType } from './utils-layer';
 /** Builds a closed planar offset polygon from a local-space polyline. */
 export { offsetPolyline } from './utils-geometry';
+
+/** Returns the smallest power of two greater than or equal to the input, with a minimum of one. */
+export { nextPowerOfTwo } from './utils-math';
