@@ -3,74 +3,43 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Bar chart selection</title>
     <link rel="stylesheet" href="/src/autk-plot/barchart-click.css">
+    <link rel="stylesheet" href="../../example.css" />
 </head>
 
-<body>
-    <div id="app">
-        <h2>barchart-click.ts</h2>
-        <canvas> </canvas>
-        <div id="plot">
-            <div id="plotBar"></div>
+<body class="gallery-example gallery-chart">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-plot/">Chart guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-plot <span aria-hidden="true">/</span> Bar charts</p>
+            <h1 id="example-title">Bar chart selection</h1>
+            <p class="description">Select bars and explore linked data.</p>
+        </section>
+    <div id="app" class="example-workspace chart-workspace">
+
+        <section class="map-panel" aria-label="Bar chart selection map area">
+            <div class="panel-header"><h2>Bar chart selection</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Bar chart selection map"> </canvas></div>
+            <div class="panel-footer" id="map-help"><span>Drag to pan · Scroll to zoom</span></div>
+        </section>
+        <aside id="plot" class="details-panel" aria-labelledby="plot-title">
+            <div class="panel-header"><h2 id="plot-title">Linked chart</h2></div>
             <div id="plotBody"></div>
-        </div>
+            <p class="data-note">Click to select · Linked to map</p>
+        </aside>
     </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
 </body>
 <script type="module" src="/src/autk-plot/barchart-click.ts"></script>
-
-<script>
-    function floatingPlot() {
-        let newX = 0,
-            newY = 0,
-            startX = 0,
-            startY = 0;
-
-        const plot = document.querySelector('#plot');
-        const bar = document.querySelector('#plotBar');
-
-        bar.style.touchAction = 'none';
-        bar.addEventListener('pointerdown', pointerDown);
-        bar.addEventListener('pointermove', pointerMove);
-        bar.addEventListener('pointerup', pointerUp);
-        bar.addEventListener('pointercancel', pointerUp);
-        plot.style.visibility = 'visible';
-
-        function pointerDown(e) {
-            startX = e.clientX;
-            startY = e.clientY;
-            bar.setPointerCapture(e.pointerId);
-
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function pointerMove(e) {
-            if (!bar.hasPointerCapture(e.pointerId)) return;
-
-            newX = startX - e.clientX;
-            newY = startY - e.clientY;
-
-            startX = e.clientX;
-            startY = e.clientY;
-
-            plot.style.top = plot.offsetTop - newY + 'px';
-            plot.style.left = plot.offsetLeft - newX + 'px';
-
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function pointerUp(e) {
-            if (bar.hasPointerCapture(e.pointerId)) {
-                bar.releasePointerCapture(e.pointerId);
-            }
-
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    }
-    floatingPlot();
-</script>
 
 </html>

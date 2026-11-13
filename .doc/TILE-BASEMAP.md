@@ -1,129 +1,89 @@
-# Tile basemaps for `autk-map`
+# Tile basemaps for autk-map
 
-Draw web map tiles (satellite imagery, street maps) behind Autark layers, fetched on demand as the camera moves, on a flat map or draped over terrain. Terrain from tiles builds on this: [TILE-TERRAIN.md](TILE-TERRAIN.md).
+Tile imagery is integrated with the current renderer and gallery. Flat maps and imagery draping over fixed or streamed terrain are supported. See [TILE-TERRAIN.md](TILE-TERRAIN.md) for the terrain path; globe rendering remains outside this implementation.
 
-Out of scope: vector tiles, WMS/WMTS parsing, offline prefetching, non-Mercator grids, CRSs other than EPSG:3395, 3857 and 4326, and a globe.
-
-## Using it
+## Usage
 
 ```ts
 import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
 
-map.loadCollection('neighborhoods', { collection, type: 'polylines' }); // any data layer sets the map origin
 map.loadTiles('imagery', {
-    source: TILE_SOURCES.esriWorldImagery,   // a preset, or your own source (below)
-    crs: 'EPSG:3395',                        // the CRS of your data; default 'EPSG:3395'
-    opacity: 1,                              // optional
-    maxCachedTiles: 256,                     // optional
-    zoomBias: 0,                             // optional: + sharper, - fewer tiles
-    maxTiles: 64,                            // optional: cap on tiles requested and drawn at once
+    source: TILE_SOURCES.esriWorldImagery,
+    center: { latitude: 40.7831, longitude: -73.9712 },
+    zoom: 12,
+    crs: 'EPSG:3395',
+    opacity: 1,
+    maxCachedTiles: 256,
+    maxTiles: 64,
+    zoomBias: 0,
 });
-map.loadTiles('streets', { source: {
-    urlTemplate: 'https://{s}.tile.example.org/{z}/{x}/{y}.png',
-    attribution: { text: '© Example contributors', url: 'https://example.org/copyright' },
-    minZoom: 0, maxZoom: 19, tileSize: 256, subdomains: 'abc',
-} });
-map.updateRenderInfo('imagery', { opacity: 0.6 });   // also { isSkip: true } to hide
-map.getTileStats('imagery');                         // read-only statistics
-map.renderStats;                                     // CPU time and rate of rendered frames
+map.updateRenderInfo('imagery', { opacity: 0.6 });
+map.updateRenderInfo('imagery', { isSkip: true });
+map.getTileStats('imagery');
+map.renderStats;
 map.removeLayer('imagery');
 ```
 
-- **Sources.** A URL template with `{z}`, `{x}`, `{y}` (or `{reverseY}` for TMS) and optionally `{s}` with `subdomains`; invalid templates, zoom limits, tile sizes or links are errors at load time. Presets: `esriWorldImagery`, `openStreetMap`, `cartoLight`.
-- **Attribution** is required: a string, a `{ text, url }` entry, or a list. It shows at the bottom right as DOM text and anchors (`http(s)` links only), once per visible layer. Following provider terms is the caller's job: OSM's public servers forbid heavy use, and Esri needs its credit visible.
-- **Order.** Tile layers sit under every other layer (z-index −1), so a `surface` layer would cover them. Tiles are not drawn until a data layer sets the origin.
-- Request concurrency (8), ancestor preloading (1 level), retry timing and the footprint reach are internal defaults.
+Custom sources accept `{z}`, `{x}`, `{y}` or `{reverseY}`, and optional `{s}` subdomains. Attribution is required and may contain HTTP(S) links. Credits are built from DOM text/anchors and merged across visible tile layers. Source requests need CORS support; provider access and usage terms still apply.
 
-## How it works
+Sources use the Web Mercator tile grid. The creation parameter `crs` selects EPSG:3395, EPSG:3857, or EPSG:4326. When omitted, it inherits the map workspace CRS, which defaults to `DEFAULT_WORKSPACE_COORDINATE_FORMAT` from `autk-core`, the same constant used by `autk-db` (EPSG:3395). Configure a custom workspace in the map constructor or with `crs` on the first successful imagery/terrain load. Subsequent conflicting CRS values are rejected. This is the workspace/output CRS, not an imported file's source CRS. It must match the data's actual coordinates. The optional `center` is always geographic WGS84 latitude/longitude and is projected into that CRS. `zoom` sets the initial Web Mercator horizontal scale in CSS pixels (source tile size applies); fractional values are supported. Zoom defaults to 12 when a center is supplied. Existing scene origins are preserved; only an explicit center positions the camera. Unsupported CRS values and invalid numeric options are rejected before GPU allocation. Cache and tile limits must be positive safe integers; zoom bias must be finite; initial opacity must be finite and between zero and one. Loading errors are reported through the existing console-based API convention.
 
-Each frame the map calls `prepareRender(camera)` and `renderPass(camera, pass)` on every visible layer. A `TileLayer` selects the tiles the camera sees, tells the store which are wanted, takes each tile's own texture or its nearest loaded ancestor's, packs them into one vertex and index set, and draws each tile with its own bind group (premultiplied alpha, no depth write). A tile arrival asks for a frame, so on-demand rendering draws it.
+## Rendering and camera integration
 
-All files are in `autk-map/src`; only the last row uses the GPU:
+The layer manager controls tile placement through CPU drawing order. Tile vertices have physical height zero and use main's raster shader and premultiplied blending. There is no z-index shader uniform, artificial layer height, per-layer depth bias, or call to the removed `Pipeline.updateZIndex` API. Buildings and terrain retain their physical-depth and compositing paths.
 
-| File | Role |
-|---|---|
-| `tile-index`, `tile-source`, `tile-projection` | tile addressing and ranges, sources and URLs, lon/lat to EPSG:3395, 3857, 4326 |
-| `tile-geometry`, `tile-selection`, `tile-frame` | one tile's vertices, camera → footprint → zoom → tile list, packing with ancestor stand-ins |
-| `tile-cache`, `tile-loader`, `tile-store` | LRU cache, request queue (concurrency, priority, dedupe, abort, retries), policy and counters |
-| `attribution`, `frame-stats`, `utils-math` | credits and their DOM element, frame timing, shared helpers |
-| `layer-tiles`, `pipeline-tiles` | the layer and its pipeline |
+Projection is computed on the CPU. Tiles use additional mesh rows where needed to approximate projection curvature. Shared edges use the same coordinate arithmetic; geometry is stored relative to the shared origin before conversion to float32.
 
-## Behaviour
+Selection reads the camera's ground-plane footprint. Tile resolution uses the actual render target: the renderer's backing-store dimensions for flat maps and the offscreen overlay viewport for terrain. Flat-map selection includes DPR; DPR 2 can request a finer zoom than DPR 1 at the same CSS size. This does not change camera or pointer-coordinate semantics. The tile cap is applied separately and can deliberately lower resolution. Selection is inactive for an unconfigured orthographic terrain-overlay camera.
 
-### Geometry
+Main's opt-in fitting, raster-only bounds, and automatic far-plane expansion are retained. The camera ground helpers include a ray-basis correction checked against inverse rendering matrices, including nonunit and nonorthogonal up vectors. The new explicit geographic view can choose a smaller near plane for degree-based coordinates or extreme zoom; ordinary camera resets retain their previous near-plane default. Existing rendering/picking GPU regressions exercise the integrated camera.
 
-Tiles are EPSG:3857; the map plane is the workspace CRS minus the shared origin. The x axis agrees between 3857 and 3395, but y differs (up to 27 km at 40° N), so each tile is a quad with corners projected into the map CRS and `R` rows so the texture stays linear in Mercator y:
+## Loading, fallback, and ownership
 
-| CRS | rows by zoom |
-|---|---|
-| EPSG:3857 | 1 at every zoom |
-| EPSG:3395 | 4, 4, 2, 2, 2 for zoom 0 to 4; 1 from zoom 5 |
-| EPSG:4326 | 64, 64, 64, 32, 16, 16, 8, 8, 4, 4, 2, 2 for zoom 0 to 11; 1 from zoom 12 |
+- Up to eight requests run concurrently per tile layer.
+- The default selection cap is 64 tiles. Ancestor preloads add requests; the cap is not a lifetime request count or cache limit.
+- The default cache limit is 256 entries. It is soft: currently used tiles remain protected to avoid evicting a frame's own imagery.
+- One ancestor level is preloaded. A missing child uses its nearest loaded ancestor with cropped UVs. A cold cache can still show blank areas until an image arrives.
+- Requests that leave the view are cancelled. Timeouts and transient errors retry with backoff; permanent HTTP failures do not retry while their failure entry is retained.
+- Hiding a layer cancels outstanding work and retains ready textures. Showing it reuses the cache. Removal/destruction cancels timers and requests and releases textures and buffers.
+- Initialization is transactional. If pipeline setup fails, the new layer is removed and its partial resources are destroyed; retrying the same ID is permitted.
+- A texture whose upload/bind-group creation throws is destroyed before propagating the failure.
 
-The error bound is 1/8 pixel of a 512-pixel tile. Neighbouring tiles share edge vertices exactly. Float32 vertices relative to the origin stay within 1/32 pixel up to about 100 km from it.
+Requests and arrivals schedule only the frames needed. Reading statistics does not schedule rendering. CPU frame statistics measure preparing/submitting a frame, not GPU execution.
 
-### Selection
+## Gallery
 
-1. **Footprint.** `Camera.getGroundFootprint(reach)` returns the visible ground within `reach` (20 camera heights, at least 1000 map units) as a convex polygon, including the interior near the horizon. Its vertices give a lon/lat box.
-2. **Zoom.** `z = clamp(round(log2(metresAtZoom0 / metresPerScreenPixel)) + zoomBias, minZoom, maxZoom)`, measured at the view centre in device pixels and using the source's `tileSize`.
-3. **Cap.** Tiles are counted as a rectangle. While the count exceeds `maxTiles`, `z` is lowered (`wantedZoom` keeps the zoom before this); if the lowest zoom still needs more, a window of `maxTiles` around the view centre is kept and the result is `truncated`.
-4. Tiles come back nearest the view centre first, which is also the request priority.
+`gallery/src/autk-map/tiles-basemap.html` uses the shared gallery layout, compact header/footer, statistics side panel, and map-anchored opacity control. It loads only a tile layer, using a geographic Manhattan center and initial zoom. Its source choices are Esri imagery, OpenStreetMap (Light), OpenStreetMap (Dark), OpenStreetMap, and local synthetic tiles, in that order. OpenStreetMap (Light) is selected initially in both tile examples. All OSM options use the same standard raster endpoint and preserve OSM attribution. The themes remap image luminance to muted palettes once per decoded tile; they do not remove baked-in labels or roads. No external style service, API key, or generated regional tile set is required. The public OSM tile usage policy still applies. CARTO is not included in the library presets or gallery. Overview and Tilt are the only view buttons. No neighborhood or other data collection is loaded.
 
-### Loading and cache
+`tiles-categorical.html` adds roads loaded through `autk-db`, using the same numeric category helper as `colormap-categorical-numeric`. The road legend keeps the category order 3, 1, 2. This combined example has no statistics panel or imagery-opacity control.
 
-- **Frame protocol.** `update(tiles)` marks what the frame uses (wanted tiles, preloaded ancestors, stand-in ancestors) before admitting new requests, and `endFrame()` trims the cache skipping tiles in use, so a visible tile is never evicted and reloaded.
-- **Priority.** Ancestors load first, coarse to fine; a tile that becomes more important moves ahead; in-flight requests are never duplicated. A tile no longer wanted is aborted.
-- **Failures.** A permanent failure (4xx other than 408 and 429) is not retried until reload. A transient one is retried twice by the loader (500 ms, doubling), then by the store after 5 s doubling to 60 s while the view still wants the tile.
-- **Hiding** a layer cancels its requests and keeps ready textures; showing it resumes with only what is missing.
-- The browser HTTP cache is used as is. Textures upload as images arrive, with no per-frame budget.
+Run:
 
-### Drawing
+```sh
+make dev APP=gallery OPEN=/src/autk-map/tiles-basemap.html
+```
 
-A tile uses its texture if ready, else the nearest ready ancestor's with a UV offset and scale. The sampler is linear, clamp-to-edge, with no mipmaps: zoom rounding keeps texels within about 0.7 to 1.4 screen pixels, which can look soft or shimmer while moving.
+Exercise Overview → Tilt, source selection, visibility, and resize; standalone tiles also retain opacity and statistics. Cache reuse should rise on a return visit, requests should stop while hidden, and frame count should stop when idle. Live-provider failures should be distinguished from local rendering failures.
 
-### Statistics
+## Validation
 
-Read-only, safe to poll. `getTileStats(id)` returns `visible`, `zoom`, `wantedZoom`, `selectedTiles`, `truncated`, `readyTiles` / `fallbackTiles` / `missingTiles`, request counts, cache counts and bytes, cumulative `requests` / `cacheReuses` / `evictions`, and `idle` (`null` for an unknown id). `renderStats` returns `frameCount`, `lastFrameCpuMs`, `averageFrameCpuMs` and `framesPerSecond`. `requests` counts load attempts, retries included, so it is not a count of network transfers. Frame time is CPU time around preparing and submitting a frame, not GPU time.
+CPU tests cover grid addressing, projection fixtures, mesh approximation and shared edges, zoom/cap selection, cache policy, request priority, retries/cancellation, fallback, attribution, and statistics. Integration regressions add DPR resolution, invalid options, partial GPU setup cleanup, rollback/retry, and preservation of existing layers.
 
-## Terrain mode
+`autk-map/test/tiles.webgpu.ts` uses real fetch/decode/texture upload and the production pipeline with synthetic PNGs. It checks all three CRSs, orientation and colors, ancestor UV cropping, alpha/opacity, drawing order without physical z-index, building composition, cache reuse, idle rendering, and removal. The real gallery smoke test exercises local loading, view controls, visibility, statistics, and opacity. Existing render-order, camera/terrain/building, RGB raster, and gallery status regressions are retained.
 
-Tile layers draw into the terrain overlay like every other non-3D layer, through an orthographic camera over the visible terrain bounds (`Camera.setOrthographicBounds`; the ground and ray helpers follow the bounds, so reach does not apply). The overlay is at most 4096 px, so imagery can look slightly soft near the camera over a large terrain: at worst an overlay texel covers about 1.8 screen pixels at the bottom of a steeply tilted view. Draping is checked in a browser on GeoTIFF terrain and on streamed terrain.
+```sh
+node autk-compute/test/run-webgpu.mjs /autk-map/test/tiles.webgpu.ts
+node autk-compute/test/run-webgpu.mjs /gallery/test/tiles-basemap.webgpu.ts
+node autk-compute/test/run-webgpu.mjs /autk-map/test/render-order.webgpu.ts
+node autk-compute/test/run-webgpu.mjs /autk-map/test/raster-rgb.webgpu.ts
+```
 
-## Defaults
+## Remaining limits
 
-| Setting | Value |
-|---|---|
-| Concurrent requests / timeout | 8 / 15 s |
-| Loader retries | 2, 500 ms doubling |
-| Store retry cooldown | 5 s doubling to 60 s |
-| Cached tiles | 256 (about 64 MB at 256×256 RGBA) |
-| Tiles per selection | 64 |
-| Ancestors preloaded | 1 level |
-| Footprint reach | 20 camera heights, at least 1000 map units |
-| Texture format | `rgba8unorm` |
+Vector tiles, WMS/WMTS discovery, offline prefetching, arbitrary tile grids, and antimeridian wrapping are not implemented. Without an explicit center, a tile layer still needs an existing origin established by data or terrain; center and zoom allow standalone maps. Near-horizontal views have a finite selection reach. Source zoom limits and tile caps can soften imagery or truncate coverage.
 
-## Known behaviour
+Geometry is rebuilt/uploaded per rendered frame, and texture uploads have no per-frame budget. These are profiling targets rather than reasons to add speculative scheduler changes. Memory statistics count pixel storage only: 256 RGBA textures of 256×256 pixels are approximately 64 MiB, excluding driver overhead. Planet-scale views are not an acceptance target.
 
-- **Far plane.** The camera's far plane is 500 km, so zooming out past about that height clips the map.
-- **Tile cap on 2× screens.** A 2× screen asks for one zoom more, which can exceed the cap of 64 tiles; the cap then lowers the zoom and tiles look softer (`wantedZoom` above `zoom`).
-- **Reach.** A nearly level camera gets imagery only out to 20 camera heights.
+## Map credits
 
-## Tests
-
-All without a GPU, against a recording fake device: grid math, projection and geometry (against PROJ ground truth), selection and the tile cap, packing, cache, loader and store (priority, retries with fake timers, cancellation), the layer (requests, fallback, statistics, hide and show, terrain mode), attribution and frame statistics, and `autk-core`'s ground-point and footprint helpers. Not covered: a real GPU, real network behaviour, the visual result. Browser acceptance (flat map and terrain) was done by hand on 2026-11-07, without recorded details. Repeat it after changes to selection, loading or drawing with the gallery's `tiles-basemap`: Neighborhood → Overview → Neighborhood → Tilted → hide and show.
-
-## Open
-
-- Whether the default `maxTiles` should rise for 2× screens, and whether to add mipmaps or round the zoom up if tiles look soft.
-- Where the tile `crs` should come from (an `autk-db` helper could supply it), and whether presets belong in a separate module.
-- **Upload budget**, only if measurements show hitches while many tiles arrive: a bounded queue of decoded images drained per frame.
-- **Planet-scale views:** scale the far plane with altitude and avoid float32 error far from the origin.
-- Sharing pipeline setup with `PipelineTriangleRaster`, and a `*.webgpu.html` test for the tile pipeline.
-
-## Decisions made
-
-URL-template sources plus presets; an in-memory LRU plus the browser HTTP cache; no texture pool (measure first); device pixels set the zoom, with `zoomBias`; a tile cap bounds memory and requests and is never exceeded silently; reprojection on the CPU with extra rows only where the table says.
-
-## Prior art
-
-CesiumJS (imagery providers, per-layer cache, request scheduler, parent imagery) and OpenSpace globebrowsing (LRU tile cache over a texture pool, ancestor fallback with a UV transform). Ideas only; no code is taken.
+Autark and visible imagery providers share one translucent credit strip at the bottom left. “Made with Autark” links to https://www.autarkjs.org; linked credits have matching font, size, color, and decoration. Provider text and links are preserved, repeated credits are merged, and hiding imagery removes its provider credits while retaining Autark. Narrow maps wrap the strip; the bottom-right thematic legend moves above the strip when their horizontal space would overlap.

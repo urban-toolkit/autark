@@ -206,7 +206,7 @@ export class PipelineSprite extends Pipeline {
         const multisample: GPUMultisampleState = { count: this._renderer.sampleCount };
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: false,
-            depthCompare: 'greater-equal',
+            depthCompare: 'always',
             format: 'depth32float',
         };
 

@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import {
@@ -66,4 +67,4 @@ async function main() {
     const example = new ColormapCat();
     await example.run(canvas);
 }
-main();
+void runExample(main);

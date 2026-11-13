@@ -1,50 +1,62 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
-    <link rel="stylesheet" href="/src/autk-map/tiles-basemap.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Tile basemap</title>
+    <link rel="stylesheet" href="./tiles-basemap.css" />
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-
-<body>
-    <div id="app">
-        <h2>tiles-basemap.ts: satellite basemap explorer</h2>
-        <div id="controls">
-            <div class="group" role="group" aria-label="View">
-                <button id="view-overview" type="button">Overview</button>
-                <button id="view-neighborhood" type="button">Neighborhood</button>
-                <button id="view-tilted" type="button">Tilted</button>
-            </div>
-            <label class="check"><input id="show-tiles" type="checkbox" checked /> Show tiles</label>
-            <label class="slider">Opacity
-                <input id="opacity" type="range" min="0" max="1" step="0.05" value="1" />
-                <output id="opacity-value">100%</output>
-            </label>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header"><nav class="navigation" aria-label="Main navigation">
+        <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+        <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+    </nav></header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html">← All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Tile imagery</p>
+            <h1 id="example-title">Tile basemap</h1>
+            <p class="description">Explore a tile-only map. Choose a subdued light or dark basemap, satellite imagery, a street map, or local test tiles.</p>
+        </section>
+        <div class="tile-controls" role="group" aria-label="Basemap controls">
+            <label for="source-select">Source</label>
+            <select id="source-select"><option value="esriWorldImagery">Esri World Imagery</option><option value="osmLight" selected>OpenStreetMap (Light)</option><option value="osmDark">OpenStreetMap (Dark)</option><option value="openStreetMap">OpenStreetMap</option><option value="local">Local test tiles</option></select>
+            <button id="view-overview" type="button">Overview</button>
+            <button id="view-tilted" type="button">Tilt</button>
+            <label><input id="show-tiles" type="checkbox" checked /> Show tiles</label>
         </div>
-        <div id="stage">
-            <canvas></canvas>
-            <table id="stats" aria-label="Tile layer statistics">
-                <caption id="stats-status">Starting…</caption>
-                <tbody>
-                    <tr><th>Tile zoom / selected</th><td id="stat-selection">-</td></tr>
-                    <tr><th>Ready / fallback / missing</th><td id="stat-drawn">-</td></tr>
-                    <tr><th>Active / queued / waiting</th><td id="stat-requests-now">-</td></tr>
-                    <tr><th>Cached textures / limit</th><td id="stat-cache">-</td></tr>
-                    <tr><th>Texture memory (est.)</th><td id="stat-memory">-</td></tr>
-                    <tr><th>Requests / reuses / evictions</th><td id="stat-counters">-</td></tr>
-                    <tr><th>CPU per frame / frames per second</th><td id="stat-frames">-</td></tr>
-                    <tr><th>Frames rendered</th><td id="stat-frame-count">-</td></tr>
-                </tbody>
-            </table>
+        <div id="app" class="example-workspace tile-workspace">
+            <section class="map-panel" aria-labelledby="map-title">
+                <div class="panel-header"><h2 id="map-title">Manhattan</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+                <div class="map-stage" aria-busy="true">
+                    <canvas aria-label="Tile basemap of Manhattan" aria-describedby="map-help"></canvas>
+                    <div class="opacity-control"><label for="opacity">Imagery opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="1" /><output id="opacity-value" class="control-value">100%</output></div>
+                </div>
+                <div id="map-help" class="panel-footer"><span>Drag to pan · Shift-drag to tilt · Scroll to zoom</span></div>
+            </section>
+            <aside class="details-panel" aria-labelledby="stats-title">
+                <div class="panel-header"><h2 id="stats-title">Tile statistics</h2></div>
+                <div class="details-body">
+                    <p id="stats-status" class="selection-label" role="status">Starting…</p>
+                    <dl class="metric-list tile-metrics">
+                        <div><dt>Zoom / selected</dt><dd id="stat-selection">—</dd></div>
+                        <div><dt>Ready / fallback / missing</dt><dd id="stat-drawn">—</dd></div>
+                        <div><dt>Active / queued / retrying</dt><dd id="stat-requests-now">—</dd></div>
+                        <div><dt>Cache / limit</dt><dd id="stat-cache">—</dd></div>
+                        <div><dt>Texture memory</dt><dd id="stat-memory">—</dd></div>
+                        <div><dt>Requests / reuses / evictions</dt><dd id="stat-counters">—</dd></div>
+                        <div><dt>CPU time / frame rate</dt><dd id="stat-frames">—</dd></div>
+                        <div><dt>Frames rendered</dt><dd id="stat-frame-count">—</dd></div>
+                    </dl>
+                    <p class="selection-help">Requests include retries and browser-cache reads. Memory estimates exclude driver overhead. Local tiles use a synthetic pattern, not geographic imagery.</p>
+                </div>
+                <p class="data-note">CPU timing · GPU time excluded</p>
+            </aside>
         </div>
-        <p id="notes">
-            CPU time is measured around preparing and submitting a frame; it does not include the GPU.
-            The request count includes retries and is not a count of network transfers: the browser may answer from its cache.
-            Memory is the tile pixels only, at 4 bytes each.
-        </p>
-    </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./tiles-basemap.ts"></script>
 </body>
-<script type="module" src="/src/autk-map/tiles-basemap.ts"></script>
-
 </html>

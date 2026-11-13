@@ -10,7 +10,7 @@
  */
 
 import type { Heightfield } from '@urban-toolkit/autk-core';
-import { bilerp, clamp } from './utils-math';
+import { bilerp, clamp } from '@urban-toolkit/autk-core';
 
 /** Most levels a height source may have; the WGSL uniform table holds this many. */
 export const MAX_HEIGHT_LEVELS = 8;

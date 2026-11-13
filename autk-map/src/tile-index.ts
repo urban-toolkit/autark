@@ -4,7 +4,7 @@
  *
  * Tiles follow the common XYZ ("slippy map") scheme: zoom `z` splits the world
  * square into `2^z × 2^z` tiles, `x` counts from the west edge and `y` from the
- * north edge. These are the tiles served by OpenStreetMap, Esri, Carto and most
+ * north edge. These are the tiles served by OpenStreetMap, Esri and most
  * other providers.
  */
 

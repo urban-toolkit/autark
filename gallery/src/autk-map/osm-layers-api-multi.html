@@ -3,18 +3,44 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Multiple OpenStreetMap areas</title>
     <link rel="stylesheet" href="/src/autk-map/osm-layers-api-multi.css">
+    <link rel="stylesheet" href="../../example.css" />
 </head>
 
-<body>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> OpenStreetMap</p>
+            <h1 id="example-title">Multiple OpenStreetMap areas</h1>
+            <p class="description">Work with layers across multiple areas.</p>
+        </section>
     <div id="app">
-        <h2>osm-layers-api-multi.ts</h2>
+
         <div class="map-container">
-            <canvas id="map01"> </canvas>
-            <canvas id="map02"> </canvas>
+            <section class="map-panel" aria-label="Multiple OpenStreetMap areas map area">
+            <div class="panel-header"><h2>Map 1</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Multiple OpenStreetMap areas map" id="map01"> </canvas></div>
+            <div class="panel-footer" id="map-help"><span>Drag to pan · Scroll to zoom · Menu for layers</span></div>
+        </section>
+            <section class="map-panel" aria-label="Multiple OpenStreetMap areas map area">
+            <div class="panel-header"><h2>Map 2</h2><p id="map-status-2" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help-2" aria-label="Multiple OpenStreetMap areas map" id="map02"> </canvas></div>
+            <div class="panel-footer" id="map-help-2"><span>Drag to pan · Scroll to zoom · Menu for layers</span></div>
+        </section>
         </div>
     </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
 </body>
 <script type="module" src="/src/autk-map/osm-layers-api-multi.ts"></script>
 

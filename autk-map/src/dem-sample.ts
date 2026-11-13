@@ -15,8 +15,10 @@
  */
 
 import type { DemTile } from './dem-decode';
+import { DemValidator } from './dem-validation';
+import type { ElevationValidationStats, ResolvedElevationValidation } from '@urban-toolkit/autk-core';
 import type { TileIndex } from './tile-index';
-import { bilerp, clamp } from './utils-math';
+import { bilerp, clamp } from '@urban-toolkit/autk-core';
 
 /** Finds a loaded tile, or `undefined` when it is not available. */
 export type DemTileLookup = (tile: TileIndex) => DemTile | undefined;
@@ -34,6 +36,7 @@ export class DemSampler {
     private lastKey = -1;
     private lastTile: DemTile | undefined;
     private usable: readonly boolean[] | undefined;
+    private readonly validator?: DemValidator;
     /** After {@link DemSampler.sample}: `true` when the value came from a coarser zoom or a pixel was filled from one, or there was none. */
     usedFallback = false;
 
@@ -44,7 +47,15 @@ export class DemSampler {
     constructor(
         private readonly lookup: DemTileLookup,
         private readonly tileSize: number,
-    ) {}
+        validation?: ResolvedElevationValidation,
+        memory?: (bytes: number) => void,
+    ) {
+        if (validation) this.validator = new DemValidator(tileSize, validation,
+            (z, x, y) => this.tile(z, x, y), (z, i, j) => this.rawTexel(z, i, j),
+            (z, px, py, minZoom) => this.fromCoarser(z, px, py, minZoom), () => { this.usedFallback = true; }, memory);
+    }
+
+    get validationStats(): ElevationValidationStats | undefined { return this.validator ? { ...this.validator.stats } : undefined; }
 
     /**
      * Tells the sampler which zooms can have data, so fallback does not search the others.
@@ -94,10 +105,10 @@ export class DemSampler {
         const j0 = Math.floor(v);
         const fu = u - i0;
         const fv = v - j0;
-        let a = this.texel(z, i0, j0);
-        let b = this.texel(z, i0 + 1, j0);
-        let c = this.texel(z, i0, j0 + 1);
-        let d = this.texel(z, i0 + 1, j0 + 1);
+        let a = this.texel(z, i0, j0, minZoom);
+        let b = this.texel(z, i0 + 1, j0, minZoom);
+        let c = this.texel(z, i0, j0 + 1, minZoom);
+        let d = this.texel(z, i0 + 1, j0 + 1, minZoom);
         const aMissing = a !== a;
         const bMissing = b !== b;
         const cMissing = c !== c;
@@ -142,7 +153,11 @@ export class DemSampler {
     }
 
     /** One pixel of the world at zoom `z`. The world wraps in x and clamps in y. */
-    private texel(z: number, i: number, j: number): number {
+    private texel(z: number, i: number, j: number, minZoom: number): number {
+        return this.validator ? this.validator.read(z, i, j, minZoom) : this.rawTexel(z, i, j);
+    }
+
+    private rawTexel(z: number, i: number, j: number): number {
         const size = this.tileSize;
         const span = 2 ** z * size;
         const wrappedI = ((i % span) + span) % span;

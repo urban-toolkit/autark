@@ -110,18 +110,20 @@ export class Camera {
      * @param wUp - World-space up vector.
      * @param wLookAt - Point to look at in world space.
      * @param wEye - Eye position in world space.
+     * @param far - Far clipping distance; defaults to 500,000 world units.
+     * @param near - Near clipping distance; defaults to 1 world unit. Explicit small-unit views may use a smaller value.
      * @throws Never throws.
      * @example
      * camera.resetCamera([0, 1, 0], [100, 200, 0], [100, 200, 500]);
      * camera.update();
      */
-    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[]): void {
+    public resetCamera(wUp: number[], wLookAt: number[], wEye: number[], far = 5e5, near = 1): void {
         this.orthographic = null;
         this.fovy = (45 * Math.PI) / 180.0;
         this.mProjectionMatrix = mat4.create();
         this.mViewMatrix = mat4.create();
-        this.wNear = 1;
-        this.wFar = 5e5;
+        this.wNear = near;
+        this.wFar = far;
         this.wLookAt = vec3.fromValues(wLookAt[0], wLookAt[1], wLookAt[2]);
         this.wEye = vec3.fromValues(wEye[0], wEye[1], wEye[2]);
         this.updateEyeDirAndLen();
@@ -263,10 +265,8 @@ export class Camera {
      *
      * The camera stays orthographic until {@link resetCamera} is called:
      * {@link resize} and {@link update} keep the projection, and the ground and
-     * ray helpers follow the bounds. World `z` from -10 to 90 is inside the
-     * depth range, so layers may use small negative `z` values (tile layers draw
-     * at `z = -1`). Depth is `(z + 10) / 100`, the same slope as before, so the
-     * order of layers does not change.
+     * ray helpers follow the bounds. World `z` from -10 to 90 is inside the depth range.
+     * Ordinary 2D layers remain on the common ground plane and use drawing order.
      *
      * @param left - World X at the left edge.
      * @param right - World X at the right edge.

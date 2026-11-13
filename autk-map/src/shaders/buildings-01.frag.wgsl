@@ -46,8 +46,11 @@ fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @locati
 
     var sampledColor = textureSample(cMapTex, cMapSampler, vec2f(thematicValue, 0.0));
 
+    // A highlighted feature is drawn opaque: at the layer's opacity it would fade with the layer, and could vanish.
+    var drawOpacity = opacity;
     if(showHighlight > 0 && inHighlighted > 0) {
         color = vec4f(highlightColor.r / 255, highlightColor.g / 255, highlightColor.b / 255, highlightColor.a);
+        drawOpacity = 1.0;
     }
     else if (showThematic > 0 && inThematicValid < 0.5) {
         color = vec4f(invalidValueColor.r / 255, invalidValueColor.g / 255, invalidValueColor.b / 255, invalidValueColor.a);
@@ -59,7 +62,7 @@ fn main(@builtin(position) fragPos: vec4f, @location(0) inNormal: vec3f, @locati
     var shade: vec4f = color * (diffuse + ambient);
 
     var output : BufferOut;
-    output.color  = vec4f(shade.rgb * opacity, opacity);
+    output.color  = vec4f(shade.rgb * drawOpacity, drawOpacity);
     // Store depth in normal.a (mapped to [0.001, 0.999] so geometry is always > 0,
     // distinguishable from background which is cleared to 0.0).
     output.normal = vec4f(normal * 0.5 + 0.5, fragPos.z * 0.998 + 0.001);

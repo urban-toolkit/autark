@@ -11,9 +11,10 @@
 
 import { ColorMap } from '@urban-toolkit/autk-core';
 import type { ColorRGB } from '@urban-toolkit/autk-core';
-import { createAttributionElement } from './attribution';
+import { AUTARK_CREDIT, createAttributionElement, mergeCredits } from './attribution';
 import type { TileCredit } from './attribution';
 import { Layer } from './layer';
+import { legendLabelPlacements } from './legend-labels';
 import { AutkMap } from './map';
 
 import * as d3 from 'd3';
@@ -111,10 +112,16 @@ export class AutkMapUi {
             this._subMenu.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
         }
         if (this._legend) {
-            const width  = parseInt(this._legend.style.width  || '0', 10) || 0;
-            const height = parseInt(this._legend.style.height || '0', 10) || 0;
+            const width  = this._legend.offsetWidth;
+            const height = this._legend.offsetHeight;
             this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth  - 2 - width  - this._uiMargin) + 'px';
             this._legend.style.top  = (this.map.canvas.offsetTop  + this.map.canvas.clientHeight - 2 - height - this._uiMargin) + 'px';
+        }
+        if (this._attributionEl) {
+            // Constrain the watermark instead of moving other overlays out of its way.
+            this._attributionEl.style.maxWidth = this._legend?.style.visibility === 'visible'
+                ? `${Math.max(0, this.map.canvas.clientWidth - this._legend.offsetWidth - 3 * this._uiMargin - 2)}px`
+                : 'calc(100% - 20px)';
         }
         if (this._performanceOverlay) {
             this._performanceOverlay.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth - 92 - this._uiMargin) + 'px';
@@ -123,8 +130,8 @@ export class AutkMapUi {
     }
 
     /**
-     * Adds a faint “made with autark” watermark at the bottom right. Branding is independent of `showUi` and never
-     * intercepts canvas interaction. No animation loop is needed for positioning.
+     * Adds linked Autark and provider credits at the bottom left. Branding is
+     * independent of `showUi`; only the credit strip intercepts pointer events.
      */
     buildBranding(): void {
         if (this._branding || !this.map.canvas.parentElement) return;
@@ -134,20 +141,19 @@ export class AutkMapUi {
         Object.assign(this._branding.style, {
             position: 'absolute', pointerEvents: 'none', zIndex: '10', overflow: 'hidden',
         });
-        this._branding.innerHTML = `<span class="autk-map-credit" style="position:absolute;right:10px;bottom:10px;font:11px system-ui,sans-serif;color:#555;opacity:0.6;white-space:nowrap">made with autark</span>`;
         this.map.canvas.parentElement.appendChild(this._branding);
         this.renderAttribution();
         if (typeof ResizeObserver !== 'undefined') {
             this._brandingResizeObserver = new ResizeObserver(() => this.handleResize());
             this._brandingResizeObserver.observe(this.map.canvas);
+            if (this._legend) this._brandingResizeObserver.observe(this._legend);
         }
         this.handleResize();
     }
 
     /**
-     * Sets the data-provider credits shown above the watermark, such as the
-     * attribution of tile sources. Credits with a link are shown as anchors; an
-     * empty list hides them.
+     * Sets the data-provider credits shown beside the Autark link. An empty list
+     * removes provider credits while retaining Autark's credit.
      *
      * @param credits Credits to show, as plain strings or `{ text, url }` entries.
      */
@@ -159,8 +165,11 @@ export class AutkMapUi {
     private renderAttribution(): void {
         if (!this._branding) return;
         this._attributionEl?.remove();
-        this._attributionEl = createAttributionElement(document, this._attribution);
-        if (this._attributionEl) this._branding.appendChild(this._attributionEl);
+        this._attributionEl = createAttributionElement(document, mergeCredits([[AUTARK_CREDIT], this._attribution]));
+        if (this._attributionEl) {
+            this._branding.appendChild(this._attributionEl);
+        }
+        this.handleResize();
     }
 
     // ── Active layer ──────────────────────────────────────────────────────────
@@ -332,6 +341,7 @@ export class AutkMapUi {
         const isColorMap = this._activeLayer?.layerRenderInfo.isColorMap ?? false;
         this._legend.style.visibility = isColorMap ? 'visible' : 'hidden';
         this.updateLegendContent();
+        this.handleResize();
     }
 
     // ── Build structure (idempotent) ───────────────────────────────────────────
@@ -457,6 +467,8 @@ export class AutkMapUi {
         });
 
         this.map.canvas.parentElement?.appendChild(this._legend);
+        this._brandingResizeObserver?.observe(this._legend);
+        this.handleResize();
     }
 
     /**
@@ -571,17 +583,12 @@ export class AutkMapUi {
             .style('stroke', (d) => `rgb(${d.r},${d.g},${d.b})`)
             .style('stroke-width', '1px');
 
-        const textData = labels.map((d, i) => ({
-            label: d,
-            pos: isCategorical
-                ? i * rectWidth + rectWidth / 2
-                : i * (innerWidth / (labels.length - 1)),
-        }));
+        const textData = legendLabelPlacements(labels, innerWidth, rectWidth, isCategorical);
 
         g.selectAll('text').data(textData).join('text')
             .text((d) => d.label)
             .attr('x', (d) => d.pos).attr('y', rectH + 12)
-            .style('font-size', '12px').style('fill', '#333').style('text-anchor', 'middle');
+            .style('font-size', '12px').style('fill', '#333').style('text-anchor', (d) => d.anchor);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -608,9 +615,14 @@ export class AutkMapUi {
 
         const paletteBtn = layer.layerInfo.typeLayer === 'tiles'
             ? makeButtonSpacer()
-            : this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
-                this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
-            });
+            : (() => {
+                const button = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
+                    this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
+                });
+                button.disabled = !layer.supportsColorMap;
+                if (!layer.supportsColorMap) button.title = 'RGB imagery does not use a scalar color map';
+                return button;
+            })();
 
         const isRaster = layer.layerInfo.typeLayer === 'raster' || layer.layerInfo.typeLayer === 'tiles';
         const cursorBtn = isRaster

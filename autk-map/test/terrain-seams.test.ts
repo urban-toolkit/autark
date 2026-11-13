@@ -8,6 +8,18 @@ const block = (x: number, y: number, size: number): SeamBlock => ({ x, y, size, 
 const seams = (b: SeamBlock) => [b.seamXMin, b.seamXMax, b.seamYMin, b.seamYMax];
 
 describe('assignSeams', () => {
+  it('stitches fixed heightfields whose quadtree origin is not aligned to world zero', () => {
+    const origin = [35.5, -11.25] as const;
+    const coarse = block(origin[0], origin[1], 200);
+    const fine = block(origin[0] + 200, origin[1], 100);
+    assignSeams([coarse, fine], origin);
+    expect(fine.seamXMin).toBe(1);
+    expect(coarse.seamXMax).toBe(0);
+    const edge = morphEdge(origin[1], 100 / 32, 5, 1, origin[1]);
+    expect(edge.lower).toBe(origin[1] + 12.5);
+    expect(edge.upper).toBe(origin[1] + 18.75);
+    expect(edge.weight).toBe(0.5);
+  });
   it('leaves equal-size neighbours alone', () => {
     const blocks = [block(0, 0, 100), block(100, 0, 100), block(0, 100, 100), block(100, 100, 100)];
     assignSeams(blocks);

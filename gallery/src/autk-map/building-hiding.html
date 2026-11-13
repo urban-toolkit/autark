@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Hide selected buildings</title>
+    <link rel="stylesheet" href="./building-hiding.css" />
+    <link rel="stylesheet" href="../../example.css" />
+</head>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Interaction</p>
+            <h1 id="example-title">Hide selected buildings</h1>
+            <p class="description">Double-click a building to select it, then hide it to reveal what is behind it.
+                Keep selecting and hiding buildings, or restore them all to start again.</p>
+        </section>
+        <div class="workspace">
+            <section class="map-panel" aria-labelledby="map-title">
+                <div class="panel-header">
+                    <h2 id="map-title">Lower Manhattan</h2>
+                    <p id="map-status" class="map-status" role="status">Loading map…</p>
+                </div>
+                <div class="map-stage" aria-busy="true">
+                    <canvas aria-label="Interactive map of Lower Manhattan buildings" aria-describedby="map-help"></canvas>
+                </div>
+                <div class="panel-footer" id="map-help"><span>Double-click to select · Scroll to zoom</span></div>
+            </section>
+            <aside class="details-panel" aria-labelledby="details-title">
+                <div class="panel-header">
+                    <h2 id="details-title">Building details</h2>
+                </div>
+                <div class="details-body">
+                    <p class="selection-label" id="info-selection">Awaiting selection</p>
+                    <h3 id="info-title" aria-live="polite" aria-atomic="true">No building selected</h3>
+                    <p class="selection-help" id="info-help">Double-click a building on the map to see its details here.</p>
+                    <div class="visibility-controls">
+                        <button type="button" id="hide-selected" disabled>Hide selected</button>
+                        <button type="button" id="restore-all" disabled>Restore all</button>
+                        <p id="visibility-status" role="status">0 buildings hidden</p>
+                    </div>
+                    <dl class="building-attributes">
+                        <div><dt>OSM ID</dt><dd id="info-osm-id">—</dd></div>
+                        <div><dt>Type</dt><dd id="info-type">—</dd></div>
+                        <div><dt>Height</dt><dd id="info-height">—</dd></div>
+                        <div><dt>Floors</dt><dd id="info-levels">—</dd></div>
+                        <div><dt>Address</dt><dd id="info-address">—</dd></div>
+                    </dl>
+                    <p class="selection-help">Tilt the map so buildings overlap. Hide a foreground building, then select a visible building behind it. Source: bundled OpenStreetMap extract. Missing attributes appear as a dash; estimated heights use 3 meters per floor.</p>
+                </div>
+                <p class="data-note">Source: bundled OpenStreetMap.</p>
+            </aside>
+        </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./building-hiding.ts"></script>
+</body>
+</html>

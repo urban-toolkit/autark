@@ -1,65 +1,61 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
-    <link rel="stylesheet" href="/src/autk-map/building-picking.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Building picking</title>
+    <link rel="stylesheet" href="./building-picking.css" />
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-
-<body>
-    <div id="app">
-        <h2>building-picking.ts</h2>
-        <button id="plotToggle" title="Toggle info panel">Info</button>
-        <canvas> </canvas>
-        <div id="plot">
-            <div id="plotBar"></div>
-            <div id="plotBody">
-                <h3 id="info-title">Click a building</h3>
-                <div class="info-row"><span>OSM id</span><strong id="info-osm-id">—</strong></div>
-                <div class="info-row"><span>Type</span><strong id="info-type">—</strong></div>
-                <div class="info-row"><span>Height</span><strong id="info-height">—</strong></div>
-                <div class="info-row"><span>Floors</span><strong id="info-levels">—</strong></div>
-                <div class="info-row"><span>Address</span><strong id="info-address">—</strong></div>
-            </div>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Interaction</p>
+            <h1 id="example-title">Building picking</h1>
+            <p class="description">Explore Lower Manhattan one building at a time.
+                Double-click a building to highlight it and inspect its OpenStreetMap attributes.</p>
+        </section>
+        <div class="workspace">
+            <section class="map-panel" aria-labelledby="map-title">
+                <div class="panel-header">
+                    <h2 id="map-title">Lower Manhattan</h2>
+                    <p id="map-status" class="map-status" role="status">Loading map…</p>
+                </div>
+                <div class="map-stage" aria-busy="true">
+                    <canvas aria-label="Interactive map of Lower Manhattan buildings" aria-describedby="map-help"></canvas>
+                </div>
+                <div class="panel-footer" id="map-help"><span>Double-click to select · Scroll to zoom</span></div>
+            </section>
+            <aside class="details-panel" aria-labelledby="details-title">
+                <div class="panel-header">
+                    <h2 id="details-title">Building details</h2>
+                </div>
+                <div class="details-body">
+                    <p class="selection-label" id="info-selection">Awaiting selection</p>
+                    <h3 id="info-title" aria-live="polite" aria-atomic="true">No building selected</h3>
+                    <p class="selection-help" id="info-help">Double-click a building on the map to see its details here.</p>
+                    <dl class="building-attributes">
+                        <div><dt>OSM ID</dt><dd id="info-osm-id">—</dd></div>
+                        <div><dt>Type</dt><dd id="info-type">—</dd></div>
+                        <div><dt>Height</dt><dd id="info-height">—</dd></div>
+                        <div><dt>Floors</dt><dd id="info-levels">—</dd></div>
+                        <div><dt>Address</dt><dd id="info-address">—</dd></div>
+                    </dl>
+                    <p class="selection-help">Source: OpenStreetMap. Missing attributes appear as a dash. Estimated heights use 3 meters per floor.</p>
+                </div>
+                <p class="data-note">Source: OpenStreetMap.</p>
+            </aside>
         </div>
-    </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./building-picking.ts"></script>
 </body>
-<script type="module" src="/src/autk-map/building-picking.ts"></script>
-<script>
-    function floatingPlot() {
-        let startX = 0, startY = 0, dragging = false;
-        const plot = document.querySelector('#plot');
-        const bar = document.querySelector('#plotBar');
-        const toggle = document.querySelector('#plotToggle');
-        if (!plot || !bar || !toggle) return;
-
-        plot.style.visibility = 'visible';
-        bar.style.touchAction = 'none';
-        toggle.addEventListener('click', () => plot.classList.toggle('hidden-plot'));
-
-        bar.addEventListener('pointerdown', e => {
-            e.preventDefault(); e.stopPropagation();
-            dragging = true; startX = e.clientX; startY = e.clientY;
-            bar.setPointerCapture(e.pointerId);
-        });
-        bar.addEventListener('pointermove', e => {
-            if (!dragging) return;
-            plot.style.top = `${plot.offsetTop + (e.clientY - startY)}px`;
-            plot.style.left = `${plot.offsetLeft + (e.clientX - startX)}px`;
-            startX = e.clientX; startY = e.clientY;
-            e.preventDefault(); e.stopPropagation();
-        });
-        bar.addEventListener('pointerup', e => {
-            dragging = false;
-            if (bar.hasPointerCapture(e.pointerId)) bar.releasePointerCapture(e.pointerId);
-        });
-        bar.addEventListener('pointercancel', e => {
-            dragging = false;
-            if (bar.hasPointerCapture(e.pointerId)) bar.releasePointerCapture(e.pointerId);
-        });
-    }
-    floatingPlot();
-</script>
-
 </html>

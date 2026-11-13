@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CameraMotion, ColorMapInterpolator } from '@urban-toolkit/autk-core';
 import { AutkMap } from '../src/map';
 import { FlatMapRenderPath } from '../src/map-flat';
+import { TileLayer } from '../src/layer-tiles';
 import { RasterLayer } from '../src/layer-raster';
 import { Triangles2DLayer } from '../src/layer-triangles2D';
 import { SpriteLayer } from '../src/layer-sprite';
@@ -522,7 +523,7 @@ describe('on-demand rendering', () => {
 
 describe('render statistics', () => {
     it('counts the frames that are rendered, measures their CPU time, and stops counting when the map is idle', async () => {
-        // The fake clock is installed before the setup frames render, so every duration below is deterministic.
+        // The fake clock is installed before the setup frames render, so every timestamp shares one clock.
         vi.spyOn(performance, 'now').mockImplementation(() => frames.now);
         const { map } = await idleOnDemandMap();
         flatFrames.mockImplementation(() => { frames.now += 3; }); // each frame now costs 3 ms of CPU; setup frames cost 0
@@ -573,12 +574,15 @@ describe('render statistics', () => {
 });
 
 describe('continuous rendering and teardown', () => {
-    it('adds faint branding even without map controls, tracks resize and cleans up on destroy', async () => {
+    it('adds linked branding even without map controls, tracks resize and cleans up on destroy', async () => {
         const canvas = new FakeCanvas();
         const parent = { appendChild: vi.fn() };
         Object.assign(canvas, { parentElement: parent });
-        const branding = { style: {}, innerHTML: '', className: '', remove: vi.fn() };
-        Object.assign(documentTarget, { createElement: vi.fn(() => branding) });
+        const makeElement = () => ({ style: {}, className: '', textContent: '', href: '', children: [] as any[],
+            appendChild(child: any) { this.children.push(child); }, remove: vi.fn() });
+        const branding = makeElement();
+        Object.assign(documentTarget, { createElement: vi.fn().mockReturnValueOnce(branding).mockImplementation(makeElement),
+            createTextNode: (text: string) => ({ textContent: text }) });
         const observe = vi.fn();
         const disconnect = vi.fn();
         let resized = () => undefined;
@@ -592,10 +596,13 @@ describe('continuous rendering and teardown', () => {
         map.ui.buildBranding();
 
         expect(parent.appendChild).toHaveBeenCalledOnce();
-        expect(branding.innerHTML).toContain('made with autark');
-        expect(branding.innerHTML).not.toContain('2026');
-        expect(branding.innerHTML).not.toContain('<img');
-        expect(branding.innerHTML).toContain('color:#555;opacity:0.6');
+        const strip = branding.children[0];
+        const link = strip.children[0];
+        expect(link.textContent).toBe('Made with Autark');
+        expect(link.href).toBe('https://www.autarkjs.org');
+        expect(link.target).toBe('_blank');
+        expect(link.rel).toBe('noopener noreferrer');
+        expect(strip.style).toMatchObject({ left: '10px', bottom: '10px' });
         expect(branding.style).toMatchObject({ pointerEvents: 'none', width: '400px', height: '300px' });
         expect(observe).toHaveBeenCalledWith(canvas);
         canvas.offsetWidth = 200;
@@ -718,6 +725,12 @@ describe('continuous rendering and teardown', () => {
 });
 
 describe('terrain tiles', () => {
+    it.each([NaN, Infinity, -1, 63, 4097, 128.5])('rejects an invalid overlay size before creating terrain: %s', async overlaySize => {
+        const { map } = await createMap();
+        expect(() => map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, overlaySize })).toThrow(/overlaySize/);
+        expect(terrainPaths).toHaveLength(0);
+        expect(map.getTerrainTileStats()).toBeNull();
+    });
     /** Tile requests that never answer, and stop when aborted: nothing reaches the network. */
     function stubTileNetwork(): Array<{ url: string; signal: AbortSignal }> {
         const requests: Array<{ url: string; signal: AbortSignal }> = [];
@@ -753,7 +766,7 @@ describe('terrain tiles', () => {
         expect(heights.levels).toHaveLength(6);
 
         expect(requests.length).toBeGreaterThan(0);
-        expect(requests[0]!.url).toMatch(/terrarium\/9\//);
+        expect(requests[0]!.url).toMatch(/terrarium\/8\//);
         const stats = map.getTerrainTileStats();
         expect(stats).toMatchObject({ levels: 6, windowSize: 64, readyTiles: 0 });
         expect(stats!.zooms).toEqual([14, 13, 12, 11, 10, 9]);
@@ -794,6 +807,117 @@ describe('terrain tiles', () => {
         map.disableTerrainMode();
         expect(map.getTerrainTileStats()).toBeNull();
         first.destroy();
+    });
+});
+
+describe('unified terrain loading', () => {
+    const source = TERRAIN_TILE_SOURCES.awsTerrarium;
+    const imagery = { urlTemplate: 'https://tiles.example/{z}/{x}/{y}.png', attribution: 'Example' };
+    const center = { latitude: -22.96, longitude: -43.2075 };
+
+    beforeEach(() => {
+        vi.stubGlobal('fetch', (_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }));
+        vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+    });
+
+    it('reuses a vector map origin, camera, and CRS without center or zoom', async () => {
+        const { map } = await createMap();
+        map.camera.pitch(-0.4);
+        const origin = [...map.layerManager.origin], eye = [...map.camera.getEye()], target = [...map.camera.getLookAt()];
+        map.loadTerrain({ source, windowSize: 16 });
+        map.loadTiles('imagery', { source: imagery });
+        expect(map.layerManager.origin).toEqual(origin);
+        expect(map.camera.getEye()).toEqual(eye);
+        expect(map.camera.getLookAt()).toEqual(target);
+        expect(map.workspaceCrs).toBe('EPSG:3395');
+        expect(terrainPaths[0].args[8]).toBe(false);
+        map.removeTerrain();
+        expect(map.layerManager.searchByLayerId('imagery')).toBeInstanceOf(TileLayer);
+        expect(map.layerManager.searchByLayerId('parks')).not.toBeNull();
+        expect(map.camera.getEye()).toEqual(eye);
+        map.destroy();
+    });
+
+    it('initializes terrain without imagery and later reuses its context for imagery', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        expect(() => map.loadTerrain({ source })).toThrow(/origin|center/);
+        map.loadTerrain({ source, center, zoom: 14, windowSize: 16 });
+        expect(map.layerManager.layers).toHaveLength(0);
+        expect(map.layerManager.hasOrigin).toBe(true);
+        const origin = [...map.layerManager.origin], eye = [...map.camera.getEye()];
+        map.loadTiles('imagery', { source: imagery });
+        expect(map.layerManager.origin).toEqual(origin);
+        expect(map.camera.getEye()).toEqual(eye);
+        map.destroy();
+    });
+
+    it('inherits a custom workspace CRS and rejects a conflicting layer', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs: 'EPSG:3857' });
+        await map.init();
+        map.loadCollection('parks', { collection: square, type: 'parks' });
+        map.loadTerrain({ source, windowSize: 16 });
+        map.loadTiles('imagery', { source: imagery });
+        expect(map.workspaceCrs).toBe('EPSG:3857');
+        const path = terrainPaths[0];
+        expect(() => map.loadTerrain({ source, crs: 'EPSG:3395' })).toThrow(/Workspace CRS/);
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        map.loadTiles('wrong', { source: imagery, crs: 'EPSG:3395' });
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('Workspace CRS'));
+        expect(map.layerManager.searchByLayerId('wrong')).toBeNull();
+        expect(terrainPaths).toEqual([path]);
+        map.destroy();
+    });
+
+    it('preserves the existing first-load CRS parameter for custom vector workspaces', async () => {
+        const { map } = await createMap();
+        map.loadTiles('imagery', { source: imagery, crs: 'EPSG:3857' });
+        map.loadTerrain({ source, windowSize: 16 });
+        expect(map.workspaceCrs).toBe('EPSG:3857');
+        expect(map.getTerrainTileStats()).not.toBeNull();
+        expect(() => map.loadTerrain({ source, crs: 'EPSG:3395' })).toThrow(/Workspace CRS/);
+        map.destroy();
+    });
+
+    it('validates fixed terrain without modifying database data and exposes shared diagnostics', async () => {
+        const { map } = await createMap();
+        const data = new Array(81).fill(-430); data[40] = -3000;
+        const collection: FeatureCollection<Geometry | null> = { type: 'FeatureCollection', bbox: [0, 0, 100, 100],
+            features: [{ type: 'Feature', geometry: null, properties: { rasterResX: 9, rasterResY: 9, band: data } }] };
+        map.loadTerrain({ source: { collection, property: 'band' } });
+        expect((terrainPaths.at(-1)!.args[5] as { data: Float32Array }).data[40]).toBe(-430);
+        expect(data[40]).toBe(-3000);
+        expect(map.getTerrainValidationStats()).toMatchObject({ rejected: 1, corrected: 1 });
+        const count = terrainPaths.length;
+        expect(() => map.loadTerrain({ source: { collection, property: 'band' }, validation: { minDeviation: NaN } })).toThrow(/finite and positive/);
+        expect(terrainPaths).toHaveLength(count);
+        map.loadTerrain({ source: { collection, property: 'band' }, validation: false });
+        expect((terrainPaths.at(-1)!.args[5] as { data: Float32Array }).data[40]).toBe(-3000);
+        expect(map.getTerrainValidationStats()).toBeNull();
+        map.removeTerrain();
+        expect(map.getTerrainValidationStats()).toBeNull();
+        map.destroy();
+    });
+
+    it('loads raster terrain through the same lifecycle and preserves active terrain on invalid input', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        expect(() => map.loadTerrain({ source, center, zoom: NaN })).toThrow(/zoom/);
+        expect(map.layerManager.hasOrigin).toBe(false);
+        map.loadTerrain({ source: { collection: raster([10, 20, 30, 40]), property: 'band' }, verticalScale: 2 });
+        expect((terrainPaths[0].args[5] as { data: Float32Array }).data[0]).toBe(20);
+        expect(map.layerManager.origin).toEqual([50, 50]);
+        expect(map.layerManager.layers).toHaveLength(0);
+        expect(map.getTerrainTileStats()).toBeNull();
+        const path = terrainPaths[0];
+        expect(() => map.loadTerrain({ source: { collection: raster([]), property: 'missing' } })).toThrow();
+        expect(terrainPaths).toEqual([path]);
+        expect((path as any).destroy).not.toHaveBeenCalled();
+        map.removeTerrain();
+        expect((path as any).destroy).toHaveBeenCalledOnce();
+        map.destroy();
     });
 });
 
@@ -894,5 +1018,99 @@ describe('terrain mode on demand', () => {
         land();
         await flushPromises();
         expect(requestFrame).toHaveBeenCalledOnce();
+    });
+});
+
+
+describe('transactional tile integration', () => {
+    const source = { urlTemplate: 'https://tiles.example/{z}/{x}/{y}.png', attribution: 'Example' };
+
+    it('removes a failed tile layer and permits retrying the same ID', async () => {
+        const { map } = await createMap();
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const destroy = vi.spyOn(TileLayer.prototype, 'destroy');
+        const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementationOnce(() => { throw new Error('GPU setup failed'); });
+        map.loadTiles('basemap', { source });
+        expect(map.layerManager.searchByLayerId('basemap')).toBeNull();
+        expect(destroy).toHaveBeenCalledTimes(1);
+        expect(map.layerManager.searchByLayerId('parks')).not.toBeNull();
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('GPU setup failed'));
+        create.mockImplementation(() => {});
+        map.loadTiles('basemap', { source });
+        expect(map.layerManager.searchByLayerId('basemap')).toBeInstanceOf(TileLayer);
+        expect(map.layerManager.layers[0]!.layerInfo.id).toBe('basemap');
+        map.destroy();
+    });
+
+    it('rejects invalid configuration without touching existing layers or a duplicate ID', async () => {
+        const { map } = await createMap();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        map.loadTiles('invalid', { source, crs: 'EPSG:9999' as never });
+        map.loadTiles('bad-limit', { source, maxCachedTiles: NaN });
+        expect(create).not.toHaveBeenCalled();
+        const parks = map.layerManager.searchByLayerId('parks');
+        map.loadTiles('parks', { source });
+        expect(map.layerManager.searchByLayerId('parks')).toBe(parks);
+        expect(map.layerManager.layers).toHaveLength(2);
+        map.destroy();
+    });
+});
+
+describe('tile-only geographic views', () => {
+    const source = { urlTemplate: 'https://tiles.example/{z}/{x}/{y}.png', attribution: 'Example' };
+    const center = { latitude: 0, longitude: 0 };
+
+    it('creates a standalone tile map and preserves its origin when adding overlays and another centered view', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        map.loadTiles('imagery', { source, center, zoom: 12 });
+        expect(map.layerManager.layers.map(layer => layer.layerInfo.typeLayer)).toEqual(['tiles']);
+        expect(map.layerManager.origin[0]).toBeCloseTo(0, 6);
+        expect(map.layerManager.origin[1]).toBeCloseTo(0, 6);
+        expect(map.camera.getLookAt()).toEqual([0, 0, 0]);
+        const distance = map.camera.getEye()[2];
+        const origin = [...map.layerManager.origin];
+        map.loadCollection('parks', { collection: square, type: 'polygons' });
+        map.loadTiles('second', { source, center, zoom: 13 });
+        expect(map.layerManager.origin).toEqual(origin);
+        expect(map.camera.getEye()[2]).toBeCloseTo(distance / 2, 3);
+        map.destroy();
+    });
+
+    it('does not initialize an origin on invalid geographic views or failed GPU setup', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => { throw new Error('GPU failure'); });
+        for (const config of [{ zoom: 12 }, { center, zoom: NaN }, { center, zoom: -1 },
+            { center: { latitude: 90, longitude: 0 } }, { center: { latitude: 0, longitude: 181 } }]) {
+            map.loadTiles('invalid', { source, ...config });
+        }
+        expect(create).not.toHaveBeenCalled();
+        map.loadTiles('failed', { source, center, zoom: 12 });
+        expect(map.layerManager.hasOrigin).toBe(false);
+        expect(map.layerManager.layers).toHaveLength(0);
+        map.destroy();
+    });
+
+    it('uses zoom 12 when only a center is supplied and adapts clipping to degree-based coordinates', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        map.loadTiles('imagery', { source, center });
+        const defaultDistance = map.camera.getEye()[2];
+        map.loadTiles('explicit', { source, center, zoom: 12 });
+        expect(map.camera.getEye()[2]).toBe(defaultDistance);
+        map.destroy();
+        const degrees = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs: 'EPSG:4326' });
+        await degrees.init();
+        degrees.loadTiles('degrees', { source, center, zoom: 12 });
+        expect(degrees.layerManager.searchByLayerId('degrees')).toBeInstanceOf(TileLayer);
+        expect(degrees.camera.getNear()).toBeLessThan(degrees.camera.getEye()[2]);
+        expect(degrees.camera.getNear()).toBeGreaterThan(0);
+        expect(() => degrees.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium })).toThrow(/metre-based/);
+        degrees.destroy();
     });
 });

@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { ComputeRender } from '@urban-toolkit/autk-compute';
 import { ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
 import { AutkDb } from '@urban-toolkit/autk-db';
@@ -110,4 +111,4 @@ async function main() {
     const example = new ComputeRenderOsmSkyExposure();
     await example.run(canvas);
 }
-main();
+void runExample(main);

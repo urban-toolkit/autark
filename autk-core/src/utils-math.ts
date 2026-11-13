@@ -1,6 +1,6 @@
 /**
- * @module AutkMapMath
- * Small numeric helpers shared by renderers and pipelines.
+ * @module AutkCoreMath
+ * General-purpose numeric helpers shared across Autark packages.
  */
 
 /**

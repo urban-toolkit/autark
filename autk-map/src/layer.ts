@@ -74,6 +74,9 @@ export abstract class Layer {
      */
     get supportsHighlight(): boolean { return false; }
 
+    /** Whether scalar/thematic coloring and its legend apply to the current payload. */
+    get supportsColorMap(): boolean { return true; }
+
     /**
      * Layer identity and ordering metadata.
      *
@@ -110,6 +113,7 @@ export abstract class Layer {
     updateLayerRenderInfo(info: Partial<LayerRenderInfo>): void {
         const canPick = this.supportsPicking && this.supportsHighlight;
         const nextInfo: Partial<LayerRenderInfo> = { ...info };
+        if (!this.supportsColorMap) nextInfo.isColorMap = false;
 
         for (const key of ['pointSize', 'polylinesWidth'] as const) {
             if (!(key in nextInfo)) { continue; }
@@ -197,10 +201,11 @@ export abstract class Layer {
      * camera-dependent precomputations.
      *
      * @param _camera Active camera used to compute view/projection transforms.
+     * @param _viewport Optional target dimensions in device pixels for offscreen rendering.
      * @returns Performs any layer-specific pre-render work. The base
      * implementation does nothing.
      */
-    prepareRender(_camera: Camera): void {}
+    prepareRender(_camera: Camera, _viewport?: readonly [number, number]): void {}
 
     /**
      * Executes the picking render pass.
@@ -210,6 +215,7 @@ export abstract class Layer {
      * implementation is a no-op.
      *
      * @param _camera Active camera used to compute view/projection transforms.
+     * @param _viewport Optional target dimensions in device pixels for offscreen rendering.
      * @returns Renders picking data when supported. Otherwise does nothing.
      */
     renderPickingPass(_camera: Camera, _passEncoder?: GPURenderPassEncoder): void {}

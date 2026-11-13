@@ -16,11 +16,12 @@ const fake = (label?: string): Fake => ({ id: nextId++, label, destroyed: false,
 
 function fakeRenderer() {
   const textures: Fake[] = [];
+  const buffers: Fake[] = [];
   const bindGroups: Array<{ id: number; label?: string }> = [];
   const writes: Array<{ label?: string; data: ArrayBufferView }> = [];
   const device = {
     createShaderModule: () => fake(),
-    createBuffer: (d: { label?: string }) => fake(d.label),
+    createBuffer: (d: { label?: string }) => { const b = fake(d.label); buffers.push(b); return b; },
     createBindGroupLayout: () => fake(),
     createPipelineLayout: () => fake(),
     createRenderPipeline: () => fake(),
@@ -43,7 +44,7 @@ function fakeRenderer() {
     getInvalidValueColor: () => ({ r: 0, g: 0, b: 0 }),
   };
   const renderer = { device, canvasFormat: 'bgra8unorm', sampleCount: 4, style } as unknown as Renderer;
-  return { renderer, textures, bindGroups, writes };
+  return { renderer, textures, buffers, bindGroups, writes };
 }
 
 function fakePass() {
@@ -596,5 +597,72 @@ describe('map style keys', () => {
       background: '#fff', surface: '#eee', parks: '#cfc', water: '#bdf', roads: '#ddd',
       buildings: '#ccc', points: '#555', polylines: '#777', polygons: '#999',
     })).not.toThrow();
+  });
+});
+
+
+describe('tile integration validation and partial resources', () => {
+  it.each([
+    { crs: 'EPSG:9999' }, { maxCachedTiles: NaN }, { maxCachedTiles: Infinity },
+    { maxCachedTiles: 0 }, { maxTiles: 1.5 }, { maxTiles: -1 }, { zoomBias: Infinity },
+    { maxDistanceInHeights: 0 },
+  ])('rejects invalid options before creating a pipeline: %j', options => {
+    expect(() => makeLayer(options)).toThrow();
+    expect(requests).toHaveLength(0);
+  });
+
+  it.each([NaN, -0.1, 1.1])('rejects invalid opacity %s', opacity => {
+    expect(() => new TileLayer(INFO, { ...RENDER, opacity }, { source: SOURCE }, () => ORIGIN)).toThrow(/opacity/);
+  });
+
+  it('owns and releases allocations when pipeline setup fails halfway through', () => {
+    vi.spyOn(ColorMap, 'getColorMap').mockReturnValue(new Uint8Array(4));
+    const gpu = fakeRenderer();
+    const layer = new TileLayer(INFO, RENDER, { source: SOURCE }, () => ORIGIN);
+    vi.spyOn(gpu.renderer.device, 'createBindGroup').mockImplementation(() => { throw new Error('allocation failed'); });
+    expect(() => layer.createPipeline(gpu.renderer)).toThrow('allocation failed');
+    expect(gpu.buffers.length).toBeGreaterThan(0);
+    layer.destroy();
+    expect(gpu.buffers.every(buffer => buffer.destroyed)).toBe(true);
+    expect(gpu.textures.every(texture => texture.destroyed)).toBe(true);
+    layer.destroy();
+  });
+});
+
+describe('tile renderer integration', () => {
+  it('uses the offscreen target viewport instead of the main canvas backing store', () => {
+    const { layer, renderer } = makeLayer({ maxTiles: 10000 });
+    Object.defineProperties(renderer, { pixelWidth: { value: 1600 }, pixelHeight: { value: 1000 } });
+    const view = new Camera();
+    view.setOrthographicBounds(-4000, 4000, -2500, 2500);
+    view.resize(1600, 1000);
+    layer.prepareRender(view);
+    const zoom = layer.stats.wantedZoom!;
+    layer.prepareRender(view, [3200, 2000]);
+    expect(layer.stats.wantedZoom).toBe(zoom + 1);
+    expect(view.getViewportWidth()).toBe(1600);
+    layer.destroy();
+  });
+  it('reads the renderer backing store instead of treating camera CSS dimensions as device pixels', () => {
+    const { layer, renderer } = makeLayer({ maxTiles: 10000 });
+    const view = camera(4000);
+    layer.prepareRender(view);
+    const zoom = layer.stats.wantedZoom!;
+    Object.defineProperties(renderer, { pixelWidth: { value: 3200 }, pixelHeight: { value: 2000 } });
+    layer.prepareRender(view);
+    expect(layer.stats.wantedZoom).toBe(zoom + 1);
+    expect(view.getViewportWidth()).toBe(1600);
+    layer.destroy();
+  });
+
+  it('releases a texture when external image upload throws', async () => {
+    const { layer, renderer, textures } = makeLayer();
+    vi.spyOn(renderer.device.queue, 'copyExternalImageToTexture').mockImplementation(() => { throw new Error('upload failed'); });
+    layer.prepareRender(camera(2000));
+    await requests[0]!.settle();
+    const allocated = textures.filter(texture => texture.label === 'Tile texture');
+    expect(allocated.length).toBeGreaterThan(0);
+    expect(allocated.every(texture => texture.destroyed)).toBe(true);
+    layer.destroy();
   });
 });

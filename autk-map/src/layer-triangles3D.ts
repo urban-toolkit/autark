@@ -23,7 +23,9 @@ import { Renderer } from './renderer';
 
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { PipelineTrianglePicking } from './pipeline-triangle-picking';
+import { StaticHeightSource } from './height-source';
 import type { HeightSource } from './height-source';
+import type { Heightfield } from '@urban-toolkit/autk-core';
 
 /**
  * 3D indexed-triangle layer with derived lighting normals.
@@ -55,6 +57,9 @@ export class Triangles3DLayer extends VectorLayer {
     protected _normalsAreDirty: boolean = false;
 
     private readonly COORD_DIM = 3;
+    private terrainDevice?: GPUDevice;
+    private legacyHeightTexture?: GPUTexture;
+    private legacyHeightSize = '';
 
     /**
      * Creates a 3D triangle layer.
@@ -110,6 +115,7 @@ export class Triangles3DLayer extends VectorLayer {
      * @returns {void} The layer pipelines are created and built against the current layer state.
      */
     override createPipeline(renderer: Renderer): void {
+        this.terrainDevice = renderer.device;
         this._pipeline = new PipelineBuildingSSAO(renderer);
         this._pipeline.build(this);
 
@@ -155,9 +161,8 @@ export class Triangles3DLayer extends VectorLayer {
      * Renders the layer's scene geometry into the geometry pass.
      *
      * This method keeps normal data current, pushes pending render-info and
-     * vertex-buffer updates to the active pipelines, refreshes the pipeline
-     * z-index from the current layer metadata, and then delegates the draw call
-     * to the SSAO geometry pass implementation.
+     * vertex-buffer updates to the active pipelines, then delegates the draw
+     * call to the SSAO geometry pass implementation at the geometry's elevation.
      *
      * Render-info updates are applied only when flagged dirty. Vertex-buffer
      * uploads are applied to both the main render pipeline and the picking
@@ -183,7 +188,6 @@ export class Triangles3DLayer extends VectorLayer {
             this._dataIsDirty = false;
         }
 
-        this._pipeline.updateZIndex(this._layerInfo.zIndex);
         (this._pipeline as PipelineBuildingSSAO).renderGeometryPass(camera, passEncoder);
     }
 
@@ -197,9 +201,37 @@ export class Triangles3DLayer extends VectorLayer {
      * @example
      * layer.setTerrainHeightSource(source, terrainHeightTextureView);
      */
-    setTerrainHeightSource(source: HeightSource, heightTextureView: GPUTextureView): void {
+    setTerrainHeightSource(source: HeightSource | Heightfield, heightTextureView: GPUTextureView): void {
+        // Older callers supply a Heightfield and a 2D view. Keep that API working
+        // by owning an array texture shared by the new render and picking paths.
+        if (!('levels' in source)) {
+            const device = this.terrainDevice;
+            if (!device) return;
+            const size = `${source.width}x${source.height}`;
+            if (!this.legacyHeightTexture || size !== this.legacyHeightSize) {
+                const texture = device.createTexture({ size: [source.width, source.height, 1], format: 'r32float',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+                this.legacyHeightTexture?.destroy();
+                this.legacyHeightTexture = texture;
+                this.legacyHeightSize = size;
+            }
+            device.queue.writeTexture({ texture: this.legacyHeightTexture }, source.data,
+                { bytesPerRow: source.width * 4 }, [source.width, source.height, 1]);
+            heightTextureView = this.legacyHeightTexture.createView({ dimension: '2d-array' });
+            source = new StaticHeightSource(source);
+        } else {
+            this.legacyHeightTexture?.destroy();
+            this.legacyHeightTexture = undefined;
+        }
         (this._pipeline as PipelineBuildingSSAO).setTerrainHeightSource(source, heightTextureView);
         this._pipelinePicking.setTerrainHeightSource(source, heightTextureView);
+    }
+
+    /** Releases pipelines and any texture owned by the fixed-heightfield compatibility path. */
+    override destroy(): void {
+        this.legacyHeightTexture?.destroy();
+        this.legacyHeightTexture = undefined;
+        super.destroy();
     }
 
     /**
@@ -211,6 +243,8 @@ export class Triangles3DLayer extends VectorLayer {
      * layer.clearTerrainHeightSource();
      */
     clearTerrainHeightSource(): void {
+        this.legacyHeightTexture?.destroy();
+        this.legacyHeightTexture = undefined;
         (this._pipeline as PipelineBuildingSSAO).clearTerrainHeightSource();
         this._pipelinePicking.clearTerrainHeightSource();
     }

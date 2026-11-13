@@ -1,3 +1,4 @@
+import { setExampleState } from '../example';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkDb } from '@urban-toolkit/autk-db';
 
@@ -36,21 +37,24 @@ form.addEventListener('submit', async event => {
     try {
         const parsed: unknown = JSON.parse(bboxInput.value);
         if (!Array.isArray(parsed) || parsed.length !== 4 || !parsed.every(value => typeof value === 'number' && Number.isFinite(value))) {
-            throw new Error('Formato inválido');
+            throw new Error('Invalid bounds format');
         }
         bbox = parsed as [number, number, number, number];
     } catch {
-        status.textContent = 'Recorte inválido: use [oeste, sul, leste, norte] com quatro números WGS84.';
+        setExampleState('error', 'Map unavailable.');
+        status.textContent = 'Invalid bounds: use [west, south, east, north] with four WGS84 numbers.';
         return;
     }
     if (bbox[0] >= bbox[2] || bbox[1] >= bbox[3] || bbox[0] < -180 || bbox[2] > 180 || bbox[1] < -90 || bbox[3] > 90) {
-        status.textContent = 'Recorte inválido: use oeste < leste e sul < norte, em graus WGS84.';
+        setExampleState('error', 'Map unavailable.');
+        status.textContent = 'Invalid bounds: use west < east and south < north in WGS84 degrees.';
         return;
     }
     const controls = form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button');
     controls.forEach(control => { control.disabled = true; });
     download.disabled = true;
-    status.textContent = 'Carregando dados do OpenStreetMap via Overpass…';
+    setExampleState('loading', 'Loading map…');
+    status.textContent = 'Loading OpenStreetMap data via Overpass…';
     try {
         if (!initialized) {
             await db.init();
@@ -70,7 +74,7 @@ form.addEventListener('submit', async event => {
             }
         }
         if (!layers.some(layer => layer.metadata.type === 'roads')) {
-            throw new Error('Nenhuma rua encontrada neste recorte. Tente outra área.');
+            throw new Error('No roads found in these bounds. Try another area.');
         }
         const bounds = await db.getBoundingBoxFromLayer('table_osm_surface');
         map?.destroy();
@@ -90,10 +94,12 @@ form.addEventListener('submit', async event => {
         map.camera.resetCamera([0, 1, 0], center, [center[0], center[1], distance]);
         map.draw();
         ready = true;
-        status.textContent = 'Mapa pronto. Ajuste o enquadramento, o texto e a largura das ruas; depois baixe o PNG.';
+        setExampleState('ready', 'Map ready');
+        status.textContent = 'Map ready. Adjust the view, caption, and road width, then download the PNG.';
     } catch (error) {
         console.error(error);
-        status.textContent = `Não foi possível gerar o mapa: ${error instanceof Error ? error.message : String(error)}`;
+        setExampleState('error', 'Map unavailable.');
+        status.textContent = `Unable to generate the map: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
         controls.forEach(control => { control.disabled = false; });
         download.disabled = !ready;
@@ -103,6 +109,7 @@ form.addEventListener('submit', async event => {
 download.addEventListener('click', async () => {
     if (!map || !ready) return;
     download.disabled = true;
+    setExampleState('loading', 'Exporting PNG…');
     try {
         const output = document.createElement('canvas');
         output.width = 2400;
@@ -139,7 +146,7 @@ download.addEventListener('click', async () => {
         }
         const blob = await new Promise<Blob>((resolve, reject) => output.toBlob(value => {
             if (value) resolve(value);
-            else reject(new Error('Falha ao exportar PNG.'));
+            else reject(new Error('Unable to export PNG.'));
         }, 'image/png'));
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -147,9 +154,11 @@ download.addEventListener('click', async () => {
         link.download = `${title.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').toLowerCase() || 'mapa'}-autark.png`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        status.textContent = 'PNG exportado com “made with autark”.';
+        setExampleState('ready', 'Map ready');
+        status.textContent = 'PNG exported with “made with autark”.';
     } catch (error) {
-        status.textContent = `Falha ao exportar: ${error instanceof Error ? error.message : String(error)}`;
+        setExampleState('error', 'Map unavailable.');
+        status.textContent = `Unable to export: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
         download.disabled = !ready;
     }

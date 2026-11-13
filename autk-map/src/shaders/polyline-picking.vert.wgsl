@@ -1,6 +1,5 @@
 @group(0) @binding(0) var<uniform> modelView: mat4x4f;
 @group(0) @binding(1) var<uniform> projection: mat4x4f;
-@group(0) @binding(2) var<uniform> zIndex: f32;
 @group(1) @binding(0) var<uniform> widthOverride: f32;
 @group(1) @binding(1) var<storage, read> adjacency: array<PolylineAdjacency>;
 
@@ -22,7 +21,7 @@ fn main(
     let node = adjacency[vertexIndex / 5u];
     let position = expandPolyline(center, node.previous, node.next, polylineSideRole(vertexIndex), width);
     var out: VSOut;
-    out.position = projection * modelView * vec4f(position, zIndex, 1.0);
+    out.position = projection * modelView * vec4f(position, 0.0, 1.0);
     out.color = objectId;
     out.skipped = skipped;
     return out;

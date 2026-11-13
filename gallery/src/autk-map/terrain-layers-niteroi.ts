@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
 
@@ -56,7 +57,7 @@ export class TerrainLayersNiteroi {
         this.map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
 
         const elevation = await this.db.getRaster(ELEVATION_LAYER_ID);
-        this.map.enableTerrainMode(elevation, 'band_1');
+        this.map.loadTerrain({ source: { collection: elevation, property: 'band_1' } });
 
         this.map.draw();
     }
@@ -84,4 +85,4 @@ async function main() {
     const example = new TerrainLayersNiteroi();
     await example.run(canvas);
 }
-main();
+void runExample(main);

@@ -23,6 +23,7 @@ export const DEFAULT_TIMING_CAPACITY = 2000;
 /** The most recent durations, summarized on demand. */
 export class TimingWindow {
     private readonly values: number[] = [];
+    private cached: TimingSummary | undefined;
 
     /** @param capacity - Most recent durations kept. */
     constructor(private readonly capacity: number = DEFAULT_TIMING_CAPACITY) {}
@@ -34,6 +35,7 @@ export class TimingWindow {
      */
     record(ms: number): void {
         if (!Number.isFinite(ms) || ms < 0) return;
+        this.cached = undefined;
         this.values.push(ms);
         if (this.values.length > this.capacity) this.values.shift();
     }
@@ -41,6 +43,7 @@ export class TimingWindow {
     /** Forgets every duration. */
     reset(): void {
         this.values.length = 0;
+        this.cached = undefined;
     }
 
     /**
@@ -49,10 +52,12 @@ export class TimingWindow {
      * @returns The summary; zeros when nothing was recorded.
      */
     summary(): TimingSummary {
+        if (this.cached) return { ...this.cached };
         const count = this.values.length;
         if (count === 0) return { count: 0, p50: 0, p95: 0, p99: 0, max: 0 };
         const sorted = [...this.values].sort((a, b) => a - b);
         const at = (fraction: number): number => sorted[Math.min(count - 1, Math.max(0, Math.ceil(fraction * count) - 1))]!;
-        return { count, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: sorted[count - 1]! };
+        this.cached = { count, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: sorted[count - 1]! };
+        return { ...this.cached };
     }
 }

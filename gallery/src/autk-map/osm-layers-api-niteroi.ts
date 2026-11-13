@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkDb } from '@urban-toolkit/autk-db';
 
@@ -63,4 +64,4 @@ async function main() {
     await example.run(canvas);
 }
 
-main();
+void runExample(main);

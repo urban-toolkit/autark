@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import {
     ComputeRender,
 } from '@urban-toolkit/autk-compute';
@@ -225,7 +226,7 @@ export class ComputeRenderOsmViewScore {
 
     protected renderSummary(): void {
         this.updateInfoPanel({
-            title: 'Pick a Building',
+            title: 'Pick a building',
             buildingId: '—',
             buildingHeight: null,
             parksVisibility: 0,
@@ -333,4 +334,4 @@ async function main() {
     const example = new ComputeRenderOsmViewScore();
     await example.run(canvas);
 }
-main();
+void runExample(main);

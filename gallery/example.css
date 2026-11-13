@@ -1,0 +1,220 @@
+:root {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #3c3c43;
+    background: #fff;
+    font-synthesis: none;
+    -webkit-font-smoothing: antialiased;
+    --accent: #3451b2;
+    --muted: #67676c;
+    --border: #e2e2e3;
+    --surface: #f6f6f7;
+    --panel-bar-height: 56px;
+}
+
+* { box-sizing: border-box; }
+body.gallery-example { font-family: inherit; margin: 0; display: block; color: #3c3c43; background: #fff; }
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: 3px; }
+
+.skip-link {
+    position: absolute;
+    top: -60px;
+    left: 16px;
+    z-index: 20;
+    padding: 10px 16px;
+    background: #fff;
+    color: var(--accent);
+}
+.skip-link:focus { top: 12px; }
+.site-header { border-bottom: 1px solid var(--border); }
+.navigation {
+    max-width: 1184px;
+    min-height: 68px;
+    margin: auto;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+.wordmark { display: flex; align-items: center; gap: 16px; font-size: 21px; font-weight: 750; letter-spacing: -.6px; }
+.wordmark span { border-left: 1px solid var(--border); padding-left: 16px; color: var(--muted); font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.guide-link { font-size: 13px; font-weight: 600; }
+.guide-link span { margin-left: 5px; color: var(--muted); }
+main.example-main { display: block; max-width: 1184px; margin: auto; padding: 28px 32px 24px; }
+.back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.introduction { margin: 30px 0 28px; }
+.eyebrow { margin: 0 0 10px; color: var(--accent); font-size: 12px; font-weight: 650; letter-spacing: .03em; }
+.eyebrow span { margin: 0 8px; color: #b2b2b8; }
+h1 { margin: 0; font-size: clamp(28px, 4vw, 38px); font-weight: 750; line-height: 1.18; letter-spacing: -1.2px; }
+.description { max-width: 690px; margin: 14px 0 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+.map-panel { min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.panel-header { min-height: 54px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-header h2 { margin: 0; font-size: 13px; font-weight: 650; }
+.map-status { margin: 0; color: var(--muted); font-size: 12px; }
+.map-status[data-state="error"] { color: #b8272c; }
+.map-stage { position: relative; background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.gallery-example canvas { display: block; width: 100%; height: clamp(400px, 58vh, 640px); }
+.panel-footer { display: flex; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; padding: 12px 20px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.page-footer { margin-top: 28px; color: var(--muted); font-size: 12px; text-align: center; }
+
+@media (max-width: 600px) {
+    .navigation { min-height: 60px; padding: 0 20px; }
+    main.example-main { padding: 24px 16px; }
+    .introduction { margin-top: 24px; }
+    .panel-header, .panel-footer { padding-left: 14px; padding-right: 14px; }
+}
+
+/* Shared controls and legacy layouts retain their original IDs and event bindings. */
+button, input, select { font: inherit; }
+.gallery-example button, .gallery-example select, .gallery-example input:not([type="range"]):not([type="checkbox"]) { min-height: 40px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--accent); font-size: 13px; }
+.gallery-example button { cursor: pointer; }
+.gallery-example button:hover:not(:disabled) { background: var(--surface); }
+.gallery-example button:disabled { opacity: .45; cursor: default; }
+.gallery-example button:focus-visible, .gallery-example input:focus-visible, .gallery-example select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.gallery-example input[type="range"] { accent-color: var(--accent); max-width: 100%; }
+.gallery-example #app { position: relative; display: block; margin: 0; width: 100%; min-height: 0; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.gallery-example #app canvas { width: 100%; margin: 0; }
+.gallery-example #app > label, .gallery-example #app > p, .gallery-example #app > select { margin: 14px 20px; font-size: 13px; }
+.gallery-example #app > label { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.gallery-example .map-container { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--border); }
+.gallery-example .map-container > canvas { min-width: 0; }
+.gallery-example .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0; }
+.gallery-example .controls label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.gallery-example .map { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.gallery-example #status { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.gallery-example .example-note { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.gallery-example .poster-workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 24px; }
+.gallery-example .poster-workspace aside { top: 20px; }
+.gallery-example #poster { border: 1px solid var(--border); border-radius: 12px; box-shadow: none; }
+.gallery-example #poster canvas { height: 100%; }
+.gallery-example .poster-workspace label { color: var(--muted); }
+.gallery-example .poster-workspace button { width: 100%; }
+.gallery-example .poster-workspace fieldset { border-color: var(--border); }
+@media (max-width: 700px) {
+    .gallery-example .map-container, .gallery-example .poster-workspace { grid-template-columns: minmax(0, 1fr); }
+    .gallery-example .poster-workspace aside { position: static; }
+    .gallery-example .navigation { gap: 12px; }
+    .gallery-example .guide-link { font-size: 12px; }
+    .gallery-example .panel-header { flex-wrap: wrap; }
+}
+
+/* Each canvas has its own status header and persistent interaction instructions. */
+.gallery-example #app { border: 0; background: transparent; }
+.gallery-example .map { border: 0; background: transparent; }
+.gallery-example .map-container { gap: 20px; background: transparent; align-items: start; }
+.gallery-example .map-status { max-width: 60%; text-align: right; overflow-wrap: anywhere; }
+.gallery-example .panel-header h2 { min-width: 0; }
+.gallery-example .map-status[data-state="loading"] { color: var(--muted); }
+.gallery-example .panel-footer span { max-width: 100%; }
+@media (max-width: 600px) {
+    .gallery-example .map-status { flex-basis: 100%; max-width: 100%; text-align: left; }
+}
+.gallery-example .map-panel { display: block; }
+.gallery-example #app .map-status { margin: 0; }
+
+/* Persistent side panels use the same layout as the building examples. */
+.gallery-example #app.example-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: stretch; }
+.gallery-example #app.chart-workspace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gallery-example .chart-workspace > .details-panel { align-self: stretch; }
+.details-panel { align-self: start; min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; }
+.details-panel > .panel-header { border-bottom: 1px solid var(--border); }
+.details-body { padding: 24px 20px; }
+.data-note { margin: 0; border-top: 1px solid var(--border); padding: 16px 20px; background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1.7; }
+.gallery-example #plotBody { margin: 0; padding: 20px; width: 100%; min-width: 0; overflow: auto; }
+.gallery-chart #plotBody { min-height: 240px; }
+.gallery-chart #plotBody > svg { display: block; width: 100%; height: auto; }
+@media (max-width: 900px) {
+    .gallery-example #app.example-workspace, .gallery-example #app.chart-workspace { grid-template-columns: minmax(0, 1fr); }
+    .gallery-example .chart-workspace > .details-panel { align-self: start; }
+}
+
+/* A consistent hierarchy for selections, metrics, controls, and explanatory notes. */
+.gallery-example .details-panel { font-size: 13px; line-height: 1.6; }
+.gallery-example .details-panel > .panel-header { min-height: 54px; padding: 16px 20px; }
+.gallery-example .details-panel > .panel-header h2 { font-size: 13px; line-height: 1.6; font-weight: 650; letter-spacing: 0; }
+.gallery-example .details-body h3 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: -.3px; overflow-wrap: anywhere; }
+.gallery-example .selection-label { margin: 0 0 8px; color: var(--accent); font-size: 11px; font-weight: 650; letter-spacing: .03em; }
+.gallery-example .selection-help { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.metric-list { margin: 24px 0 0; }
+.metric-list > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.metric-list dt { color: var(--muted); font-size: 12px; }
+.metric-list dd { min-width: 0; margin: 0; text-align: right; font-size: 13px; font-weight: 550; font-variant-numeric: tabular-nums; }
+/* Live values must not change row heights as counters and timings grow.
+   Long values remain selectable and horizontally scrollable. */
+.gallery-example .metric-list dd { display: flex; justify-content: safe flex-end; white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+.gallery-example .metric-list dd::-webkit-scrollbar { display: none; }
+.metric-score { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 14px 16px; border-radius: 8px; background: #3451b20a; color: var(--accent); }
+.metric-score span { font-size: 12px; font-weight: 550; }
+.metric-score strong { font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: -.6px; font-variant-numeric: tabular-nums; }
+.gallery-example .data-note { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.data-note > strong { display: block; margin-bottom: 4px; color: #3c3c43; font-size: 11px; font-weight: 600; }
+.gallery-example .building-attributes { margin-top: 20px; font-size: 12px; }
+.gallery-example .building-attributes > div { padding: 12px 0; }
+.gallery-example .building-attributes dd { font-size: 13px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.control-value { min-width: 38px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: #3c3c43; font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; }
+
+/* Keep opacity controls anchored to the map during scrolling and resizing. */
+.opacity-control { position: absolute; top: 12px; right: 12px; z-index: 20; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; width: 240px; max-width: calc(100% - 76px); padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: #fffffff2; box-shadow: 0 2px 8px #00000012; font-size: 12px; }
+.opacity-control label { grid-column: 1; align-self: center; color: var(--muted); font-weight: 550; }
+.opacity-control input { grid-column: 1 / -1; grid-row: 2; width: 100%; min-width: 0; margin: 0; }
+.opacity-control .control-value { grid-column: 2; grid-row: 1; }
+
+/* Shared tracks keep adjacent panel bars aligned, including wrapped text. */
+.gallery-example .panel-header,
+.gallery-example .panel-footer,
+.gallery-example .details-panel > .panel-header,
+.gallery-example .details-panel > .data-note {
+    min-height: var(--panel-bar-height);
+    height: var(--panel-bar-height);
+    max-height: var(--panel-bar-height);
+    padding: 16px 20px;
+    box-sizing: border-box;
+    overflow: auto;
+}
+.gallery-example .panel-footer,
+.gallery-example .details-panel > .data-note { padding-top: 9px; padding-bottom: 9px; line-height: 18px; }
+.gallery-example .panel-footer { row-gap: 0; }
+.gallery-example .panel-header h2,
+.gallery-example .map-status,
+.gallery-example .data-note { line-height: 20px; }
+.gallery-example .details-panel > .data-note { line-height: 18px; }
+.gallery-example .map-stage { border: 0; }
+.gallery-example .map-panel > .panel-header { border-bottom: 1px solid var(--border); }
+.gallery-example .map-panel > .panel-footer { border-top: 1px solid var(--border); align-items: center; }
+.gallery-example .workspace,
+.gallery-example #app.example-workspace,
+.gallery-example .map-container { grid-template-rows: auto 1fr auto; row-gap: 0; }
+.gallery-example .workspace > .map-panel,
+.gallery-example .workspace > .details-panel,
+.gallery-example .example-workspace > .map-panel,
+.gallery-example .example-workspace > .details-panel,
+.gallery-example .map-container > .map-panel {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    align-self: stretch;
+}
+@media (max-width: 900px) {
+    .gallery-example .workspace > .details-panel,
+    .gallery-example .example-workspace > .details-panel { margin-top: 20px; }
+}
+@media (max-width: 700px) {
+    .gallery-example .map-container > .map-panel + .map-panel { margin-top: 20px; }
+}
+@media (max-width: 600px) {
+    .gallery-example .panel-header,
+    .gallery-example .panel-footer,
+    .gallery-example .details-panel > .panel-header,
+    .gallery-example .details-panel > .data-note { padding-left: 14px; padding-right: 14px; }
+    .gallery-example .panel-header,
+    .gallery-example .details-panel > .panel-header { padding-top: 6px; padding-bottom: 6px; row-gap: 0; }
+}
+
+/* Compact copy fits the fixed bars without clipping or scrolling. */
+.gallery-example .panel-header,
+.gallery-example .details-panel > .panel-header { padding-top: 7px; padding-bottom: 7px; row-gap: 0; }
+.gallery-example .panel-footer { justify-content: flex-start; }
+.gallery-example .panel-footer span { white-space: normal; }

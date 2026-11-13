@@ -28,6 +28,11 @@ export type { TerrainDebugOptions } from './renderer-terrain';
 
 /** Parameter types for the main `AutkMap` loading and update APIs. */
 export type {
+    /** A rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map. */
+    MapBounds,
+    MapOptions,
+    LoadTerrainParams,
+    TerrainRasterSource,
     /** Parameters for loading a GeoJSON feature collection as a map layer. */
     LoadCollectionParams,
     /** Optional geometry-building configuration applied while loading a collection. */
@@ -53,7 +58,7 @@ export type {
 /** Ready-made tile sources for `AutkMap.loadTiles`. Each provider sets its own terms of use. */
 export { TILE_SOURCES } from './tile-source';
 
-/** Ready-made elevation tile sources for `AutkMap.enableTerrainTiles`. */
+/** Ready-made elevation tile sources for `AutkMap.loadTerrain`. */
 export { TERRAIN_TILE_SOURCES } from './terrain-tile-source';
 export type { TerrainTileSource } from './terrain-tile-source';
 export type { DemEncoding } from './dem-decode';
@@ -62,6 +67,7 @@ export type { TimingSummary } from './terrain-timing';
 
 /** Tile source and coordinate-system types used by `AutkMap.loadTiles`. */
 export type { TileSource, ResolvedTileSource } from './tile-source';
+export type { TileTheme } from './tile-theme';
 export type { TileCredit, TileAttribution } from './attribution';
 
 /** Statistics types returned by `AutkMap.getTileStats` and `AutkMap.renderStats`. */
@@ -83,6 +89,9 @@ export type {
     LayerThematic,
 } from './types-layers';
 
+/** Types for drawing three raster bands as a true-color RGB image. */
+export type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
+
 /** Abstract base class returned by layer lookup and picking APIs. */
 export { Layer } from './layer';
 
@@ -97,3 +106,5 @@ export { MapEvent, MouseStatus } from './types-events';
 
 /** Typed event payloads emitted by the map event bus. */
 export type { MapEventData, MapEventRecord } from './types-events';
+
+export type { ElevationValidationOptions, ElevationValidationStats } from '@urban-toolkit/autk-core';

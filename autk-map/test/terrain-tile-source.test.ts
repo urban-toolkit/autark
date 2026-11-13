@@ -7,6 +7,7 @@ import { TERRAIN_TILE_SOURCES, resolveTerrainTileSource } from '../src/terrain-t
 import type { TerrainTileSource } from '../src/terrain-tile-source';
 import type { TileIndex } from '../src/tile-index';
 import { WEB_MERCATOR_EXTENT, crsToLonLat, lonLatToCrs } from '../src/tile-projection';
+import { TileLoadError } from '../src/tile-loader';
 
 const SIZE = 256;
 const CRS = 'EPSG:3395' as const;
@@ -63,6 +64,37 @@ describe('TerrainTileSource', () => {
 });
 
 describe('TileHeightSource', () => {
+  it.each([
+    { maxCachedTiles: NaN }, { maxCachedTiles: Infinity }, { maxCachedTiles: -1 }, { maxCachedTiles: 1.5 },
+    { levels: NaN }, { levels: 0 }, { levels: 9 }, { levels: 1.5 },
+    { windowSize: 2050 }, { verticalScale: Infinity }, { verticalScale: 0 },
+    { zoomBias: NaN }, { composeBudgetMs: NaN }, { composeBudgetMs: -1 },
+  ])('rejects invalid terrain options before starting requests: %j', options => {
+    const load = vi.fn();
+    expect(() => make({ ...options, load })).toThrow();
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it('settles with incomplete coverage after permanent failures instead of staying loading forever', async () => {
+    const onChange = vi.fn();
+    const { source } = make({ levels: 1, windowSize: 4, onChange,
+      load: async () => { throw new TileLoadError('Not found', { status: 404, permanent: true }); } });
+    await flush();
+    source.update([0, 0]);
+    expect(source.stats).toMatchObject({ idle: true, complete: false });
+    expect(source.stats.failedTiles).toBeGreaterThan(0);
+    expect(source.stats.store).toMatchObject({ inFlight: 0, queued: 0, waitingRetries: 0 });
+    onChange.mockClear();
+    source.update([0, 0]);
+    expect(onChange).not.toHaveBeenCalled();
+    source.destroy();
+  });
+
+  it('rejects a pathological tile demand before allocating windows or starting requests', () => {
+    const load = vi.fn();
+    expect(() => make({ source: { ...resolved, tileSize: 1 }, windowSize: 512, load })).toThrow(/too many tiles/);
+    expect(load).not.toHaveBeenCalled();
+  });
   it('is a valid flat source before anything loads, with one window per zoom from 14 down', () => {
     const { source } = make();
     expect(isStreamingHeightSource(source)).toBe(true);
@@ -94,7 +126,7 @@ describe('TileHeightSource', () => {
     const { source, requested } = make();
     await flush();
     expect(requested.length).toBeGreaterThan(0);
-    expect(requested[0]!.z).toBe(9);
+    expect(requested[0]!.z).toBe(8); // validation reference below the coarsest render level
     source.destroy();
   });
 
@@ -191,15 +223,15 @@ describe('TileHeightSource', () => {
   it('raises the cache to what the windows can need, so tiles in use are never evicted', () => {
     const { source } = make({ maxCachedTiles: 1, windowSize: 512 });
     const stats = source.stats;
-    expect(stats.tileBound).toBe(stats.levels * 16); // 16 tiles per 512-sample window at 256 pixels
+    expect(stats.tileBound).toBe(stats.levels * 16 * 2); // render tiles plus parent references per 512-sample window at 256 pixels
     expect(stats.cacheLimit).toBeGreaterThanOrEqual(stats.tileBound);
     expect(stats.wantedTiles).toBeLessThanOrEqual(stats.tileBound);
     const tile = 256 * 256 * 4;
-    expect(stats.memory.decodedTiles).toBe(stats.cacheLimit * tile);
-    expect(stats.memory.cpuWindows).toBe(stats.levels * stats.windowSize ** 2 * 4);
-    expect(stats.memory.gpuHeights).toBe(stats.memory.cpuWindows);
+    expect(stats.memory.decodedTiles).toBe((stats.cacheLimit + stats.tileBound) * tile);
+    expect(stats.memory.cpuWindows).toBe(2 * stats.levels * stats.windowSize ** 2 * 4);
+    expect(stats.memory.gpuHeights).toBe(stats.memory.cpuWindows / 2);
     expect(stats.memory.decoding).toBe(8 * 2 * tile);
-    expect(stats.memory.total).toBe(stats.memory.decodedTiles + 2 * stats.memory.cpuWindows + stats.memory.decoding);
+    expect(stats.memory.total).toBe(stats.memory.decodedTiles + stats.memory.cpuWindows + stats.memory.gpuHeights + stats.memory.decoding);
     source.destroy();
   });
 
@@ -290,6 +322,26 @@ describe('TileHeightSource', () => {
   });
 });
 
+describe('terrain quality configuration', () => {
+  it('requests a validation reference even with one rendered level', async () => {
+    const { source, requested } = make({ levels: 1 });
+    await flush();
+    source.update([0, 0]);
+    expect(source.levels).toHaveLength(1);
+    expect(requested.some(tile => tile.z === 13)).toBe(true);
+    expect(source.stats.validation!.checked).toBeGreaterThan(0);
+    source.destroy();
+  });
+  it('can preserve raw terrain and omit quality reference requests', async () => {
+    const { source, requested } = make({ levels: 1, validation: false });
+    await flush();
+    source.update([0, 0]);
+    expect(requested.every(tile => tile.z === 14)).toBe(true);
+    expect(source.stats.validation).toBeNull();
+    source.destroy();
+  });
+});
+
 describe('compose budget', () => {
   /** Every call to the clock advances it by `step` milliseconds, so each composition costs exactly `step`. */
   function slowClock(step: number) {
@@ -299,11 +351,14 @@ describe('compose budget', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('composes every level the first time, whatever the budget', () => {
+  it('initializes valid placeholders but respects the budget on the first update', () => {
     slowClock(10);
     const { source } = make({ levels: 3, composeBudgetMs: 4 });
     expect(source.levels).toHaveLength(3);
     expect(source.levels.every((level) => level.data.length > 0)).toBe(true);
+    expect(source.stats.pendingLevels).toBe(2);
+    source.update([0, 0]);
+    source.update([0, 0]);
     expect(source.stats.pendingLevels).toBe(0);
     source.destroy();
   });
@@ -311,6 +366,8 @@ describe('compose budget', () => {
   it('composes one out-of-date level per frame when each costs more than the budget, coarsest first, and asks for the next frame', () => {
     slowClock(10);
     const { source, onChange } = make({ levels: 3, composeBudgetMs: 4 });
+    source.update([0, 0]);
+    source.update([0, 0]);
     onChange.mockClear();
     const before = [...source.levelVersions];
     const far = 50 * source.levels[2]!.cellSizeX * 64; // far enough that every level moves
@@ -328,6 +385,36 @@ describe('compose budget', () => {
     expect(source.stats.pendingLevels).toBe(0);
     expect(source.levelVersions.every((v, k) => v > before[k]!)).toBe(true);
     expect(source.stats.idle).toBe(false); // tiles are still loading, but nothing waits for composition
+    source.destroy();
+  });
+
+  it('publishes only complete row batches and cancels a scratch grid when the camera moves', async () => {
+    const { source, onChange } = make({ levels: 1, composeBudgetMs: 0 });
+    await flush();
+    const original = source.levels[0]!;
+    const version = source.levelVersions[0];
+    source.update([0, 0]);
+    expect(source.stats.pendingLevels).toBe(1);
+    expect(source.levels[0]).toBe(original);
+    expect(source.levelVersions[0]).toBe(version);
+    for (let i = 0; i < 14; i++) source.update([0, 0]);
+    expect(source.levels[0]).toBe(original);
+    onChange.mockClear();
+    source.update([0, 0]);
+    expect(source.stats.pendingLevels).toBe(0);
+    expect(source.levels[0]).not.toBe(original);
+    expect(source.stats.missingSamples[0]).toBe(0);
+    expect(onChange).toHaveBeenCalled(); // recheck arrivals after publishing the snapshot
+
+    const offset = original.cellSizeX * 2;
+    source.update([offset, 0]);
+    const published = source.levels[0]!;
+    expect(source.stats.pendingLevels).toBe(1);
+    const far = original.cellSizeX * 64 * 100;
+    source.update([far, far]); // no tiles here yet: discard the old scratch grid
+    expect(source.levels[0]).not.toBe(published);
+    expect(source.levels[0]!.originX).toBeGreaterThan(far / 2);
+    expect(source.levels[0]!.data.every(value => value === 0)).toBe(true);
     source.destroy();
   });
 

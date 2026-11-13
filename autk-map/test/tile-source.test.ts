@@ -66,10 +66,14 @@ describe('attribution forms', () => {
   });
 
   it('gives the OpenStreetMap-based presets a link to the OSM copyright page', () => {
-    for (const preset of [TILE_SOURCES.openStreetMap, TILE_SOURCES.cartoLight]) {
+    for (const preset of [TILE_SOURCES.openStreetMap, TILE_SOURCES.osmLight, TILE_SOURCES.osmDark]) {
       const credits = resolveTileSource(preset).attribution;
       expect(credits.some((c) => c.text.includes('OpenStreetMap') && c.url === 'https://www.openstreetmap.org/copyright')).toBe(true);
     }
+  });
+
+  it('rejects unknown image themes', () => {
+    expect(() => resolveTileSource({ ...OSM, theme: 'missing' as never })).toThrow(/theme/);
   });
 
   it('keeps every preset valid', () => {
@@ -95,7 +99,7 @@ describe('expandTileUrl', () => {
   });
 
   it('always sends a tile to the same subdomain, and spreads neighbours across them', () => {
-    const source = resolveTileSource(TILE_SOURCES.cartoLight);
+    const source = resolveTileSource({ ...OSM, urlTemplate: 'https://{s}.example.org/{z}/{x}/{y}.png', subdomains: 'abcd' });
     const tile = { z: 10, x: 5, y: 7 };
     expect(expandTileUrl(source, tile)).toBe(expandTileUrl(source, tile));
     const hosts = new Set<string>();
@@ -109,6 +113,19 @@ describe('expandTileUrl', () => {
 });
 
 describe('tileSourceId', () => {
+  it('separates themed textures while retaining original URL and attribution', () => {
+    const normal = resolveTileSource(TILE_SOURCES.openStreetMap);
+    const ids = [tileSourceId(normal)];
+    for (const theme of [TILE_SOURCES.osmLight, TILE_SOURCES.osmDark]) {
+      const source = resolveTileSource(theme);
+      expect(source.urlTemplate).toBe(normal.urlTemplate);
+      expect(source.attribution).toEqual(normal.attribution);
+      ids.push(tileSourceId(source));
+    }
+    expect(new Set(ids).size).toBe(3);
+    expect(tileSourceId(resolveTileSource({ ...OSM, theme: 'original' }))).toBe(tileSourceId(normal));
+  });
+
   it('is shared by sources with the same template and tile size', () => {
     expect(tileSourceId(resolveTileSource(OSM))).toBe(tileSourceId(resolveTileSource({ ...OSM, attribution: 'other' })));
     expect(tileSourceId(resolveTileSource(OSM))).not.toBe(tileSourceId(resolveTileSource({ ...OSM, tileSize: 512 })));

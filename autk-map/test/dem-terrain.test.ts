@@ -3,7 +3,7 @@ import { DEM_BITMAP_OPTIONS, decodeDemPixels, decodeHeight, isDemEncoding } from
 import type { DemTile } from '../src/dem-decode';
 import { fetchDemTile } from '../src/dem-load';
 import { DemSampler } from '../src/dem-sample';
-import { MAX_WINDOW_SIZE, composeWindow, crsScaleAt, maxTilesPerWindow, planWindow } from '../src/height-window';
+import { MAX_WINDOW_SIZE, composeWindow, composeWindowSteps, crsScaleAt, maxTilesPerWindow, planWindow } from '../src/height-window';
 import { heightAt } from '../src/height-source';
 import type { TileIndex } from '../src/tile-index';
 import { tileKey } from '../src/tile-index';
@@ -428,6 +428,20 @@ describe('composeWindow', () => {
       expect(partial.missing).toBeGreaterThan(0);
       expect(partial.missing).toBeLessThan(64 * 64);
     }
+  });
+
+  it('yields partial work privately and uses one tile snapshot across batches', () => {
+    const tile = (height: number): DemTile => ({ size: SIZE, heights: new Float32Array(SIZE * SIZE).fill(height), min: height, max: height });
+    let current = tile(10);
+    const steps = composeWindowSteps(plan, () => current);
+    let step = steps.next();
+    expect(step.done).toBe(false);
+    current = tile(90); // a replacement arrives while this window is composing
+    let batches = 1;
+    while (!step.done) { step = steps.next(); batches++; }
+    expect(batches).toBe(16);
+    expect(step.value.level.data.every(value => value === 10)).toBe(true);
+    expect(composeWindow(plan, () => current).level.data.every(value => value === 90)).toBe(true);
   });
 
   it('multiplies heights by the vertical scale and reports the range after scaling', () => {

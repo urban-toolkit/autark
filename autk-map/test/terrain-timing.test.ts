@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TimingWindow } from '../src/terrain-timing';
 import { TileHeightSource } from '../src/height-source-tiles';
 
@@ -26,6 +26,23 @@ describe('TimingWindow', () => {
     expect(summary.count).toBe(3);
     expect(summary.p50).toBe(100);
     expect(summary.max).toBe(200);
+  });
+
+  it('reuses the percentile calculation until values change and protects its cached result', () => {
+    const window = new TimingWindow();
+    [9, 1, 5].forEach(value => window.record(value));
+    const sort = vi.spyOn(Array.prototype, 'sort');
+    const first = window.summary();
+    first.p95 = 999;
+    const second = window.summary();
+    const calls = sort.mock.calls.length;
+    sort.mockRestore();
+    expect(calls).toBe(1);
+    expect(second.p95).toBe(9);
+    window.record(12);
+    expect(window.summary().max).toBe(12);
+    window.reset();
+    expect(window.summary().count).toBe(0);
   });
 
   it('ignores negative and non-finite values and can be reset', () => {

@@ -9,6 +9,9 @@
  * helpers.
  */
 
+/** Default projected coordinate system shared by database workspaces and map layers. */
+export { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from './defaults';
+
 /** Colormap configuration, domain strategies, and color primitives. */
 // ─── Color mapping ───────────────────────────────────────────────────────────
 
@@ -182,6 +185,8 @@ export { computeOrigin } from './utils-geojson';
 export { computeGeometryCentroid } from './utils-geojson';
 /** Computes the bounding box of a GeoJSON collection or geometry. */
 export { computeBoundingBox } from './utils-geojson';
+/** Geometry bounds with declared collection bbox fallback for geometry-less rasters. */
+export { resolveCollectionBounds } from './utils-geojson';
 /** Type guard that checks whether a value is a GeoJSON FeatureCollection. */
 export { isFeatureCollection } from './utils-geojson';
 /** Returns true when a string matches a shared layer type. */
@@ -190,3 +195,9 @@ export { isLayerType } from './utils-layer';
 export { mapGeometryTypeToLayerType } from './utils-layer';
 /** Builds a closed planar offset polygon from a local-space polyline. */
 export { offsetPolyline } from './utils-geometry';
+
+/** Returns the smallest power of two greater than or equal to the input, with a minimum of one. */
+export { nextPowerOfTwo, clamp, bilerp } from './utils-math';
+
+export { resolveElevationValidation, isPotentialElevationOutlier, assessElevationSample, replaceElevationOutlier, validateElevationGrid } from './elevation-validation';
+export type { ElevationValidationOptions, ElevationValidationStats, ResolvedElevationValidation, ElevationAssessment } from './elevation-validation';

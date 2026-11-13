@@ -16,10 +16,11 @@
  */
 
 import { DemSampler } from './dem-sample';
+import type { ElevationValidationStats, ResolvedElevationValidation } from '@urban-toolkit/autk-core';
 import type { DemTile } from './dem-decode';
 import type { DemTileLookup } from './dem-sample';
 import type { HeightLevel } from './height-source';
-import { ancestorTile, lonLatToTileCoord, tileRangeInBounds, tilesInRange, tilesPerAxis } from './tile-index';
+import { lonLatToTileCoord, tileKey, tileRangeInBounds, tilesInRange, tilesPerAxis } from './tile-index';
 import type { TileIndex } from './tile-index';
 import { EARTH_RADIUS, WEB_MERCATOR_EXTENT, crsToLonLat, latToMercatorY, lonLatToCrs } from './tile-projection';
 import type { TileCrs } from './tile-projection';
@@ -77,6 +78,8 @@ export interface WindowParams {
     size: number;
     /** Local-space point the window is centred on (for example the camera's ground point). */
     centre: readonly [number, number];
+    /** Neighbor halo for bilinear sampling and optional quality validation. */
+    padding?: number;
 }
 
 /** A window's place and the tiles it needs. */
@@ -128,8 +131,8 @@ const REPROJECTION_STRETCH = 1.05;
  * @example
  * const perLevel = maxTilesPerWindow(512, 256); // 16
  */
-export function maxTilesPerWindow(size: number, tileSize: number): number {
-    const perAxis = Math.floor(((size + 2) * REPROJECTION_STRETCH) / tileSize) + 2;
+export function maxTilesPerWindow(size: number, tileSize: number, padding = 1): number {
+    const perAxis = Math.floor(((size + 2 * padding) * REPROJECTION_STRETCH) / tileSize) + 2;
     return perAxis * perAxis;
 }
 
@@ -156,11 +159,12 @@ export function planWindow(params: WindowParams): WindowPlan {
     const latticeX = Math.round((origin[0] + centre[0]) / cellSizeX) - size / 2;
     const latticeY = Math.round((origin[1] + centre[1]) / cellSizeY) - size / 2;
 
-    // One extra cell on every side: interpolation reads the next pixel over.
-    const west = crsToLonLat(crs, (latticeX - 1) * cellSizeX, 0)[0];
-    const east = crsToLonLat(crs, (latticeX + size) * cellSizeX, 0)[0];
-    const south = crsToLonLat(crs, 0, (latticeY - 1) * cellSizeY)[1];
-    const north = crsToLonLat(crs, 0, (latticeY + size) * cellSizeY)[1];
+    const padding = params.padding ?? 1;
+    // Include the interpolation footprint and validation neighbors across tile boundaries.
+    const west = crsToLonLat(crs, (latticeX - padding) * cellSizeX, 0)[0];
+    const east = crsToLonLat(crs, (latticeX + size - 1 + padding) * cellSizeX, 0)[0];
+    const south = crsToLonLat(crs, 0, (latticeY - padding) * cellSizeY)[1];
+    const north = crsToLonLat(crs, 0, (latticeY + size - 1 + padding) * cellSizeY)[1];
     const range = tileRangeInBounds({ west, south, east, north }, zoom);
 
     return {
@@ -181,6 +185,9 @@ export function planWindow(params: WindowParams): WindowPlan {
 
 /** Options for {@link composeWindow}. */
 export interface ComposeOptions {
+    validation?: ResolvedElevationValidation;
+    /** Live typed-array storage held by validation in this composition job. */
+    onValidationMemory?: (bytes: number) => void;
     /** Multiplies every height. Defaults to 1. */
     verticalScale?: number;
     /** Height used where no tile has data. Defaults to 0. */
@@ -191,6 +198,7 @@ export interface ComposeOptions {
 
 /** A composed window. */
 export interface ComposedWindow {
+    readonly validation?: ElevationValidationStats;
     /** The window as a height level, ready for a {@link HeightSource}. */
     readonly level: HeightLevel;
     /** Lowest height among samples that had data, or 0 when none did. */
@@ -224,11 +232,24 @@ export interface ComposedWindow {
  * const { level, missing } = composeWindow(plan, (tile) => store.get(tile)?.value);
  */
 export function composeWindow(plan: WindowPlan, lookup: DemTileLookup, options: ComposeOptions = {}): ComposedWindow {
+    const steps = composeWindowSteps(plan, lookup, options);
+    let step = steps.next();
+    while (!step.done) step = steps.next();
+    return step.value;
+}
+
+/**
+ * Composes a private window in four-row batches. Each yield lets the caller honor
+ * its frame budget; only the final return value is ready to publish. Tile references
+ * are captured before the first batch so arrivals cannot change a half-composed grid.
+ */
+export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, options: ComposeOptions = {}): Generator<void, ComposedWindow> {
     const { size, zoom, tileSize, crs } = plan;
     const verticalScale = options.verticalScale ?? 1;
     const fill = options.fill ?? 0;
     const minZoom = options.minZoom ?? 0;
     const worldPixels = tilesPerAxis(zoom) * tileSize;
+    const halo = options.validation ? 2 : 0;
 
     const data = new Float32Array(size * size);
     const level: HeightLevel = {
@@ -245,16 +266,29 @@ export function composeWindow(plan: WindowPlan, lookup: DemTileLookup, options: 
     const usable: boolean[] = [];
     let anyUsable = false;
     const grid = new Map<number, DemTile>();
+    const snapshot = new Map<string, DemTile>();
+    const west = crsToLonLat(crs, plan.latticeX * plan.cellSizeX, 0)[0];
+    const east = crsToLonLat(crs, (plan.latticeX + size - 1) * plan.cellSizeX, 0)[0];
+    const south = crsToLonLat(crs, 0, plan.latticeY * plan.cellSizeY)[1];
+    const north = crsToLonLat(crs, 0, (plan.latticeY + size - 1) * plan.cellSizeY)[1];
     for (let z = zoom; z >= minZoom; z--) {
-        const shift = zoom - z;
+        const n = tilesPerAxis(z);
+        const nw = lonLatToTileCoord(west, north, z), se = lonLatToTileCoord(east, south, z);
+        // Include both bilinear texels at every fallback zoom, including neighbours
+        // beyond the fine window's one-pixel padding. Snapshot only this footprint.
+        const x0 = Math.floor((Math.floor(nw.x * tileSize - 0.5) - halo) / tileSize);
+        const x1 = Math.min(x0 + n - 1, Math.floor((Math.floor(se.x * tileSize - 0.5) + 1 + halo) / tileSize));
+        const y0 = Math.max(0, Math.min(n - 1, Math.floor((Math.floor(nw.y * tileSize - 0.5) - halo) / tileSize)));
+        const y1 = Math.max(0, Math.min(n - 1, Math.floor((Math.floor(se.y * tileSize - 0.5) + 1 + halo) / tileSize)));
         let found = false;
-        for (const tile of plan.tiles) {
-            const ancestor = ancestorTile(tile, shift)!; // shift <= zoom, so there is one
-            const value = lookup(ancestor);
-            if (value) {
-                found = true;
-                if (z === zoom) grid.set(tile.x * 4194304 + tile.y, value);
-            }
+        for (let y = y0; y <= y1; y++) for (let column = x0; column <= x1; column++) {
+            const x = ((column % n) + n) % n;
+            const tile = { z, x, y };
+            const value = lookup(tile);
+            if (!value) continue;
+            snapshot.set(tileKey('', tile), value);
+            found = true;
+            if (z === zoom) grid.set(x * 4194304 + y, value);
         }
         usable[z] = found;
         anyUsable ||= found;
@@ -284,7 +318,7 @@ export function composeWindow(plan: WindowPlan, lookup: DemTileLookup, options: 
         colLi[i] = li;
     }
 
-    const sampler = new DemSampler(lookup, tileSize);
+    const sampler = new DemSampler(tile => snapshot.get(tileKey('', tile)), tileSize, options.validation, options.onValidationMemory);
     sampler.setUsableZooms(usable);
     let min = Infinity;
     let max = -Infinity;
@@ -306,7 +340,7 @@ export function composeWindow(plan: WindowPlan, lookup: DemTileLookup, options: 
         for (let i = 0; i < size; i++) {
             let height = NaN;
             const tx = colTx[i]!;
-            if (rowFast && tx >= 0) {
+            if (!options.validation && rowFast && tx >= 0) {
                 if (tx !== tileX) {
                     tileX = tx;
                     tile = grid.get(tx * 4194304 + ty);
@@ -336,10 +370,11 @@ export function composeWindow(plan: WindowPlan, lookup: DemTileLookup, options: 
             if (scaled < min) min = scaled;
             if (scaled > max) max = scaled;
         }
+        if ((j + 1) % 4 === 0 && j + 1 < size) yield;
     }
     if (min > max) {
         min = 0;
         max = 0;
     }
-    return { level, min, max, missing, fallback };
+    return { level, min, max, missing, fallback, validation: sampler.validationStats };
 }

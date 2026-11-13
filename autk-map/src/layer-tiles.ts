@@ -10,7 +10,7 @@
  * map camera and the GPU.
  */
 
-import { Camera } from '@urban-toolkit/autk-core';
+import { Camera, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '@urban-toolkit/autk-core';
 
 import type { TileCredit } from './attribution';
 import { Layer } from './layer';
@@ -21,7 +21,8 @@ import type { TileTexture } from './pipeline-tiles';
 import { buildTileFrame } from './tile-frame';
 import type { FrameTile, TileFrame } from './tile-frame';
 import { fetchTileImage } from './tile-loader';
-import type { TileCrs } from './tile-projection';
+import { applyTileTheme } from './tile-theme';
+import { isTileCrs, type TileCrs } from './tile-projection';
 import { selectTiles } from './tile-selection';
 import type { TileSelectionOptions } from './tile-selection';
 import { resolveTileSource } from './tile-source';
@@ -82,7 +83,7 @@ export interface TileLayerStats {
     idle: boolean;
 }
 
-const DEFAULT_CRS: TileCrs = 'EPSG:3395';
+const DEFAULT_CRS: TileCrs = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
 const MAX_REPORTED_ERRORS = 3;
 
 /** What the last selection holds, kept for {@link TileLayerStats}. */
@@ -113,6 +114,7 @@ export class TileLayer extends Layer {
     private readonly _getOrigin: () => readonly number[] | undefined;
 
     private _pipeline: PipelineTiles | null = null;
+    private _renderer: Renderer | null = null;
     private _store: TileStore<TileTexture> | null = null;
     private _frame: TileFrame<TileTexture> = EMPTY_FRAME;
     private _reportedErrors = 0;
@@ -136,6 +138,20 @@ export class TileLayer extends Layer {
         super(layerInfo, layerRenderInfo);
         this._source = resolveTileSource(options.source);
         this._crs = options.crs ?? DEFAULT_CRS;
+        if (!isTileCrs(this._crs)) throw new Error(`Unsupported tile CRS: ${this._crs}.`);
+        for (const name of ['maxCachedTiles', 'maxTiles'] as const) {
+            const value = options[name];
+            if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) {
+                throw new Error(`Tile ${name} must be a positive integer.`);
+            }
+        }
+        if (options.zoomBias !== undefined && !Number.isFinite(options.zoomBias)) throw new Error('Tile zoomBias must be finite.');
+        if (options.maxDistanceInHeights !== undefined && (!Number.isFinite(options.maxDistanceInHeights) || options.maxDistanceInHeights <= 0)) {
+            throw new Error('Tile maxDistanceInHeights must be positive and finite.');
+        }
+        if (layerRenderInfo.opacity !== undefined && (!Number.isFinite(layerRenderInfo.opacity) || layerRenderInfo.opacity < 0 || layerRenderInfo.opacity > 1)) {
+            throw new Error('Tile opacity must be between 0 and 1.');
+        }
         this._options = options;
         this._getOrigin = getOrigin;
     }
@@ -184,19 +200,27 @@ export class TileLayer extends Layer {
         return this._store ? this._store.pendingCount + this._store.inFlightCount : 0;
     }
 
+    override get supportsColorMap(): boolean { return false; }
+
     createPipeline(renderer: Renderer): void {
         const pipeline = new PipelineTiles(renderer);
-        pipeline.build(this);
+        this._renderer = renderer;
         this._pipeline = pipeline;
+        pipeline.build(this);
 
         this._store = new TileStore<TileTexture>({
             source: this._source,
             maxCachedTiles: this._options.maxCachedTiles,
             load: async (url, signal) => {
-                const bitmap = await fetchTileImage(url, signal);
+                let bitmap = await fetchTileImage(url, signal);
                 try {
                     // A tile cancelled while it downloaded must not cost a texture.
                     signal.throwIfAborted();
+                    if (this._source.theme && this._source.theme !== 'original') {
+                        const themed = applyTileTheme(bitmap, this._source.theme);
+                        bitmap.close();
+                        bitmap = themed;
+                    }
                     return pipeline.createTileTexture(bitmap);
                 } finally {
                     bitmap.close();
@@ -237,7 +261,7 @@ export class TileLayer extends Layer {
         this._store?.endFrame();
     }
 
-    override prepareRender(camera: Camera): void {
+    override prepareRender(camera: Camera, targetViewport?: readonly [number, number]): void {
         this._frame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
         const store = this._store;
@@ -246,7 +270,10 @@ export class TileLayer extends Layer {
 
         store.beginFrame();
 
-        const view = { camera, origin: [origin[0]!, origin[1]!] as const, crs: this._crs };
+        const renderer = this._renderer;
+        const viewport = targetViewport ?? (renderer && renderer.pixelWidth > 0 && renderer.pixelHeight > 0
+            ? [renderer.pixelWidth, renderer.pixelHeight] as const : undefined);
+        const view = { camera, origin: [origin[0]!, origin[1]!] as const, crs: this._crs, viewport };
         const selection = selectTiles(view, this._source, this._options);
         if (!selection) {
             store.update([]);
@@ -294,7 +321,6 @@ export class TileLayer extends Layer {
             pipeline.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
         }
-        pipeline.updateZIndex(this._layerInfo.zIndex);
         pipeline.renderFrame(camera, passEncoder, this._frame);
     }
 
@@ -304,5 +330,6 @@ export class TileLayer extends Layer {
         this._frame = EMPTY_FRAME;
         this._pipeline?.destroy();
         this._pipeline = null;
+        this._renderer = null;
     }
 }

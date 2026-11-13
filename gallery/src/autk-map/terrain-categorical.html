@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Terrain and numeric categories</title>
+    <link rel="stylesheet" href="./tiles-basemap.css" />
+    <link rel="stylesheet" href="../../example.css" />
+</head>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header"><nav class="navigation" aria-label="Main navigation">
+        <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+        <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+    </nav></header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html">← All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Terrain imagery</p>
+            <h1 id="example-title">Terrain and numeric categories</h1>
+            <p class="description">Overlay a Rio de Janeiro road sample on imagery draped over terrain. Major, secondary, and other roads keep the legend order 3, 1, 2.</p>
+        </section>
+        <div class="tile-controls" role="group" aria-label="Basemap controls">
+            <label for="source-select">Source</label>
+            <select id="source-select"><option value="esriWorldImagery">Esri World Imagery</option><option value="osmLight" selected>OpenStreetMap (Light)</option><option value="osmDark">OpenStreetMap (Dark)</option><option value="openStreetMap">OpenStreetMap</option><option value="local">Local test tiles</option></select>
+            <button id="view-overview" type="button">Overview</button>
+            <button id="view-tilted" type="button">Tilt</button>
+            <label><input id="show-tiles" type="checkbox" checked /> Show tiles</label>
+        </div>
+        <div id="app">
+            <section class="map-panel" aria-labelledby="map-title">
+                <div class="panel-header"><h2 id="map-title">Rio de Janeiro</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+                <div class="map-stage" aria-busy="true">
+                    <canvas aria-label="Numeric road colors over Rio de Janeiro terrain" aria-describedby="map-help"></canvas>
+                </div>
+                <div id="map-help" class="panel-footer"><span>Drag to pan · Shift-drag to tilt · Scroll to zoom</span></div>
+            </section>
+        </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./terrain-categorical.ts"></script>
+</body>
+</html>

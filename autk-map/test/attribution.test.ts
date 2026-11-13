@@ -52,13 +52,13 @@ describe('createAttributionElement', () => {
     expect(createAttributionElement(fakeDocument(), [])).toBeNull();
   });
 
-  it('makes a link for a credit with a URL and text for one without, separated by bars', () => {
+  it('makes a link for a credit with a URL and text for one without, separated by middle dots', () => {
     const root = asNode(createAttributionElement(fakeDocument(), [
       { text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' },
       { text: 'Source: Esri' },
     ]));
     expect(root.className).toBe('autk-map-attribution');
-    expect(root.children.map((c) => c.tag ?? c.text)).toEqual(['a', ' | ', 'Source: Esri']);
+    expect(root.children.map((c) => c.tag ?? c.text)).toEqual(['a', ' · ', 'Source: Esri']);
     const link = root.children[0]!;
     expect(link).toMatchObject({
       textContent: '© OpenStreetMap contributors',

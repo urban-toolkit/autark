@@ -136,9 +136,12 @@ crop covering Rio de Janeiro, Guanabara Bay and Niterói. The crop remains edita
 title/subtitle controls, road widths, interactive framing and a 2400-pixel-wide PNG export.
 The exporter temporarily redraws the WebGPU map at export resolution rather than scaling the
 on-screen canvas. Every `autk-map`
-canvas includes a faint “made with autark” watermark at the bottom right, even with
-`showUi: false`. It follows canvas resizing and is removed by `destroy()`. It has no logo
-or year and does not intercept pointer events. The poster PNG includes the same watermark.
+canvas includes a bottom-left credit strip, even with `showUi: false`. The “Made with Autark”
+link opens `https://www.autarkjs.org` alongside credits for visible tile imagery. All credit
+links share the same typography and styling, and wrap on narrow maps. Legends stay at the
+bottom right, moving above the credits when needed to avoid overlap. The strip follows
+canvas resizing and is removed by `destroy()`; only the strip intercepts pointer events.
+The poster PNG retains its separately drawn watermark.
 The poster omits the OpenStreetMap credit text; published uses still require
 appropriate OpenStreetMap attribution. Data loading requires network access to Overpass;
 larger crops may take longer.
@@ -150,64 +153,22 @@ larger crops may take longer.
 ```ts
 import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
 
-map.loadCollection('neighborhoods', { collection, type: 'polygons' });
-map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
-map.updateRenderInfo('neighborhoods', { opacity: 0.4 });   // let the imagery show through
+map.loadTiles('imagery', {
+    source: TILE_SOURCES.esriWorldImagery,
+    center: { latitude: 40.7831, longitude: -73.9712 },
+    zoom: 12,
+});
 ```
 
-* **Sources.** Presets are `esriWorldImagery`, `openStreetMap` and `cartoLight`. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown at the bottom right of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
+* **Sources.** Presets are `esriWorldImagery`, `openStreetMap`, `osmLight`, and `osmDark`. The OSM themes use the standard OSM raster endpoint and apply muted colors on the client. `osmLight` has a pale background and `osmDark` reverses luminance onto a dark background. Roads and labels baked into the images remain; this does not add vector tile styling. Custom raster sources can also set `theme: 'light' | 'dark' | 'original'`. Colors are processed once when a tile is loaded and cached with the texture; overlays and other render pipelines are unchanged. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown beside the Autark link at the bottom left of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
 * **Provider terms.** Presets are conveniences, not licences. OpenStreetMap's public servers forbid heavy use and bulk downloading; use your own server or a commercial provider in production. Esri imagery needs its attribution to stay visible.
-* **Coordinate system.** `crs` is the system of your data: `'EPSG:3395'` (the default, as in `AutkDb` workspaces), `'EPSG:3857'` or `'EPSG:4326'`. Tiles are Web Mercator and are reprojected on the CPU, so there is no extra GPU cost.
-* **Order and origin.** Tile layers sit under every other layer, so a `surface` layer would cover them. The map origin comes from the first data layer; until one is loaded the tiles are not drawn.
-* **Loading.** At most 8 requests run at once; tiles that leave the view are cancelled, 256 tiles are kept in memory (`maxCachedTiles`), and the browser HTTP cache applies as usual. While a tile loads, the nearest loaded ancestor is drawn in its place. Tiles that fail for a transient reason are retried by the layer itself after a delay that doubles with each failure, up to a minute, for as long as they are in view; a definitive error such as 404 is not retried.
-* **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps what is requested and drawn at once: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
+* **Coordinate system.** `crs` is the system of your data: `'EPSG:3395'` (the default, as in `AutkDb` workspaces), `'EPSG:3857'` or `'EPSG:4326'`. Tiles are Web Mercator and are reprojected on the CPU; unsupported CRS values are rejected before creating a layer.
+* **Order and origin.** Tile layers sit under every other layer, so a `surface` layer would cover them. An explicit geographic `center` initializes tile-only maps; otherwise the first data layer establishes the origin. `zoom` requires a center and defaults to 12. Centers are WGS84 coordinates regardless of the output CRS.
+* **Loading.** At most 8 requests run at once; tiles that leave the view are cancelled, the soft cache limit is 256 tiles (`maxCachedTiles`), and the browser HTTP cache applies as usual. While a tile loads, the nearest loaded ancestor is drawn in its place. Tiles that fail for a transient reason are retried by the layer itself after a delay that doubles with each failure, up to a minute, for as long as they are in view; a definitive error such as 404 is not retried.
+* **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps selected tiles; ancestor preloads add requests: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
 * **Hiding.** Hiding a tile layer (`updateRenderInfo(id, { isSkip: true })`) cancels its queued, in-flight and retrying requests and keeps the textures already loaded, so showing it again draws at once and loads only what is missing.
 * **Statistics.** `map.getTileStats(id)` returns a read-only snapshot: the zoom (and the zoom the view wanted, when the tile cap lowered it), how many selected tiles are drawn with their own image, with an ancestor's or not at all, the request queue, cached textures with an estimated size in bytes, and cumulative counts of requests (retries included, not network transfers), cache reuses and pressure evictions. `map.renderStats` gives the number of frames rendered, the CPU time of the last frame and the average, and the frame rate while rendering. Time is CPU time around preparing and submitting a frame, not GPU time, and the rate is 0 while the map is idle. Reading either does not trigger rendering, so a page can poll them on a timer; a frame count that stops increasing means the map is idle.
-* **Limits.** The camera's far plane (500 km) limits how far you can zoom out before the map is clipped, so continent- and planet-scale views are not supported yet. In terrain mode tiles are draped through the terrain overlay (at most 4096 px over the visible terrain), so they may look soft near the camera over a large terrain. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
-
-### Terrain from tiles
-
-`enableTerrainTiles` streams terrain elevation from a web tile service (Terrarium or Mapbox terrain-RGB PNG tiles) instead of a GeoTIFF. Layers, buildings, picking and tile-layer imagery work as in `enableTerrainMode`.
-
-```ts
-import { AutkMap, TERRAIN_TILE_SOURCES, TILE_SOURCES } from '@urban-toolkit/autk-map';
-
-map.loadCollection('neighborhoods', { collection, type: 'polylines' }); // any data layer sets the map origin
-map.enableTerrainTiles({
-    source: TERRAIN_TILE_SOURCES.awsTerrarium, // or your own source with its `encoding`
-    crs: 'EPSG:3395',                          // the CRS of your data (EPSG:3395 or 3857)
-    levels: 6,                                 // optional: nested windows, finest first (at most 8)
-    windowSize: 512,                           // optional: samples per window edge (even, at most 2048)
-    zoomBias: 0,                               // optional: negative gives coarser terrain, fewer requests
-    maxCachedTiles: 128,                       // optional; raised to what the windows can need
-    verticalScale: 1,                          // optional: multiplies every height
-    composeBudgetMs: 4,                        // optional: ms of terrain work per frame; the rest waits a frame
-});
-map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery }); // optional: drape imagery
-map.getTerrainTileStats();      // statistics, including `memory` and `timing` (p50/p95/p99)
-map.resetTerrainTileTiming();   // clear the timings to measure one scenario
-map.disableTerrainMode();
-```
-
-* **How it works.** Heights come from nested windows around the view: the finest covers a few kilometres and each further one twice the area at half the detail. The outermost window (about 150 km with the defaults) is the terrain. Coarse tiles load first, so a surface appears quickly and sharpens.
-* **Sources.** `awsTerrarium` is the public Terrain Tiles on AWS dataset (zooms 0 to 15). The provider says its S3 endpoints are meant for EC2 networking, are not cached by CloudFront and state no rate limits, so put your own CDN in front for anything beyond development. A custom source is a tile source plus `encoding: 'terrarium' | 'mapbox'`.
-* **Attribution** is required and shown while terrain tiles are active. The provider asks for "Mapzen" plus a statement for each data source used in your area (for example "3DEP data courtesy of the U.S. Geological Survey"). The preset shows "Mapzen" with a link to the list; add your area's statements: `attribution: [...TERRAIN_TILE_SOURCES.awsTerrarium.attribution, '3DEP data courtesy of the U.S. Geological Survey']`.
-* **Mapbox terrain-RGB** needs your token in the URL, so it is not bundled. Its [attribution guide](https://docs.mapbox.com/help/dive-deeper/attribution/) asks for these links and for the Mapbox logo (not drawn by autk-map; confirm the terms for this tileset with Mapbox):
-  ```ts
-  map.enableTerrainTiles({
-      source: {
-          urlTemplate: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${token}`,
-          encoding: 'mapbox', tileSize: 256, minZoom: 0, maxZoom: 15,
-          attribution: [
-              { text: '© Mapbox', url: 'https://www.mapbox.com/about/maps' },
-              { text: '© OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' },
-              { text: 'Improve this map', url: 'https://apps.mapbox.com/feedback/' },
-          ],
-      },
-  });
-  ```
-* **Heights.** Heights are ground metres while the EPSG:3395 plane is stretched by about `1/cos(latitude)`; building heights are not scaled, so `verticalScale` 1 keeps them consistent. Vertical datums are not reconciled.
-* **Limits.** The terrain reaches only as far as the outermost window. Detail depends on the source data (30 m in most of the world, so zooms above about 12 add smoothness, not detail). Stay within about 1,000 km of the map origin. Design, memory and measurements: `.doc/TILE-TERRAIN.md`.
+* **Limits.** Camera fitting retains automatic far-plane expansion; planet-scale views remain outside the tile feature's scope. Terrain draping is also not supported yet. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
 
 ### Render sizing verification
 
@@ -229,18 +190,141 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `loadTiles(id, params)`: Loads a tile basemap from a URL template or a preset (`TILE_SOURCES`).
 * `getTileStats(id)`, `renderStats`: Read-only statistics of a tile layer and of rendered frames; neither triggers rendering.
 * `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
-* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions.
+* `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions, or the three bands of an RGB image.
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.
 * `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
 * `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
+* `fitBounds(bounds?)`: Moves the camera, looking straight down, so a rectangle (by default the first loaded collection) fits the viewport. A flat map otherwise starts at a fixed height over the middle of the first layer. Opt-in: loading layers does not call it.
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.
 * `destroy()`: Releases event handlers and GPU resources.
+
+## Layer order and elevation
+
+`LayerInfo.zIndex` controls CPU layer ordering only. Polygons, borders, rasters,
+points, and polylines use a common ground plane and blend in layer order; each
+polygon fill is followed by its border before the next layer is drawn. Adding
+or reordering layers does not raise geometry or change its apparent size.
+
+Buildings retain their actual geometry heights and depth testing, and their
+shared SSAO result is composited over the 2D map. In terrain mode, ordered 2D
+layers are draped through the terrain overlay, and buildings retain terrain
+occlusion. Picking uses the same positions as visible geometry and continues
+to target the active pick-enabled layer.
+
+Run the rendering regression in a WebGPU-enabled Chrome installation:
+
+```sh
+node autk-compute/test/run-webgpu.mjs /autk-map/test/render-order.webgpu.ts
+```
+
+## Raster layers
+
+A raster layer draws one band of a GeoTIFF-derived collection through the layer color map. The collection comes from `AutkDb.getLayer()` (or `getRaster()`) after `loadGeoTiff()`.
+
+```ts
+map.loadCollection('elevation', { collection, type: 'raster', property: 'band_1' });
+```
+
+A raster alone is enough to start a map: its declared `bbox` establishes the map origin. Call `map.fitBounds()` after loading to frame it; loading does not move the camera automatically. No vector layer has to be loaded first.
+
+Satellite and aerial imagery has red, green and blue bands that should be shown as they are. Pass the three band paths to draw a true-color image; the color map and transfer function do not apply.
+
+```ts
+map.loadCollection('imagery', {
+    collection,
+    type: 'raster',
+    property: ['band_1', 'band_2', 'band_3'],
+    // Optional: band values mapped to 0 and 255.
+    loadConfig: { rgbRange: [0, 3000] },
+});
+
+// Later, with different bands or range:
+map.updateRaster('imagery', { collection, property: ['band_4', 'band_3', 'band_2'], rgbRange: [0, 3000] });
+```
+
+Values in 0 to 255 are shown unchanged. Other data, such as reflectance up to 10000, is stretched using the smallest and largest channel values of complete, finite RGB pixels unless `rgbRange` is given. A pixel with a nonfinite value in any band stays transparent and does not affect that range. Normalized floating-point imagery in 0 to 1 needs `rgbRange: [0, 1]`; it cannot be distinguished reliably from dark byte imagery. Explicit ranges must have two finite endpoints with min <= max and a finite span.
+
+Each band must contain exactly `rasterResX * rasterResY` samples for the existing layer. Missing bands, mismatched dimensions, and invalid ranges log a warning and leave the image and display mode unchanged. Updates keep the existing grid and geometry; remove and reload a layer to change its dimensions or extent.
+
+Switching to RGB suppresses the scalar domain, legend, and palette control. Colormap updates and transfer functions do not apply to RGB pixels. Switching back to one band restores the previous scalar legend preference, recomputes its domain, and uses the stored scalar colormap and transfer function. Layer opacity works in both modes.
+
+`loadGeoTiff()` limits a raster to one million cells by default and logs a warning when it resamples a larger image; raise `maxRasterCells` to keep more detail.
+
+See the [gallery validation checklist](../.doc/PR-125-GALLERY-VALIDATION.md) for the raster example and all existing gallery regression checks.
+After building, run the RGB browser regression with `node autk-compute/test/run-webgpu.mjs /autk-map/test/raster-rgb.webgpu.ts`
+and the gallery-control smoke test with `node autk-compute/test/run-webgpu.mjs /gallery/test/raster-rgb.webgpu.ts` from the repository root.
+
+## Terrain and optional imagery
+
+```ts
+import { TERRAIN_TILE_SOURCES } from '@urban-toolkit/autk-map';
+
+// Existing vector layers already define the origin and view.
+map.loadTerrain({
+    source: TERRAIN_TILE_SOURCES.awsTerrarium,
+    // CRS and camera are inherited from the map.
+    levels: 6,
+    windowSize: 512,
+    composeBudgetMs: 4,
+    overlaySize: 2048,
+});
+map.getTerrainTileStats();
+map.resetTerrainTileTiming();
+map.removeTerrain();
+```
+
+An existing map needs no center or zoom. For a standalone terrain map, supply the initial view:
+
+```ts
+map.loadTerrain({
+    source: TERRAIN_TILE_SOURCES.awsTerrarium,
+    center: { latitude: -22.96, longitude: -43.2075 },
+    zoom: 14,
+});
+// Optional: add imagery without changing terrain or the camera.
+map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });
+```
+
+Terrain without imagery uses the shaded map surface color. Imagery can be hidden or removed independently; `removeTerrain()` preserves imagery, data, and the camera. Calling `loadTerrain()` again replaces elevation after successful setup.
+
+Normalized raster elevation uses the same API:
+
+```ts
+map.loadTerrain({ source: { collection: elevation, property: 'band_1' } });
+```
+
+The raster is already in the workspace CRS and can initialize an empty map from its bounds. Tile source descriptors need no additional `type` argument. `enableTerrainMode()`, `enableTerrainTiles()`, and `disableTerrainMode()` remain compatibility wrappers.
+
+The shared workspace CRS defaults to the same EPSG:3395 constant as AutkDb. For normalized data from a custom workspace, construct the map with `new AutkMap(canvas, true, { crs: 'EPSG:3857' })`. The existing `crs` parameter on the first imagery or terrain load can also declare a custom workspace CRS when the constructor did not specify one. Imagery and elevation then inherit this CRS and the same origin; subsequent conflicting settings are rejected. GeoJSON does not reliably carry workspace CRS metadata, so a custom database CRS must be declared on the map. Explicit center/zoom repositions the camera without changing an existing origin. Terrain zoom uses a 256-pixel Web Mercator reference independent of DEM tile resolution.
+
+Elevation supports Terrarium and Mapbox terrain-RGB encodings in EPSG:3395 or EPSG:3857 workspaces. Imagery and ordered 2D layers render into the terrain overlay; buildings and picking sample the same height source. Flat maps retain their existing high-DPI tile selection, while terrain selection uses the actual overlay viewport.
+
+Elevation validation is enabled by default for every region, independently of imagery. It uses physical sample spacing, robust local variation, coherent-feature checks, and validated coarser references before replacing isolated spikes or pits. Negative elevations are retained. Unconfirmed features are not automatically flattened. Tile boundaries share neighboring samples; raster terrain uses the same spatial rules with conservative local repair.
+
+```ts
+map.loadTerrain({
+    source: TERRAIN_TILE_SOURCES.awsTerrarium,
+    validation: { minDeviation: 100, maxSlope: 8, madMultiplier: 8 },
+});
+map.getTerrainValidationStats(); // checked, rejected, corrected, unresolved
+// Use validation: false to preserve raw source heights.
+```
+
+Validation requests parent references even when only one terrain level is rendered. It uses the existing composition row budget and records its live typed-array storage as `memory.validationScratch`. Diagnostics are per published window and can count overlapping source samples. Broad errors shared across scales cannot reliably be detected without an independent source. See [elevation validation](../.doc/ELEVATION-VALIDATION.md) for sensitivity, uncertainty, and coverage.
+
+`overlaySize` accepts integer edges from 64 to 4096 and defaults to 2048 for streamed terrain. Existing GeoTIFF terrain retains its previous 4096 target and device-limit clamping. At 4× MSAA the streamed default overlay is approximately 185 MB, compared with approximately 740 MB at 4096. This excludes height data, canvas, building, and depth resources.
+
+Terrain options are validated before starting requests. The requested windows may need at most 4096 tiles. `idle` means no requests, retries, or composition remain; `complete` separately indicates height coverage, and `failedTiles` reports current request failures. A scene can be idle with partial coverage instead of loading forever. Missing elevation uses coarser data where available and zero otherwise.
+
+`composeBudgetMs` is checked between four-row batches, including initial sampling. Published windows remain intact until a replacement finishes; camera movement cancels obsolete scratch grids. A batch, GPU submission, or other frame work can still exceed the requested time, so this is not a frame-time guarantee. Diagnostics include scratch-window memory and retained tile snapshots. Provider terms, data resolution, vertical datums, and available GPU memory still apply. See [the terrain design and limits](../.doc/TILE-TERRAIN.md) and [the terrain gallery](../gallery/src/autk-map/terrain-tiles.html).
 
 ## Resources
 
 - [Documentation](https://autarkjs.org/introduction.html)
 - [Examples](https://autarkjs.org/gallery/)
 - [Use Cases](https://autarkjs.org/usecases/)
+
+The [tile basemap gallery example](../gallery/src/autk-map/tiles-basemap.html) loads tiles only, with Esri, OSM, and local source choices. The separate [numeric-category overlay example](../gallery/src/autk-map/tiles-categorical.html) adds database-projected roads and a categorical legend. See [.doc/TILE-BASEMAP.md](../.doc/TILE-BASEMAP.md) for lifecycle, validation, tests, and remaining limits.

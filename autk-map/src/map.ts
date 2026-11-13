@@ -26,6 +26,7 @@ import {
 
 import {
     Camera,
+    DEFAULT_WORKSPACE_COORDINATE_FORMAT,
     ColorMapDomainStrategy,
     ColorMapConfig,
     ColorMap,
@@ -39,12 +40,16 @@ import {
     TriangulatorBuildings,
     TriangulatorRaster,
     heightfieldFromRaster,
+    computeOrigin,
+    resolveElevationValidation,
+    validateElevationGrid,
     valueAtPath,
     LayerType,
     ResolvedDomain,
     mapGeometryTypeToLayerType,
 } from '@urban-toolkit/autk-core';
 
+import type { ElevationValidationStats } from '@urban-toolkit/autk-core';
 import type { MapEventRecord } from './types-events';
 
 import {
@@ -57,6 +62,7 @@ import {
 import {
     LoadCollectionParams,
     LoadMeshParams,
+    MapBounds,
     MapDrawOptions,
     UpdateColorMapParams,
     UpdateRenderInfoParams,
@@ -64,6 +70,8 @@ import {
     UpdateThematicParams,
     LoadTilesParams,
     EnableTerrainTilesParams,
+    LoadTerrainParams,
+    MapOptions,
 } from './api';
 
 import { KeyEvents } from './events-key';
@@ -74,12 +82,16 @@ import { Renderer } from './renderer';
 
 import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
+import { initialTileView } from './tile-view';
+import { crsToLonLat, isTileCrs, type TileCrs } from './tile-projection';
 import { FrameStats } from './frame-stats';
 import type { FrameStatsSnapshot } from './frame-stats';
 import { TileLayer } from './layer-tiles';
 import type { TileLayerStats } from './layer-tiles';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
+import { composeRgbRaster, isRgbBands, toFloat32Band } from './raster-rgb';
+import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
 import { SpriteLayer } from './layer-sprite';
 import { AutkMapUi } from './map-ui';
 import { MapStyle } from './map-style';
@@ -158,6 +170,11 @@ export class AutkMap {
     private _terrainCredits: readonly TileCredit[] = [];
     /** Elevation tile failures reported so far. */
     private _reportedTerrainErrors = 0;
+    private _terrainValidation: ElevationValidationStats | null = null;
+    /** Shared workspace CRS for normalized data, imagery, and terrain. */
+    private _workspaceCrs: TileCrs = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+    /** Locked by explicit map configuration or the first successful geographic load. */
+    private _workspaceCrsEstablished = false;
     /** Shared picking coordinator used by both render paths. */
     private _picking!: MapPickingController;
 
@@ -166,9 +183,13 @@ export class AutkMap {
      *
      * @param canvas Canvas element used as the WebGPU drawing surface.
      * @param showUi Whether floating UI elements should be shown. Defaults to `true`.
-     * @throws Never throws.
+     * @param options Workspace CRS of normalized data, imagery, and terrain.
+     * @throws If the workspace CRS is unsupported.
      */
-    constructor(canvas: HTMLCanvasElement, showUi: boolean = true) {
+    constructor(canvas: HTMLCanvasElement, showUi: boolean = true, options: MapOptions = {}) {
+        if (options.crs !== undefined && !isTileCrs(options.crs)) throw new Error("Unsupported workspace CRS.");
+        this._workspaceCrs = options.crs ?? DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+        this._workspaceCrsEstablished = options.crs !== undefined;
         this._canvas = canvas;
         this._showUi = showUi;
         this._style = new MapStyle();
@@ -191,6 +212,19 @@ export class AutkMap {
         this._flatRenderPath = new FlatMapRenderPath(this._renderer, this._camera, this._layerManager, this._picking);
 
         this._ui = new AutkMapUi(this);
+    }
+
+    /** Coordinate system shared by normalized data, imagery, and terrain. */
+    get workspaceCrs(): TileCrs { return this._workspaceCrs; }
+
+    /** Reject a layer that would interpret the established workspace in a different CRS. */
+    private resolveWorkspaceCrs(crs?: TileCrs): TileCrs {
+        const resolved = crs ?? this._workspaceCrs;
+        if (!isTileCrs(resolved)) throw new Error('Unsupported workspace CRS.');
+        if (resolved !== this._workspaceCrs && this._workspaceCrsEstablished) {
+            throw new Error(`Workspace CRS is ${this._workspaceCrs}; cannot load a layer using ${resolved}.`);
+        }
+        return resolved;
     }
 
     /** View and projection camera. */
@@ -328,8 +362,11 @@ export class AutkMap {
                 break;
 
             case 'raster':
-                if (typeof property !== 'string') { console.error(`Layer "${id}": property path string is required for raster layers.`); return; }
-                this.createRasterLayer(id, collection, property);
+                if (typeof property !== 'string' && !isRgbBands(property)) {
+                    console.error(`Layer "${id}": a band path string, or three band paths for RGB, is required for raster layers.`);
+                    return;
+                }
+                this.createRasterLayer(id, collection, property, loadConfig?.rgbRange);
                 break;
 
             case 'tiles':
@@ -393,8 +430,8 @@ export class AutkMap {
      * Tiles use the Web Mercator grid. They are drawn below every other layer,
      * so load vector layers normally and the basemap shows underneath; a
      * `surface` layer would cover it. Drawing needs the map origin, which the
-     * first loaded data layer defines, so the tiles appear once such a layer
-     * exists. The source attribution is shown on the map.
+     * first loaded data layer defines, or `center` can establish it for a
+     * tile-only map. The source attribution is shown on the map.
      *
      * Opacity and visibility change through {@link AutkMap.updateRenderInfo}.
      *
@@ -402,9 +439,10 @@ export class AutkMap {
      * @param params Tile source and options.
      * @throws Never throws. Errors, such as an invalid source, are logged to the console.
      * @example
-     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
+     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery,
+     *     center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
      */
-    loadTiles(id: string, { source, crs, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
+    loadTiles(id: string, { source, crs, center, zoom, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
         const layerInfo: LayerInfo = {
             id,
             zIndex: this._layerManager.computeZindex('tiles'),
@@ -418,12 +456,31 @@ export class AutkMap {
             isSkip: false,
         };
 
+        let layer: TileLayer | null = null;
         try {
-            const layer = this._layerManager.addTileLayer(layerInfo, layerRenderInfo, { source, crs, maxCachedTiles, zoomBias, maxTiles });
+            crs = this.resolveWorkspaceCrs(crs);
+            if (zoom !== undefined && center === undefined) throw new Error('Tile zoom requires a geographic center.');
+            if (!this._layerManager.hasOrigin && center === undefined) throw new Error('An empty map requires a geographic center and optional zoom.');
+            layer = this._layerManager.addTileLayer(layerInfo, layerRenderInfo, { source, crs, maxCachedTiles, zoomBias, maxTiles });
             if (!layer) { return; }
+            const view = center !== undefined
+                ? initialTileView(center, zoom ?? 12, crs ?? DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+                    this.canvas.clientHeight, this._camera.getFovyRadians(), layer.source.tileSize) : undefined;
             layer.createPipeline(this._renderer);
+            if (view) {
+                const [x, y] = view.point;
+                if (!this._layerManager.hasOrigin) {
+                    this._layerManager.initializeOrigin({ type: 'FeatureCollection', features: [], bbox: [x, y, x, y] });
+                }
+                const origin = this._layerManager.origin;
+                const target = [x - origin[0], y - origin[1], 0];
+                this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
+            }
+            this._workspaceCrs = crs;
+            this._workspaceCrsEstablished = true;
             layer.setChangeListener(() => this.requestRender());
         } catch (error) {
+            if (layer) this._layerManager.removeLayerById(id);
             console.error(`Layer "${id}": ${(error as Error).message}`);
             return;
         }
@@ -557,13 +614,21 @@ export class AutkMap {
             }
 
             resolvedDomain = ColorMap.resolveDomainFromData(validValues, colorMap);
+            // A categorical color map gives numbers a domain of labels, and the
+            // shader reads a feature's category index in it, as the string branch
+            // stores: the number itself would pick another category's color.
+            const categories = typeof resolvedDomain[0] === 'string' ? resolvedDomain as string[] : null;
             for (let featureIndex = 0; featureIndex < rawValues.length; featureIndex++) {
                 const rawValue = rawValues[featureIndex];
-                if (!storeThematicValue(featureIndex, rawValue ?? 0, rawValue === undefined ? 0 : 1)) {
+                const categoryIndex = categories && rawValue !== undefined ? categories.indexOf(String(rawValue)) : -1;
+                const stored = categories
+                    ? storeThematicValue(featureIndex, Math.max(categoryIndex, 0), categoryIndex >= 0 ? 1 : 0)
+                    : storeThematicValue(featureIndex, rawValue ?? 0, rawValue === undefined ? 0 : 1);
+                if (!stored) {
                     return;
                 }
             }
-        } 
+        }
         else if (dataType === 'string') {
             const rawValues = features.map((feature) => {
                 const resolved = propertyResolver(feature);
@@ -636,11 +701,12 @@ export class AutkMap {
      * @param id Layer identifier.
      * @param params Update parameters.
      * @param params.collection GeoTIFF-derived feature collection.
-     * @param params.property Dot-path accessor for a flat raster band array on feature properties.
-     * @param params.transferFunction Optional opacity transfer-function configuration.
+     * @param params.property Dot-path accessor for a flat raster band array on feature properties, or three accessors (red, green, blue) to draw an RGB image.
+     * @param params.transferFunction Optional opacity transfer-function configuration. Ignored for RGB.
+     * @param params.rgbRange Optional band values mapped to 0 and 255 for RGB.
      * @throws Never throws. Errors are logged to the console.
      */
-    updateRaster(id: string, { collection, property, transferFunction }: UpdateRasterParams): void {
+    updateRaster(id: string, { collection, property, transferFunction, rgbRange }: UpdateRasterParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || layer.layerInfo.typeLayer !== 'raster') { return; }
 
@@ -655,20 +721,16 @@ export class AutkMap {
             return;
         }
 
-        const resolved = valueAtPath(props, property);
-        const rasterValues = resolved instanceof Float32Array
-            ? resolved
-            : ArrayBuffer.isView(resolved) && !(resolved instanceof DataView)
-                ? new Float32Array(Array.from(resolved as unknown as ArrayLike<number>, (value: number) => {
-                    const numeric = Number(value);
-                    return Number.isFinite(numeric) ? numeric : Number.NaN;
-                }))
-                : Array.isArray(resolved)
-                    ? new Float32Array(resolved.map((value: unknown) => {
-                        const numeric = Number(value);
-                        return Number.isFinite(numeric) ? numeric : Number.NaN;
-                    }))
-                    : null;
+        if (isRgbBands(property)) {
+            this.updateRgbRaster(layer as RasterLayer, id, props, property, rgbRange);
+            return;
+        }
+
+        if (typeof property !== 'string') {
+            console.warn(`Raster update skipped for layer '${id}': expected a band path or three RGB band paths.`);
+            return;
+        }
+        const rasterValues = toFloat32Band(valueAtPath(props, property));
 
         if (!rasterValues || rasterValues.length === 0) {
             console.warn(`Raster update skipped for layer '${id}': invalid raster band '${property}'.`);
@@ -676,6 +738,11 @@ export class AutkMap {
         }
 
         const rasterLayer = layer as RasterLayer;
+        const expected = rasterLayer.rasterResX * rasterLayer.rasterResY;
+        if (rasterValues.length !== expected) {
+            console.warn(`Raster update skipped for layer '${id}': expected ${expected} samples for ${rasterLayer.rasterResX}x${rasterLayer.rasterResY} pixels (got ${rasterValues.length}).`);
+            return;
+        }
         const config = layer.layerRenderInfo.colormap.config;
         const resolvedDomain = ColorMap.resolveDomainFromData(rasterValues, config);
 
@@ -686,14 +753,53 @@ export class AutkMap {
                 computedLabels: ColorMap.computeLabels(resolvedDomain),
             },
         });
-        this._ui.refreshLegend(layer);
-
         if (transferFunction) {
             rasterLayer.setTransferFunction(transferFunction);
         }
 
         rasterLayer.loadRaster(rasterValues);
         rasterLayer.makeLayerDataDirty();
+        this._ui.refreshLegend(layer);
+        this._ui.refreshLayerList();
+    }
+
+    /**
+     * Draws three bands of a raster layer as a true-color RGB image.
+     *
+     * The bands are interleaved into the RGBA payload the raster layer copies
+     * as-is, so the layer color map, domain, legend and transfer function do
+     * not apply.
+     *
+     * @param layer Target raster layer.
+     * @param id Layer identifier, used in warnings.
+     * @param props Feature properties holding the band arrays.
+     * @param bands Dot-path accessors for the red, green and blue bands.
+     * @param range Optional band values mapped to 0 and 255.
+     * @returns Nothing. A warning is logged and the layer is left unchanged when a band is missing or the lengths differ.
+     */
+    private updateRgbRaster(
+        layer: RasterLayer,
+        id: string,
+        props: Record<string, unknown>,
+        bands: RasterRgbBands,
+        range?: RasterRgbRange,
+    ): void {
+        const values = bands.map((band) => toFloat32Band(valueAtPath(props, band)));
+        const missing = bands.filter((_, i) => !values[i] || values[i]!.length === 0);
+        if (missing.length > 0) {
+            console.warn(`Raster update skipped for layer '${id}': invalid raster band(s) ${missing.map((band) => `'${band}'`).join(', ')}.`);
+            return;
+        }
+
+        try {
+            layer.loadRgbRaster(composeRgbRaster(values as [Float32Array, Float32Array, Float32Array], range));
+        } catch (error) {
+            console.warn(`Raster update skipped for layer '${id}': ${(error as Error).message}`);
+            return;
+        }
+        layer.makeLayerDataDirty();
+        this._ui.refreshLegend(layer);
+        this._ui.refreshLayerList();
     }
 
     /**
@@ -707,6 +813,7 @@ export class AutkMap {
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
+        if (layer.layerInfo.typeLayer === 'raster' && (layer as RasterLayer).rasterMode === 'rgb') { return; }
         if (layer.layerInfo.typeLayer === 'tiles') { return; }
 
         const currentConfig = layer.layerRenderInfo.colormap.config;
@@ -896,28 +1003,13 @@ export class AutkMap {
      * @param collection Raster feature collection containing bbox, resolution, and height values.
      * @param property Dot-path to the raster band used as terrain height.
      * @returns Nothing. Terrain resources are initialized immediately.
-     * @throws {Error} If the map origin is not initialized or the heightfield input is invalid.
+     * @deprecated Use loadTerrain({ source: { collection, property } }).
+     * @throws {Error} If the heightfield input or workspace CRS is invalid.
      * @example
      * map.enableTerrainMode(elevationCollection, 'bands.elevation');
      */
     enableTerrainMode(collection: FeatureCollection<Geometry | null>, property: string): void {
-        if (!this.layerManager.hasOrigin) {
-            throw new Error('Terrain mode requires at least one map layer to initialize the map origin first.');
-        }
-
-        const heightfield = heightfieldFromRaster(collection, property, this.layerManager.origin);
-        this._terrainRenderPath?.destroy();
-        this.clearTerrainTiles();
-        this._terrainRenderPath = new TerrainMapRenderPath(
-            this._renderer,
-            this._camera,
-            this._layerManager,
-            this._picking,
-            this._style,
-            heightfield,
-            () => this.requestRender(),
-        );
-        this.requestRender();
+        this.loadTerrain({ source: { collection, property } });
     }
 
     /**
@@ -925,14 +1017,15 @@ export class AutkMap {
      *
      * @returns Nothing. Terrain GPU resources are released when present.
      * @throws Never throws.
+     * @deprecated Use removeTerrain().
      * @example
      * map.disableTerrainMode();
      */
-    disableTerrainMode(): void {
-        if (!this._terrainRenderPath) {
-            return;
-        }
+    disableTerrainMode(): void { this.removeTerrain(); }
 
+    /** Removes elevation while preserving imagery, data layers, origin, and camera. */
+    removeTerrain(): void {
+        if (!this._terrainRenderPath) return;
         this._terrainRenderPath.destroy();
         this._terrainRenderPath = null;
         this.clearTerrainTiles();
@@ -949,9 +1042,10 @@ export class AutkMap {
      * appears quickly and sharpens. Layers, buildings and picking work as in
      * {@link AutkMap.enableTerrainMode}; load a tile layer to drape imagery.
      *
-     * Needs the map origin, which the first loaded data layer defines. Replaces
+     * Reuses the map origin, which the first loaded data layer defines. Replaces
      * any terrain already enabled. The source attribution is shown on the map.
      *
+     * @deprecated Use loadTerrain(params).
      * @param params Elevation source and options.
      * @returns Nothing. Terrain resources are initialized immediately and tiles load in the background.
      * @throws {Error} If the map origin is not initialized, or the source or an option is invalid.
@@ -960,60 +1054,107 @@ export class AutkMap {
      * map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
      * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
      */
-    enableTerrainTiles({ source, crs = 'EPSG:3395', levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs }: EnableTerrainTilesParams): void {
-        if (!this.layerManager.hasOrigin) {
-            throw new Error('Terrain mode requires at least one map layer to initialize the map origin first.');
-        }
+    enableTerrainTiles(params: EnableTerrainTilesParams): void { this.loadTerrain(params); }
 
-        const resolved = resolveTerrainTileSource(source);
-        const origin = this.layerManager.origin;
-        const heights = new TileHeightSource({
-            source: resolved,
-            crs,
-            origin: [origin[0]!, origin[1]!],
-            centre: [0, 0],
-            levels,
-            windowSize,
-            zoomBias,
-            maxCachedTiles,
-            verticalScale,
-            composeBudgetMs,
+    /**
+     * Loads elevation tiles or a normalized raster into the shared terrain renderer.
+     * Imagery is optional and is loaded independently with loadTiles(). An existing
+     * workspace origin and camera are reused. An empty tile-terrain map needs center;
+     * a raster can initialize its own origin and view from its bounds.
+     * @param params Elevation source, optional initial view, and terrain options.
+     * @throws If coordinates, source, or options are invalid, or GPU setup fails.
+     * @example
+     * map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
+     */
+    loadTerrain({ source, crs, center, zoom, validation, levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, overlaySize }: LoadTerrainParams): void {
+        const qualityOptions = resolveElevationValidation(validation);
+        const workspaceCrs = this.resolveWorkspaceCrs(crs);
+        if (workspaceCrs === 'EPSG:4326') throw new Error('Terrain requires a metre-based workspace CRS.');
+        if (zoom !== undefined && center === undefined) throw new Error('Terrain zoom requires a geographic center.');
+        if (!source || typeof source !== 'object') throw new Error('Terrain requires an elevation source.');
+        if (verticalScale !== undefined && (!Number.isFinite(verticalScale) || verticalScale <= 0)) {
+            throw new Error('Terrain verticalScale must be finite and positive.');
+        }
+        const raster = 'collection' in source;
+        const resolved = raster ? null : resolveTerrainTileSource(source);
+        const size = overlaySize ?? (raster ? 4096 : 2048);
+        if (!Number.isSafeInteger(size) || size < 64 || size > 4096) {
+            throw new Error('Terrain overlaySize must be an integer from 64 to 4096.');
+        }
+        const view = center === undefined ? undefined : initialTileView(center, zoom ?? 12, workspaceCrs,
+            this.canvas.clientHeight, this._camera.getFovyRadians(), 256);
+        const hadOrigin = this.layerManager.hasOrigin;
+        if (!hadOrigin && !view && !raster) {
+            throw new Error('Terrain requires an existing map origin or a geographic center and optional zoom.');
+        }
+        let origin: number[];
+        if (hadOrigin) origin = this.layerManager.origin;
+        else if (view) origin = [view.point[0], view.point[1]];
+        else if (raster) origin = computeOrigin(source.collection as FeatureCollection);
+        else throw new Error('Terrain requires a geographic center.');
+        const heights = raster ? heightfieldFromRaster(source.collection, source.property, origin) : new TileHeightSource({
+            source: resolved!, crs: workspaceCrs, origin: [origin[0]!, origin[1]!],
+            centre: view ? [view.point[0] - origin[0]!, view.point[1] - origin[1]!] : [this._camera.getLookAt()[0], this._camera.getLookAt()[1]],
+            levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, validation,
             onChange: () => this.requestRender(),
             onError: (tile, error, permanent) => {
                 if (this._reportedTerrainErrors >= MAX_REPORTED_TERRAIN_ERRORS) return;
                 this._reportedTerrainErrors++;
                 const reason = error instanceof Error ? error.message : String(error);
-                console.warn(
-                    `Terrain tiles: tile ${tile.z}/${tile.x}/${tile.y} ${permanent ? 'is unavailable' : 'failed to load'}: ${reason}`
-                    + (this._reportedTerrainErrors === MAX_REPORTED_TERRAIN_ERRORS ? ' (further tile errors are not reported)' : ''),
-                );
+                console.warn(`Terrain tiles: tile ${tile.z}/${tile.x}/${tile.y} ${permanent ? 'is unavailable' : 'failed to load'}: ${reason}`
+                    + (this._reportedTerrainErrors === MAX_REPORTED_TERRAIN_ERRORS ? ' (further tile errors are not reported)' : ''));
             },
         });
-
+        let qualityStats = null;
+        if (!(heights instanceof TileHeightSource) && qualityOptions) {
+            const result = validateElevationGrid(heights.data, heights.width, heights.height,
+                Math.max(heights.cellSizeX, heights.cellSizeY) * Math.cos(crsToLonLat(workspaceCrs, origin[0], origin[1])[1] * Math.PI / 180), qualityOptions);
+            qualityStats = result.stats;
+            heights.data = result.values;
+            let min = Infinity, max = -Infinity;
+            for (let i = 0; i < heights.data.length; i++) {
+                if (!Number.isFinite(heights.data[i])) heights.data[i] = 0; // display fallback; unresolved count remains explicit
+                min = Math.min(min, heights.data[i]); max = Math.max(max, heights.data[i]);
+            }
+            heights.minHeight = min; heights.maxHeight = max;
+        }
+        if (!(heights instanceof TileHeightSource) && verticalScale !== undefined && verticalScale !== 1) {
+            heights.data = Float32Array.from(heights.data, height => height * verticalScale);
+            heights.minHeight *= verticalScale;
+            heights.maxHeight *= verticalScale;
+        }
         let path: TerrainMapRenderPath;
         try {
-            path = new TerrainMapRenderPath(
-                this._renderer,
-                this._camera,
-                this._layerManager,
-                this._picking,
-                this._style,
-                heights,
-                () => this.requestRender(),
-            );
+            path = new TerrainMapRenderPath(this._renderer, this._camera, this._layerManager, this._picking,
+                this._style, heights, () => this.requestRender(), size, !hadOrigin && !view);
         } catch (error) {
-            heights.destroy();
+            if (heights instanceof TileHeightSource) heights.destroy();
             throw error;
         }
-
         this._terrainRenderPath?.destroy();
         this.clearTerrainTiles();
+        if (!hadOrigin) {
+            this.layerManager.initializeOrigin(raster && !view ? source.collection
+                : { type: 'FeatureCollection', features: [], bbox: [origin[0]!, origin[1]!, origin[0]!, origin[1]!] });
+        }
+        this._workspaceCrs = workspaceCrs;
+        this._workspaceCrsEstablished = true;
         this._terrainRenderPath = path;
-        this._terrainTiles = heights;
-        this._terrainCredits = resolved.attribution;
+        this._terrainValidation = qualityStats;
+        this._terrainTiles = heights instanceof TileHeightSource ? heights : null;
+        this._terrainCredits = resolved?.attribution ?? [];
         this._reportedTerrainErrors = 0;
+        if (view) {
+            const target = [view.point[0] - origin[0]!, view.point[1] - origin[1]!, 0];
+            this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
+        }
         this.refreshAttribution();
         this.requestRender();
+    }
+
+    /** Validation diagnostics shared by tile and normalized raster terrain. Null when disabled or absent. */
+    getTerrainValidationStats(): ElevationValidationStats | null {
+        return this._terrainTiles?.stats.validation ?? (this._terrainValidation ? { ...this._terrainValidation } : null);
     }
 
     /**
@@ -1045,6 +1186,7 @@ export class AutkMap {
     /** Forgets the streamed terrain of a terrain path that was just destroyed. */
     private clearTerrainTiles(): void {
         this._terrainTiles = null;
+        this._terrainValidation = null;
         if (this._terrainCredits.length > 0) {
             this._terrainCredits = [];
             this.refreshAttribution();
@@ -1084,6 +1226,32 @@ export class AutkMap {
      */
     resetCamera(): void {
         (this._terrainRenderPath ?? this._flatRenderPath).resetCamera();
+    }
+
+    /**
+     * Moves the camera, looking straight down, so a rectangle fits the viewport.
+     *
+     * A flat map starts at the middle of its first layer from a fixed height, which can show nothing of a spread-out
+     * collection. Call this after loading the layers to frame them: without an argument it frames the collection that
+     * set the map origin (the first one loaded), otherwise the rectangle given, in the coordinates of the data. In
+     * terrain mode, which frames its heightfield itself, or before any layer is loaded, it does nothing. Nothing
+     * calls it for you, so existing maps keep their view.
+     *
+     * @param bounds Optional rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map.
+     * @returns Nothing. The camera is moved and a frame is requested.
+     * @throws Never throws.
+     * @example
+     * await map.init();
+     * map.loadCollection('parks', { collection });
+     * map.fitBounds();
+     */
+    fitBounds(bounds?: MapBounds): void {
+        if (this._terrainRenderPath || !this._layerManager.hasOrigin) { return; }
+        const world = bounds ?? this._layerManager.bounds;
+        if (!world) { return; }
+        const [originX, originY] = this._layerManager.origin;
+        this._flatRenderPath.fitBounds([world[0] - originX, world[1] - originY, world[2] - originX, world[3] - originY]);
+        this.requestRender();
     }
 
     /**
@@ -1226,6 +1394,10 @@ export class AutkMap {
         this._terrainRenderPath?.destroy();
         this._terrainRenderPath = null;
 
+        this._terrainTiles = null;
+        this._terrainValidation = null;
+        this._terrainCredits = [];
+
         this._style.setChangeListener(null);
         this._layerManager.layers.forEach((layer) => {
             layer.setChangeListener(null);
@@ -1364,7 +1536,11 @@ export class AutkMap {
 
         const layerMesh = TriangulatorPolygons.buildMesh(geojson, this.layerManager.origin);
         if (layerMesh[0].length === 0 || layerMesh[1].length === 0) {
-            console.error('Invalid Polygon Layer');
+            console.error(
+                `Layer "${layerName}" was not created: its ${geojson.features.length} feature(s) gave an empty ${typeLayer} mesh. ` +
+                'Check that the collection has features with polygon or line geometry. A table loaded after the first one ' +
+                "can also be clipped to nothing by the workspace extent, which the first geometry table sets (see AutkDb)."
+            );
             return;
         }
 
@@ -1372,7 +1548,7 @@ export class AutkMap {
         if (typeLayer === 'polygons') {
             layerBorder = TriangulatorPolygons.buildBorder(geojson, this.layerManager.origin);
             if (!layerBorder[0] || !layerBorder[1] || layerBorder[0].length === 0 || layerBorder[1].length === 0) {
-                console.error('Invalid Polygon Layer border.');
+                console.error(`Layer "${layerName}" was not created: its ${geojson.features.length} feature(s) gave an empty border mesh.`);
                 return;
             }
         } else {
@@ -1558,10 +1734,16 @@ export class AutkMap {
      *
      * @param layerName Target layer id.
      * @param geotiff GeoTIFF-derived feature collection.
-     * @param property Feature-property path selecting the raster band array.
+     * @param property Feature-property path selecting the raster band array, or three paths for an RGB image.
+     * @param rgbRange Optional band values mapped to 0 and 255 for an RGB image.
      * @returns Nothing. The raster layer is created and initialized.
      */
-    private createRasterLayer(layerName: string, geotiff: FeatureCollection<Geometry | null>, property: string) {
+    private createRasterLayer(
+        layerName: string,
+        geotiff: FeatureCollection<Geometry | null>,
+        property: string | RasterRgbBands,
+        rgbRange?: RasterRgbRange,
+    ) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
             zIndex: this._layerManager.computeZindex('raster'),
@@ -1596,7 +1778,7 @@ export class AutkMap {
         };
 
         this.createLayer(layerInfo, layerRenderInfo, layerData);
-        this.updateRaster(layerName, { collection: geotiff, property  });
+        this.updateRaster(layerName, { collection: geotiff, property, rgbRange });
     }
 
     /**

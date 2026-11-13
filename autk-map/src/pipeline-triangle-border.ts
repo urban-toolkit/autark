@@ -169,7 +169,7 @@ export class PipelineTriangleBorder extends Pipeline {
         // vertex data
         this._skippedBuffer = this._renderer.device.createBuffer({
             label: 'Skipped data buffer',
-            size: borders.skippedVertices.length * 4,
+            size: borders.borderSkippedVertices.length * 4,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
     }
@@ -188,7 +188,7 @@ export class PipelineTriangleBorder extends Pipeline {
     updateVertexBuffers(borders: Triangles2DLayer): void {
         this._positionData = this._syncFloatData(this._positionData, borders.borderPosition);
         this._indicesData = this._syncUintData(this._indicesData, borders.borderIndices);
-        this._skippedData = this._syncFloatData(this._skippedData, borders.skippedVertices);
+        this._skippedData = this._syncFloatData(this._skippedData, borders.borderSkippedVertices);
 
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
         this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, this._indicesData);
@@ -272,7 +272,7 @@ export class PipelineTriangleBorder extends Pipeline {
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: false,
-            depthCompare: 'greater-equal',
+            depthCompare: 'always',
             format: 'depth32float',
         };
 

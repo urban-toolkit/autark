@@ -53,6 +53,8 @@ export interface TileView {
     origin: readonly [number, number];
     /** Coordinate system of the map. */
     crs: TileCrs;
+    /** Backing-store dimensions for tile resolution; camera coordinates remain unchanged. */
+    viewport?: readonly [number, number];
 }
 
 /** Tuning for {@link selectTiles}. Values that are not finite numbers are ignored. */
@@ -154,8 +156,9 @@ export function selectTiles(
     options: TileSelectionOptions = {},
 ): TileSelection | null {
     const { camera } = view;
-    const width = camera.getViewportWidth();
-    const height = camera.getViewportHeight();
+    if (!(camera.getViewportWidth() > 0) || !(camera.getViewportHeight() > 0)) return null;
+    const width = view.viewport?.[0] ?? camera.getViewportWidth();
+    const height = view.viewport?.[1] ?? camera.getViewportHeight();
     if (!(width > 0) || !(height > 0)) return null;
 
     const maxTiles = Math.max(1, Math.floor(finiteOr(options.maxTiles, DEFAULT_MAX_TILES)));

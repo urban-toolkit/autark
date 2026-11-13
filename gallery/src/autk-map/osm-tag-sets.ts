@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkDb } from '@urban-toolkit/autk-db';
 
@@ -46,7 +47,7 @@ export class OsmTagSets {
         this.map.updateRenderInfo('table_osm_paths_polylines', { polylinesWidth:8 });
 
         this.map.draw();
-        this.addOpacitySlider(canvas);
+        this.addOpacitySlider();
 
     }
 
@@ -64,40 +65,25 @@ export class OsmTagSets {
         }
     }
 
-    private addOpacitySlider(canvas: HTMLCanvasElement): void {
+    private addOpacitySlider(): void {
         const container = document.createElement('div');
-        const rect = canvas.getBoundingClientRect();
-        container.style.cssText = `
-            position: fixed;
-            top: ${rect.top + 16}px;
-            right: ${window.innerWidth - rect.right + 16}px;
-            background: rgba(255,255,255,0.9);
-            padding: 10px 14px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            font-family: system-ui, sans-serif;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            z-index: 20;
-        `;
+        container.className = 'opacity-control';
 
         const label = document.createElement('label');
-        label.textContent = 'Buildings';
-        label.style.color = '#333';
+        label.textContent = 'Building opacity';
+        label.htmlFor = 'building-opacity';
 
         const slider = document.createElement('input');
         slider.type = 'range';
+        slider.id = 'building-opacity';
         slider.min = '0';
         slider.max = '1';
         slider.step = '0.01';
         slider.value = '0.35';
-        slider.style.width = '100px';
 
         const valueDisplay = document.createElement('span');
         valueDisplay.textContent = '0.35';
-        valueDisplay.style.cssText = 'min-width: 2.5em; text-align: right; color: #555;';
+        valueDisplay.className = 'control-value';
 
         slider.addEventListener('input', () => {
             const opacity = parseFloat(slider.value);
@@ -106,7 +92,7 @@ export class OsmTagSets {
         });
 
         container.append(label, slider, valueDisplay);
-        document.body.appendChild(container);
+        document.querySelector('.map-stage')!.appendChild(container);
     }
 }
 
@@ -115,6 +101,4 @@ async function main() {
     if (!canvas) throw new Error('No canvas found');
     await new OsmTagSets().run(canvas);
 }
-main().catch(error => {
-    console.error(error);
-});
+void runExample(main);

@@ -11,6 +11,7 @@
 import { normalizeAttribution } from './attribution';
 import type { TileAttribution, TileCredit } from './attribution';
 import type { TileIndex } from './tile-index';
+import type { TileTheme } from './tile-theme';
 import { MAX_TILE_ZOOM, isValidTile, tilesPerAxis } from './tile-index';
 
 /** A web map tile source as written by an application. */
@@ -20,6 +21,8 @@ export interface TileSource {
      * optionally `{s}` for a subdomain.
      */
     urlTemplate: string;
+    /** Client-side image treatment. Changes colors and contrast; retains baked-in labels and geometry. */
+    theme?: TileTheme;
     /**
      * Credit shown on the map. Required: providers' terms ask for it. Give a
      * string, a `{ text, url }` entry that links to the provider's page, or a
@@ -42,6 +45,7 @@ export interface TileSource {
 /** A {@link TileSource} with defaults applied and validated. */
 export interface ResolvedTileSource {
     readonly urlTemplate: string;
+    readonly theme?: TileTheme;
     readonly attribution: readonly TileCredit[];
     readonly minZoom: number;
     readonly maxZoom: number;
@@ -70,7 +74,10 @@ const KNOWN_PLACEHOLDERS = new Set(['z', 'x', 'y', 's', 'reverseY']);
  * });
  */
 export function resolveTileSource(source: TileSource): ResolvedTileSource {
-    const { urlTemplate } = source;
+    const { urlTemplate, theme } = source;
+    if (theme !== undefined && !['original', 'light', 'dark'].includes(theme)) {
+        throw new Error('Tile theme must be original, light, or dark.');
+    }
     if (typeof urlTemplate !== 'string' || urlTemplate.length === 0) {
         throw new Error('Tile source needs a urlTemplate.');
     }
@@ -118,7 +125,7 @@ export function resolveTileSource(source: TileSource): ResolvedTileSource {
         throw new Error('Tile source urlTemplate uses {s} but no subdomains were given.');
     }
 
-    return { urlTemplate, attribution, minZoom, maxZoom, tileSize, subdomains };
+    return { urlTemplate, attribution, minZoom, maxZoom, tileSize, subdomains, ...(theme !== undefined ? { theme } : {}) };
 }
 
 /**
@@ -152,17 +159,23 @@ export function expandTileUrl(source: ResolvedTileSource, tile: TileIndex): stri
 /**
  * Identifier of a source, used in cache keys.
  *
- * Two sources with the same template and tile size share tiles.
+ * Two sources with the same template, tile size, and image theme share tiles.
  *
  * @param source - Resolved source.
  * @returns A short string.
  */
 export function tileSourceId(source: ResolvedTileSource): string {
-    return `${source.urlTemplate}@${source.tileSize}`;
+    return `${source.urlTemplate}@${source.tileSize}${source.theme && source.theme !== 'original' ? `:${source.theme}` : ''}`;
 }
 
 /** Where OpenStreetMap asks credits to link, for access to its licence and origin information. */
 const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
+
+const OSM_SOURCE = {
+    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: { text: '© OpenStreetMap', url: OSM_COPYRIGHT_URL },
+    maxZoom: 19,
+} as const;
 
 /**
  * Ready-made tile sources.
@@ -170,32 +183,21 @@ const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
  * These are conveniences, not licences. Each provider sets its own terms, and
  * the attribution must stay visible.
  *
- * - `esriWorldImagery`: Esri World Imagery satellite and aerial imagery. Free
- *   for development and light use; check Esri's terms for production.
+ * - `esriWorldImagery`: Esri World Imagery satellite and aerial imagery.
+ *   Provider access and usage terms apply.
  * - `openStreetMap`: the public OpenStreetMap tile server. Its usage policy
- *   forbids heavy use and bulk downloading; use your own server or a
- *   commercial provider for production.
- * - `cartoLight`: Carto's light basemap. Free for non-commercial use; check
- *   Carto's terms otherwise.
+ *   forbids heavy use and bulk downloading; use a suitable hosted provider
+ *   or your own server for heavier traffic.
+ * - `osmLight`, `osmDark`: the same OSM raster tiles with muted
+ *   client-side color treatments. Labels and geometry remain in the image.
  */
 export const TILE_SOURCES = {
     esriWorldImagery: {
         urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: 'Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community',
+        attribution: 'Esri, Vantor, Earthstar Geographics, GIS User Community',
         maxZoom: 19,
     },
-    openStreetMap: {
-        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: { text: '© OpenStreetMap contributors', url: OSM_COPYRIGHT_URL },
-        maxZoom: 19,
-    },
-    cartoLight: {
-        urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-        attribution: [
-            { text: '© OpenStreetMap contributors', url: OSM_COPYRIGHT_URL },
-            { text: '© CARTO', url: 'https://carto.com/attributions' },
-        ],
-        subdomains: 'abcd',
-        maxZoom: 20,
-    },
+    openStreetMap: OSM_SOURCE,
+    osmLight: { ...OSM_SOURCE, theme: 'light' },
+    osmDark: { ...OSM_SOURCE, theme: 'dark' },
 } as const satisfies Record<string, TileSource>;

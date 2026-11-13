@@ -19,6 +19,9 @@ export interface TileCredit {
 /** Credit as an application writes it: text, an entry with a link, or a list of either. */
 export type TileAttribution = string | TileCredit | ReadonlyArray<string | TileCredit>;
 
+/** Branding shown with the provider credits, including on maps without tile imagery. */
+export const AUTARK_CREDIT: TileCredit = { text: 'Made with Autark', url: 'https://www.autarkjs.org' };
+
 /**
  * Whether a string is an `http` or `https` URL, the only kinds a credit may link to.
  *
@@ -105,21 +108,27 @@ export function createAttributionElement(doc: AttributionDocument, credits: read
 
     const root = doc.createElement('span');
     root.className = 'autk-map-attribution';
+    root.tabIndex = 0;
+    root.title = credits.map(credit => credit.text).join(' · ');
     Object.assign(root.style, {
-        position: 'absolute', right: '10px', bottom: '26px', maxWidth: 'calc(100% - 20px)',
-        font: '11px system-ui,sans-serif', color: '#333', background: 'rgba(255,255,255,0.75)',
-        padding: '1px 5px', borderRadius: '3px', textAlign: 'right', pointerEvents: 'auto',
+        position: 'absolute', left: '10px', bottom: '10px', width: 'max-content', maxWidth: 'calc(100% - 20px)',
+        boxSizing: 'border-box', fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '10px', lineHeight: '12px', fontWeight: '400', letterSpacing: 'normal', color: '#737379',
+        background: 'rgba(255,255,255,0.6)', padding: '0 4px',
+        textAlign: 'left', whiteSpace: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', pointerEvents: 'auto',
     });
 
     credits.forEach((credit, index) => {
-        if (index > 0) root.appendChild(doc.createTextNode(' | '));
+        if (index > 0) root.appendChild(doc.createTextNode(' · '));
         if (credit.url !== undefined && isHttpUrl(credit.url)) {
             const link = doc.createElement('a') as HTMLAnchorElement;
             link.textContent = credit.text;
             link.href = credit.url;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
-            link.style.color = '#1a4f8b';
+            link.className = 'autk-map-credit';
+            const isAutark = credit.url === AUTARK_CREDIT.url && credit.text === AUTARK_CREDIT.text;
+            Object.assign(link.style, { color: isAutark ? '#3451b2' : 'inherit', font: 'inherit', textDecoration: 'none' });
             root.appendChild(link);
         } else {
             root.appendChild(doc.createTextNode(credit.text));

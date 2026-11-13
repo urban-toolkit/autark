@@ -1,0 +1,8 @@
+.reading-note { display: grid; grid-template-columns: 150px 1fr; gap: 12px 24px; margin-top: 20px; padding: 20px 24px; background: var(--surface); border-radius: 10px; }
+.reading-note h2 { margin: 0; font-size: 13px; font-weight: 650; line-height: 1.7; }
+.reading-note p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.reading-note strong { color: var(--accent); font-weight: 650; }
+
+@media (max-width: 600px) {
+    .reading-note { grid-template-columns: 1fr; padding: 18px; }
+}

@@ -32,28 +32,32 @@ Tiles are decoded to `Float32Array`s, and each window is composed on the CPU and
 
 ### Imagery on terrain
 
-Non-3D layers render into one offscreen overlay texture (at most 4096²) through an orthographic camera over the visible bounds, and that texture drapes over the mesh. Computed with the real camera, an overlay texel covers at most about 1.8 screen pixels on the bottom row of a steeply tilted view and is finer than a pixel at 45° or less, so imagery can look slightly soft at the nearest edge. Accepted.
+Non-3D layers render into one offscreen overlay texture (2048² by default for streamed terrain, at most 4096²) through an orthographic camera over the visible bounds, and that texture drapes over the mesh. Computed with the real camera, an overlay texel covers at most about 1.8 screen pixels on the bottom row of a steeply tilted view and is finer than a pixel at 45° or less, so imagery can look slightly soft at the nearest edge. Accepted.
 
 ## API and limits
 
 ```ts
-map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, crs: 'EPSG:3395', levels: 6,
-    windowSize: 512, zoomBias: 0, maxCachedTiles: 128, verticalScale: 1, composeBudgetMs: 4 });
+map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium, crs: 'EPSG:3395', levels: 6,
+    windowSize: 512, zoomBias: 0, maxCachedTiles: 128, verticalScale: 1, composeBudgetMs: 4, overlaySize: 2048 });
 map.getTerrainTileStats();      // levels, tiles, memory, timing (p50/p95/p99), pendingLevels, idle
 map.resetTerrainTileTiming();
-map.disableTerrainMode();
+map.removeTerrain();
 ```
 
-- **Origin.** Like `enableTerrainMode`, it needs the map origin (any loaded layer sets it). Calling it again replaces the terrain.
+- **Origin and view.** Existing vector or imagery layers supply the shared origin and camera; neither center nor zoom is needed. On an empty map, tile terrain requires a WGS84 `center` and optional `zoom` (default 12). Raster terrain uses `source: { collection, property }` and can initialize from its bounds. Calling `loadTerrain` again replaces terrain after successful setup. Imagery remains independently optional, and terrain without imagery uses a shaded surface color.
+- **Shared CRS.** The map defaults to the same EPSG:3395 constant as AutkDb. Declare custom normalized data with `new AutkMap(canvas, true, { crs: 'EPSG:3857' })`. Terrain and imagery inherit this context; the existing first-load `crs` parameter can also declare a custom workspace. Subsequent conflicting CRS values are rejected. No reprojection of already-normalized database vectors occurs.
+- **Compatibility.** Previous terrain methods delegate to `loadTerrain`/`removeTerrain`; both elevation inputs share setup, replacement, rendering, and cleanup.
 - **Sources.** A `TerrainTileSource` is a `TileSource` plus `encoding: 'terrarium' | 'mapbox'`. The only preset is `awsTerrarium` (zooms 0 to 15). A Mapbox source needs your token in the URL (README has a recipe).
 - **Attribution** is shown while terrain tiles are active. The provider asks for "Mapzen" plus a statement per data source used in your area; the preset shows "Mapzen" with a link to the list, and callers add the area's statements. Mapbox also requires its logo, which the library does not draw. Following provider terms is the caller's job.
 - **Provider.** The AWS S3 endpoints are meant for EC2 networking, are not cached by CloudFront and state no rate limits: use your own CDN beyond development.
 - **Coordinates.** Only metre-based systems (EPSG:3395, 3857); EPSG:4326 is rejected. `verticalScale` (default 1) multiplies heights; DEM heights are ground metres while the plane is stretched by about `1/cos(latitude)`. Vertical datums are not reconciled.
 - **Float32.** Vertices are relative to the map origin. Projection error stays under 0.2 px out to 1,000 km from the origin even for a camera 300 m up (0.5 px at 3,000 km, 2.4 px at 10,000 km). Stay within about 1,000 km; re-centring the origin is not supported. This is a numeric check, not a browser test.
 
+See [general elevation validation](ELEVATION-VALIDATION.md) for region-independent detection, preservation rules, diagnostics, and real-data coverage. Validation defaults to enabled and can be configured or disabled with `loadTerrain({ validation })`.
+
 ## Memory and performance
 
-At the defaults the height side holds at most about 50 MB: decoded tiles 33.5 MB (128 tiles), CPU windows 6.3 MB, the GPU texture 6.3 MB and in-flight decodes 4.2 MB (`stats.memory`; tile demand is bounded by `maxTilesPerWindow`, and tiles in use are never evicted). The imagery overlay dominates: at 4096² with 4× MSAA it is roughly 740 MB, inherited from terrain mode.
+The height-side estimate includes cached decoded tiles, retained tile snapshots, published and scratch CPU grids, GPU heights, and in-flight decoding. Validation increases the tile halo and protects parent references, so the cache is raised when necessary. `memory.validationScratch` tracks the live validation masks, row-spacing arrays, and correction buffers in pending jobs. `memory.total` includes these buffers; source tile references are shared, and actual use can be smaller than the conservative configured cache bounds. The imagery overlay dominates. Streamed terrain now defaults to 2048² (approximately 185 MB with 4× MSAA); `overlaySize` can select 64–4096 pixels per edge. At 4096² it is roughly 740 MB. Existing GeoTIFF terrain keeps its previous 4096 target. These figures exclude other map resources.
 
 Browser measurements (Chrome 156, macOS, 1568×1024 at devicePixelRatio 1.6, six levels, 512² windows; compose time in ms):
 
@@ -63,7 +67,15 @@ Browser measurements (Chrome 156, macOS, 1568×1024 at devicePixelRatio 1.6, six
 | Cold start, with the budget | 27 / 32 / 36 | one window per frame |
 | Panning, with the budget (1,070 frames) | 5.1 / 13.3 / 23.9 | two windows per frame; frame CPU averages 4.9 |
 
-A window costs about 2.5 ms with all tiles ready and about 27 ms with partial data. The p95 tail while panning is probably windows composed while tiles arrive. Upload submission stays under 1 ms at p95. Not measured: other hardware, GPU time, decoding and quadtree selection (inside the frame time). The `terrain-tiles` example shows these timings with Reset and Copy buttons.
+A window costs about 2.5 ms with all tiles ready and about 27 ms with partial data. The p95 tail while panning is probably windows composed while tiles arrive. Upload submission stays under 1 ms at p95. Not measured: other hardware, GPU time, decoding and quadtree selection (inside the frame time). These measurements describe the original PR prototype. The current Rio terrain-basemap example shows the compose p95 alongside tile and memory statistics.
+
+### Current scheduling
+
+Composition now yields between four-row batches and uses one frozen tile footprint per job. It publishes a completed grid and its placement together, keeps the prior grid while work is pending, and cancels jobs for obsolete camera positions. Finishing a snapshot requests a recheck so tiles arriving mid-job are not missed in on-demand rendering. Empty initial grids provide valid GPU metadata without bypassing the sampling budget.
+
+Terrain LOD and seams are selected once per frame; the overlay-bound update only writes its uniforms. Gallery status is resolved once, unchanged DOM values are left alone, and unchanged timing samples reuse their percentile calculation.
+
+A controlled Chrome 157 gallery startup/tilt profile at 1440×1100, DPR 1, with local synthetic tiles measured the maximum animation callback falling from 49.1 ms to 7.8 ms. Panel callbacks remained below 50 ms (maximum 1.4 ms across the final startup/tilt and panning/provider-switch runs). This is a diagnostic comparison, not a guarantee for live providers or other hardware.
 
 ## Possible next steps
 
@@ -76,9 +88,38 @@ Only if measurements on other hardware call for them:
 ## Tests
 
 - **Unit tests (no GPU):** decoding, sampling and composition against a synthetic DEM, window snapping and tile bounds, the CPU lookup and blend, streaming-source invalidation and the compose budget, quadtree coverage under the budget, seam assignment and morph (including a six-level gap), and map-level behavior with stubbed `fetch`.
-- **Optional GPU test:** `autk-map/test/terrain-shader-gpu.test.ts` runs the real shader code on a GPU through Dawn (Chrome's engine, with the Tint compiler) and compares height and normal with the CPU twins, including seam vertices. It skips unless the `webgpu` npm package (131 MB installed, a native binary) is installed: `npm install --no-save webgpu`, then `npx vitest run test/terrain-shader-gpu.test.ts`. Whether that justifies a CI dependency is open.
+- **Optional GPU test:** `autk-map/test/terrain-shader-gpu.test.ts` runs the real shader code on a GPU through Dawn (Chrome's engine, with the Tint compiler) and compares height and normal with the CPU twins, including seam vertices. It skips unless the `webgpu` npm package (131 MB installed, a native binary) is installed: `npm install --no-save webgpu`, then `npx vitest run test/terrain-shader-gpu.test.ts`. The browser regressions below exercise the GPU path without this optional dependency.
 - **Browser:** terrain, buildings and picking on GeoTIFF terrain; streamed terrain with imagery, level blending and seams (none visible).
 
 ## Prior art
 
 Geometry clipmaps (Losasso and Hoppe, 2004) for the nested windows and level blending; Cesium's terrain providers and deck.gl's `TerrainLayer` for tile services and the Terrarium and Mapbox encodings. Ideas only; no code is taken.
+
+## Integration with current main
+
+- Shared math helpers are exported by `autk-core`; the map has no local `utils-math.ts`.
+- Persistent orthographic cameras retain main's near/far parameters and perspective camera fixes. Layer drawing order never becomes artificial geometry height.
+- Offscreen tile selection uses the actual overlay viewport, while ordinary maps retain backing-store/DPR selection.
+- Invalid public options fail before starting requests. The window/tile-size combination is capped at 4096 wanted tiles before enumerating them.
+- `idle` is independent of `complete`: failed or no-data requests settle with partial coverage. `failedTiles` describes current failures.
+- Failed terrain construction releases partial GPU resources, cancels its requests, and leaves the existing terrain and camera active. Fixed-heightfield callers remain supported, including the previous building-height API.
+- Fixed heightfields use their own quadtree origin for seam stitching; streamed grids remain anchored in world space, including single-level sources.
+- The gallery uses the shared shell, map loading header, bottom instructions, statistics side panel, and shared credits. Canvas replacement retains accessibility attributes.
+
+Required browser regressions (WebGPU-enabled Chrome):
+
+```sh
+node autk-compute/test/run-webgpu.mjs /autk-map/test/terrain-tiles.webgpu.ts
+node autk-compute/test/run-webgpu.mjs /autk-map/test/terrain-shader.webgpu.ts
+node autk-compute/test/run-webgpu.mjs /gallery/test/terrain-tiles.webgpu.ts
+```
+
+These cover native DEM decode and GPU updates, complete terrain rendering and imagery pixels, building picking, replacement/failure recovery, the existing GeoTIFF path, shader/CPU height and normal parity, multi-level seams, and the real gallery controls and failure status. They supplement the CPU suite and existing main rendering/RGB/gallery regressions.
+
+Remaining limits: composition remains on the main thread, yielding between four-row batches. Its budget can be exceeded by one batch or by unrelated frame work; timings vary by hardware. Validate on slower GPUs and other WebGPU browsers before making performance guarantees. Long-distance origin precision, provider coverage and vertical datums retain the limits described above. No vector tiles, globe, offline support, or automatic datum conversion is introduced.
+
+## Rio gallery examples
+
+`terrain-tiles.html` extends the flat `tiles-basemap` example: Rio de Janeiro only, the same imagery-provider selector, Overview/Tilt, visibility, map-overlay opacity, and a statistics side panel. It enables streamed terrain after the geographic center initializes the map origin; no placeholder outline or other data layer is needed.
+
+`terrain-categorical.html` extends the `tiles-categorical` example with terrain and a bundled Rio road sample loaded through `autk-db`. The shared road-category helper preserves the order 3, 1, 2. In the Rio sample, major roads (motorway/trunk/primary, including links) use 3, secondary roads use 1, and the remaining classes use 2. The flat categorical example keeps its original classification. Like the flat categorical example, it has no statistics panel or imagery-opacity slider. Road data remains attributed to OpenStreetMap when changing imagery providers. The bundled WGS84 GeoJSON records its source and attribution, so opening the example does not query Overpass.

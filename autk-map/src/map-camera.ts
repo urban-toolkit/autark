@@ -33,8 +33,8 @@ export class MapCamera extends Camera {
     }
 
     /** Resets the camera, then reports the change. */
-    override resetCamera(wUp: number[], wLookAt: number[], wEye: number[]): void {
-        super.resetCamera(wUp, wLookAt, wEye);
+    override resetCamera(wUp: number[], wLookAt: number[], wEye: number[], far?: number, near?: number): void {
+        super.resetCamera(wUp, wLookAt, wEye, far, near);
         this._onChange?.();
     }
 

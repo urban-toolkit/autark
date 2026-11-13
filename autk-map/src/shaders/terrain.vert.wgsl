@@ -75,7 +75,8 @@ fn patchVertex(blockOrigin: vec2<f32>, blockSize: f32, local: vec2<f32>, seams: 
 
   let spacing = own * exp2(levels);
   let along = select(position.y, position.x, alongX);
-  let lower = floor(along / spacing) * spacing;
+  let gridOrigin = select(camera.reserved0.y, camera.reserved0.x, alongX);
+  let lower = gridOrigin + floor((along - gridOrigin) / spacing) * spacing;
   let weight = (along - lower) / spacing;
   var lowerPoint = position;
   var upperPoint = position;

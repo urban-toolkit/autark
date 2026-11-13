@@ -18,9 +18,8 @@ import { Pipeline } from './pipeline';
 import { Renderer } from './renderer';
 import type { Layer } from './layer';
 import type { TileFrame } from './tile-frame';
-import { nextPowerOfTwo } from './utils-math';
 
-import { Camera } from '@urban-toolkit/autk-core';
+import { Camera, nextPowerOfTwo } from '@urban-toolkit/autk-core';
 
 /** A tile image on the GPU and the bind group that samples it. */
 export interface TileTexture {
@@ -101,20 +100,25 @@ export class PipelineTiles extends Pipeline {
             format: 'rgba8unorm',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
         });
-        device.queue.copyExternalImageToTexture(
-            { source: bitmap },
-            { texture, premultipliedAlpha: false },
-            { width: bitmap.width, height: bitmap.height },
-        );
-        const bindGroup = device.createBindGroup({
-            label: 'Tile bind group',
-            layout: this._tileBindGroupLayout,
-            entries: [
-                { binding: 0, resource: texture.createView() },
-                { binding: 1, resource: this._sampler },
-            ],
-        });
-        return { texture, bindGroup, width: bitmap.width, height: bitmap.height };
+        try {
+            device.queue.copyExternalImageToTexture(
+                { source: bitmap },
+                { texture, premultipliedAlpha: false },
+                { width: bitmap.width, height: bitmap.height },
+            );
+            const bindGroup = device.createBindGroup({
+                label: 'Tile bind group',
+                layout: this._tileBindGroupLayout,
+                entries: [
+                    { binding: 0, resource: texture.createView() },
+                    { binding: 1, resource: this._sampler },
+                ],
+            });
+            return { texture, bindGroup, width: bitmap.width, height: bitmap.height };
+        } catch (error) {
+            texture.destroy();
+            throw error;
+        }
     }
 
     /**
@@ -231,7 +235,7 @@ export class PipelineTiles extends Pipeline {
             vertex,
             fragment,
             primitive: { frontFace: 'cw', cullMode: 'none', topology: 'triangle-list' },
-            depthStencil: { depthWriteEnabled: false, depthCompare: 'greater-equal', format: 'depth32float' },
+            depthStencil: { depthWriteEnabled: false, depthCompare: 'always', format: 'depth32float' },
             multisample: { count: this._renderer.sampleCount },
         });
     }

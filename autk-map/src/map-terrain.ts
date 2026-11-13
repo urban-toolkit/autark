@@ -82,12 +82,15 @@ export class TerrainMapRenderPath {
         heightfield: Heightfield | HeightSource,
         /** Schedules another frame when a GPU readback changes what the next frame draws. */
         private readonly requestRender: () => void,
+        /** Maximum imagery-overlay edge; fixed GeoTIFF terrain retains its previous default. */
+        private readonly maximumOverlaySize = TERRAIN_OVERLAY_TEXTURE_SIZE,
+        fitInitialView = true,
     ) {
         this.heightSource = 'levels' in heightfield ? heightfield : new StaticHeightSource(heightfield);
-        this.fitCameraToTerrainBounds();
         const overlaySize = this.getTerrainOverlayTextureSize();
         this.renderer.configureOverlayTexture(overlaySize, overlaySize);
         this.rebuildTerrainRenderer();
+        if (fitInitialView) this.fitCameraToTerrainBounds();
     }
 
     /**
@@ -152,10 +155,14 @@ export class TerrainMapRenderPath {
 
         this.layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && !(layer instanceof Triangles3DLayer)) {
-                layer.prepareRender(this.terrainOverlayCamera);
+                layer.prepareRender(this.terrainOverlayCamera, [overlayPixelRect.width, overlayPixelRect.height]);
             }
         });
-        const overlayPass = this.renderer.beginOverlayRenderPass();
+        // An opaque shaded surface keeps terrain visible without imagery or data.
+        const surface = this.style.getColor('surface');
+        const overlayPass = this.renderer.beginOverlayRenderPass({
+            r: surface.r / 255, g: surface.g / 255, b: surface.b / 255, a: 1,
+        });
         overlayPass.setViewport(overlayPixelRect.x, overlayPixelRect.y, overlayPixelRect.width, overlayPixelRect.height, 0, 1);
         overlayPass.setScissorRect(overlayPixelRect.x, overlayPixelRect.y, overlayPixelRect.width, overlayPixelRect.height);
         this.layerManager.layers.forEach((layer) => {
@@ -165,7 +172,7 @@ export class TerrainMapRenderPath {
         });
         overlayPass.end();
 
-        activeTerrain.update(this.camera, overlayBounds, overlayUvRect, waterColor, this.terrainDebug);
+        activeTerrain.updateOverlay(overlayBounds, overlayUvRect);
         const terrainPass = this.renderer.beginMainRenderPass();
         activeTerrain.render(terrainPass, this.terrainDebug.showMesh);
         if (this.frozenTerrainOverlayBounds) {
@@ -318,7 +325,7 @@ export class TerrainMapRenderPath {
      * const size = terrainPath['getTerrainOverlayTextureSize']();
      */
     private getTerrainOverlayTextureSize(): number {
-        return Math.min(TERRAIN_OVERLAY_TEXTURE_SIZE, this.renderer.device.limits.maxTextureDimension2D);
+        return Math.min(this.maximumOverlaySize, this.renderer.device.limits.maxTextureDimension2D);
     }
 
     /**

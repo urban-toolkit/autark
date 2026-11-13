@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 
 import { FeatureCollection } from 'geojson';
 
@@ -42,7 +43,7 @@ export class MapParallelCoordinates {
                 axis: ['shape_area', 'shape_leng', 'cdta2020'], 
                 title: 'Neighborhood Characteristics' 
             },
-            width: 790,
+            width: Math.max(280, plotDiv.clientWidth - 40),
             events: [PlotEvent.BRUSH_Y]
         });
     }
@@ -72,10 +73,9 @@ async function main() {
     const plotBdy = document.querySelector('#plotBody') as HTMLElement;
 
     if (!canvas || !plotBdy) {
-        console.error('Canvas or plot body element not found');
-        return;
+        throw new Error('Canvas or plot body element not found');
     }
 
     await example.run(canvas, plotBdy);
 }
-main();
+void runExample(main);

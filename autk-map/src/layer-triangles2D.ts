@@ -41,6 +41,12 @@ export class Triangles2DLayer extends VectorLayer {
     /** Cumulative border component ranges aligned with rendered features. */
     protected _borderComponents: LayerBorderComponent[] = [];
 
+    /**
+     * Per-border-vertex skip flags: `1` for the vertices of the borders of skipped features. Border vertices are
+     * laid out differently from the fill's, so the fill's flags cannot be used for them.
+     */
+    protected _borderSkippedVertices: Float32Array = new Float32Array(0);
+
     /** Border rendering pipeline, created only when border geometry exists. */
     protected _pipelineBorder!: PipelineTriangleBorder;
 
@@ -79,6 +85,11 @@ export class Triangles2DLayer extends VectorLayer {
     /** Cumulative border component ranges aligned with rendered features. */
     get borderComponents(): LayerBorderComponent[] {
         return this._borderComponents;
+    }
+
+    /** Per-border-vertex skip flags, aligned with {@link borderPosition}: `1` hides the vertex. */
+    get borderSkippedVertices(): Float32Array {
+        return this._borderSkippedVertices;
     }
 
     /**
@@ -170,6 +181,45 @@ export class Triangles2DLayer extends VectorLayer {
                 nLines: accum.nLines
             });
         }
+
+        this._syncBorderSkipped();
+    }
+
+    /** Skips the given components, in the fill and in the border. */
+    override setSkippedIds(ids: number[]): void {
+        super.setSkippedIds(ids);
+        this._syncBorderSkipped();
+    }
+
+    /** Shows every component again, in the fill and in the border. */
+    override clearSkippedIds(): void {
+        super.clearSkippedIds();
+        this._syncBorderSkipped();
+    }
+
+    /**
+     * Rebuilds the border skip flags from the skipped components.
+     *
+     * Fill component `i` and border component `i` are the same feature: both are built once per drawable feature, in
+     * order, and skip the same ones. A border component covers the border vertices from the end of the previous one
+     * to its own cumulative `nPoints`.
+     */
+    private _syncBorderSkipped(): void {
+        // While a base-class constructor loads the first data, this class's fields do not exist yet: the constructor
+        // loads the border again once they do, and that call sets the flags up.
+        const vertexCount = this._borderPosition.length / 2;
+        if (!this._borderSkippedVertices || this._borderSkippedVertices.length !== vertexCount) {
+            this._borderSkippedVertices = new Float32Array(vertexCount);
+        } else {
+            this._borderSkippedVertices.fill(0);
+        }
+
+        for (const id of this._skippedIds ?? []) {
+            if (id < 0 || id >= this._borderComponents.length) { continue; }
+            const start = id > 0 ? this._borderComponents[id - 1].nPoints : 0;
+            this._borderSkippedVertices.fill(1, start, this._borderComponents[id].nPoints);
+        }
+        // The callers mark the layer data dirty, and the upload happens at the next render, after this has run.
     }
 
     /**
@@ -195,8 +245,8 @@ export class Triangles2DLayer extends VectorLayer {
     /**
      * Renders the filled geometry and, when present, the border pass.
      *
-     * The border pipeline reuses the layer's current z-index and updates its
-     * vertex buffers whenever the layer data was dirty at the start of the pass.
+     * The border pipeline draws after the fill and updates its vertex buffers
+     * whenever the layer data was dirty at the start of the pass.
      * This preserves synchronization between filled geometry updates and border
      * rendering.
      *
@@ -226,7 +276,6 @@ export class Triangles2DLayer extends VectorLayer {
 
         // Keep hidden border buffers/uniforms synchronized so toggling them back on needs no reload.
         if (this._layerRenderInfo.showBorders !== false) {
-            this._pipelineBorder.updateZIndex(this._layerInfo.zIndex);
             this._pipelineBorder.renderPass(camera, passEncoder);
         }
     }

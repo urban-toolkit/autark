@@ -60,8 +60,7 @@ export const TERRAIN_TILE_SOURCES = {
         urlTemplate: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
         encoding: 'terrarium',
         attribution: [
-            { text: 'Terrain: Mapzen', url: 'https://github.com/tilezen/joerd/blob/master/docs/attribution.md' },
-            { text: 'Elevation data sources and licenses', url: 'https://github.com/tilezen/joerd/blob/master/docs/attribution.md' },
+            { text: 'Mapzen', url: 'https://github.com/tilezen/joerd/blob/master/docs/attribution.md' },
         ],
         minZoom: 0,
         maxZoom: 15,

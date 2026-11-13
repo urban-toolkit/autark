@@ -2,20 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Autark — render sizing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Point radius and line width</title>
     <link rel="stylesheet" href="/src/autk-map/geojson-lines-vis.css">
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-<body>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Render sizing</p>
+            <h1 id="example-title">Point radius and line width</h1>
+            <p class="description">Adjust point sizes, line widths, and picking in local planar units.</p>
+        </section>
     <div id="app">
-        <h2>Point radius and line width</h2>
+
         <p>Local planar units. Zoom changes apparent size through the camera only.</p>
         <label>Point radius <input id="point-size" type="range" min="1" max="128"> <output id="point-value"></output></label>
         <label>Line width <input id="line-width" type="range" min="1" max="40"> <output id="line-value"></output></label>
         <label>Road width override <input id="road-width" type="range" min="1" max="40" value="7"> <output id="road-value">OSM defaults until adjusted</output></label>
         <label>Picking layer <select id="picking-layer"><option value="points">Points</option><option value="lines">Lines</option><option value="roads">Roads</option></select></label>
         <p id="selection">Click a feature to pick/highlight it.</p>
-        <canvas></canvas>
+        <section class="map-panel" aria-label="Point radius and line width map area">
+            <div class="panel-header"><h2>Map</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Point radius and line width map"></canvas></div>
+            <div class="panel-footer" id="map-help"><span>Adjust sliders · Double-click to pick</span></div>
+        </section>
     </div>
     <script type="module" src="/src/autk-map/render-sizing.ts"></script>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
 </body>
 </html>

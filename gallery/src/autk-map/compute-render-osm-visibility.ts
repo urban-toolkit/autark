@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { Feature, FeatureCollection, GeoJsonProperties, Point } from 'geojson';
 
 import { AutkDb } from '@urban-toolkit/autk-db';
@@ -311,4 +312,4 @@ async function main() {
     const example = new ComputeRenderOsmVisibility();
     await example.run(canvas);
 }
-main();
+void runExample(main);

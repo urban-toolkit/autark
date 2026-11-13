@@ -41,8 +41,6 @@ export abstract class Pipeline {
 
     /** Projection matrix uniform buffer. */
     protected _projectionBuffer!: GPUBuffer;
-    /** Layer z-index uniform buffer. */
-    protected _zIndexBuffer!: GPUBuffer;
 
     /** Camera bind group shared by vertex shaders. */
     protected _cameraBindGroup!: GPUBindGroup;
@@ -83,8 +81,6 @@ export abstract class Pipeline {
     private _mviewData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(16 * Float32Array.BYTES_PER_ELEMENT));
     /** Cached projection matrix data to avoid per-frame allocations. */
     private _projectionData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(16 * Float32Array.BYTES_PER_ELEMENT));
-    /** Cached z-index uniform payload. */
-    private _zIndexData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
     /** Cached fixed-color uniform payload (rgba). */
     private _colorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
     /** Cached highlight-color uniform payload (rgba). */
@@ -128,12 +124,6 @@ export abstract class Pipeline {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
-        this._zIndexBuffer = this._renderer.device.createBuffer({
-            label: 'Z index buffer',
-            size: 4,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-
         this._cameraBindGroupLayout = this._renderer.device.createBindGroupLayout({
             entries: [
                 {
@@ -143,11 +133,6 @@ export abstract class Pipeline {
                 },
                 {
                     binding: 1, // projection
-                    visibility: GPUShaderStage.VERTEX,
-                    buffer: {},
-                },
-                {
-                    binding: 2, // zIndex
                     visibility: GPUShaderStage.VERTEX,
                     buffer: {},
                 },
@@ -165,10 +150,6 @@ export abstract class Pipeline {
                     binding: 1,
                     resource: { buffer: this._projectionBuffer },
                 },
-                {
-                    binding: 2,
-                    resource: { buffer: this._zIndexBuffer },
-                },
             ],
         });
     }
@@ -185,17 +166,6 @@ export abstract class Pipeline {
 
         this._renderer.device.queue.writeBuffer(this._mviewBuffer, 0, this._mviewData);
         this._renderer.device.queue.writeBuffer(this._projectionBuffer, 0, this._projectionData);
-    }
-
-    /**
-     * Writes the layer z-index to the shared vertex uniform buffer.
-     *
-     * @param value Layer z-index value.
-     * @throws Never throws.
-     */
-    updateZIndex(value: number): void {
-        this._zIndexData[0] = value;
-        this._renderer.device.queue.writeBuffer(this._zIndexBuffer, 0, this._zIndexData);
     }
 
     /**
@@ -448,7 +418,6 @@ export abstract class Pipeline {
     destroy(): void {
         this._mviewBuffer?.destroy();
         this._projectionBuffer?.destroy();
-        this._zIndexBuffer?.destroy();
 
         this._colorBuffer?.destroy();
         this._highlightColorBuffer?.destroy();

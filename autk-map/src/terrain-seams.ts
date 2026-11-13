@@ -37,12 +37,13 @@ export interface SeamBlock {
  * the base-2 logarithm of the size ratio, so a neighbour two levels up gives 2.
  *
  * @param blocks - Leaf blocks. Their seam fields are overwritten.
+ * @param origin - Grid origin; fixed heightfields may use an offset grid.
  * @returns Nothing.
  * @throws Never throws.
  * @example
  * assignSeams(blocks);
  */
-export function assignSeams(blocks: SeamBlock[]): void {
+export function assignSeams(blocks: SeamBlock[], origin: readonly [number, number] = [0, 0]): void {
     const sizes = [...new Set(blocks.map((b) => b.size))].sort((a, b) => b - a);
     const leaves = new Map<string, SeamBlock>();
     for (const block of blocks) leaves.set(leafKey(block.size, block.x, block.y), block);
@@ -50,7 +51,7 @@ export function assignSeams(blocks: SeamBlock[]): void {
     const coarserBy = (block: SeamBlock, px: number, py: number): number => {
         for (const size of sizes) {
             if (size <= block.size) break;
-            const neighbour = leaves.get(leafKey(size, Math.floor(px / size) * size, Math.floor(py / size) * size));
+            const neighbour = leaves.get(leafKey(size, origin[0] + Math.floor((px - origin[0]) / size) * size, origin[1] + Math.floor((py - origin[1]) / size) * size));
             if (neighbour) return Math.round(Math.log2(neighbour.size / block.size));
         }
         return 0;
@@ -86,15 +87,16 @@ function leafKey(size: number, x: number, y: number): string {
  * @param cell - Spacing between the patch's own vertices.
  * @param index - Vertex index along the edge, `0` to the cell count.
  * @param levels - Levels the neighbour is coarser; `0` leaves the vertex alone.
+ * @param origin - Grid origin along the edge, zero for streamed terrain.
  * @returns The lower and upper world coordinate and the weight of the upper one.
  * @throws Never throws.
  * @example
  * morphEdge(1024, 8, 5, 1); // { lower: 1056, upper: 1072, weight: 0.5 }: the neighbour's vertices are 16 apart
  */
-export function morphEdge(start: number, cell: number, index: number, levels: number): { lower: number; upper: number; weight: number } {
+export function morphEdge(start: number, cell: number, index: number, levels: number, origin = 0): { lower: number; upper: number; weight: number } {
     const position = start + index * cell;
     if (levels <= 0) return { lower: position, upper: position, weight: 0 };
     const spacing = cell * 2 ** levels;
-    const lower = Math.floor(position / spacing) * spacing;
+    const lower = origin + Math.floor((position - origin) / spacing) * spacing;
     return { lower, upper: lower + spacing, weight: (position - lower) / spacing };
 }

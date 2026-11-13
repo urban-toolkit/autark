@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 // TODO: filter CSV data based on the osm data polygon.
 
 import { AutkDb } from '@urban-toolkit/autk-db';
@@ -81,4 +82,4 @@ async function main() {
     const example = new Heatmap();
     await example.run();
 }
-main();
+void runExample(main);

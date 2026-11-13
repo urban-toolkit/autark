@@ -219,3 +219,27 @@ describe('selectTiles is bounded and covers the visible ground', () => {
     });
   }
 });
+
+describe('backing-store tile resolution', () => {
+  it('uses finer imagery at DPR 2 without changing the camera or its CSS viewport', () => {
+    const base = topDown(4000);
+    const before = base.camera.getViewportWidth();
+    const normal = selectTiles({ ...base, viewport: [W, H] }, SOURCE, { maxTiles: 10000 })!;
+    const retina = selectTiles({ ...base, viewport: [W * 2, H * 2] }, SOURCE, { maxTiles: 10000 })!;
+    expect(retina.z).toBe(normal.z + 1);
+    expect(retina.bounds).toEqual(normal.bounds);
+    expect(base.camera.getViewportWidth()).toBe(before);
+  });
+
+  it('still applies the tile cap independently of backing-store resolution', () => {
+    const selected = selectTiles({ ...topDown(4000), viewport: [W * 2, H * 2] }, SOURCE, { maxTiles: 4 })!;
+    expect(selected.tiles.length).toBeLessThanOrEqual(4);
+    expect(selected.z).toBeLessThan(selected.wantedZoom);
+  });
+
+  it('keeps an unconfigured terrain overlay camera inactive even with a renderer viewport', () => {
+    const camera = new Camera();
+    camera.setOrthographicBounds(-1000, 1000, -1000, 1000);
+    expect(selectTiles({ camera, origin: ORIGIN, crs: 'EPSG:3857', viewport: [W, H] }, SOURCE)).toBeNull();
+  });
+});

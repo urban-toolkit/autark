@@ -1,3 +1,4 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
@@ -82,4 +83,4 @@ async function main() {
 
     await example.run(canvas);
 }
-main();
+void runExample(main);

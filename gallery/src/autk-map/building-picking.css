@@ -1,105 +1,16 @@
-body {
-    margin: 20px;
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: flex-start;
-}
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: stretch; }
+.details-panel { min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.details-panel > .panel-header { border-bottom: 1px solid var(--border); }
+.details-body { padding: 24px 20px; }
+.selection-label { margin: 0 0 10px; color: var(--accent); font-size: 11px; font-weight: 650; letter-spacing: .04em; }
+.details-body h3 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 650; letter-spacing: -.4px; overflow-wrap: anywhere; }
+.selection-help { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.building-attributes { margin: 24px 0 0; font-size: 13px; line-height: 1.6; }
+.building-attributes > div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-top: 1px solid var(--border); }
+.building-attributes dt { color: var(--muted); }
+.building-attributes dd { margin: 0; font-weight: 550; text-align: right; overflow-wrap: anywhere; }
+.data-note { margin: auto 0 0; padding: 18px 20px; background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1.7; }
 
-#app {
-    margin: 10px;
-    position: relative;
-    width: 800px;
-    min-height: 185px;
-    border: 1px solid #bfbfbf;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-canvas {
-    margin: 10px;
-    width: 780px;
-    height: 780px;
-}
-
-#plotToggle {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    z-index: 10;
-    padding: 9px 14px;
-    border: none;
-    border-radius: 6px;
-    background: #ffffff;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    cursor: pointer;
-    font-family: system-ui, sans-serif;
-    font-size: 14px;
-    color: #222;
-}
-
-#plot {
-    position: absolute;
-    top: 96px;
-    right: 18px;
-    z-index: 29;
-    width: 280px;
-    border: none;
-    border-radius: 10px 10px 0 0;
-    background: #ffffff;
-    opacity: 0.96;
-    visibility: hidden;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    font-family: system-ui, sans-serif;
-    font-size: 14px;
-}
-
-#plotBar {
-    width: 100%;
-    height: 30px;
-    cursor: move;
-    background-color: #bfbfbf;
-    border-radius: 10px 10px 0 0;
-    border-bottom: 1px solid #bbb;
-    box-shadow: 0px 1px 3px #666;
-    touch-action: none;
-    user-select: none;
-}
-
-#plotBody {
-    margin: 0;
-    padding: 12px 14px 14px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-#plotBody h3 {
-    margin: 0 0 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #e8e8e8;
-    font-weight: 600;
-    font-size: 14px;
-    color: #222;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    margin: 6px 0;
-    color: #333;
-}
-
-.info-row strong {
-    text-align: right;
-    word-break: break-all;
-}
-
-.hidden-plot,
-.hidden-plot * {
-    visibility: hidden !important;
+@media (max-width: 900px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
 }

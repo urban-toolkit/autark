@@ -1,60 +1,65 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
-    <link rel="stylesheet" href="/src/autk-map/tiles-basemap.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Terrain basemap</title>
+    <link rel="stylesheet" href="./tiles-basemap.css" />
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-
-<body>
-    <div id="app">
-        <h2>terrain-tiles.ts: streamed terrain with satellite imagery</h2>
-        <div id="controls">
-            <div class="group" id="places" role="group" aria-label="Place"></div>
-            <div class="group" role="group" aria-label="View">
-                <button id="view-top" type="button">Top</button>
-                <button id="view-tilted" type="button">Tilted</button>
-                <button id="view-wide" type="button">Wide</button>
-            </div>
-            <div class="group" role="group" aria-label="Vertical scale">
-                <button id="scale-1" type="button">Height ×1</button>
-                <button id="scale-2" type="button">×2</button>
-                <button id="scale-3" type="button">×3</button>
-            </div>
-            <label class="check"><input id="show-tiles" type="checkbox" checked /> Imagery</label>
-            <div class="group" role="group" aria-label="Timings">
-                <button id="timing-reset" type="button" title="Forget the timings so far, then pan or zoom and read the new ones">Reset timings</button>
-                <button id="timing-copy" type="button" title="Copy the statistics and timings as JSON">Copy timings</button>
-            </div>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header"><nav class="navigation" aria-label="Main navigation">
+        <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+        <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+    </nav></header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html">← All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Terrain imagery</p>
+            <h1 id="example-title">Terrain basemap</h1>
+            <p class="description">Explore Rio de Janeiro with imagery draped over streamed elevation. Change the imagery provider or tilt the map to see the terrain.</p>
+        </section>
+        <div class="tile-controls" role="group" aria-label="Basemap controls">
+            <label for="source-select">Source</label>
+            <select id="source-select"><option value="esriWorldImagery">Esri World Imagery</option><option value="osmLight" selected>OpenStreetMap (Light)</option><option value="osmDark">OpenStreetMap (Dark)</option><option value="openStreetMap">OpenStreetMap</option><option value="local">Local test tiles</option></select>
+            <button id="view-overview" type="button">Overview</button>
+            <button id="view-tilted" type="button">Tilt</button>
+            <label><input id="show-tiles" type="checkbox" checked /> Show tiles</label>
         </div>
-        <div id="stage">
-            <canvas></canvas>
-            <table id="stats" aria-label="Terrain tile statistics">
-                <caption id="stats-status">Starting…</caption>
-                <tbody>
-                    <tr><th>Zoom of each window</th><td id="stat-zooms">-</td></tr>
-                    <tr><th>Tiles ready / wanted</th><td id="stat-tiles">-</td></tr>
-                    <tr><th>Active / queued / waiting</th><td id="stat-requests-now">-</td></tr>
-                    <tr><th>Cached tiles / limit</th><td id="stat-cache">-</td></tr>
-                    <tr><th>Requests / reuses / evictions</th><td id="stat-counters">-</td></tr>
-                    <tr><th>Frame CPU ms, last / average</th><td id="stat-frame">-</td></tr>
-                    <tr><th>Terrain update ms, p50 / p95 / p99 / max (frames)</th><td id="stat-update">-</td></tr>
-                    <tr><th>Compose ms, only frames that composed</th><td id="stat-compose">-</td></tr>
-                    <tr><th>Windows composed per such frame</th><td id="stat-windows">-</td></tr>
-                    <tr><th>Upload ms, only frames that uploaded</th><td id="stat-upload">-</td></tr>
-                    <tr><th>Memory bound, height side</th><td id="stat-memory">-</td></tr>
-                </tbody>
-            </table>
+        <div id="app" class="example-workspace tile-workspace">
+            <section class="map-panel" aria-labelledby="map-title">
+                <div class="panel-header"><h2 id="map-title">Rio de Janeiro</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+                <div class="map-stage" aria-busy="true">
+                    <canvas aria-label="Terrain basemap of Rio de Janeiro" aria-describedby="map-help"></canvas>
+                    <div class="opacity-control"><label for="opacity">Imagery opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="1" /><output id="opacity-value" class="control-value">100%</output></div>
+                </div>
+                <div id="map-help" class="panel-footer"><span>Drag to pan · Shift-drag to tilt · Scroll to zoom</span></div>
+            </section>
+            <aside class="details-panel" aria-labelledby="stats-title">
+                <div class="panel-header"><h2 id="stats-title">Map statistics</h2></div>
+                <div class="details-body">
+                    <p id="stats-status" class="selection-label" role="status">Starting…</p>
+                    <dl class="metric-list tile-metrics">
+                        <div><dt>Zoom / selected</dt><dd id="stat-selection">—</dd></div>
+                        <div><dt>Ready / fallback / missing</dt><dd id="stat-drawn">—</dd></div>
+                        <div><dt>Active / queued / retrying</dt><dd id="stat-requests-now">—</dd></div>
+                        <div><dt>Cache / limit</dt><dd id="stat-cache">—</dd></div>
+                        <div><dt>Texture memory</dt><dd id="stat-memory">—</dd></div>
+                        <div><dt>Requests / reuses / evictions</dt><dd id="stat-counters">—</dd></div>
+                        <div><dt>CPU time / frame rate</dt><dd id="stat-frames">—</dd></div>
+                        <div><dt>Frames rendered</dt><dd id="stat-frame-count">—</dd></div>
+                        <div><dt>Elevation tiles ready / wanted</dt><dd id="terrain-tiles">—</dd></div>
+                        <div><dt>Elevation memory bound</dt><dd id="terrain-memory">—</dd></div>
+                        <div><dt>Compose time, p95</dt><dd id="terrain-compose">—</dd></div>
+                    </dl>
+                    <p class="selection-help">Requests include retries and browser-cache reads. Memory estimates exclude driver overhead. Local tiles use a synthetic pattern, not geographic imagery.</p>
+                </div>
+                <p class="data-note">CPU timings · GPU time excluded</p>
+            </aside>
         </div>
-        <p id="place-note"></p>
-        <p id="notes">
-            Elevation streams as nested windows around the view: the finest covers a few kilometres, each further one twice the area at half the detail.
-            Coarse tiles load first, so a surface appears quickly and sharpens. The square outline is a vector layer draped on the terrain.
-            The request count includes retries and is not a count of network transfers: the browser may answer from its cache.
-        </p>
-    </div>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./terrain-tiles.ts"></script>
 </body>
-<script type="module" src="/src/autk-map/terrain-tiles.ts"></script>
-
 </html>

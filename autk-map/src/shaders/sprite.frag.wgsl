@@ -40,13 +40,16 @@ fn main(
 
     let sampledColor = textureSample(cMapTex, cMapSampler, vec2f(thematicValue, 0.0));
 
+    // A highlighted feature is drawn opaque: at the layer's opacity it would fade with the layer, and could vanish.
+    var drawOpacity = opacity;
     if (showHighlight > 0.0 && inHighlighted > 0.0) {
         outColor = vec4f(highlightColor.r / 255.0, highlightColor.g / 255.0, highlightColor.b / 255.0, highlightColor.a);
+        drawOpacity = 1.0;
     } else if (showThematic > 0.0 && inThematicValid < 0.5) {
         outColor = vec4f(invalidValueColor.r / 255.0, invalidValueColor.g / 255.0, invalidValueColor.b / 255.0, invalidValueColor.a);
     } else if (showThematic > 0.0) {
         outColor = sampledColor;
     }
 
-    return vec4f(outColor.rgb * opacity, opacity);
+    return vec4f(outColor.rgb * drawOpacity, drawOpacity);
 }

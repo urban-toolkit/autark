@@ -18,6 +18,7 @@ import {
 } from 'geojson';
 
 import type {
+    ElevationValidationOptions,
     ColorMapConfig,
     TransferFunction,
     LayerComponent,
@@ -29,6 +30,36 @@ import type {
     LayerRenderInfo, 
     LayerThematic 
 } from './types-layers';
+
+import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
+
+/** Coordinate system of normalized data supplied to the map. */
+export interface MapOptions {
+    /** Workspace CRS; defaults to the same EPSG:3395 CRS as AutkDb. */
+    crs?: TileCrs;
+}
+
+/** A normalized raster elevation collection, including its band property. */
+export interface TerrainRasterSource {
+    collection: FeatureCollection<Geometry | null>;
+    property: string;
+}
+
+/** One terrain-loading API for elevation tiles and normalized raster data. */
+export interface LoadTerrainParams extends Omit<EnableTerrainTilesParams, 'source'> {
+    /** Elevation tile descriptor or normalized raster collection and band property. */
+    source: TerrainTileSource | TerrainRasterSource;
+    /** Optional initial WGS84 view. Required for tile terrain when the map has no origin. */
+    center?: { latitude: number; longitude: number };
+    /** Initial zoom; requires center and defaults to 12. */
+    zoom?: number;
+}
+
+/**
+ * A rectangle `[minX, minY, maxX, maxY]` in the coordinate system of the data the map was given (the workspace
+ * coordinate system, in meters, for data from `AutkDb`), not relative to the map origin.
+ */
+export type MapBounds = [minX: number, minY: number, maxX: number, maxY: number];
 
 /**
  * Parameters for loading a feature collection as a map layer.
@@ -48,6 +79,13 @@ export interface LoadCollectionConfig {
      * Optional flag to preserve buildings that lack valid height metadata.
      */
     buildingsZeroHeight?: boolean;
+    /**
+     * Band values that map to 0 and 255 when a raster layer is drawn as an RGB
+     * image (`property` given as three bands). Defaults to `[0, 255]` for 8-bit
+     * imagery and to the smallest and largest channel value of complete, finite RGB pixels otherwise.
+     * Use `[0, 1]` explicitly for normalized floating-point imagery.
+     */
+    rgbRange?: RasterRgbRange;
 }
 
 export interface LoadCollectionParams {
@@ -80,9 +118,12 @@ export interface LoadCollectionParams {
      * immediately as the initial thematic mapping when provided.
      *
      * For raster layers, the path is resolved from the feature properties and
-     * must point to a flat band array such as `band_1`.
+     * must point to a flat band array such as `band_1`, which is drawn through
+     * the layer color map. Pass three paths, such as
+     * `['band_1', 'band_2', 'band_3']`, to draw the bands as a true-color RGB
+     * image instead. The color map does not apply to an RGB raster.
      */
-    property?: string;
+    property?: string | RasterRgbBands;
 }
 
 /**
@@ -128,7 +169,8 @@ export interface LoadMeshParams {
  *
  * Raster updates replace the value source for an existing raster layer. The
  * `property` accessor is resolved from `collection.features[0].properties` and
- * must point to a flat band array such as `band_1`.
+ * must point to a flat band array such as `band_1`, or be three such accessors
+ * to draw the bands as a true-color RGB image.
  */
 export interface UpdateRasterParams {
     /**
@@ -137,12 +179,26 @@ export interface UpdateRasterParams {
     collection: FeatureCollection<Geometry | null>;
     /**
      * Dot-path accessor for the flat raster band array on feature properties.
+     *
+     * Pass three accessors in red, green, blue order, such as
+     * `['band_1', 'band_2', 'band_3']`, to draw them as a true-color RGB image.
+     * Each band must match the existing layer's width times height; updates do not resize the grid.
+     * The bands must have the same length, and the color map and
+     * `transferFunction` do not apply.
      */
-    property: string;
+    property: string | RasterRgbBands;
     /**
      * Optional transfer function used to derive raster opacity from values.
+     * Ignored for an RGB raster.
      */
     transferFunction?: TransferFunction;
+    /**
+     * Band values that map to 0 and 255 for an RGB raster. Defaults to
+     * `[0, 255]` for 8-bit imagery and to the smallest and largest channel value of complete, finite pixels
+     * otherwise, so reflectance data may need an explicit range such as
+     * `[0, 3000]` to look right. Use `[0, 1]` explicitly for normalized imagery.
+     */
+    rgbRange?: RasterRgbRange;
 }
 
 /**
@@ -160,13 +216,28 @@ export interface LoadTilesParams {
      */
     source: TileSource;
     /**
-     * Coordinate system of the map's data. Defaults to `'EPSG:3395'`, the
-     * workspace default of `AutkDb`.
+     * Workspace/output coordinate system of the map's data, not the source CRS
+     * of an imported file. Inherits the map workspace CRS, whose default is the shared
+     * `DEFAULT_WORKSPACE_COORDINATE_FORMAT` (`'EPSG:3395'`), also used by AutkDb.
+     * The first geographic load may declare a custom workspace CRS when the map constructor
+     * did not specify one. Subsequent conflicting settings are rejected before allocation.
      */
     crs?: TileCrs;
+    /**
+     * Optional WGS84 center for the initial view, using named latitude/longitude in degrees.
+     * Initializes a tile-only scene without another data layer. An existing shared origin is preserved.
+     * The point is projected into `crs`; supplying a center explicitly positions the camera.
+     */
+    center?: { latitude: number; longitude: number };
+    /**
+     * Initial Web Mercator zoom (0–30, fractional values allowed); requires `center`.
+     * Defaults to 12 when `center` is supplied. Uses the source tile size and CSS pixels;
+     * device pixel ratio independently controls imagery resolution.
+     */
+    zoom?: number;
     /** Layer opacity from 0 to 1. Defaults to 1. */
     opacity?: number;
-    /** Tiles kept in memory. Defaults to 256. */
+    /** Positive safe integer soft cache limit. Defaults to 256. Invalid values are rejected. */
     maxCachedTiles?: number;
     /**
      * Added to the zoom level chosen for the view. Positive values give
@@ -175,7 +246,7 @@ export interface LoadTilesParams {
      */
     zoomBias?: number;
     /**
-     * Most tiles requested and drawn at once. The zoom drops to fit; if the
+     * Positive safe integer cap on selected tiles; ancestor preloads add requests. The zoom drops to fit; if the
      * source's lowest zoom still needs more, only the tiles nearest the view
      * centre are used. Defaults to 64.
      */
@@ -187,6 +258,8 @@ export interface LoadTilesParams {
  * from a web tile service.
  */
 export interface EnableTerrainTilesParams {
+    /** Conservative, region-independent elevation validation. Enabled by default; false preserves raw heights. */
+    validation?: false | ElevationValidationOptions;
     /**
      * Where the elevation tiles come from: a preset from `TERRAIN_TILE_SOURCES`
      * or a custom source with its `encoding`. The attribution is required and is
@@ -194,7 +267,7 @@ export interface EnableTerrainTilesParams {
      */
     source: TerrainTileSource;
     /**
-     * Coordinate system of the map's data. Defaults to `'EPSG:3395'`, the workspace default of `AutkDb`.
+     * Coordinate system of the map's data. Inherited from the map; defaults to `'EPSG:3395'`, the workspace default of `AutkDb`.
      * Only metre-based systems are accepted: heights are metres, so a map plane in degrees would give a distorted scene.
      */
     crs?: Exclude<TileCrs, 'EPSG:4326'>;
@@ -221,6 +294,8 @@ export interface EnableTerrainTilesParams {
     verticalScale?: number;
     /** Milliseconds of terrain composition per frame before the rest waits for the next frame (default 4; `Infinity` for no limit). */
     composeBudgetMs?: number;
+    /** Draped-layer overlay edge in pixels, from 64 to 4096. Defaults to 2048 for tiles and 4096 for raster terrain. */
+    overlaySize?: number;
 }
 
 /**

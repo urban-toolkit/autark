@@ -683,12 +683,13 @@ export class Renderer {
     /**
      * Begins the terrain overlay color render pass.
      *
+     * @param clearColor Background beneath draped layers; transparent by default.
      * @returns Render pass encoder targeting the overlay color and depth textures.
      * @throws If overlay textures have not been configured.
      * @example
      * const pass = renderer.beginOverlayRenderPass();
      */
-    beginOverlayRenderPass(): GPURenderPassEncoder {
+    beginOverlayRenderPass(clearColor: GPUColor = { r: 0, g: 0, b: 0, a: 0 }): GPURenderPassEncoder {
         if (!this._overlayTextureView || !this._overlayMultisampleTextureView || !this._overlayDepthTextureView) {
             throw new Error('Renderer overlay pass requested before overlay texture configuration.');
         }
@@ -699,7 +700,7 @@ export class Renderer {
                 {
                     view: this._overlayMultisampleTextureView,
                     resolveTarget: this._overlayTextureView,
-                    clearValue: { r: 0, g: 0, b: 0, a: 0 },
+                    clearValue: clearColor,
                     loadOp: 'clear',
                     storeOp: 'store',
                 },

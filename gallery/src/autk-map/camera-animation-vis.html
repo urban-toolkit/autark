@@ -1,18 +1,52 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
-    <title>Autark (Examples)</title>
-    <link rel="stylesheet" href="/src/autk-map/camera-animation-vis.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Camera animation</title>
+    <link rel="stylesheet" href="./camera-animation-vis.css" />
+    <link rel="stylesheet" href="../../example.css" />
 </head>
-
-<body>
-    <div id="app">
-        <h2>camera-animation-vis.ts</h2>
-        <canvas> </canvas>
-    </div>
+<body class="gallery-example">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-map/">Map guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Camera motion</p>
+            <h1 id="example-title">Camera animation</h1>
+            <p class="description">Watch a camera sequence reveal Manhattan neighborhoods from a new angle.
+                The default scene colors neighborhoods by compactness, calculated in your browser.</p>
+        </section>
+        <section class="map-panel" aria-labelledby="map-title">
+            <div class="panel-header">
+                <h2 id="map-title">Manhattan neighborhoods</h2>
+                <p id="map-status" class="map-status" role="status">Preparing scene…</p>
+            </div>
+            <div class="map-stage" aria-busy="true">
+                <canvas aria-label="Animated map of Manhattan neighborhoods" aria-describedby="map-help"></canvas>
+            </div>
+            <div class="panel-footer" id="map-help"><span>Auto animation · Scroll to zoom afterward</span></div>
+        </section>
+        <aside class="motion-note" aria-labelledby="motion-title">
+            <div>
+                <h2 id="motion-title">The camera sequence</h2>
+                <p>Four movements, played in order.</p>
+            </div>
+            <ol class="motion-steps">
+                <li><span class="step-number" aria-hidden="true">1</span> Zoom out</li>
+                <li><span class="step-number" aria-hidden="true">2</span> Tilt</li>
+                <li><span class="step-number" aria-hidden="true">3</span> Rotate</li>
+                <li><span class="step-number" aria-hidden="true">4</span> Zoom in</li>
+            </ol>
+        </aside>
+        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="./camera-animation-vis.ts"></script>
 </body>
-<script type="module" src="/src/autk-map/camera-animation-vis.ts"></script>
-
 </html>

@@ -364,7 +364,7 @@ export class PipelineTriangleRaster extends Pipeline {
         // Depth test
         const depthStencil: GPUDepthStencilState = {
             depthWriteEnabled: false,
-            depthCompare: 'greater-equal',
+            depthCompare: 'always',
             format: 'depth32float',
         };
 

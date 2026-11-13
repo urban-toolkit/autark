@@ -24,6 +24,9 @@ export default defineConfig({
     ]),
   ],
   optimizeDeps: {
+    // Discover DuckDB before navigation so the first data-backed example does
+    // not trigger dependency re-optimization and replace the inspected page.
+    include: ['@duckdb/duckdb-wasm'],
     exclude: [
       '@urban-toolkit/autk-core',
       '@urban-toolkit/autk-map',
