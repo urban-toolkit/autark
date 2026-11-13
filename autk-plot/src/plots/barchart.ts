@@ -1,235 +1,79 @@
 /**
- * @fileoverview Bar plot visualization supporting both categorical and binned modes.
+ * @fileoverview Bar chart of a value per category or per bin.
  *
- * Provides a D3-based bar plot implementation with the following features:
- * - **Dual rendering modes**: Categorical bars and one-dimensional binned output from transformed data
- * - **Two-axis mapping**: Category/bin labels on x and numeric values on y
- * - **Selection and linked views**: Uses source feature ids for click/brush interactions across components
- *
- * The plot maintains a stable mapping between rendered bins and original source features,
- * allowing selections to remain consistent across transformations.
+ * Reads label and value rows: the features as they are, or the bins of a `binning-1d` (or
+ * `category-value`) transform. Each bar is a mark; a selection elsewhere fills each bar from its
+ * base with the part the selection produces.
  *
  * @example
- * // Binned mode with map-plot linking
- * const plot = new AutkPlot(plotDiv, {
+ * new AutkPlot(plotDiv, {
  *   type: 'barchart',
  *   collection: geojson,
  *   attributes: { axis: ['shape_area', '@transform'] },
- *   transform: {
- *     preset: 'binning-1d',
- *     options: { bins: 8 }
- *   },
- *   labels: { axis: ['area range', 'count'], title: 'Distribution' },
- *   events: [PlotEvent.CLICK]
- * });
- *
- * @example
- * // Categorical mode
- * const plot = new AutkPlot(plotDiv, {
- *   type: 'barchart',
- *   collection: features,
- *   attributes: { axis: ['category', 'value'] },
- *   labels: { axis: ['category', 'value'] }
+ *   transform: { preset: 'binning-1d', options: { bins: 8 } },
+ *   labels: { axis: ['area range', 'count'], title: 'Distribution' }
  * });
  */
 
 import * as d3 from 'd3';
 
-import { valueAtPath } from '@urban-toolkit/autk-core';
+import type { AutkDatum } from '../types-plot';
 
-import type { PlotConfig } from '../api';
+import type { PlotDefinition } from './registered';
 
-import { PlotBaseInteractive } from '../plot-base-interactive';
+/** Bars of a label (`axis[0]`) and a value (`axis[1]`). */
+export const barchart: PlotDefinition = {
+    name: 'barchart',
+    label: 'Barchart',
+    // A registered transform is read like binning-1d when it yields label and value rows.
+    transforms: ['binning-1d', 'category-value'],
+    defaults: config => ({
+        tickFormats: ['~s', '~s'],
+        ...(config.transform ? { labels: { axis: ['label', 'value'], title: 'Distribution' } } : {}),
+    }),
+    // Without a transform, each feature is a bar: it needs its label and its value.
+    validate: config => {
+        const fields = (config.attributes?.axis ?? []).filter(field => field !== '@transform');
+        if (!config.transform && fields.length < 2) throw new Error('Barchart requires a label and a value (two fields) when it has no transform.');
+    },
+    // Bars grow from the bottom: the selected part is a slice from the base,
+    // even when there are too few bars for the geometry to prove it.
+    design: { rect: { rule: 'length', axis: 'y', anchor: 'end' } },
 
-/**
- * Bar plot implementation supporting categorical values and binned mode.
- *
- * In binned mode, rendered bins are mapped back to original source feature
- * indices so interaction payloads remain stable across transformations.
- */
-export class Barchart extends PlotBaseInteractive {
+    draw({ group, rows, value, width, height, format, axisX, axisY, partRange, tickCount }) {
+        const label = (row: AutkDatum) => String(value(row, 0));
+        const amount = (row: AutkDatum) => Number(value(row, 1)) || 0;
 
-    /** Band scale mapping category/bin labels to pixel positions. */
-    protected mapX!: d3.ScaleBand<string>;
-    /** Linear scale mapping bar heights (numeric values) to pixel coordinates. */
-    protected mapY!: d3.ScaleLinear<number, number>;
+        const x = d3.scaleBand(rows.map(label), [0, width]).padding(0.25);
+        // An empty result (e.g. everything filtered out) keeps a finite [0, 1] axis.
+        // A subset statistic (avg, min, max) may exceed every bar.
+        const beyond = partRange && !partRange.additive ? partRange.extent[1] : 0;
+        const y = d3.scaleLinear([0, Math.max(d3.max(rows, amount) ?? 0, 1, beyond)], [height, 0]);
 
-    /**
-     * Creates a bar plot instance and performs the initial draw.
-     *
-     * @param config Plot configuration with categorical axes or binning settings.
-     * @throws If a transform is configured with a preset other than `binning-1d`.
-     */
-    constructor(config: PlotConfig) {
-        if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) { 
-            config.tickFormats = ['~s', '~s']; 
-        }
-        if (config.transform) {
-            if (config.transform.preset !== 'binning-1d') {
-                throw new Error('Barchart only supports the binning-1d transform preset.');
-            }
-
-            const axis = config.labels?.axis ?? ['label', 'value'];
-            const title = config.labels?.title ?? 'Distribution';
-            config.labels = { axis, title };
-        }
-        super(config);
-
-        this.draw();
-    }
-
-    /**
-     * Renders plot scaffolding, axes, and bar marks.
-     *
-     * @throws If the root SVG element cannot be created.
-     */
-    render(): void {
-        const svg = d3
-            .select(this._div)
-            .selectAll('#plot')
-            .data([0])
-            .join('svg')
-            .attr('id', 'plot')
-            .style('width', `${this._width}px`)
-            .style('height', `${this._height}px`)
-            .style('visibility', 'visible');
-
-        const node = svg.node();
-
-        if (!svg || !node) {
-            throw new Error('SVG element could not be created.');
-        }
-
-        svg.attr('width', this._width).attr('height', this._height);
-
-        // ---- Plot size
-        const width = this._width - this._margins.left - this._margins.right;
-        const height = this._height - this._margins.top - this._margins.bottom;
-
-        // ---- Title (optional)
-        if (this._title && this._title.length > 0) {
-            svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
-                .data([this._title])
-                .join('text')
-                .attr('id', 'plotTitle')
-                .attr('class', 'plot-title')
-                .attr('x', this._margins.left + width / 2)
-                .attr('y', Math.max(this._margins.top * 0.5, 10))
-                .attr('text-anchor', 'middle')
-                .style('font-weight', '600')
-                .style('visibility', 'visible')
-                .text((d) => d);
-        }
-
-        // ---- Scales
-        const xDomain = this._data.map((d) => {
-            const val = d ? valueAtPath(d, this.renderAxisAttributes[0]) : 'unknown';
-            return String(val);
-        });
-        this.mapX = d3.scaleBand().domain(xDomain).range([0, width]).padding(0.25);
-
-        const yExtent = <[number, number]>d3.extent(this._data, (d) => d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0);
-        this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
-
-        // ---- Axes
-        const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
-            const value = String(d);
-            const numericValue = Number(value);
-            return Number.isFinite(numericValue) && value.trim() !== ''
-                ? d3.format(this._tickFormats[0] || '~s')(numericValue)
-                : value;
-        });
-
-        const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisX')
-            .attr('class', 'x axis')
-            .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
-            .style('visibility', 'visible');
-
-        xAxisSelection
-            .call(xAxis)
-            .selectAll('text')
+        // Bin labels are numbers; category labels are kept as they are.
+        const tick = format(0, '~s');
+        axisX(d3.axisBottom(x).tickSizeOuter(0).tickFormat(d => {
+            const text = String(d);
+            return text.trim() !== '' && Number.isFinite(Number(text)) ? tick(Number(text)) : text;
+        }))
+            .selectAll('.tick text')
             .style('text-anchor', 'end')
             .attr('dx', '-.8em')
             .attr('dy', '-.40em')
             .attr('transform', 'rotate(-90)');
+        // A few counts get whole ticks, never "500m" of a feature.
+        axisY(d3.axisLeft(y).ticks(tickCount(y.domain()[1], rows.map(amount), 10)).tickSizeInner(-width).tickFormat(format(1)));
 
-        xAxisSelection
-            .selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axisLabels[0]])
-            .join('text')
-            .attr('class', 'axis-label title')
-            .attr('text-anchor', 'end')
-            .attr('x', width)
-            .attr('y', this._margins.bottom / 2 + 10)
-            .style('visibility', 'visible')
-            .text((d) => d);
-
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
-
-        const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
-            .data([0])
-            .join('g')
-            .attr('id', 'axisY')
-            .attr('class', 'y axis')
-            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
-            .style('visibility', 'visible');
-        yAxisSelection.call(yAxis);
-
-        yAxisSelection
-            .selectAll<SVGTextElement, string>('.axis-label')
-            .data([this._axisLabels[1]])
-            .join('text')
-            .attr('class', 'axis-label title')
-            .attr('text-anchor', 'end')
-            .attr('transform', 'rotate(-90)')
-            .attr('y', -this._margins.left / 2 - 7)
-            .attr('x', -this._margins.top)
-            .style('visibility', 'visible')
-            .text((d) => d);
-
-        // ---- Bars
-        const cGroup = svg
-            .selectAll('.autkBrush')
-            .data([0])
-            .join('g')
-            .attr('class', 'autkBrush autkMarksGroup')
-            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
-
-        cGroup
-            .selectAll('.autkClear')
-            .data([0])
-            .join('rect')
-            .attr('class', 'autkClear')
-            .attr('width', width)
-            .attr('height', height)
-            .style('fill', 'white')
-            .style('opacity', 0)
-            .style('visibility', 'visible');
-
-        cGroup
-            .selectAll('.autkMark')
-            .data(this._data)
+        group.selectAll('rect.autkMark')
+            .data(rows)
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', (d) => {
-                const val = d ? valueAtPath(d, this.renderAxisAttributes[0]) : 'unknown';
-                return this.mapX(String(val)) || 0;
-            })
-            .attr('y', (d) => this.mapY(d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0))
-            .attr('height', (d) => height - this.mapY(d ? Number(valueAtPath(d, this.renderAxisAttributes[1])) || 0 : 0))
-            .attr('width', this.mapX.bandwidth())
-            .style('fill', d => this.getMarkColor(d))
+            .attr('x', row => x(label(row)) ?? 0)
+            .attr('width', x.bandwidth())
+            .attr('y', row => y(amount(row)))
+            .attr('height', row => height - y(amount(row)))
             .style('stroke', '#2f2f2f')
-            .style('visibility', 'inherit');
-
-        this.configureSignalListeners();
-    }
-
-}
+            .append('title')
+            .text(row => `${label(row)}: ${d3.format('~s')(amount(row))}`);
+    },
+};

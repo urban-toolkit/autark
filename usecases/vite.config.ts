@@ -30,6 +30,7 @@ export default defineConfig({
       input: {
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         niteroi: fileURLToPath(new URL('./src/niteroi/main.html', import.meta.url)),
+        provenance: fileURLToPath(new URL('./src/provenance/main.html', import.meta.url)),
         shadows: fileURLToPath(new URL('./src/shadows/main.html', import.meta.url)),
         urbane: fileURLToPath(new URL('./src/urbane/main.html', import.meta.url)),
       },
