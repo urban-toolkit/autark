@@ -3,9 +3,19 @@ const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-f
 const groups = Array.from(document.querySelectorAll<HTMLElement>('.example-group')).map(element => ({
     element,
     count: element.querySelector<HTMLElement>('.group-count')!,
+    features: Array.from(element.querySelectorAll<HTMLElement>('.example-feature')).map(feature => ({
+        element: feature,
+        count: feature.querySelector<HTMLElement>('.feature-count')!,
+    })),
     cards: Array.from(element.querySelectorAll<HTMLElement>('.example-card')).map(card => ({
         element: card,
-        text: normalize(`${card.textContent} ${card.dataset.keywords}`),
+        text: normalize([
+            card.textContent,
+            card.dataset.keywords,
+            element.querySelector('h2')!.firstChild!.textContent,
+            element.dataset.module,
+            card.closest('.example-feature')!.querySelector('h3')!.firstChild!.textContent,
+        ].join(' ')),
     })),
 }));
 const resultCount = document.querySelector<HTMLElement>('#result-count')!;
@@ -30,6 +40,11 @@ function updateExamples(): void {
         }
         group.element.hidden = groupVisible === 0;
         group.count.textContent = String(groupVisible);
+        for (const feature of group.features) {
+            const featureVisible = feature.element.querySelectorAll('.example-card:not([hidden])').length;
+            feature.element.hidden = featureVisible === 0;
+            feature.count.textContent = String(featureVisible);
+        }
         visible += groupVisible;
     }
     for (const button of buttons) {

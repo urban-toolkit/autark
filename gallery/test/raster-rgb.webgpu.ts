@@ -9,8 +9,7 @@ export async function runWebGpuCases() {
     document.body.innerHTML = parsed.body.innerHTML;
     document.body.className = parsed.body.className;
     const style = document.createElement('style');
-    style.textContent = (await Promise.all(['/gallery/src/autk-map/raster-rgb.css', '/gallery/example.css']
-        .map(path => fetch(`${path}?direct`).then(response => response.text())))).join('\n');
+    style.textContent = await fetch('/gallery/example.css?direct').then(response => response.text());
     document.head.append(style);
     await import('../src/autk-map/raster-rgb');
     const status = document.querySelector<HTMLElement>('#status')!;

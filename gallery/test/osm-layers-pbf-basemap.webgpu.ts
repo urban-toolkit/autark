@@ -46,7 +46,7 @@ export async function checkPbfBasemap(options: PbfBasemapOptions) {
         document.body.innerHTML = parsed.body.innerHTML;
         document.body.className = parsed.body.className;
         style = document.createElement('style');
-        style.textContent = (await Promise.all(['/gallery/src/autk-map/osm-layers-pbf.css', '/gallery/example.css'].map(path => fetch(`${path}?direct`).then(response => response.text())))).join('\n');
+        style.textContent = await fetch('/gallery/example.css?direct').then(response => response.text());
         document.head.append(style);
         await example.run(document.querySelector('canvas')!);
         const map = (example as unknown as { map: AutkMap }).map;

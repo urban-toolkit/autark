@@ -27,8 +27,7 @@ export async function checkTilesGallery(withRoads = false, terrain = false, fail
         document.body.innerHTML = parsed.body.innerHTML;
         document.body.className = parsed.body.className;
         const style = document.createElement('style');
-        style.textContent = (await Promise.all(['/gallery/src/autk-map/tiles-basemap.css', '/gallery/example.css']
-            .map(path => fetch(`${path}?direct`).then(response => response.text())))).join('\n');
+        style.textContent = await fetch('/gallery/example.css?direct').then(response => response.text());
         document.head.append(style);
         const assert = (value: boolean, message: string) => { if (!value) throw new Error(message); };
         const sources = document.querySelector<HTMLSelectElement>('#source-select')!;

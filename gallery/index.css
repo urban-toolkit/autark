@@ -32,7 +32,7 @@ main { max-width: 1184px; margin: auto; padding: 0 32px; }
 h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); font-weight: 750; line-height: 1.15; letter-spacing: -1.6px; }
 .description { margin: 18px 0 0; color: var(--muted); font-size: 16px; line-height: 1.7; }
 .browse-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 0 0 22px; border-bottom: 1px solid var(--border); }
-.filters { display: flex; gap: 6px; padding: 4px; border-radius: 9px; background: var(--surface); }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 9px; background: var(--surface); }
 .filters button { min-height: 36px; padding: 7px 14px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
 .filters button:hover { color: var(--accent); }
 .filters button[aria-pressed="true"] { border-color: var(--border); background: #fff; color: var(--accent); box-shadow: 0 1px 3px #00000006; }
@@ -41,7 +41,11 @@ h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); font-weight: 750; line-height
 .search-field input { width: 100%; min-height: 42px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: #fff; color: inherit; font-size: 13px; }
 .search-field input::placeholder { color: var(--muted); opacity: 1; }
 .result-count { margin: 16px 0 30px; color: var(--muted); font-size: 12px; }
-.example-group { margin-bottom: 44px; }
+.example-group { margin-bottom: 56px; padding-top: 28px; border-top: 1px solid var(--border); }
+.example-group:first-of-type { padding-top: 0; border-top: 0; }
+.example-feature { margin-top: 28px; }
+.feature-title { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 15px; font-weight: 650; line-height: 1.5; }
+.feature-count { color: var(--muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
 .module-label { margin: 0 0 6px; color: var(--accent); font-size: 12px; font-weight: 600; }
 h2 { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 700; letter-spacing: -.5px; }
@@ -52,7 +56,7 @@ h2 { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 700; letter-spac
 .example-card { border: 1px solid transparent; border-radius: 10px; background: var(--surface); transition: border-color .15s ease, background .15s ease; }
 .example-card:hover, .example-card:focus-within { border-color: var(--accent); background: #fff; }
 .example-card a { display: block; height: 100%; padding: 20px; border-radius: inherit; }
-.example-card h3 { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0; color: #3c3c43; font-size: 14px; line-height: 1.5; font-weight: 650; }
+.example-card h4 { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0; color: #3c3c43; font-size: 14px; line-height: 1.5; font-weight: 650; }
 .card-arrow { color: var(--muted); font-weight: 400; }
 .example-card a:hover .card-arrow { color: var(--accent); }
 .example-card p { margin: 8px 20px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
