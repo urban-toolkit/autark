@@ -11,6 +11,8 @@ import { Camera } from '@urban-toolkit/autk-core';
 
 import { LayerManager } from './layer-manager';
 import { Triangles3DLayer } from './layer-triangles3D';
+import { Triangles2DLayer } from './layer-triangles2D';
+import { RasterLayer } from './layer-raster';
 import { MapStyle } from './map-style';
 import { MapPickingController } from './map-picking';
 import type { PendingPick } from './map-picking';
@@ -122,6 +124,12 @@ export class TerrainMapRenderPath {
         if (!activeTerrain) {
             return;
         }
+        const surfaces = this.layerManager.layers.filter((layer): layer is Triangles2DLayer =>
+            layer instanceof Triangles2DLayer && layer.layerInfo.typeLayer === 'surface');
+        const imagery = this.layerManager.layers.some(layer => !layer.layerRenderInfo.isSkip
+            && (layer.layerInfo.typeLayer === 'tiles' || layer instanceof RasterLayer && layer.rasterMode === 'rgb'));
+        activeTerrain.setSurfaceGeometry(!imagery && surfaces.length
+            ? surfaces.filter(layer => !layer.layerRenderInfo.isSkip) : null);
         const pendingPick = this.picking.consumePendingPick();
         const fallbackBounds = this.computeTerrainVisibleBounds(activeTerrain.bounds);
         const waterColor = this.getTerrainWaterColor();

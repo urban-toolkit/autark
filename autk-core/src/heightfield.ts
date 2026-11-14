@@ -34,7 +34,7 @@ export interface Heightfield {
     minHeight: number;
     /** Largest finite height value found in the source data. */
     maxHeight: number;
-    /** Row-major scalar height samples. Non-finite source values are replaced with `0`. */
+    /** Row-major heights. Missing values default to zero, or remain NaN for validation when requested. */
     data: Float32Array;
     /** Local-space bounds as `[minX, minY, maxX, maxY]`. */
     bounds: [number, number, number, number];
@@ -49,6 +49,7 @@ export interface Heightfield {
  * @param collection Raster feature collection containing `bbox` and raster metadata.
  * @param property Dot-path to the raster band values in the first feature properties.
  * @param origin World-space origin to subtract from the raster bbox.
+ * @param preserveNoData Preserve missing samples as NaN until terrain validation can repair them.
  * @returns Heightfield with local bounds, cell sizes, min/max height, and sample data.
  * @throws {Error} If bbox, raster metadata, raster values, or finite heights are missing or invalid.
  * @example
@@ -59,6 +60,7 @@ export function heightfieldFromRaster(
     collection: FeatureCollection<Geometry | null>,
     property: string,
     origin: readonly number[],
+    preserveNoData = false,
 ): Heightfield {
     const feature = collection.features[0];
     const props = feature?.properties as Record<string, unknown> | undefined;
@@ -90,7 +92,7 @@ export function heightfieldFromRaster(
             minHeight = Math.min(minHeight, value);
             maxHeight = Math.max(maxHeight, value);
         } else {
-            data[i] = 0;
+            data[i] = preserveNoData ? NaN : 0;
             nonFinite++;
         }
     }
@@ -98,7 +100,7 @@ export function heightfieldFromRaster(
     if (!Number.isFinite(minHeight) || !Number.isFinite(maxHeight)) {
         throw new Error('Heightfield does not contain finite elevation values.');
     }
-    if (nonFinite > 0) {
+    if (nonFinite > 0 && !preserveNoData) {
         console.warn(`Heightfield contains ${nonFinite} non-finite elevation values. These were set to 0.`);
     }
 

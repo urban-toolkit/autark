@@ -23,10 +23,11 @@ export function regionLookup(region: ElevationRegion) {
 export function regionHeightSource(region: ElevationRegion, validate: boolean): HeightSource {
     const origin = lonLatToCrs('EPSG:3857', region.longitude, region.latitude) as [number, number];
     const lookup = regionLookup(region);
-    const windows = [14, 13].map(zoom => composeWindow(planWindow({
+    const finest = Math.max(...region.patches.map(patch => patch.z));
+    const windows = [finest, finest - 1].map(zoom => composeWindow(planWindow({
         crs: 'EPSG:3857', origin, scale: crsScaleAt('EPSG:3857', origin), zoom,
         tileSize: 256, size: 64, centre: [0, 0], padding: validate ? 6 : 1,
-    }), lookup, { minZoom: 13, validation: validate ? resolveElevationValidation() : undefined }));
+    }), lookup, { minZoom: finest - 1, validation: validate ? resolveElevationValidation() : undefined }));
     return { levels: windows.map(window => window.level), bounds: [-1e4, -1e4, 1e4, 1e4],
         minHeight: Math.min(...windows.map(window => window.min)), maxHeight: Math.max(...windows.map(window => window.max)),
         version: 1, levelVersions: [1, 1] };

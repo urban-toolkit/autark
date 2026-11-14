@@ -34,6 +34,8 @@ Tiles are decoded to `Float32Array`s, and each window is composed on the CPU and
 
 Non-3D layers render into one offscreen overlay texture (2048² by default for streamed terrain, at most 4096²) through an orthographic camera over the visible bounds, and that texture drapes over the mesh. Computed with the real camera, an overlay texel covers at most about 1.8 screen pixels on the bottom row of a steeply tilted view and is finer than a pixel at 45° or less, so imagery can look slightly soft at the nearest edge. Accepted.
 
+When surface layers are loaded without visible imagery, their original geometry defines the terrain footprint. A constrained Delaunay mesh samples a regular triangular lattice inside that footprint, preserving coastline edges, holes, and disconnected components. This avoids extending the polygon triangulator's long, thin triangle fans through the hills. Interior spacing follows the elevation resolution, with at most 256 lattice intervals across the longest dimension; terrain normals use the same spacing. The mesh is cached until source geometry or visibility changes. Color, depth, picking, and visible-bounds passes use the same mesh. Visible tile layers or RGB rasters retain the larger terrain region; hiding imagery restores the surface geometry. Maps without surface layers keep the existing terrain mesh.
+
 ## API and limits
 
 ```ts

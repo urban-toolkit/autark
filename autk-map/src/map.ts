@@ -1061,6 +1061,9 @@ export class AutkMap {
      * Imagery is optional and is loaded independently with loadTiles(). An existing
      * workspace origin and camera are reused. An empty tile-terrain map needs center;
      * a raster can initialize its own origin and view from its bounds.
+     * Without visible imagery, loaded surface layers supply the terrain geometry,
+     * preserving their boundaries and holes. Visible tiles or RGB rasters retain
+     * the larger elevation mesh. Maps without surface layers also retain that mesh.
      * @param params Elevation source, optional initial view, and terrain options.
      * @throws If coordinates, source, or options are invalid, or GPU setup fails.
      * @example
@@ -1092,7 +1095,7 @@ export class AutkMap {
         else if (view) origin = [view.point[0], view.point[1]];
         else if (raster) origin = computeOrigin(source.collection as FeatureCollection);
         else throw new Error('Terrain requires a geographic center.');
-        const heights = raster ? heightfieldFromRaster(source.collection, source.property, origin) : new TileHeightSource({
+        const heights = raster ? heightfieldFromRaster(source.collection, source.property, origin, !!qualityOptions) : new TileHeightSource({
             source: resolved!, crs: workspaceCrs, origin: [origin[0]!, origin[1]!],
             centre: view ? [view.point[0] - origin[0]!, view.point[1] - origin[1]!] : [this._camera.getLookAt()[0], this._camera.getLookAt()[1]],
             levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, validation,

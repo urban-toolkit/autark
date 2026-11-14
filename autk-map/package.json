@@ -48,6 +48,7 @@
     "vite-plugin-glsl": "^1.6.2"
   },
   "dependencies": {
+    "@kninnug/constrainautor": "^4.1.0",
     "@urban-toolkit/autk-core": "4.1.1",
     "d3": "^7.9.0"
   }

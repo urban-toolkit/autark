@@ -249,7 +249,7 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
     const fill = options.fill ?? 0;
     const minZoom = options.minZoom ?? 0;
     const worldPixels = tilesPerAxis(zoom) * tileSize;
-    const halo = options.validation ? 2 : 0;
+    const halo = options.validation ? 4 : 0;
 
     const data = new Float32Array(size * size);
     const level: HeightLevel = {

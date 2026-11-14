@@ -199,5 +199,5 @@ export { offsetPolyline } from './utils-geometry';
 /** Returns the smallest power of two greater than or equal to the input, with a minimum of one. */
 export { nextPowerOfTwo, clamp, bilerp } from './utils-math';
 
-export { resolveElevationValidation, isPotentialElevationOutlier, assessElevationSample, replaceElevationOutlier, validateElevationGrid } from './elevation-validation';
+export { resolveElevationValidation, isPotentialElevationOutlier, assessElevationSample, replaceElevationOutlier, replaceElevationDiscontinuity, validateElevationGrid } from './elevation-validation';
 export type { ElevationValidationOptions, ElevationValidationStats, ResolvedElevationValidation, ElevationAssessment } from './elevation-validation';

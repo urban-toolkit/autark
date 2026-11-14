@@ -3,15 +3,17 @@ import { resolveElevationValidation } from '@urban-toolkit/autk-core';
 import { DemSampler } from '../src/dem-sample';
 import { heightAt } from '../src/height-source';
 import { elevationRegions, regionLookup, regionHeightSource } from './elevation-fixtures';
+import niteroiStrips from './fixtures/niteroi-elevation-strips.json';
 
-for (const region of elevationRegions) it(`validates real ${region.name} elevations without region-specific rules`, () => {
-    const n = 2 ** 14 * 256;
+for (const region of [...elevationRegions, ...niteroiStrips.sites]) it(`validates real ${region.name} elevations without region-specific rules`, () => {
+    const zoom = Math.max(...region.patches.map(patch => patch.z));
+    const n = 2 ** zoom * 256;
     const i = Math.round((region.longitude + 180) / 360 * n - 0.5);
     const j = Math.round((1 - Math.asinh(Math.tan(region.latitude * Math.PI / 180)) / Math.PI) / 2 * n - 0.5);
     const lookup = regionLookup(region);
-    const raw = new DemSampler(lookup, 256).sample(14, i + 0.5, j + 0.5, 13);
+    const raw = new DemSampler(lookup, 256).sample(zoom, i + 0.5, j + 0.5, zoom - 1);
     const sampler = new DemSampler(lookup, 256, resolveElevationValidation());
-    const clean = sampler.sample(14, i + 0.5, j + 0.5, 13);
+    const clean = sampler.sample(zoom, i + 0.5, j + 0.5, zoom - 1);
     if (region.expected === 'repair') {
         expect(raw).toBeLessThan(-2000);
         expect(Math.abs(clean)).toBeLessThan(20);

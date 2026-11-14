@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assessElevationSample, replaceElevationOutlier, resolveElevationValidation, validateElevationGrid } from '../src/elevation-validation';
+import { assessElevationSample, replaceElevationOutlier, replaceElevationDiscontinuity, resolveElevationValidation, validateElevationGrid } from '../src/elevation-validation';
+import { heightfieldFromRaster } from '../src/heightfield';
 
 const settings = resolveElevationValidation()!;
 const ring = (height: (x: number, y: number) => number) => {
@@ -51,5 +52,24 @@ describe('region-independent elevation validation', () => {
         for (const key of ['minDeviation', 'maxSlope', 'madMultiplier']) for (const value of [0, -1, NaN, Infinity]) {
             expect(() => resolveElevationValidation({ [key]: value })).toThrow(/finite and positive/);
         }
+    });
+    it('repairs a corrupt band using independent coarse terrain, preserving supported depths and cliffs', () => {
+        expect(replaceElevationDiscontinuity(-4200, 8, [7, 10, 6, 8], 5, settings)).toBe(8);
+        expect(replaceElevationDiscontinuity(-6200, -6150, [-6100, -6200, -6150, -6160], 5, settings)).toBe(-6200);
+        expect(replaceElevationDiscontinuity(5000, 0, [-3000, 3000, 0, 0], 5, settings)).toBe(5000);
+        expect(replaceElevationDiscontinuity(-600, 800, [800, 800, 800, 800], 5, settings)).toBe(-600);
+        expect(replaceElevationDiscontinuity(-4200, NaN, [7, 10, 6, 8], 5, settings)).toBe(-4200);
+    });
+    it('repairs non-finite raster holes and boundary pits without mutating the source', () => {
+        const data = new Float32Array(81).fill(120); data[0] = -5000; data[8] = -5000;
+        data[40] = NaN; data[41] = Infinity;
+        const result = validateElevationGrid(data, 9, 9, 10, settings);
+        expect(result.values.every(value => value === 120)).toBe(true);
+        expect(result.stats).toMatchObject({ rejected: 4, corrected: 4, unresolved: 0 });
+        expect(Number.isNaN(data[40])).toBe(true);
+        const raster = { type: 'FeatureCollection' as const, bbox: [0, 0, 8, 8] as [number, number, number, number],
+            features: [{ type: 'Feature' as const, geometry: null, properties: { rasterResX: 9, rasterResY: 9, elevation: data } }] };
+        const field = heightfieldFromRaster(raster, 'elevation', [0, 0], true);
+        expect(Number.isNaN(field.data[40])).toBe(true);
     });
 });

@@ -1,10 +1,10 @@
 /** Tile-aware elevation validation. All numerical assessment lives in autk-core. */
-import { assessElevationSample, isPotentialElevationOutlier, replaceElevationOutlier } from '@urban-toolkit/autk-core';
+import { assessElevationSample, isPotentialElevationOutlier, replaceElevationOutlier, replaceElevationDiscontinuity } from '@urban-toolkit/autk-core';
 import type { ElevationValidationStats, ResolvedElevationValidation } from '@urban-toolkit/autk-core';
 import type { DemTile } from './dem-decode';
 import { EARTH_RADIUS, WEB_MERCATOR_EXTENT } from './tile-projection';
 
-interface ValidationBlock { tile?: DemTile; flags: Uint8Array; spacing: Float64Array; replacements?: Float32Array }
+interface ValidationBlock { tile?: DemTile; flags: Uint8Array; spacing: Float64Array; replacements?: Float32Array; reference?: number }
 
 /** A frozen composition snapshot owns these decisions; new arrivals create a new validator. */
 export class DemValidator {
@@ -49,16 +49,35 @@ export class DemValidator {
         const b = interior ? heights[at + 2]! : this.raw(z, i + 2, j);
         const c = interior ? heights[at - 2 * size]! : this.raw(z, i, j - 2);
         const d = interior ? heights[at + 2 * size]! : this.raw(z, i, j + 2);
-        if (!isPotentialElevationOutlier(value, a, b, c, d, threshold)) return value;
+        const potential = isPotentialElevationOutlier(value, a, b, c, d, threshold);
+        if (!potential) {
+            // Broad corrupt clusters can hide from the small local ring. A sparse tile
+            // median identifies candidates cheaply; independent coarse data decides.
+            if (block.reference === undefined) {
+                const samples: number[] = [];
+                for (let y = 0; y < size; y += 8) for (let x = 0; x < size; x += 8) {
+                    const height = heights[y * size + x]; if (Number.isFinite(height)) samples.push(height);
+                }
+                samples.sort((a, b) => a - b); block.reference = samples[Math.floor(samples.length / 2)] ?? value;
+            }
+            if (Math.abs(value - block.reference) <= 16 * threshold) return value;
+        }
+        const coarse = this.coarse(z, i + 0.5, j + 0.5, minZoom);
+        let replacement = value;
+        if (Number.isFinite(coarse) && Math.abs(value - coarse) > 16 * threshold) {
+            replacement = replaceElevationDiscontinuity(value, coarse,
+                [[-4, 0], [4, 0], [0, -4], [0, 4]].map(([dx, dy]) => this.coarse(z, i + 0.5 + dx, j + 0.5 + dy, minZoom)),
+                spacing, this.options);
+        }
+        if (replacement === value && !potential) return value;
         const neighbor = (dx: number, dy: number) => interior ? heights[at + dy * size + dx]! : this.raw(z, i + dx, j + dy);
         const ring: number[] = [];
         for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) ring.push(neighbor(dx, dy));
         }
-        const assessment = assessElevationSample(value, ring, spacing, this.options);
+        const assessment = replacement === value ? assessElevationSample(value, ring, spacing, this.options) : undefined;
         if (assessment && !assessment.suspect) return value;
-        const coarse = assessment ? this.coarse(z, i + 0.5, j + 0.5, minZoom) : NaN;
-        const replacement = assessment ? replaceElevationOutlier(value, assessment, coarse) : NaN;
+        if (replacement === value) replacement = assessment ? replaceElevationOutlier(value, assessment, coarse) : NaN;
         if (replacement === value) {
             if (!Number.isFinite(coarse)) { this.stats.unresolved++; this.fallback(); }
             return value;

@@ -28,7 +28,7 @@ All sensitivity values must be finite and positive. Higher values are more conse
 4. Suspect samples are compared with coarser elevations, validated with the same rules. Coarser detail is naturally smoother: disagreement alone does not justify rejecting a feature. A coarse reference that corroborates a peak preserves it, including partial same-sided support after averaging.
 5. A confirmed outlier takes a validated coarse value. If no reference exists, local median repair requires exceptionally strong support and a departure above four times the tolerance. Other numeric features remain unchanged rather than being guessed away. Incomplete neighboring-tile support can temporarily quarantine a sample and use the existing missing-data fallback until data arrive.
 
-Both error signs are treated identically. Small clusters are assessed against their surrounding ring; broad coherent errors may escape detection. No elevation-only rule can perfectly separate every real feature from every error. Persistent datum offsets or errors shared across zooms require independent reference data.
+Both error signs are treated identically. A sparse tile median also identifies extreme bands that appear coherent within the small local ring. A departure exceeding sixteen times the spacing-based tolerance is repaired only when validated coarser data and four surrounding coarse samples corroborate a smooth replacement. This catches the deep Niterói coastal strips without imposing an absolute altitude cutoff. Broad errors shared across zooms can still escape detection. No elevation-only rule can perfectly separate every real feature from every error; persistent datum offsets require independent reference data.
 
 ## Tile boundaries and streaming
 
@@ -36,7 +36,7 @@ The tile adapter includes neighboring pixels across tile edges and corners, incl
 
 Each row-batched job uses its own frozen tile snapshot. Validation occurs before interpolation and before the resulting height texture reaches terrain, buildings, or picking. Completed windows are published atomically, and camera changes cancel obsolete jobs. Diagnostic masks are released with those jobs. `memory.validationScratch` tracks their live typed-array storage. Raw downloaded tiles and database collections are not modified.
 
-Normalized raster terrain uses the same spatial assessment and strong local repair. It has no independent coarser reference. Samples at the outer two rows/columns are retained because a complete surrounding ring is unavailable. Static loading remains synchronous, as before.
+Normalized raster terrain uses the same spatial assessment and strong local repair. It has no independent coarser reference. Missing or non-finite samples retain their missing-data identity during normalization and take the nearest finite raster sample before spatial validation. A mirrored neighborhood permits validation at raster edges and corners. Source arrays remain unchanged. Static loading remains synchronous, as before.
 
 ## Diagnostics
 
@@ -46,7 +46,7 @@ Normalized raster terrain uses the same spatial assessment and strong local repa
 
 Controlled tests cover plains, slopes, sharp cliffs, narrow ridges and valleys, peaks corroborated at coarser scales, smooth ocean depths, below-sea-level land, isolated positive/negative errors, small clusters, missing neighbors, tile edges/corners, and invalid coarse references. They verify configuration, raw-data mode, database-input immutability, and diagnostics.
 
-Unmodified real patches cover the Rio coast, Alps, Grand Canyon, Netherlands, Dead Sea, North Pacific, and Sahara. Their source addresses, pixel ranges, and full PNG hashes are bundled with the fixtures. The same defaults repair the Rio coastal pit while preserving the tested samples in the other regions, including negative elevations. Native WebGPU probes run the actual production terrain vertex/normal functions against raw and validated Rio windows.
+Unmodified real patches cover the Rio coast, Niterói coastal strips, Alps, Grand Canyon, Netherlands, Dead Sea, North Pacific, and Sahara. Their source addresses, pixel ranges, and full PNG hashes are bundled with the fixtures. The same defaults repair the coastal defects while preserving the tested samples in the other regions, including negative elevations. Native WebGPU probes run the actual production terrain vertex/normal functions against raw and validated coastal windows.
 
 These tests demonstrate supported cases and preservation behavior; they do not establish a worldwide ground-truth guarantee.
 

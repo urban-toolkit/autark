@@ -77,6 +77,18 @@ export function replaceElevationOutlier(value: number, assessment: ElevationAsse
         ? assessment.reference : value;
 }
 
+/** Rejects extreme fine/coarse contradictions only when the coarse neighborhood
+ * independently supports a smooth surface. No absolute altitude cutoff is used.
+ */
+export function replaceElevationDiscontinuity(value: number, coarse: number, neighbors: readonly number[], spacing: number,
+    options: ResolvedElevationValidation): number {
+    const tolerance = Math.max(options.minDeviation, spacing * options.maxSlope);
+    return Number.isFinite(value) && Number.isFinite(coarse) && neighbors.length === 4
+        && Math.abs(value - coarse) > 16 * tolerance
+        && neighbors.every(height => Number.isFinite(height) && Math.abs(height - coarse) <= 2 * tolerance)
+        ? coarse : value;
+}
+
 /** Validates a standalone normalized grid without modifying the caller's data. */
 export function validateElevationGrid(data: Float32Array, width: number, height: number, spacing: number, options: ResolvedElevationValidation) {
     if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height !== data.length || !Number.isFinite(spacing) || spacing <= 0) {
@@ -84,14 +96,44 @@ export function validateElevationGrid(data: Float32Array, width: number, height:
     }
     const values = data.slice();
     const stats: ElevationValidationStats = { checked: 0, rejected: 0, corrected: 0, unresolved: 0 };
-    for (let y = 2; y < height - 2; y++) for (let x = 2; x < width - 2; x++) {
-        const at = y * width + x, value = data[at]!;
+    // Fill missing samples from nearby supported terrain instead of introducing sea-level pits.
+    let missing = 0;
+    for (const value of values) if (!Number.isFinite(value)) missing++;
+    if (missing) {
+        const queue = new Int32Array(values.length);
+        let head = 0, tail = 0;
+        for (let i = 0; i < values.length; i++) if (Number.isFinite(values[i])) queue[tail++] = i;
+        stats.rejected += missing;
+        while (head < tail) {
+            const at = queue[head++], x = at % width, y = Math.floor(at / width);
+            for (const next of [x > 0 ? at - 1 : -1, x + 1 < width ? at + 1 : -1, y > 0 ? at - width : -1, y + 1 < height ? at + width : -1]) {
+                if (next < 0 || Number.isFinite(values[next])) continue;
+                values[next] = values[at]; queue[tail++] = next; stats.corrected++;
+            }
+        }
+        stats.unresolved += missing - stats.corrected;
+    }
+    const input = missing ? values.slice() : data;
+    // Mirror the neighborhood at raster edges so edge/corner errors are validated too.
+    const mirror = (n: number, size: number): number => {
+        if (size === 1) return 0;
+        const period = 2 * (size - 1), v = ((n % period) + period) % period;
+        return v < size ? v : period - v;
+    };
+    const atSample = (x: number, y: number) => input[mirror(y, height) * width + mirror(x, width)];
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const at = y * width + x, value = input[at]!;
         stats.checked++;
         const threshold = Math.max(options.minDeviation, spacing * options.maxSlope);
-        if (!isPotentialElevationOutlier(value, data[at - 2]!, data[at + 2]!, data[at - 2 * width]!, data[at + 2 * width]!, threshold)) continue;
+        const interior = x >= 2 && y >= 2 && x < width - 2 && y < height - 2;
+        const a = interior ? input[at - 2] : atSample(x - 2, y);
+        const b = interior ? input[at + 2] : atSample(x + 2, y);
+        const c = interior ? input[at - 2 * width] : atSample(x, y - 2);
+        const d = interior ? input[at + 2 * width] : atSample(x, y + 2);
+        if (!isPotentialElevationOutlier(value, a, b, c, d, threshold)) continue;
         const ring: number[] = [];
         for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-            if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) ring.push(data[at + dy * width + dx]!);
+            if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) ring.push(interior ? input[at + dy * width + dx] : atSample(x + dx, y + dy));
         }
         const assessment = assessElevationSample(value, ring, spacing, options);
         if (!assessment?.suspect) continue;

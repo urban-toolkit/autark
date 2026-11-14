@@ -17,6 +17,8 @@ import terrainBoundsReduceSource from './shaders/terrain-bounds-reduce.comp.wgsl
 import { StaticHeightSource, HEIGHT_UNIFORM_BYTES, finestCellOver, packHeightUniform, isStreamingHeightSource } from './height-source';
 import type { HeightSource } from './height-source';
 import { nextPowerOfTwo } from '@urban-toolkit/autk-core';
+import { buildTerrainSurface } from './terrain-surface';
+import type { TerrainSurfaceGeometry, TerrainSurfaceMesh } from './terrain-surface';
 
 /** Number of grid cells per terrain patch side. */
 const PATCH_CELLS = 32;
@@ -184,6 +186,10 @@ export class TerrainRenderer {
     private readonly reducePass3BindGroup: GPUBindGroup;
     /** Reusable terrain patch mesh drawn once per selected block. */
     private readonly mesh: TerrainMesh;
+    private surfaceMesh: TerrainMesh | null = null;
+    private surfaceGeometry: TerrainSurfaceMesh | null = null;
+    private surfaceSources: TerrainSurfaceGeometry[] | null = null;
+    private get activeMesh(): TerrainMesh { return this.surfaceMesh ?? this.mesh; }
     /** CPU-side instance upload buffer for terrain block metadata. */
     private readonly instanceData = new Float32Array(MAX_INSTANCES * 8);
     /** Last selected terrain blocks, reused when LOD freezing is enabled. */
@@ -485,7 +491,50 @@ export class TerrainRenderer {
      * const [minX, minY, maxX, maxY] = terrain.bounds;
      */
     get bounds(): [number, number, number, number] {
-        return this._bounds;
+        return this.surfaceGeometry?.bounds ?? this._bounds;
+    }
+
+    /** Uses a mesh constrained to the original surface when imagery is absent; null restores the tiled mesh. */
+    setSurfaceGeometry(sources: readonly TerrainSurfaceGeometry[] | null): void {
+        if (sources === null && this.surfaceSources === null) return;
+        if (sources && this.surfaceSources && sources.length === this.surfaceSources.length && sources.every((source, i) => {
+            const previous = this.surfaceSources![i];
+            return source.position === previous.position && source.indices === previous.indices
+                && source.skippedVertices.length === previous.skippedVertices.length
+                && source.skippedVertices.every((value, j) => value === previous.skippedVertices[j]);
+        })) return;
+        const geometry = sources === null ? null : buildTerrainSurface(sources, this.finestCell);
+        const allocated: GPUBuffer[] = [];
+        let mesh: TerrainMesh | null = null;
+        try {
+            if (geometry) {
+                const upload = (data: Float32Array | Uint32Array, usage: GPUBufferUsageFlags): GPUBuffer => {
+                    const buffer = this.device.createBuffer({ label: 'Terrain surface geometry', size: Math.max(4, data.byteLength), usage: usage | GPUBufferUsage.COPY_DST });
+                    allocated.push(buffer);
+                    if (data.byteLength) this.device.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>);
+                    return buffer;
+                };
+                const lines = new Uint32Array(geometry.indices.length * 2);
+                for (let i = 0; i < geometry.indices.length; i += 3) {
+                    const [a, b, c] = geometry.indices.subarray(i, i + 3);
+                    lines.set([a, b, b, c, c, a], i * 2);
+                }
+                mesh = { vertexBuffer: upload(geometry.vertices, GPUBufferUsage.VERTEX),
+                    indexBuffer: upload(geometry.indices, GPUBufferUsage.INDEX),
+                    lineIndexBuffer: upload(lines, GPUBufferUsage.INDEX),
+                    indexCount: geometry.indices.length, lineIndexCount: lines.length };
+            }
+        } catch (error) { allocated.forEach(buffer => buffer.destroy()); throw error; }
+        this.surfaceMesh?.vertexBuffer.destroy();
+        this.surfaceMesh?.indexBuffer.destroy();
+        this.surfaceMesh?.lineIndexBuffer.destroy();
+        this.surfaceMesh = mesh;
+        this.surfaceGeometry = geometry;
+        // Layer geometry uses prototype getters, which object spread does not copy.
+        this.surfaceSources = sources === null ? null : sources.map(source => ({
+            position: source.position, indices: source.indices, skippedVertices: source.skippedVertices.slice(),
+        }));
+        this.latestReducedBounds = null;
     }
 
     /**
@@ -592,12 +641,21 @@ export class TerrainRenderer {
         uniform.set(camera.getViewProjectionMatrix(), 0);
         uniform.set([...camera.getEye(), 1], 16);
         uniform.set([0.42, -0.46, -0.78, 0], 20);
-        uniform.set([performance.now() / 1000, MAX_LOD_LEVEL + 1, this.finestCell, PATCH_CELLS], 24);
+        uniform.set([performance.now() / 1000, MAX_LOD_LEVEL + 1, this.surfaceGeometry?.spacing ?? this.finestCell, PATCH_CELLS], 24);
         if (!isStreamingHeightSource(this._source)) uniform.set([this.bounds[0], this.bounds[1]], 28);
+        uniform[30] = this.surfaceSources === null ? 0 : 1;
         uniform.set([overlayBounds[0], overlayBounds[1], overlayBounds[2] - overlayBounds[0], overlayBounds[3] - overlayBounds[1]], 36);
         uniform.set(overlayUvRect, 40);
         uniform.set([waterColor[0], waterColor[1], waterColor[2], 0.08], 44);
         this.device.queue.writeBuffer(this.cameraBuffer, 0, uniform);
+
+        if (this.surfaceSources !== null) {
+            this.instanceCount = this.activeMesh.indexCount > 0 ? 1 : 0;
+            this.device.queue.writeBuffer(this.instanceBuffer, 0, new Float32Array([0, 0, 1, 0, 0, 0, 0, 0]));
+            this.stats.selectedBlocks = this.instanceCount;
+            this.stats.triangles = this.activeMesh.indexCount / 3;
+            return;
+        }
 
         if (!options.freezeLod || this.lastBlocks.length === 0) {
             this.selectBlocks(camera, options.enableCulling !== false);
@@ -618,7 +676,7 @@ export class TerrainRenderer {
         }
         this.device.queue.writeBuffer(this.instanceBuffer, 0, this.instanceData.subarray(0, this.instanceCount * 8));
         this.stats.selectedBlocks = this.instanceCount;
-        this.stats.triangles = (this.mesh.indexCount / 3) * this.instanceCount;
+        this.stats.triangles = (this.activeMesh.indexCount / 3) * this.instanceCount;
     }
 
     /** Updates draped-layer bounds without repeating height uploads, LOD selection, or seam construction. */
@@ -645,16 +703,16 @@ export class TerrainRenderer {
         }
 
         pass.setBindGroup(0, this.bindGroup);
-        pass.setVertexBuffer(0, this.mesh.vertexBuffer);
+        pass.setVertexBuffer(0, this.activeMesh.vertexBuffer);
         pass.setVertexBuffer(1, this.instanceBuffer);
         pass.setPipeline(this.pipeline);
-        pass.setIndexBuffer(this.mesh.indexBuffer, 'uint32');
-        pass.drawIndexed(this.mesh.indexCount, this.instanceCount);
+        pass.setIndexBuffer(this.activeMesh.indexBuffer, 'uint32');
+        pass.drawIndexed(this.activeMesh.indexCount, this.instanceCount);
 
         if (showMesh) {
             pass.setPipeline(this.meshPipeline);
-            pass.setIndexBuffer(this.mesh.lineIndexBuffer, 'uint32');
-            pass.drawIndexed(this.mesh.lineIndexCount, this.instanceCount);
+            pass.setIndexBuffer(this.activeMesh.lineIndexBuffer, 'uint32');
+            pass.drawIndexed(this.activeMesh.lineIndexCount, this.instanceCount);
         }
     }
 
@@ -673,11 +731,11 @@ export class TerrainRenderer {
         }
 
         pass.setBindGroup(0, this.bindGroup);
-        pass.setVertexBuffer(0, this.mesh.vertexBuffer);
+        pass.setVertexBuffer(0, this.activeMesh.vertexBuffer);
         pass.setVertexBuffer(1, this.instanceBuffer);
         pass.setPipeline(this.depthPipeline);
-        pass.setIndexBuffer(this.mesh.indexBuffer, 'uint32');
-        pass.drawIndexed(this.mesh.indexCount, this.instanceCount);
+        pass.setIndexBuffer(this.activeMesh.indexBuffer, 'uint32');
+        pass.drawIndexed(this.activeMesh.indexCount, this.instanceCount);
     }
 
     /**
@@ -695,11 +753,11 @@ export class TerrainRenderer {
         }
 
         pass.setBindGroup(0, this.pickingBindGroup);
-        pass.setVertexBuffer(0, this.mesh.vertexBuffer);
+        pass.setVertexBuffer(0, this.activeMesh.vertexBuffer);
         pass.setVertexBuffer(1, this.instanceBuffer);
         pass.setPipeline(this.pickingPipeline);
-        pass.setIndexBuffer(this.mesh.indexBuffer, 'uint32');
-        pass.drawIndexed(this.mesh.indexCount, this.instanceCount);
+        pass.setIndexBuffer(this.activeMesh.indexBuffer, 'uint32');
+        pass.drawIndexed(this.activeMesh.indexCount, this.instanceCount);
     }
 
     /**
@@ -737,11 +795,11 @@ export class TerrainRenderer {
             },
         });
         renderPass.setBindGroup(0, this.bindGroup);
-        renderPass.setVertexBuffer(0, this.mesh.vertexBuffer);
+        renderPass.setVertexBuffer(0, this.activeMesh.vertexBuffer);
         renderPass.setVertexBuffer(1, this.instanceBuffer);
         renderPass.setPipeline(this.visibleBoundsPipeline);
-        renderPass.setIndexBuffer(this.mesh.indexBuffer, 'uint32');
-        renderPass.drawIndexed(this.mesh.indexCount, this.instanceCount);
+        renderPass.setIndexBuffer(this.activeMesh.indexBuffer, 'uint32');
+        renderPass.drawIndexed(this.activeMesh.indexCount, this.instanceCount);
         renderPass.end();
 
         const computePass = encoder.beginComputePass({ label: 'Terrain visible bounds reduction' });
@@ -874,6 +932,10 @@ export class TerrainRenderer {
      * terrain.destroy();
      */
     destroy(): void {
+        this.surfaceMesh?.vertexBuffer.destroy();
+        this.surfaceMesh?.indexBuffer.destroy();
+        this.surfaceMesh?.lineIndexBuffer.destroy();
+        this.surfaceMesh = null;
         for (const resource of this.ownedResources.splice(0)) resource.destroy();
     }
 

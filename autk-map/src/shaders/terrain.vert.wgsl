@@ -48,6 +48,12 @@ struct PatchVertex {
 // `seams` holds, for the minimum-X, maximum-X, minimum-Y and maximum-Y edges, how many
 // levels coarser the neighbour is. CPU twin of the height: `morphEdge` in terrain-seams.ts.
 fn patchVertex(blockOrigin: vec2<f32>, blockSize: f32, local: vec2<f32>, seams: vec4<f32>) -> PatchVertex {
+  if (camera.reserved0.z > 0.5) {
+    var surface: PatchVertex;
+    surface.height = terrainHeight(local);
+    surface.normal = terrainNormal(local, camera.settings.z);
+    return surface;
+  }
   let cells = camera.settings.w;
   let own = blockSize / cells;
   let index = local * cells;
@@ -103,7 +109,7 @@ fn vertexMain(
   let blockOrigin = levelData.xy;
   let blockSize = levelData.z;
   let level = levelData.w;
-  let worldXY = blockOrigin + localPosition * blockSize;
+  let worldXY = select(blockOrigin + localPosition * blockSize, localPosition, camera.reserved0.z > 0.5);
   let vertex = patchVertex(blockOrigin, blockSize, localPosition, seamData);
   let worldPosition = vec3<f32>(worldXY.x, worldXY.y, vertex.height);
 
@@ -127,7 +133,7 @@ fn meshVertexMain(
   let blockSize = levelData.z;
   let level = levelData.w;
   let scale = blockSize / camera.settings.w;
-  let worldXY = blockOrigin + localPosition * blockSize;
+  let worldXY = select(blockOrigin + localPosition * blockSize, localPosition, camera.reserved0.z > 0.5);
   let vertex = patchVertex(blockOrigin, blockSize, localPosition, seamData);
   let normal = vertex.normal;
   let worldPosition = vec3<f32>(worldXY.x, worldXY.y, vertex.height) + normal * max(0.6, scale * 0.08);
@@ -161,7 +167,7 @@ fn visibleBoundsVertexMain(
   let blockOrigin = levelData.xy;
   let blockSize = levelData.z;
   let level = levelData.w;
-  let worldXY = blockOrigin + localPosition * blockSize;
+  let worldXY = select(blockOrigin + localPosition * blockSize, localPosition, camera.reserved0.z > 0.5);
   let vertex = patchVertex(blockOrigin, blockSize, localPosition, seamData);
   let worldPosition = vec3<f32>(worldXY.x, worldXY.y, vertex.height);
 
