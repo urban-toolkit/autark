@@ -1,8 +1,9 @@
 import { examples, modules, sections, externalServices } from '../catalog';
 import { exampleCode } from '../code';
+import { exampleSource } from '../source';
+import { highlightTypeScript } from '../highlight';
 
 const example = examples.find(item => location.pathname.endsWith(`/${item.path}`));
-const sources = import.meta.glob('./autk-*/*.ts', { query: '?raw', import: 'default' });
 const cleanups = new Set<() => void>();
 let initializer: (() => Promise<void>) | undefined;
 let preserveInitialStatus = false;
@@ -45,7 +46,7 @@ if (example) {
     }
     const learning = document.createElement('section'); learning.className = 'example-learning';
     const title = document.createElement('h2'); title.textContent = 'Code';
-    const context = document.createElement('p'); context.textContent = 'The task-specific API calls. The full source below includes imports, data preparation, and initialization.';
+    const context = document.createElement('p'); context.textContent = 'The core API calls for this task. The full source below is a minimal runnable program for a page with a canvas.';
     const pre = document.createElement('pre'); pre.className = 'task-code';
     const code = document.createElement('code'); pre.append(code);
     const refresh = () => {
@@ -54,26 +55,24 @@ if (example) {
             const key = control.dataset.variantParameter || control.id;
             state[key] = control instanceof HTMLInputElement && control.type === 'checkbox' ? String(control.checked) : control.value;
         });
-        code.textContent = exampleCode(example.id, state);
+        code.innerHTML = highlightTypeScript(exampleCode(example.id, state));
     };
     document.addEventListener('change', refresh);
     document.addEventListener('input', refresh);
     document.addEventListener('example-ready', refresh);
     refresh();
     learning.append(title, context, pre);
-    const paths = [example.path.replace(/\.html$/, '.ts'), ...(example.sources ?? [])];
-    for (const path of paths) {
-        const details = document.createElement('details'); details.className = 'example-source';
-        const summary = document.createElement('summary'); summary.textContent = path === paths[0] ? 'View full source' : 'View supporting source';
-        const full = document.createElement('pre'); const content = document.createElement('code'); content.textContent = 'Open to load the runnable TypeScript source.';
-        full.append(content); details.append(summary, full);
-        details.addEventListener('toggle', async () => {
-            if (!details.open || details.dataset.loaded) return;
-            try { const load = sources[`./${path.slice(4)}`]; if (!load) throw new Error('Source unavailable'); content.textContent = String(await load()); details.dataset.loaded = 'true'; }
-            catch { content.textContent = 'Unable to load source. Reopen this section to retry.'; }
-        });
-        learning.append(details);
-    }
+    const details = document.createElement('details'); details.className = 'example-source';
+    const summary = document.createElement('summary'); summary.textContent = 'View full source';
+    const full = document.createElement('pre'); const content = document.createElement('code');
+    full.append(content); details.append(summary, full);
+    details.addEventListener('toggle', () => {
+        if (!details.open || details.dataset.loaded) return;
+        const state = Object.fromEntries(new URLSearchParams(location.search));
+        content.innerHTML = highlightTypeScript(exampleSource(example.id, state));
+        details.dataset.loaded = 'true';
+    });
+    learning.append(details);
     const related = examples.filter(item => item.section === example.section && item.id !== example.id).slice(0, 3);
     if (related.length) {
         const heading = document.createElement('h2'); heading.textContent = 'Related examples'; learning.append(heading);

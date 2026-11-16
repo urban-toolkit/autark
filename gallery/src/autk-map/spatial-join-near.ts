@@ -1,85 +1,40 @@
-import { runExample } from '../example';
+import { runExample, exampleVariant, onExampleDispose } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
+async function main(): Promise<void> {
+    const target = exampleVariant('Join near', { roads: 'Roads', buildings: 'Buildings' });
+    const layer = target === 'buildings' ? 'table_osm_buildings' : 'table_osm_roads';
+    document.querySelector('#map-title')?.append(` · ${target}`);
 
-export class SpatialJoinNear {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
+    const db = new AutkDb();
+    await db.init();
+    await db.loadOsm({
+        pbfFileUrl: `${BASE_URL}data/lower_mnt.osm.pbf`,
+        queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+        autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+    });
+    await db.loadCsv({ csvFileUrl: `${BASE_URL}data/noise.csv`, outputTableName: 'noise', geometryColumns: true });
 
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
+    await db.spatialQuery({
+        tableRootName: layer,
+        tableJoinName: 'noise',
+        near: { distance: 1000 },
+        groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+    });
 
-        await this.db.loadOsm({
-            pbfFileUrl: `${(import.meta as any).env.BASE_URL}data/lower_mnt.osm.pbf`,
-            queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
-                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
-                >,
-            },
-        });
-
-        await this.db.loadCsv({
-            csvFileUrl: `${URL}data/noise.csv`,
-            outputTableName: 'noise',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-            },
-        });
-
-        await this.db.spatialQuery({
-            tableRootName: 'table_osm_roads',
-            tableJoinName: 'noise',
-            near: { distance: 1000 },
-            groupBy: [
-                {
-                    column: 'Unique Key',
-                    aggregateFn: 'count',
-                },
-            ],
-        });
-
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-
-        await this.loadLayers();
-        await this.updateThematicData('table_osm_roads');
-
-        this.map.draw();
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    onExampleDispose(() => map.destroy());
+    await map.init();
+    for (const data of db.getLayersMetadata()) {
+        map.loadCollection(data.name, { collection: await db.getLayer(data.name), type: data.type });
     }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const geojson = await this.db.getLayer(layerData.name);
-
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
-            this.map.updateRenderInfo(layerData.name, { isSkip: layerData.source === 'csv' });
-
-            console.log(`Loading layer: ${layerData.name} from ${layerData.source} of type ${layerData.type}`);
-        }
-    }
-
-    protected async updateThematicData(layer: string = 'table_osm_buildings') {
-        const geojson = await this.db.getLayer(layer);
-
-        this.map.updateThematic(layer, { collection: geojson, property: 'properties.sjoin.count.noise' });
-    }
-}
-
-async function main() {
-    const example = new SpatialJoinNear();
-
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
-    }
-    
-    await example.run(canvas);
+    map.updateRenderInfo('noise', { isSkip: true });
+    map.updateThematic(layer, { collection: await db.getLayer(layer), property: 'properties.sjoin.count.noise' });
+    map.updateRenderInfo(layer, { isColorMap: true });
+    map.fitBounds();
+    map.draw();
 }
 void runExample(main);

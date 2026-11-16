@@ -1,79 +1,44 @@
-import { runExample } from '../example';
+import { runExample, exampleVariant } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
-
 import { AutkMap } from '@urban-toolkit/autk-map';
 
-import { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-const URL = (import.meta as any).env.BASE_URL;
+async function main(): Promise<void> {
+    const input = exampleVariant('Input', { polygons: 'Neighborhood compactness', roads: 'Road lane counts' });
+    const db = new AutkDb();
+    await db.init();
 
-export class ComputeFunction {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
-
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
-
-        await this.db.loadGeojson({
-            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
-            outputTableName: 'neighborhoods',
+    let collection, layer;
+    if (input === 'roads') {
+        await db.loadOsm({
+            pbfFileUrl: `${BASE_URL}data/lower_mnt.osm.pbf`,
+            queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+            autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads'] },
         });
-
-        await this.db.loadCsv({
-            csvFileUrl: `${URL}data/noise.csv`,
-            outputTableName: 'noise',
-            geometryColumns: {
-                latColumnName: 'Latitude',
-                longColumnName: 'Longitude',
-            },
-        });
-
-        let geojson = await this.db.getLayer('neighborhoods');
-
-        const geojsonCompute = new ComputeGpgpu();
-        geojson = await geojsonCompute.run({
-            collection: geojson,
-            variableMapping: {
-                x: 'shape_area',
-                y: 'shape_leng',
-            },
-            resultField: 'result',
-            // The Isoperimetric Quotient (Compactness/Circularity) 
-            wgslBody: 'return (4 * 3.1415927 * x) / (y * y);',
-        });
-
-        this.map = new AutkMap(canvas);
-
-        await this.map.init();
-        await this.loadLayers();
-        await this.updateThematicData(geojson);
-
-        this.map.draw();
+        layer = 'table_osm_roads';
+        collection = await db.getLayer(layer);
+    } else {
+        await db.loadGeojson({ geojsonFileUrl: `${BASE_URL}data/mnt_neighs.geojson`, outputTableName: 'neighborhoods' });
+        layer = 'neighborhoods';
+        collection = await db.getLayer(layer);
     }
 
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
+    const result = await new ComputeGpgpu().run({
+        collection,
+        variableMapping: input === 'roads' ? { x: 'lanes' } : { x: 'shape_area', y: 'shape_leng' },
+        resultField: 'result',
+        wgslBody: input === 'roads' ? 'return x <= 0 ? 1 : x;' : 'return (4 * 3.1415927 * x) / (y * y);',
+    });
 
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
-        }
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    for (const data of db.getLayersMetadata()) {
+        map.loadCollection(data.name, { collection: data.name === layer ? result : await db.getLayer(data.name), type: data.type });
     }
-
-    protected async updateThematicData(geojson: FeatureCollection<Geometry, GeoJsonProperties>) {
-        this.map.updateThematic('neighborhoods', { collection: geojson, property: 'properties.compute.result' });
-    }
-}
-
-async function main() {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
-    }
-
-    const example = new ComputeFunction();
-    await example.run(canvas);
+    map.updateThematic(layer, { collection: result, property: 'properties.compute.result' });
+    map.fitBounds();
+    map.draw();
 }
 void runExample(main);

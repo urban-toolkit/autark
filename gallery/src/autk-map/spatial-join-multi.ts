@@ -2,90 +2,30 @@ import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
+async function main(): Promise<void> {
+    const db = new AutkDb();
+    await db.init();
+    await db.loadGeojson({ geojsonFileUrl: `${BASE_URL}data/mnt_neighs.geojson`, outputTableName: 'neighborhoods' });
 
-export class SpatialJoin {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
-
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
-
-        await this.db.loadGeojson({
-            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
-            outputTableName: 'neighborhoods',
-        });
-
-        const CSVs = ['noise', 'parking'];
-
-        for (const csv of CSVs) {
-            await this.db.loadCsv({
-                csvFileUrl: `${URL}data/${csv}.csv`,
-                outputTableName: csv,
-                geometryColumns: true,
-            });
-
-            await this.db.spatialQuery({
-                tableRootName: 'neighborhoods',
-                tableJoinName: csv,
-                groupBy: [
-                    {
-                        column: 'Unique Key',
-                        aggregateFn: 'count',
-                    },
-                ],
-            });
-        }
-
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-
-        await this.loadLayers();
-        await this.updateThematicData('noise');
-
-        this.map.draw();
-    }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const collection = await this.db.getLayer(layerData.name);
-
-            this.map.loadCollection(layerData.name, { collection, type: layerData.type });
-            this.map.updateRenderInfo(layerData.name, { isSkip: layerData.source === 'csv' });
-
-            console.log(`Loading layer: ${layerData.name} from ${layerData.source} of type ${layerData.type}`);
-        }
-    }
-
-    protected async updateThematicData(property: string) {
-        const geojson = await this.db.getLayer('neighborhoods');
-
-        this.map.updateThematic('neighborhoods', { collection: geojson,
-            property: `properties.sjoin.count.${property}`, });
-    }
-
-    uiUpdate() {
-        document.querySelector('select')?.addEventListener('change', async (event) => {
-            const select = event.target as HTMLSelectElement;
-            const value = select.value;
-
-            this.updateThematicData(value);
+    for (const table of ['noise', 'parking']) {
+        await db.loadCsv({ csvFileUrl: `${BASE_URL}data/${table}.csv`, outputTableName: table, geometryColumns: true });
+        await db.spatialQuery({
+            tableRootName: 'neighborhoods',
+            tableJoinName: table,
+            groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
         });
     }
-}
 
-async function main() {
-    const example = new SpatialJoin();
-
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    for (const layer of db.getLayersMetadata()) {
+        map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
     }
-
-    await example.run(canvas);
-    example.uiUpdate();
+    map.updateRenderInfo('noise', { isSkip: true });
+    map.updateRenderInfo('parking', { isSkip: true });
+    map.fitBounds();
+    map.draw();
 }
-
 void runExample(main);

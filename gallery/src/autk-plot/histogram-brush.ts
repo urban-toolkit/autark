@@ -1,78 +1,31 @@
 import { runExample } from '../example';
-import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
-
-import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-export class MapD3Histogram {
-    protected map!: AutkMap;
-    protected plot!: AutkPlot;
+async function main(): Promise<void> {
+    const collection = await fetch(`${BASE_URL}data/mnt_neighs_proj.geojson`).then(response => response.json());
 
-    protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    map.loadCollection('neighborhoods', { collection });
+    map.updateRenderInfo('neighborhoods', { isPick: true });
+    map.fitBounds();
+    map.draw();
 
-    public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
+    const body = document.querySelector<HTMLElement>('#plotBody')!;
+    const plot = new AutkPlot(body, {
+        type: 'barchart',
+        collection,
+        attributes: { axis: ['shape_area', '@transform'] },
+        labels: { title: 'Distribution' },
+        transform: { preset: 'binning-1d', options: { bins: 10 } },
+        width: Math.max(280, body.clientWidth - 40),
+        events: [PlotEvent.BRUSH_X],
+    });
 
-        await this.loadAutkMap(canvas);
-        await this.loadAutkPlot(plotDiv);
-
-        this.updateMapListeners();
-        this.updatePlotListeners();
-    }
-
-    protected async loadAutkMap(canvas: HTMLCanvasElement): Promise<void> {
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-
-        this.map.loadCollection('neighborhoods', { collection: this.geojson });
-        this.map.updateRenderInfo('neighborhoods', { isPick: true });
-
-        this.map.draw();
-    }
-
-    protected async loadAutkPlot(plotDiv: HTMLElement): Promise<void> {
-        this.plot = new AutkPlot(plotDiv, {
-            type: 'barchart',
-            collection: this.geojson,
-            attributes: { axis: ['shape_area', '@transform'] },
-            labels: { axis: ['area range', 'neighborhoods count'], title: 'Histogram example' },
-            transform: {
-                preset: 'binning-1d',
-                options: { bins: 10 },
-            },
-            margins: { left: 60, right: 20, top: 50, bottom: 80 },
-            width: Math.max(280, plotDiv.clientWidth - 40),
-            events: [PlotEvent.BRUSH_X],
-        });
-    }
-
-    protected updatePlotListeners(layerId: string = 'neighborhoods') {
-        this.plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
-            this.map.setHighlightedIds(layerId, selection);
-        });
-
-    }
-
-    protected updateMapListeners(): void {
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            this.plot.setSelection(selection);
-        });
-    }
+    map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
+    plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
 }
-
-async function main() {
-    const example = new MapD3Histogram();
-
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const plotBdy = document.querySelector('#plotBody') as HTMLElement;
-
-    if (!canvas || !plotBdy) {
-        throw new Error('Canvas or plot body element not found');
-    }
-
-    await example.run(canvas, plotBdy);
-}
-
 void runExample(main);

@@ -1,61 +1,28 @@
 import { runExample } from '../example';
-import { AutkMap } from '@urban-toolkit/autk-map';
 import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
-export class GeotiffVis {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
+async function main(): Promise<void> {
+    const db = new AutkDb();
+    await db.init();
+    await db.loadOsm({
+        pbfFileUrl: `${BASE_URL}data/lower_mnt.osm.pbf`,
+        queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+        autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads'] },
+    });
+    await db.loadGeoTiff({ geotiffFileUrl: `${BASE_URL}data/lower_mnt_dem.tif`, coordinateFormat: 'EPSG:3857', outputTableName: 'dem' });
 
-        await this.db.loadOsm({
-            pbfFileUrl: '/data/lower_mnt.osm.pbf',
-            queryArea: {
-                geocodeArea: 'New York',
-                areas: ['Battery Park City', 'Financial District'],
-            },
-            autoLoadLayers: {
-                layers: ['surface', 'parks', 'water', 'roads']
-            },
-        });
-
-        await this.db.loadGeoTiff({
-            geotiffFileUrl: '/data/lower_mnt_dem.tif',
-            outputTableName: 'lower_mnt_dem',
-            coordinateFormat: 'EPSG:3857',
-        });
-
-        this.map = new AutkMap(canvas);
-
-        await this.map.init();
-        await this.loadLayers();
-
-        this.map.draw();
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    for (const layer of db.getLayersMetadata()) {
+        map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
     }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of [...this.db.getLayersMetadata(), ...this.db.getRastersMetadata()]) {
-            // getLayer preserves a GeoTIFF's own extent even after OSM establishes workspace bounds.
-            const geojson = await this.db.getLayer(layerData.name);
-
-            const propertyPath = layerData.type === 'raster' ? 'band_1' : undefined;
-
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type, property: propertyPath });
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
-        }
-    }
-
-}
-
-async function main() {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
-    }
-
-    const example = new GeotiffVis();
-    await example.run(canvas);
+    // A raster keeps its own extent; getRaster returns its band arrays.
+    map.loadCollection('dem', { collection: await db.getRaster('dem'), type: 'raster', property: 'band_1' });
+    map.updateRenderInfo('dem', { opacity: 0.7 });
+    map.fitBounds();
+    map.draw();
 }
 void runExample(main);

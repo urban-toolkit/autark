@@ -3,56 +3,24 @@ import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-export class ColormapDiv {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
+async function main(): Promise<void> {
+    const db = new AutkDb();
+    await db.init();
+    await db.loadGeojson({ geojsonFileUrl: `${BASE_URL}data/mnt_neighs.geojson`, outputTableName: 'neighborhoods' });
 
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
 
-        await this.db.loadGeojson({
-            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
-            outputTableName: 'neighborhoods',
-        });
-
-        this.map = new AutkMap(canvas);
-
-        await this.map.init();
-        await this.loadLayers();
-        await this.updateThematicData();
-
-        this.map.draw();
-    }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
-        }
-    }
-
-    protected async updateThematicData(layer: string = 'neighborhoods'): Promise<void> {
-        const geojson = await this.db.getLayer(layer);
-        this.map.updateColorMap(layer, { colorMap: {
-                interpolator: ColorMapInterpolator.DIV_SPECTRAL,
-                domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },
-            }, });
-        this.map.updateThematic(layer, { collection: geojson, property: 'properties.shape_area' });
-    }
-
-}
-
-async function main() {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
-    }
-
-    const example = new ColormapDiv();
-    await example.run(canvas);
+    const neighborhoods = await db.getLayer('neighborhoods');
+    map.loadCollection('neighborhoods', { collection: neighborhoods });
+    map.updateColorMap('neighborhoods', { colorMap: {
+        interpolator: ColorMapInterpolator.DIV_SPECTRAL,
+        domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },
+    } });
+    map.updateThematic('neighborhoods', { collection: neighborhoods, property: 'properties.shape_area' });
+    map.fitBounds();
+    map.draw();
 }
 void runExample(main);

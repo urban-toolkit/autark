@@ -1,66 +1,33 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
-import { runExample, setExampleState } from '../example';
 
-const BASE_URL = (import.meta as ImportMeta & { env: { BASE_URL: string } }).env.BASE_URL;
-const ELEVATION_LAYER_ID = 'niteroi_elevation';
-
-/** Niterói surface and buildings with elevation from the bundled GeoTIFF. */
-export class TerrainLayersNiteroi {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
-    private readonly onPageHide = () => this.dispose();
-
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        try {
-            this.db = new AutkDb();
-            await this.db.init();
-            setExampleState('loading', 'Loading local OpenStreetMap data…');
-            await this.db.loadOsm({
-                pbfFileUrl: `${BASE_URL}data/niteroi.osm.pbf`,
-                queryArea: { bbox: [-43.14, -22.97, -43.03, -22.85] },
-                outputTableName: 'table_osm',
-                autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
-            });
-            setExampleState('loading', 'Loading local elevation…');
-            await this.db.loadGeoTiff({
-                geotiffFileUrl: `${BASE_URL}data/niteroi-elevation.tif`,
-                coordinateFormat: 'EPSG:3395',
-                outputTableName: ELEVATION_LAYER_ID,
-            });
-            setExampleState('loading', 'Preparing terrain…');
-            this.map = new AutkMap(canvas);
-            await this.map.init();
-            await this.loadLayers();
-            this.map.setView({ center: { latitude: -22.9, longitude: -43.1 }, zoom: 13 });
-            const elevation = await this.db.getRaster(ELEVATION_LAYER_ID);
-            this.map.loadTerrain({ source: { collection: elevation, property: 'band_1' } });
-            this.map.ui.setAttribution([
-                { text: 'Mapzen', url: 'https://github.com/tilezen/joerd/blob/master/docs/attribution.md' },
-                { text: '© OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' },
-            ]);
-            this.map.draw();
-            window.addEventListener('pagehide', this.onPageHide, { once: true });
-        } catch (error) { this.dispose(); throw error; }
-    }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layer of this.db.getLayersMetadata()) {
-            const collection = await this.db.getLayer(layer.name);
-            this.map.loadCollection(layer.name, { collection, type: layer.type, loadConfig: { buildingsZeroHeight: true } });
-        }
-    }
-
-    dispose(): void {
-        window.removeEventListener('pagehide', this.onPageHide);
-        this.map?.destroy();
-    }
-}
+const BASE_URL = (import.meta as any).env.BASE_URL;
+const ELEVATION = 'niteroi_elevation';
 
 async function main(): Promise<void> {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) throw new Error('No canvas found');
-    await new TerrainLayersNiteroi().run(canvas);
-}
+    const db = new AutkDb();
+    await db.init();
+    await db.loadOsm({
+        pbfFileUrl: `${BASE_URL}data/niteroi.osm.pbf`,
+        queryArea: { bbox: [-43.14, -22.97, -43.03, -22.85] },
+        autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+    });
+    await db.loadGeoTiff({ geotiffFileUrl: `${BASE_URL}data/niteroi-elevation.tif`, coordinateFormat: 'EPSG:3395', outputTableName: ELEVATION });
 
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    map.setView({ center: { latitude: -22.9, longitude: -43.1 }, zoom: 13 });
+    for (const layer of db.getLayersMetadata()) {
+        map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type, loadConfig: { buildingsZeroHeight: true } });
+    }
+
+    // A raster source keeps the elevation's own finite coverage.
+    map.loadTerrain({ source: { collection: await db.getRaster(ELEVATION), property: 'band_1' } });
+    map.ui.setAttribution([
+        { text: 'Mapzen', url: 'https://github.com/tilezen/joerd/blob/master/docs/attribution.md' },
+        { text: '© OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' },
+    ]);
+    map.draw();
+}
 void runExample(main);

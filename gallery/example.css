@@ -303,3 +303,13 @@ button, input, select { font: inherit; }
 @media (max-width: 1100px) {
     #poster { padding: 12px; }
 }
+
+/* TypeScript highlighting from highlight.js, using the gallery palette. */
+.task-code code, .example-source code { color: #3c3c43; }
+.hljs-keyword, .hljs-built_in, .hljs-literal { color: #8b5cf6; }
+.hljs-string, .hljs-template-string, .hljs-regexp { color: #0a7c5a; }
+.hljs-number { color: #b45309; }
+.hljs-comment { color: #9a9aa2; font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-title.class_ { color: #0a6fb8; }
+.hljs-attr, .hljs-property { color: #3c3c43; }
+.hljs-type, .hljs-type.class_ { color: #0ea5e9; }

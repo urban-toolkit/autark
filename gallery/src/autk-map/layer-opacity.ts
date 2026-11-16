@@ -2,57 +2,25 @@ import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-export class LayerOpacity {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
+async function main(): Promise<void> {
+    const db = new AutkDb();
+    await db.init();
+    await db.loadOsm({
+        pbfFileUrl: `${BASE_URL}data/lower_mnt.osm.pbf`,
+        queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+        autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+    });
+    await db.loadGeojson({ geojsonFileUrl: `${BASE_URL}data/mnt_neighs.geojson`, outputTableName: 'neighborhoods', layerType: 'polygons' });
 
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
-
-        await this.db.loadOsm({
-            pbfFileUrl: `${(import.meta as any).env.BASE_URL}data/lower_mnt.osm.pbf`,
-            queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
-                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
-                >,
-            },
-        });
-
-        await this.db.loadGeojson({
-            geojsonFileUrl: `${URL}data/mnt_neighs.geojson`,
-            outputTableName: 'neighborhoods',
-        });
-
-        this.map = new AutkMap(canvas);
-
-        await this.map.init();
-        await this.loadLayers();
-
-        this.map.draw();
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    for (const layer of db.getLayersMetadata()) {
+        map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
     }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
-        }
-        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75 });
-    }
-}
-
-async function main() {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('No canvas found');
-    }
-
-    const example = new LayerOpacity();
-    await example.run(canvas);
+    map.updateRenderInfo('neighborhoods', { opacity: 0.75, showBorders: true });
+    map.fitBounds();
+    map.draw();
 }
 void runExample(main);

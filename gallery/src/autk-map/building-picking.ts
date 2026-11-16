@@ -1,148 +1,65 @@
+import { runExample } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import type { Feature, FeatureCollection } from 'geojson';
 
+const BASE_URL = (import.meta as any).env.BASE_URL;
 const LAYER = 'table_osm_buildings';
 
-export class BuildingPickingVis {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
-    protected buildings!: FeatureCollection;
+function set(id: string, text: string): void {
+    const element = document.getElementById(id);
+    if (element) element.textContent = text;
+}
 
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
-
-        await this.db.loadOsm({
-            pbfFileUrl: `${(import.meta as any).env.BASE_URL}data/lower_mnt.osm.pbf`,
-            queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
-            outputTableName: 'table_osm',
-            autoLoadLayers: {
-                layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
-                    'surface' | 'parks' | 'water' | 'roads' | 'buildings'
-                >,
-            },
-        });
-
-        this.buildings = await this.db.getLayer(LAYER);
-
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-        await this.loadLayers();
-
-        this.map.updateRenderInfo(LAYER, { isPick: true });
-        this.map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
-            if (layerId !== LAYER) return;
-
-            if (selection.length === 0) {
-                this.map.setHighlightedIds(LAYER, []);
-                this.resetPanel();
-                return;
-            }
-
-            const pickedId = selection[selection.length - 1];
-            this.map.setHighlightedIds(LAYER, [pickedId]);
-            this.showBuildingInfo(pickedId);
-        });
-
-        this.map.draw();
-        this.resetPanel();
-    }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const geojson = layerData.name === LAYER
-                ? this.buildings
-                : await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
+function showDetails(buildings: FeatureCollection, pickedId: number | null): void {
+    const feature = pickedId === null ? undefined : buildings.features[pickedId] as Feature | undefined;
+    const props = (feature?.properties ?? {}) as Record<string, unknown>;
+    const get = (...keys: string[]): string => {
+        for (const key of keys) {
+            const value = props[key];
+            if (value !== undefined && value !== null && String(value).trim() !== '') return String(value);
         }
-    }
-
-    protected showBuildingInfo(pickedId: number): void {
-        const feature = this.buildings.features[pickedId] as Feature;
-        if (!feature) return;
-
-        const props = (feature.properties ?? {}) as Record<string, unknown>;
-        const get = (...keys: string[]): string => {
-            for (const k of keys) {
-                const v = props[k];
-                if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
-            }
-            return '—';
-        };
-
-        const levels = get('building:levels', 'levels');
-        const heightRaw = get('height');
-        const height = heightRaw !== '—'
-            ? heightRaw
-            : levels !== '—' ? `~${(Number(levels) * 3).toFixed(0)} m (est.)` : '—';
-
-        this.updatePanel({
-            title: get('name', 'addr:housename') !== '—'
-                ? get('name', 'addr:housename')
-                : `Building ${pickedId}`,
-            osmId: get('id', 'osm_id', '@id'),
-            type: get('building'),
-            height,
-            levels,
-            address: [get('addr:housenumber'), get('addr:street')]
-                .filter(v => v !== '—').join(' ') || '—',
-        });
-        this.setSelectionState(true);
-    }
-
-    protected resetPanel(): void {
-        this.updatePanel({ title: 'No building selected', osmId: '—', type: '—', height: '—', levels: '—', address: '—' });
-        this.setSelectionState(false);
-    }
-
-    protected setSelectionState(selected: boolean): void {
-        const label = document.getElementById('info-selection');
-        const help = document.getElementById('info-help');
-        if (label) label.textContent = selected ? 'Selected building' : 'Awaiting selection';
-        if (help) help.textContent = selected
-            ? 'Double-click another building to compare its attributes.'
-            : 'Double-click a building on the map to see its details here.';
-    }
-
-    protected updatePanel(values: {
-        title: string;
-        osmId: string;
-        type: string;
-        height: string;
-        levels: string;
-        address: string;
-    }): void {
-        const set = (id: string, text: string) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = text;
-        };
-        set('info-title', values.title);
-        set('info-osm-id', values.osmId);
-        set('info-type', values.type);
-        set('info-height', values.height);
-        set('info-levels', values.levels);
-        set('info-address', values.address);
-    }
+        return '—';
+    };
+    const levels = get('building:levels', 'levels');
+    const height = get('height');
+    set('info-selection', feature ? 'Selected building' : 'Awaiting selection');
+    set('info-help', feature ? 'Double-click another building to compare its attributes.'
+        : 'Double-click a building on the map to see its details here.');
+    set('info-title', feature ? get('name', 'addr:housename') === '—' ? `Building ${pickedId}` : get('name', 'addr:housename') : 'No building selected');
+    set('info-osm-id', get('id', 'osm_id', '@id'));
+    set('info-type', get('building'));
+    set('info-height', height !== '—' ? height : levels !== '—' ? `~${(Number(levels) * 3).toFixed(0)} m (est.)` : '—');
+    set('info-levels', levels);
+    set('info-address', [get('addr:housenumber'), get('addr:street')].filter(value => value !== '—').join(' ') || '—');
 }
 
 async function main(): Promise<void> {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) throw new Error('No canvas found');
-    const status = document.querySelector<HTMLElement>('#map-status');
-    const stage = document.querySelector<HTMLElement>('.map-stage');
-    try {
-        if (status) status.textContent = 'Loading OpenStreetMap data…';
-        await new BuildingPickingVis().run(canvas);
-        if (status) status.textContent = 'Interactive map';
-    } catch (error) {
-        if (status) {
-            status.textContent = 'Unable to load map.';
-            status.dataset.state = 'error';
-        }
-        console.error('Unable to initialize the building picking example:', error);
-    } finally {
-        stage?.setAttribute('aria-busy', 'false');
+    const db = new AutkDb();
+    await db.init();
+    await db.loadOsm({
+        pbfFileUrl: `${BASE_URL}data/lower_mnt.osm.pbf`,
+        queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+        autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+    });
+    const buildings: FeatureCollection = await db.getLayer(LAYER);
+
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    for (const layer of db.getLayersMetadata()) {
+        map.loadCollection(layer.name, { collection: layer.name === LAYER ? buildings : await db.getLayer(layer.name), type: layer.type });
     }
+    map.updateRenderInfo(LAYER, { isPick: true });
+    map.fitBounds();
+
+    map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+        if (layerId !== LAYER) return;
+        const pickedId = selection.length === 0 ? null : selection[selection.length - 1]!;
+        map.setHighlightedIds(LAYER, pickedId === null ? [] : [pickedId]);
+        showDetails(buildings, pickedId);
+    });
+
+    map.draw();
+    showDetails(buildings, null);
 }
-main();
+void runExample(main);

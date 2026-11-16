@@ -1,91 +1,36 @@
 import { runExample } from '../example';
-import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
-
-import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-export class MapD3Timeseries {
-    protected map!: AutkMap;
-    protected plot!: AutkPlot;
-    protected plotDiv!: HTMLElement;
-
-    protected geojson!: FeatureCollection<Geometry, GeoJsonProperties>;
-
-    public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
-        this.plotDiv = plotDiv;
-
-        this.attachSyntheticTimeseries();
-        await this.loadAutkMap(canvas);
-        this.initPlot();
-        this.updateMapListeners();
+async function main(): Promise<void> {
+    const collection = await fetch(`${BASE_URL}data/mnt_neighs_proj.geojson`).then(response => response.json());
+    // Synthetic series keep this chart self-contained.
+    for (const [index, feature] of collection.features.entries()) {
+        const base = 10 + (index % 7);
+        feature.properties.series = ['2021', '2022', '2023', '2024'].map((timestamp, step) => ({ timestamp, value: base + step }));
     }
 
-    protected attachSyntheticTimeseries(): void {
-        const years = ['2021', '2022', '2023', '2024'];
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    map.loadCollection('neighborhoods', { collection });
+    map.updateRenderInfo('neighborhoods', { isPick: true });
+    map.fitBounds();
+    map.draw();
 
-        this.geojson.features.forEach((feature, index) => {
-            const props = (feature.properties ?? {}) as Record<string, unknown>;
-            const base = 10 + (index % 7);
-            props.series = years.map((year, yearIndex) => ({
-                timestamp: year,
-                value: base + yearIndex * (1 + (index % 3)),
-            }));
-            feature.properties = props as GeoJsonProperties;
-        });
-    }
+    const body = document.querySelector<HTMLElement>('#plotBody')!;
+    const plot = new AutkPlot(body, {
+        type: 'barchart',
+        collection,
+        attributes: { axis: ['series', '@transform'] },
+        labels: { title: 'Average series' },
+        transform: { preset: 'reduce-series', options: { timestamp: 'timestamp', value: 'value', reducer: 'avg' } },
+        width: Math.max(280, body.clientWidth - 40),
+        events: [PlotEvent.CLICK],
+    });
 
-    protected async loadAutkMap(canvas: HTMLCanvasElement): Promise<void> {
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-
-        this.map.loadCollection('neighborhoods', { collection: this.geojson });
-        this.map.updateRenderInfo('neighborhoods', { isPick: true });
-        this.map.draw();
-    }
-
-    protected initPlot(): void {
-        this.plot = new AutkPlot(this.plotDiv, {
-            type: 'barchart',
-            collection: this.geojson,
-            attributes: { axis: ['series', '@transform'] },
-            labels: { axis: ['bucket', 'avg'], title: 'Average synthetic timeseries (neighborhoods)' },
-            transform: {
-                preset: 'reduce-series',
-                options: { timestamp: 'timestamp', value: 'value', reducer: 'avg' },
-            },
-            margins: { left: 60, right: 20, top: 50, bottom: 140 },
-            width: Math.max(280, this.plotDiv.clientWidth - 40),
-            events: [PlotEvent.CLICK],
-        });
-
-        this.plot.events.on(PlotEvent.CLICK, ({ selection }) => {
-            this.map.setHighlightedIds('neighborhoods', selection);
-        });
-    }
-
-    protected updateMapListeners(): void {
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            this.map.setHighlightedIds('neighborhoods', selection);
-
-            this.plot.setSelection(selection);
-        });
-    }
+    map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
+    plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
 }
-
-async function main() {
-    const example = new MapD3Timeseries();
-
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const plotBdy = document.querySelector('#plotBody') as HTMLElement;
-
-    if (!canvas || !plotBdy) {
-        throw new Error('Canvas or plot body element not found');
-    }
-
-    await example.run(canvas, plotBdy);
-}
-
 void runExample(main);

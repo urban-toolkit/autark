@@ -1,140 +1,41 @@
 import { runExample } from '../example';
-import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
-
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-export class MapD3TemporalEvents {
-    protected map!: AutkMap;
-    protected db!: AutkDb;
-    protected plot!: AutkPlot;
+async function main(): Promise<void> {
+    const db = new AutkDb();
+    await db.init();
+    await db.loadGeojson({ geojsonFileUrl: `${BASE_URL}data/mnt_roads.geojson`, outputTableName: 'roads', coordinateFormat: 'EPSG:3395' });
+    await db.loadCsv({ csvFileUrl: `${BASE_URL}data/noise_manhattan_clean.csv`, outputTableName: 'noise',
+        geometryColumns: { latColumnName: 'latitude', longColumnName: 'longitude', coordinateFormat: 'EPSG:3395' } });
+    await db.spatialQuery({
+        tableRootName: 'roads',
+        tableJoinName: 'noise',
+        near: { distance: 200 },
+        groupBy: [{ column: 'key', aggregateFn: 'count' }, { column: 'date', aggregateFn: 'collect' }],
+    });
+    const roads = await db.getLayer('roads');
 
-    protected canvas!: HTMLCanvasElement;
-    protected plotDiv!: HTMLElement;
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    await map.init();
+    map.loadCollection('roads', { collection: roads, type: 'roads' });
+    map.fitBounds();
+    map.draw();
 
-    protected roads!: FeatureCollection<Geometry, GeoJsonProperties>;
-    protected selectionSource: 'map' | 'plot' | null = null;
+    const body = document.querySelector<HTMLElement>('#plotBody')!;
+    const plot = new AutkPlot(body, {
+        type: 'linechart',
+        collection: roads,
+        attributes: { axis: ['sjoin.collect.noise', '@transform'] },
+        transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } },
+        width: Math.max(280, body.clientWidth - 40),
+        events: [PlotEvent.BRUSH_X],
+    });
 
-    public async run(canvas: HTMLCanvasElement, plotDiv: HTMLElement): Promise<void> {
-        this.canvas = canvas;
-        this.plotDiv = plotDiv;
-
-        await this.loadData();
-        await this.loadMap();
-        await this.loadPlot();
-    }
-
-    protected async loadData(): Promise<void> {
-        this.db = new AutkDb();
-        await this.db.init();
-
-        await this.db.loadGeojson({
-            geojsonFileUrl: `${URL}data/mnt_roads.geojson`,
-            outputTableName: 'roads',
-            coordinateFormat: 'EPSG:3395'
-        });
-
-        await this.db.loadCsv({
-            csvFileUrl: `${URL}data/noise_manhattan_clean.csv`,
-            outputTableName: 'noise',
-            geometryColumns: {
-                latColumnName: 'latitude',
-                longColumnName: 'longitude',
-                coordinateFormat: 'EPSG:3395',
-            },
-        });
-
-        await this.db.spatialQuery({
-            tableRootName: 'roads',
-            tableJoinName: 'noise',
-            near: { distance: 200 },
-            groupBy: [
-                {
-                    column: 'key',
-                    aggregateFn: 'count',
-                },
-                {
-                    column: 'date',
-                    aggregateFn: 'collect',
-                }
-            ],
-        });
-
-        this.roads = await this.db.getLayer('roads');
-    }
-
-    protected async loadMap(): Promise<void> {
-        this.map = new AutkMap(this.canvas);
-        this.map.style.setPredefinedStyle('light');
-
-        await this.map.init();
-        await this.loadLayers();
-
-        this.map.draw();
-
-        this.map.events.on(MapEvent.PICKING, ({ selection }) => {
-            if (this.selectionSource === 'plot') return;
-
-            this.selectionSource = 'map';
-            this.plot.setSelection(selection);
-            this.selectionSource = null;
-        });
-    }
-
-    protected loadPlot() {
-        this.plot = new AutkPlot(this.plotDiv, {
-            type: 'linechart',
-            collection: this.roads,
-            attributes: { axis: ['sjoin.collect.noise', '@transform'] },
-            labels: { axis: ['buckets', 'count'], title: 'Monthly noise events per road' },
-            transform: {
-                preset: 'binning-events',
-                options: {
-                    timestamp: 'date',
-                    resolution: 'day',
-                    reducer: 'count',
-                },
-            },
-            margins: { left: 60, right: 20, top: 50, bottom: 140 },
-            width: Math.max(280, this.plotDiv.clientWidth - 40),
-            events: [PlotEvent.BRUSH_X],
-        });
-
-        this.plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
-            if (this.selectionSource === 'map') return;
-
-            this.selectionSource = 'plot';
-            this.map.setHighlightedIds('roads', selection);
-            this.selectionSource = null;
-        });
-    }
-
-    protected async loadLayers(): Promise<void> {
-        for (const layerData of this.db.getLayersMetadata()) {
-            const geojson = await this.db.getLayer(layerData.name);
-            this.map.loadCollection(layerData.name, { collection: geojson, type: layerData.type });
-            console.log(`Loading layer: ${layerData.name} of type ${layerData.type}`);
-        }
-
-        this.map.updateThematic('roads', { collection: this.roads, property: 'properties.sjoin.count.noise' });
-        this.map.updateRenderInfo('roads', { isPick: true });
-    }
+    map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
+    plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => map.setHighlightedIds('roads', selection));
 }
-
-async function main() {
-    const example = new MapD3TemporalEvents();
-
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const plotBdy = document.querySelector('#plotBody') as HTMLElement;
-
-    if (!canvas || !plotBdy) {
-        throw new Error('Canvas or plot body element not found');
-    }
-
-    await example.run(canvas, plotBdy);
-}
-
 void runExample(main);
