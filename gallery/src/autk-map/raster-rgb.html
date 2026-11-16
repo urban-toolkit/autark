@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — RGB raster and scalar transitions</title>
+    <title>Autark — RGB and scalar rasters</title>
     <link rel="stylesheet" href="../../example.css" />
 </head>
 <body class="gallery-example">
@@ -18,7 +18,7 @@
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Raster imagery</p>
-            <h1 id="example-title">RGB raster and scalar transitions</h1>
+            <h1 id="example-title">RGB and scalar rasters</h1>
             <p class="description">Validate RGB ranges, no-data, scalar legends, and rejected updates with local imagery.</p>
         </section>
         <div class="controls" aria-label="Raster controls">
@@ -32,7 +32,7 @@
             <label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="1" /></label>
         </div>
 
-        <div class="map"><section class="map-panel" aria-label="RGB raster and scalar transitions map area">
+        <div class="map"><section class="map-panel" aria-label="RGB and scalar rasters map area">
             <div class="panel-header"><h2>Raster preview</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
             <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Raster validation map"></canvas></div>
             <div class="panel-footer" id="map-help"><span>Switch modes above · R to reset · Scroll to zoom</span></div>
@@ -41,7 +41,7 @@
         <p class="example-note">RGB modes should show the same colors and no scalar legend. Scalar mode should show a ramp and legend.
             Invalid updates should preserve the current picture and show one warning in the console.
             Pan or zoom, resize the window, then press <kbd>r</kbd> or Fit / reset to frame the complete raster.</p>
-        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+        <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
     </main>
     <script type="module" src="./raster-rgb.ts"></script>
 </body>

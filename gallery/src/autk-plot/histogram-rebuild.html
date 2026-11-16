@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — Updating a histogram</title>
+    <title>Autark — Dynamic histogram</title>
     <link rel="stylesheet" href="../../example.css" />
 </head>
 
@@ -20,14 +20,14 @@
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-plot <span aria-hidden="true">/</span> Dynamic charts</p>
-            <h1 id="example-title">Updating a histogram</h1>
+            <h1 id="example-title">Dynamic histogram</h1>
             <p class="description">Rebuild a histogram as its data changes.</p>
         </section>
     <div id="app" class="example-workspace chart-workspace">
 
-        <section class="map-panel" aria-label="Updating a histogram map area">
-            <div class="panel-header"><h2>Updating a histogram</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
-            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Updating a histogram map"> </canvas></div>
+        <section class="map-panel" aria-label="Dynamic histogram map area">
+            <div class="panel-header"><h2>Dynamic histogram</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Dynamic histogram map"> </canvas></div>
             <div class="panel-footer" id="map-help"><span>Drag to pan · Scroll to zoom</span></div>
         </section>
         <aside id="plot" class="details-panel" aria-labelledby="plot-title">
@@ -36,7 +36,7 @@
             <p class="data-note">Click to select · Linked to map</p>
         </aside>
     </div>
-        <footer class="page-footer">Built with Autark · Rendered in your browser</footer>
+        <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
     </main>
 </body>
 <script type="module" src="/src/autk-plot/histogram-rebuild.ts"></script>
