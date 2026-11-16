@@ -171,7 +171,13 @@ export function selectTiles(
     const polygon = camera.getGroundFootprint(reach);
     if (polygon.length < 3) return null;
 
-    const lonLats = polygon.map((p) => toLonLat(view, p));
+    // A projected edge need not remain straight in longitude/latitude.
+    const footprint = polygon.flatMap((point, index) => {
+        const next = polygon[(index + 1) % polygon.length]!;
+        return Array.from({ length: 8 }, (_, sample) => [point[0] + (next[0] - point[0]) * sample / 8,
+            point[1] + (next[1] - point[1]) * sample / 8] as [number, number]);
+    });
+    const lonLats = footprint.map((p) => toLonLat(view, p));
     if (!lonLats.every(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat))) return null;
     const bounds: LonLatBounds = {
         west: Math.min(...lonLats.map((p) => p[0])),

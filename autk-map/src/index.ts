@@ -31,6 +31,7 @@ export type {
     /** A rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map. */
     MapBounds,
     MapOptions,
+    SetViewParams,
     LoadTerrainParams,
     TerrainRasterSource,
     /** Parameters for loading a GeoJSON feature collection as a map layer. */

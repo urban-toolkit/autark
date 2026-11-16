@@ -1,7 +1,7 @@
 import type { FeatureCollection, Geometry } from 'geojson';
 import type { Mock, MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CameraMotion, ColorMapInterpolator } from '@urban-toolkit/autk-core';
+import { CameraMotion, ColorMapInterpolator, DEFAULT_WORKSPACE_COORDINATE_FORMAT, lonLatToCrs, reprojectPosition } from '@urban-toolkit/autk-core';
 import { AutkMap } from '../src/map';
 import { FlatMapRenderPath } from '../src/map-flat';
 import { TileLayer } from '../src/layer-tiles';
@@ -871,13 +871,122 @@ describe('unified terrain loading', () => {
         map.destroy();
     });
 
-    it('preserves the existing first-load CRS parameter for custom vector workspaces', async () => {
+    it('locks the shared database default CRS after loading projected vector data', async () => {
         const { map } = await createMap();
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
         map.loadTiles('imagery', { source: imagery, crs: 'EPSG:3857' });
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('Workspace CRS'));
+        expect(map.layerManager.searchByLayerId('imagery')).toBeNull();
+        expect(map.workspaceCrs).toBe(DEFAULT_WORKSPACE_COORDINATE_FORMAT);
         map.loadTerrain({ source, windowSize: 16 });
-        expect(map.workspaceCrs).toBe('EPSG:3857');
         expect(map.getTerrainTileStats()).not.toBeNull();
-        expect(() => map.loadTerrain({ source, crs: 'EPSG:3395' })).toThrow(/Workspace CRS/);
+        map.destroy();
+    });
+
+    it.each(['EPSG:3395', 'EPSG:3857'] as const)('sets a geographic view before data in %s and preserves its origin', async crs => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs });
+        await map.init();
+        map.setView({ center, zoom: 14 });
+        const origin = [...map.layerManager.origin];
+        expect(origin).toEqual(lonLatToCrs(crs, center.longitude, center.latitude));
+        expect([...map.camera.getLookAt()]).toEqual([0, 0, 0]);
+        const distance = map.camera.getEye()[2];
+        map.loadCollection('parks', { collection: square, type: 'parks' });
+        map.loadTiles('imagery', { source: imagery });
+        map.loadTerrain({ source, windowSize: 16 });
+        expect(map.layerManager.origin).toEqual(origin);
+        expect(map.camera.getEye()[2]).toBe(distance);
+        const next = { latitude: -22.95, longitude: -43.2 };
+        map.setView({ center: next, zoom: 15 });
+        const [x, y] = lonLatToCrs(crs, next.longitude, next.latitude);
+        expect(map.layerManager.origin).toEqual(origin);
+        expect(map.camera.getLookAt()[0]).toBeCloseTo(x - origin[0], 3);
+        expect(map.camera.getLookAt()[1]).toBeCloseTo(y - origin[1], 3);
+        expect(map.camera.getEye()[2]).toBeCloseTo(distance / 2, 3);
+        map.destroy();
+    });
+
+    it('uses a UTM workspace for setView, mixed-CRS collections, imagery, and terrain', async () => {
+        vi.spyOn(SpriteLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs: 'EPSG:32618' });
+        await map.init();
+        const center = { latitude: 40.7, longitude: -74 };
+        map.setView({ center, zoom: 14 });
+        const expected = reprojectPosition([-74, 40.7], 'EPSG:4326', 'EPSG:32618');
+        expect(map.layerManager.origin).toEqual(expected);
+        const eye = [...map.camera.getEye()];
+        const mercator = reprojectPosition([-74, 40.7], 'EPSG:4326', 'EPSG:3857');
+        map.loadCollection('projected', { sourceCrs: 'EPSG:3857', type: 'points', collection: {
+            type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: mercator } }],
+        } });
+        map.loadTiles('imagery', { source: imagery });
+        map.loadTerrain({ source, windowSize: 16, levels: 2 });
+        expect(map.workspaceCrs).toBe('EPSG:32618');
+        expect(map.camera.getEye()).toEqual(eye);
+        expect(map.getTerrainTileStats()).not.toBeNull();
+        const points = map.layerManager.searchByLayerId('projected') as SpriteLayer;
+        expect(points.pointInstances[0]).toBeCloseTo(0, 3);
+        expect(points.pointInstances[1]).toBeCloseTo(0, 3);
+        map.destroy();
+    });
+
+    it('setView preserves a data-derived origin and requests an on-demand render', async () => {
+        const { map } = await idleOnDemandMap();
+        const origin = [...map.layerManager.origin];
+        const before = renders();
+        map.setView({ center, zoom: 13 });
+        expect(map.layerManager.origin).toEqual(origin);
+        frames.run(2);
+        expect(renders()).toBeGreaterThan(before);
+        map.destroy();
+    });
+
+    it('rejects invalid views before establishing an origin or moving the camera', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        const eye = [...map.camera.getEye()];
+        expect(() => map.setView({ center, zoom: NaN })).toThrow(/zoom/);
+        expect(() => map.setView({ center: { latitude: 91, longitude: 0 } })).toThrow(/center/);
+        expect(map.layerManager.hasOrigin).toBe(false);
+        expect([...map.camera.getEye()]).toEqual(eye);
+        map.destroy();
+    });
+
+    it('reprojects vector coordinates before establishing the origin without modifying the input', async () => {
+        vi.spyOn(SpriteLayer.prototype, 'createPipeline').mockImplementation(() => {});
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        const collection: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature',
+            properties: { value: 5 }, geometry: { type: 'Point', coordinates: [-74, 40.7, 15] } }] };
+        const original = structuredClone(collection);
+        map.loadCollection('geographic', { collection, sourceCrs: 'EPSG:4326', type: 'points' });
+        const [x, y] = lonLatToCrs('EPSG:3395', -74, 40.7);
+        expect(map.layerManager.origin[0]).toBeCloseTo(x, 6);
+        expect(map.layerManager.origin[1]).toBeCloseTo(y, 6);
+        expect(map.workspaceCrs).toBe(DEFAULT_WORKSPACE_COORDINATE_FORMAT);
+        expect(collection).toEqual(original);
+        // Omitted sourceCrs must not interpret these already-projected coordinates as degrees.
+        map.loadCollection('projected', { collection: { ...collection, features: [{ ...collection.features[0],
+            geometry: { type: 'Point', coordinates: [x, y, 15] } }] }, type: 'points' });
+        const utm = reprojectPosition([-74, 40.7, 15], 'EPSG:4326', 'EPSG:32618');
+        map.loadCollection('utm', { collection: { ...collection, features: [{ ...collection.features[0],
+            geometry: { type: 'Point', coordinates: utm } }] }, sourceCrs: 'EPSG:32618', type: 'points' });
+        expect(map.layerManager.layers).toHaveLength(3);
+        for (const layer of map.layerManager.layers as SpriteLayer[]) {
+            expect(layer.pointInstances[0]).toBeCloseTo(0, 3);
+            expect(layer.pointInstances[1]).toBeCloseTo(0, 3);
+        }
+        map.destroy();
+    });
+
+    it('rejects unsupported source CRSs and raster reprojection before mutating map state', async () => {
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        await map.init();
+        expect(() => map.loadCollection('wrong', { collection: square, sourceCrs: 'EPSG:NOT_REGISTERED' })).toThrow(/Unsupported CRS/);
+        expect(() => map.loadCollection('raster', { collection: raster([1, 2, 3, 4]), type: 'raster',
+            property: 'band', sourceCrs: 'EPSG:4326' })).toThrow(/Raster collections/);
+        expect(map.layerManager.hasOrigin).toBe(false);
+        expect(map.layerManager.layers).toHaveLength(0);
         map.destroy();
     });
 

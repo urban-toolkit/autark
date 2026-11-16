@@ -35,8 +35,16 @@ import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
 
 /** Coordinate system of normalized data supplied to the map. */
 export interface MapOptions {
-    /** Workspace CRS; defaults to the same EPSG:3395 CRS as AutkDb. */
+    /** Workspace CRS understood by Proj4js; defaults to the same EPSG:3395 CRS as AutkDb. */
     crs?: TileCrs;
+}
+
+/** Geographic navigation independent of imagery, vectors, and elevation sources. */
+export interface SetViewParams {
+    /** WGS84 center in named latitude/longitude degrees, regardless of workspace CRS. */
+    center: { latitude: number; longitude: number };
+    /** Web Mercator zoom using a 256-pixel reference tile; defaults to 12. */
+    zoom?: number;
 }
 
 /** A normalized raster elevation collection, including its band property. */
@@ -49,9 +57,12 @@ export interface TerrainRasterSource {
 export interface LoadTerrainParams extends Omit<EnableTerrainTilesParams, 'source'> {
     /** Elevation tile descriptor or normalized raster collection and band property. */
     source: TerrainTileSource | TerrainRasterSource;
-    /** Optional initial WGS84 view. Required for tile terrain when the map has no origin. */
+    /**
+     * Optional initial WGS84 view.
+     * @deprecated Use setView() before loading terrain.
+     */
     center?: { latitude: number; longitude: number };
-    /** Initial zoom; requires center and defaults to 12. */
+    /** Initial zoom; requires center and defaults to 12. @deprecated Use setView(). */
     zoom?: number;
 }
 
@@ -97,6 +108,13 @@ export interface LoadCollectionParams {
      * per-cell vector geometries.
      */
     collection: FeatureCollection<Geometry | null>;
+    /**
+     * CRS of input vector coordinates; defaults to the map's workspace CRS (no conversion).
+     * Accepts Proj4js names registered through autk-core's registerCrs(), PROJ strings, or WKT.
+     * EPSG:4326 uses [longitude, latitude]. Geometry and bounds are converted without mutating input.
+     * Normalized raster collections must already use the workspace CRS.
+     */
+    sourceCrs?: string;
     /**
      * Optional explicit layer type override.
      *
@@ -227,12 +245,14 @@ export interface LoadTilesParams {
      * Optional WGS84 center for the initial view, using named latitude/longitude in degrees.
      * Initializes a tile-only scene without another data layer. An existing shared origin is preserved.
      * The point is projected into `crs`; supplying a center explicitly positions the camera.
+     * @deprecated Use setView() before loading tiles.
      */
     center?: { latitude: number; longitude: number };
     /**
      * Initial Web Mercator zoom (0–30, fractional values allowed); requires `center`.
      * Defaults to 12 when `center` is supplied. Uses the source tile size and CSS pixels;
      * device pixel ratio independently controls imagery resolution.
+     * @deprecated Use setView() before loading tiles.
      */
     zoom?: number;
     /** Layer opacity from 0 to 1. Defaults to 1. */
@@ -270,7 +290,7 @@ export interface EnableTerrainTilesParams {
      * Coordinate system of the map's data. Inherited from the map; defaults to `'EPSG:3395'`, the workspace default of `AutkDb`.
      * Only metre-based systems are accepted: heights are metres, so a map plane in degrees would give a distorted scene.
      */
-    crs?: Exclude<TileCrs, 'EPSG:4326'>;
+    crs?: TileCrs;
     /**
      * Nested windows of height samples around the view, finest first; each covers
      * twice the area of the one before. Fewer are used when the source has too few

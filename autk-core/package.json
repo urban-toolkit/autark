@@ -39,6 +39,7 @@
     "d3-scale-chromatic": "^3.1.0",
     "earcut": "^3.2.4",
     "gl-matrix": "^3.4.4",
+    "proj4": "^2.23.0",
     "rbush": "^4.0.1"
   },
   "devDependencies": {

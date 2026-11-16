@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildTileGrid, tileRowCount } from '../src/tile-geometry';
 import { tilesPerAxis } from '../src/tile-index';
-import { TILE_CRS_VALUES, WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from '../src/tile-projection';
+import { WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from '../src/tile-projection';
 import type { TileCrs } from '../src/tile-projection';
+
+const LEGACY_TILE_PROJECTIONS = ['EPSG:3395', 'EPSG:3857', 'EPSG:4326'] as const;
 
 /** A real Esri z17 tile; corners in EPSG:3395 computed by PROJ through `gdaltransform`. */
 const LAGOS = { z: 17, x: 66500, y: 63177 };
@@ -10,6 +12,24 @@ const LAGOS_NW_3395 = [294741.18106764, 716451.752437051];
 const LAGOS_SE_3395 = [295046.92918078, 716148.025347883];
 
 describe('buildTileGrid', () => {
+  it('builds a two-dimensional imagery grid in a UTM workspace', () => {
+    const crs = 'EPSG:32631';
+    const origin = lonLatToCrs(crs, 2.65, 6.46);
+    const grid = buildTileGrid(LAGOS, crs, origin);
+    expect(grid.positions.length).toBe(17 * 17 * 2);
+    const n = tilesPerAxis(LAGOS.z);
+    for (let vertex = 0; vertex < grid.positions.length / 2; vertex++) {
+      const u = grid.texCoords[vertex * 2]!, v = grid.texCoords[vertex * 2 + 1]!;
+      const longitude = (LAGOS.x + u) / n * 360 - 180;
+      const latitude = mercatorYToLat(WEB_MERCATOR_EXTENT - (LAGOS.y + v) * 2 * WEB_MERCATOR_EXTENT / n);
+      const [x, y] = lonLatToCrs(crs, longitude, latitude);
+      expect(grid.positions[vertex * 2]).toBeCloseTo(x - origin[0], 3);
+      expect(grid.positions[vertex * 2 + 1]).toBeCloseTo(y - origin[1], 3);
+    }
+    // Convergence rotates a UTM tile: its north edge cannot be forced to a constant y.
+    expect(grid.positions[1]).not.toBe(grid.positions[16 * 2 + 1]);
+  });
+
   it('places the corners where PROJ puts them, relative to the origin', () => {
     const origin = [295000, 716000] as const;
     const grid = buildTileGrid(LAGOS, 'EPSG:3395', origin);
@@ -65,7 +85,7 @@ describe('buildTileGrid', () => {
     expect(Array.from(buildTileGrid(LAGOS, 'EPSG:3395', [0, 0]).indices)).toEqual([0, 1, 2, 1, 3, 2]);
   });
 
-  describe.each(TILE_CRS_VALUES)('neighbouring tiles in %s', (crs) => {
+  describe.each(LEGACY_TILE_PROJECTIONS)('neighbouring tiles in %s', (crs) => {
     const origin = [0, 0] as const;
 
     it.each([0, 1, 3, 8, 17])('share their vertical edge exactly at zoom %i', (z) => {
@@ -97,7 +117,7 @@ describe('buildTileGrid', () => {
 describe('float32 placement of the generated geometry', () => {
   // The projection bound below covers the approximation between row vertices.
   // This covers storing vertex positions as float32 relative to the origin.
-  it.each(TILE_CRS_VALUES)('stays within 1/32 pixel of the double-precision position in %s', (crs) => {
+  it.each(LEGACY_TILE_PROJECTIONS)('stays within 1/32 pixel of the double-precision position in %s', (crs) => {
     const tile = { z: 17, x: 66500, y: 63177 };
     const [lon, lat] = [3.1, 6.46];
     const perPixel = (2 * WEB_MERCATOR_EXTENT) / (256 * tilesPerAxis(tile.z)); // Mercator metres per tile pixel
@@ -171,7 +191,7 @@ describe('tileRowCount', () => {
     return worst;
   }
 
-  it.each(TILE_CRS_VALUES)('keeps the drawn tile within 1/8 pixel of the true projection in %s', (crs) => {
+  it.each(LEGACY_TILE_PROJECTIONS)('keeps the drawn tile within 1/8 pixel of the true projection in %s', (crs) => {
     for (let z = 0; z <= 22; z++) {
       expect(worstErrorPixels(crs, z), `${crs} zoom ${z}`).toBeLessThan(0.125);
     }

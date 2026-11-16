@@ -12,6 +12,8 @@
  * is almost linear, so a quad is within a fraction of a pixel at every zoom
  * except the first few. EPSG:4326 stretches latitude non-linearly, so low
  * zoom tiles are split into rows, each with its own Mercator texture V.
+ * Other Proj4js projections use a two-dimensional grid so convergence, rotation,
+ * and nonlinear changes in both coordinates are retained.
  */
 
 import type { TileIndex } from './tile-index';
@@ -50,7 +52,7 @@ const ROWS_BY_ZOOM: Record<TileCrs, readonly number[]> = {
  * @returns A positive integer.
  */
 export function tileRowCount(crs: TileCrs, z: number): number {
-    return ROWS_BY_ZOOM[crs][z] ?? 1;
+    return ROWS_BY_ZOOM[crs]?.[z] ?? (ROWS_BY_ZOOM[crs] ? 1 : 16);
 }
 
 /**
@@ -69,33 +71,32 @@ export function tileRowCount(crs: TileCrs, z: number): number {
  */
 export function buildTileGrid(tile: TileIndex, crs: TileCrs, origin: readonly [number, number]): TileGrid {
     const rows = tileRowCount(crs, tile.z);
+    const columns = ROWS_BY_ZOOM[crs] ? 1 : rows;
     const n = tilesPerAxis(tile.z);
     const size = (2 * WEB_MERCATOR_EXTENT) / n;
     const { west, east } = tileLonLatBounds(tile);
 
-    const positions = new Float32Array((rows + 1) * 4);
-    const texCoords = new Float32Array((rows + 1) * 4);
-    const indices = new Uint16Array(rows * 6);
+    const positions = new Float32Array((rows + 1) * (columns + 1) * 2);
+    const texCoords = new Float32Array(positions.length);
+    const indices = new Uint16Array(rows * columns * 6);
 
     for (let r = 0; r <= rows; r++) {
         const lat = mercatorYToLat(WEB_MERCATOR_EXTENT - (tile.y + r / rows) * size);
-        const [x0, y] = lonLatToCrs(crs, west, lat);
-        const [x1] = lonLatToCrs(crs, east, lat);
-        const v = r / rows;
-        const i = r * 4;
-        positions[i] = x0 - origin[0];
-        positions[i + 1] = y - origin[1];
-        positions[i + 2] = x1 - origin[0];
-        positions[i + 3] = y - origin[1];
-        texCoords[i] = 0;
-        texCoords[i + 1] = v;
-        texCoords[i + 2] = 1;
-        texCoords[i + 3] = v;
+        for (let column = 0; column <= columns; column++) {
+            const u = column / columns;
+            const [x, y] = lonLatToCrs(crs, column === columns ? east : west + (east - west) * u, lat);
+            const at = (r * (columns + 1) + column) * 2;
+            positions[at] = x - origin[0];
+            positions[at + 1] = y - origin[1];
+            texCoords[at] = u;
+            texCoords[at + 1] = r / rows;
+        }
     }
 
-    for (let r = 0; r < rows; r++) {
-        const a = r * 2;
-        indices.set([a, a + 1, a + 2, a + 1, a + 3, a + 2], r * 6);
+    for (let r = 0; r < rows; r++) for (let column = 0; column < columns; column++) {
+        const a = r * (columns + 1) + column;
+        const b = a + columns + 1;
+        indices.set([a, a + 1, b, a + 1, b + 1, b], (r * columns + column) * 6);
     }
 
     return { positions, texCoords, indices, rows };

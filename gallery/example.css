@@ -80,6 +80,7 @@ button, input, select { font: inherit; }
 .gallery-example #app > label { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .gallery-example .map-container { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--border); }
 .gallery-example .map-container > canvas { min-width: 0; }
+.gallery-example .tile-controls { margin-bottom: 20px; }
 .gallery-example .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0; }
 .gallery-example .controls label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .gallery-example .map { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
@@ -182,7 +183,8 @@ button, input, select { font: inherit; }
 .gallery-example .map-status,
 .gallery-example .data-note { line-height: 20px; }
 .gallery-example .details-panel > .data-note { line-height: 18px; }
-.gallery-example .map-stage { border: 0; }
+.gallery-example .map-stage { border: 0; min-height: clamp(400px, 58vh, 640px); }
+.gallery-example .map-stage > canvas { position: absolute; inset: 0; height: 100%; }
 .gallery-example .map-panel > .panel-header { border-bottom: 1px solid var(--border); }
 .gallery-example .map-panel > .panel-footer { border-top: 1px solid var(--border); align-items: center; }
 .gallery-example .workspace,

@@ -12,6 +12,14 @@
 /** Default projected coordinate system shared by database workspaces and map layers. */
 export { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from './defaults';
 
+/** Coordinate conversions shared by data ingestion, map navigation, imagery, and terrain. */
+export {
+    isSupportedCrs, EARTH_RADIUS, WEB_MERCATOR_MAX_LAT, WEB_MERCATOR_EXTENT,
+    clampLatitude, latToMercatorY, mercatorYToLat, lonLatToCrs, crsToLonLat,
+    registerCrs, createCoordinateTransform, reprojectPosition, reprojectBounds, crsScaleAt, crsMetresPerUnit,
+} from './crs';
+export { reprojectFeatureCollection } from './reproject-geojson';
+
 /** Colormap configuration, domain strategies, and color primitives. */
 // ─── Color mapping ───────────────────────────────────────────────────────────
 

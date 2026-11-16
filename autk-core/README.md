@@ -106,6 +106,37 @@ Tests from the repository root: `npm test -- autk-core/test` (CPU only).
 - Triangulators convert GeoJSON and related feature data into render-ready mesh buffers.
 - `@urban-toolkit/autk-core` is a stable shared dependency of the other Autark packages, but it exposes lower-level APIs than the higher-level modules.
 
+## CRS transformations
+
+`autk-core` owns the shared Proj4js registry and horizontal transformation utilities.
+`registerCrs(name, definition)` accepts PROJ or WKT definitions. Transformations can run
+between two projected CRSs as well as to or from longitude/latitude:
+
+```ts
+import { registerCrs, reprojectPosition, reprojectFeatureCollection } from '@urban-toolkit/autk-core';
+
+registerCrs('MY:UTM23S', '+proj=utm +zone=23 +south +datum=WGS84 +units=m +no_defs');
+const position = reprojectPosition([683000, 7460000], 'MY:UTM23S', 'EPSG:3395');
+const projected = reprojectFeatureCollection(collection, 'MY:UTM23S', 'EPSG:3857');
+```
+
+For batches, `createCoordinateTransform(sourceCrs, targetCrs)` constructs a converter once
+and returns a function accepting positions. Geographic coordinates always use
+`[longitude, latitude]`; projected coordinates use `[x, y]`. Z and trailing values are
+preserved, not converted between vertical datums. Collection conversion preserves IDs and
+properties, handles nested geometries, and recomputes declared bounds from transformed
+vertices. Inputs are not mutated; identical CRS names return the original collection.
+Geometry is not densified and raster bands are not resampled.
+
+The shared DB/map workspace default remains `DEFAULT_WORKSPACE_COORDINATE_FORMAT`
+(EPSG:3395). There is no fixed supported-CRS list: both source and target definitions are
+resolved by Proj4js, including geographic-to-projected, projected-to-geographic, and
+projected-to-projected conversions. `isSupportedCrs()` validates through Proj4js rather than
+a whitelist. `lonLatToCrs()` and `crsToLonLat()` also accept registered/custom definitions.
+Unknown definitions, unsupported transformations, and non-finite coordinates throw. Additional EPSG definitions must be registered explicitly. Datum
+transformations requiring external grids need those resources; an EPSG name alone does
+not guarantee high-accuracy conversion. Geocentric inputs require a separate 3D workflow.
+
 ## Resources
 
 - [Documentation](https://autarkjs.org/introduction.html)

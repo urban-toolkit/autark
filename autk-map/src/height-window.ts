@@ -8,24 +8,22 @@
  * whole samples, so a moving camera shifts it by whole samples and heights do
  * not swim.
  *
- * Tiles are EPSG:3857 and the map plane may be EPSG:3395 or EPSG:4326, so each
- * sample is placed by converting its map position to longitude and latitude and
- * then to a pixel of the tile pyramid. Longitude depends only on the column and
- * latitude only on the row, so the conversion is done per column and per row,
- * not per sample.
+ * Tiles are EPSG:3857; each map-plane sample is converted through longitude and
+ * latitude to a tile pixel. General Proj4js workspaces use full two-dimensional
+ * conversion. The separable Mercator paths retain per-column/per-row fast paths.
  */
 
 import { DemSampler } from './dem-sample';
+import { reprojectBounds } from '@urban-toolkit/autk-core';
 import type { ElevationValidationStats, ResolvedElevationValidation } from '@urban-toolkit/autk-core';
+export { crsScaleAt } from '@urban-toolkit/autk-core';
 import type { DemTile } from './dem-decode';
 import type { DemTileLookup } from './dem-sample';
 import type { HeightLevel } from './height-source';
-import { lonLatToTileCoord, tileKey, tileRangeInBounds, tilesInRange, tilesPerAxis } from './tile-index';
+import { lonLatToTileCoord, tileKey, tileRangeInBounds, tileRangeCount, tilesInRange, tilesPerAxis } from './tile-index';
 import type { TileIndex } from './tile-index';
-import { EARTH_RADIUS, WEB_MERCATOR_EXTENT, crsToLonLat, latToMercatorY, lonLatToCrs } from './tile-projection';
+import { WEB_MERCATOR_EXTENT, crsToLonLat } from './tile-projection';
 import type { TileCrs } from './tile-projection';
-
-const DEG = Math.PI / 180;
 
 /** How far the map plane stretches, per 3857 metre, at the map origin. */
 export interface CrsScale {
@@ -35,31 +33,14 @@ export interface CrsScale {
     readonly y: number;
 }
 
-/**
- * Scale between a map coordinate system and EPSG:3857 at the map origin.
- *
- * Used to choose a window's cell size so the grid is square in the map plane.
- * The scale is taken at the origin once, so every window of a clipmap uses the
- * same one and the windows stay nested.
- *
- * @param crs - Coordinate system of the map plane.
- * @param origin - Map origin in `crs` units.
- * @returns The scale, `1` and `1` for EPSG:3857.
- * @throws Never throws.
- * @example
- * const scale = crsScaleAt('EPSG:3395', origin);
- */
-export function crsScaleAt(crs: TileCrs, origin: readonly [number, number]): CrsScale {
-    const delta = 1e-3;
-    const [lon, lat] = crsToLonLat(crs, origin[0], origin[1]);
-    const x0 = lonLatToCrs(crs, lon, lat)[0];
-    const x1 = lonLatToCrs(crs, lon + delta, lat)[0];
-    const y0 = lonLatToCrs(crs, lon, lat)[1];
-    const y1 = lonLatToCrs(crs, lon, lat + delta)[1];
-    return {
-        x: (x1 - x0) / (EARTH_RADIUS * delta * DEG),
-        y: (y1 - y0) / (latToMercatorY(lat + delta) - latToMercatorY(lat)),
-    };
+/** Geographic footprint of a map-plane rectangle, with scalar fast paths where applicable. */
+function windowBounds(crs: TileCrs, minX: number, minY: number, maxX: number, maxY: number): [number, number, number, number] {
+    // Scalar fast paths only; other projections require a two-dimensional footprint.
+    if (crs === 'EPSG:3395' || crs === 'EPSG:3857' || crs === 'EPSG:4326') return [
+        crsToLonLat(crs, minX, 0)[0], crsToLonLat(crs, 0, minY)[1],
+        crsToLonLat(crs, maxX, 0)[0], crsToLonLat(crs, 0, maxY)[1],
+    ];
+    return reprojectBounds([minX, minY, maxX, maxY], crs, 'EPSG:4326');
 }
 
 /** What a window needs to be placed. */
@@ -131,8 +112,8 @@ const REPROJECTION_STRETCH = 1.05;
  * @example
  * const perLevel = maxTilesPerWindow(512, 256); // 16
  */
-export function maxTilesPerWindow(size: number, tileSize: number, padding = 1): number {
-    const perAxis = Math.floor(((size + 2 * padding) * REPROJECTION_STRETCH) / tileSize) + 2;
+export function maxTilesPerWindow(size: number, tileSize: number, padding = 1, stretch = REPROJECTION_STRETCH): number {
+    const perAxis = Math.floor(((size + 2 * padding) * stretch) / tileSize) + 2;
     return perAxis * perAxis;
 }
 
@@ -161,11 +142,13 @@ export function planWindow(params: WindowParams): WindowPlan {
 
     const padding = params.padding ?? 1;
     // Include the interpolation footprint and validation neighbors across tile boundaries.
-    const west = crsToLonLat(crs, (latticeX - padding) * cellSizeX, 0)[0];
-    const east = crsToLonLat(crs, (latticeX + size - 1 + padding) * cellSizeX, 0)[0];
-    const south = crsToLonLat(crs, 0, (latticeY - padding) * cellSizeY)[1];
-    const north = crsToLonLat(crs, 0, (latticeY + size - 1 + padding) * cellSizeY)[1];
+    const [west, south, east, north] = windowBounds(crs, (latticeX - padding) * cellSizeX,
+        (latticeY - padding) * cellSizeY, (latticeX + size - 1 + padding) * cellSizeX, (latticeY + size - 1 + padding) * cellSizeY);
     const range = tileRangeInBounds({ west, south, east, north }, zoom);
+    const generic = crs !== 'EPSG:3395' && crs !== 'EPSG:3857' && crs !== 'EPSG:4326';
+    if (generic && range && tileRangeCount(range) > maxTilesPerWindow(size, tileSize, padding, 2)) {
+        throw new Error('Projection distortion exceeds the terrain tile budget; reduce windowSize or levels for this view.');
+    }
 
     return {
         zoom,
@@ -250,6 +233,7 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
     const minZoom = options.minZoom ?? 0;
     const worldPixels = tilesPerAxis(zoom) * tileSize;
     const halo = options.validation ? 4 : 0;
+    const separable = crs === 'EPSG:3395' || crs === 'EPSG:3857' || crs === 'EPSG:4326';
 
     const data = new Float32Array(size * size);
     const level: HeightLevel = {
@@ -267,10 +251,8 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
     let anyUsable = false;
     const grid = new Map<number, DemTile>();
     const snapshot = new Map<string, DemTile>();
-    const west = crsToLonLat(crs, plan.latticeX * plan.cellSizeX, 0)[0];
-    const east = crsToLonLat(crs, (plan.latticeX + size - 1) * plan.cellSizeX, 0)[0];
-    const south = crsToLonLat(crs, 0, plan.latticeY * plan.cellSizeY)[1];
-    const north = crsToLonLat(crs, 0, (plan.latticeY + size - 1) * plan.cellSizeY)[1];
+    const [west, south, east, north] = windowBounds(crs, plan.latticeX * plan.cellSizeX,
+        plan.latticeY * plan.cellSizeY, (plan.latticeX + size - 1) * plan.cellSizeX, (plan.latticeY + size - 1) * plan.cellSizeY);
     for (let z = zoom; z >= minZoom; z--) {
         const n = tilesPerAxis(z);
         const nw = lonLatToTileCoord(west, north, z), se = lonLatToTileCoord(east, south, z);
@@ -305,7 +287,7 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
     const colTx = new Int32Array(size);
     const colLi = new Int32Array(size);
     const span = worldPixels;
-    for (let i = 0; i < size; i++) {
+    for (let i = 0; separable && i < size; i++) {
         const lon = crsToLonLat(crs, (plan.latticeX + i) * plan.cellSizeX, 0)[0];
         const px = lonLatToTileCoord(lon, 0, zoom).x * tileSize;
         columns[i] = px;
@@ -326,7 +308,7 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
     let fallback = 0;
 
     for (let j = 0; j < size; j++) {
-        const lat = crsToLonLat(crs, 0, (plan.latticeY + j) * plan.cellSizeY)[1];
+        const lat = separable ? crsToLonLat(crs, 0, (plan.latticeY + j) * plan.cellSizeY)[1] : 0;
         const py = lonLatToTileCoord(0, lat, zoom).y * tileSize;
         const v = py - 0.5;
         const j0 = Math.floor(v);
@@ -340,7 +322,7 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
         for (let i = 0; i < size; i++) {
             let height = NaN;
             const tx = colTx[i]!;
-            if (!options.validation && rowFast && tx >= 0) {
+            if (separable && !options.validation && rowFast && tx >= 0) {
                 if (tx !== tileX) {
                     tileX = tx;
                     tile = grid.get(tx * 4194304 + ty);
@@ -357,7 +339,12 @@ export function* composeWindowSteps(plan: WindowPlan, lookup: DemTileLookup, opt
             }
             // Tile edges, missing tiles and nodata take the general path.
             if (height !== height) {
-                height = sampler.sample(zoom, columns[i]!, py, minZoom);
+                if (separable) height = sampler.sample(zoom, columns[i]!, py, minZoom);
+                else {
+                    const [lon, lat] = crsToLonLat(crs, (plan.latticeX + i) * plan.cellSizeX, (plan.latticeY + j) * plan.cellSizeY);
+                    const pixel = lonLatToTileCoord(lon, lat, zoom);
+                    height = sampler.sample(zoom, pixel.x * tileSize, pixel.y * tileSize, minZoom);
+                }
                 if (sampler.usedFallback) fallback++;
             }
             if (height !== height) {

@@ -5,7 +5,7 @@ import type { TerrainMapRenderPath } from '../src/map-terrain';
 import heightLookup from '../src/shaders/height-lookup.wgsl';
 
 /** Native DEM decoding, streamed GPU updates, complete terrain rendering, and picking. */
-async function runTerrainCases(pixelRatio: number) {
+async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
     const assert = (condition: boolean, message: string) => { if (!condition) throw new Error(message); };
     const nativeFetch = window.fetch;
     const checks: string[] = [];
@@ -35,7 +35,7 @@ async function runTerrainCases(pixelRatio: number) {
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:128px;height:128px';
     document.body.append(canvas);
-    const map = new AutkMap(canvas, false);
+    const map = new AutkMap(canvas, false, { crs });
     const owned: Array<{ destroy(): void }> = [];
     const source = { urlTemplate: 'https://dem.test/{z}/{x}/{y}.png', encoding: 'terrarium' as const,
         tileSize: 16, minZoom: 9, maxZoom: 14, attribution: 'Synthetic elevation' };
@@ -168,7 +168,7 @@ async function runTerrainCases(pixelRatio: number) {
         checks.push('existing GeoTIFF terrain and nonzero grid origin through the complete GPU path');
         const error = await device.popErrorScope(); if (error) errors.push(error.message);
         assert(errors.length === 0, errors.join('\n'));
-        return { status: 'passed', checks: checks.map(check => `DPR ${pixelRatio}: ${check}`) };
+        return { status: 'passed', checks: checks.map(check => `${crs}, DPR ${pixelRatio}: ${check}`) };
     } finally {
         map.destroy(); owned.forEach(resource => resource.destroy()); canvas.remove(); window.fetch = nativeFetch;
     }
@@ -177,5 +177,6 @@ async function runTerrainCases(pixelRatio: number) {
 export async function runWebGpuCases() {
     const checks: string[] = [];
     for (const pixelRatio of [1, 2]) checks.push(...(await runTerrainCases(pixelRatio)).checks);
+    checks.push(...(await runTerrainCases(1, 'EPSG:32631')).checks);
     return { status: 'passed', checks };
 }

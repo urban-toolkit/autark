@@ -41,6 +41,9 @@ import {
     TriangulatorRaster,
     heightfieldFromRaster,
     computeOrigin,
+    reprojectFeatureCollection,
+    crsMetresPerUnit,
+    crsScaleAt,
     resolveElevationValidation,
     validateElevationGrid,
     valueAtPath,
@@ -61,6 +64,7 @@ import {
 
 import {
     LoadCollectionParams,
+    SetViewParams,
     LoadMeshParams,
     MapBounds,
     MapDrawOptions,
@@ -173,7 +177,7 @@ export class AutkMap {
     private _terrainValidation: ElevationValidationStats | null = null;
     /** Shared workspace CRS for normalized data, imagery, and terrain. */
     private _workspaceCrs: TileCrs = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
-    /** Locked by explicit map configuration or the first successful geographic load. */
+    /** Locked by explicit map configuration, setView(), or the first successfully loaded collection/source. */
     private _workspaceCrsEstablished = false;
     /** Shared picking coordinator used by both render paths. */
     private _picking!: MapPickingController;
@@ -216,6 +220,25 @@ export class AutkMap {
 
     /** Coordinate system shared by normalized data, imagery, and terrain. */
     get workspaceCrs(): TileCrs { return this._workspaceCrs; }
+
+    /**
+     * Sets a geographic center and zoom without loading data or changing an existing origin.
+     * On an empty map the projected center establishes the shared origin and locks the workspace CRS.
+     * @throws If the center, zoom, or viewport is invalid.
+     */
+    setView({ center, zoom = 12 }: SetViewParams): void {
+        const view = initialTileView(center, zoom, this._workspaceCrs,
+            this.canvas.clientHeight, this._camera.getFovyRadians(), 256);
+        if (!this._layerManager.hasOrigin) {
+            const [x, y] = view.point;
+            this._layerManager.initializeOrigin({ type: 'FeatureCollection', features: [], bbox: [x, y, x, y] });
+        }
+        const origin = this._layerManager.origin;
+        const target = [view.point[0] - origin[0], view.point[1] - origin[1], 0];
+        this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
+        this._workspaceCrsEstablished = true;
+        this.requestRender();
+    }
 
     /** Reject a layer that would interpret the established workspace in a different CRS. */
     private resolveWorkspaceCrs(crs?: TileCrs): TileCrs {
@@ -319,15 +342,21 @@ export class AutkMap {
      * @param params.type Optional layer type override.
      * @param params.loadConfig Optional geometry-building configuration applied while loading.
      * @param params.property Optional value extractor applied immediately as the initial thematic mapping.
-     * @throws Never throws. Errors are logged to the console.
+     * @param params.sourceCrs Input vector CRS; omitted means coordinates already use the workspace CRS.
+     * @throws If reprojection is unsupported or coordinates are invalid. Other loading errors are logged.
      */
-    loadCollection(id: string, { collection, type = null, property, loadConfig }: LoadCollectionParams): void {
+    loadCollection(id: string, { collection, sourceCrs, type = null, property, loadConfig }: LoadCollectionParams): void {
+        const sType = type ?? this.inferCollectionLayerType(collection, id);
+        if (!sType) { return; }
+        if (sourceCrs !== undefined) {
+            if (sType === 'raster' && sourceCrs !== this._workspaceCrs) {
+                throw new Error('Raster collections must already use the workspace CRS; reproject rasters with AutkDb.');
+            }
+            collection = reprojectFeatureCollection(collection, sourceCrs, this._workspaceCrs);
+        }
         if (!this.layerManager.hasOrigin) {
             this.layerManager.initializeOrigin(collection);
         }
-
-        let sType = type ?? this.inferCollectionLayerType(collection, id);
-        if (!sType) { return; }
 
         switch (sType) {
             case 'surface':
@@ -378,6 +407,7 @@ export class AutkMap {
                 break;
         }
 
+        this._workspaceCrsEstablished = true;
         this._ui.refreshLayerList();
     }
 
@@ -1072,7 +1102,8 @@ export class AutkMap {
     loadTerrain({ source, crs, center, zoom, validation, levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, overlaySize }: LoadTerrainParams): void {
         const qualityOptions = resolveElevationValidation(validation);
         const workspaceCrs = this.resolveWorkspaceCrs(crs);
-        if (workspaceCrs === 'EPSG:4326') throw new Error('Terrain requires a metre-based workspace CRS.');
+        const metresPerUnit = crsMetresPerUnit(workspaceCrs);
+        if (!(metresPerUnit && metresPerUnit > 0)) throw new Error('Terrain requires projected linear units (a metre-based or other linear workspace CRS).');
         if (zoom !== undefined && center === undefined) throw new Error('Terrain zoom requires a geographic center.');
         if (!source || typeof source !== 'object') throw new Error('Terrain requires an elevation source.');
         if (verticalScale !== undefined && (!Number.isFinite(verticalScale) || verticalScale <= 0)) {
@@ -1110,8 +1141,10 @@ export class AutkMap {
         });
         let qualityStats = null;
         if (!(heights instanceof TileHeightSource) && qualityOptions) {
+            const scale = crsScaleAt(workspaceCrs, [origin[0], origin[1]]);
             const result = validateElevationGrid(heights.data, heights.width, heights.height,
-                Math.max(heights.cellSizeX, heights.cellSizeY) * Math.cos(crsToLonLat(workspaceCrs, origin[0], origin[1])[1] * Math.PI / 180), qualityOptions);
+                Math.max(heights.cellSizeX / scale.x, heights.cellSizeY / scale.y)
+                    * Math.cos(crsToLonLat(workspaceCrs, origin[0], origin[1])[1] * Math.PI / 180), qualityOptions);
             qualityStats = result.stats;
             heights.data = result.values;
             let min = Infinity, max = -Infinity;
@@ -1121,10 +1154,11 @@ export class AutkMap {
             }
             heights.minHeight = min; heights.maxHeight = max;
         }
-        if (!(heights instanceof TileHeightSource) && verticalScale !== undefined && verticalScale !== 1) {
-            heights.data = Float32Array.from(heights.data, height => height * verticalScale);
-            heights.minHeight *= verticalScale;
-            heights.maxHeight *= verticalScale;
+        const rasterScale = (verticalScale ?? 1) / metresPerUnit;
+        if (!(heights instanceof TileHeightSource) && rasterScale !== 1) {
+            heights.data = Float32Array.from(heights.data, height => height * rasterScale);
+            heights.minHeight *= rasterScale;
+            heights.maxHeight *= rasterScale;
         }
         let path: TerrainMapRenderPath;
         try {

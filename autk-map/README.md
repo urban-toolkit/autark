@@ -56,6 +56,58 @@ map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
 map.draw();
 ```
 
+### Workspace CRS, input CRS, and view
+
+The map and `AutkDb` share the default workspace CRS, **EPSG:3395**. Existing collections
+are assumed to already use that projected CRS; coordinates are never guessed. To choose
+a different workspace CRS, use `new AutkMap(canvas, true, { crs: 'EPSG:32618' })`.
+Any horizontal CRS understood by Proj4js can be used: register additional definitions before
+creating the map. There is no fixed CRS whitelist. Terrain needs projected linear coordinates
+rather than angular degrees; elevation meters are converted to the workspace's linear units.
+
+`setView()` positions the camera independently of loading data. Its center is always WGS84,
+with named latitude/longitude fields, and zoom uses a 256-pixel Web Mercator reference tile.
+On an empty map it establishes the projected origin. Subsequent calls preserve that origin.
+Alternatively, load finite datasets and call `fitBounds()` before `draw()`.
+
+```ts
+map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
+map.loadCollection('neighborhoods', {
+  collection: geographicGeojson,
+  sourceCrs: 'EPSG:4326', // GeoJSON order: [longitude, latitude]
+});
+map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
+map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
+map.draw();
+```
+
+Optional `sourceCrs` accepts a name known to Proj4js, a PROJ string, or WKT. Reprojection
+happens in `autk-core` before origin selection and triangulation, without modifying the
+input. Geometry, properties, IDs, and Z values are preserved; declared bounds are recomputed.
+For additional named input projections, register their definitions once:
+
+```ts
+import { registerCrs } from '@urban-toolkit/autk-core';
+
+registerCrs('MY:UTM23S', '+proj=utm +zone=23 +south +datum=WGS84 +units=m +no_defs');
+map.loadCollection('roads', { collection: utmRoads, sourceCrs: 'MY:UTM23S', type: 'roads' });
+```
+
+Input and target CRSs can both be projected. Not every EPSG definition is bundled; unknown
+CRSs and invalid transformations throw before changing the map. This is horizontal vector
+reprojection, not vertical-datum conversion, geometry densification, or raster resampling.
+Normalized raster collections and prebuilt local-space meshes must already use the workspace
+coordinate system. Use `AutkDb` to prepare raster inputs.
+
+The first collection, `setView()`, imagery, or terrain establishes the workspace context;
+subsequent layers cannot reinterpret it in another CRS. **Migration:** `center`/`zoom` in
+`loadTiles()` and `loadTerrain()` remain supported, but are deprecated in favor of `setView()`.
+Applications that previously selected a different workspace CRS through the first imagery
+load after loading vectors should configure the CRS in the map constructor instead.
+
+Gallery: `gallery/src/autk-map/standalone-geographic-geojson-vis.html` loads the existing
+longitude/latitude Manhattan neighborhood dataset without `AutkDb` or manual reprojection.
+
 ### On-demand rendering
 
 `map.draw()` now renders once and then only when something changes. Camera navigation and
@@ -162,7 +214,7 @@ map.loadTiles('imagery', {
 
 * **Sources.** Presets are `esriWorldImagery`, `openStreetMap`, `osmLight`, and `osmDark`. The OSM themes use the standard OSM raster endpoint and apply muted colors on the client. `osmLight` has a pale background and `osmDark` reverses luminance onto a dark background. Roads and labels baked into the images remain; this does not add vector tile styling. Custom raster sources can also set `theme: 'light' | 'dark' | 'original'`. Colors are processed once when a tile is loaded and cached with the texture; overlays and other render pipelines are unchanged. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown beside the Autark link at the bottom left of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
 * **Provider terms.** Presets are conveniences, not licences. OpenStreetMap's public servers forbid heavy use and bulk downloading; use your own server or a commercial provider in production. Esri imagery needs its attribution to stay visible.
-* **Coordinate system.** `crs` is the system of your data: `'EPSG:3395'` (the default, as in `AutkDb` workspaces), `'EPSG:3857'` or `'EPSG:4326'`. Tiles are Web Mercator and are reprojected on the CPU; unsupported CRS values are rejected before creating a layer.
+* **Coordinate system.** `crs` is the workspace coordinate system, defaulting to `'EPSG:3395'` as in `AutkDb`. Any horizontal CRS understood by Proj4js can be supplied as a name, PROJ string, or WKT definition. Tiles remain Web Mercator and are reprojected into a two-dimensional CPU mesh. Unknown definitions are rejected before creating a layer; choose a projection and view within their valid geographic domain.
 * **Order and origin.** Tile layers sit under every other layer, so a `surface` layer would cover them. An explicit geographic `center` initializes tile-only maps; otherwise the first data layer establishes the origin. `zoom` requires a center and defaults to 12. Centers are WGS84 coordinates regardless of the output CRS.
 * **Loading.** At most 8 requests run at once; tiles that leave the view are cancelled, the soft cache limit is 256 tiles (`maxCachedTiles`), and the browser HTTP cache applies as usual. While a tile loads, the nearest loaded ancestor is drawn in its place. Tiles that fail for a transient reason are retried by the layer itself after a delay that doubles with each failure, up to a minute, for as long as they are in view; a definitive error such as 404 is not retried.
 * **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps selected tiles; ancestor preloads add requests: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
@@ -300,7 +352,7 @@ The raster is already in the workspace CRS and can initialize an empty map from 
 
 The shared workspace CRS defaults to the same EPSG:3395 constant as AutkDb. For normalized data from a custom workspace, construct the map with `new AutkMap(canvas, true, { crs: 'EPSG:3857' })`. The existing `crs` parameter on the first imagery or terrain load can also declare a custom workspace CRS when the constructor did not specify one. Imagery and elevation then inherit this CRS and the same origin; subsequent conflicting settings are rejected. GeoJSON does not reliably carry workspace CRS metadata, so a custom database CRS must be declared on the map. Explicit center/zoom repositions the camera without changing an existing origin. Terrain zoom uses a 256-pixel Web Mercator reference independent of DEM tile resolution.
 
-Elevation supports Terrarium and Mapbox terrain-RGB encodings in EPSG:3395 or EPSG:3857 workspaces. Imagery and ordered 2D layers render into the terrain overlay; buildings and picking sample the same height source. Flat maps retain their existing high-DPI tile selection, while terrain selection uses the actual overlay viewport.
+Elevation supports Terrarium and Mapbox terrain-RGB encodings in projected Proj4js workspaces with linear units. General projections use two-dimensional terrain sampling; Mercator retains its scalar fast paths. Geographic/angular workspaces cannot display terrain. Terrain clipmaps sample the local projection footprint and retain bounded request budgets; views with excessive projection distortion require smaller windows or fewer levels. Imagery and ordered 2D layers render into the terrain overlay; buildings and picking sample the same height source. Flat maps retain their existing high-DPI tile selection, while terrain selection uses the actual overlay viewport.
 
 Elevation validation is enabled by default for every region, independently of imagery. It uses physical sample spacing, robust local variation, coherent-feature checks, and validated coarser references before replacing isolated spikes or pits. Negative elevations are retained. Unconfirmed features are not automatically flattened. Tile boundaries share neighboring samples; raster terrain uses the same spatial rules with conservative local repair.
 

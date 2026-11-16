@@ -80,7 +80,8 @@ describe('Mercator helpers', () => {
     expect(isTileCrs('EPSG:3395')).toBe(true);
     expect(isTileCrs('EPSG:3857')).toBe(true);
     expect(isTileCrs('EPSG:4326')).toBe(true);
-    expect(isTileCrs('EPSG:32631')).toBe(false);
+    expect(isTileCrs('EPSG:32631')).toBe(true);
+    expect(isTileCrs('EPSG:NOT_REGISTERED')).toBe(false);
     expect(isTileCrs(undefined)).toBe(false);
   });
 });

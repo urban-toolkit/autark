@@ -124,6 +124,25 @@ describe('fetchDemTile', () => {
   });
 });
 
+describe('terrain in a nonseparable projected workspace', () => {
+  it('samples both coordinates per vertex when composing a UTM height window', () => {
+    const crs = 'EPSG:32723';
+    const origin = originFor(crs);
+    const plan = planWindow({ crs, origin, scale: crsScaleAt(crs, origin), zoom: 12,
+      tileSize: SIZE, size: 32, centre: [0, 0] });
+    const tiles = new Set(plan.tiles.map(tile => tileKey('', tile)));
+    const { lookup } = demLookup(tile => tiles.has(tileKey('', tile)));
+    const window = composeWindow(plan, lookup, { minZoom: plan.zoom });
+    expect(window.missing).toBe(0);
+    for (const row of [0, 15, 31]) for (const column of [0, 15, 31]) {
+      const [lon, lat] = crsToLonLat(crs, origin[0] + window.level.originX + column * window.level.cellSizeX,
+        origin[1] + window.level.originY + row * window.level.cellSizeY);
+      const [x, y] = lonLatToCrs('EPSG:3857', lon, lat);
+      expect(window.level.data[row * 32 + column]).toBeCloseTo(plane(x, y), 3);
+    }
+  });
+});
+
 describe('DemSampler', () => {
   it('reproduces a linear surface exactly inside a tile and across a tile edge', () => {
     const { lookup } = demLookup();

@@ -13,7 +13,7 @@
  * position snaps to a new sample or a tile they read arrives.
  */
 
-import { resolveElevationValidation } from '@urban-toolkit/autk-core';
+import { resolveElevationValidation, crsMetresPerUnit } from '@urban-toolkit/autk-core';
 import type { ElevationValidationOptions, ElevationValidationStats, ResolvedElevationValidation } from '@urban-toolkit/autk-core';
 import { fetchDemTile } from './dem-load';
 import type { DemTile } from './dem-decode';
@@ -213,9 +213,9 @@ export class TileHeightSource implements StreamingHeightSource {
         if (!Number.isSafeInteger(windowSize) || windowSize < 4 || windowSize > MAX_WINDOW_SIZE || windowSize % 2 !== 0) {
             throw new Error(`Terrain window size must be an even integer from 4 to ${MAX_WINDOW_SIZE}, got ${windowSize}.`);
         }
-        if (options.crs !== 'EPSG:3395' && options.crs !== 'EPSG:3857') {
-            // Heights are metres and `verticalScale` assumes a horizontal plane in metres; degrees would make a distorted scene.
-            throw new Error(`Terrain tiles need a metre-based coordinate system ('EPSG:3395' or 'EPSG:3857'); received '${options.crs}'.`);
+        const metresPerUnit = crsMetresPerUnit(options.crs);
+        if (!(metresPerUnit && metresPerUnit > 0)) {
+            throw new Error(`Terrain tiles need projected linear units (a metre-based or other linear CRS); received '${options.crs}'.`);
         }
         if (options.levels !== undefined && (!Number.isSafeInteger(options.levels) || options.levels < 1 || options.levels > MAX_HEIGHT_LEVELS)) {
             throw new Error(`Terrain levels must be an integer from 1 to ${MAX_HEIGHT_LEVELS}.`);
@@ -232,7 +232,7 @@ export class TileHeightSource implements StreamingHeightSource {
         }
         if (![...options.origin, ...options.centre].every(Number.isFinite)) throw new Error('Terrain origin and centre must be finite.');
         this.windowSize = windowSize;
-        this.verticalScale = Number.isFinite(options.verticalScale) ? (options.verticalScale as number) : 1;
+        this.verticalScale = (options.verticalScale ?? 1) / metresPerUnit;
         this.minZoom = source.minZoom;
 
         const bias = Number.isFinite(options.zoomBias) ? Math.round(options.zoomBias as number) : 0;
@@ -256,7 +256,9 @@ export class TileHeightSource implements StreamingHeightSource {
 
         // Tiles the windows can need at once are protected from eviction, so the cache must hold them all:
         // this is what makes the memory bound hold. Decoded tiles then take at most `cacheLimit * tileSize² * 4` bytes.
-        this.tileBound = count * maxTilesPerWindow(windowSize, source.tileSize, this.validation ? 6 : 1) * (this.validation ? 2 : 1);
+        const genericProjection = options.crs !== 'EPSG:3395' && options.crs !== 'EPSG:3857';
+        this.tileBound = count * maxTilesPerWindow(windowSize, source.tileSize, this.validation ? 6 : 1,
+            genericProjection ? 2 : undefined) * (this.validation ? 2 : 1);
         if (!Number.isSafeInteger(this.tileBound) || this.tileBound > 4096) {
             throw new Error('Terrain windows would request too many tiles; reduce levels/windowSize or increase the source tile size.');
         }
