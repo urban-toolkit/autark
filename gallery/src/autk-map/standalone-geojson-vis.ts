@@ -16,7 +16,7 @@ async function main(): Promise<void> {
     const { file, layer, label, type, tune } = datasets[geometry]!;
     document.querySelector('#map-title')!.textContent = label;
 
-    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!, { showUi: false });
     onExampleDispose(() => map.destroy());
     await map.init();
     const response = await fetch(`${BASE_URL}data/${file}`);

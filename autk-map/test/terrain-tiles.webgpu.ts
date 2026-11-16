@@ -35,7 +35,7 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:128px;height:128px';
     document.body.append(canvas);
-    const map = new AutkMap(canvas, false, { crs });
+    const map = new AutkMap(canvas, { showUi: false, crs });
     const owned: Array<{ destroy(): void }> = [];
     const source = { urlTemplate: 'https://dem.test/{z}/{x}/{y}.png', encoding: 'terrarium' as const,
         tileSize: 16, minZoom: 9, maxZoom: 14, attribution: 'Synthetic elevation' };

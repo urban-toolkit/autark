@@ -313,3 +313,10 @@ button, input, select { font: inherit; }
 .hljs-title, .hljs-title.function_, .hljs-title.class_ { color: #0a6fb8; }
 .hljs-attr, .hljs-property { color: #3c3c43; }
 .hljs-type, .hljs-type.class_ { color: #0ea5e9; }
+
+/* Compact in-panel choice groups (used where a details panel owns the control). */
+.gallery-example .choice-group { margin: 0 0 20px; padding: 0; border: 0; }
+.gallery-example .choice-group legend { padding: 0; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .03em; }
+.gallery-example .choice-group > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.gallery-example .choice-group button { min-height: 34px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--accent); font-size: 12px; font-weight: 600; }
+.gallery-example .choice-group button[aria-pressed="true"] { border-color: var(--accent); background: #3451b210; color: var(--accent); }

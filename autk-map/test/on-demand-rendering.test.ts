@@ -195,7 +195,7 @@ function flushPromises(): Promise<void> {
 /** An initialized map with a polygon layer and a raster layer, not yet drawing. */
 async function createMap(): Promise<{ map: AutkMap; canvas: FakeCanvas }> {
     const canvas = new FakeCanvas();
-    const map = new AutkMap(canvas as unknown as HTMLCanvasElement, false);
+    const map = new AutkMap(canvas as unknown as HTMLCanvasElement, { showUi: false });
     await map.init();
     map.loadCollection('parks', { collection: square, type: 'polygons' });
     map.loadCollection('heat', { collection: raster([1, 2, 3, 4]), type: 'raster', property: 'band' });
@@ -591,7 +591,7 @@ describe('continuous rendering and teardown', () => {
             observe = observe;
             disconnect = disconnect;
         });
-        const map = new AutkMap(canvas as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(canvas as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         map.ui.buildBranding();
 
@@ -742,7 +742,7 @@ describe('terrain tiles', () => {
     }
 
     it('needs the map origin, which the first data layer defines', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         expect(() => map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium })).toThrow(/origin/);
     });
@@ -841,7 +841,7 @@ describe('unified terrain loading', () => {
     });
 
     it('initializes terrain without imagery and later reuses its context for imagery', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         expect(() => map.loadTerrain({ source })).toThrow(/origin|center/);
         map.loadTerrain({ source, center, zoom: 14, windowSize: 16 });
@@ -855,7 +855,7 @@ describe('unified terrain loading', () => {
     });
 
     it('inherits a custom workspace CRS and rejects a conflicting layer', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs: 'EPSG:3857' });
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs: 'EPSG:3857' });
         await map.init();
         map.loadCollection('parks', { collection: square, type: 'parks' });
         map.loadTerrain({ source, windowSize: 16 });
@@ -884,7 +884,7 @@ describe('unified terrain loading', () => {
     });
 
     it.each(['EPSG:3395', 'EPSG:3857'] as const)('sets a geographic view before data in %s and preserves its origin', async crs => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs });
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs });
         await map.init();
         map.setView({ center, zoom: 14 });
         const origin = [...map.layerManager.origin];
@@ -908,7 +908,7 @@ describe('unified terrain loading', () => {
 
     it('uses a UTM workspace for setView, mixed-CRS collections, imagery, and terrain', async () => {
         vi.spyOn(SpriteLayer.prototype, 'createPipeline').mockImplementation(() => {});
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs: 'EPSG:32618' });
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs: 'EPSG:32618' });
         await map.init();
         const center = { latitude: 40.7, longitude: -74 };
         map.setView({ center, zoom: 14 });
@@ -942,7 +942,7 @@ describe('unified terrain loading', () => {
     });
 
     it('rejects invalid views before establishing an origin or moving the camera', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         const eye = [...map.camera.getEye()];
         expect(() => map.setView({ center, zoom: NaN })).toThrow(/zoom/);
@@ -954,7 +954,7 @@ describe('unified terrain loading', () => {
 
     it('reprojects vector coordinates before establishing the origin without modifying the input', async () => {
         vi.spyOn(SpriteLayer.prototype, 'createPipeline').mockImplementation(() => {});
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         const collection: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature',
             properties: { value: 5 }, geometry: { type: 'Point', coordinates: [-74, 40.7, 15] } }] };
@@ -980,7 +980,7 @@ describe('unified terrain loading', () => {
     });
 
     it('rejects unsupported source CRSs and raster reprojection before mutating map state', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         expect(() => map.loadCollection('wrong', { collection: square, sourceCrs: 'EPSG:NOT_REGISTERED' })).toThrow(/Unsupported CRS/);
         expect(() => map.loadCollection('raster', { collection: raster([1, 2, 3, 4]), type: 'raster',
@@ -1011,7 +1011,7 @@ describe('unified terrain loading', () => {
     });
 
     it('loads raster terrain through the same lifecycle and preserves active terrain on invalid input', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         expect(() => map.loadTerrain({ source, center, zoom: NaN })).toThrow(/zoom/);
         expect(map.layerManager.hasOrigin).toBe(false);
@@ -1171,7 +1171,7 @@ describe('tile-only geographic views', () => {
     const center = { latitude: 0, longitude: 0 };
 
     it('creates a standalone tile map and preserves its origin when adding overlays and another centered view', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
         map.loadTiles('imagery', { source, center, zoom: 12 });
@@ -1189,7 +1189,7 @@ describe('tile-only geographic views', () => {
     });
 
     it('does not initialize an origin on invalid geographic views or failed GPU setup', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => { throw new Error('GPU failure'); });
@@ -1205,7 +1205,7 @@ describe('tile-only geographic views', () => {
     });
 
     it('uses zoom 12 when only a center is supplied and adapts clipping to degree-based coordinates', async () => {
-        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false);
+        const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
         map.loadTiles('imagery', { source, center });
@@ -1213,7 +1213,7 @@ describe('tile-only geographic views', () => {
         map.loadTiles('explicit', { source, center, zoom: 12 });
         expect(map.camera.getEye()[2]).toBe(defaultDistance);
         map.destroy();
-        const degrees = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, false, { crs: 'EPSG:4326' });
+        const degrees = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs: 'EPSG:4326' });
         await degrees.init();
         degrees.loadTiles('degrees', { source, center, zoom: 12 });
         expect(degrees.layerManager.searchByLayerId('degrees')).toBeInstanceOf(TileLayer);

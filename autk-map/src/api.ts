@@ -33,10 +33,12 @@ import type {
 
 import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
 
-/** Coordinate system of normalized data supplied to the map. */
+/** Construction options for a map instance. */
 export interface MapOptions {
     /** Workspace CRS understood by Proj4js; defaults to the same EPSG:3395 CRS as AutkDb. */
     crs?: TileCrs;
+    /** Whether floating UI controls are drawn. Defaults to `true`; the credit strip always remains. */
+    showUi?: boolean;
 }
 
 /** Geographic navigation independent of imagery, vectors, and elevation sources. */

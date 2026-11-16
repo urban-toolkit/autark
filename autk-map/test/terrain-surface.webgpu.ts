@@ -6,7 +6,7 @@ import type { Triangles2DLayer } from '../src/layer-triangles2D';
 export async function runWebGpuCases() {
     const assert = (value: boolean, message: string) => { if (!value) throw new Error(message); };
     const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:128px;height:128px'; document.body.append(canvas);
-    const map = new AutkMap(canvas, false);
+    const map = new AutkMap(canvas, { showUi: false });
     let pixels: GPUBuffer | undefined;
     let restoreCreateBuffer: (() => void) | undefined;
     const nativeFetch = window.fetch;

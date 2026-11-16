@@ -79,7 +79,7 @@ form.addEventListener('submit', async event => {
         const bounds = await db.getBoundingBoxFromLayer('table_osm_surface');
         map?.destroy();
         ready = false;
-        map = new AutkMap(canvas, false);
+        map = new AutkMap(canvas, { showUi: false });
         map.style.setPredefinedStyle('poster');
         await map.init();
         for (const { metadata, collection } of layers) {

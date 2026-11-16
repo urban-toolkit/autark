@@ -186,16 +186,21 @@ export class AutkMap {
      * Creates an AutkMap instance bound to a canvas element.
      *
      * @param canvas Canvas element used as the WebGPU drawing surface.
-     * @param showUi Whether floating UI elements should be shown. Defaults to `true`.
-     * @param options Workspace CRS of normalized data, imagery, and terrain.
+     * @param options Workspace CRS and whether floating UI elements are shown.
      * @throws If the workspace CRS is unsupported.
+     * @example
+     * new AutkMap(canvas, { crs: 'EPSG:3857', showUi: false });
      */
-    constructor(canvas: HTMLCanvasElement, showUi: boolean = true, options: MapOptions = {}) {
+    constructor(canvas: HTMLCanvasElement, options?: MapOptions);
+    /** @deprecated Pass `showUi` inside the options object. */
+    constructor(canvas: HTMLCanvasElement, showUi: boolean, options?: MapOptions);
+    constructor(canvas: HTMLCanvasElement, optionsOrShowUi: MapOptions | boolean = {}, legacyOptions: MapOptions = {}) {
+        const options = typeof optionsOrShowUi === 'boolean' ? legacyOptions : optionsOrShowUi;
         if (options.crs !== undefined && !isTileCrs(options.crs)) throw new Error("Unsupported workspace CRS.");
         this._workspaceCrs = options.crs ?? DEFAULT_WORKSPACE_COORDINATE_FORMAT;
         this._workspaceCrsEstablished = options.crs !== undefined;
         this._canvas = canvas;
-        this._showUi = showUi;
+        this._showUi = typeof optionsOrShowUi === 'boolean' ? optionsOrShowUi : options.showUi ?? true;
         this._style = new MapStyle();
         this._style.setChangeListener(() => {
             for (const layer of this._layerManager.layers) {

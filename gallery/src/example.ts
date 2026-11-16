@@ -83,6 +83,21 @@ if (example) {
     main.insertBefore(learning, main.querySelector('.page-footer'));
 }
 
+/** Variant selects and in-panel choice buttons share the loading lock. */
+function setExampleControlsDisabled(disabled: boolean): void {
+    document.querySelectorAll<HTMLButtonElement | HTMLSelectElement>('select[data-variant-parameter], fieldset.choice-group button')
+        .forEach(control => { control.disabled = disabled; });
+}
+
+/** Rebuilds the example in place after a control changes its input. */
+function rerunExample(): void {
+    if (!initializer || changingVariant) return;
+    changingVariant = true;
+    for (const cleanup of cleanups) cleanup();
+    cleanups.clear();
+    void runExample(initializer, preserveInitialStatus).finally(() => { changingVariant = false; });
+}
+
 /** A variant control updates the current example, never navigates or reloads the document. */
 export function exampleVariant(label: string, choices: Record<string, string>, parameter = 'variant'): string {
     const value = new URL(location.href).searchParams.get(parameter);
@@ -98,13 +113,42 @@ export function exampleVariant(label: string, choices: Record<string, string>, p
     select.addEventListener('change', () => {
         const url = new URL(location.href); url.searchParams.set(parameter, select.value);
         history.replaceState(null, '', url);
-        if (!initializer || changingVariant) return;
-        changingVariant = true;
-        for (const cleanup of cleanups) cleanup();
-        cleanups.clear();
-        void runExample(initializer, preserveInitialStatus).finally(() => { changingVariant = false; });
+        rerunExample();
     });
     field.append(select); controls.append(field); document.querySelector('.introduction')!.after(controls);
+    return selected;
+}
+
+/** A compact button group, for choices that belong inside a details panel. */
+export function exampleChoices(label: string, choices: Record<string, string>, parameter = 'variant'): string {
+    const value = new URL(location.href).searchParams.get(parameter);
+    const selected = value && Object.prototype.hasOwnProperty.call(choices, value) ? value : Object.keys(choices)[0]!;
+    const existing = document.querySelector<HTMLElement>(`fieldset.choice-group[data-choice-parameter="${parameter}"]`);
+    if (existing) {
+        existing.querySelectorAll<HTMLButtonElement>('button').forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.choice === selected));
+            button.disabled = initializing;
+        });
+        return selected;
+    }
+    const fieldset = document.createElement('fieldset'); fieldset.className = 'choice-group';
+    fieldset.dataset.choiceParameter = parameter;
+    const legend = document.createElement('legend'); legend.textContent = label; fieldset.append(legend);
+    const group = document.createElement('div'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', label);
+    for (const [key, text] of Object.entries(choices)) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.textContent = text; button.dataset.choice = key;
+        button.setAttribute('aria-pressed', String(key === selected));
+        button.addEventListener('click', () => {
+            if (button.getAttribute('aria-pressed') === 'true') return;
+            const url = new URL(location.href); url.searchParams.set(parameter, key);
+            history.replaceState(null, '', url);
+            rerunExample();
+        });
+        group.append(button);
+    }
+    fieldset.append(group);
+    document.querySelector('.details-body')?.prepend(fieldset);
     return selected;
 }
 
@@ -120,7 +164,7 @@ export function setExampleState(state: 'loading' | 'ready' | 'error', message?: 
 export async function runExample(initialize: () => Promise<void>, preserveStatus = false): Promise<void> {
     if (!initializer) { initializer = initialize; preserveInitialStatus = preserveStatus; }
     initializing = true;
-    document.querySelectorAll<HTMLSelectElement>('select[data-variant-parameter]').forEach(control => { control.disabled = true; });
+    setExampleControlsDisabled(true);
     setExampleState('loading', 'Loading map and data…');
     try {
         await initialize();
@@ -131,7 +175,7 @@ export async function runExample(initialize: () => Promise<void>, preserveStatus
         console.error('Unable to initialize the gallery example:', error);
     } finally {
         initializing = false;
-        document.querySelectorAll<HTMLSelectElement>('select[data-variant-parameter]').forEach(control => { control.disabled = false; });
+        setExampleControlsDisabled(false);
         document.dispatchEvent(new Event('example-ready'));
     }
 }

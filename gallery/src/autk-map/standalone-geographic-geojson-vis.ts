@@ -1,28 +1,47 @@
 import { AutkMap } from '@urban-toolkit/autk-map';
-import { registerCrs, reprojectFeatureCollection, reprojectPosition } from '@urban-toolkit/autk-core';
-import { exampleVariant, onExampleDispose, runExample } from '../example';
+import { lonLatToCrs } from '@urban-toolkit/autk-core';
+import { exampleChoices, onExampleDispose, runExample } from '../example';
 
 const BASE_URL = (import.meta as any).env.BASE_URL;
+const CENTER = { latitude: 41.855, longitude: -87.665 };
+
+/** A projected workspace and a geographic one, described in the side panel. */
+const SYSTEMS = {
+    'EPSG:3395': { name: 'World Mercator', code: '3395', projection: 'Mercator', units: 'metres', axes: 'easting, northing' },
+    'EPSG:3857': { name: 'Web Mercator', code: '3857', projection: 'Spherical Mercator', units: 'metres', axes: 'easting, northing' },
+} as const;
+
+function describe(crs: keyof typeof SYSTEMS): void {
+    const system = SYSTEMS[crs];
+    const [x, y] = lonLatToCrs(crs, CENTER.longitude, CENTER.latitude);
+    const text = (id: string, value: string) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    };
+    text('crs-name', system.name);
+    text('crs-code', `EPSG:${system.code}`);
+    text('crs-projection', system.projection);
+    text('crs-units', system.units);
+    text('crs-axes', system.axes);
+    text('crs-center-x', x.toFixed(2));
+    text('crs-center-y', y.toFixed(2));
+}
 
 async function main(): Promise<void> {
-    registerCrs('LOCAL:NY_UTM', '+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs');
-    const sourceCrs = exampleVariant('Input CRS', { 'EPSG:4326': 'Longitude / latitude', 'EPSG:3395': 'World Mercator', 'LOCAL:NY_UTM': 'UTM zone 18N' }, 'source');
-    const crs = exampleVariant('Workspace CRS', { 'EPSG:3395': 'World Mercator', 'EPSG:3857': 'Web Mercator', 'LOCAL:NY_UTM': 'UTM zone 18N', 'EPSG:4326': 'Longitude / latitude' }, 'workspace');
-    const response = await fetch(`${BASE_URL}data/mnt_neighs.geojson`);
-    if (!response.ok) throw new Error(`Could not load neighborhoods: HTTP ${response.status}`);
-    const geographic = await response.json();
-    // Prepare alternative input encodings of the same dataset, without changing its features.
-    const collection = sourceCrs === 'EPSG:4326' ? geographic : reprojectFeatureCollection(geographic, 'EPSG:4326', sourceCrs);
-    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!, true, { crs });
+    // The data is always longitude/latitude; these buttons choose the projected workspace.
+    const crs = exampleChoices('Projected CRS', { 'EPSG:3395': 'EPSG:3395', 'EPSG:3857': 'EPSG:3857' }, 'crs') as keyof typeof SYSTEMS;
+    describe(crs);
+
+    // The collection is always longitude/latitude; only the workspace CRS changes.
+    const response = await fetch(`${BASE_URL}data/chi-community-areas.geojson`);
+    if (!response.ok) throw new Error(`Could not load community areas: HTTP ${response.status}`);
+    const collection = await response.json();
+
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!, { crs, showUi: false });
     onExampleDispose(() => map.destroy());
     await map.init();
-    map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
-    map.loadCollection('neighborhoods', { collection, sourceCrs });
+    map.setView({ center: CENTER, zoom: 11 });
+    map.loadCollection('community-areas', { collection, sourceCrs: 'EPSG:4326' });
     map.draw();
-    const position = reprojectPosition([-73.9712, 40.7831], 'EPSG:4326', sourceCrs);
-    const readout = document.createElement('p'); readout.className = 'example-note';
-    readout.textContent = `Center in input CRS: ${position.map(value => value.toFixed(4)).join(', ')} → workspace: ${reprojectPosition(position, sourceCrs, crs).map(value => value.toFixed(4)).join(', ')}`;
-    document.querySelector('.controls')!.after(readout);
-    onExampleDispose(() => readout.remove());
 }
 void runExample(main);

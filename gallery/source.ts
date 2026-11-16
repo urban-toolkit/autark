@@ -8,7 +8,7 @@ export function exampleSource(id: string, state: Record<string, string>): string
     switch (id) {
         case 'D01': return `import { AutkMap } from '@urban-toolkit/autk-map';
 
-const map = new AutkMap(document.querySelector('canvas')!);
+const map = new AutkMap(document.querySelector('canvas')!, { showUi: false });
 await map.init();
 
 const layer = '${variant === 'lines' ? 'neighborhood-boundaries' : variant === 'points' ? 'neighborhood-centers' : 'neighborhoods'}';
@@ -19,17 +19,14 @@ map.loadCollection(layer, { collection${variant === 'lines' ? ", type: 'polyline
 ${variant === 'lines' ? "map.updateRenderInfo(layer, { polylinesWidth: 120 });\n" : variant === 'points' ? "map.updateRenderInfo(layer, { pointSize: 160 });\n" : ''}map.fitBounds();
 map.draw();`;
         case 'D02': return `import { AutkMap } from '@urban-toolkit/autk-map';
-import { registerCrs } from '@urban-toolkit/autk-core';
 
-registerCrs('LOCAL:NY_UTM', '+proj=utm +zone=18 +datum=WGS84 +units=m +no_defs');
-
-const map = new AutkMap(document.querySelector('canvas')!, true, { crs: '${state.workspace || 'EPSG:3395'}' });
+const map = new AutkMap(document.querySelector('canvas')!, { crs: '${state.crs || 'EPSG:3395'}', showUi: false });
 await map.init();
-map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
+map.setView({ center: { latitude: 41.855, longitude: -87.665 }, zoom: 11 });
 
-const response = await fetch('/data/mnt_neighs.geojson');
-const collection = await response.json();
-map.loadCollection('neighborhoods', { collection, sourceCrs: '${state.source || 'EPSG:4326'}' });
+// The source collection is longitude/latitude; the map projects it into the workspace CRS.
+const collection = await fetch('/data/chi-community-areas.geojson').then(response => response.json());
+map.loadCollection('community-areas', { collection, sourceCrs: 'EPSG:4326' });
 map.draw();`;
         case 'D03': return `${DB_MAP}
 ${variant === 'memory'

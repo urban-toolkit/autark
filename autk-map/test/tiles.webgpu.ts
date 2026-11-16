@@ -42,7 +42,7 @@ export async function runWebGpuCases() {
         const canvas = document.createElement('canvas');
         canvas.style.cssText = 'width:128px;height:128px';
         document.body.append(canvas);
-        const map = new AutkMap(canvas, false);
+        const map = new AutkMap(canvas, { showUi: false });
         const resources: Array<{ destroy(): void }> = [];
         try {
             await map.init();

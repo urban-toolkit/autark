@@ -60,7 +60,7 @@ map.draw();
 
 The map and `AutkDb` share the default workspace CRS, **EPSG:3395**. Existing collections
 are assumed to already use that projected CRS; coordinates are never guessed. To choose
-a different workspace CRS, use `new AutkMap(canvas, true, { crs: 'EPSG:32618' })`.
+a different workspace CRS, use `new AutkMap(canvas, { crs: 'EPSG:32618' })`.
 Any horizontal CRS understood by Proj4js can be used: register additional definitions before
 creating the map. There is no fixed CRS whitelist. Terrain needs projected linear coordinates
 rather than angular degrees; elevation meters are converted to the workspace's linear units.
@@ -350,7 +350,7 @@ map.loadTerrain({ source: { collection: elevation, property: 'band_1' } });
 
 The raster is already in the workspace CRS and can initialize an empty map from its bounds. Tile source descriptors need no additional `type` argument. `enableTerrainMode()`, `enableTerrainTiles()`, and `disableTerrainMode()` remain compatibility wrappers.
 
-The shared workspace CRS defaults to the same EPSG:3395 constant as AutkDb. For normalized data from a custom workspace, construct the map with `new AutkMap(canvas, true, { crs: 'EPSG:3857' })`. The existing `crs` parameter on the first imagery or terrain load can also declare a custom workspace CRS when the constructor did not specify one. Imagery and elevation then inherit this CRS and the same origin; subsequent conflicting settings are rejected. GeoJSON does not reliably carry workspace CRS metadata, so a custom database CRS must be declared on the map. Explicit center/zoom repositions the camera without changing an existing origin. Terrain zoom uses a 256-pixel Web Mercator reference independent of DEM tile resolution.
+The shared workspace CRS defaults to the same EPSG:3395 constant as AutkDb. For normalized data from a custom workspace, construct the map with `new AutkMap(canvas, { crs: 'EPSG:3857' })`. The existing `crs` parameter on the first imagery or terrain load can also declare a custom workspace CRS when the constructor did not specify one. Imagery and elevation then inherit this CRS and the same origin; subsequent conflicting settings are rejected. GeoJSON does not reliably carry workspace CRS metadata, so a custom database CRS must be declared on the map. Explicit center/zoom repositions the camera without changing an existing origin. Terrain zoom uses a 256-pixel Web Mercator reference independent of DEM tile resolution.
 
 Elevation supports Terrarium and Mapbox terrain-RGB encodings in projected Proj4js workspaces with linear units. General projections use two-dimensional terrain sampling; Mercator retains its scalar fast paths. Geographic/angular workspaces cannot display terrain. Terrain clipmaps sample the local projection footprint and retain bounded request budgets; views with excessive projection distortion require smaller windows or fewer levels. Imagery and ordered 2D layers render into the terrain overlay; buildings and picking sample the same height source. Flat maps retain their existing high-DPI tile selection, while terrain selection uses the actual overlay viewport.
 

@@ -7,9 +7,9 @@ export function exampleCode(id: string, state: Record<string, string>): string {
             const [layer, type, tune] = variant === 'lines' ? ['neighborhood-boundaries', ", type: 'polylines'", "map.updateRenderInfo('neighborhood-boundaries', { polylinesWidth: 120 });\n"]
                 : variant === 'points' ? ['neighborhood-centers', ", type: 'points'", "map.updateRenderInfo('neighborhood-centers', { pointSize: 160 });\n"]
                     : ['neighborhoods', '', ''];
-            return `map.loadCollection('${layer}', { collection${type} });\n${tune}map.fitBounds();\nmap.draw();`;
+            return `new AutkMap(canvas, { showUi: false });\nmap.loadCollection('${layer}', { collection${type} });\n${tune}map.fitBounds();\nmap.draw();`;
         }
-        case 'D02': return `map.loadCollection('neighborhoods', {\n  collection,\n  sourceCrs: '${state.source || 'EPSG:4326'}',\n});`;
+        case 'D02': return `new AutkMap(canvas, { crs: '${state.crs || 'EPSG:3395'}', showUi: false });\nmap.loadCollection('community-areas', { collection, sourceCrs: 'EPSG:4326' });`;
         case 'D03': return `await db.loadGeojson({ ${variant === 'memory' ? 'geojsonObject: collection' : "geojsonFileUrl: '/data/mnt_neighs.geojson'"}, outputTableName: 'neighborhoods' });\nmap.loadCollection('neighborhoods', { collection: await db.getLayer('neighborhoods') });`;
         case 'D04': return `await db.${state.format === 'json' ? 'loadJson' : 'loadCsv'}({\n  ${state.format === 'json' ? 'jsonObject: rows' : "csvFileUrl: '/data/parks.csv'"},\n  outputTableName: 'parks',\n  geometryColumns: ${state.geometry === 'wkt' ? "{ wktColumnName: 'wkt' }" : "{ latColumnName: 'Latitude', longColumnName: 'Longitude' }"},\n});`;
         case 'D05': return `await db.loadOsm({\n  queryArea: ${variant === 'place' ? "{ geocodeArea: 'New York', areas: ['Battery Park City', 'Financial District'] }" : '{ bbox: [-74.019, 40.700, -74.003, 40.714] }'},\n  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },\n});`;
