@@ -58,6 +58,20 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 38px); font-weight: 750; line-height
 .gallery-example canvas { margin: 0; display: block; width: 100%; height: clamp(400px, 58vh, 640px); }
 .panel-footer { display: flex; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; padding: 12px 20px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .page-footer { margin-top: 28px; color: var(--muted); font-size: 12px; text-align: center; }
+.example-modules { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
+.example-module { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+.example-module::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--module-color); }
+.example-learning { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 24px; }
+.example-learning h2 { margin: 0 0 8px; font-size: 16px; }
+.example-learning p, .example-learning li { color: var(--muted); font-size: 13px; line-height: 1.8; }
+.example-learning a { color: var(--accent); }
+.example-learning ul { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 0; list-style: none; }
+.gallery-example .service-notice { margin: 16px 0 0; padding: 12px 16px; border: 1px solid #f3e5bd; background: #fffbeb; color: #854d0e; border-radius: 8px; font-size: 12px; line-height: 1.7; }
+.task-code { margin: 16px 0; padding: 20px; border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; background: var(--surface); font-size: 13px; line-height: 1.8; }
+.example-source { margin: 16px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.example-source summary { cursor: pointer; padding: 14px 16px; color: var(--accent); font-size: 13px; }
+.example-source pre { margin: 0; padding: 16px; overflow: auto; max-height: 480px; background: var(--surface); font-size: 12px; line-height: 1.7; }
+.example-source code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 @media (max-width: 600px) {
     .navigation { min-height: 60px; padding: 0 20px; }
@@ -69,6 +83,8 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 38px); font-weight: 750; line-height
 /* Shared controls and legacy layouts retain their original IDs and event bindings. */
 button, input, select { font: inherit; }
 .gallery-example button, .gallery-example select, .gallery-example input:not([type="range"]):not([type="checkbox"]) { min-height: 40px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--accent); font-size: 13px; }
+.gallery-example select { appearance: none; padding-right: 40px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%233451b2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px; }
+@media (forced-colors: active) { .gallery-example select { appearance: auto; background-image: none; } }
 .gallery-example button { cursor: pointer; }
 .gallery-example button:hover:not(:disabled) { background: var(--surface); }
 .gallery-example button:disabled { opacity: .45; cursor: default; }

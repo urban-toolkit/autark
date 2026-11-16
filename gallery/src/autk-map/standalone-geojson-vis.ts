@@ -1,30 +1,24 @@
-import { runExample } from '../example';
 import { AutkMap } from '@urban-toolkit/autk-map';
+import type { FeatureCollection, MultiPolygon } from 'geojson';
+import { exampleVariant, onExampleDispose, runExample } from '../example';
 
-const URL = (import.meta as any).env.BASE_URL;
+const BASE_URL = (import.meta as any).env.BASE_URL;
 
-export class StandaloneGeojsonVis {
-    protected map!: AutkMap;
-
-    public async run(canvas: HTMLCanvasElement): Promise<void> {
-        this.map = new AutkMap(canvas);
-        await this.map.init();
-
-        const geojson = await fetch(`${URL}data/mnt_neighs_proj.geojson`).then(res => res.json());
-        this.map.loadCollection('neighborhoods', { collection: geojson });
-
-        this.map.draw();
-    }
-}
-
-async function main() {
-    const example = new StandaloneGeojsonVis();
-
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        throw new Error('Canvas element not found');
-    }
-
-    await example.run(canvas);
+async function main(): Promise<void> {
+    const geometry = exampleVariant('Geometry', { polygons: 'Neighborhood polygons', lines: 'Neighborhood boundaries', points: 'National park points' });
+    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
+    onExampleDispose(() => map.destroy());
+    await map.init();
+    const file = geometry === 'points' ? 'mnt_pois_proj.geojson' : 'mnt_neighs_proj.geojson';
+    const response = await fetch(`${BASE_URL}data/${file}`);
+    if (!response.ok) throw new Error(`Could not load data: HTTP ${response.status}`);
+    const collection = await response.json();
+    if (geometry === 'lines') {
+        const polygons = collection as FeatureCollection<MultiPolygon>;
+        map.loadCollection('boundaries', { type: 'polylines', collection: { type: 'FeatureCollection', features: polygons.features.map(feature => ({ ...feature,
+            geometry: { type: 'MultiLineString', coordinates: feature.geometry.coordinates.flat() } })) } });
+    } else map.loadCollection(geometry, { collection });
+    map.fitBounds();
+    map.draw();
 }
 void runExample(main);

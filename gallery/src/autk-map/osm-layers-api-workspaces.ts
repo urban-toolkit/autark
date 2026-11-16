@@ -18,8 +18,8 @@ export class OsmLayersApi {
         this.db = new AutkDb();
         await this.db.init();
 
-        await this.loadWorkspaceOsm(BATTERY_PARK_CITY_WORKSPACE, 'Battery Park City');
-        await this.loadWorkspaceOsm(FINANCIAL_DISTRICT_WORKSPACE, 'Financial District');
+        await this.loadWorkspaceOsm(BATTERY_PARK_CITY_WORKSPACE, [-74.019, 40.707, -74.012, 40.719]);
+        await this.loadWorkspaceOsm(FINANCIAL_DISTRICT_WORKSPACE, [-74.014, 40.700, -74.003, 40.713]);
 
         this.map01 = new AutkMap(canvas01);
         this.map02 = new AutkMap(canvas02);
@@ -30,18 +30,19 @@ export class OsmLayersApi {
         await this.loadWorkspaceLayers(BATTERY_PARK_CITY_WORKSPACE, this.map01);
         await this.loadWorkspaceLayers(FINANCIAL_DISTRICT_WORKSPACE, this.map02);
 
+        this.map01.fitBounds();
+        this.map02.fitBounds();
         this.map01.draw();
         this.map02.draw();
+        window.addEventListener('pagehide', () => { this.map01.destroy(); this.map02.destroy(); }, { once: true });
     }
 
-    protected async loadWorkspaceOsm(workspace: string, areaName: string): Promise<void> {
+    protected async loadWorkspaceOsm(workspace: string, bbox: [number, number, number, number]): Promise<void> {
         await this.db.setWorkspace(workspace);
 
         await this.db.loadOsm({
-            queryArea: {
-                geocodeArea: 'New York',
-                areas: [areaName],
-            },
+            pbfFileUrl: `${(import.meta as any).env.BASE_URL}data/lower_mnt.osm.pbf`,
+            queryArea: { bbox },
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 layers: OSM_LAYERS,

@@ -18,9 +18,9 @@ export class TerrainLayersNiteroi {
             setExampleState('loading', 'Loading local OpenStreetMap data…');
             await this.db.loadOsm({
                 pbfFileUrl: `${BASE_URL}data/niteroi.osm.pbf`,
-                queryArea: { geocodeArea: 'Rio de Janeiro', areas: ['Niterói'] },
+                queryArea: { bbox: [-43.14, -22.97, -43.03, -22.85] },
                 outputTableName: 'table_osm',
-                autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads'] },
+                autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
             });
             setExampleState('loading', 'Loading local elevation…');
             await this.db.loadGeoTiff({
@@ -28,16 +28,11 @@ export class TerrainLayersNiteroi {
                 coordinateFormat: 'EPSG:3395',
                 outputTableName: ELEVATION_LAYER_ID,
             });
-            setExampleState('loading', 'Loading local buildings…');
-            await this.db.loadGeojson({
-                geojsonFileUrl: `${BASE_URL}data/nit_buildings.geojson`,
-                outputTableName: 'lots', layerType: 'buildings',
-            });
             setExampleState('loading', 'Preparing terrain…');
             this.map = new AutkMap(canvas);
             await this.map.init();
             await this.loadLayers();
-            this.map.fitBounds();
+            this.map.setView({ center: { latitude: -22.9, longitude: -43.1 }, zoom: 13 });
             const elevation = await this.db.getRaster(ELEVATION_LAYER_ID);
             this.map.loadTerrain({ source: { collection: elevation, property: 'band_1' } });
             this.map.ui.setAttribution([

@@ -22,7 +22,6 @@ export class OsmLayersPbfBasemap extends OsmLayersApi {
 
     protected override async loadLayers(): Promise<void> {
         await super.loadLayers();
-        this.map.fitBounds();
         if (this.options.imagery) {
             this.map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });
             // Keep the loaded surface available in the layer menu while revealing the imagery below it.

@@ -16,10 +16,7 @@ export class Heatmap {
 
         await this.db.loadOsm({
             pbfFileUrl: `${URL}data/lower_mnt.osm.pbf`,
-            queryArea: {
-                geocodeArea: 'New York',
-                areas: ['Battery Park City', 'Financial District'],
-            },
+            queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 layers: ['surface', 'parks', 'water', 'roads'] as Array<

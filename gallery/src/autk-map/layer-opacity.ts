@@ -13,10 +13,8 @@ export class LayerOpacity {
         await this.db.init();
 
         await this.db.loadOsm({
-            queryArea: {
-                geocodeArea: 'New York',
-                areas: ['Manhattan Island'],
-            },
+            pbfFileUrl: `${(import.meta as any).env.BASE_URL}data/lower_mnt.osm.pbf`,
+            queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
             outputTableName: 'table_osm',
             autoLoadLayers: {
                 layers: ['surface', 'parks', 'water', 'roads', 'buildings'] as Array<
