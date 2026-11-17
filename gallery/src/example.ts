@@ -49,28 +49,32 @@ if (example) {
     const context = document.createElement('p'); context.textContent = 'The core API calls for this task. The full source below is a minimal runnable program for a page with a canvas.';
     const pre = document.createElement('pre'); pre.className = 'task-code';
     const code = document.createElement('code'); pre.append(code);
-    const refresh = () => {
+    const details = document.createElement('details'); details.className = 'example-source';
+    const summary = document.createElement('summary'); summary.textContent = 'View full source';
+    const full = document.createElement('pre'); const content = document.createElement('code');
+    full.append(content); details.append(summary, full);
+    const currentState = () => {
         const state = Object.fromEntries(new URLSearchParams(location.search));
         document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[id], select[id], select[data-variant-parameter]').forEach(control => {
             const key = control.dataset.variantParameter || control.id;
             state[key] = control instanceof HTMLInputElement && control.type === 'checkbox' ? String(control.checked) : control.value;
         });
+        return state;
+    };
+    const refresh = () => {
+        const state = currentState();
         code.innerHTML = highlightTypeScript(exampleCode(example.id, state));
+        if (details.dataset.loaded) content.innerHTML = highlightTypeScript(exampleSource(example.id, state));
     };
     document.addEventListener('change', refresh);
     document.addEventListener('input', refresh);
     document.addEventListener('example-ready', refresh);
     refresh();
     learning.append(title, context, pre);
-    const details = document.createElement('details'); details.className = 'example-source';
-    const summary = document.createElement('summary'); summary.textContent = 'View full source';
-    const full = document.createElement('pre'); const content = document.createElement('code');
-    full.append(content); details.append(summary, full);
     details.addEventListener('toggle', () => {
-        if (!details.open || details.dataset.loaded) return;
-        const state = Object.fromEntries(new URLSearchParams(location.search));
-        content.innerHTML = highlightTypeScript(exampleSource(example.id, state));
+        if (!details.open) return;
         details.dataset.loaded = 'true';
+        content.innerHTML = highlightTypeScript(exampleSource(example.id, currentState()));
     });
     learning.append(details);
     const related = examples.filter(item => item.section === example.section && item.id !== example.id).slice(0, 3);

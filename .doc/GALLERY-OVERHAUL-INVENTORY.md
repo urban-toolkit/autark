@@ -8,8 +8,8 @@ This document finalizes the content inventory. It does not implement the redesig
 
 | Section | Examples |
 |---|---:|
-| Data loading | 7 |
-| Interaction | 3 |
+| Data loading | 6 |
+| Interaction | 4 |
 | Styling and data-driven colors | 4 |
 | Imagery | 3 |
 | Terrain | 4 |
@@ -43,11 +43,10 @@ Module abbreviations in these tables: **Map** = `autk-map`, **DB** = `autk-db`, 
 |---|---|---|---|---|
 | D01 | Render GeoJSON directly | Map | `src/autk-map/standalone-geojson-vis.html` | Points, lines, and polygons as explicit dataset variants; no database required. |
 | D02 | Convert between coordinate systems | Map | `src/autk-map/standalone-geographic-geojson-vis.html` | Geographic to projected, projected to geographic, and projected to projected; custom definitions and workspace selection. |
-| D03 | Import GeoJSON into a workspace | DB, Map | `src/autk-map/geojson-vis.html` | Database import, workspace normalization, and rendering; show file URL and in-memory collection inputs. |
-| D04 | Import CSV and JSON tables | DB, Map | `src/autk-map/csv-wkt-vis.html` | Explicit CSV/JSON and coordinate-column/WKT variants; show the appropriate loading call for each. |
-| D05 | Access OpenStreetMap through Overpass | DB, Map | `src/autk-map/osm-layers-api.html` | The dedicated live-API example: place and bounding-box queries, tag filters, and base-layer selection. Explicitly label Overpass and any geocoding dependency. |
-| D06 | Load a local OSM extract | DB, Map | `src/autk-map/osm-layers-pbf.html` | Bundled PBF import with an optional bounding-box filter. This is the flat vector-city baseline. |
-| D07 | Organize data in workspaces | DB, Map | `src/autk-map/osm-layers-api-workspaces.html` | Switch between isolated workspaces in one database using local PBF inputs and explicit bounds; make differences in the displayed data explicit. |
+| D03 | Import data into database workspaces | DB, Map | `src/autk-map/geojson-vis.html` | Database import, workspace normalization, and rendering; one city per workspace, with one city loaded from a file URL and the others from in-memory collections. |
+| D04 | Load layers from different file formats | DB, Map | `src/autk-map/csv-wkt-vis.html` | CSV with a WKT column, CSV with longitude/latitude columns, and JSON with WKT in one workspace; London boroughs, Tube lines, and Tube entrances compose in a single scene, with the lines colored by line name. |
+| D05 | Access OpenStreetMap through Overpass | DB, Map | `src/autk-map/osm-layers-api.html` | The dedicated live-API example: named Sol, Madrid, its enclosing small bounding box, and custom tag filters over that same box. Explicitly label Overpass and any geocoding dependency. |
+| D06 | Access OpenStreetMap from a local extract | DB, Map | `src/autk-map/osm-layers-pbf.html` | The same named-place, bounding-box and tag queries as D05, using a bundled La Condamine, Monaco PBF with no Overpass requests. |
 
 ### Interaction
 
@@ -56,6 +55,7 @@ Module abbreviations in these tables: **Map** = `autk-map`, **DB** = `autk-db`, 
 | I01 | Select and inspect features | Map, DB | `src/autk-map/building-picking.html` | Feature selection, highlighting, and a useful properties panel. Explain that selection is not limited to buildings. |
 | I02 | Hide and restore selected features | Map, DB | `src/autk-map/building-hiding.html` | Select, hide, restore, and clear; maintain selection/visibility feedback. |
 | I03 | Navigate and animate the camera | Map | `src/autk-map/camera-animation-vis.html` | One focused scene with `setView`, data-driven framing, and camera animation. Remove unrelated analysis scenes from this page. |
+| I04 | Organize data in workspaces | DB, Map | `src/autk-map/osm-layers-api-workspaces.html` | Switch between isolated workspaces in one database using local PBF inputs and explicit bounds; make differences in the displayed data explicit. |
 
 ### Styling and data-driven colors
 
@@ -83,11 +83,11 @@ Module abbreviations in these tables: **Map** = `autk-map`, **DB** = `autk-db`, 
 | T03 | Combine terrain, imagery, and vectors | Map, DB | `src/autk-map/osm-layers-pbf-imagery-terrain.html` | The combined city scene. Explain only the additions beyond B02 and T01. |
 | T04 | Load terrain from a local GeoTIFF | Map, DB | `src/autk-map/terrain-layers-niteroi.html` | Local elevation rather than streaming; communicate its finite coverage. |
 
-Use Niteroi for D06, B01's initial view, B02, and T01-T04, reusing the existing PBF and elevation assets. Preserve the existing dataset's documented spelling in UI copy. Match the initial center, zoom, styles, and vector source across the six city configurations:
+Use Niteroi for B01's initial view, B02, and T01-T04, reusing the existing PBF and elevation assets. Preserve the existing dataset's documented spelling in UI copy. D06 uses a separate Monaco extract; leave the shared Niteroi vector helper (`osm-layers-pbf-example.ts`) unchanged for the imagery and terrain comparisons. Match the initial center, zoom, styles, and vector source across the Niteroi configurations:
 
 | Ground | Vectors | Imagery | Vectors + imagery |
 |---|---|---|---|
-| Flat | D06 | B01 | B02 |
+| Flat | Shared Niteroi vector stack | B01 | B02 |
 | Terrain | T01 | T02 | T03 |
 
 ### Plots
@@ -164,7 +164,7 @@ Actions:
 | 31 | `autk-map/osm-layers-api.html` | Retain | D05 | Canonical remote OSM query. |
 | 32 | `autk-map/osm-layers-api-bbox.html` | Merge | D05 | Bounding-box queries remain a visible, documented variant. |
 | 33 | `autk-map/osm-tag-sets.html` | Merge | D05 | Preserve custom tag filters and typed results. |
-| 34 | `autk-map/osm-layers-api-multi.html` | Fixture | D07 | Current code creates two databases/maps, not one multi-area query. Preserve instance-isolation coverage; D07 remains the public workspace task. |
+| 34 | `autk-map/osm-layers-api-multi.html` | Fixture | I04 | Current code creates two databases/maps, not one multi-area query. Preserve instance-isolation coverage; I04 remains the public workspace task. |
 | 35 | `autk-map/osm-layers-api-chicago.html` | Retire | D06 | City-only duplication. Preserve any missing-height edge cases in tests before deletion. |
 | 36 | `autk-map/osm-layers-api-niteroi.html` | Retire | D06 | City-only duplication; local city examples use D06's shared Niteroi extract. |
 | 37 | `autk-map/osm-layers-api-paris.html` | Retire | D06 | City-only duplication. |
@@ -176,7 +176,7 @@ Actions:
 | 43 | `autk-map/osm-layers-api-manhattan-w+p.html` | Retire | D06 | A base-layer combination, not another task. |
 | 44 | `autk-map/osm-layers-pbf.html` | Retain | D06 | Canonical local PBF import and flat vector city. |
 | 45 | `autk-map/osm-layers-pbf-bbox.html` | Merge | D06 | Preserve spatial filtering without a duplicate page. |
-| 46 | `autk-map/osm-layers-api-workspaces.html` | Retain | D07 | Canonical workspace switching. |
+| 46 | `autk-map/osm-layers-api-workspaces.html` | Retain | I04 | Canonical workspace switching. |
 | 47 | `autk-map/spatial-join.html` | Retain | A01 | Containment-based aggregation. |
 | 48 | `autk-map/spatial-join-buildings.html` | Merge | A03 | The code uses `near`, so preserve building proximity as a distance-join variant, not a containment join. |
 | 49 | `autk-map/spatial-join-multi.html` | Retain | A02 | Chaining joins is a distinct task. |
@@ -227,7 +227,7 @@ Actions:
 
 1. **Catalog and navigation:** represent these 37 tasks in one catalog; implement section grouping, per-card module filtering, search, accessible color labels, and URL state. Verify that every canonical card appears once and that cross-module filters retain the correct cards.
 2. **Page template:** convert D01 and P02 first. Verify usable desktop/mobile layouts, consistent loading/error/empty states, readable source, and bidirectional linked selection where applicable.
-3. **Loading, styling/data-driven colors, and interaction:** migrate D01-D07, I01-I03, and S01-S04. Verify variant-specific loading calls, projection examples, workspace isolation, selection, and camera stability. Confirm local PBF loading for every OSM-dependent scene except D05.
+3. **Loading, styling/data-driven colors, and interaction:** migrate D01-D06, I01-I04, and S01-S04. Verify variant-specific loading calls, projection examples, workspace isolation, selection, and camera stability. Confirm local PBF loading for every OSM-dependent scene except D05.
 4. **Imagery and terrain:** migrate B01-B03 and T01-T04 around the shared city baseline. Verify all six map configurations, finite raster coverage, attribution, visibility, and both local and streamed elevation.
 5. **Plots and analytics:** migrate P01-P08 and A01-A08. Verify unique learning goals, coordinated selections, explicit resets/data updates, and deterministic analytical results.
 6. **Retirement:** transfer regression coverage to module-owned tests/fixtures, remove gallery-specific tests and fixtures, update old links, remove obsolete public pages including export, and audit shared assets. The final public gallery has exactly seven sections and 37 examples, with no diagnostic or export cards and no gallery test suite.

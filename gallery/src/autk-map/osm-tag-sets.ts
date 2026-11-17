@@ -11,7 +11,7 @@ export class OsmTagSets {
         await this.db.init();
 
         await this.db.loadOsm({
-            // Same area/base layers as osm-layers-pbf.ts. Custom tag sets currently require Overpass.
+            // This legacy example uses Overpass; omit pbfFileUrl to select the live source.
             queryArea: {
                 geocodeArea: 'New York',
                 areas: ['Battery Park City', 'Financial District'],

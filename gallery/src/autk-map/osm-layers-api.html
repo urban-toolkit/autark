@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — OSM layer queries</title>
+    <title>Autark — Access OpenStreetMap through Overpass</title>
     <link rel="stylesheet" href="../../example.css" />
 </head>
 
@@ -19,15 +19,15 @@
     <main id="main" class="example-main">
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
-            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> OpenStreetMap</p>
-            <h1 id="example-title">OSM layer queries</h1>
-            <p class="description">Load urban layers through the OpenStreetMap API.</p>
+            <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Data loading</p>
+            <h1 id="example-title">Access OpenStreetMap through Overpass</h1>
+            <p class="description">Query a place or bounding box and filter OSM tags through the live API.</p>
         </section>
     <div id="app">
 
-        <section class="map-panel" aria-label="OSM layer queries map area">
-            <div class="panel-header"><h2>OSM layer queries</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
-            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="OSM layer queries map"> </canvas></div>
+        <section class="map-panel" aria-label="Sol, Madrid map area">
+            <div class="panel-header"><h2>Sol, Madrid</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="OpenStreetMap layers in Sol, Madrid"> </canvas></div>
             <div class="panel-footer" id="map-help"><span>Drag to pan · Scroll to zoom · Menu for layers</span></div>
         </section>
     </div>

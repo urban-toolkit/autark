@@ -1,0 +1,529 @@
+osm_id,station,stop_area_ids,name,entrance,exit,wheelchair,lon,lat
+13411436367,Acton Town,7666567,Gunnersbury Lane,,,yes,-0.280392,51.50304
+13411436379,Acton Town,7666567,Bollo Lane,,,,-0.280007,51.503196
+1402066827,Aldgate,9629329,Aldgate,,,yes,-0.075525,51.514094
+166860072,Aldgate East,7218599,"Aldgate East, Exit 2, High Street (north side), Toynbee Hall, Petticoat Lane Market",,2,no,-0.072113,51.515307
+469759899,Aldgate East,7218599,Aldgate East,,3,no,-0.070027,51.516051
+475381373,Aldgate East,7218599,Aldgate East,,4,no,-0.069969,51.515806
+5109686507,Aldgate East,7218599,"Aldgate East, Exit 1, High Street (south side), Leman Street, Conference forum",,1,no,-0.07179,51.51507
+2870197126,Alperton,3757862,,,,no,-0.299305,51.54068
+1623696416,Angel,7216546,Angel Station,,,no,-0.105885,51.53281
+2417777283,Archway,7218536,Archway,,,,-0.134859,51.565403
+4306818846,Archway,7218536,,,,yes,-0.135113,51.565663
+12351134129,Arnos Grove,9629191,,,,,-0.133491,51.616225
+186186683,Arsenal,7218703,Arsenal,main,A,no,-0.105655,51.558428
+601141522,Baker Street (Bakerloo and Jubilee lines); Baker Street (Circle and Hammersmith & City lines); Baker Street (Metropolitan line),7216573;7673185;7673186,,,,no,-0.156752,51.522501
+1614146398,Baker Street (Bakerloo and Jubilee lines); Baker Street (Circle and Hammersmith & City lines); Baker Street (Metropolitan line),7216573;7673185;7673186,,,,yes,-0.157069,51.522444
+1614146440,Baker Street (Bakerloo and Jubilee lines); Baker Street (Circle and Hammersmith & City lines); Baker Street (Metropolitan line),7216573;7673185;7673186,,,,yes,-0.157653,51.522751
+7702484008,Baker Street (Bakerloo and Jubilee lines); Baker Street (Circle and Hammersmith & City lines); Baker Street (Metropolitan line),7216573;7673185;7673186,Baker Street,,,no,-0.156315,51.522179
+3941256584,Balham,7220389,,,,,-0.153105,51.443371
+3941256585,Balham,7220389,,,,,-0.152664,51.44329
+4839785771,Balham,7220389,,,,,-0.152805,51.443255
+4839785778,Balham,7220389,,,,,-0.153078,51.443463
+8723231995,Balham,7220389,,,,,-0.152646,51.443226
+10699155991,Bank (Central line); Bank (Northern line); Bank (Waterloo & City line),6408143;7673051;7673052,Bank Station Exit,,,yes,-0.087869,51.511246
+2378843912,Bank (Central line); Bank (Northern line); Bank (Waterloo & City line); Monument,6408143;7673050;7673051;7673052,Monument,,D,no,-0.086449,51.510946
+5473273447,Bank (Central line); Bank (Northern line); Bank (Waterloo & City line); Monument,6408143;7673050;7673051;7673052,Monument,,D,no,-0.08665,51.510981
+291913900,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 4",,4,,-0.088131,51.513433
+560717337,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit G",,G,no,-0.09028,51.51344
+1733389358,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 9",,9,no,-0.090214,51.513357
+2622210364,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 3",,3,no,-0.088175,51.51358
+2622404466,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 1",,1,no,-0.089209,51.513426
+2622404476,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 1",,1,no,-0.089124,51.513507
+2869062009,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 8",,8,no,-0.089831,51.513154
+4861365382,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 2",,2,no,-0.088837,51.513558
+5473274720,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 6",,6,no,-0.088285,51.512989
+5473274739,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit P",,P,no,-0.088196,51.512773
+5473274907,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 2",,2,no,-0.088925,51.513579
+5473274971,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 7",,7,no,-0.089131,51.513137
+5473274996,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 5",,5,no,-0.088672,51.513209
+5473275002,Bank (Central line); Bank (Waterloo & City line),6408143;7673052,"Bank station, Exit 5",,5,no,-0.088659,51.513307
+2378843902,Bank (Northern line); Bank (Waterloo & City line); Monument,7673050;7673051;7673052,Monument,,B,no,-0.086559,51.510691
+2378843911,Bank (Northern line); Bank (Waterloo & City line); Monument,7673050;7673051;7673052,Monument,,C,no,-0.086967,51.510916
+5473273382,Bank (Northern line); Bank (Waterloo & City line); Monument,7673050;7673051;7673052,Monument,,B,no,-0.086406,51.510768
+13513212434,Bank (Waterloo & City line),7673052,"Bank station, Walbrook exit",,,yes,-0.090428,51.512404
+1401459404,Bank (Waterloo & City line); Monument,7673050;7673052,Fish Street Hill,,A,no,-0.085988,51.510452
+5473273333,Bank (Waterloo & City line); Monument,7673050;7673052,King William Street (South),,B,no,-0.086503,51.510658
+2135389151,Barbican,2373532,,yes,,no,-0.097563,51.520174
+6431933493,Barbican,2373532,Barbican,exit,,yes,-0.099284,51.519619
+9804578359,Barbican,2373532,Barbican,yes,,yes,-0.099643,51.51953
+2629051168,Barkingside,7666581,,,,,0.088591,51.585835
+1508498094,Barons Court,1853215,Barons Court,,,no,-0.213349,51.490284
+9110399663,Battersea Power Station,13223243,Battersea Power Station,,,yes,-0.142278,51.479805
+3054539250,Becontree,4006365,,,,no,0.127506,51.540387
+5473344936,Belsize Park,8119296,Belsize Park,,A,no,-0.164462,51.550414
+4329415739,Bermondsey,7218597,Bermondsey,,A,yes,-0.063649,51.498127
+2337594720,Bethnal Green,7216686,,,B,no,-0.055661,51.52722
+2337594730,Bethnal Green,7216686,,,A,no,-0.055196,51.527241
+2337594745,Bethnal Green,7216686,,,B,no,-0.055705,51.527361
+5493361584,Bethnal Green,7216686,,,C,no,-0.055307,51.527745
+1777742707,Blackfriars,5544563,Blackfriars Station,,,limited,-0.103896,51.511678
+1226713873,Bond Street (Underground),7216559,,yes,,,-0.149153,51.514043
+2271434204,Bond Street (Underground),7216559,,,,no,-0.14884,51.514311
+3357928886,Bond Street (Underground),7216559,,yes,,,-0.149911,51.513775
+5769380890,Bond Street (Underground),7216559,,main,,yes,-0.149487,51.514239
+9436818729,Bond Street (Underground),7216559,Marylebone Lane,,,yes,-0.148624,51.514638
+1155201774,Borough,7216746,,,,limited,-0.093544,51.501162
+3965646193,Boston Manor,7220417,Boston Manor,,A,no,-0.324701,51.495801
+6507056587,Boston Manor,7220417,Boston Manor,,B,no,-0.324757,51.495834
+1802592716,Bounds Green,7220376,Bounds Green,,,no,-0.124197,51.607016
+5472303632,Bounds Green,7220376,Bounds Green,,,no,-0.124083,51.607033
+3775184957,Bow Road,7216694,,,,no,-0.024821,51.52699
+245955904,Brixton,7218629,,,,yes,-0.11504,51.461804
+3283054317,Brixton,7218629,,,,yes,-0.11483,51.46262
+2311722541,Bromley-By-Bow,3858529,,,,no,-0.011545,51.524858
+946902398,Buckhurst Hill,7666596,"Buckhurst Hill, Victoria Road",,A,no,0.046606,51.626602
+5322792288,Buckhurst Hill,7666596,,,,yes,0.046605,51.625611
+6352535943,Buckhurst Hill,7666596,,,,yes,0.046808,51.625543
+1568934912,Camden Town (Northern line Edgware branch); Camden Town (Northern line High Barnet branch),1637686;7673046,Camden Town,,,,-0.142518,51.539396
+1568934913,Camden Town (Northern line Edgware branch); Camden Town (Northern line High Barnet branch),1637686;7673046,Camden Town,,,no,-0.142815,51.53937
+2450024729,Canada Water (Jubilee line),3172933,Canada Water,yes,,yes,-0.049339,51.497645
+2450024730,Canada Water (Jubilee line),3172933,Canada Water,yes,,no,-0.049346,51.498516
+5466529278,Canada Water (Jubilee line),3172933,Canada Water,yes,A,yes,-0.049893,51.498053
+2039163546,Canary Wharf (Jubilee line),7666585,,,,,-0.017353,51.503476
+6300338079,Canary Wharf (Jubilee line),7666585,,,,,-0.018893,51.503659
+6300338080,Canary Wharf (Jubilee line),7666585,,,,,-0.018959,51.50341
+10197479029,Canary Wharf (Jubilee line),7666585,East Entrance,,,no,-0.017625,51.503365
+11109939627,Canary Wharf (Jubilee line),7666585,Fosterito Entrance,,,no,-0.01689,51.503237
+11951823643,Canary Wharf (Jubilee line),7666585,West Entrance,,,yes,-0.019678,51.503614
+1690301464,Canning Town (Jubilee line),9627542,Canning Town,,,yes,0.007277,51.514477
+2697247696,Canning Town (Jubilee line),9627542,Canning Town,,,yes,0.0083,51.514671
+4370324275,Canning Town (Jubilee line),9627542,Canning Town,,,yes,0.008944,51.513939
+5455894783,Canning Town (Jubilee line),9627542,Canning Town,,,yes,0.008153,51.514597
+5455894788,Canning Town (Jubilee line),9627542,Canning Town,,,yes,0.00795,51.514898
+2389868966,Cannon Street (Circle and District lines),1572316,Cannon Street,,,no,-0.090611,51.511361
+3091088241,Chalk Farm,7216773,,,,,-0.153796,51.544001
+1637578514,Chancery Lane,204450,Barnards Inn,,3,,-0.111505,51.518101
+1637578518,Chancery Lane,204450,Chancery Lane,,4,,-0.111605,51.518113
+6866516269,Chancery Lane,204450,Holborn Circus,,1,no,-0.111098,51.518257
+6866516282,Chancery Lane,204450,Gray's Inn Road,,2,,-0.111536,51.518278
+452514295,Charing Cross (Bakerloo line),1572989,Charing Cross (Exit 5),,5,no,-0.125677,51.508266
+1274040743,Charing Cross (Bakerloo line),1572989,,,6,no,-0.125945,51.508554
+1274040746,Charing Cross (Bakerloo line),1572989,Charing Cross (Exit 1),,1,no,-0.124855,51.508735
+1274040750,Charing Cross (Bakerloo line),1572989,,,,no,-0.127305,51.50782
+1979188146,Charing Cross (Bakerloo line),1572989,,,,no,-0.126891,51.507971
+9344480910,Charing Cross (Bakerloo line),1572989,,,,no,-0.126977,51.508003
+826724221,Charing Cross (Bakerloo line); Charing Cross (Northern line),1572989;7677364,Charing Cross (Exit 2),,2,no,-0.124614,51.508598
+12292507855,Charing Cross (Bakerloo line); Charing Cross (Northern line),1572989;7677364,Charing Cross (Exit 3),,3,,-0.124984,51.50839
+12754166553,Charing Cross (Bakerloo line); Charing Cross (Northern line),1572989;7677364,Charing Cross (Exit 4),,4,no,-0.125045,51.508031
+2242453036,Chigwell,7673058,,,,,0.074442,51.617918
+2889686743,Chiswick Park,3783822,,,,limited,-0.267707,51.494222
+4503057018,Clapham Common,7218593,Clapham Common,,,no,-0.138273,51.461778
+4503057019,Clapham Common,7218593,Clapham Common,,,no,-0.138338,51.461833
+4503057076,Clapham Common,7218593,,,,no,-0.138035,51.461629
+1783610445,Clapham North,7218594,Clapham North,yes,,,-0.129482,51.465146
+4839795869,Clapham South,7224715,,,,,-0.147715,51.452869
+4839795870,Clapham South,7224715,,,,,-0.147646,51.452816
+4839795871,Clapham South,7224715,,,,,-0.147648,51.452856
+1991260771,Cockfosters,7671936,,,,,-0.150115,51.6515
+6328949043,Cockfosters,7671936,,,,yes,-0.149742,51.651815
+6328949044,Cockfosters,7671936,,,,no,-0.149814,51.651607
+6328949045,Cockfosters,7671936,,,,,-0.150166,51.651583
+4839759904,Colliers Wood,7224648,,,,,-0.178057,51.4181
+4100833163,Covent Garden,7216543,Covent Garden,,,,-0.124185,51.512986
+5479717495,Covent Garden,7216543,Covent Garden,main,A,no,-0.124246,51.513082
+5479777483,Covent Garden,7216543,Covent Garden,exit,B,no,-0.124067,51.513005
+7556510381,Covent Garden,7216543,Covent Garden,main,A,no,-0.124158,51.513086
+3053097229,Dagenham East,4005028,,,,no,0.165995,51.544168
+3054468056,Dagenham Heathway,4006294,,,,limited,0.147739,51.541719
+1583158931,Debden,7673044,,,,yes,0.08373,51.645488
+812150818,Dollis Hill,3350099,Dollis Hill,,,,-0.239341,51.551532
+812150828,Dollis Hill,3350099,Dollis Hill,,,no,-0.238947,51.552251
+1591175886,Earl's Court,7231516,,,,yes,-0.193111,51.492148
+6340614312,Earl's Court,7231516,Earl's Court (Warwick Road),,,,-0.195639,51.490263
+12452989324,East Acton,7673062,,,,limited,-0.247458,51.516608
+3670686907,East Finchley,10042383,,,,,-0.164897,51.586962
+6306753639,East Finchley,10042383,,,,,-0.164356,51.587184
+12499239046,East Finchley,10042383,,,,,-0.164507,51.587269
+3306108975,East Ham,4511998,,main,,yes,0.051405,51.5389
+3306108988,East Ham,4511998,,main,,,0.051384,51.539008
+3306108999,East Ham,4511998,,main,,,0.051356,51.539122
+2905116129,East Putney,3774661,,,,no,-0.210807,51.459067
+13418039391,Edgware,7925081,,,,,-0.275466,51.613422
+13418039394,Edgware,7925081,,,,,-0.275545,51.613542
+5481955758,Edgware Road (Bakerloo line),7673120,Edgware Road (Bakerloo line),yes,,yes,-0.170264,51.520215
+5894785001,"Edgware Road (Circle, District and Hammersmith & City lines)",1562751,"Edgware Road (Circle, District and Hammersmith & City lines)",,,yes,-0.168012,51.519638
+5455869571,Elephant & Castle (Underground),7704296,Elephant & Castle,yes,B,limited,-0.100389,51.494691
+5455869579,Elephant & Castle (Underground),7704296,Elephant & Castle,,B,limited,-0.100443,51.494479
+5455870244,Elephant & Castle (Underground),7704296,Elephant & Castle,,A,no,-0.100876,51.495949
+5455870246,Elephant & Castle (Underground),7704296,Elephant & Castle,,A,no,-0.100925,51.495895
+5455870529,Elephant & Castle (Underground),7704296,Elephant & Castle,,A,no,-0.100826,51.49575
+3052027802,Elm Park,4003810,,,,yes,0.199246,51.549885
+1925480735,Embankment,7704124,,,,no,-0.122138,51.507199
+1925480736,Embankment,7704124,,,,limited,-0.12248,51.507312
+5489178481,Epping,1924227,Epping,yes,A,yes,0.113836,51.693706
+3091088222,Euston (Northern line Bank branch); Euston (Northern line Charing Cross branch); Euston (Victoria line),1561612;7673048;9746605,,,,,-0.133027,51.528013
+3091088264,Euston (Northern line Bank branch); Euston (Northern line Charing Cross branch); Euston (Victoria line),1561612;7673048;9746605,,,,no,-0.134051,51.528557
+3371499072,Euston (Northern line Bank branch); Euston (Northern line Charing Cross branch); Euston (Victoria line),1561612;7673048;9746605,,,,yes,-0.133605,51.527728
+3371499084,Euston (Northern line Bank branch); Euston (Northern line Charing Cross branch); Euston (Victoria line),1561612;7673048;9746605,,,,,-0.133184,51.527989
+8018471586,Euston (Northern line Bank branch); Euston (Northern line Charing Cross branch); Euston (Victoria line),1561612;7673048;9746605,,,,yes,-0.133045,51.527851
+1102565750,Euston Square,4156867,Euston Square,,B,no,-0.135775,51.525815
+9300541899,Euston Square,4156867,Euston Square,,A,yes,-0.135451,51.525331
+1777173936,Farlop,7220374,,,,no,0.090884,51.595701
+5466543543,Farringdon,1570695,,secondary,B,yes,-0.105232,51.521113
+5466543649,Farringdon,1570695,Cowcross Street,main,A,yes,-0.104743,51.520125
+2458659084,Finchley Road,7220379,Finchley Road,,A,no,-0.179829,51.546937
+562730480,Finsbury Park,7218533,,yes,,,-0.105862,51.564631
+562730483,Finsbury Park,7218533,,,,yes,-0.105884,51.564481
+6906005966,Finsbury Park,7218533,,yes,,,-0.107027,51.563622
+8557777012,Finsbury Park,7218533,City North Place,yes,,,-0.107325,51.564595
+5142610269,Fulham Broadway,7672058,,,,,-0.194495,51.480786
+5142610298,Fulham Broadway,7672058,Football Exit,exit,,no,-0.193846,51.481135
+7844644589,Fulham Broadway,7672058,Football Exit,exit,,no,-0.194096,51.481254
+2356284258,Gants Hill,7220375,Gants Hill,,I,no,0.06642,51.576925
+2356284273,Gants Hill,7220375,Gants Hill,,H,no,0.066092,51.577187
+2356284280,Gants Hill,7220375,Gants Hill,,G,yes,0.065626,51.577207
+5482434785,Gants Hill,7220375,Gants Hill,,C,yes,0.067275,51.57621
+5482434791,Gants Hill,7220375,Gants Hill,,D,no,0.066811,51.576327
+5482434804,Gants Hill,7220375,Gants Hill,,B,yes,0.067578,51.57642
+5482434811,Gants Hill,7220375,Gants Hill,,A,no,0.067048,51.576613
+5482434833,Gants Hill,7220375,Gants Hill,,E,yes,0.065782,51.576436
+5482434835,Gants Hill,7220375,Gants Hill,,E,no,0.065438,51.576443
+5482434889,Gants Hill,7220375,Gants Hill,,H,yes,0.066301,51.577054
+1422925294,Golders Green,7673056,,,,yes,-0.194443,51.572106
+2883647835,Goldhawk Road,3796510,,,,no,-0.226597,51.502234
+2883647837,Goldhawk Road,3796510,,,,no,-0.226771,51.502264
+1666386024,Goodge Street,7216585,Goodge Street,,,no,-0.134485,51.520597
+5458751115,Grange Hill,7673059,Grange Hill,,,no,0.09205,51.613399
+5055932491,Great Portland Street,7216575,Great Portland Street,,A,no,-0.143729,51.523735
+5055932492,Great Portland Street,7216575,Great Portland Street,,B,no,-0.143911,51.523872
+799284557,Green Park (Jubilee line),3118087,,,,no,-0.142897,51.50654
+12279370549,Green Park (Jubilee line),3118087,,,A,,-0.142712,51.506627
+1905896400,Green Park (Jubilee line); Green Park (Piccadilly line); Green Park (Victoria line),3118087;7216555;7671874,Green Park,,,yes,-0.142594,51.506569
+2038051147,Green Park (Jubilee line); Green Park (Piccadilly line); Green Park (Victoria line),3118087;7216555;7671874,Piccadilly (north side),,,no,-0.142841,51.506888
+7712929538,Green Park (Jubilee line); Green Park (Piccadilly line); Green Park (Victoria line),3118087;7216555;7671874,Stratton Street,yes,,no,-0.143137,51.507027
+12279370575,Green Park (Jubilee line); Green Park (Piccadilly line); Green Park (Victoria line),3118087;7216555;7671874,Piccadilly (south side),,,,-0.142446,51.506763
+2297110852,Gunnersbury,6413220,Gunnersbury,,,no,-0.275362,51.492019
+2129514730,Hainault,7673061,,,,,0.093135,51.60387
+1530391823,Hammersmith (Circle and Hammersmith & City lines),7220381,Hammersmith (Circle and Hammersmith & City lines),,,yes,-0.224328,51.493324
+1530391837,Hammersmith (Circle and Hammersmith & City lines),7220381,Hammersmith (Circle and Hammersmith & City lines),,,yes,-0.224602,51.493514
+5474926446,Hammersmith (Circle and Hammersmith & City lines),7220381,Hammersmith (Circle and Hammersmith & City lines),,,yes,-0.22485,51.493338
+5474926464,Hammersmith (Circle and Hammersmith & City lines),7220381,Hammersmith (Circle and Hammersmith & City lines),,,yes,-0.225025,51.493403
+4620931876,Hammersmith (District & Piccadilly lines),1853216,Hammersmith (District and Piccadilly lines),,,yes,-0.224432,51.49286
+9190969045,Hammersmith (District & Piccadilly lines),1853216,Hammersmith (District and Piccadilly lines),,,yes,-0.224436,51.492897
+5482470204,Hampstead,7218600,Hampstead,main,A,no,-0.178341,51.556642
+5482470228,Hampstead,7218600,Hampstead,exit,B,no,-0.178337,51.556796
+9556379979,Hanger Lane,7666603,,,,,-0.292887,51.529966
+2920572802,Harlesden,9746617,,,,no,-0.257204,51.536258
+1745863675,Harrow & Wealdstone,2175975,,main,,limited,-0.334461,51.592492
+2900011671,Harrow-on-the-Hill,3797453,,,,no,-0.337192,51.579105
+2900011836,Harrow-on-the-Hill,3797453,,,,no,-0.336788,51.579657
+1744497400,Hatton Cross,7220373,,yes,B,no,-0.42295,51.46675
+1744498045,Hatton Cross,7220373,,yes,A,no,-0.423128,51.466914
+5491840998,Hatton Cross,7220373,,yes,A,no,-0.423177,51.46687
+5491841000,Hatton Cross,7220373,,yes,B,no,-0.422878,51.466778
+5491841002,Hatton Cross,7220373,,yes,A,no,-0.423055,51.466943
+1748630218,Heathrow Terminal 4 (Piccadilly line),7220372,Heathrow Terminal 4,,,,-0.44675,51.459072
+1748630302,Heathrow Terminal 4 (Piccadilly line),7220372,Heathrow Terminal 4,,,,-0.446068,51.46013
+1747549354,Heathrow Terminals 2 & 3 (Piccadilly line),7220371,Heathrow Terminals 2 & 3,,A,yes,-0.452241,51.471169
+1747549541,Heathrow Terminals 2 & 3 (Piccadilly line),7220371,Heathrow Terminals 2 & 3,,A,yes,-0.452149,51.471253
+4329936982,Heathrow Terminals 2 & 3 (Piccadilly line),7220371,,,,yes,-0.458155,51.471353
+1979172156,High Street Kensington,7220419,,,,yes,-0.192823,51.501001
+2162923164,Highbury & Islington,9717764,Highbury and Islington,,,yes,-0.103634,51.546106
+2374465204,Highbury & Islington,9717764,Exit,,,yes,-0.103688,51.546233
+3717563929,Highgate,7673840,,,,no,-0.145726,51.577371
+4841545632,Highgate,7673840,Archway Road,exit,3,no,-0.1468,51.577603
+10251043187,Highgate,7673840,,,,no,-0.145668,51.577751
+2905116134,Hillingdon,3768005,,,,yes,-0.449599,51.553882
+850451674,Holborn (Central line); Holborn (Piccadilly line),3118025;7673049,Holborn,,B,no,-0.119977,51.517603
+5044663755,Holborn (Central line); Holborn (Piccadilly line),3118025;7673049,Holborn,,A,no,-0.120058,51.517368
+5482938750,Holland Park,7220384,Holland Park,,,no,-0.205621,51.507281
+5482917772,Holloway Road,7671931,Holloway Road,,,no,-0.112804,51.552848
+3053012315,Hornchurch,4004897,,,,no,0.219138,51.554102
+5493439054,Hounslow Central,7671933,Hounslow Central,,,no,-0.367034,51.471142
+6475647579,Hounslow East,7671932,Hounslow East,,,yes,-0.356495,51.472973
+821849117,Hyde Park Corner,7216554,Hyde Park Corner,,C,no,-0.151757,51.502961
+2586466038,Hyde Park Corner,7216554,Hyde Park Corner,,B,no,-0.151464,51.503083
+5475561743,Hyde Park Corner,7216554,Hyde Park Corner,,E,yes,-0.153077,51.502752
+5475561757,Hyde Park Corner,7216554,Hyde Park Corner,,D,no,-0.152641,51.502712
+5475561765,Hyde Park Corner,7216554,Hyde Park Corner,,A,no,-0.15276,51.503068
+5475561770,Hyde Park Corner,7216554,Hyde Park Corner,,G,no,-0.153229,51.503084
+5154003939,Ickenham,7666578,,main,,,-0.441948,51.562099
+13177004081,Kennington,1561742,,,,no,-0.105723,51.488258
+909319724,Kensal Green (Overground and Bakerloo line),3809995,,,,no,-0.225348,51.530521
+2417777289,Kentish Town (Northern line),7932380,Kentish Town,,,,-0.140591,51.550451
+2515594156,Kenton,7666575,,main,,,-0.317136,51.581891
+9396600875,Kilburn,7671938,Kilburn,,A,yes,-0.204134,51.546927
+861334642,Kilburn Park,7218555,Kilburn Park,,,yes,-0.193689,51.535051
+3951413141,"King's Cross St Pancras (Circle, Hammersmith & City and Metropolitan lines)",7666555,,,,yes,-0.124896,51.529729
+4281073750,"King's Cross St Pancras (Circle, Hammersmith & City and Metropolitan lines)",7666555,,,,yes,-0.124401,51.530104
+14212130158,"King's Cross St Pancras (Circle, Hammersmith & City and Metropolitan lines)",7666555,,yes,,yes,-0.123518,51.530003
+911189370,"King's Cross St Pancras (Circle, Hammersmith & City and Metropolitan lines); King's Cross St Pancras (Piccadilly line); King's Cross St Pancras (Victoria line)",7666554;7666555;7666556,,yes,,yes,-0.123737,51.530409
+2428147211,King's Cross St Pancras (Piccadilly line),7666554,St Pancras,yes,,yes,-0.125779,51.5321
+2670344081,King's Cross St Pancras (Piccadilly line),7666554,King's Cross St Pancras Underground Station,,,yes,-0.123816,51.53087
+2966431610,King's Cross St Pancras (Piccadilly line),7666554,,,,yes,-0.124916,51.533156
+3858588809,King's Cross St Pancras (Piccadilly line),7666554,St Pancras,,,yes,-0.126071,51.532326
+3951416904,King's Cross St Pancras (Piccadilly line),7666554,,,,,-0.12458,51.531675
+3951416907,King's Cross St Pancras (Piccadilly line),7666554,,,,yes,-0.124104,51.531842
+3951416908,King's Cross St Pancras (Piccadilly line),7666554,,,,yes,-0.12476,51.531936
+1436218816,Knightsbridge,7216553,Knightsbridge,,D,no,-0.16052,51.50162
+5475500317,Knightsbridge,7216553,Knightsbridge,,A,no,-0.162649,51.499929
+5475500517,Knightsbridge,7216553,Knightsbridge,,C,no,-0.160084,51.501764
+5475500551,Knightsbridge,7216553,Knightsbridge,,B,no,-0.160359,51.501977
+5475500846,Knightsbridge,7216553,Knightsbridge,,D,no,-0.16042,51.501601
+10773003064,Ladbroke Grove,203365,,,,limited,-0.210171,51.517333
+2574345453,Lambeth North,7216741,,main,,,-0.112135,51.49889
+2206651256,Lancaster Gate,7216562,,,,no,-0.175367,51.511806
+6410209279,Latimer Road,9631958,,,,no,-0.217543,51.513768
+1567761340,Leicester Square (Northern line); Leicester Square (Piccadilly line),7216544;7673780,Leicester Square,,4,no,-0.127937,51.511607
+1567842127,Leicester Square (Northern line); Leicester Square (Piccadilly line),7216544;7673780,Leicester Square,,2,no,-0.128533,51.511486
+1567842141,Leicester Square (Northern line); Leicester Square (Piccadilly line),7216544;7673780,Leicester Square,,1,no,-0.128242,51.511275
+1568611250,Leicester Square (Northern line); Leicester Square (Piccadilly line),7216544;7673780,Leicester Square,,3,no,-0.128258,51.511715
+269236112,Leyton,4036560,,,,no,-0.005666,51.556472
+2350011147,Leytonstone,3083703,,,,no,0.00755,51.56801
+4596766651,Leytonstone,3083703,,yes,,,0.007985,51.567955
+4596766652,Leytonstone,3083703,,yes,,yes,0.008509,51.568231
+7702807819,Leytonstone,3083703,,yes,,,0.008522,51.568322
+1271712918,Liverpool Street (Underground),1571789,,,,no,-0.081175,51.51773
+1390303296,Liverpool Street (Underground),1571789,,yes,,yes,-0.082344,51.517772
+1587318992,Liverpool Street (Underground),1571789,,yes,,yes,-0.082467,51.517997
+3637436402,Liverpool Street (Underground),1571789,,,,,-0.082349,51.517762
+4511948225,Liverpool Street (Underground),1571789,,,,no,-0.083007,51.517454
+302013869,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,Borough High Street (West),,,no,-0.090108,51.504942
+2869215804,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,,,,yes,-0.08706,51.505447
+2869216633,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,,,D,yes,-0.086693,51.505389
+3134220947,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,Borough High Street (East),yes,,yes,-0.089535,51.504991
+4779511335,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,,,B,yes,-0.086637,51.505565
+12228351762,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,,,A,no,-0.086995,51.505851
+12228351777,London Bridge (Jubilee line); London Bridge (Northern line),1574288;7672057,,,C,,-0.086643,51.505454
+1517625818,Loughton,7673043,,,,,0.055118,51.641645
+3654438967,Maida Vale,5369958,Maida Vale,,,,-0.185803,51.529878
+759818258,Manor House,7218538,Exit 5,,5,no,-0.096066,51.570453
+759818259,Manor House,7218538,Exit 4,,4,no,-0.095847,51.570431
+759818269,Manor House,7218538,Exit 3,,3,no,-0.095637,51.570597
+759818277,Manor House,7218538,Exit 7,,7,no,-0.096026,51.571062
+1782059707,Manor House,7218538,Exit 6,,6,no,-0.096421,51.571069
+2204100391,Manor House,7218538,Exit 2,,2,no,-0.095524,51.570736
+2204100392,Manor House,7218538,Exit 1,,1,no,-0.095541,51.571007
+1590789224,Mansion House,7231506,,,,no,-0.093242,51.512375
+1590789253,Mansion House,7231506,Mansion House,,,no,-0.094316,51.512409
+1678155316,Mansion House,7231506,Mansion House,,,no,-0.093799,51.512205
+734984839,Marble Arch,7216563,,,6,,-0.157415,51.511857
+2558339869,Marble Arch,7216563,Marble Arch,,3,no,-0.158531,51.512857
+2558339870,Marble Arch,7216563,Marble Arch,,1,no,-0.158394,51.513565
+2775564042,Marble Arch,7216563,,,7,yes,-0.158363,51.511496
+2775564044,Marble Arch,7216563,,,5,no,-0.158553,51.511952
+13884924259,Marble Arch,7216563,Marble Arch,,,no,-0.158128,51.513233
+1781694459,Marylebone (Bakerloo line),7216567,Marylebone,,,no,-0.163094,51.522736
+133043403,Mile End (Central line); Mile End (District and Hammersmith & City lines),203910;9861906,Mile End,,,no,-0.033414,51.525222
+1288249464,Moorgate,7673652,Moorgate (west side),,2,no,-0.088246,51.518477
+3027323674,Moorgate,7673652,Moorgate (east side),,3,no,-0.08796,51.518405
+3027323675,Moorgate,7673652,Moorfields,,1,no,-0.088512,51.518531
+8898783675,Moorgate,7673652,,,,no,-0.088856,51.518232
+12286248187,Moorgate,7673652,,,,,-0.088951,51.518073
+1406969070,Morden,7220386,Station Entrance,,,,-0.194733,51.40226
+2343331828,Mornington Crescent,2997489,Mornington Crescent,,,,-0.138935,51.534265
+10794029352,Newbury Park,7666571,,,,,0.090436,51.575638
+9113091952,Nine Elms,13223244,,,,yes,-0.128493,51.479877
+2905116131,North Acton,3792353,,,A,no,-0.259778,51.523417
+5531126005,North Acton,3792353,North Acton,yes,B,no,-0.259863,51.523434
+9647992503,North Ealing,9990515,,,,,-0.289099,51.517557
+356071892,North Greenwich,7220369,,yes,,yes,0.003764,51.500402
+1812340266,North Greenwich,7220369,,yes,,yes,0.003911,51.500261
+9104455045,North Greenwich,7220369,,yes,,yes,0.003144,51.500047
+242936414,Northfields,7220416,Northfields,,,no,-0.314374,51.499331
+3091468568,Northolt,4059962,,,,no,-0.368286,51.548107
+1699913768,Northwick Park,3799567,,,,,-0.318311,51.578316
+2901134521,Northwick Park,3799567,,,,,-0.318217,51.57866
+2905107527,Northwick Park,3799567,,,,no,-0.318229,51.578522
+841529954,Notting Hill Gate (Central line); Notting Hill Gate (Circle and District lines),7220385;7704300,Notting Hill Gate,,4,no,-0.196147,51.509189
+841529957,Notting Hill Gate (Central line); Notting Hill Gate (Circle and District lines),7220385;7704300,Notting Hill Gate,,1,no,-0.196209,51.508984
+841529958,Notting Hill Gate (Central line); Notting Hill Gate (Circle and District lines),7220385;7704300,Notting Hill Gate,,3,no,-0.196611,51.509118
+841529967,Notting Hill Gate (Central line); Notting Hill Gate (Circle and District lines),7220385;7704300,Notting Hill Gate,,2,no,-0.196532,51.508934
+295818161,Old Street,7216545,Old Street - Exit 4,,4,yes,-0.08793,51.526001
+6155015831,Old Street,7216545,Old Street - Exit 2,,2,no,-0.086894,51.525344
+9980862189,Old Street,7216545,Old Street Station,,,,-0.087745,51.525761
+6486214853,Osterley,7671870,Osterley,,A,yes,-0.351972,51.480934
+6502804319,Osterley,7671870,Osterley,,B,yes,-0.351908,51.480945
+1964240596,Oval,7218596,Oval,yes,,no,-0.112615,51.481983
+659654477,Oxford Circus,2204290,"Exit 4, Oxford Street - West / Regent Street - North",,4,no,-0.142216,51.515398
+659654478,Oxford Circus,2204290,"Exit 5, Oxford Street - West / Regent Street - South",exit,5,no,-0.141491,51.515244
+659654479,Oxford Circus,2204290,"Exit 2, Oxford Street - East / Regent Street - South",,2,no,-0.141761,51.515188
+659654480,Oxford Circus,2204290,"Exit 1, Oxford Street - East / Regent Street - North",,1,no,-0.141889,51.515436
+659654481,Oxford Circus,2204290,"Exit 3, Oxford Street - West / Regent Street - South",,3,no,-0.142165,51.515132
+659654482,Oxford Circus,2204290,"Exit 8, Argyll Street",exit,8,no,-0.140983,51.515037
+659654483,Oxford Circus,2204290,"Exit 7, Oxford Street",exit,7,no,-0.141017,51.515295
+659654484,Oxford Circus,2204290,"Exit 6, Argyll Street",exit,6,no,-0.141128,51.515256
+12193929800,Paddington (Bakerloo line),7704132,Paddington Underground Station,,,yes,-0.175389,51.516371
+1436229643,Paddington (Bakerloo line); Paddington (Circle and District lines),1562609;7704132,"Paddington (Bakerloo, Circle and District lines)",,,,-0.176674,51.516226
+3100196382,Paddington (Bakerloo line); Paddington (Circle and District lines),1562609;7704132,"Paddington (Bakerloo, Circle and District lines)",,,limited,-0.175586,51.515501
+3649452129,Paddington (Circle and Hammersmith & City lines),1562696,Paddington (Circle and Hammersmith & City lines),,,,-0.178449,51.518488
+5495828221,Park Royal,8186577,,yes,A,no,-0.284602,51.527053
+5495828261,Park Royal,8186577,,yes,B,no,-0.284349,51.527022
+5107248201,Parsons Green,7673839,Parsons Green,,A,no,-0.200826,51.475361
+5464024792,Parsons Green,7673839,Parsons Green,,B,no,-0.20099,51.475416
+5462451573,Perivale,7666559,Perivale,,C,,-0.323733,51.536587
+5462451728,Perivale,7666559,Perivale,,A,no,-0.323945,51.536716
+5462451767,Perivale,7666559,Perivale,,B,no,-0.32389,51.536637
+1227938903,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,4,no,-0.134094,51.509892
+1227938921,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,4,no,-0.134109,51.510111
+1227938928,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,3,no,-0.134523,51.509608
+1227938942,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,3,no,-0.134766,51.509556
+1567896328,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,2,no,-0.13513,51.509983
+6250466320,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,1,no,-0.135044,51.510266
+6311039270,Piccadilly Circus (Bakerloo line); Piccadilly Circus (Piccadilly line),7216557;7704123,Piccadilly Circus,,2,no,-0.134953,51.509802
+273210311,Pimlico,7216716,,,,,-0.133611,51.488908
+1287703199,Pimlico,7216716,,,,yes,-0.132977,51.489105
+1754724809,Pimlico,7216716,,,,no,-0.133061,51.489058
+10990368074,Pimlico,7216716,,,,no,-0.13362,51.489244
+4257808979,Pinner,7666597,,yes,C,no,-0.380197,51.59222
+5504569178,Pinner,7666597,,yes,,yes,-0.380758,51.592891
+5491203694,Plaistow,7666926,Plaistow,yes,A,yes,0.018046,51.531206
+5491207368,Plaistow,7666926,Plaistow,yes,C,yes,0.01786,51.531346
+5491207852,Plaistow,7666926,Plaistow,yes,B,yes,0.018014,51.531267
+2901411241,Preston Road,3799837,,,,no,-0.294884,51.571996
+1707018236,Putney Bridge,7671937,,,,,-0.20901,51.467901
+861357344,Queen's Park,3803730,,main,,no,-0.204615,51.534197
+13259847061,Queensbury,7666574,,,,,-0.285519,51.594431
+10047756841,Queensway,7666598,,,,no,-0.18718,51.510479
+11926119620,Queensway,7666598,,,,,-0.18735,51.51037
+9264275893,Ravenscourt Park,5513294,,,,,-0.236239,51.493955
+9264275894,Ravenscourt Park,5513294,,,,,-0.236476,51.494042
+6279255419,Rayners Lane,7673624,,main,,no,-0.370901,51.575057
+2337312612,Redbridge,7666593,,,,yes,0.045284,51.576381
+2337312616,Redbridge,7666593,,,,yes,0.04554,51.576382
+1754989023,Regent's Park,7216576,Regent's Park,,,no,-0.146848,51.523561
+2109650788,Roding Valley,7673060,Roding_Valley,yes,A,,0.043811,51.617184
+5510513374,Roding Valley,7673060,Roding_Valley,yes,C,,0.0438,51.61701
+5510514122,Roding Valley,7673060,Roding_Valley,yes,B,,0.043715,51.617166
+2940884436,Royal Oak,3861197,,,,no,-0.188689,51.519135
+2905116135,Ruislip,3801709,,yes,,yes,-0.421375,51.571566
+1666386104,Russell Square,7231514,Russell Square,exit,A,no,-0.12432,51.523152
+7557173555,Russell Square,7231514,Russell Square,main,A,yes,-0.124249,51.523168
+2403974186,Seven Sisters,3115058,Seven Sisters,,,no,-0.075021,51.581993
+2403974187,Seven Sisters,3115058,Seven Sisters,,,no,-0.072471,51.583201
+2403974188,Seven Sisters,3115058,Seven Sisters,,,no,-0.071966,51.583281
+2403974189,Seven Sisters,3115058,Seven Sisters,,,no,-0.071958,51.583504
+2403974190,Seven Sisters,3115058,Seven Sisters,,,no,-0.072396,51.583615
+25531623,Shepherd's Bush (Central line),1872409,Shepherd's Bush (Central Line),,,no,-0.218439,51.504763
+8645537547,Shepherd's Bush Market,3776016,,,,,-0.226497,51.505599
+13460887058,Shepherd's Bush Market,3776016,,,,,-0.22634,51.505571
+5168285119,Sloane Square,7216717,Sloane Square,,,,-0.156553,51.492362
+1154677921,Snaresbrook,200247,,,,,0.021624,51.581021
+1154677974,Snaresbrook,200247,,,,,0.021514,51.581054
+10794001703,Snaresbrook,200247,,,,,0.02173,51.58082
+281608544,South Kensington,7216714,South Kensington,,,no,-0.174067,51.497731
+1169725686,South Kensington,7216714,South Kensington,,,no,-0.1742,51.493997
+1321785861,South Kensington,7216714,South Kensington,,,no,-0.173402,51.495396
+6981269682,South Kensington,7216714,South Kensington,,,no,-0.174178,51.49433
+6443125703,South Wimbledon,10042385,,,,,-0.19221,51.415473
+10793986849,South Woodford,3083881,,,,yes,0.027402,51.591956
+10793986850,South Woodford,3083881,,,,,0.027546,51.591936
+2340290839,Southgate,7671935,,,,,-0.127645,51.632413
+914501370,Southwark,7216743,,yes,,yes,-0.104817,51.503809
+3134010903,Southwark,7216743,,,,,-0.107595,51.504431
+3134010911,Southwark,7216743,,,,,-0.107595,51.504308
+5359381330,Southwark,7216743,,yes,,no,-0.10732,51.504189
+5361364376,Southwark,7216743,Southwark Station,yes,,yes,-0.104742,51.503888
+130113776,St. James's Park,7216732,,yes,,no,-0.135333,51.499026
+4116858565,St. James's Park,7216732,,yes,,no,-0.133512,51.4992
+4116860365,St. James's Park,7216732,,yes,,no,-0.133942,51.499611
+4116860369,St. James's Park,7216732,,yes,,no,-0.133278,51.499603
+5487992736,St. John's Wood,7889971,St. John's Wood,,,no,-0.174158,51.534588
+1649365732,St. Paul's,7231505,St. Paul's,,2,no,-0.097601,51.514948
+5475684862,St. Paul's,7231505,St. Paul's,,1,no,-0.097096,51.514965
+5475684864,St. Paul's,7231505,St. Paul's,,1,no,-0.09714,51.515087
+256508646,Stamford Brook,3898725,,,,,-0.245216,51.494762
+2969920237,Stamford Brook,3898725,,,,no,-0.245053,51.494776
+2917442734,Stanmore,3823171,,,,yes,-0.303135,51.619731
+133190031,Stepney Green,7218598,Stepney Green,main,,yes,-0.046669,51.521915
+3279462723,Stockwell,7218595,,,,no,-0.122774,51.4723
+13411711414,Stonebridge Park,8255673,,,,,-0.275296,51.544004
+1322528502,Stratford Rail Station (High Level),6413199,,,,,-0.002707,51.541433
+12108164536,Stratford Rail Station (High Level),6413199,,,,,-0.002894,51.541298
+3983695129,Stratford Rail Station (High Level); Stratford Rail Station (Low Level),6413199;7772545,Westfield Stratford City,,,yes,-0.004484,51.54259
+11368893613,Stratford Rail Station (High Level); Stratford Rail Station (Low Level),6413199;7772545,Town centre,,,,-0.002599,51.54176
+12046071820,Stratford Rail Station (Low Level),7772545,Gibbins Road,,,yes,-0.003691,51.540835
+4334058021,Sudbury Town,7220418,,,,,-0.31573,51.550677
+129879246,Swiss Cottage,7218529,Swiss Cottage Exit 4&5,,,no,-0.175673,51.54358
+5489115426,Swiss Cottage,7218529,Swiss Cottage Exit 3,,3,no,-0.174829,51.543166
+5489115519,Swiss Cottage,7218529,Swiss Cottage Exit 1,,1,no,-0.174341,51.543217
+5489115556,Swiss Cottage,7218529,Swiss Cottage Exit 2,,2,no,-0.174446,51.543689
+1663320226,Temple,7216688,,,,limited,-0.113645,51.511116
+1555998565,Theydon Bois,1924228,Theydon_Bois,yes,A,yes,0.103083,51.671781
+3668572453,Tooting Bec,9856597,,,,,-0.159769,51.435818
+3668572454,Tooting Bec,9856597,,,,,-0.159495,51.435533
+4839779280,Tooting Bec,9856597,,,,,-0.159557,51.435491
+4839779281,Tooting Bec,9856597,,,,,-0.159621,51.435804
+2544231186,Tooting Broadway,10042384,,yes,,yes,-0.167968,51.427709
+2544231190,Tooting Broadway,10042384,,yes,,yes,-0.167794,51.427688
+5461196611,Tottenham Court Road (Underground),4453593,Exit 3 - New Oxford Street / Charing Cross Road,,3,yes,-0.130053,51.516319
+5461196614,Tottenham Court Road (Underground),4453593,Exit 2 - Tottenham Court Road / New Oxford Street,,2,no,-0.130174,51.516567
+5461199022,Tottenham Court Road (Underground),4453593,Exit 4 - Charing Cross Road,,4,no,-0.129893,51.515882
+9041881190,Tottenham Court Road (Underground),4453593,,,,yes,-0.134062,51.515849
+10676305852,Tottenham Court Road (Underground),4453593,Exit 1 - Charing Cross Road / Oxford Street,,1,yes,-0.130585,51.516277
+9513744946,Tottenham Hale,204675,Tottenham Hale Station,yes,,yes,-0.060546,51.588433
+1048410592,Tower Hill,7216753,Tower Hill,,,yes,-0.076397,51.509843
+2531865787,Tower Hill,7216753,Tower Hill,,,yes,-0.076578,51.510056
+2417777294,Tufnell Park,7216772,Tufnell Park,,,no,-0.138132,51.556745
+2196630994,Turnham Green,3783537,,yes,,no,-0.255094,51.495284
+4452525379,Turnpike Lane,7220378,High Road Green Lanes (East),yes,A,no,-0.103015,51.590446
+4452525386,Turnpike Lane,7220378,High Road (West),yes,C,no,-0.103617,51.59055
+4452525389,Turnpike Lane,7220378,Turnpike Lane,yes,B,no,-0.103542,51.590161
+4452525401,Turnpike Lane,7220378,High Road Green Lanes (West),yes,A,no,-0.102681,51.590497
+3244383798,Upminster,7666590,,main,,,0.250491,51.559022
+11752158564,Upminster,7666590,,,,,0.251553,51.558732
+3061313991,Upminster Bridge,4013364,,,,no,0.235812,51.558902
+3059650358,Upney,4011273,,,,yes,0.101603,51.538414
+926239878,Vauxhall,5639629,,,2,yes,-0.123798,51.485939
+1795470572,Vauxhall,5639629,,,4,no,-0.124951,51.485585
+2146058862,Vauxhall,5639629,,,1,no,-0.124515,51.48625
+3817850260,Vauxhall,5639629,,,3,no,-0.12332,51.485827
+169454966,Victoria (Underground),7704122,,yes,,no,-0.143862,51.496542
+169481934,Victoria (Underground),7704122,,yes,,no,-0.143978,51.496259
+4613902901,Victoria (Underground),7704122,Tube: North Ticket Hall,,,yes,-0.141523,51.496829
+7730374800,Victoria (Underground),7704122,,,,yes,-0.143189,51.495693
+9597688949,Victoria (Underground),7704122,Tube: North Ticket Hall,,,yes,-0.141487,51.496907
+10794007650,Wanstead,7666561,,,,,0.028564,51.575615
+10794007651,Wanstead,7666561,,,,,0.028584,51.575584
+2365046453,Warren Street (Northern line); Warren Street (Victoria line),7216586;7673831,Warren Street,,,no,-0.138084,51.524636
+2365046457,Warren Street (Northern line); Warren Street (Victoria line),7216586;7673831,Warren Street,,,no,-0.138174,51.524491
+1782125670,Warwick Avenue,7218554,Warwick Avenue Exit A,yes,A,no,-0.18356,51.523306
+3959650479,Warwick Avenue,7218554,Warwick Avenue Exit B,yes,B,no,-0.184016,51.523069
+6735162515,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line),238793;7704127;13331679,York Road,,,yes,-0.115186,51.503968
+914438342,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,,,4,,-0.113831,51.505644
+1953721172,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,,,3,,-0.114561,51.505781
+1953721173,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,,,4,,-0.114281,51.505874
+2625374441,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,,,4,no,-0.113505,51.505297
+2641139302,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,,,4,yes,-0.11345,51.505318
+4274551641,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,Waterloo,,,no,-0.11209,51.502881
+4274551706,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,Waterloo,,,no,-0.113484,51.503348
+4275242334,Waterloo (Bakerloo line); Waterloo (Jubilee line); Waterloo (Northern line); Waterloo (Waterloo & City line),238793;7704126;7704127;13331679,Waterloo,,,,-0.11171,51.503382
+10315035466,Wembley Central,9980113,,,,,-0.296796,51.552207
+2907810003,Wembley Park,3808861,,,,no,-0.279988,51.563017
+2907810006,Wembley Park,3808861,,,,no,-0.279886,51.563017
+2907810047,Wembley Park,3808861,C,,,yes,-0.279257,51.563162
+2907810065,Wembley Park,3808861,B,,,yes,-0.27915,51.563291
+2907810083,Wembley Park,3808861,A,,,yes,-0.279048,51.563415
+2970698856,Wembley Park,3808861,D,,,yes,-0.279339,51.563125
+2970698857,Wembley Park,3808861,E,,,yes,-0.279357,51.563106
+2971213611,Wembley Park,3808861,,,,no,-0.279764,51.563018
+3507694573,Wembley Park,3808861,Lift,,,yes,-0.280172,51.56296
+12085209715,West Acton,7673065,,,,yes,-0.28106,51.517886
+4443568378,West Brompton,9746606,West Brompton,,A,yes,-0.195614,51.487373
+5461690597,West Brompton,9746606,West Brompton,,C,no,-0.196031,51.487237
+5461690598,West Brompton,9746606,West Brompton,,B,yes,-0.19567,51.487343
+8176294605,West Brompton,9746606,West Brompton,,,yes,-0.195772,51.48729
+5457001672,West Ham,7766454,West Ham,yes,A,yes,0.00517,51.527944
+5490904342,West Hampstead,7220428,,yes,A,no,-0.190963,51.54676
+1558429812,West Kensington,7671872,,,,,-0.206571,51.490573
+13460891681,Westbourne Park,9629192,,,,,-0.200866,51.521118
+13460891682,Westbourne Park,9629192,,,,,-0.200668,51.52087
+587959213,Westminster (Circle and District lines); Westminster (Jubilee line),7216731;7673041,,,1,yes,-0.12374,51.501152
+1587633281,Westminster (Circle and District lines); Westminster (Jubilee line),7216731;7673041,,,,no,-0.125976,51.501227
+1587633283,Westminster (Circle and District lines); Westminster (Jubilee line),7216731;7673041,,,,no,-0.12643,51.501243
+2621668682,Westminster (Circle and District lines); Westminster (Jubilee line),7216731;7673041,,,,no,-0.124223,51.500781
+10671686470,Westminster (Circle and District lines); Westminster (Jubilee line),7216731;7673041,,,,yes,-0.124886,51.501061
+12793161797,Westminster (Jubilee line),7673041,,,2,,-0.123787,51.501154
+1525365546,White City,7220383,White City,,,,-0.224685,51.511952
+9034242022,Whitechapel,3155934,Durward Street,,,yes,-0.060468,51.520016
+9034242023,Whitechapel,3155934,,,,yes,-0.059588,51.519374
+5459566868,Willesden Green,7220380,Walm Lane,,A,,-0.221058,51.549267
+5459566869,Willesden Green,7220380,Walm Lane,,B,,-0.22116,51.549043
+2905116132,Willesden Junction,3791636,,,,yes,-0.243613,51.532163
+3718925484,Willesden Junction,3791636,,,,yes,-0.245103,51.532225
+3748134859,Wimbledon Park,7220387,,,,yes,-0.199584,51.434591
+1802592682,Wood Green,7220377,Wood Green,,,no,-0.109833,51.597384
+308426708,Wood Lane,7220382,Wood Lane,yes,A,yes,-0.224432,51.509986
+4860732668,Woodford,15730346,Woodford Station,,,yes,0.034047,51.607248
+4860732670,Woodford,15730346,,,,,0.034361,51.607188

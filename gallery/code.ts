@@ -10,11 +10,40 @@ export function exampleCode(id: string, state: Record<string, string>): string {
             return `new AutkMap(canvas, { showUi: false });\nmap.loadCollection('${layer}', { collection${type} });\n${tune}map.fitBounds();\nmap.draw();`;
         }
         case 'D02': return `new AutkMap(canvas, { crs: '${state.crs || 'EPSG:3395'}', showUi: false });\nmap.loadCollection('community-areas', { collection, sourceCrs: 'EPSG:4326' });`;
-        case 'D03': return `await db.loadGeojson({ ${variant === 'memory' ? 'geojsonObject: collection' : "geojsonFileUrl: '/data/mnt_neighs.geojson'"}, outputTableName: 'neighborhoods' });\nmap.loadCollection('neighborhoods', { collection: await db.getLayer('neighborhoods') });`;
-        case 'D04': return `await db.${state.format === 'json' ? 'loadJson' : 'loadCsv'}({\n  ${state.format === 'json' ? 'jsonObject: rows' : "csvFileUrl: '/data/parks.csv'"},\n  outputTableName: 'parks',\n  geometryColumns: ${state.geometry === 'wkt' ? "{ wktColumnName: 'wkt' }" : "{ latColumnName: 'Latitude', longColumnName: 'Longitude' }"},\n});`;
-        case 'D05': return `await db.loadOsm({\n  queryArea: ${variant === 'place' ? "{ geocodeArea: 'New York', areas: ['Battery Park City', 'Financial District'] }" : '{ bbox: [-74.019, 40.700, -74.003, 40.714] }'},\n  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },\n});`;
-        case 'D06': return `await db.loadOsm({\n  pbfFileUrl: '/data/niteroi.osm.pbf',\n  queryArea: { bbox: ${state.extent === 'clipped' ? '[-43.13, -22.95, -43.08, -22.88]' : '[-43.14, -22.97, -43.03, -22.85]'} },\n  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },\n});`;
-        case 'D07': return "await db.setWorkspace('battery_park_city');\nawait db.loadOsm({ pbfFileUrl: '/data/lower_mnt.osm.pbf', queryArea: { bbox }, autoLoadLayers: { layers } });\nawait db.setWorkspace('financial_district');";
+        case 'D03': {
+            const city = state.workspace || 'paris';
+            const [workspace, load, layer] = city === 'new_york'
+                ? ['new_york', "geojsonObject: collection", 'neighborhoods']
+                : city === 'chicago'
+                    ? ['chicago', "geojsonObject: collection", 'community_areas']
+                    : ['paris', "geojsonFileUrl: '/data/paris-arrondissements.geojson'", 'arrondissements'];
+            return `await db.setWorkspace('${workspace}');\nawait db.loadGeojson({ ${load}, outputTableName: '${layer}' });\nmap.loadCollection('${layer}', { collection: await db.getLayer('${layer}'), type: 'polygons' });`;
+        }
+        case 'D04': return `await db.loadCsv({
+  csvFileUrl: '/data/london-boroughs.csv',
+  outputTableName: 'boroughs',
+  geometryColumns: { wktColumnName: 'wkt' },
+});
+await db.loadJson({
+  jsonFileUrl: '/data/london-tube-lines.json',
+  outputTableName: 'tube_lines',
+  geometryColumns: { wktColumnName: 'wkt' },
+});
+await db.loadCsv({
+  csvFileUrl: '/data/london-tube-entrances.csv',
+  outputTableName: 'tube_entrances',
+  geometryColumns: { latColumnName: 'lat', longColumnName: 'lon' },
+});`;
+        case 'D05': return `await db.loadOsm({
+  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Comunidad de Madrid', areas: ['Sol'] }" : '{ bbox: [-3.7089, 40.4135, -3.6992, 40.4204] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
+});${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
+        case 'D06': return `await db.loadOsm({
+  pbfFileUrl: '/data/monaco-condamine.osm.pbf',
+  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Monaco', areas: ['La Condamine', 'Monaco-Ville'] }" : '{ bbox: [7.4158, 43.7293, 7.4322, 43.7378] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
+});${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
+        case 'I04': return "await db.setWorkspace('battery_park_city');\nawait db.loadOsm({ pbfFileUrl: '/data/lower_mnt.osm.pbf', queryArea: { bbox }, autoLoadLayers: { layers } });\nawait db.setWorkspace('financial_district');";
         case 'I01': return "map.updateRenderInfo('table_osm_buildings', { isPick: true });\nmap.events.on(MapEvent.PICKING, ({ selection, layerId }) => {\n  map.setHighlightedIds(layerId, selection);\n});";
         case 'I02': return "map.setSkippedIds('table_osm_buildings', [id]);   // hide\nmap.clearSkippedIds('table_osm_buildings');      // restore all";
         case 'I03': return "map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });\nmap.fitBounds();\nawait new CameraMotion().zoomOut(1.5, 1).pitch(-35, 1).yaw(20, 1).play(map.camera);";

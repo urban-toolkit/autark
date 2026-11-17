@@ -28,48 +28,102 @@ map.setView({ center: { latitude: 41.855, longitude: -87.665 }, zoom: 11 });
 const collection = await fetch('/data/chi-community-areas.geojson').then(response => response.json());
 map.loadCollection('community-areas', { collection, sourceCrs: 'EPSG:4326' });
 map.draw();`;
-        case 'D03': return `${DB_MAP}
-${variant === 'memory'
-                ? "const collection = await fetch('/data/mnt_neighs.geojson').then(response => response.json());\nawait db.loadGeojson({ geojsonObject: collection, outputTableName: 'neighborhoods' });"
-                : "await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });"}
+        case 'D03': {
+            const { workspace, table, file, input } = D03_CITIES[state.workspace || 'paris'] ?? D03_CITIES.paris!;
+            const load = input === 'url'
+                ? `await db.loadGeojson({ geojsonFileUrl: '/data/${file}', outputTableName: '${table}' });`
+                : `const collection = await fetch('/data/${file}').then(response => response.json());\nawait db.loadGeojson({ geojsonObject: collection, outputTableName: '${table}' });`;
+            return `import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
 
-map.loadCollection('neighborhoods', { collection: await db.getLayer('neighborhoods') });
+const db = new AutkDb();
+await db.init();
+
+// One workspace per city; switching workspaces swaps the visible dataset.
+await db.setWorkspace('${workspace}');
+${load}
+
+const map = new AutkMap(document.querySelector('canvas')!, { showUi: false });
+await map.init();
+map.loadCollection('${table}', { collection: await db.getLayer('${table}'), type: 'polygons' });
 map.fitBounds();
 map.draw();`;
-        case 'D04': return `${DB_MAP}
-await db.${state.format === 'json' ? 'loadJson' : 'loadCsv'}({
-  ${state.format === 'json' ? 'jsonObject: rows' : "csvFileUrl: '/data/parks.csv'"},
-  outputTableName: 'parks',
-  geometryColumns: ${state.geometry === 'wkt' ? "{ wktColumnName: 'wkt' }" : "{ latColumnName: 'Latitude', longColumnName: 'Longitude' }"},
+        }
+        case 'D04': return `import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
+import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
+
+const db = new AutkDb();
+await db.init();
+
+// One workspace: the boroughs cover the whole area, so they are imported first and the
+// later layers are clipped to the same ground.
+await db.setWorkspace('london');
+await db.loadCsv({
+  csvFileUrl: '/data/london-boroughs.csv',
+  outputTableName: 'boroughs',
+  geometryColumns: { wktColumnName: 'wkt' },
+});
+await db.loadJson({
+  jsonFileUrl: '/data/london-tube-lines.json',
+  outputTableName: 'tube_lines',
+  geometryColumns: { wktColumnName: 'wkt' },
+});
+await db.loadCsv({
+  csvFileUrl: '/data/london-tube-entrances.csv',
+  outputTableName: 'tube_entrances',
+  geometryColumns: { latColumnName: 'lat', longColumnName: 'lon' },
 });
 
-map.loadCollection('parks', { collection: await db.getLayer('parks'), type: 'points' });
+const map = new AutkMap(document.querySelector('canvas')!);
+await map.init();
+map.loadCollection('boroughs', { collection: await db.getLayer('boroughs'), type: 'polygons' });
+map.updateRenderInfo('boroughs', { opacity: 0.25, showBorders: true });
+
+const tubeLines = await db.getLayer('tube_lines');
+map.loadCollection('tube_lines', { collection: tubeLines, type: 'polylines' });
+map.updateRenderInfo('tube_lines', { polylinesWidth: 900, isColorMap: true });
+map.updateColorMap('tube_lines', { colorMap: { interpolator: ColorMapInterpolator.CAT_PAIRED } });
+map.updateThematic('tube_lines', { collection: tubeLines, property: 'properties.name' });
+
+const entrances = await db.getLayer('tube_entrances');
+for (const feature of entrances.features) feature.properties!.wheelchair ||= 'unmapped';
+map.loadCollection('tube_entrances', { collection: entrances, type: 'points' });
+map.updateRenderInfo('tube_entrances', { pointSize: 450 });
+map.updateColorMap('tube_entrances', { colorMap: {
+  interpolator: ColorMapInterpolator.CAT_SET1,
+  domainSpec: { type: ColorMapDomainStrategy.USER, params: ['no', 'limited', 'yes', 'unmapped'] },
+} });
+map.updateThematic('tube_entrances', { collection: entrances, property: 'properties.wheelchair' });
 map.fitBounds();
 map.draw();`;
         case 'D05': return `${DB_MAP}
 await db.loadOsm({
-  queryArea: ${variant === 'place' ? "{ geocodeArea: 'New York', areas: ['Battery Park City', 'Financial District'] }" : '{ bbox: [-74.019, 40.700, -74.003, 40.714] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'playgrounds', type: 'polygons', tags: [{ key: 'leisure', value: 'playground' }] },\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
-  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Comunidad de Madrid', areas: ['Sol'] }" : '{ bbox: [-3.7089, 40.4135, -3.6992, 40.4204] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });
 
 for (const layer of db.getLayersMetadata()) {
   map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
 }
-map.fitBounds();
+${variant === 'tags' ? "map.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });\n" : ''}map.fitBounds();
 map.draw();`;
         case 'D06': return `${DB_MAP}
 await db.loadOsm({
-  pbfFileUrl: '/data/niteroi.osm.pbf',
-  queryArea: { bbox: ${state.extent === 'clipped' ? '[-43.13, -22.95, -43.08, -22.88]' : '[-43.14, -22.97, -43.03, -22.85]'} },
-  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+  pbfFileUrl: '/data/monaco-condamine.osm.pbf',
+  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Monaco', areas: ['La Condamine', 'Monaco-Ville'] }" : '{ bbox: [7.4158, 43.7293, 7.4322, 43.7378] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });
 
-map.setView({ center: { latitude: -22.9, longitude: -43.1 }, zoom: 13 });
 for (const layer of db.getLayersMetadata()) {
-  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
+  map.loadCollection(layer.name, {
+    collection: await db.getLayer(layer.name), type: layer.type,
+    loadConfig: { buildingsZeroHeight: true },
+  });
 }
+${variant === 'tags' ? "map.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });\n" : ''}map.fitBounds();
 map.draw();`;
-        case 'D07': return `${DB_MAP}
+        case 'I04': return `${DB_MAP}
 await db.setWorkspace('battery_park_city');
 await db.loadOsm({
   pbfFileUrl: '/data/lower_mnt.osm.pbf',
@@ -399,6 +453,12 @@ await db.init();
 const map = new AutkMap(document.querySelector('canvas')!);
 await map.init();
 `;
+
+const D03_CITIES: Record<string, { workspace: string; table: string; file: string; input: 'url' | 'object' }> = {
+    paris: { workspace: 'paris', table: 'arrondissements', file: 'paris-arrondissements.geojson', input: 'url' },
+    new_york: { workspace: 'new_york', table: 'neighborhoods', file: 'mnt_neighs.geojson', input: 'object' },
+    chicago: { workspace: 'chicago', table: 'community_areas', file: 'chi-community-areas.geojson', input: 'object' },
+};
 
 const TILES = `import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
 
