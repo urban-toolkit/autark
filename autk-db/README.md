@@ -95,7 +95,7 @@ BBox gallery examples: [`osm-layers-api-bbox`](../gallery/src/autk-map/osm-layer
 
 ### Typed OpenStreetMap tag sets
 
-Overpass loads custom tag-selected layers beside the standard themes. **Each set requires one `type`** and creates only `<outputTableName>_<name>_<type>`; there is no automatic three-layer split or geometry conversion.
+Overpass and local PBF loading support custom tag-selected layers beside the standard themes. **Each set requires one `type`** and creates only `<outputTableName>_<name>_<type>`; there is no automatic three-layer split or geometry conversion.
 
 ```ts
 await db.loadOsm({
@@ -116,9 +116,9 @@ All tag sets are filtered/cropped against the same mandatory, optionally coastal
 
 A set with no features after clipping has no table or timings entry. Reload replaces the set's layer, removes obsolete geometry-family tables for that same set, and restores its old table/metadata if processing fails. Sets omitted from a later call are not deleted. Per-set table replacement and clipping are transactional; the entire OSM import remains non-atomic. Tag timing entries carry `tagSet` and a **final, post-clipping** `featureCount`.
 
-Tag sets are **Overpass-only**; combining them with `pbfFileUrl` throws before acquisition. Validation allows at most 8 sets, unique lowercase identifier names (up to 32 characters), and 1–64 filters per set. Keys use `[A-Za-z0-9][A-Za-z0-9_:.-]*` (up to 255 characters); values are 1–255 characters without control characters. One extra Overpass request acquires all sets, with selectors restricted to requested element families. Cache keys include geometry types and canonical filters, not set names/order; traditional full-data cache entries never satisfy tag requests.
+Tag sets work with either source. With `pbfFileUrl`, the streaming reader selects matching nodes, ways, and multipolygon relations locally, retaining untagged members for assembly and tagged way vertices without duplicates. The file must contain the required objects; missing data is never fetched from Overpass. Validation allows at most 8 sets, unique lowercase identifier names (up to 32 characters), and 1–64 filters per set. Keys use `[A-Za-z0-9][A-Za-z0-9_:.-]*` (up to 255 characters); values are 1–255 characters without control characters. For the live source, one extra Overpass request acquires all sets, with selectors restricted to requested element families. Cache keys include geometry types and canonical filters, not set names/order; traditional full-data cache entries never satisfy tag requests.
 
-Gallery example, based on `osm-layers-pbf.ts` but using Overpass: [`osm-tag-sets`](../gallery/src/autk-map/osm-tag-sets.ts). Open `/src/autk-map/osm-tag-sets.html` to see food points, footway lines and playground polygons with the standard Lower Manhattan layers.
+The gallery demonstrates matching named-place, bounding-box, and custom-tag queries through [Overpass in Sol, Madrid](../gallery/src/autk-map/osm-layers-api.html) and a [bundled PBF in La Condamine, Monaco](../gallery/src/autk-map/osm-layers-pbf.html). The tag variants add cafe points and omit buildings from the standard layers.
 
 ### Building features and spatial joins
 

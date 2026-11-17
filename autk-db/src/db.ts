@@ -322,9 +322,6 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const tagSets = checkTagSets(params.tagSets);
-        if (tagSets.length > 0 && params.pbfFileUrl) {
-            throw new Error('tagSets are not supported with pbfFileUrl.');
-        }
 
         const workspaceData = this.getCurrentWorkspaceData();
         if (workspaceData.tables.some((table) => table.source !== 'osm')) {

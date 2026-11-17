@@ -133,7 +133,7 @@ export type LoadOsmParams = {
    * Surface excludes sea when reconstruction succeeds; otherwise the full query area is used with a warning.
    * Buildings retain complete original parts. */
   queryArea: OsmQueryArea;
-  /** Overpass-only tag-selected layers, clipped to the mandatory surface. Each set requires one geometry type. */
+  /** Tag-selected layers from Overpass or the bundled PBF, clipped to the mandatory surface. Each set requires one geometry type. */
   tagSets?: OsmTagSet[];
   /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
   pbfFileUrl?: string;

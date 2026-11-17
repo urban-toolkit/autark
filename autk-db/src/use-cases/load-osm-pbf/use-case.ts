@@ -13,7 +13,7 @@ import {
   DEFAULT_WORKSPACE_NAME,
 } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { LoadOsmParams, OsmElement, OsmNamedArea, boundingBoxOf, checkTagSets, isBoundingBoxArea } from '../load-osm-overpass/interfaces';
+import { LoadOsmParams, OsmElement, OsmNamedArea, OsmTagSet, boundingBoxOf, checkTagSets, isBoundingBoxArea } from '../load-osm-overpass/interfaces';
 import type { MultiPolygon } from 'geojson';
 import { coastalLandMask } from '../../internal/process-osm-surface/coastline';
 import { OsmProcessingPipeline } from '../../internal/process-osm/pipeline';
@@ -114,9 +114,7 @@ export class LoadOsmFromPbfUseCase {
   }
 
   async exec(params: LoadOsmParams): Promise<OsmExecResult> {
-    if (checkTagSets(params.tagSets).length > 0) {
-      throw new Error('tagSets are not supported with pbfFileUrl.');
-    }
+    const tagSets = checkTagSets(params.tagSets);
     const pbfFileUrl = params.pbfFileUrl;
     if (!pbfFileUrl) throw new Error('pbfFileUrl must be provided for PBF loading');
     const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
@@ -140,6 +138,7 @@ export class LoadOsmFromPbfUseCase {
       boundaryContext.boundaryRelationIds,
       boundaryContext.boundaryWayIds,
       requestedLayers,
+      tagSets,
     );
 
     await this.collectRequiredNodes(pbfFileUrl, candidates.requiredNodeIds, candidates.elements);
@@ -150,6 +149,7 @@ export class LoadOsmFromPbfUseCase {
       bbox,
       boundaryContext.boundaryRelationIds,
       boundaryContext.boundaryWayIds,
+      tagSets,
     );
     const grouped = this.buildGroupedCollections(
       filteredElements,
@@ -168,7 +168,9 @@ export class LoadOsmFromPbfUseCase {
       && (!coastlineExtent || !element.geometry || this.wayIntersectsBbox(element, coastlineExtent)));
     const surfaceMask = coastlineExtent ? coastalLandMask(coastlines, coastlineExtent) : undefined;
     if (!coastlineExtent) console.warn('[autk-db] No complete geocode boundary in PBF; coastal water is not generated. Include the geocode region and all its bbox coastlines in the extract.');
-    const combined = this.mergeResponses(
+    // Custom tag sets also need standalone nodes and arbitrary ways/multipolygons,
+    // including untagged members that do not belong to a standard theme.
+    const combined = tagSets.length > 0 ? { elements: filteredElements } : this.mergeResponses(
       this.mergeResponses(grouped.boundaries, grouped.parksWater),
       this.mergeResponses(grouped.roads, grouped.buildings),
     );
@@ -263,6 +265,7 @@ export class LoadOsmFromPbfUseCase {
     boundaryRelationIds: Set<number>,
     boundaryWayIds: Set<number>,
     requestedLayers: RequestedLayer[],
+    tagSets: OsmTagSet[],
   ): Promise<{
     elements: OsmElement[];
     requiredNodeIds: IdFilter;
@@ -274,7 +277,8 @@ export class LoadOsmFromPbfUseCase {
       for (const element of blockElements) {
         if (element.type !== 'relation') continue;
 
-        if (boundaryRelationIds.has(element.id) || this.matchesRequestedRelationLayers(element.tags, requestedLayers)) {
+        if (boundaryRelationIds.has(element.id) || this.matchesRequestedRelationLayers(element.tags, requestedLayers)
+          || this.matchesTagSets(element, tagSets)) {
           elements.push(element);
           for (const member of element.members ?? []) {
             if (member.type === 'way') relationWayIds.add(member.ref);
@@ -287,13 +291,15 @@ export class LoadOsmFromPbfUseCase {
 
     await this.streamPbfBlocks(pbfFileUrl, async (blockElements) => {
       for (const element of blockElements) {
+        if (element.type === 'node' && this.matchesTagSets(element, tagSets)) elements.push(element);
         if (element.type !== 'way') continue;
 
         const keep =
           boundaryWayIds.has(element.id) ||
           element.tags?.natural === 'coastline' ||
           relationWayIds.has(element.id) ||
-          this.matchesRequestedWayLayers(element.tags, requestedLayers);
+          this.matchesRequestedWayLayers(element.tags, requestedLayers) ||
+          this.matchesTagSets(element, tagSets);
 
         if (!keep) continue;
 
@@ -312,10 +318,11 @@ export class LoadOsmFromPbfUseCase {
     requiredNodeIds: IdFilter,
     elements: OsmElement[],
   ): Promise<void> {
+    const existing = new Set(elements.filter(element => element.type === 'node').map(element => element.id));
     await this.streamPbfBlocks(pbfFileUrl, async (blockElements) => {
       for (const element of blockElements) {
         if (element.type !== 'node') continue;
-        if (!requiredNodeIds.has(element.id)) continue;
+        if (!requiredNodeIds.has(element.id) || existing.has(element.id)) continue;
         elements.push(element);
       }
     });
@@ -326,6 +333,7 @@ export class LoadOsmFromPbfUseCase {
     bbox: Bbox,
     boundaryRelationIds: Set<number>,
     boundaryWayIds: Set<number>,
+    tagSets: OsmTagSet[],
   ): OsmElement[] {
     const intersectingWays = new IdFilter();
 
@@ -375,7 +383,10 @@ export class LoadOsmFromPbfUseCase {
 
     return elements.filter((element) => {
       if (element.type === 'way') return keptWays.has(element.id);
-      if (element.type === 'node') return keptNodeIds.has(element.id);
+      if (element.type === 'node') return keptNodeIds.has(element.id) || (
+        this.matchesTagSets(element, tagSets) && element.lon !== undefined && element.lat !== undefined
+        && element.lon >= bbox.west && element.lon <= bbox.east && element.lat >= bbox.south && element.lat <= bbox.north
+      );
       if (element.type === 'relation') return keptRelationIds.has(element.id);
       return false;
     });
@@ -535,6 +546,18 @@ export class LoadOsmFromPbfUseCase {
     for await (const block of blocks) {
       await onBlock(blockToElements(block));
     }
+  }
+
+  /** Same exact-value/OR and geometry-family selection used by Overpass tag queries. */
+  private matchesTagSets(element: OsmElement, tagSets: OsmTagSet[]): boolean {
+    if (!element.tags) return false;
+    return tagSets.some(set => {
+      const familyMatches = element.type === 'node' ? set.type === 'points'
+        : element.type === 'way' ? set.type !== 'points'
+          : set.type === 'polygons' && element.tags!.type === 'multipolygon';
+      return familyMatches && set.tags.some(tag => element.tags![tag.key] !== undefined
+        && (tag.value === undefined || element.tags![tag.key] === tag.value));
+    });
   }
 
   private matchesRequestedWayLayers(tags: Record<string, string> | undefined, requestedLayers: RequestedLayer[]): boolean {

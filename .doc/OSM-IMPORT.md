@@ -132,7 +132,7 @@ await db.loadOsm({
 | `autoLoadLayers.layers` | Public layers extracted, in the given order. Surface is always built; if omitted, it stays hidden from the layer listing. |
 | `autoLoadLayers.coordinateFormat` | Declared CRS of the input; default `EPSG:4326`. Does not change the CRS of the data at the source. |
 | `outputTableName` | Table prefix; default `table_osm`. |
-| `tagSets` | Overpass layers selected by tags, each set with a mandatory `type`: `points`, `polylines` or `polygons`. All of them go through the surface. Does not accept `pbfFileUrl`. |
+| `tagSets` | Layers selected by tags from Overpass or PBF, each set with a mandatory `type`: `points`, `polylines` or `polygons`. All of them go through the surface. |
 | `forceRefresh` | Ignores the Overpass cache. Does not complete or update the PBF file. |
 | `onProgress` | Receives the loading phases; it is not a progress percentage. |
 
@@ -157,11 +157,11 @@ Each set requires a single type and does not convert geometries: `points` accept
 
 Acquisition keeps members to assemble relations, but the final layer goes through the surface, including the coastal mask: external points are excluded; lines and areas are clipped; empty results and components incompatible with the type are discarded. This prevents an auxiliary member that is entirely external from surviving as an independent feature. An internal member with its own tags can still be a feature; there is no semantic deduplication between a relation and its members.
 
-There are at most 8 sets, unique names in lowercase identifier format (up to 32 characters) and 1 to 64 filters per set. Keys have up to 255 characters and the format `[A-Za-z0-9][A-Za-z0-9_:.-]*`; values have 1 to 255 characters, without control characters. Invalid parameters and combination with PBF are refused before acquisition. Invalid ways or ways without all their coordinates are omitted with a warning; relation reconstruction keeps the existing limits of section 9. SQL errors and precision grid collapse are propagated.
+There are at most 8 sets, unique names in lowercase identifier format (up to 32 characters) and 1 to 64 filters per set. Keys have up to 255 characters and the format `[A-Za-z0-9][A-Za-z0-9_:.-]*`; values have 1 to 255 characters, without control characters. Invalid parameters are refused before acquisition for both sources. PBF acquisition selects matching nodes, ways and multipolygon relations locally, retaining their required nodes and untagged members without duplicating tagged way vertices. Missing objects are never fetched from Overpass. Invalid ways or ways without all their coordinates are omitted with a warning; relation reconstruction keeps the existing limits of section 9. SQL errors and precision grid collapse are propagated.
 
 A set produces only `<outputTableName>_<name>_<type>`. If it is empty after clipping, there is no table and no timing. A reload removes old tables of other types of the same set; sets omitted in the new call are not removed. Replacement, normalization and clipping of each set are transactional, restoring the previous table/metadata on error; the whole OSM load is not a single transaction. Per-element export uses the current explicit provenance, without inference from `refs`. Explicit nodes keep their tags even when they were already emitted as way vertices, without reordering the elements. `read_json` uses explicit column types so as not to depend on an initial sample made only of nodes.
 
-Gallery example: [`osm-tag-sets.ts`](../gallery/src/autk-map/osm-tag-sets.ts), based on `osm-layers-pbf.ts`, using Overpass and the same named boundaries of Lower Manhattan.
+The gallery compares the same named-place, bounding-box and tag queries using [Overpass in Sol, Madrid](../gallery/src/autk-map/osm-layers-api.html) and a [local PBF in La Condamine, Monaco](../gallery/src/autk-map/osm-layers-pbf.html). Both tag variants select cafe points and omit buildings.
 
 ## 3. Acquisition via Overpass
 

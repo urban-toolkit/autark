@@ -227,13 +227,13 @@ describe('typed OSM tag sets', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('rejects PBF and duplicate set names before network requests', async () => {
-    await db.setWorkspace(`tag_pbf_${++serial}`);
+  it('rejects duplicate set names before network requests for both sources', async () => {
+    await db.setWorkspace(`tag_duplicates_${++serial}`);
     const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network request'));
-    await expect(db.loadOsm({ queryArea: { bbox }, autoLoadLayers: { layers: [] }, tagSets: [schools('points')], pbfFileUrl: '/data.pbf' }))
-      .rejects.toThrow('tagSets are not supported with pbfFileUrl');
-    await expect(db.loadOsm({ queryArea: { bbox }, autoLoadLayers: { layers: [] }, tagSets: [schools('points'), schools('polygons')] }))
-      .rejects.toThrow(/unique/);
+    for (const pbfFileUrl of [undefined, '/data.pbf']) {
+      await expect(db.loadOsm({ queryArea: { bbox }, autoLoadLayers: { layers: [] }, tagSets: [schools('points'), schools('polygons')], pbfFileUrl }))
+        .rejects.toThrow(/unique/);
+    }
     expect(fetch).not.toHaveBeenCalled();
   });
 
