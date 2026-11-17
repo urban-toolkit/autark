@@ -253,6 +253,13 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.
 * `destroy()`: Releases event handlers and GPU resources.
 
+Categorical legends display one color swatch and wrapping label per row. They stay
+within the canvas and scroll when the category list is tall. Continuous legends
+retain their horizontal color ramp. Layer-menu legend buttons select one thematic
+layer at a time; clicking the selected button switches thematic coloring off. Only
+the selected layer uses its color map and displays a legend; other layers use their
+base colors. Explicit legend choices survive data refreshes and picking changes.
+
 ## Layer order and elevation
 
 `LayerInfo.zIndex` controls CPU layer ordering only. Polygons, borders, rasters,

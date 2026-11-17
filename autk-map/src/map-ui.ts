@@ -13,9 +13,9 @@ import { ColorMap } from '@urban-toolkit/autk-core';
 import type { ColorRGB } from '@urban-toolkit/autk-core';
 import { AUTARK_CREDIT, createAttributionElement, mergeCredits } from './attribution';
 import type { TileCredit } from './attribution';
-import { Layer } from './layer';
+import type { Layer } from './layer';
 import { legendLabelPlacements } from './legend-labels';
-import { AutkMap } from './map';
+import type { AutkMap } from './map';
 
 import * as d3 from 'd3';
 
@@ -47,6 +47,8 @@ export class AutkMapUi {
     protected _uiMargin: number = 10;
     /** Currently active layer shown in the legend panel. */
     protected _activeLayer: Layer | null = null;
+    /** A menu selection (including none) takes priority over automatic legend refreshes. */
+    private _legendSelectionExplicit = false;
     /** Root menu icon element toggling submenu visibility. */
     protected _menuIcon: HTMLDivElement | null = null;
     /** Submenu container listing layers and controls. */
@@ -112,6 +114,8 @@ export class AutkMapUi {
             this._subMenu.style.left = (this.map.canvas.offsetLeft + this._uiMargin) + 'px';
         }
         if (this._legend) {
+            this._legend.style.maxWidth = `${Math.max(0, this.map.canvas.clientWidth - 2 * this._uiMargin - 4)}px`;
+            this._legend.style.maxHeight = `${Math.max(0, this.map.canvas.clientHeight - 2 * this._uiMargin - 4)}px`;
             const width  = this._legend.offsetWidth;
             const height = this._legend.offsetHeight;
             this._legend.style.left = (this.map.canvas.offsetLeft + this.map.canvas.clientWidth  - 2 - width  - this._uiMargin) + 'px';
@@ -175,13 +179,13 @@ export class AutkMapUi {
     // ── Active layer ──────────────────────────────────────────────────────────
 
     /**
-     * Activates a layer for picking and legend display.
+     * Activates a layer for picking without overriding an explicit legend selection.
      *
      * The provided layer is first validated against the current layer manager.
      * When a valid layer is found, this method makes picking exclusive by
      * disabling `isPick` on every other registered layer before enabling it on
-     * the selected one. The legend is then refreshed to reflect the new active
-     * layer.
+     * the selected one. Unless the user explicitly chose a legend, the legend
+     * follows the picking layer.
      *
      * Calls with `null` or with a layer object that is no longer the currently
      * registered instance are ignored.
@@ -192,7 +196,7 @@ export class AutkMapUi {
     changeActiveLayer(layer: Layer | null): void {
         layer = this._resolveActiveLayer(layer);
         if (!layer) return;
-        this._activeLayer = layer;
+        if (!this._legendSelectionExplicit) this._activeLayer = layer;
 
         // Exclusive isPick: disable on all other vector layers
         this._map.layerManager.layers.forEach((l: Layer) => {
@@ -257,6 +261,7 @@ export class AutkMapUi {
         this._legend = null;
         this._performanceOverlay = null;
         this._activeLayer = null;
+        this._legendSelectionExplicit = false;
     }
 
     /**
@@ -296,18 +301,19 @@ export class AutkMapUi {
      * Refreshes legend state after layer render settings change.
      *
      * If the provided layer is still registered and has color-map rendering
-     * enabled, it becomes the active legend layer. The legend container is then
-     * shown or hidden according to the resolved active layer state.
+     * enabled, it becomes the active legend layer unless the user has explicitly
+     * selected a legend (or none). Refreshing data or colors preserves that choice.
      *
      * @param layer Layer whose legend-related state may have changed.
      * @returns Recomputes legend visibility and content for the current active layer.
      */
     refreshLegend(layer: Layer | null): void {
         const resolvedLayer = this._resolveActiveLayer(layer);
-        if (resolvedLayer && resolvedLayer.layerRenderInfo.isColorMap) {
+        if (!this._legendSelectionExplicit && resolvedLayer && resolvedLayer.layerRenderInfo.isColorMap) {
             this._activeLayer = resolvedLayer;
         }
         this.syncLegendVisibility();
+        this.refreshLayerList();
     }
 
     /**
@@ -532,8 +538,8 @@ export class AutkMapUi {
      * this method renders the layer title and a color ramp derived from the
      * layer's colormap interpolator and computed labels.
      *
-     * Categorical color schemes are truncated to the supported scheme size,
-     * while continuous schemes render a 100-step ramp.
+     * Categorical schemes use a scrollable list of labeled swatches, truncated
+     * to the supported scheme size. Continuous schemes render a 100-step ramp.
      *
      * @param width Legend width in CSS pixels.
      * @param height Legend height in CSS pixels.
@@ -549,12 +555,13 @@ export class AutkMapUi {
         }
 
         this._legend.innerHTML = '';
+        Object.assign(this._legend.style, { height: height + 'px', overflow: 'auto' });
 
         const title = document.createElement('div');
         title.textContent = this._activeLayer.layerInfo.id;
         Object.assign(title.style, {
             padding: '10px 14px 6px', fontWeight: '600', fontSize: '14px',
-            color: '#222', borderBottom: '1px solid #e8e8e8', textAlign: 'center',
+            color: '#222', borderBottom: '1px solid #e8e8e8', textAlign: 'center', overflowWrap: 'anywhere',
         });
         this._legend.appendChild(title);
 
@@ -571,6 +578,34 @@ export class AutkMapUi {
         const slc             = isCategorical ? Math.min(labels.length, categoricalSize) : 100;
         const colorMap     = ColorMap.getColorArray(interpolator, res).slice(0, slc);
 
+        if (isCategorical) {
+            this._legend.style.height = 'auto';
+            const list = document.createElement('div');
+            list.className = 'autk-map-legend-categories';
+            Object.assign(list.style, { display: 'grid', gap: '6px', padding: '10px 14px' });
+            colorMap.forEach((color, index) => {
+                const row = document.createElement('div');
+                Object.assign(row.style, {
+                    display: 'grid', gridTemplateColumns: '12px minmax(0, 1fr)', gap: '8px', alignItems: 'start',
+                });
+                const swatch = document.createElement('span');
+                swatch.setAttribute('aria-hidden', 'true');
+                Object.assign(swatch.style, {
+                    width: '12px', height: '12px', marginTop: '3px', borderRadius: '2px',
+                    backgroundColor: `rgb(${color.r},${color.g},${color.b})`,
+                });
+                const label = document.createElement('span');
+                label.textContent = labels[index];
+                Object.assign(label.style, { fontSize: '12px', lineHeight: '18px', color: '#333', overflowWrap: 'anywhere' });
+                row.append(swatch, label);
+                list.appendChild(row);
+            });
+            this._legend.appendChild(list);
+            this.handleResize();
+            return;
+        }
+
+        this.handleResize();
         const svg       = d3.select(this._legend).append('svg').attr('width', width).attr('height', innerHeight);
         const rectWidth = innerWidth / colorMap.length;
         const rectH     = innerHeight * 0.3;
@@ -616,9 +651,23 @@ export class AutkMapUi {
         const paletteBtn = layer.layerInfo.typeLayer === 'tiles'
             ? makeButtonSpacer()
             : (() => {
-                const button = this.makeIconButton(RAMP_SVG, layer.layerRenderInfo.isColorMap ?? false, () => {
-                    this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isColorMap: !layer.layerRenderInfo.isColorMap } });
+                const selected = this._activeLayer === layer && this._legend?.style.visibility === 'visible';
+                const button = this.makeIconButton(RAMP_SVG, selected, () => {
+                    this._legendSelectionExplicit = true;
+                    this._activeLayer = selected ? null : layer;
+                    // The selected legend owns thematic coloring; all other layers use their base colors.
+                    for (const candidate of this.map.layerManager.layers) {
+                        const enabled = !selected && candidate === layer;
+                        if (candidate.supportsColorMap && Boolean(candidate.layerRenderInfo.isColorMap) !== enabled) {
+                            this.map.updateRenderInfo(candidate.layerInfo.id, { renderInfo: { isColorMap: enabled } });
+                        }
+                    }
+                    this.syncLegendVisibility();
+                    this.refreshLayerList();
                 });
+                button.setAttribute('aria-label', `Show legend for ${layer.layerInfo.id}`);
+                button.setAttribute('aria-pressed', String(selected));
+                button.title = selected ? 'Hide legend' : 'Show legend';
                 button.disabled = !layer.supportsColorMap;
                 if (!layer.supportsColorMap) button.title = 'RGB imagery does not use a scalar color map';
                 return button;
