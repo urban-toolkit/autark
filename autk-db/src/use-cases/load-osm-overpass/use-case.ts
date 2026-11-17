@@ -394,7 +394,7 @@ export class LoadOsmFromOverpassApiUseCase {
    * Before each top-level call the slot status is checked and waited on.
    *
    * Retryable conditions:
-   *  - 429 / 503 — server overloaded; backoff: 20s → 45s → 90s → 120s → 180s → 240s
+   *  - 429 / 502 / 503 — server overloaded; backoff: 20s → 45s → 90s → 120s → 180s → 240s
    *  - 504 / ERR_EMPTY_RESPONSE / fetch timeout — proxy rejection; backoff:
    *    10s → 20s → 45s → 90s → 120s → 180s, plus [timeout] in the query is
    *    stepped down (60s → 45s → 30s → 20s → 15s → 10s) so each retry looks
@@ -412,7 +412,7 @@ export class LoadOsmFromOverpassApiUseCase {
     const endpoint = LoadOsmFromOverpassApiUseCase.OVERPASS_ENDPOINT;
     const jitter = (ms: number) => ms * (0.9 + Math.random() * 0.2);
     const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-    const isRetryable = (status: number) => status === 429 || status === 503 || status === 504;
+    const isRetryable = (status: number) => status === 429 || status === 502 || status === 503 || status === 504;
 
     await this.waitForSlot();
 

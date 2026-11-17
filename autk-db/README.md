@@ -77,6 +77,8 @@ await db.loadOsm({
 });
 ```
 
+Live Overpass acquisition retries transient network failures and HTTP 429, 502, 503, and 504 responses, with jittered backoff and at most six retries per request. HTTP 502 capacity errors follow the overload schedule (20, 45, 90, 120, 180, and 240 seconds, ±10% jitter). A persistent outage still fails with the server's error details; malformed queries are not retried. Local PBF loading does not depend on Overpass availability.
+
 Named queries use `queryArea: { geocodeArea: 'Illinois', areas: ['Golf'] }`. Both sources match exact named OSM boundaries (including `boundary=administrative` and `boundary=place`) with at least one member node inside the named region, not just its rectangular extent. Overpass derives each thematic area from the same scoped boundary relation via `map_to_area`. PBF reconstructs the region's polygons, including holes and disconnected components, before selecting the requested boundaries. If the PBF lacks usable region geometry (missing, incomplete or invalid), loading continues with a clear warning and matches only the exact boundary names in `areas`. This fallback may include homonymous areas elsewhere in the extract; use a complete extract or `queryArea.bbox` when that ambiguity matters. Missing requested area names still cause an error. The small gallery `lower_mnt.osm.pbf` uses this warned fallback because its New York boundary is incomplete.
 
 Boxes require four finite WGS84 coordinates within geographic limits, with west < east and south < north; antimeridian crossings are unsupported. Overpass spatial selectors acquire candidates, not an exhaustive geometric intersection query. PBF cannot recover relation members absent from the extract.

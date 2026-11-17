@@ -236,7 +236,7 @@ The implementation:
 - uses POST so as not to depend on the size of a URL;
 - queries the Overpass status to wait for slots;
 - keeps a 3 second pause between thematic requests;
-- retries after network errors and HTTP `429`, `503` and `504`;
+- retries after network errors and HTTP `429`, `502`, `503` and `504`; `502` capacity errors use the existing overload backoff, with at most six retries;
 - uses backoff with jitter;
 - reduces the declared timeout of the query after consecutive network/`504` failures;
 - does not write the combined result to the cache when any requested group returns empty.
