@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — Building picking</title>
+    <title>Autark — Select features</title>
     <link rel="stylesheet" href="../../example.css" />
 </head>
 <body class="gallery-example">
@@ -18,9 +18,9 @@
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Interaction</p>
-            <h1 id="example-title">Building picking</h1>
-            <p class="description">Explore Lower Manhattan one building at a time.
-                Double-click a building to highlight it and inspect its OpenStreetMap attributes.</p>
+            <h1 id="example-title">Select features</h1>
+            <p class="description">Click buildings to grow a selection. The panel tracks heights, floor data, and
+                how much of the selection is measured.</p>
         </section>
         <div class="workspace">
             <section class="map-panel" aria-labelledby="map-title">
@@ -31,26 +31,27 @@
                 <div class="map-stage" aria-busy="true">
                     <canvas aria-label="Interactive map of Lower Manhattan buildings" aria-describedby="map-help"></canvas>
                 </div>
-                <div class="panel-footer" id="map-help"><span>Double-click to select · Scroll to zoom</span></div>
+                <div class="panel-footer" id="map-help"><span>Click to add or remove a building · Scroll to zoom</span></div>
             </section>
             <aside class="details-panel" aria-labelledby="details-title">
                 <div class="panel-header">
-                    <h2 id="details-title">Building details</h2>
+                    <h2 id="details-title">Selection</h2>
                 </div>
                 <div class="details-body">
-                    <p class="selection-label" id="info-selection">Awaiting selection</p>
-                    <h3 id="info-title" aria-live="polite" aria-atomic="true">No building selected</h3>
-                    <p class="selection-help" id="info-help">Double-click a building on the map to see its details here.</p>
-                    <dl class="building-attributes">
-                        <div><dt>OSM ID</dt><dd id="info-osm-id">—</dd></div>
-                        <div><dt>Type</dt><dd id="info-type">—</dd></div>
-                        <div><dt>Height</dt><dd id="info-height">—</dd></div>
-                        <div><dt>Floors</dt><dd id="info-levels">—</dd></div>
-                        <div><dt>Address</dt><dd id="info-address">—</dd></div>
+                    <p class="selection-label" id="info-selection">Aggregate</p>
+                    <h3 id="info-title" aria-live="polite" aria-atomic="true">No buildings selected</h3>
+                    <p class="selection-help" id="info-help">Click toggles a building; empty space clears. Buildings without height tags render at 20 m.</p>
+                    <dl class="metric-list">
+                        <div><dt>Buildings selected</dt><dd id="agg-count">0</dd></div>
+                        <div><dt>With height or floors</dt><dd id="agg-height-share">—</dd></div>
+                        <div><dt>Tallest measured</dt><dd id="agg-tallest">—</dd></div>
+                        <div><dt>Average rendered</dt><dd id="agg-average">—</dd></div>
                     </dl>
-                    <p class="selection-help">Source: OpenStreetMap. Missing attributes appear as a dash. Estimated heights use 3 meters per floor.</p>
+                    <div class="selection-actions">
+                        <div><button type="button" id="clear-selection" disabled>Clear selection</button></div>
+                    </div>
                 </div>
-                <p class="data-note">Source: OpenStreetMap.</p>
+                <p class="data-note data-note-centered" id="selection-status">No selection</p>
             </aside>
         </div>
         <footer class="page-footer">Made with Autark · Rendered in your browser</footer>

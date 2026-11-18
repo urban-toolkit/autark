@@ -1,3 +1,5 @@
+import { CAMERA_TOUR_ROUTE } from './src/autk-map/camera-tour-route';
+
 /**
  * Minimal runnable programs shown under "View full source".
  * Each assumes an HTML page containing a <canvas> (and `#plotBody` for charts).
@@ -110,8 +112,8 @@ ${variant === 'tags' ? "map.updateRenderInfo('table_osm_cafes_points', { pointSi
 map.draw();`;
         case 'D06': return `${DB_MAP}
 await db.loadOsm({
-  pbfFileUrl: '/data/monaco-condamine.osm.pbf',
-  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Monaco', areas: ['La Condamine', 'Monaco-Ville'] }" : '{ bbox: [7.4158, 43.7293, 7.4322, 43.7378] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  pbfFileUrl: '/data/monaco.osm.pbf',
+  queryArea: ${variant === 'place' || variant === 'tags' ? "{ geocodeArea: 'Monaco', areas: ['Monaco'] }" : '{ bbox: [7.405, 43.720, 7.445, 43.7525] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });
 
@@ -123,94 +125,145 @@ for (const layer of db.getLayersMetadata()) {
 }
 ${variant === 'tags' ? "map.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });\n" : ''}map.fitBounds();
 map.draw();`;
-        case 'I04': return `${DB_MAP}
-await db.setWorkspace('battery_park_city');
+        case 'I01': return `${DB_MAP.replace("import { AutkMap }", "import { MapEvent, AutkMap }").replace("const map = new AutkMap(document.querySelector('canvas')!);", "const map = new AutkMap(document.querySelector('canvas')!, { showUi: false });")}
 await db.loadOsm({
   pbfFileUrl: '/data/lower_mnt.osm.pbf',
-  queryArea: { bbox: [-74.019, 40.707, -74.012, 40.719] },
+  queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+  autoLoadLayers: { layers: ['surface', 'buildings'] },
+});
+const buildings = await db.getLayer('table_osm_buildings');
+
+for (const layer of db.getLayersMetadata()) {
+  map.loadCollection(layer.name, { collection: layer.name === 'table_osm_buildings'
+    ? buildings : await db.getLayer(layer.name), type: layer.type });
+}
+map.updateRenderInfo('table_osm_buildings', { isPick: true });
+map.fitBounds();
+
+// Picking toggles ids, so repeated clicks accumulate a selection.
+map.events.on(MapEvent.PICKING, ({ selection }) => {
+  const picked = selection.map(id => buildings.features[id]);
+  console.log(picked.length, 'selected');
+});
+map.draw();`;
+        case 'I02': return `import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
+
+const db = new AutkDb();
+await db.init();
+await db.loadOsm({
+  pbfFileUrl: '/data/boston-harbor.osm.pbf',
+  queryArea: { bbox: [-71.090, 42.340, -71.035, 42.377] },
   autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
 });
 
-// A different workspace keeps its own tables.
-await db.setWorkspace('financial_district');
-for (const layer of db.getLayersMetadata()) {
-  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
-}
-map.fitBounds();
-map.draw();`;
-        case 'I01': return `${DB_MAP.replace("import { AutkMap }", "import { MapEvent, AutkMap }")}
-await db.loadOsm({
-  pbfFileUrl: '/data/lower_mnt.osm.pbf',
-  queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
-  autoLoadLayers: { layers: ['surface', 'buildings'] },
-});
-
-for (const layer of db.getLayersMetadata()) {
-  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
-}
-map.updateRenderInfo('table_osm_buildings', { isPick: true });
-map.fitBounds();
-
-map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
-  map.setHighlightedIds(layerId, selection);
-  console.log(layerId, selection);
-});
-map.draw();`;
-        case 'I02': return `${DB_MAP.replace("import { AutkMap }", "import { MapEvent, AutkMap }")}
-await db.loadOsm({
-  pbfFileUrl: '/data/lower_mnt.osm.pbf',
-  queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
-  autoLoadLayers: { layers: ['surface', 'buildings'] },
-});
-
-for (const layer of db.getLayersMetadata()) {
-  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
-}
-map.updateRenderInfo('table_osm_buildings', { isPick: true });
-map.fitBounds();
-
-map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
-  map.setHighlightedIds(layerId, selection);
-  // Hide the selection; clearSkippedIds restores everything.
-  map.setSkippedIds(layerId, selection);
-});
-map.draw();`;
-        case 'I03': return `import { AutkMap } from '@urban-toolkit/autk-map';
-import { CameraMotion } from '@urban-toolkit/autk-core';
-
-const map = new AutkMap(document.querySelector('canvas')!);
+const map = new AutkMap(document.querySelector('canvas')!, { showUi: false });
 await map.init();
+for (const layer of db.getLayersMetadata()) {
+  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
+}
+map.updateRenderInfo('table_osm_buildings', { isPick: true });
+map.fitBounds();
 
-map.loadCollection('neighborhoods', {
-  collection: await fetch('/data/mnt_neighs_proj.geojson').then(response => response.json()),
+const hidden = new Set<number>();
+map.events.on(MapEvent.PICKING, ({ selection }) => {
+  // Hide the clicked building; restore everything with clearSkippedIds.
+  for (const id of selection) if (!hidden.has(id)) { hidden.add(id); map.setSkippedIds('table_osm_buildings', [id]); }
 });
-map.fitBounds();
-map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
-
-await new CameraMotion().zoomOut(1.5, 1).pitch(-35, 1).yaw(20, 1).zoomIn(1.5, 1).play(map.camera);
 map.draw();`;
+        case 'I03': return `import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
+import { computeOrigin, lonLatToCrs } from '@urban-toolkit/autk-core';
+
+const bbox: [number, number, number, number] = [-74.019, 40.700, -74.003, 40.714];
+const db = new AutkDb();
+await db.init();
+await db.loadOsm({ pbfFileUrl: '/data/lower_mnt.osm.pbf', queryArea: { bbox },
+  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] } });
+const map = new AutkMap(document.querySelector('canvas')!, { showUi: false });
+await map.init();
+const roads = await db.getLayer('table_osm_roads');
+map.loadCollection('table_osm_roads', { collection: roads, type: 'roads' });
+for (const layer of db.getLayersMetadata()) {
+  if (layer.name !== 'table_osm_roads')
+    map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
+}
+const origin = computeOrigin(roads);
+const route: Array<[number, number]> = ${JSON.stringify(CAMERA_TOUR_ROUTE)};
+const path = route.map(([lon, lat]) => {
+  const [x, y] = lonLatToCrs(map.workspaceCrs, lon, lat);
+  return [x - origin[0], y - origin[1]];
+});
+const distances = [0];
+for (let i = 1; i < path.length; i++)
+  distances.push(distances[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+const total = distances[distances.length - 1];
+const sampleRoad = (distance: number) => {
+  const d = Math.max(0, Math.min(distance, total));
+  const i = distances.findIndex(value => value >= d);
+  if (i <= 0) return path[0];
+  const t = (d - distances[i - 1]) / (distances[i] - distances[i - 1]);
+  return path[i - 1].map((v, axis) => v + (path[i][axis] - v) * t);
+};
+// Soften small bends while keeping the camera close to the mapped path.
+const point = (distance: number) => {
+  const d = Math.max(0, Math.min(distance, total));
+  const radius = Math.min(8, d, total - d);
+  const before = sampleRoad(d - radius), current = sampleRoad(d), after = sampleRoad(d + radius);
+  return current.map((v, axis) => (before[axis] + 2 * v + after[axis]) / 4);
+};
+const sw = lonLatToCrs(map.workspaceCrs, bbox[0], bbox[1]);
+const ne = lonLatToCrs(map.workspaceCrs, bbox[2], bbox[3]);
+map.fitBounds([sw[0], sw[1], ne[0], ne[1]]);
+const center = map.camera.getLookAt();
+const height = map.camera.getEye()[2];
+const finalEye = [center[0], center[1] - height * 0.55, height * 1.05];
+const end = path[path.length - 1], before = point(total - 22.5);
+const startAngle = Math.atan2(end[1] - before[1], end[0] - before[0]);
+const endAngle = Math.atan2(center[1] - end[1], center[0] - end[0]);
+const delta = Math.atan2(Math.sin(endAngle - startAngle), Math.cos(endAngle - startAngle));
+const ease = (t: number) => t * t * (3 - 2 * t);
+map.draw();
+let start: number | undefined;
+const step = (time: number) => {
+  start ??= time;
+  const elapsed = (time - start) / 1000;
+  if (elapsed < 42) {
+    const distance = ease(elapsed / 42) * total;
+    const eye = point(distance), behind = point(distance - 22.5), ahead = point(distance + 22.5);
+    const angle = Math.atan2(ahead[1] - behind[1], ahead[0] - behind[0]);
+    map.camera.resetCamera([0, 0, 1], [eye[0] + Math.cos(angle) * 45, eye[1] + Math.sin(angle) * 45, 15], [eye[0], eye[1], 12]);
+  } else if (elapsed < 50) {
+    const angle = startAngle + delta * ease((elapsed - 42) / 8);
+    map.camera.resetCamera([0, 0, 1], [end[0] + Math.cos(angle) * 45, end[1] + Math.sin(angle) * 45, 15], [end[0], end[1], 12]);
+  } else {
+    const t = ease(Math.min((elapsed - 50) / 20, 1));
+    const initialLook = [end[0] + Math.cos(endAngle) * 45, end[1] + Math.sin(endAngle) * 45, 15];
+    const eye = [end[0] + (finalEye[0] - end[0]) * t, end[1] + (finalEye[1] - end[1]) * t, 12 + (finalEye[2] - 12) * t];
+    map.camera.resetCamera([0, 0, 1], initialLook.map((v, axis) => v + (center[axis] - v) * t), eye);
+  }
+  map.requestRender();
+  if (elapsed < 70) requestAnimationFrame(step);
+};
+requestAnimationFrame(step);`;
         case 'S01': return `${DB_MAP.replace("import { AutkMap }", "import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';\nimport { AutkMap }")}
-await db.loadGeojson({ geojsonFileUrl: '/data/mnt_roads.geojson', outputTableName: 'roads' });
 
-const roads = await db.getLayer('roads');
-map.loadCollection('roads', { collection: roads, type: 'roads' });
-map.updateColorMap('roads', { colorMap: {
-  interpolator: ColorMapInterpolator.CAT_OBSERVABLE10,
-  domainSpec: { type: ColorMapDomainStrategy.USER, params: ${variant === 'numeric' ? '[3, 1, 2]' : "['primary', 'secondary', 'other']"} },
+const BERLIN_BEZIRKE = ['Mitte', 'Friedrichshain-Kreuzberg', 'Pankow', 'Charlottenburg-Wilmersdorf', 'Spandau', 'Steglitz-Zehlendorf', 'Tempelhof-Schöneberg', 'Neukölln', 'Treptow-Köpenick', 'Marzahn-Hellersdorf', 'Lichtenberg', 'Reinickendorf'];
+
+await db.loadGeojson({ geojsonFileUrl: '/data/berlin-ortsteile.geojson', outputTableName: 'ortsteile' });
+
+const ortsteile = await db.getLayer('ortsteile');
+map.loadCollection('ortsteile', { collection: ortsteile });
+${variant === 'category' ? `map.updateColorMap('ortsteile', { colorMap: {
+  interpolator: ColorMapInterpolator.CAT_PAIRED,
+  domainSpec: { type: ColorMapDomainStrategy.USER, params: BERLIN_BEZIRKE },
 } });
-map.updateThematic('roads', { collection: roads, property: 'properties.highway' });
-map.fitBounds();
-map.draw();`;
-        case 'S02': return `${DB_MAP.replace("import { AutkMap }", "import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';\nimport { AutkMap }")}
-await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });
-
-const neighborhoods = await db.getLayer('neighborhoods');
-map.loadCollection('neighborhoods', { collection: neighborhoods });
-map.updateColorMap('neighborhoods', { colorMap: {
-  interpolator: ColorMapInterpolator.${variant === 'sequential' ? 'SEQ_VIRIDIS' : 'DIV_SPECTRAL'},
+map.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.bezirk' });` : `map.updateColorMap('ortsteile', { colorMap: {
+  interpolator: ColorMapInterpolator.${variant === 'diverging' ? 'DIV_RED_BLUE' : 'SEQ_BLUES'},
   domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },
 } });
-map.updateThematic('neighborhoods', { collection: neighborhoods, property: 'properties.shape_area' });
+map.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.area_km2' });`}
+map.updateRenderInfo('ortsteile', { isColorMap: true });
 map.fitBounds();
 map.draw();`;
         case 'S03': return `import { AutkMap } from '@urban-toolkit/autk-map';

@@ -201,6 +201,23 @@ button, input, select { font: inherit; }
 .gallery-example .details-panel > .data-note { line-height: 18px; }
 .gallery-example .map-stage { border: 0; min-height: clamp(400px, 58vh, 640px); }
 .gallery-example .map-stage > canvas { position: absolute; inset: 0; height: 100%; }
+.gallery-example .map-stage > .map-actions {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 1;
+    display: flex;
+    gap: 8px;
+}
+.gallery-example .map-actions button {
+    min-height: 34px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.94);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgb(16 24 40 / 12%);
+}
 .gallery-example .map-panel > .panel-header { border-bottom: 1px solid var(--border); }
 .gallery-example .map-panel > .panel-footer { border-top: 1px solid var(--border); align-items: center; }
 .gallery-example .workspace,
@@ -320,3 +337,23 @@ button, input, select { font: inherit; }
 .gallery-example .choice-group > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .gallery-example .choice-group button { min-height: 34px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--accent); font-size: 12px; font-weight: 600; }
 .gallery-example .choice-group button[aria-pressed="true"] { border-color: var(--accent); background: #3451b210; color: var(--accent); }
+
+/* Aggregation panels hold their height as selection counts change. */
+.gallery-example #info-title { min-height: 2lh; }
+.gallery-example #info-help { min-height: 3lh; }
+.gallery-example #agg-height-share { white-space: nowrap; overflow-x: auto; }
+/* One-line footer status, centered both ways inside the fixed panel bar. */
+.gallery-example .details-panel > .data-note {
+    display: block;
+    text-align: center;
+    line-height: calc(var(--panel-bar-height) - 18px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* Panel actions follow the choice-group layout: small label, then buttons. */
+.gallery-example .selection-actions { margin: 20px 0 0; }
+.gallery-example .selection-actions > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.gallery-example .selection-actions button { min-height: 34px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--accent); font-size: 12px; font-weight: 600; }
+.gallery-example .selection-actions button:disabled { color: var(--muted); opacity: .6; cursor: default; }
+.gallery-example .group-label { margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .03em; }

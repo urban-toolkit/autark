@@ -3,20 +3,20 @@ import { AutkMap } from '@urban-toolkit/autk-map';
 import { exampleVariant, onExampleDispose, runExample } from '../example';
 
 const BASE_URL = (import.meta as any).env.BASE_URL;
-const BBOX: [number, number, number, number] = [7.4158, 43.7293, 7.4322, 43.7378];
+const BBOX: [number, number, number, number] = [7.405, 43.720, 7.445, 43.7525];
 const db = new AutkDb();
 let databaseReady = false;
 
-/** Same three queries as the Overpass example, using only a bundled Monaco extract. */
+/** Queries Monaco by bounding box, named boundary, or custom tags from a bundled extract. */
 async function main(): Promise<void> {
     const mode = exampleVariant('PBF query', { bbox: 'Bounding box', place: 'Named place', tags: 'Custom tag filters' });
     if (!databaseReady) { await db.init(); databaseReady = true; }
-    await db.setWorkspace(`condamine_${mode}`);
+    await db.setWorkspace(`monaco_${mode}`);
     if (!db.getLayersMetadata().length) {
         await db.loadOsm({
-            pbfFileUrl: `${BASE_URL}data/monaco-condamine.osm.pbf`,
-            queryArea: mode === 'place' ? { geocodeArea: 'Monaco', areas: ['La Condamine', 'Monaco-Ville'] }
-                : { bbox: BBOX },
+            pbfFileUrl: `${BASE_URL}data/monaco.osm.pbf`,
+            queryArea: mode === 'bbox' ? { bbox: BBOX }
+                : { geocodeArea: 'Monaco', areas: ['Monaco'] },
             autoLoadLayers: { layers: mode === 'tags'
                 ? ['surface', 'parks', 'water', 'roads']
                 : ['surface', 'parks', 'water', 'roads', 'buildings'] },
@@ -34,7 +34,7 @@ async function main(): Promise<void> {
             loadConfig: { buildingsZeroHeight: true } });
     }
     if (mode === 'tags') map.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });
-    map.fitBounds();
+    map.setView({ center: { latitude: 43.738, longitude: 7.424 }, zoom: 14 });
     map.ui.setAttribution([{ text: '© OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' }]);
     map.draw();
 }

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { AsyncDuckDB } from '@duckdb/duckdb-wasm';
+import { booleanPointInPolygon } from '@turf/turf';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { OsmElement, OsmQueryArea, OsmTagSet } from '../src/use-cases/load-osm-overpass/interfaces';
 import { resolveWayGeometries } from '../src/use-cases/load-osm-pbf/osm-pbf-parser';
@@ -106,29 +107,50 @@ describe('PBF tag-set acquisition', () => {
   });
 
   it('runs the three bundled Monaco queries locally, including cafes without buildings', async () => {
-    const bytes = readFileSync(new URL('../../gallery/public/data/monaco-condamine.osm.pbf', import.meta.url));
+    const bytes = readFileSync(new URL('../../gallery/public/data/monaco.osm.pbf', import.meta.url));
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      expect(String(input)).toBe('/monaco-condamine.osm.pbf');
+      expect(String(input)).toBe('/monaco.osm.pbf');
       return new Response(new Uint8Array(bytes));
     });
     const api = vi.spyOn((db as any).loadOsmFromOverpassApiUseCase, 'fetchCombinedOsmData').mockRejectedValue(new Error('Unexpected Overpass call'));
     for (const mode of ['bbox', 'place', 'tags']) {
-      await db.setWorkspace(`monaco_asset_${++serial}`);
+      await db.setWorkspace(`monaco_asset_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
       await db.loadOsm({
-        pbfFileUrl: '/monaco-condamine.osm.pbf',
-        queryArea: mode === 'place' ? { geocodeArea: 'Monaco', areas: ['La Condamine', 'Monaco-Ville'] }
-          : { bbox: [7.4158, 43.7293, 7.4322, 43.7378] },
+        pbfFileUrl: '/monaco.osm.pbf',
+        queryArea: mode === 'bbox' ? { bbox: [7.405, 43.720, 7.445, 43.7525] }
+          : { geocodeArea: 'Monaco', areas: ['Monaco'] },
         autoLoadLayers: { layers: mode === 'tags' ? ['surface', 'parks', 'water', 'roads']
           : ['surface', 'parks', 'water', 'roads', 'buildings'] },
         ...(mode === 'tags' ? { tagSets: [{ name: 'cafes', type: 'points' as const, tags: [{ key: 'amenity', value: 'cafe' }] }] } : {}),
       });
       const counts: Record<string, number> = {};
       for (const layer of db.getLayersMetadata()) counts[layer.name] = (await db.getLayer(layer.name)).features.length;
-      expect(counts.table_osm_surface).toBe(mode === 'place' ? 2 : 1);
-      expect(counts.table_osm_parks).toBe(mode === 'place' ? 23 : 31);
-      expect(counts.table_osm_roads).toBe(mode === 'place' ? 324 : 480);
-      expect(counts.table_osm_buildings).toBe(mode === 'tags' ? undefined : mode === 'place' ? 154 : 296);
-      expect(counts.table_osm_cafes_points).toBe(mode === 'tags' ? 15 : undefined);
+      expect(counts.table_osm_surface).toBeGreaterThan(0);
+      expect(counts.table_osm_parks).toBeGreaterThan(0);
+      expect(counts.table_osm_roads).toBeGreaterThan(0);
+      if (mode === 'tags') {
+        expect(counts.table_osm_buildings).toBeUndefined();
+        expect(counts.table_osm_cafes_points).toBeGreaterThan(0);
+        expect((await db.getBoundingBoxFromLayer('table_osm_cafes_points')).maxLat).toBeGreaterThan(43.74);
+      } else {
+        expect(counts.table_osm_buildings).toBeGreaterThan(0);
+        expect((await db.getBoundingBoxFromLayer('table_osm_buildings')).maxLat).toBeGreaterThan(43.74);
+      }
+
+      const water = await db.getLayer('table_osm_water');
+      expect(water.features.some(feature => feature.properties?.generated === 'coastline')).toBe(true);
+      const waterBounds = await db.getBoundingBoxFromLayer('table_osm_water');
+      expect(waterBounds.minLat).toBeGreaterThanOrEqual(43.72);
+      expect(waterBounds.maxLon).toBeLessThanOrEqual(7.445);
+      {
+        const surface = await db.getLayer('table_osm_surface');
+        const sea = [7.43, 43.73];
+        for (const [collection, containsSea] of [[surface, false], [water, true]] as const) {
+          expect(collection.features.some(({ geometry }) =>
+            (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')
+              && booleanPointInPolygon(sea, geometry))).toBe(containsSea);
+        }
+      }
     }
     expect(fetch).toHaveBeenCalled();
     expect(api).not.toHaveBeenCalled();

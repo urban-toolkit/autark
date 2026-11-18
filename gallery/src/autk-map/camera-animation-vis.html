@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — Camera animation</title>
+    <title>Autark — Navigate and animate the camera</title>
     <link rel="stylesheet" href="../../example.css" />
 </head>
+
 <body class="gallery-example">
     <a class="skip-link" href="#main">Skip to example</a>
     <header class="site-header">
@@ -18,34 +20,38 @@
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Camera motion</p>
-            <h1 id="example-title">Camera animation</h1>
-            <p class="description">Watch a camera sequence reveal Manhattan neighborhoods from a new angle.
-                The default scene colors neighborhoods by compactness, calculated in your browser.</p>
+            <h1 id="example-title">Navigate and animate the camera</h1>
+            <p class="description">Script a camera path with position and orientation keyframes. Drive at street
+                level, turn to face the skyline, then ascend while tilting into an overview.</p>
         </section>
         <section class="map-panel" aria-labelledby="map-title">
             <div class="panel-header">
-                <h2 id="map-title">Manhattan neighborhoods</h2>
+                <h2 id="map-title">Battery Park to the World Trade Center</h2>
                 <p id="map-status" class="map-status" role="status">Preparing scene…</p>
             </div>
             <div class="map-stage" aria-busy="true">
-                <canvas aria-label="Animated map of Manhattan neighborhoods" aria-describedby="map-help"></canvas>
+                <canvas aria-label="Camera animation from Battery Park toward the World Trade Center" aria-describedby="map-help"></canvas>
+                <div class="map-actions">
+                    <button type="button" id="replay">Replay tour</button>
+                </div>
             </div>
-            <div class="panel-footer" id="map-help"><span>Auto animation · Scroll to zoom afterward</span></div>
+            <div class="panel-footer" id="map-help"><span>Camera tour · Drag or scroll to explore afterward</span></div>
         </section>
         <aside class="motion-note" aria-labelledby="motion-title">
             <div>
                 <h2 id="motion-title">The camera sequence</h2>
-                <p>Four movements, played in order.</p>
+                <p>A street-level drive, followed by a turn and an ascending overview.</p>
             </div>
             <ol class="motion-steps">
-                <li><span class="step-number" aria-hidden="true">1</span> Zoom out</li>
-                <li><span class="step-number" aria-hidden="true">2</span> Tilt</li>
-                <li><span class="step-number" aria-hidden="true">3</span> Rotate</li>
-                <li><span class="step-number" aria-hidden="true">4</span> Zoom in</li>
+                <li><span class="step-number" aria-hidden="true">1</span> Battery Park</li>
+                <li><span class="step-number" aria-hidden="true">2</span> Hudson River Greenway north</li>
+                <li><span class="step-number" aria-hidden="true">3</span> World Trade Center</li>
+                <li><span class="step-number" aria-hidden="true">4</span> Turn, rise, and tilt</li>
             </ol>
         </aside>
         <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
     </main>
     <script type="module" src="./camera-animation-vis.ts"></script>
 </body>
+
 </html>

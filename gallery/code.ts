@@ -39,16 +39,18 @@ await db.loadCsv({
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
         case 'D06': return `await db.loadOsm({
-  pbfFileUrl: '/data/monaco-condamine.osm.pbf',
-  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Monaco', areas: ['La Condamine', 'Monaco-Ville'] }" : '{ bbox: [7.4158, 43.7293, 7.4322, 43.7378] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  pbfFileUrl: '/data/monaco.osm.pbf',
+  queryArea: ${variant === 'place' || variant === 'tags' ? "{ geocodeArea: 'Monaco', areas: ['Monaco'] }" : '{ bbox: [7.405, 43.720, 7.445, 43.7525] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
-        case 'I04': return "await db.setWorkspace('battery_park_city');\nawait db.loadOsm({ pbfFileUrl: '/data/lower_mnt.osm.pbf', queryArea: { bbox }, autoLoadLayers: { layers } });\nawait db.setWorkspace('financial_district');";
-        case 'I01': return "map.updateRenderInfo('table_osm_buildings', { isPick: true });\nmap.events.on(MapEvent.PICKING, ({ selection, layerId }) => {\n  map.setHighlightedIds(layerId, selection);\n});";
-        case 'I02': return "map.setSkippedIds('table_osm_buildings', [id]);   // hide\nmap.clearSkippedIds('table_osm_buildings');      // restore all";
-        case 'I03': return "map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });\nmap.fitBounds();\nawait new CameraMotion().zoomOut(1.5, 1).pitch(-35, 1).yaw(20, 1).play(map.camera);";
-        case 'S01': return `map.updateColorMap('roads', { colorMap: {\n  interpolator: ColorMapInterpolator.CAT_OBSERVABLE10,\n  domainSpec: { type: ColorMapDomainStrategy.USER, params: ${variant === 'numeric' ? '[3, 1, 2]' : "['primary', 'secondary', 'other']"} },\n} });\nmap.updateThematic('roads', { collection: roads, property: 'properties.highway' });`;
-        case 'S02': return `map.updateColorMap('neighborhoods', { colorMap: {\n  interpolator: ColorMapInterpolator.${variant === 'sequential' ? 'SEQ_VIRIDIS' : 'DIV_SPECTRAL'},\n  domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },\n} });\nmap.updateThematic('neighborhoods', { collection, property: 'properties.shape_area' });`;
+        case 'I01': return `const map = new AutkMap(canvas, { showUi: false });\nmap.updateRenderInfo('buildings', { isPick: true });\nmap.events.on(MapEvent.PICKING, ({ selection }) => {\n  // Each click toggles one id, so the selection keeps growing.\n  summarize(selection.map(id => buildings.features[id]));\n});`;
+        case 'I02': return "map.setSkippedIds('buildings', [id]);\nmap.clearSkippedIds('buildings');";
+        case 'I03': return `// Update the eye and look-at target on each animation frame.
+map.camera.resetCamera([0, 0, 1], lookAt, eye);
+map.requestRender();`;
+        case 'S01': return variant === 'category'
+            ? `map.updateColorMap('ortsteile', { colorMap: {\n  interpolator: ColorMapInterpolator.CAT_PAIRED,\n  domainSpec: { type: ColorMapDomainStrategy.USER, params: BERLIN_BEZIRKE },\n} });\nmap.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.bezirk' });\nmap.updateRenderInfo('ortsteile', { isColorMap: true });`
+            : `map.updateColorMap('ortsteile', { colorMap: {\n  interpolator: ColorMapInterpolator.${variant === 'diverging' ? 'DIV_RED_BLUE' : 'SEQ_BLUES'},\n  domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },\n} });\nmap.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.area_km2' });\nmap.updateRenderInfo('ortsteile', { isColorMap: true });`;
         case 'S03': return variant === 'custom'
             ? "map.style.setCustomStyle({\n  surface: '#eee8db', parks: '#c4d9b0', water: '#b6d7e8',\n  roads: '#fff', buildings: '#c8b9a7', ...\n});"
             : `map.style.setPredefinedStyle('${variant || 'apple'}');`;

@@ -25,6 +25,7 @@ function describe(crs: keyof typeof SYSTEMS): void {
     text('crs-axes', system.axes);
     text('crs-center-x', x.toFixed(2));
     text('crs-center-y', y.toFixed(2));
+    text('crs-status', `Geographic center ${CENTER.latitude.toFixed(3)}, ${CENTER.longitude.toFixed(3)} (WGS 84)`);
 }
 
 async function main(): Promise<void> {
