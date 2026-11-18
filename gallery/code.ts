@@ -51,15 +51,13 @@ map.requestRender();`;
         case 'S01': return variant === 'category'
             ? `map.updateColorMap('ortsteile', { colorMap: {\n  interpolator: ColorMapInterpolator.CAT_PAIRED,\n  domainSpec: { type: ColorMapDomainStrategy.USER, params: BERLIN_BEZIRKE },\n} });\nmap.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.bezirk' });\nmap.updateRenderInfo('ortsteile', { isColorMap: true });`
             : `map.updateColorMap('ortsteile', { colorMap: {\n  interpolator: ColorMapInterpolator.${variant === 'diverging' ? 'DIV_RED_BLUE' : 'SEQ_BLUES'},\n  domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },\n} });\nmap.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.area_km2' });\nmap.updateRenderInfo('ortsteile', { isColorMap: true });`;
-        case 'S03': return variant === 'custom'
-            ? "map.style.setCustomStyle({\n  surface: '#eee8db', parks: '#c4d9b0', water: '#b6d7e8',\n  roads: '#fff', buildings: '#c8b9a7', ...\n});"
-            : `map.style.setPredefinedStyle('${variant || 'apple'}');`;
-        case 'S04': return `map.updateRenderInfo('neighborhoods', {\n  opacity: ${state.opacity || '0.75'},\n  showBorders: ${state['show-borders'] !== 'false'},\n});`;
+        case 'S03': return `map.style.setPredefinedStyle('${variant || 'google'}');`;
+        case 'S04': return `map.updateRenderInfo('table_osm_buildings', { opacity: ${state.opacity || '0.75'} });\nmap.updateRenderInfo('salzburg-districts', { opacity: ${state['district-opacity'] || '0.30'}, showBorders: ${state['show-borders'] !== 'false'} });`;
         case 'B01': return `map.loadTiles('imagery', { source: TILE_SOURCES.${provider} });\nmap.updateRenderInfo('imagery', { isSkip: ${state['show-tiles'] === 'false'} });`;
         case 'B02': return "map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });\n// An opaque surface would cover the imagery beneath the vectors.\nmap.updateRenderInfo('table_osm_surface', { isSkip: true });";
         case 'B03': return variant === 'rgb'
-            ? "await db.loadGeoTiff({ geotiffFileUrl: '/data/rgb-imagery.tif', coordinateFormat: 'EPSG:32618', outputTableName: 'image' });\nmap.loadCollection('image', { collection: await db.getRaster('image'), type: 'raster', property: ['band_1', 'band_2', 'band_3'] });"
-            : "await db.loadGeoTiff({ geotiffFileUrl: '/data/mnt_dem.tif', coordinateFormat: 'EPSG:3857', outputTableName: 'image' });\nmap.loadCollection('image', { collection: await db.getRaster('image'), type: 'raster', property: 'band_1' });";
+            ? "await db.loadGeoTiff({ geotiffFileUrl: '/data/lisbon-corine-2018-rgb.tif', coordinateFormat: 'EPSG:4326', outputTableName: 'imagery' });\nmap.loadCollection('imagery', { collection: await db.getRaster('imagery'), type: 'raster', property: ['band_1', 'band_2', 'band_3'], loadConfig: { rgbRange: [0, 255] } });\nmap.updateRenderInfo('imagery', { opacity: " + (state['raster-opacity'] ?? '0.78') + " });"
+            : "await db.loadGeoTiff({ geotiffFileUrl: '/data/lisbon-population-2020.tif', coordinateFormat: 'EPSG:4326', outputTableName: 'population' });\nmap.loadCollection('population', { collection: await db.getRaster('population'), type: 'raster', property: 'band_1' });\nmap.updateRenderInfo('population', { opacity: " + (state['raster-opacity'] ?? '0.78') + " });";
         case 'T01': return "map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });";
         case 'T02': return `map.loadTiles('imagery', { source: TILE_SOURCES.${provider} });\nmap.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });`;
         case 'T03': return "map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });\nmap.updateRenderInfo('table_osm_surface', { isSkip: true });\nmap.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });";

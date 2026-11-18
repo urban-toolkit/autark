@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Autark — GeoTIFF raster</title>
+    <title>Autark — Load raster layers</title>
     <link rel="stylesheet" href="../../example.css" />
 </head>
 
@@ -20,18 +20,57 @@
         <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Raster layers</p>
-            <h1 id="example-title">GeoTIFF raster</h1>
-            <p class="description">Display a geospatial raster on the map.</p>
+            <h1 id="example-title">Load raster layers</h1>
+            <p class="description">Compare a population heatmap and a CORINE land-cover raster for the same area in Lisbon.</p>
         </section>
     <div id="app">
 
         <section class="map-panel" aria-label="GeoTIFF raster map area">
-            <div class="panel-header"><h2>GeoTIFF raster</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
-            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="GeoTIFF raster map"> </canvas></div>
-            <div class="panel-footer" id="map-help"><span>Drag to pan · Shift-drag to tilt · Scroll to zoom</span></div>
+            <div class="panel-header"><h2 id="map-title">Lisbon population, 2020</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="opacity-toolbar">
+                <div class="opacity-slider">
+                    <label for="raster-opacity">Raster opacity</label>
+                    <output id="raster-opacity-value" for="raster-opacity" aria-hidden="true">78%</output>
+                    <input id="raster-opacity" type="range" min="0" max="1" step="0.01" value="0.78" disabled />
+                </div>
+            </div>
+            <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-labelledby="map-title"> </canvas></div>
+            <div class="panel-footer" id="map-help"><span>Estimated people per grid cell · Darker red means more residents</span></div>
         </section>
     </div>
-        <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
+        <details id="corine-legend" class="example-source corine-legend" hidden>
+            <summary>CORINE land-cover legend</summary>
+            <ul>
+                <li style="--swatch:#e6004d">Continuous urban fabric</li>
+                <li style="--swatch:#ff0000">Discontinuous urban fabric</li>
+                <li style="--swatch:#cc4df2">Industrial or commercial units</li>
+                <li style="--swatch:#cc0000">Road and rail networks</li>
+                <li style="--swatch:#e6cccc">Port areas</li>
+                <li style="--swatch:#e6cce6">Airports</li>
+                <li style="--swatch:#ff4dff">Construction sites</li>
+                <li style="--swatch:#ffa6ff">Green urban areas</li>
+                <li style="--swatch:#ffe6ff">Sport and leisure facilities</li>
+                <li style="--swatch:#ffffa8">Non-irrigated arable land</li>
+                <li style="--swatch:#ffff00">Permanently irrigated land</li>
+                <li style="--swatch:#e6a600">Olive groves</li>
+                <li style="--swatch:#e6e64d">Pastures</li>
+                <li style="--swatch:#ffe64d">Complex cultivation patterns</li>
+                <li style="--swatch:#e6cc4d">Agriculture with natural vegetation</li>
+                <li style="--swatch:#80ff00">Broad-leaved forest</li>
+                <li style="--swatch:#00a600">Coniferous forest</li>
+                <li style="--swatch:#4dff00">Mixed forest</li>
+                <li style="--swatch:#ccf24d">Natural grasslands</li>
+                <li style="--swatch:#a6ff80">Moors and heathland</li>
+                <li style="--swatch:#a6f200">Transitional woodland and shrub</li>
+                <li style="--swatch:#a6a6ff">Inland marshes</li>
+                <li style="--swatch:#ccccff">Salt marshes</li>
+                <li style="--swatch:#a6ffe6">Estuaries</li>
+            </ul>
+        </details>
+        <footer class="page-footer">
+            Data: <a href="https://hub.worldpop.org/Global1_2000-2020">WorldPop, Portugal 2020</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, cropped to Lisbon) ·
+            <a href="https://land.copernicus.eu/en/products/corine-land-cover/clc2018">Copernicus Land Monitoring Service / EEA: CORINE Land Cover 2018</a> (rendered class colors, cropped to Lisbon).
+        </footer>
     </main>
 </body>
 <script type="module" src="/src/autk-map/geotiff-vis.ts"></script>

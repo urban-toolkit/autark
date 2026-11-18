@@ -266,24 +266,49 @@ map.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.a
 map.updateRenderInfo('ortsteile', { isColorMap: true });
 map.fitBounds();
 map.draw();`;
-        case 'S03': return `import { AutkMap } from '@urban-toolkit/autk-map';
+        case 'S03': return `import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap } from '@urban-toolkit/autk-map';
+
+const db = new AutkDb();
+await db.init();
+await db.loadOsm({
+  pbfFileUrl: '/data/venice.osm.pbf',
+  queryArea: { bbox: [12.300, 45.420, 12.360, 45.450] },
+  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+});
 
 const map = new AutkMap(document.querySelector('canvas')!);
-${variant === 'custom'
-                ? "map.style.setCustomStyle({\n  background: '#f7f5ef', surface: '#eee8db', parks: '#c4d9b0',\n  water: '#b6d7e8', roads: '#fff', buildings: '#c8b9a7',\n  points: '#7c3aed', polylines: '#3451b2', polygons: '#d6c5a3',\n});"
-                : `map.style.setPredefinedStyle('${variant || 'apple'}');`}
+map.style.setPredefinedStyle('${variant || 'google'}');
 await map.init();
 
-map.loadCollection('neighborhoods', {
-  collection: await fetch('/data/mnt_neighs_proj.geojson').then(response => response.json()),
-});
+for (const layer of db.getLayersMetadata()) {
+  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type,
+    loadConfig: { buildingsZeroHeight: true } });
+}
 map.fitBounds();
 map.draw();`;
         case 'S04': return `${DB_MAP}
-await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });
+await db.loadOsm({
+  pbfFileUrl: '/data/salzburg.osm.pbf',
+  queryArea: { bbox: [13.030, 47.790, 13.065, 47.815] },
+  autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
+});
 
-map.loadCollection('neighborhoods', { collection: await db.getLayer('neighborhoods') });
-map.updateRenderInfo('neighborhoods', { opacity: ${state.opacity || '0.75'}, showBorders: ${state['show-borders'] !== 'false'} });
+for (const layer of db.getLayersMetadata()) {
+  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type,
+    loadConfig: { buildingsZeroHeight: true } });
+}
+const response = await fetch('/data/salzburg-districts.geojson');
+if (!response.ok) throw new Error('Could not load Salzburg districts');
+map.loadCollection('salzburg-districts', { collection: await response.json(), type: 'polygons', sourceCrs: 'EPSG:4326' });
+map.updateRenderInfo('table_osm_buildings', { opacity: ${state.opacity || '0.75'} });
+map.updateRenderInfo('salzburg-districts', {
+  opacity: ${state['district-opacity'] || '0.30'},
+  strokeColor: { r: 25, g: 54, b: 117, alpha: 1 },
+  showBorders: ${state['show-borders'] !== 'false'},
+});
+// Credit the district dataset in the page footer: Stadt Salzburg, CC BY 3.0 AT (grouped and cropped).
+map.ui.setAttribution([{ text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' }]);
 map.fitBounds();
 map.draw();`;
         case 'B01': return `${TILES}
@@ -306,18 +331,54 @@ for (const layer of db.getLayersMetadata()) {
 // An opaque surface would cover the imagery beneath the vectors.
 map.updateRenderInfo('table_osm_surface', { isSkip: true });
 map.draw();`;
-        case 'B03': return `${DB_MAP}
+        case 'B03': return variant === 'rgb' ? `${DB_MAP}
+map.style.setPredefinedStyle('light');
+await db.loadOsm({
+  pbfFileUrl: '/data/lisbon.osm.pbf',
+  queryArea: { bbox: [-9.240416615, 38.669583380, -9.039583283, 38.820416713] },
+  autoLoadLayers: { layers: ['surface', 'water', 'roads'] },
+});
 await db.loadGeoTiff({
-  geotiffFileUrl: ${variant === 'rgb' ? "'/data/rgb-imagery.tif'" : "'/data/mnt_dem.tif'"},
-  coordinateFormat: ${variant === 'rgb' ? "'EPSG:32618'" : "'EPSG:3857'"},
-  outputTableName: 'image',
+  geotiffFileUrl: '/data/lisbon-corine-2018-rgb.tif',
+  coordinateFormat: 'EPSG:4326',
+  outputTableName: 'imagery',
 });
-
-map.loadCollection('image', {
-  collection: await db.getRaster('image'),
+map.loadCollection('imagery', {
+  collection: await db.getRaster('imagery'),
   type: 'raster',
-  property: ${variant === 'rgb' ? "['band_1', 'band_2', 'band_3']" : "'band_1'"},
+  property: ['band_1', 'band_2', 'band_3'],
+  loadConfig: { rgbRange: [0, 255] },
 });
+for (const layer of db.getLayersMetadata()) {
+  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
+}
+map.updateRenderInfo('imagery', { opacity: ${state['raster-opacity'] ?? '0.78'} });
+map.ui.setAttribution([{ text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' }]);
+map.fitBounds();
+map.draw();` : `import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
+${DB_MAP}
+map.style.setPredefinedStyle('light');
+await db.loadOsm({
+  pbfFileUrl: '/data/lisbon.osm.pbf',
+  queryArea: { bbox: [-9.240416615, 38.669583380, -9.039583283, 38.820416713] },
+  autoLoadLayers: { layers: ['surface', 'water', 'roads'] },
+});
+// WorldPop, Portugal 2020 (CC BY 4.0), cropped to Lisbon.
+await db.loadGeoTiff({
+  geotiffFileUrl: '/data/lisbon-population-2020.tif',
+  coordinateFormat: 'EPSG:4326',
+  outputTableName: 'population',
+});
+map.loadCollection('population', { collection: await db.getRaster('population'), type: 'raster', property: 'band_1' });
+map.updateColorMap('population', { colorMap: {
+  interpolator: ColorMapInterpolator.SEQ_YL_OR_RD,
+  domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [0, 98] },
+} });
+for (const layer of db.getLayersMetadata()) {
+  map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
+}
+map.updateRenderInfo('population', { isColorMap: true, opacity: ${state['raster-opacity'] ?? '0.78'} });
+map.ui.setAttribution([{ text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' }]);
 map.fitBounds();
 map.draw();`;
         case 'T01': return `${DB_TERRAIN}
