@@ -93,6 +93,30 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     expectCells(payload.values.band_2, [1 / 3, 2 / 3, 0, 1, 1 / 3, 2 / 3]);
   });
 
+  it('labels each band so that a label names one band', async () => {
+    await loadReadings(readings.map(feature => ({
+      ...feature, properties: { ...feature.properties, other: 2 * (feature.properties?.value as number) },
+    })));
+    await db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'labelled', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      groupBy: [
+        { column: 'value', aggregateFn: 'avg' },
+        { column: 'other', aggregateFn: 'avg' },
+        { column: 'value', aggregateFn: 'avg', normalize: true },
+        { column: 'value', aggregateFn: 'max' },
+        { column: '*', aggregateFn: 'count' },
+      ],
+    });
+
+    // The two averages of different columns name their columns; the normalized one, the max and the count need not.
+    const bands = bandsOf('labelled');
+    expect(Object.keys(bands)).toEqual([
+      'avg_readings_value', 'avg_readings_other', 'avg_readings_norm', 'max_readings', 'count_readings',
+    ]);
+    expect(bands.avg_readings_value).toEqual([2, 6, 0, 7, 10, 3]);
+    expect(bands.avg_readings_other).toEqual([4, 12, 0, 14, 20, 6]);
+  });
+
   it('reads a column whose name holds quotes and a nested key', async () => {
     const key = `it's "loud"`;
     await loadReadings([
