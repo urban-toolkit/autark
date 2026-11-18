@@ -175,28 +175,16 @@ map.updateRenderInfo('table_osm_playgrounds_polygons', { showBorders: true });
 
 The nested form `{ renderInfo: { showBorders: false } }` also works. Border geometry remains synchronized while hidden; the setting does not generate borders for layers that have none. The gallery's typed OSM tag-set polygons start with `showBorders: false`.
 
-### Minimalist map posters
+### Map style presets and attribution
 
-The `poster` preset uses white land, graphite roads and pale-blue water/background:
+The built-in presets are `apple`, `default`, `light`, `google`, `osm`, and `dark`.
+The retired `poster` preset falls back to `apple`; use `setCustomStyle()` for a custom palette.
 
-```ts
-map.style.setPredefinedStyle('poster');
-```
-
-Gallery example: `gallery/src/autk-map/map-poster.html`. It automatically loads a WGS84
-crop covering Rio de Janeiro, Guanabara Bay and Niterói. The crop remains editable, with
-title/subtitle controls, road widths, interactive framing and a 2400-pixel-wide PNG export.
-The exporter temporarily redraws the WebGPU map at export resolution rather than scaling the
-on-screen canvas. Every `autk-map`
-canvas includes a bottom-left credit strip, even with `showUi: false`. The “Made with Autark”
+Every `autk-map` canvas includes a bottom-left credit strip, even with `showUi: false`. The “Made with Autark”
 link opens `https://www.autarkjs.org` alongside credits for visible tile imagery. All credit
 links share the same typography and styling, and wrap on narrow maps. Legends stay at the
 bottom right, moving above the credits when needed to avoid overlap. The strip follows
 canvas resizing and is removed by `destroy()`; only the strip intercepts pointer events.
-The poster PNG retains its separately drawn watermark.
-The poster omits the OpenStreetMap credit text; published uses still require
-appropriate OpenStreetMap attribution. Data loading requires network access to Overpass;
-larger crops may take longer.
 
 ### Tile basemaps
 

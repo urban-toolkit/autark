@@ -17,10 +17,10 @@ describe('subdued generic layer defaults', () => {
   it.each([
     ['apple', '#ababa9', '#c3c3c2', '#dcdcda', '#c3cdd4'],
     ['default', '#9ea4a6', '#b5bbbe', '#cbd3d5', '#b98c0f'],
-    ['light', '#a1a2a2', '#b8bab9', '#cfd1d0', '#b7bdc4'],
+    ['light', '#5a5a5a', '#7a7a7a', '#eaeaec', '#ffffff'],
+    ['dark', '#b5b5b5', '#858585', '#3a3737', '#525252'],
     ['google', '#9e9b95', '#b5b1aa', '#cbc7c0', '#a3b2c2'],
     ['osm', '#adaaa5', '#c6c2bc', '#dedbd4', '#d2c0a5'],
-    ['poster', '#666666', '#444444', '#eeeeee', '#353535'],
   ])('uses the %s generic palette without changing road colors', (preset, points, polylines, polygons, roads) => {
     const style = new MapStyle(preset);
     for (const [key, color] of Object.entries({ points, polylines, polygons, roads })) {
@@ -29,13 +29,11 @@ describe('subdued generic layer defaults', () => {
     expect(style.getColor('custom-category')).toEqual(style.getColor('polygons'));
   });
 
-  it('offers the poster preset with white land and pale-blue water', () => {
-    const style = new MapStyle('poster');
-    expect(style.availableStyles).toContain('poster');
-    expect(style.currentStyle).toBe('poster');
-    expect(style.getColor('background')).toEqual(ColorMap.hexToRgb('#e6eef4'));
-    expect(style.getColor('surface')).toEqual(ColorMap.hexToRgb('#ffffff'));
-    expect(style.getColor('water')).toEqual(ColorMap.hexToRgb('#e6eef4'));
+  it('does not offer the retired poster preset and falls back to apple', () => {
+    const style = new MapStyle('light');
+    expect(style.availableStyles).not.toContain('poster');
+    style.setPredefinedStyle('poster');
+    expect(style.currentStyle).toBe('apple');
   });
 
   it('keeps generic and road widths in render state, not centerline geometry', () => {

@@ -15,13 +15,13 @@ import light from './styles/light.json';
 import google from './styles/google.json';
 import apple from './styles/apple.json';
 import osm from './styles/osm.json';
-import poster from './styles/poster.json';
+import dark from './styles/dark.json';
 
 /** Supported built-in style preset identifiers. */
-export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm' | 'poster';
+export type MapStylePresetId = 'default' | 'light' | 'google' | 'apple' | 'osm' | 'dark';
 
 /** Ordered preset ids used for keyboard style cycling. */
-const PRESET_IDS: readonly MapStylePresetId[] = ['apple', 'default', 'light', 'google', 'osm', 'poster'];
+const PRESET_IDS: readonly MapStylePresetId[] = ['apple', 'default', 'light', 'google', 'osm', 'dark'];
 /** Required keys for a valid map style object — derived from `LayerType` minus `raster` and `tiles`. */
 const MAP_STYLE_KEYS: Array<keyof MapStyleShape> = LAYER_TYPE_VALUES.filter(
   (l): l is Exclude<LayerType, 'raster' | 'tiles'> => l !== 'raster' && l !== 'tiles',
@@ -68,7 +68,7 @@ export class MapStyle {
         google: MapStyle._normalizeStyle(google as MapStyleShape, 'google'),
         apple: MapStyle._normalizeStyle(apple as MapStyleShape, 'apple'),
         osm: MapStyle._normalizeStyle(osm as MapStyleShape, 'osm'),
-        poster: MapStyle._normalizeStyle(poster as MapStyleShape, 'poster'),
+        dark: MapStyle._normalizeStyle(dark as MapStyleShape, 'dark'),
     };
 
     /** Default style assigned to new maps. */
