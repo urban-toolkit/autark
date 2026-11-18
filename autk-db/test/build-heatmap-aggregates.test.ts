@@ -33,6 +33,12 @@ function bandsOf(table: string): Record<string, number[]> {
   return Object.fromEntries(payload.bands.map(band => [band.label, Array.from(payload.values[band.id])]));
 }
 
+/** A band's cells, row by row from the south, against *expected*, to float32's precision. */
+function expectCells(cells: ArrayLike<number>, expected: number[]) {
+  expect(cells).toHaveLength(expected.length);
+  expected.forEach((value, index) => expect(cells[index]).toBeCloseTo(value, 5));
+}
+
 describe('heatmap cells hold the aggregate of the rows near their center', () => {
   // A box 3 wide and 2 high in 3 by 2 unit cells. The readings at its corners give the workspace its extent and
   // lie 0.71 from every cell center, past the 0.6 the heatmap reaches; every other reading lies within 0.1 of the
@@ -69,6 +75,22 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     // 1 / (distance + 1) for each reading near the center.
     const weighted = [1, 1 + 1 / 1.1, 0, 1 + 2 / 1.1, 1, 1 + 1 / 1.1];
     bands.weighted_readings.forEach((cell, index) => expect(cell).toBeCloseTo(weighted[index], 5));
+  });
+
+  it('builds a normalized band from the values the join rescales from 0 to 1 across the cells', async () => {
+    await loadReadings(readings);
+    await db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'scaled', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      groupBy: [
+        { column: 'value', aggregateFn: 'avg', normalize: true },
+        { column: '*', aggregateFn: 'count', normalize: true },
+      ],
+    });
+
+    // The averages 2, 6, 0, 7, 10, 3 and the counts 1, 2, 0, 3, 1, 2, each from its least to its greatest.
+    const payload = getRasterPayload(db.getCurrentWorkspace(), 'scaled')!;
+    expectCells(payload.values.band_1, [0.2, 0.6, 0, 0.7, 1, 0.3]);
+    expectCells(payload.values.band_2, [1 / 3, 2 / 3, 0, 1, 1 / 3, 2 / 3]);
   });
 
   it('reads a column whose name holds quotes and a nested key', async () => {
