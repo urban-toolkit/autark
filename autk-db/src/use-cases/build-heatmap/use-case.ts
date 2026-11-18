@@ -1,5 +1,5 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
-import { BuildHeatmapParams } from './interfaces';
+import { BuildHeatmapParams, HeatmapGroupBy } from './interfaces';
 import type { BoundingBox } from '@urban-toolkit/autk-core';
 import { RasterBandMetadata, Table, UserTable } from '../../interfaces';
 import { SpatialJoinUseCase } from '../spatial-join/use-case';
@@ -259,21 +259,23 @@ ${bandAssignments}
      * Derives raster band metadata from the group-by configuration.
      */
     private getRasterBands(params: BuildHeatmapParams): Array<RasterBandMetadata & { jsonPath: string }> {
-        const groupBy = params.groupBy && params.groupBy.length > 0
+        const groupBy: HeatmapGroupBy[] = params.groupBy && params.groupBy.length > 0
             ? params.groupBy
-            : [{ column: '*', aggregateFn: 'count' as const }];
+            : [{ column: '*', aggregateFn: 'count' }];
 
         return groupBy.map((column, index) => {
             const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
             const sourceKey = aggregateFn === 'count' || aggregateFn === 'weighted'
                 ? params.tableJoinName
                 : `${params.tableJoinName}.${column.column}`;
+            // The join writes a normalized value under its key with `_norm` added.
+            const key = column.normalize ? `${sourceKey}_norm` : sourceKey;
 
             return {
                 id: `band_${index + 1}`,
                 label: `${aggregateFn}_${params.tableJoinName}`,
                 // The join stores `<table>.<column>` as one key, so the path quotes it.
-                jsonPath: `$.sjoin.${aggregateFn}.${JSON.stringify(sourceKey)}`,
+                jsonPath: `$.sjoin.${aggregateFn}.${JSON.stringify(key)}`,
             };
         });
     }
