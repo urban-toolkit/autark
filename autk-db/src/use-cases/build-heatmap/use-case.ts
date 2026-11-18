@@ -151,7 +151,7 @@ export class BuildHeatmapUseCase {
     ): Promise<void> {
         const qualifiedTableName = `${workspace}.${tableName}`;
         const bandAssignments = bands
-            .map((band) => `                    '${band.id}': COALESCE(json_extract(properties, '${band.jsonPath}')::DOUBLE, 0)`) 
+            .map((band) => `                    '${band.id}': COALESCE(json_extract(properties, '${band.jsonPath.replace(/'/g, "''")}')::DOUBLE, 0)`)
             .join(',\n');
 
         const transformQuery = `
@@ -272,7 +272,8 @@ ${bandAssignments}
             return {
                 id: `band_${index + 1}`,
                 label: `${aggregateFn}_${params.tableJoinName}`,
-                jsonPath: `$.sjoin.${aggregateFn}.${sourceKey}`,
+                // The join stores `<table>.<column>` as one key, so the path quotes it.
+                jsonPath: `$.sjoin.${aggregateFn}.${JSON.stringify(sourceKey)}`,
             };
         });
     }
