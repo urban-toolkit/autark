@@ -257,26 +257,40 @@ ${bandAssignments}
 
     /**
      * Derives raster band metadata from the group-by configuration.
+     *
+     * A band is labelled `<aggregateFn>_<table>`, with `_norm` added when it is normalized. When bands of one
+     * aggregate over different columns would share that label, each of them names its column too,
+     * `<aggregateFn>_<table>_<column>` with the column's dots as underscores, so a label names one band.
      */
     private getRasterBands(params: BuildHeatmapParams): Array<RasterBandMetadata & { jsonPath: string }> {
         const groupBy: HeatmapGroupBy[] = params.groupBy && params.groupBy.length > 0
             ? params.groupBy
             : [{ column: '*', aggregateFn: 'count' }];
 
-        return groupBy.map((column, index) => {
+        const bands = groupBy.map((column, index) => {
             const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
             const sourceKey = aggregateFn === 'count' || aggregateFn === 'weighted'
                 ? params.tableJoinName
                 : `${params.tableJoinName}.${column.column}`;
             // The join writes a normalized value under its key with `_norm` added.
             const key = column.normalize ? `${sourceKey}_norm` : sourceKey;
+            const norm = column.normalize ? '_norm' : '';
 
             return {
                 id: `band_${index + 1}`,
-                label: `${aggregateFn}_${params.tableJoinName}`,
+                label: `${aggregateFn}_${params.tableJoinName}${norm}`,
                 // The join stores `<table>.<column>` as one key, so the path quotes it.
                 jsonPath: `$.sjoin.${aggregateFn}.${JSON.stringify(key)}`,
+                columnLabel: sourceKey === params.tableJoinName
+                    ? null
+                    : `${aggregateFn}_${params.tableJoinName}_${column.column.replace(/\./g, '_')}${norm}`,
             };
         });
+
+        return bands.map(({ columnLabel, ...band }) => (
+            columnLabel !== null && bands.filter((other) => other.label === band.label).length > 1
+                ? { ...band, label: columnLabel }
+                : band
+        ));
     }
 }
