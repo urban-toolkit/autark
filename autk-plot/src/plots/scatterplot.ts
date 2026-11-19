@@ -32,7 +32,6 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
-import { PlotStyle } from '../plot-style';
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
@@ -196,7 +195,7 @@ export class Scatterplot extends PlotBaseInteractive {
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, xAttribute)) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, yAttribute)) || 0 : 0))
             .attr('r', 5)
-            .style('fill', PlotStyle.default)
+            .style('fill', d => this.getMarkColor(d))
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();

@@ -39,7 +39,6 @@ import * as d3 from 'd3';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
-import { PlotStyle } from '../plot-style';
 
 import type { ExecutedPlotTransform } from '../transforms';
 
@@ -262,7 +261,7 @@ export class Linechart extends PlotBaseInteractive {
             .attr('cx', (d) => xScale(d.x))
             .attr('cy', (d) => yScale(d.y))
             .attr('r', 5)
-            .style('fill', PlotStyle.default)
+            .style('fill', d => this.getMarkColor(d))
             .style('visibility', 'inherit');
 
         // ---- Empty state
