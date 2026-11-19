@@ -13,8 +13,26 @@ export default defineConfig({
       '@urban-toolkit/autk-core': resolve(import.meta.dirname, '../autk-core/src/index.ts'),
     },
   },
-  // Published declarations must reference the core package, not its workspace source.
-  plugins: [glsl(), dts({ aliasesExclude: ['@urban-toolkit/autk-core'] })],
+  plugins: [
+    glsl(),
+    // Published declarations must reference the core package, not its workspace source.
+    dts({ aliasesExclude: ['@urban-toolkit/autk-core'] }),
+    {
+      name: 'split-map-es-dependencies',
+      outputOptions(options) {
+        // Only split the ES build; the UMD entry remains self-contained.
+        if (options.format !== 'es') return null;
+        return {
+          ...options,
+          // Proj4 registers projections during module initialization.
+          strictExecutionOrder: true,
+          codeSplitting: {
+            groups: [{ name: 'map-vendor', test: /[\\/]node_modules[\\/]/, maxSize: 180_000 }],
+          },
+        };
+      },
+    },
+  ],
   build: {
     lib: {
       entry: resolve(import.meta.dirname, 'src/index.ts'),

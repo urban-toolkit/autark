@@ -77,6 +77,14 @@ export default defineConfig({
       external: ['@duckdb/duckdb-wasm'],
       output: {
         globals: { '@duckdb/duckdb-wasm': 'duckdb' },
+        // Split dependencies before publishing so browser bundlers can keep chunks within budget.
+        ...(buildTarget === 'browser' ? {
+          // Preserve dependency initialization order across chunks.
+          strictExecutionOrder: true,
+          codeSplitting: {
+            groups: [{ name: 'db-vendor', test: /[\\/]node_modules[\\/]/, maxSize: 180_000 }],
+          },
+        } : {}),
       },
     },
   },

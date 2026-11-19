@@ -53,6 +53,8 @@ Commit and push only when authorized, using a message such as `chore(release): p
 5. Before any staging call, the script verifies all tarball hashes and packed manifests, published versions and remote tags. Registry/network/authentication failures abort; they are not interpreted as missing versions.
 6. The script submits selected packages in order: core → map → db → plot → compute → umbrella. It sets the npm subprocess's provenance source SHA to the tested commit, since a `workflow_run` execution's default SHA may refer to a newer main commit. It uses `npm stage publish <tarball> --access=public --tag=latest --provenance --ignore-scripts`. It never approves a stage or publishes directly.
 
+The browser ES modules for `autk-map` and `autk-db` ship with sibling JavaScript chunks to stay within the isolated consumer's 500 kB per-chunk budget. npm imports are unchanged. When serving these builds directly instead of using a bundler, keep the sibling chunks and other assets alongside the entry file. The map UMD and database Node builds retain their existing layout.
+
 The workflow shares a non-cancelling concurrency group with finalization. It rejects versions behind registry `latest`, integrity mismatches and conflicting tags. GitHub concurrency does not guarantee FIFO ordering; registry checks are still necessary. Do not cancel an in-progress release or rerun its CI attempt after staging, since recovery must use the original artifacts.
 
 ## Review and approve on npm
