@@ -14,9 +14,9 @@ beforeAll(async () => {
 }, 120_000);
 afterAll(async () => { await (db as any)?.conn?.close(); await native.db?.terminate(); vi.unstubAllGlobals(); });
 
-/** A point with no GeoJSON id, whose properties carry an `id` and a `value`. */
-const zone = (id: number, value: number, coordinates: [number, number]): Feature => ({
-  type: 'Feature', geometry: { type: 'Point', coordinates }, properties: { id, value },
+/** A point with no GeoJSON id, whose properties carry its id under *key* (`id` by default) and a `value`. */
+const zone = (id: number, value: number, coordinates: [number, number], key = 'id'): Feature => ({
+  type: 'Feature', geometry: { type: 'Point', coordinates }, properties: { [key]: id, value },
 });
 
 describe('a layer update keyed by a property', () => {
@@ -35,6 +35,29 @@ describe('a layer update keyed by a property', () => {
     const features = (await db.getLayer('zones')).features;
     expect(features).toHaveLength(3);
     const zones = Object.fromEntries(features.map(feature => [feature.properties?.id, {
+      value: feature.properties?.value, coordinates: (feature.geometry as Point).coordinates,
+    }]));
+    expect(zones).toEqual({
+      11: { value: 10, coordinates: [0, 0] },
+      12: { value: 99, coordinates: [150, 50] },
+      13: { value: 30, coordinates: [200, 200] },
+    });
+  });
+
+  it('updates by a property whose name holds quotes, and only the row it names', async () => {
+    const key = `it's "loud"`;
+    await db.setWorkspace('update_by_quoted_property');
+    await db.loadGeojson({ outputTableName: 'zones', coordinateFormat: 'EPSG:3395', geojsonObject: {
+      type: 'FeatureCollection',
+      features: [zone(11, 10, [0, 0], key), zone(12, 20, [100, 100], key), zone(13, 30, [200, 200], key)],
+    } });
+    await db.updateTable({ tableName: 'zones', strategy: 'update', idColumn: `properties.${key}`, data: {
+      type: 'FeatureCollection', features: [zone(12, 99, [150, 50], key)],
+    } });
+
+    const features = (await db.getLayer('zones')).features;
+    expect(features).toHaveLength(3);
+    const zones = Object.fromEntries(features.map(feature => [feature.properties?.[key], {
       value: feature.properties?.value, coordinates: (feature.geometry as Point).coordinates,
     }]));
     expect(zones).toEqual({
