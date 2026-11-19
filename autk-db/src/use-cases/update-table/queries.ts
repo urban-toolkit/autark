@@ -144,7 +144,7 @@ export const UPDATE_LAYER_FROM_STAGING_QUERY = (
       geometry = staging.geometry,
       properties = staging.properties
     FROM ${stagingTableName} AS staging
-    WHERE ${qualifiedTableName}.${idSqlExpression} = staging.${idSqlExpression};
+    WHERE (${qualifiedTableName}.${idSqlExpression}) = (staging.${idSqlExpression});
   `;
 };
 
@@ -230,7 +230,7 @@ export const INSERT_LAYER_FROM_STAGING_QUERY = (
     FROM ${stagingTableName} AS staging
     WHERE NOT EXISTS (
       SELECT 1 FROM ${qualifiedTableName} AS target
-      WHERE target.${idSqlExpression} = staging.${idSqlExpression}
+      WHERE (target.${idSqlExpression}) = (staging.${idSqlExpression})
     );
   `;
 };
