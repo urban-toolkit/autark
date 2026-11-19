@@ -53,7 +53,10 @@ function transformed(transform: string | null, [x, y]: [number, number]): [numbe
     return [x, y];
 }
 
-/** A text's box in the coordinates of its ancestor `frame`, through the transforms between them. */
+/**
+ * A text's box in the coordinates of its ancestor `frame`, through the transforms between them,
+ * to a millionth of a pixel: a rotation by 90 degrees leaves noise such as 1e-14 (cos 90° is 6e-17).
+ */
 function boxIn(frame: Element, text: Element): Box {
     const { x, y, width, height } = textBox(text);
     let corners: [number, number][] = [[x, y], [x + width, y], [x, y + height], [x + width, y + height]];
@@ -61,9 +64,10 @@ function boxIn(frame: Element, text: Element): Box {
         const transform = node.getAttribute('transform');
         corners = corners.map((corner) => transformed(transform, corner));
     }
+    const round = (value: number) => Math.round(value * 1e6) / 1e6;
     const xs = corners.map(([cx]) => cx);
     const ys = corners.map(([, cy]) => cy);
-    return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+    return { left: round(Math.min(...xs)), top: round(Math.min(...ys)), right: round(Math.max(...xs)), bottom: round(Math.max(...ys)) };
 }
 
 /** The box all the tick labels of an axis group take, in its coordinates. */
