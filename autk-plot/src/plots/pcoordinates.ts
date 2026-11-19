@@ -77,10 +77,10 @@ export class ParallelCoordinates extends PlotBaseInteractive {
 
         const svg = d3
             .select(this._div)
-            .selectAll('#plot')
+            .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('id', 'plot')
+            .attr('class', 'autk-plot')
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
@@ -100,10 +100,9 @@ export class ParallelCoordinates extends PlotBaseInteractive {
         // ---- Title (optional)
         if (this._title && this._title.length > 0) {
             svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
+                .selectAll<SVGTextElement, string>('.plot-title')
                 .data([this._title])
                 .join('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + width / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))

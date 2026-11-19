@@ -119,10 +119,10 @@ export class Linechart extends PlotBaseInteractive {
 
         const svg = d3
             .select(this._div)
-            .selectAll('#plot')
+            .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('id', 'plot')
+            .attr('class', 'autk-plot')
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
@@ -137,10 +137,9 @@ export class Linechart extends PlotBaseInteractive {
         // ---- Title (optional)
         if (this._title && this._title.length > 0) {
             svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
+                .selectAll<SVGTextElement, string>('.plot-title')
                 .data([this._title])
                 .join('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + innerW / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -166,10 +165,9 @@ export class Linechart extends PlotBaseInteractive {
             .tickFormat((d) => seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
 
         const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
+            .selectAll<SVGGElement, unknown>('.x.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisX')
             .attr('class', 'x axis')
             .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
@@ -197,10 +195,9 @@ export class Linechart extends PlotBaseInteractive {
             .tickFormat(d3.format(this._tickFormats[1]));
 
         const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
+            .selectAll<SVGGElement, unknown>('.y.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisY')
             .attr('class', 'y axis')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');
