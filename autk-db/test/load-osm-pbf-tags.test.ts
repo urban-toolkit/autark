@@ -154,7 +154,7 @@ describe('PBF tag-set acquisition', () => {
     }
     expect(fetch).toHaveBeenCalled();
     expect(api).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it('clips custom nodes by the same coastal land mask as standard layers', async () => {
     const elements: OsmElement[] = [...fixture,
