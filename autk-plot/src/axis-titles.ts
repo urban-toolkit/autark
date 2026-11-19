@@ -22,11 +22,12 @@ type Matrix = [number, number, number, number, number, number];
 export type TitleOverflow = { bottom: number; left: number };
 
 /**
- * Places the x and y titles of a plot clear of their tick labels, as drawn: the
- * x title below the lowest point of the x tick labels, the y title beyond the
- * widest y tick label, `TITLE_GAP` pixels away. A title already that clear keeps
- * its place. Where nothing is laid out (a plot drawn hidden), nothing is measured
- * and the titles stay where they are.
+ * Places the x and y titles of a plot clear of their tick labels, as drawn. A
+ * title drawn over any of its axis's tick labels moves, the x title below the
+ * lowest point of the x tick labels and the y title beyond the widest y tick
+ * label, `TITLE_GAP` pixels away. A title drawn over none keeps its place. Where
+ * nothing is laid out (a plot drawn hidden), nothing is measured and the titles
+ * stay where they are.
  *
  * @param svg - The plot's svg, if it has one.
  * @param margins - The margins the plot was drawn with.
@@ -38,10 +39,10 @@ export function placeAxisTitles(svg: SVGSVGElement | null, margins: PlotMargins)
     const xAxis = svg?.querySelector<SVGGElement>('.x.axis');
     const xTitle = xAxis ? titleOf(xAxis) : null;
     if (xAxis && xTitle) {
-        const labels = labelsBox(xAxis);
+        const labels = labelBoxes(xAxis);
         const title = boxIn(xAxis, xTitle);
-        const shift = labels && title ? labels.bottom + TITLE_GAP - title.top : 0;
-        if (title && shift > 0) {
+        if (title && labels.some(label => overlaps(label, title))) {
+            const shift = Math.max(...labels.map(label => label.bottom)) + TITLE_GAP - title.top;
             moveBy(xAxis, xTitle, 0, shift);
             overflow.bottom = title.bottom + shift - margins.bottom;
         }
@@ -50,16 +51,27 @@ export function placeAxisTitles(svg: SVGSVGElement | null, margins: PlotMargins)
     const yAxis = svg?.querySelector<SVGGElement>('.y.axis');
     const yTitle = yAxis ? titleOf(yAxis) : null;
     if (yAxis && yTitle) {
-        const labels = labelsBox(yAxis);
+        const labels = labelBoxes(yAxis);
         const title = boxIn(yAxis, yTitle);
-        const shift = labels && title ? labels.left - TITLE_GAP - title.right : 0;
-        if (title && shift < 0) {
+        if (title && labels.some(label => overlaps(label, title))) {
+            const shift = Math.min(...labels.map(label => label.left)) - TITLE_GAP - title.right;
             moveBy(yAxis, yTitle, shift, 0);
             overflow.left = -margins.left - (title.left + shift);
         }
     }
 
     return overflow;
+}
+
+/**
+ * Tells whether two boxes overlap.
+ *
+ * @param a - A box.
+ * @param b - Another box in the same coordinates.
+ * @returns True if they share more than an edge.
+ */
+function overlaps(a: Box, b: Box): boolean {
+    return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
 /**
@@ -74,26 +86,18 @@ function titleOf(axis: SVGGElement): SVGGraphicsElement | null {
 }
 
 /**
- * Returns the box all the tick labels of an axis group take in its coordinates.
+ * Returns the box of each tick label of an axis group, in its coordinates.
  *
  * @param axis - Axis group.
- * @returns The labels' box, or null if none of them could be measured.
+ * @returns The boxes of the labels that could be measured.
  */
-function labelsBox(axis: SVGGElement): Box | null {
-    let union: Box | null = null;
+function labelBoxes(axis: SVGGElement): Box[] {
+    const boxes: Box[] = [];
     for (const label of Array.from(axis.querySelectorAll<SVGGraphicsElement>('.tick text'))) {
         const box = boxIn(axis, label);
-        if (!box) continue;
-        union = union
-            ? {
-                left: Math.min(union.left, box.left),
-                top: Math.min(union.top, box.top),
-                right: Math.max(union.right, box.right),
-                bottom: Math.max(union.bottom, box.bottom),
-            }
-            : box;
+        if (box) boxes.push(box);
     }
-    return union;
+    return boxes;
 }
 
 /**
