@@ -35,14 +35,26 @@ try {
             pkg${specifiers.indexOf('@urban-toolkit/autk-core')}.PolylineBuilder.build({ type: 'FeatureCollection', features: [] }, [0, 0]);
         console.log(centerlines);
     `);
-    writeFileSync(resolve(consumer, 'tsconfig.json'), JSON.stringify({
-        compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true,
-            noEmit: true, skipLibCheck: false, types: [], ignoreDeprecations: '6.0' },
-        include: ['index.ts'],
-    }));
-    execFileSync(process.execPath, [resolve(root, 'node_modules/typescript/bin/tsc'), '-p', resolve(consumer, 'tsconfig.json')], {
-        cwd: consumer, stdio: 'inherit',
-    });
+    writeFileSync(resolve(consumer, 'types.ts'), `
+        import { ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
+        import { AutkDb } from '@urban-toolkit/autk-db';
+        import { AutkDb as UmbrellaDb } from '@urban-toolkit/autk/db';
+        const db: AutkDb = new UmbrellaDb();
+        const strategy: ColorMapDomainStrategy = ColorMapDomainStrategy.USER;
+        // @ts-expect-error A broken re-export can silently turn the enum into any.
+        const untyped: symbol = ColorMapDomainStrategy;
+    `);
+    for (const [module, moduleResolution] of [['ESNext', 'Bundler'], ['Node16', 'Node16'], ['NodeNext', 'NodeNext']]) {
+        console.log(`Checking isolated package types with ${moduleResolution} resolution.`);
+        writeFileSync(resolve(consumer, 'tsconfig.json'), JSON.stringify({
+            compilerOptions: { target: 'ES2022', module, moduleResolution, strict: true,
+                noEmit: true, skipLibCheck: false, types: [], ignoreDeprecations: '6.0' },
+            include: ['index.ts', 'types.ts'],
+        }));
+        execFileSync(process.execPath, [resolve(root, 'node_modules/typescript/bin/tsc'), '-p', resolve(consumer, 'tsconfig.json')], {
+            cwd: consumer, stdio: 'inherit',
+        });
+    }
     writeFileSync(resolve(consumer, 'node.mjs'), `
         import { strict as assert } from 'node:assert';
         import { ColorMap } from '@urban-toolkit/autk-core';

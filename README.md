@@ -50,6 +50,28 @@ npm install @urban-toolkit/autk-plot
 npm install @urban-toolkit/autk-map
 ```
 
+### Web apps and notebooks
+
+In an npm-based web app, import from the package as usual:
+
+```js
+import { AutkMap } from '@urban-toolkit/autk-map';
+```
+
+For a browser notebook without a build step, use a versioned ES module URL. In [anywidget](https://anywidget.dev/en/getting-started/), put this import in the widget's `_esm` JavaScript:
+
+```js
+import { AutkMap } from 'https://esm.sh/@urban-toolkit/autk-map@4.1.1';
+```
+
+In an Observable notebook, use the same URL with a dynamic import in a cell:
+
+```js
+AutkMap = (await import('https://esm.sh/@urban-toolkit/autk-map@4.1.1')).AutkMap
+```
+
+Autark runs in the notebook's browser, not the Python kernel. Maps and GPU computation need WebGPU in that browser. If you use `AutkDb`, the host must also allow its web worker and WebAssembly assets to load. The versioned URLs above point to npm releases, not unreleased changes on `main`.
+
 ## Development
 
 ### Dependencies

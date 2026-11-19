@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 import { dirname, resolve } from 'path';
 import { defineConfig, type Plugin } from 'vite';
 import dts from 'vite-plugin-dts';
+import { writeEsmDeclarationPaths } from '../.github/scripts/esm-declarations.mjs';
 
 const require = createRequire(import.meta.url);
 const duckdbDistDir = dirname(require.resolve('@duckdb/duckdb-wasm'));
@@ -62,7 +63,7 @@ export default defineConfig({
   },
   // Published declarations must reference the core package, not its workspace source.
   plugins: buildTarget === 'browser'
-    ? [duckdbAssets(), dts({ aliasesExclude: ['@urban-toolkit/autk-core'] })]
+    ? [duckdbAssets(), dts({ aliasesExclude: ['@urban-toolkit/autk-core'], afterBuild: writeEsmDeclarationPaths })]
     : [],
   build: {
     lib: {

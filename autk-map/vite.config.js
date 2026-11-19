@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import glsl from 'vite-plugin-glsl';
 import dts from 'vite-plugin-dts';
+import { writeEsmDeclarationPaths } from '../.github/scripts/esm-declarations.mjs';
 
 const isWatch = process.argv.includes('--watch');
 
@@ -16,7 +17,7 @@ export default defineConfig({
   plugins: [
     glsl(),
     // Published declarations must reference the core package, not its workspace source.
-    dts({ aliasesExclude: ['@urban-toolkit/autk-core'] }),
+    dts({ aliasesExclude: ['@urban-toolkit/autk-core'], afterBuild: writeEsmDeclarationPaths }),
     {
       name: 'split-map-es-dependencies',
       outputOptions(options) {
