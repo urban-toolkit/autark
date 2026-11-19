@@ -133,12 +133,14 @@ afterEach(() => {
 });
 
 describe('Axis titles clear of their tick labels', () => {
-    it('puts a bar chart\'s x title below its rotated tick labels, inside the svg', () => {
+    it('puts a bar chart\'s x title, drawn over its rotated tick labels, below them, inside the svg', () => {
+        // 300 px wide, so the title, at the right end, sits over the last label.
         const { svg, x } = draw({
             type: 'barchart',
             collection: landUses,
             attributes: { axis: ['landuse', 'area'] },
             labels: { axis: ['Land use', 'Area'] },
+            width: 300,
         });
         const title = boxIn(x, titleOf(x));
 
@@ -146,18 +148,32 @@ describe('Axis titles clear of their tick labels', () => {
         expect(originOf(x)[1] + title.bottom).toBeLessThanOrEqual(Number(svg.getAttribute('height')));
     });
 
-    it('puts a heat matrix\'s y title beyond its widest tick label, inside the svg', () => {
+    it('puts a heat matrix\'s y title, drawn over its tick labels, beyond the widest, inside the svg', () => {
+        // A title long enough to reach down to the second label, "Residential".
         const { y } = draw({
             type: 'heatmatrix',
             collection: landUses,
             attributes: { axis: ['kind', 'landuse'], color: '@transform' },
             transform: { preset: 'binning-2d' },
-            labels: { axis: ['Kind', 'Land use'] },
+            labels: { axis: ['Kind', 'Land use of the parcel'] },
         });
         const title = boxIn(y, titleOf(y));
 
         expect(title.right).toBeLessThan(labelsBox(y).left);
         expect(originOf(y)[0] + title.left).toBeGreaterThanOrEqual(0);
+    });
+
+    it('keeps a bar chart\'s x title in place when it is drawn over none of its tick labels', () => {
+        // 800 px wide: the short title, at the right end, is right of the last rotated label.
+        const { x } = draw({
+            type: 'barchart',
+            collection: landUses,
+            attributes: { axis: ['landuse', 'area'] },
+            labels: { axis: ['Use', 'Area'] },
+        });
+
+        expect(x.getAttribute('transform')).toBe('translate(40, 450)');
+        expect(titleOf(x).getAttribute('y')).toBe('35');
     });
 
     it('keeps the titles of a scatterplot whose titles are clear where they were', () => {
