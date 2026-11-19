@@ -74,8 +74,10 @@ export abstract class PlotBaseData {
     protected _width: number = 800;
     /** Outer plot height in pixels. */
     protected _height: number = 500;
-    /** Plot margins in pixels. */
+    /** Plot margins in pixels: the configured ones, grown when a draw needs room for its axis titles. */
     protected _margins!: PlotMargins;
+    /** Margins from the configuration, in pixels; each draw starts from them. */
+    private _configuredMargins!: PlotMargins;
 
     /** Resolved color domain, computed from data after each transform. */
     protected _resolvedDomain: ResolvedDomain | undefined = undefined;
@@ -135,7 +137,8 @@ export abstract class PlotBaseData {
 
         this._width = config.width || 800;
         this._height = config.height || 500;
-        this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
+        this._configuredMargins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
+        this._margins = { ...this._configuredMargins };
 
         this._domainSpec = config.domainSpec;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
@@ -150,6 +153,7 @@ export abstract class PlotBaseData {
      * @throws If active render bindings do not resolve on the rendered data.
      */
     public draw(): void {
+        this._margins = { ...this._configuredMargins };
         this._data = this.buildSourceRows();
         this._transformAttributes = undefined;
         this._transformColorAttribute = undefined;
@@ -158,6 +162,7 @@ export abstract class PlotBaseData {
         this.validateRenderedAttributeBindings();
         this.computeColorDomain();
         this.render();
+        this.afterRender();
     }
 
     /**
@@ -265,6 +270,11 @@ export abstract class PlotBaseData {
      * Renders plot DOM, SVG, or HTML nodes for the current internal state.
      */
     abstract render(): void;
+
+    /**
+     * Lifecycle hook invoked after `render()` within `draw()`, with the plot drawn.
+     */
+    protected afterRender(): void {}
 
     /**
      * Maps a preset-specific executed transform into the rendered row schema

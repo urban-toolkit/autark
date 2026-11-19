@@ -19,6 +19,7 @@ import type { PlotEventRecord } from './types-events';
 import { PlotStyle } from './plot-style';
 import { PlotEvent } from './types-events';
 import { PlotBaseData } from './plot-base-data';
+import { placeAxisTitles } from './axis-titles';
 
 /**
  * Interactive plot base class.
@@ -123,6 +124,30 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      */
     protected override afterDataRefresh(): void {
         this.restoreLocalSelectionAfterDraw();
+    }
+
+    /**
+     * Places the axis titles clear of their tick labels. Where the margins cannot
+     * hold a title so placed, the plot area gives up the room, at most half of it,
+     * and the plot is drawn again: the svg keeps its size, and no title is cut by
+     * its edge or drawn over a label.
+     */
+    protected override afterRender(): void {
+        const svg = () => d3.select(this._div).select<SVGSVGElement>('svg.autk-plot').node();
+        const overflow = placeAxisTitles(svg(), this._margins);
+        const bottom = Math.max(0, Math.ceil(overflow.bottom));
+        const left = Math.max(0, Math.ceil(overflow.left));
+        if (bottom === 0 && left === 0) return;
+
+        const plotWidth = this._width - this._margins.left - this._margins.right;
+        const plotHeight = this._height - this._margins.top - this._margins.bottom;
+        this._margins = {
+            ...this._margins,
+            bottom: this._margins.bottom + Math.min(bottom, Math.max(0, Math.floor(plotHeight / 2))),
+            left: this._margins.left + Math.min(left, Math.max(0, Math.floor(plotWidth / 2))),
+        };
+        this.render();
+        placeAxisTitles(svg(), this._margins);
     }
 
     /**

@@ -151,7 +151,7 @@ export class Barchart extends PlotBaseInteractive {
 
         xAxisSelection
             .call(xAxis)
-            .selectAll('text')
+            .selectAll('.tick text')
             .style('text-anchor', 'end')
             .attr('dx', '-.8em')
             .attr('dy', '-.40em')

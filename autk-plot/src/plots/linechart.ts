@@ -172,7 +172,7 @@ export class Linechart extends PlotBaseInteractive {
             .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
         xAxisSelection.call(xAxis);
-        xAxisSelection.selectAll<SVGTextElement, unknown>('text')
+        xAxisSelection.selectAll<SVGTextElement, unknown>('.tick text')
             .style('font-size', '11px')
             .attr('transform', 'rotate(-45)')
             .attr('text-anchor', 'end')
