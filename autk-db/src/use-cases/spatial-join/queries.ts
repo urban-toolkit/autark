@@ -457,7 +457,7 @@ function buildNormalizationMergePatch(normalizedColumns: Array<InternalColumn>, 
       funcName === 'count' || funcName === 'weighted' || funcName === 'collect'
         ? tableJoinName
         : `${tableJoinName}.${col.column}`;
-    const jsonPath = `$.sjoin.${funcName}.${JSON.stringify(colKey)}`;
+    const jsonPath = `$.sjoin.${funcName}.${quoteJsonPathKey(colKey)}`;
 
     if (!byAggFn[funcName]) byAggFn[funcName] = [];
     byAggFn[funcName].push({ colKey, jsonPath });
