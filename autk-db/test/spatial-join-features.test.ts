@@ -152,3 +152,16 @@ describe('spatial matches are pairs of whole features', () => {
     expect(output.features.map(f => f.properties?.sjoin.count.other_norm).sort()).toEqual([0, 1]);
   });
 });
+
+describe('aggregated columns are read by their whole names', () => {
+  // A bare `$v` is a JSONPath to DuckDB and `/v` a JSON pointer, which reads the decoy `v`. Inside a quoted key DuckDB
+  // decodes only `\"` and `\\`, so a key holding a tab has to reach it as it is.
+  const sums: Array<[string, number]> = [['$v', 6], ['/v', 8], ['tab\tv', 10]];
+  it.each(sums)('sums the property named %j', async (column, sum) => {
+    const rows = [{ $v: 2, '/v': 3, 'tab\tv': 4, v: 7 }, { $v: 4, '/v': 5, 'tab\tv': 6, v: 7 }];
+    const values = rows.map(row => `('${JSON.stringify(row).replace(/'/g, "''")}', ST_Point(0, 0))`).join(', ');
+    await conn.query(`INSERT INTO autk.root VALUES ('{}', ST_Point(0, 0)); INSERT INTO autk.other VALUES ${values};`);
+    const output = await join([{ column, aggregateFn: 'sum' }]);
+    expect(output.features[0].properties?.sjoin.sum[`other.${column}`]).toBe(sum);
+  });
+});

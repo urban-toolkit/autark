@@ -66,4 +66,32 @@ describe('a layer update keyed by a property', () => {
       13: { value: 30, coordinates: [200, 200] },
     });
   });
+
+  it.each([
+    ['$id', 'update_by_dollar_property'],
+    ['/p', 'update_by_slash_property'],
+    ['zone\tid', 'update_by_tab_property'],
+  ])('updates by a property named %j, read as a key and not as a JSON path', async (key, workspace) => {
+    // A bare `$id` is a JSONPath to DuckDB and `/p` a JSON pointer, which reads the key `p`. Inside a quoted key DuckDB
+    // decodes only `\"` and `\\`, so a key holding a tab has to reach it as it is.
+    await db.setWorkspace(workspace);
+    await db.loadGeojson({ outputTableName: 'zones', coordinateFormat: 'EPSG:3395', geojsonObject: {
+      type: 'FeatureCollection',
+      features: [zone(11, 10, [0, 0], key), zone(12, 20, [100, 100], key), zone(13, 30, [200, 200], key)],
+    } });
+    await db.updateTable({ tableName: 'zones', strategy: 'update', idColumn: `properties.${key}`, data: {
+      type: 'FeatureCollection', features: [zone(12, 99, [150, 50], key)],
+    } });
+
+    const features = (await db.getLayer('zones')).features;
+    expect(features).toHaveLength(3);
+    const zones = Object.fromEntries(features.map(feature => [feature.properties?.[key], {
+      value: feature.properties?.value, coordinates: (feature.geometry as Point).coordinates,
+    }]));
+    expect(zones).toEqual({
+      11: { value: 10, coordinates: [0, 0] },
+      12: { value: 99, coordinates: [150, 50] },
+      13: { value: 30, coordinates: [200, 200] },
+    });
+  });
 });
