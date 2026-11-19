@@ -1,4 +1,5 @@
 import { Table } from '../../interfaces';
+import { quoteJsonPathKey } from '../../utils';
 
 /** Column specification for group-by aggregation within the query builder. */
 type InternalColumn = { column: string; aggregateFn?: string; normalize?: boolean };
@@ -422,9 +423,10 @@ function buildRowObjectExpression(table: Table): string {
 }
 
 /**
- * Builds a DuckDB JSON extract chain for a nested property path.
+ * Builds a DuckDB JSON extract for a nested property path.
  *
- * Converts `'properties.a.b.c'` into `table.properties->'a'->'b'->>'c'`.
+ * Converts `'a.b.c'` into `table.properties->>'$."a"."b"."c"'`, with each key quoted so that DuckDB never reads one
+ * that starts with `$` or `/` as a path of its own.
  *
  * @param tableName - table alias used in the expression.
  * @param columnPath - dot-separated path within the properties JSON.
@@ -432,10 +434,8 @@ function buildRowObjectExpression(table: Table): string {
  * @throws No runtime errors.
  */
 function buildJsonExtract(tableName: string, columnPath: string): string {
-  const parts = columnPath.split('.');
-  const last = parts.pop()!;
-  const chain = parts.reduce((acc, p) => `${acc}->'${escapeSqlString(p)}'`, `${tableName}.properties`);
-  return `${chain}->>'${escapeSqlString(last)}'`;
+  const path = `$.${columnPath.split('.').map((part) => quoteJsonPathKey(part)).join('.')}`;
+  return `${tableName}.properties->>'${escapeSqlString(path)}'`;
 }
 
 /**

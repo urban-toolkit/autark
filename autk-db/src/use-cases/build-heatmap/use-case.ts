@@ -3,7 +3,7 @@ import { BuildHeatmapParams, HeatmapGroupBy } from './interfaces';
 import type { BoundingBox } from '@urban-toolkit/autk-core';
 import { RasterBandMetadata, Table, UserTable } from '../../interfaces';
 import { SpatialJoinUseCase } from '../spatial-join/use-case';
-import { getColumnsFromDuckDbTableDescribe, toPlain } from '../../utils';
+import { getColumnsFromDuckDbTableDescribe, quoteJsonPathKey, toPlain } from '../../utils';
 import { setRasterPayload } from '../../raster-store';
 import { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
 
@@ -280,7 +280,7 @@ ${bandAssignments}
                 id: `band_${index + 1}`,
                 label: `${aggregateFn}_${params.tableJoinName}${norm}`,
                 // The join stores `<table>.<column>` as one key, so the path quotes it.
-                jsonPath: `$.sjoin.${aggregateFn}.${JSON.stringify(key)}`,
+                jsonPath: `$.sjoin.${aggregateFn}.${quoteJsonPathKey(key)}`,
                 columnLabel: sourceKey === params.tableJoinName
                     ? null
                     : `${aggregateFn}_${params.tableJoinName}_${column.column.replace(/\./g, '_')}${norm}`,
