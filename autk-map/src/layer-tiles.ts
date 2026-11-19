@@ -23,7 +23,8 @@ import type { FrameTile, TileFrame } from './tile-frame';
 import { fetchTileImage } from './tile-loader';
 import { applyTileTheme } from './tile-theme';
 import { isTileCrs, type TileCrs } from './tile-projection';
-import { selectTiles } from './tile-selection';
+import { selectFlatTiles, selectTiles } from './tile-selection';
+import type { TileIndex } from './tile-index';
 import type { TileSelectionOptions } from './tile-selection';
 import { resolveTileSource } from './tile-source';
 import type { ResolvedTileSource, TileSource } from './tile-source';
@@ -43,13 +44,9 @@ export interface TileLayerOptions extends TileSelectionOptions {
 export interface TileLayerStats {
     /** Whether the layer is drawn. A hidden layer does no work. */
     visible: boolean;
-    /** Zoom level of the last selection, or `null` when nothing was selected. */
+    /** Finest zoom in the last selection, or `null` when nothing was selected. */
     zoom: number | null;
-    /**
-     * Zoom level the last view asked for. Greater than `zoom` when the tile cap
-     * lowered it, so tiles are drawn larger than one tile pixel per screen pixel
-     * and look softer. `null` when nothing was selected.
-     */
+    /** Finest zoom requested before the tile cap, or `null` when nothing was selected. */
     wantedZoom: number | null;
     /** Tiles in the last selection. */
     selectedTiles: number;
@@ -119,6 +116,7 @@ export class TileLayer extends Layer {
     private _frame: TileFrame<TileTexture> = EMPTY_FRAME;
     private _reportedErrors = 0;
     private _selection: SelectionSummary = NO_SELECTION;
+    private _previousFlatTiles: readonly TileIndex[] = [];
 
     /**
      * Creates a tile layer. GPU resources are created later, by {@link createPipeline}.
@@ -257,6 +255,7 @@ export class TileLayer extends Layer {
     private suspend(): void {
         this._frame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
+        this._previousFlatTiles = [];
         this._store?.update([]);
         this._store?.endFrame();
     }
@@ -274,7 +273,11 @@ export class TileLayer extends Layer {
         const viewport = targetViewport ?? (renderer && renderer.pixelWidth > 0 && renderer.pixelHeight > 0
             ? [renderer.pixelWidth, renderer.pixelHeight] as const : undefined);
         const view = { camera, origin: [origin[0]!, origin[1]!] as const, crs: this._crs, viewport };
-        const selection = selectTiles(view, this._source, this._options);
+        // Terrain supplies its offscreen viewport and keeps the uniform selector.
+        const selection = targetViewport
+            ? selectTiles(view, this._source, this._options)
+            : selectFlatTiles(view, this._source, this._options, this._previousFlatTiles);
+        this._previousFlatTiles = targetViewport ? [] : selection?.tiles ?? [];
         if (!selection) {
             store.update([]);
             store.endFrame();

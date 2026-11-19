@@ -22,6 +22,15 @@ export async function runWebGpuCases() {
     }
     const parentImage = await bitmapBlob(false);
     const childImage = await bitmapBlob(true);
+    const solidTile = async (color: string) => {
+        const canvas = new OffscreenCanvas(256, 256);
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, 256, 256);
+        return canvas.convertToBlob({ type: 'image/png' });
+    };
+    const coarseTiltImage = await solidTile('#ff0000');
+    const fineTiltImage = await solidTile('#00ff00');
     const nativeFetch = window.fetch;
     const target = { z: 4, x: 8, y: 8 };
     for (const crs of ['EPSG:3857', 'EPSG:3395', 'EPSG:4326'] as TileCrs[]) {
@@ -30,6 +39,14 @@ export async function runWebGpuCases() {
         const waiting: Array<() => void> = [];
         window.fetch = ((input: RequestInfo | URL, options?: RequestInit) => {
             const url = String(input);
+            if (url.startsWith('https://autark-tilt.test/')) {
+                const z = Number(new URL(url).pathname.split('/')[1]);
+                if (z < 14 || allowChildren) return Promise.resolve(new Response(z < 14 ? coarseTiltImage : fineTiltImage));
+                return new Promise<Response>((resolve, reject) => {
+                    options?.signal?.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), { once: true });
+                    waiting.push(() => resolve(new Response(fineTiltImage)));
+                });
+            }
             if (!url.startsWith('https://autark-tiles.test/')) return nativeFetch(input, options);
             requests++;
             const z = Number(new URL(url).pathname.split('/')[1]);
@@ -42,7 +59,7 @@ export async function runWebGpuCases() {
         const canvas = document.createElement('canvas');
         canvas.style.cssText = 'width:128px;height:128px';
         document.body.append(canvas);
-        const map = new AutkMap(canvas, { showUi: false });
+        const map = new AutkMap(canvas, { showUi: false, ...(crs === 'EPSG:3395' ? {} : { crs }) });
         const resources: Array<{ destroy(): void }> = [];
         try {
             await map.init();
@@ -65,7 +82,7 @@ export async function runWebGpuCases() {
             map.camera.resize(128, 128);
             map.loadTiles('tiles', { source: { urlTemplate: 'https://autark-tiles.test/{z}/{x}/{y}.png', attribution: 'Synthetic tiles',
                 minZoom: 3, maxZoom: 4 }, ...(crs === 'EPSG:3395' ? {} : { crs }), zoomBias: 1 });
-            const tiles = map.layerManager.searchByLayerId('tiles') as TileLayer;
+            let tiles = map.layerManager.searchByLayerId('tiles') as TileLayer;
             const overlay = map.layerManager.searchByLayerId('overlay')!;
             const texture = (format: GPUTextureFormat, samples: number, copy = false) => {
                 const result = device.createTexture({ size: [128, 128], format, sampleCount: samples,
@@ -172,6 +189,28 @@ export async function runWebGpuCases() {
             map.removeLayer('tiles');
             assert(tiles.stats.cachedTextures === 0 && map.getTileStats('tiles') === null, 'Removed layer keeps tile resources');
             checks.push(`${crs}: idle rendering, hide/show cache reuse, and removal`);
+            if (crs === 'EPSG:3395') {
+                map.setView({ center: { longitude: -43.1, latitude: -22.9 }, zoom: 13 });
+                const [x, y, z] = map.camera.getLookAt();
+                const distance = map.camera.getEye()[2] - z;
+                map.camera.resetCamera([0, Math.cos(1), Math.sin(1)], [x, y, z],
+                    [x, y - distance * Math.sin(1), z + distance * Math.cos(1)], map.camera.getFar(), map.camera.getNear());
+                map.camera.resize(128, 128);
+                map.camera.update();
+                allowChildren = false;
+                map.loadTiles('tilted', { source: { urlTemplate: 'https://autark-tilt.test/{z}/{x}/{y}.png', attribution: 'Synthetic tiles', maxZoom: 14 } });
+                tiles = map.layerManager.searchByLayerId('tilted') as TileLayer;
+                await waitFor(() => tiles.stats.zoom === 14 && tiles.stats.fallbackTiles > 0 && tiles.stats.missingTiles === 0);
+                near(await pixels(), 64, 112, [255, 0, 0, 255], 'coarse fallback in tilted foreground');
+                allowChildren = true;
+                waiting.splice(0).forEach(resolve => resolve());
+                await waitFor(() => tiles.stats.readyTiles === tiles.stats.selectedTiles && tiles.stats.idle);
+                const refined = await pixels();
+                near(refined, 64, 112, [0, 255, 0, 255], 'fine tilted foreground');
+                near(refined, 64, 8, [255, 0, 0, 255], 'coarse tilted distance');
+                for (let y = 8; y <= 120; y++) assert(rgba(refined, 64, y)[3] === 255, 'Mixed-resolution tiles leave a seam');
+                checks.push('tilted foreground refinement, delayed parent fallback, and mixed-resolution seam coverage');
+            }
             const validation = await device.popErrorScope();
             if (validation) errors.push(validation.message);
             assert(errors.length === 0, errors.join('\n'));

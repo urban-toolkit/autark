@@ -326,6 +326,23 @@ describe('tile layer statistics', () => {
     expect(textureBytes / MIB).toBeCloseTo(cachedTextures * 0.25, 6);
   });
 
+  it('refines tilted flat views while keeping the overlay selector uniform', () => {
+    const view = camera(4000, 1.18);
+    const viewport = [1600, 1000] as const;
+    const { layer } = makeLayer({ maxTiles: 64 });
+    layer.prepareRender(view, viewport);
+    const uniform = layer.stats.zoom!;
+    layer.prepareRender(view);
+    const flat = layer.stats;
+    expect(flat.zoom).toBeGreaterThan(uniform);
+    expect(flat.selectedTiles).toBeLessThanOrEqual(64);
+    for (let i = 0; i < 3; i++) layer.prepareRender(view);
+    expect(layer.stats.selectedTiles).toBe(flat.selectedTiles);
+    expect(layer.stats.requests).toBe(flat.requests);
+    layer.prepareRender(view, viewport);
+    expect(layer.stats.zoom).toBe(uniform);
+  });
+
   it('shows when the tile cap made the tiles coarser than the view asked for', () => {
     const free = makeLayer({ maxTiles: 1000 }).layer;
     free.prepareRender(camera(2000));

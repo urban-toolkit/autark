@@ -262,15 +262,15 @@ export interface LoadTilesParams {
     /** Positive safe integer soft cache limit. Defaults to 256. Invalid values are rejected. */
     maxCachedTiles?: number;
     /**
-     * Added to the zoom level chosen for the view. Positive values give
-     * sharper tiles and more requests, negative values the opposite.
+     * Adjusts the zoom chosen for the view. Positive values favor sharper tiles
+     * and more requests; negative values favor fewer requests.
      * Defaults to 0.
      */
     zoomBias?: number;
     /**
-     * Positive safe integer cap on selected tiles; ancestor preloads add requests. The zoom drops to fit; if the
-     * source's lowest zoom still needs more, only the tiles nearest the view
-     * centre are used. Defaults to 64.
+     * Positive safe integer cap on selected tiles; ancestor preloads add requests.
+     * Tilted flat views prioritize foreground detail within this budget. If even the
+     * source's lowest zoom exceeds the cap, only the nearest tiles are selected. Defaults to 64.
      */
     maxTiles?: number;
 }

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Camera } from '@urban-toolkit/autk-core';
-import { selectTiles } from '../src/tile-selection';
+import { selectFlatTiles, selectTiles } from '../src/tile-selection';
+import { initialTileView } from '../src/tile-view';
 import type { TileView } from '../src/tile-selection';
 import { lonLatToCrs, crsToLonLat, EARTH_RADIUS } from '../src/tile-projection';
-import { lonLatToTileCoord } from '../src/tile-index';
+import { ancestorTile, lonLatToTileCoord } from '../src/tile-index';
 import { resolveTileSource } from '../src/tile-source';
 
 const SOURCE = resolveTileSource({ urlTemplate: 'https://t/{z}/{x}/{y}', attribution: 'a', maxZoom: 19 });
@@ -28,6 +29,60 @@ function view(eye: [number, number, number], tilt = 0, extra: Partial<TileView> 
 }
 
 const topDown = (height: number) => view([0, 0, height]);
+
+function niteroiView(angle: number) {
+    const crs = 'EPSG:3395';
+    const { point: origin, distance, near, far } = initialTileView({ longitude: -43.1, latitude: -22.9 }, 13, crs, 640, Math.PI / 4, SOURCE.tileSize);
+    const camera = new Camera();
+    camera.resetCamera([0, Math.cos(angle), Math.sin(angle)], [0, 0, 0],
+        [0, -distance * Math.sin(angle), distance * Math.cos(angle)], far, near);
+    camera.resize(1120, 640);
+    camera.update();
+    return { camera, crs, origin, viewport: [2240, 1280] as const };
+}
+
+function selectedZoomAt(selection: ReturnType<typeof selectTiles>, view: ReturnType<typeof niteroiView>, x: number, y: number) {
+    const [gx, gy] = view.camera.getGroundPoint(x, y, view.camera.getFar());
+    const [lon, lat] = crsToLonLat(view.crs, gx + view.origin[0], gy + view.origin[1]);
+    return selection?.tiles.find(tile => {
+        const coord = lonLatToTileCoord(lon, lat, tile.z);
+        return Math.floor(coord.x) === tile.x && Math.floor(coord.y) === tile.y;
+    })?.z;
+}
+
+describe('mixed-resolution flat imagery', () => {
+    it('leaves the overhead view on the existing selector', () => {
+        const view = niteroiView(0);
+        expect(selectFlatTiles(view, SOURCE)).toMatchObject(selectTiles(view, SOURCE)!);
+    });
+
+    it.each([1, 1.18, 1.42])('refines the Niterói foreground without losing visible ground at tilt %s', angle => {
+        const view = niteroiView(angle);
+        const original = selectTiles(view, SOURCE)!;
+        const selection = selectFlatTiles(view, SOURCE)!;
+        expect(selection.tiles.length).toBeLessThanOrEqual(64);
+        expect(selectedZoomAt(selection, view, 0.5, 0.1)).toBeGreaterThan(original.z);
+        const distanceRow = angle === 1 ? 0.75 : 0.55;
+        expect(selectedZoomAt(selection, view, 0.5, 0.1)).toBeGreaterThan(selectedZoomAt(selection, view, 0.5, distanceRow)!);
+        for (const leaf of selection.tiles) {
+            expect(selection.tiles.some(other => {
+                if (other.z >= leaf.z) return false;
+                const parent = ancestorTile(leaf, leaf.z - other.z);
+                return parent?.x === other.x && parent.y === other.y;
+            })).toBe(false);
+        }
+        for (const x of [0.05, 0.25, 0.5, 0.75, 0.95]) for (const y of [0.05, 0.2, 0.35]) {
+            expect(selectedZoomAt(selection, view, x, y)).toBeDefined();
+        }
+    });
+
+    it('keeps the source zoom ceiling and tiny budgets', () => {
+        const view = niteroiView(1.18);
+        expect(selectFlatTiles(view, SOURCE, { maxTiles: 1 })?.tiles).toHaveLength(1);
+        const source = { ...SOURCE, maxZoom: 12 };
+        expect(selectFlatTiles(view, source)?.tiles.every(tile => tile.z <= 12)).toBe(true);
+    });
+});
 
 // Mercator metres covered by one pixel for a top-down camera.
 const mercatorPixel = (height: number) => (2 * height * Math.tan((FOV / 2) * (Math.PI / 180))) / H;
