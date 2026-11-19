@@ -32,7 +32,7 @@ Tiles are decoded to `Float32Array`s, and each window is composed on the CPU and
 
 ### Imagery on terrain
 
-Non-3D layers render into one offscreen overlay texture (2048² by default for streamed terrain, at most 4096²) through an orthographic camera over the visible bounds, and that texture drapes over the mesh. Computed with the real camera, an overlay texel covers at most about 1.8 screen pixels on the bottom row of a steeply tilted view and is finer than a pixel at 45° or less, so imagery can look slightly soft at the nearest edge. Accepted.
+Non-3D layers render into one offscreen overlay texture (2048² by default for streamed terrain, at most 4096²) through an orthographic camera over the visible bounds, and that texture drapes over the mesh. In supported axis-aligned projections, tilted views use the perspective camera and terrain heights to favor sharper source tiles in the foreground without sacrificing coverage elsewhere in the overlay. Refinement stays within the existing tile budget and is limited by the overlay's pixel density. The texture size and drape are unchanged, so the foreground can still soften if the overlay is stretched on screen.
 
 When surface layers are loaded without visible imagery, their original geometry defines the terrain footprint. A constrained Delaunay mesh samples a regular triangular lattice inside that footprint, preserving coastline edges, holes, and disconnected components. This avoids extending the polygon triangulator's long, thin triangle fans through the hills. Interior spacing follows the elevation resolution, with at most 256 lattice intervals across the longest dimension; terrain normals use the same spacing. The mesh is cached until source geometry or visibility changes. Color, depth, picking, and visible-bounds passes use the same mesh. Visible tile layers or RGB rasters retain the larger terrain region; hiding imagery restores the surface geometry. Maps without surface layers keep the existing terrain mesh.
 
@@ -101,7 +101,7 @@ Geometry clipmaps (Losasso and Hoppe, 2004) for the nested windows and level ble
 
 - Shared math helpers are exported by `autk-core`; the map has no local `utils-math.ts`.
 - Persistent orthographic cameras retain main's near/far parameters and perspective camera fixes. Layer drawing order never becomes artificial geometry height.
-- Offscreen tile selection uses the actual overlay viewport, while ordinary maps retain backing-store/DPR selection.
+- Terrain imagery selection keeps the actual overlay viewport for coverage and uses the main camera's backing-store pixels to prioritize detail.
 - Invalid public options fail before starting requests. The window/tile-size combination is capped at 4096 wanted tiles before enumerating them.
 - `idle` is independent of `complete`: failed or no-data requests settle with partial coverage. `failedTiles` describes current failures.
 - Failed terrain construction releases partial GPU resources, cancels its requests, and leaves the existing terrain and camera active. Fixed-heightfield callers remain supported, including the previous building-height API.

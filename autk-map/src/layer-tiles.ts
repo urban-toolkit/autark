@@ -23,9 +23,9 @@ import type { FrameTile, TileFrame } from './tile-frame';
 import { fetchTileImage } from './tile-loader';
 import { applyTileTheme } from './tile-theme';
 import { isTileCrs, type TileCrs } from './tile-projection';
-import { selectFlatTiles, selectTiles } from './tile-selection';
+import { selectAdaptiveTiles, selectTiles } from './tile-selection';
 import type { TileIndex } from './tile-index';
-import type { TileSelectionOptions } from './tile-selection';
+import type { TerrainImageryDetail, TileSelectionOptions } from './tile-selection';
 import { resolveTileSource } from './tile-source';
 import type { ResolvedTileSource, TileSource } from './tile-source';
 import { TileStore } from './tile-store';
@@ -116,7 +116,7 @@ export class TileLayer extends Layer {
     private _frame: TileFrame<TileTexture> = EMPTY_FRAME;
     private _reportedErrors = 0;
     private _selection: SelectionSummary = NO_SELECTION;
-    private _previousFlatTiles: readonly TileIndex[] = [];
+    private _previousAdaptiveTiles: readonly TileIndex[] = [];
 
     /**
      * Creates a tile layer. GPU resources are created later, by {@link createPipeline}.
@@ -255,12 +255,12 @@ export class TileLayer extends Layer {
     private suspend(): void {
         this._frame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
-        this._previousFlatTiles = [];
+        this._previousAdaptiveTiles = [];
         this._store?.update([]);
         this._store?.endFrame();
     }
 
-    override prepareRender(camera: Camera, targetViewport?: readonly [number, number]): void {
+    override prepareRender(camera: Camera, targetViewport?: readonly [number, number], terrain?: TerrainImageryDetail): void {
         this._frame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
         const store = this._store;
@@ -273,11 +273,11 @@ export class TileLayer extends Layer {
         const viewport = targetViewport ?? (renderer && renderer.pixelWidth > 0 && renderer.pixelHeight > 0
             ? [renderer.pixelWidth, renderer.pixelHeight] as const : undefined);
         const view = { camera, origin: [origin[0]!, origin[1]!] as const, crs: this._crs, viewport };
-        // Terrain supplies its offscreen viewport and keeps the uniform selector.
-        const selection = targetViewport
-            ? selectTiles(view, this._source, this._options)
-            : selectFlatTiles(view, this._source, this._options, this._previousFlatTiles);
-        this._previousFlatTiles = targetViewport ? [] : selection?.tiles ?? [];
+        const adaptive = !targetViewport || terrain !== undefined;
+        const selection = adaptive
+            ? selectAdaptiveTiles(view, this._source, this._options, this._previousAdaptiveTiles, terrain)
+            : selectTiles(view, this._source, this._options);
+        this._previousAdaptiveTiles = adaptive ? selection?.tiles ?? [] : [];
         if (!selection) {
             store.update([]);
             store.endFrame();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Camera } from '@urban-toolkit/autk-core';
-import { selectFlatTiles, selectTiles } from '../src/tile-selection';
+import { selectAdaptiveTiles, selectTiles } from '../src/tile-selection';
 import { initialTileView } from '../src/tile-view';
 import type { TileView } from '../src/tile-selection';
 import { lonLatToCrs, crsToLonLat, EARTH_RADIUS } from '../src/tile-projection';
@@ -53,13 +53,13 @@ function selectedZoomAt(selection: ReturnType<typeof selectTiles>, view: ReturnT
 describe('mixed-resolution flat imagery', () => {
     it('leaves the overhead view on the existing selector', () => {
         const view = niteroiView(0);
-        expect(selectFlatTiles(view, SOURCE)).toMatchObject(selectTiles(view, SOURCE)!);
+        expect(selectAdaptiveTiles(view, SOURCE)).toMatchObject(selectTiles(view, SOURCE)!);
     });
 
     it.each([1, 1.18, 1.42])('refines the Niterói foreground without losing visible ground at tilt %s', angle => {
         const view = niteroiView(angle);
         const original = selectTiles(view, SOURCE)!;
-        const selection = selectFlatTiles(view, SOURCE)!;
+        const selection = selectAdaptiveTiles(view, SOURCE)!;
         expect(selection.tiles.length).toBeLessThanOrEqual(64);
         expect(selectedZoomAt(selection, view, 0.5, 0.1)).toBeGreaterThan(original.z);
         const distanceRow = angle === 1 ? 0.75 : 0.55;
@@ -78,9 +78,39 @@ describe('mixed-resolution flat imagery', () => {
 
     it('keeps the source zoom ceiling and tiny budgets', () => {
         const view = niteroiView(1.18);
-        expect(selectFlatTiles(view, SOURCE, { maxTiles: 1 })?.tiles).toHaveLength(1);
+        expect(selectAdaptiveTiles(view, SOURCE, { maxTiles: 1 })?.tiles).toHaveLength(1);
         const source = { ...SOURCE, maxZoom: 12 };
-        expect(selectFlatTiles(view, source)?.tiles.every(tile => tile.z <= 12)).toBe(true);
+        expect(selectAdaptiveTiles(view, source)?.tiles.every(tile => tile.z <= 12)).toBe(true);
+    });
+});
+
+describe('mixed-resolution terrain imagery', () => {
+    it('uses the perspective camera for detail and keeps the entire overlay covered', () => {
+        const camera = makeCamera([0, 0, 8000], 1.1);
+        const overlayCamera = new Camera();
+        overlayCamera.setOrthographicBounds(-50000, 50000, -12000, 88000);
+        overlayCamera.resize(2048, 2048);
+        const coverage = { origin: ORIGIN, crs: 'EPSG:3857', camera: overlayCamera };
+        const uniform = selectTiles(coverage, SOURCE)!;
+        const heightAt = (x: number) => Math.max(0, x / 10);
+        const selection = selectAdaptiveTiles(coverage, SOURCE, {}, [], { camera, viewport: [3200, 2000], heightAt })!;
+        expect(selection.z).toBeGreaterThan(uniform.z);
+        expect(new Set(selection.tiles.map(tile => tile.z)).size).toBeGreaterThan(1);
+        expect(selection.tiles.length).toBeLessThanOrEqual(64);
+        for (const x of [-49000, -6000, 0, 6000, 49000]) for (const y of [-11000, 20000, 87000]) {
+            const [lon, lat] = crsToLonLat(coverage.crs, x + ORIGIN[0], y + ORIGIN[1]);
+            expect(selection.tiles.filter(tile => {
+                const coord = lonLatToTileCoord(lon, lat, tile.z);
+                return Math.floor(coord.x) === tile.x && Math.floor(coord.y) === tile.y;
+            })).toHaveLength(1);
+        }
+    });
+
+    it('keeps overhead terrain selection uniform', () => {
+        const coverage = { ...niteroiView(0), viewport: [2048, 2048] as const };
+        expect(selectAdaptiveTiles(coverage, SOURCE, {}, [], {
+            camera: coverage.camera, viewport: [2240, 1280], heightAt: () => 0,
+        })).toEqual(selectTiles(coverage, SOURCE));
     });
 });
 

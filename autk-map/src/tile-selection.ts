@@ -242,18 +242,27 @@ function clipTileFootprint(polygon: readonly Point[], [left, bottom]: Point, [ri
     return clipped;
 }
 
-/** Selects coarse coverage plus finer tiles where a tilted flat view magnifies the source pixels. */
-export function selectFlatTiles(
+export interface TerrainImageryDetail {
+    /** Perspective camera that sees the finished terrain, not the overlay camera. */
+    camera: Camera;
+    viewport: readonly [number, number];
+    heightAt: (x: number, y: number) => number;
+}
+
+/** Selects coarse coverage plus finer tiles where a tilted view magnifies the source pixels. */
+export function selectAdaptiveTiles(
     view: TileView & { camera: Camera },
     source: ResolvedTileSource,
     options: TileSelectionOptions = {},
     previous: readonly TileIndex[] = [],
+    terrain?: TerrainImageryDetail,
 ): TileSelection | null {
     const { camera, origin, crs } = view;
+    const detailCamera = terrain?.camera ?? camera;
     const maxTiles = Math.max(1, Math.floor(finiteOr(options.maxTiles, DEFAULT_MAX_TILES)));
     // Mixed-resolution seams need coincident tile edges. Custom projections can curve an edge
     // differently at different levels, so keep the uniform selector for those projections.
-    if (maxTiles < 4 || Math.abs(camera.getWorldRayDirection(0.5, 0.5)[2]) >= 0.9
+    if (maxTiles < 4 || Math.abs(detailCamera.getWorldRayDirection(0.5, 0.5)[2]) >= 0.9
         || (crs !== 'EPSG:3395' && crs !== 'EPSG:3857' && crs !== 'EPSG:4326')) {
         return selectTiles(view, source, options);
     }
@@ -264,11 +273,16 @@ export function selectFlatTiles(
     if (base.truncated) return selectTiles(view, source, options);
     const heights = finiteOr(options.maxDistanceInHeights, DEFAULT_MAX_DISTANCE_IN_HEIGHTS);
     const reach = Math.max(Math.max(Math.abs(camera.getEye()[2]), 1) * (heights > 0 ? heights : DEFAULT_MAX_DISTANCE_IN_HEIGHTS), MIN_GROUND_DISTANCE);
+    // For terrain, this is the overlay rectangle, not the perspective ground-plane footprint.
     const footprint = camera.getGroundFootprint(reach);
-    const [width, height] = view.viewport ?? [camera.getViewportWidth(), camera.getViewportHeight()];
-    const matrix = camera.getViewProjectionMatrix();
-    const [xx, xy, , xw, yx, yy, , yw, , , , , tx, ty, , tw] = matrix as unknown as readonly number[];
-    if (![xx, xy, xw, yx, yy, yw, tx, ty, tw].every(Number.isFinite)) return selectTiles(view, source, options);
+    const overlayViewport = view.viewport ?? [camera.getViewportWidth(), camera.getViewportHeight()];
+    const [width, height] = terrain?.viewport ?? overlayViewport;
+    const [xx, xy, xz, xw, yx, yy, yz, yw, zx, zy, zz, zw, tx, ty, tz, tw] = detailCamera.getViewProjectionMatrix();
+    if (!(width > 0 && height > 0) || ![xx, xy, xz, xw, yx, yy, yz, yw, zx, zy, zz, zw, tx, ty, tz, tw].every(Number.isFinite)) {
+        return selectTiles(view, source, options);
+    }
+    const [sw, , ne] = footprint;
+    const overlayDensity = terrain ? [overlayViewport[0] / (ne![0] - sw![0]), overlayViewport[1] / (ne![1] - sw![1])] : undefined;
     const bias = 2 ** Math.min(MAX_ZOOM_BIAS, Math.max(-MAX_ZOOM_BIAS, finiteOr(options.zoomBias, 0)));
     const key = (tile: TileIndex) => `${tile.z}/${tile.x}/${tile.y}`;
     const previousSplits = new Set<string>();
@@ -278,7 +292,7 @@ export function selectFlatTiles(
         }
     }
 
-    type Leaf = { tile: TileIndex; error: number; priority: number; ground: readonly Point[] };
+    type Leaf = { tile: TileIndex; error: number; priority: number; screenError: number; ground: readonly Point[] };
     const measure = (tile: TileIndex, polygon: readonly Point[]): Leaf | null => {
         const { west, south, east, north } = tileLonLatBounds(tile);
         const sw = lonLatToCrs(crs, west, south), ne = lonLatToCrs(crs, east, north);
@@ -288,19 +302,33 @@ export function selectFlatTiles(
         if (ground.length < 3) return null;
         const dx = (upper[0] - lower[0]) / source.tileSize;
         const dy = (upper[1] - lower[1]) / source.tileSize;
+        let screenError = 0;
         let error = 0;
-        for (const [x, y] of ground) {
-            const w = xw * x + yw * y + tw;
+        // The centroid also samples a ridge inside a tile whose corners are offscreen.
+        const samples = terrain ? [...ground, [ground.reduce((sum, p) => sum + p[0], 0) / ground.length,
+            ground.reduce((sum, p) => sum + p[1], 0) / ground.length] as Point] : ground;
+        for (const [x, y] of samples) {
+            const z = finiteOr(terrain?.heightAt(x, y), 0);
+            const w = xw * x + yw * y + zw * z + tw;
             if (!(w > 0)) continue;
             // Perspective projection derivatives, scaled to device pixels per source texel.
-            const u = (xx * x + yx * y + tx) / w, v = (xy * x + yy * y + ty) / w;
+            const u = (xx * x + yx * y + zx * z + tx) / w, v = (xy * x + yy * y + zy * z + ty) / w;
+            if (terrain) {
+                const depth = xz * x + yz * y + zz * z + tz;
+                // Ignore samples far offscreen for detail only; the overlay still covers them.
+                if (depth < 0 || depth > w || Math.abs(u) > 1.25 || Math.abs(v) > 1.25) continue;
+            }
             const horizontal = Math.hypot((xx - u * xw) * width, (xy - v * xw) * height) * dx / (2 * w);
             const vertical = Math.hypot((yx - u * yw) * width, (yy - v * yw) * height) * dy / (2 * w);
-            error = Math.max(error, horizontal, vertical);
+            screenError = Math.max(screenError, horizontal, vertical);
+            // Don't spend the budget on detail that the existing overlay can't hold.
+            error = overlayDensity
+                ? Math.max(error, Math.min(horizontal, overlayDensity[0]! * dx), Math.min(vertical, overlayDensity[1]! * dy))
+                : screenError;
         }
         error *= bias;
         // Keep previously split tiles a little longer to avoid toggling around the threshold.
-        return { tile, error, priority: error / (previousSplits.has(key(tile)) ? 1.15 : 1.4), ground };
+        return { tile, error, screenError, priority: error / (previousSplits.has(key(tile)) ? 1.15 : 1.4), ground };
     };
 
     const leaves = new Set<Leaf>();
@@ -313,7 +341,7 @@ export function selectFlatTiles(
     }
     if (!leaves.size) return selectTiles(view, source, options);
     while (pending.length) {
-        pending.sort((a, b) => b.priority - a.priority);
+        pending.sort((a, b) => b.priority - a.priority || b.screenError - a.screenError);
         const leaf = pending.shift()!;
         if (!(leaf.priority > 1)) break;
         const { x, y, z } = leaf.tile;
@@ -329,7 +357,7 @@ export function selectFlatTiles(
         pending = pending.concat(children);
     }
 
-    const ordered = [...leaves].sort((a, b) => b.error - a.error);
+    const ordered = [...leaves].sort((a, b) => b.error - a.error || b.screenError - a.screenError);
     const z = ordered.reduce((finest, leaf) => Math.max(finest, leaf.tile.z), base.z);
     const wantedZoom = ordered.reduce((finest, leaf) => Math.max(finest,
         Math.min(source.maxZoom, leaf.tile.z + Math.max(0, Math.ceil(Math.log2(leaf.priority))))), z);

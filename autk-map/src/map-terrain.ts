@@ -13,6 +13,8 @@ import { LayerManager } from './layer-manager';
 import { Triangles3DLayer } from './layer-triangles3D';
 import { Triangles2DLayer } from './layer-triangles2D';
 import { RasterLayer } from './layer-raster';
+import { TileLayer } from './layer-tiles';
+import type { TerrainImageryDetail } from './tile-selection';
 import { MapStyle } from './map-style';
 import { MapPickingController } from './map-picking';
 import type { PendingPick } from './map-picking';
@@ -20,7 +22,7 @@ import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { Renderer } from './renderer';
 import { TerrainRenderer } from './renderer-terrain';
 import type { TerrainDebugOptions } from './renderer-terrain';
-import { StaticHeightSource, isStreamingHeightSource } from './height-source';
+import { StaticHeightSource, heightAt, isStreamingHeightSource } from './height-source';
 import type { HeightSource } from './height-source';
 import type { Heightfield } from '@urban-toolkit/autk-core';
 
@@ -161,9 +163,16 @@ export class TerrainMapRenderPath {
         // is the pixel rectangle the overlay is drawn into.
         this.terrainOverlayCamera.resize(overlayPixelRect.width, overlayPixelRect.height);
 
+        const overlayViewport = [overlayPixelRect.width, overlayPixelRect.height] as const;
+        const imageryDetail: TerrainImageryDetail = {
+            camera: this.camera,
+            viewport: [this.renderer.pixelWidth, this.renderer.pixelHeight],
+            heightAt: (x, y) => heightAt(activeTerrain.heightSource, x, y),
+        };
         this.layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && !(layer instanceof Triangles3DLayer)) {
-                layer.prepareRender(this.terrainOverlayCamera, [overlayPixelRect.width, overlayPixelRect.height]);
+                if (layer instanceof TileLayer) layer.prepareRender(this.terrainOverlayCamera, overlayViewport, imageryDetail);
+                else layer.prepareRender(this.terrainOverlayCamera, overlayViewport);
             }
         });
         // An opaque shaded surface keeps terrain visible without imagery or data.
