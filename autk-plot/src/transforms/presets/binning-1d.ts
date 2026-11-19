@@ -162,7 +162,7 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     const edges = span === 0
         ? [minValue]
         : Array.from({ length: numBins + 1 }, (_, i) => (i === numBins ? maxValue : minValue + i * binWidth));
-    const texts = formatBinEdges(edges);
+    const texts = formatBinEdges(edges, binWidth);
     const labels = span === 0 ? texts : texts.slice(0, -1).map((text, i) => `${text}-${texts[i + 1]}`);
 
     // Rows are grouped by bin index, so two bins never merge, even if their labels read alike.
@@ -180,17 +180,22 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
 
 /**
  * Formats bin edges at the fewest significant digits, two or more, that tell each
- * edge from the next. Values of a thousand and more keep their SI prefix ("1.5k");
- * values under one read as decimals ("0.25", where the SI format gives "250m").
+ * edge from the next and print every edge within a tenth of a bin width of its value.
+ * Values of a thousand and more keep their SI prefix ("1.5k"); values under one read
+ * as decimals ("0.25", where the SI format gives "250m").
  *
  * @param edges - Bin edges in ascending order.
+ * @param binWidth - Width of a bin.
  * @returns The text of each edge.
  */
-function formatBinEdges(edges: number[]): string[] {
+function formatBinEdges(edges: number[], binWidth: number): string[] {
     let texts: string[] = [];
     for (let digits = 2; digits <= 17; digits++) {
         texts = edges.map(edge => formatBinEdge(edge, digits));
-        if (texts.every((text, i) => i === 0 || text !== texts[i - 1])) break;
+        const apart = texts.every((text, i) => i === 0 || text !== texts[i - 1]);
+        // The value each text prints: the edge rounded to `digits` significant digits, as d3 rounds it.
+        const close = edges.every(edge => Math.abs(Number(edge.toPrecision(digits)) - edge) <= binWidth / 10);
+        if (apart && close) break;
     }
     return texts;
 }

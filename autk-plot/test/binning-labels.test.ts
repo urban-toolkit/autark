@@ -41,11 +41,12 @@ describe('1D binning labels', () => {
         ]);
     });
 
-    it('starts the labels of a range from 0.4 to 10.4 at 0.4', () => {
+    it('labels a range from 0.4 to 10.4 by its edges, from 0.4 to 10.4', () => {
         const values = [0.4, 0.9, 1.9, 2.9, 3.9, 4.9, 5.9, 6.9, 7.9, 8.9, 9.9, 10.4];
+        // Two digits would print the last edge, 10.4, as 10: more than a tenth of a bin away.
         expect(bars(values).map(([label]) => label)).toEqual([
-            '0.40-1.4', '1.4-2.4', '2.4-3.4', '3.4-4.4', '4.4-5.4',
-            '5.4-6.4', '6.4-7.4', '7.4-8.4', '8.4-9.4', '9.4-10',
+            '0.400-1.40', '1.40-2.40', '2.40-3.40', '3.40-4.40', '4.40-5.40',
+            '5.40-6.40', '6.40-7.40', '7.40-8.40', '8.40-9.40', '9.40-10.4',
         ]);
     });
 
