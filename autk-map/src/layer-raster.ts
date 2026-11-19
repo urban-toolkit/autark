@@ -27,6 +27,8 @@ import {
 } from '@urban-toolkit/autk-core';
 
 import type { 
+    ColorMapConfig,
+    ResolvedDomain,
     TransferFunction,
     RequiredTransferFunction
 } from '@urban-toolkit/autk-core';
@@ -38,6 +40,7 @@ import { Renderer } from "./renderer";
 import { Pipeline } from "./pipeline";
 
 import { PipelineTriangleRaster } from "./pipeline-triangle-raster";
+import { decodeRgbCategories, type RasterRgbValues } from './raster-rgb';
 
 /**
  * Raster layer implementation backed by triangulated geometry and texture data.
@@ -74,12 +77,45 @@ export class RasterLayer extends Layer {
     /** Canonical scalar raster payload used for domain recomputation. */
     protected _rasterValues: Float32Array = new Float32Array(0);
 
+    /** Optional lookup from an imported RGB category ID to its original category name. */
+    private _categoryNames?: readonly string[];
+
+    setCategoryNames(names: readonly string[] | undefined): void {
+        this._categoryNames = names;
+    }
+
+    resolveColorDomain(values: Float32Array, config: ColorMapConfig): ResolvedDomain {
+        const names = this._categoryNames;
+        if (!names || !ColorMap.isCategorical(config.interpolator ?? config)) {
+            return ColorMap.resolveDomainFromData(values, config);
+        }
+        const observed = new Set<string>();
+        for (const code of values) {
+            const name = names[code];
+            if (name !== undefined) observed.add(name);
+        }
+        return ColorMap.resolveDomainFromData([...observed], config);
+    }
+
     /** RGB pixels bypass scalar color mapping and its legend. */
     private _rasterMode: 'scalar' | 'rgb' = 'scalar';
+    private _rgbSource?: RasterRgbValues;
+
+    /** Decodes the current RGB source without changing the layer on failure. */
+    decodeRgbSource(config: ColorMapConfig): ReturnType<typeof decodeRgbCategories> {
+        if (!this._rgbSource) throw new Error('Decoding an RGB raster requires the original three source bands.');
+        return decodeRgbCategories(this._rgbSource, config);
+    }
     /** Scalar legend preference saved while displaying an RGB image. */
     private _scalarColorMapEnabled = false;
 
     get rasterMode(): 'scalar' | 'rgb' { return this._rasterMode; }
+
+    /** Categorical pixels must not be interpolated with neighboring class colors. */
+    get isCategoricalRaster(): boolean {
+        const { config } = this._layerRenderInfo.colormap;
+        return this._rasterMode === 'scalar' && ColorMap.isCategorical(config.interpolator ?? config);
+    }
 
     override get supportsColorMap(): boolean { return this._rasterMode !== 'rgb'; }
 
@@ -286,7 +322,8 @@ export class RasterLayer extends Layer {
      * treated as a precomputed RGBA raster and copied directly. Otherwise the
      * input is treated as a scalar raster, colorized using the active colormap,
      * and assigned per-pixel opacity using the current transfer function.
-     * `NaN` samples produce fully transparent pixels.
+     * Categorical cells use the palette in domain order and are opaque before layer opacity.
+     * NoData and cells outside a categorical domain are transparent.
      *
      * When a numeric computed colormap domain is available, transfer-function
      * statistics are derived from values inside that domain. If no valid scalar
@@ -306,9 +343,37 @@ export class RasterLayer extends Layer {
         }
         const wasRgb = this._rasterMode === 'rgb';
         this._rasterMode = 'scalar';
+        this._rgbSource = undefined;
         if (wasRgb) this.updateLayerRenderInfo({ isColorMap: this._scalarColorMapEnabled });
         this._rasterValues = rasterValues;
         const rasterData = new Float32Array(this._rasterResX * this._rasterResY * 4);
+
+        const { config, computedDomain } = this._layerRenderInfo.colormap;
+        if (this.isCategoricalRaster) {
+            const domain = (typeof computedDomain?.[0] === 'string'
+                ? computedDomain
+                : this.resolveColorDomain(rasterValues, config)) as string[];
+            const palette = ColorMap.getColorArray(config.interpolator ?? config, domain.length, domain);
+            const indexByName = this._categoryNames && new Map(this._categoryNames.map((name, index) => [name, index]));
+            const colorByCode = new Map<number, (typeof palette)[number]>();
+            domain.forEach((label, index) => {
+                const code = indexByName ? indexByName.get(label) : Number(label);
+                if (code !== undefined && Number.isFinite(code) && (indexByName || String(code) === label) && !colorByCode.has(code)) {
+                    colorByCode.set(code, palette[index]);
+                }
+            });
+            for (let i = 0; i < rasterValues.length; i++) {
+                const color = colorByCode.get(rasterValues[i]);
+                if (!color) continue;
+                const offset = i * 4;
+                rasterData[offset] = color.r;
+                rasterData[offset + 1] = color.g;
+                rasterData[offset + 2] = color.b;
+                rasterData[offset + 3] = 255;
+            }
+            this._rasterData = rasterData;
+            return;
+        }
 
         const validValues: number[] = [];
         for (let i = 0; i < rasterValues.length; i++) {
@@ -345,7 +410,7 @@ export class RasterLayer extends Layer {
         // and parses a color string on every call, which kept the main
         // thread busy for seconds on a large raster.
         const colorOf = ColorMap.getColorFunction(
-            this._layerRenderInfo.colormap.config.interpolator,
+            config.interpolator ?? config,
             effectiveDomain,
         );
 
@@ -373,7 +438,7 @@ export class RasterLayer extends Layer {
     }
 
     /** Loads a complete RGBA image explicitly, without interpreting its channels as scalar measurements. */
-    loadRgbRaster(rgba: Float32Array): void {
+    loadRgbRaster(rgba: Float32Array, source?: RasterRgbValues): void {
         const expected = this._rasterResX * this._rasterResY * 4;
         if (rgba.length !== expected || expected <= 0) {
             throw new Error(`RGB raster requires ${expected} RGBA values for ${this._rasterResX}x${this._rasterResY} pixels (got ${rgba.length}).`);
@@ -381,6 +446,8 @@ export class RasterLayer extends Layer {
         const pixels = rgba.slice();
         if (this._rasterMode !== 'rgb') this._scalarColorMapEnabled = this._layerRenderInfo.isColorMap ?? false;
         this._rasterMode = 'rgb';
+        this._rgbSource = source;
+        this._categoryNames = undefined;
         this._rasterValues = new Float32Array(0);
         this._rasterData = pixels;
         this.updateLayerRenderInfo({

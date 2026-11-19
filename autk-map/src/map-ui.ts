@@ -570,13 +570,14 @@ export class AutkMapUi {
         const innerWidth  = width - 4 * padding;
         const innerHeight = height - titleHeight;
 
-        const interpolator = this._activeLayer.layerRenderInfo.colormap.config.interpolator;
-        const labels       = this._activeLayer.layerRenderInfo.colormap.computedLabels ?? [];
-        const categoricalSize = ColorMap.getCategoricalSchemeSize(interpolator);
-        const isCategorical   = categoricalSize !== null;
-        const res             = isCategorical ? categoricalSize : 100;
-        const slc             = isCategorical ? Math.min(labels.length, categoricalSize) : 100;
-        const colorMap     = ColorMap.getColorArray(interpolator, res).slice(0, slc);
+        const { config, computedDomain, computedLabels } = this._activeLayer.layerRenderInfo.colormap;
+        const scale = config.interpolator ?? config;
+        const labels = computedLabels ?? [];
+        const isCategorical = ColorMap.isCategorical(scale);
+        const samplingDomain = ColorMap.getSamplingDomain(scale, computedDomain);
+        const colorMap = isCategorical
+            ? ColorMap.getColorArray(scale, labels.length, labels)
+            : ColorMap.getColorArray(scale, 100, samplingDomain);
 
         if (isCategorical) {
             this._legend.style.height = 'auto';
@@ -619,6 +620,9 @@ export class AutkMapUi {
             .style('stroke-width', '1px');
 
         const textData = legendLabelPlacements(labels, innerWidth, rectWidth, isCategorical);
+        if (config.type === 'diverging' && samplingDomain?.length === 3 && textData.length === 3) {
+            textData[1].pos = Number(samplingDomain[1]) * innerWidth;
+        }
 
         g.selectAll('text').data(textData).join('text')
             .text((d) => d.label)

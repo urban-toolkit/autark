@@ -157,12 +157,23 @@ export enum ColorMapInterpolator {
  * This config couples the selected interpolator with the domain strategy so
  * both `autk-core` and `@urban-toolkit/autk-map` resolve and display the same scale.
  */
-export type ColorMapConfig = {
-  /** Selected interpolator or color scheme. */
-  interpolator: ColorMapInterpolator;
-  /** Strategy used to derive the domain passed to the interpolator. */
-  domainSpec: ColorMapDomainSpec;
+export type ColorMapConfig = { domainSpec: ColorMapDomainSpec } & (
+  | { interpolator: ColorMapInterpolator; type?: never; colors?: never }
+  | (CustomColorPalette & { interpolator?: never })
+);
+
+/** Custom swatches or ramp stops. No named interpolator is needed. */
+export type CustomColorPalette = {
+  type: 'categorical' | 'sequential' | 'diverging';
+  colors: readonly ColorHEX[];
 };
+
+/** A map patch can replace the scale or update its domain without replacing it. */
+export type ColorMapPatch = { domainSpec?: ColorMapDomainSpec } & (
+  | { interpolator: ColorMapInterpolator; type?: never; colors?: never }
+  | (CustomColorPalette & { interpolator?: never })
+  | { interpolator?: never; type?: never; colors?: never }
+);
 
 /**
  * Hexadecimal color string used by styling APIs.

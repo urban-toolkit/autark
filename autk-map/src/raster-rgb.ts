@@ -9,6 +9,10 @@
  * texture layout the raster layer already accepts.
  */
 
+import { ColorMap, ColorMapDomainStrategy, type ColorMapConfig } from '@urban-toolkit/autk-core';
+
+export type RasterRgbValues = readonly [Float32Array, Float32Array, Float32Array];
+
 /** Three band accessors, in red, green, blue order, such as `['band_1', 'band_2', 'band_3']`. */
 export type RasterRgbBands = [red: string, green: string, blue: string];
 
@@ -95,7 +99,7 @@ export function resolveRgbRange(bands: readonly Float32Array[]): RasterRgbRange 
  * const rgba = composeRgbRaster([r, g, b], [0, 3000]);
  */
 export function composeRgbRaster(
-    bands: readonly [Float32Array, Float32Array, Float32Array],
+    bands: RasterRgbValues,
     range?: RasterRgbRange,
 ): Float32Array {
     const [red, green, blue] = bands;
@@ -123,4 +127,39 @@ export function composeRgbRaster(
         rgba[offset + 3] = 255;
     }
     return rgba;
+}
+
+/** Matches the original RGB samples, not the stretched display pixels. */
+export function decodeRgbCategories(bands: RasterRgbValues, palette: ColorMapConfig) {
+    if (palette.type !== 'categorical' || palette.domainSpec.type !== ColorMapDomainStrategy.USER) {
+        throw new Error('Decoding an RGB raster requires a custom categorical palette with an explicit USER domain.');
+    }
+    const { colors } = palette;
+    const names: readonly (string | number)[] = palette.domainSpec.params;
+    if (names.length !== colors.length || names.some(name => typeof name !== 'string' || !name.trim())
+        || new Set(names).size !== names.length) {
+        throw new Error('Decoding an RGB raster requires one source color per unique, nonempty category name.');
+    }
+    const codes = new Map<number, number>();
+    colors.forEach((color, index) => {
+        const { r, g, b } = ColorMap.hexToRgb(color);
+        const key = r * 65536 + g * 256 + b;
+        if (codes.has(key)) throw new Error('Decoding an RGB raster requires distinct source colors.');
+        codes.set(key, index);
+    });
+
+    const [red, green, blue] = bands;
+    const values = new Float32Array(red.length).fill(NaN);
+    const isByte = (value: number) => Number.isInteger(value) && value >= 0 && value <= 255;
+    let matched = 0;
+    let unmatched = 0;
+    for (let i = 0; i < red.length; i++) {
+        const r = red[i], g = green[i], b = blue[i];
+        if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) continue;
+        const code = isByte(r) && isByte(g) && isByte(b) ? codes.get(r * 65536 + g * 256 + b) : undefined;
+        if (code === undefined) unmatched++;
+        else { values[i] = code; matched++; }
+    }
+    if (matched === 0) throw new Error('No pixels matched the categorical RGB palette.');
+    return { names: [...names] as string[], values, unmatched };
 }

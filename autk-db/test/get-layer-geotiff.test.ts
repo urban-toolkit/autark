@@ -1,6 +1,8 @@
 import type { AsyncDuckDB } from '@duckdb/duckdb-wasm';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { writeArrayBuffer } from 'geotiff';
+import { ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
+import type { LoadGeoTiffParams } from '../src/use-cases/load-geotiff/interfaces';
 import { loadDb } from '../src/duckdb-node';
 
 const native = vi.hoisted(() => ({ db: undefined as AsyncDuckDB | undefined }));
@@ -46,6 +48,50 @@ describe('getLayer on a GeoTIFF table', () => {
     } });
     await db.loadGeoTiff({ geotiffArrayBuffer: geotiff(), outputTableName: 'image' });
     expect((await db.getLayer('image')).bbox).toEqual([10, 20, 12, 22]);
+  });
+});
+
+describe('categorical RGB import', () => {
+  const palette = {
+    type: 'categorical',
+    domainSpec: { type: ColorMapDomainStrategy.USER, params: ['Water', 'Forest'] },
+    colors: ['#0000ff', '#00ff00'],
+  } satisfies NonNullable<LoadGeoTiffParams['categoricalRgb']>;
+  const rgb = () => writeArrayBuffer(new Uint8Array([0, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255]), {
+    width: 2, height: 2, BitsPerSample: [8, 8, 8], SamplesPerPixel: 3, PhotometricInterpretation: 2,
+    GeographicTypeGeoKey: 4326, ModelTiepoint: [0, 0, 0, 10, 22, 0], ModelPixelScale: [1, 1, 0],
+  });
+
+  it('exposes one class band, preserves its category names and bounds, and warns about unmatched pixels', async () => {
+    await workspace();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const input = { geotiffArrayBuffer: rgb(), outputTableName: 'classes', categoricalRgb: palette };
+    await db.loadGeoTiff(input);
+    const result = await db.getRaster('classes');
+    const props = result.features[0].properties!;
+    expect(result.bbox).toEqual([10, 20, 12, 22]);
+    expect(props.bands).toEqual([{ id: 'band_1', label: 'band_1', categories: ['Water', 'Forest'] }]);
+    expect([...props.band_1]).toEqual([1, 0, 0, NaN]);
+    expect(props.band_2).toBeUndefined();
+    expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('1 unmatched RGB pixel'));
+  });
+
+  it('uses nearest-neighbor for categorical downsizing', async () => {
+    await workspace();
+    const input = { geotiffArrayBuffer: rgb(), outputTableName: 'classes', categoricalRgb: palette, maxRasterCells: 1 };
+    await db.loadGeoTiff(input);
+    const props = (await db.getRaster('classes')).features[0].properties!;
+    expect(props.rasterResX).toBe(1);
+    expect([...props.band_1]).toEqual([0]);
+  });
+
+  it('rejects ambiguous palettes and imports with no matching pixels', async () => {
+    await workspace();
+    const input = { geotiffArrayBuffer: rgb(), outputTableName: 'classes' };
+    await expect(db.loadGeoTiff({ ...input, categoricalRgb: { ...palette, colors: ['#00f', '#0000ff'] } }))
+      .rejects.toThrow(/distinct source colors/);
+    await expect(db.loadGeoTiff({ ...input, categoricalRgb: { ...palette, colors: ['#fff', '#000'] } }))
+      .rejects.toThrow(/No pixels matched/);
   });
 });
 

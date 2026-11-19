@@ -59,6 +59,52 @@ describe('updateRaster with three bands', () => {
     expect(rgba.slice(4, 8)).toEqual([255, 127.5, 0, 255]);
   });
 
+  it('decodes the original RGB values only once, even if display values were stretched', () => {
+    const { map, layer } = mapWithRasterLayer();
+    const collection = raster({ band_1: [0, 0], band_2: [0, 128], band_3: [128, 0] });
+    map.updateRaster('image', { collection, property: RGB, rgbRange: [0, 128] });
+    expect(layer.rasterMode).toBe('rgb');
+    expect([...layer.rasterData]).toEqual([0, 0, 255, 255, 0, 255, 0, 255]);
+
+    map.updateColorMap('image', { colorMap: {
+      type: 'categorical',
+      domainSpec: { type: ColorMapDomainStrategy.USER, params: ['Water', 'Forest'] },
+      colors: ['#000080', '#008000'],
+    } });
+    expect(layer.rasterMode).toBe('scalar');
+    expect(layer.layerRenderInfo.colormap.computedLabels).toEqual(['Water', 'Forest']);
+    expect([...layer.rasterValues]).toEqual([0, 1]);
+    expect([...layer.rasterData]).toEqual([0, 0, 128, 255, 0, 128, 0, 255]);
+
+    const decoded = layer.rasterValues;
+    map.updateColorMap('image', { colorMap: { type: 'categorical', colors: ['#ff0000', '#ffff00'] } });
+    expect(layer.rasterValues).toBe(decoded);
+    expect([...layer.rasterData]).toEqual([255, 0, 0, 255, 255, 255, 0, 255]);
+  });
+
+  it('does not modify RGB pixels when the source palette matches no pixels', () => {
+    const { map, layer } = mapWithRasterLayer();
+    map.updateRaster('image', { collection: raster({ band_1: [255, 255], band_2: [0, 0], band_3: [0, 0] }), property: RGB });
+    const before = layer.rasterData;
+    expect(() => map.updateColorMap('image', { colorMap: {
+      type: 'categorical', domainSpec: { type: ColorMapDomainStrategy.USER, params: ['Water'] }, colors: ['#0000ff'],
+    } })).toThrow(/no pixels matched/i);
+    expect(layer.rasterMode).toBe('rgb');
+    expect(layer.rasterData).toBe(before);
+  });
+
+  it('warns once and masks RGB colors outside the source palette', () => {
+    const { map, layer } = mapWithRasterLayer();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    map.updateRaster('image', { collection: raster({ band_1: [0, 255], band_2: [0, 0], band_3: [255, 0] }), property: RGB });
+    map.updateColorMap('image', { colorMap: {
+      type: 'categorical', domainSpec: { type: ColorMapDomainStrategy.USER, params: ['Water'] }, colors: ['#0000ff'],
+    } });
+    expect([...layer.rasterValues]).toEqual([0, NaN]);
+    expect([...layer.rasterData]).toEqual([0, 0, 255, 255, 0, 0, 0, 0]);
+    expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('1 unmatched RGB pixel'));
+  });
+
   it('warns and leaves the layer alone when a band is missing', () => {
     const { map, layer } = mapWithRasterLayer();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

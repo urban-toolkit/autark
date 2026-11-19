@@ -9,6 +9,7 @@ import {
 } from '@urban-toolkit/autk-core';
 import type { ResolvedDomain, TransferFunction } from '@urban-toolkit/autk-core';
 import { RasterLayer } from '../src/layer-raster';
+import { AutkMap } from '../src/map';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,14 +27,6 @@ function ramp(): Float32Array {
   values[0] = NaN;
   values[WIDTH - 1] = NaN;
   values[values.length - 1] = NaN;
-  return values;
-}
-
-/** Class codes 0 to 8, with one no-data cell. */
-function classCodes(): Float32Array {
-  const values = new Float32Array(WIDTH * HEIGHT);
-  for (let i = 0; i < values.length; i++) values[i] = i % 9;
-  values[3] = NaN;
   return values;
 }
 
@@ -116,8 +109,6 @@ describe('raster layer colors', () => {
       minMax(ramp(), ColorMapInterpolator.DIV_RED_BLUE), undefined],
     ['red-blue centered on zero', ramp(), ColorMapInterpolator.DIV_RED_BLUE, [-3, 0, 7.5], undefined],
     ['spectral, reversed and centered on zero', ramp(), ColorMapInterpolator.DIV_SPECTRAL, [7.5, 0, -3], undefined],
-    ['class codes on a categorical scheme', classCodes(), ColorMapInterpolator.CAT_SET1,
-      ['0', '1', '2', '3', '4', '5', '6', '7', '8'], undefined],
     ['viridis with a linear, gamma-shaped opacity', ramp(), ColorMapInterpolator.SEQ_VIRIDIS,
       minMax(ramp(), ColorMapInterpolator.SEQ_VIRIDIS), { mode: 'linear', opacityMin: 0.2, opacityMax: 0.9, gamma: 2 }],
     ['magma with near-zero opacity', ramp(), ColorMapInterpolator.SEQ_MAGMA,
@@ -131,6 +122,39 @@ describe('raster layer colors', () => {
     const layer = loadedLayer(values, interpolator, domain, transfer);
 
     expect(bytesOf(layer.rasterData)).toEqual(bytesOf(expected));
+  });
+
+  it('maps numeric class codes through the configured domain and recolors without reloading', () => {
+    const values = new Float32Array([30, 0, 10, 99, NaN, Infinity]);
+    const layer = new RasterLayer({ id: 'cover', zIndex: 0, typeLayer: 'raster' }, {
+      opacity: 1,
+      colormap: { config: { interpolator: ColorMapInterpolator.SEQ_REDS, domainSpec: { type: ColorMapDomainStrategy.MIN_MAX } } },
+    }, { geometry: [], components: [], rasterResX: 6, rasterResY: 1, raster: values });
+    const map = Object.assign(Object.create(AutkMap.prototype) as AutkMap, {
+      _layerManager: { searchByLayerId: () => layer },
+      _ui: { refreshLegend: vi.fn() },
+    });
+    map.updateColorMap('cover', { colorMap: {
+      type: 'categorical',
+      domainSpec: { type: ColorMapDomainStrategy.USER, params: [0, 10, 20, 30] },
+      colors: ['#ff0000', '#0000ff'],
+    } });
+    expect(layer.layerRenderInfo.colormap.computedLabels).toEqual(['0', '10', '20', '30']);
+    expect([...layer.rasterData]).toEqual([
+      0, 0, 255, 255, 255, 0, 0, 255, 0, 0, 255, 255,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    map.updateColorMap('cover', { colorMap: { type: 'categorical', colors: ['#00ff00'] } });
+    expect(layer.rasterValues).toBe(values);
+    expect([...layer.rasterData.slice(0, 12)]).toEqual([0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255]);
+    map.updateColorMap('cover', { colorMap: { interpolator: ColorMapInterpolator.CAT_SET1 } });
+    expect(layer.layerRenderInfo.colormap.config.colors).toBeUndefined();
+    expect([...layer.rasterData.slice(0, 4)]).toEqual([152, 78, 163, 255]);
+  });
+
+  it('infers raster categories in first-seen order without NoData', () => {
+    expect(minMax(new Float32Array([30, NaN, 10, 30, Infinity, 0]), ColorMapInterpolator.CAT_SET1))
+      .toEqual(['30', '10', '0']);
   });
 
   it('leaves a raster with no values transparent', () => {

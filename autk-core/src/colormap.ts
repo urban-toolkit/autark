@@ -15,6 +15,7 @@ import * as d3_scheme from 'd3-scale-chromatic';
 import {
     ColorMapDomainStrategy,
     ColorMapConfig,
+    CustomColorPalette,
     ColorHEX,
     ColorMapInterpolator,
     ResolvedDomain,
@@ -30,6 +31,8 @@ export type SequentialDomain = [number, number];
 export type DivergingDomain = [number, number, number];
 /** Ordered set of category labels used by categorical color schemes. */
 export type CategoricalDomain = string[];
+type ColorScale = ColorMapInterpolator | CustomColorPalette;
+type SamplingDomain = SequentialDomain | DivergingDomain | CategoricalDomain;
 
 /** Default number of texels used to sample continuous color maps. */
 export const DEFAULT_COLORMAP_RESOLUTION = 256;
@@ -84,7 +87,7 @@ export class ColorMap {
      * const c = ColorMap.getColor(0.5, ColorMapInterpolator.SEQ_VIRIDIS);
      * // c → { r: 33, g: 144, b: 141, alpha: 1 }
      */
-    public static getColor(value: number, color: ColorMapInterpolator, domain?: SequentialDomain | DivergingDomain | CategoricalDomain): ColorRGB {
+    public static getColor(value: number, color: ColorScale, domain?: SamplingDomain): ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const { r, g, b } = d3_color.rgb(interpolator(value));
         return { r, g, b, alpha: 1 };
@@ -106,8 +109,8 @@ export class ColorMap {
      * colorOf(0.5); // → { r: 33, g: 145, b: 140, alpha: 1 }
      */
     public static getColorFunction(
-        color: ColorMapInterpolator,
-        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        color: ColorScale,
+        domain?: SamplingDomain,
     ): (value: number) => ColorRGB {
         const interpolator = ColorMap.buildInterpolator(color, domain);
         const parsed = new Map<string, ColorRGB>();
@@ -136,9 +139,9 @@ export class ColorMap {
      * // tex → [68, 1, 84, 1, 59, 82, 139, 1, 33, 144, 141, 1, 253, 231, 37, 1]
      */
     public static getColorMap(
-        color: ColorMapInterpolator,
+        color: ColorScale,
         res: number = DEFAULT_COLORMAP_RESOLUTION,
-        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        domain?: SamplingDomain,
     ): ColorTEX {
         if (res <= 0) { return []; }
         if (res === 1) {
@@ -168,9 +171,9 @@ export class ColorMap {
      * // colors → [{ r: 228, g: 26, b: 28, alpha: 1 }, ...]
      */
     public static getColorArray(
-        color: ColorMapInterpolator,
+        color: ColorScale,
         res: number = DEFAULT_COLORMAP_RESOLUTION,
-        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        domain?: SamplingDomain,
     ): ColorRGB[] {
         if (res <= 0) { return []; }
         if (res === 1) {
@@ -246,8 +249,8 @@ export class ColorMap {
      * ColorMap.isCategorical(ColorMapInterpolator.CAT_SET1);  // true
      * ColorMap.isCategorical(ColorMapInterpolator.SEQ_VIRIDIS);  // false
      */
-    public static isCategorical(interpolator: ColorMapInterpolator): boolean {
-        return CATEGORICAL_INTERPOLATORS.has(interpolator);
+    public static isCategorical(scale: ColorScale): boolean {
+        return typeof scale === 'string' ? CATEGORICAL_INTERPOLATORS.has(scale) : scale.type === 'categorical';
     }
     
     /**
@@ -257,8 +260,8 @@ export class ColorMap {
      * @returns `true` for diverging interpolators, otherwise `false`.
      * @throws Never throws.
      */
-    private static isDiverging(interpolator: ColorMapInterpolator): boolean {
-        return DIVERGING_INTERPOLATORS.has(interpolator);
+    private static isDiverging(scale: ColorScale): boolean {
+        return typeof scale === 'string' ? DIVERGING_INTERPOLATORS.has(scale) : scale.type === 'diverging';
     }
 
     /**
@@ -271,9 +274,31 @@ export class ColorMap {
      * ColorMap.getCategoricalSchemeSize(ColorMapInterpolator.CAT_SET1);  // 9
      * ColorMap.getCategoricalSchemeSize(ColorMapInterpolator.SEQ_VIRIDIS);  // null
      */
-    public static getCategoricalSchemeSize(interpolator: ColorMapInterpolator): number | null {
-        if (!ColorMap.isCategorical(interpolator)) return null;
-        return (d3_scheme[interpolator] as string[]).length;
+    public static getCategoricalSchemeSize(scale: ColorScale): number | null {
+        if (!ColorMap.isCategorical(scale)) return null;
+        return typeof scale === 'string' ? (d3_scheme[scale] as string[]).length : scale.colors.length;
+    }
+
+    /** Normalizes the domain for sampling a texture or legend. */
+    public static getSamplingDomain(scale: ColorScale, domain?: ResolvedDomain): SamplingDomain | undefined {
+        if (!domain?.length) return undefined;
+        if (ColorMap.isCategorical(scale)) return typeof domain[0] === 'string' ? domain as CategoricalDomain : undefined;
+        if (typeof scale !== 'string' && scale.type === 'diverging' && domain.length === 3 && typeof domain[0] === 'number') {
+            const [low, center, high] = domain as DivergingDomain;
+            return low === high ? [0.5, 0.5, 0.5] : [0, (center - low) / (high - low), 1];
+        }
+        return undefined;
+    }
+
+    /** Rejects malformed custom palettes before using them to style a layer. */
+    public static validatePalette(palette: CustomColorPalette): void {
+        const { type, colors } = palette;
+        if ((type !== 'categorical' && type !== 'sequential' && type !== 'diverging')
+            || !Array.isArray(colors) || !colors.every(color => /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(color))
+            || colors.length < (type === 'categorical' ? 1 : 2)
+            || (type === 'diverging' && colors.length !== 3)) {
+            throw new Error('Invalid custom colormap: use hex colors and an explicit type (categorical: 1+, sequential: 2+, diverging: 3).');
+        }
     }
 
 
@@ -295,7 +320,7 @@ export class ColorMap {
     private static resolveNumericDomainFromConfig(
         values: number[] | TypedArray,
         config: ColorMapConfig,
-        interpolator: ColorMapInterpolator,
+        interpolator: ColorScale,
     ): SequentialDomain | DivergingDomain {
         const mode = config.domainSpec.type;
 
@@ -306,7 +331,13 @@ export class ColorMap {
             }
             const numeric = params as number[];
             if (ColorMap.isDiverging(interpolator)) {
-                if (numeric.length === 3) return [numeric[0], numeric[1], numeric[2]];
+                if (numeric.length === 3) {
+                    const [low, center, high] = numeric;
+                    if (typeof interpolator !== 'string' && (center - low) * (high - center) <= 0) {
+                        throw new Error('The custom diverging reference must be strictly between the domain endpoints.');
+                    }
+                    return [low, center, high];
+                }
                 if (numeric.length === 2) {
                     const center = (numeric[0] + numeric[1]) / 2;
                     return [numeric[0], center, numeric[1]];
@@ -331,7 +362,9 @@ export class ColorMap {
             const low = ColorMap.computePercentile(finiteValues, lowerPercentile / 100);
             const high = ColorMap.computePercentile(finiteValues, upperPercentile / 100);
             if (ColorMap.isDiverging(interpolator)) {
-                const center = ColorMap.computePercentile(finiteValues, 50 / 100);
+                const center = typeof interpolator === 'string'
+                    ? ColorMap.computePercentile(finiteValues, 50 / 100)
+                    : ColorMap.computePercentile(finiteValues, (lowerPercentile + upperPercentile) / 200);
                 return [low, center, high];
             }
             return [low, high];
@@ -356,13 +389,18 @@ export class ColorMap {
      * @returns Ordered categorical domain labels.
      */
     private static resolveCategoricalDomainFromConfig(
-        values: string[],
+        values: number[] | string[] | TypedArray,
         config: ColorMapConfig,
     ): CategoricalDomain {
         if (config.domainSpec.type === ColorMapDomainStrategy.USER) {
             return config.domainSpec.params.map(v => String(v));
         }
-        return Array.from(new Set(values.map(v => String(v))));
+        const categories = new Set<string>();
+        for (const value of values) {
+            if (typeof value === 'number' && !Number.isFinite(value)) continue;
+            categories.add(String(value));
+        }
+        return [...categories];
     }
 
     /**
@@ -420,14 +458,17 @@ export class ColorMap {
         values: number[] | string[] | TypedArray,
         config: ColorMapConfig,
     ): ResolvedDomain {
-        const isCategorical = ColorMap.isCategorical(config.interpolator)
-            || (config.domainSpec.type === ColorMapDomainStrategy.USER && config.domainSpec.params.some(v => typeof v === 'string'))
-            || (!ArrayBuffer.isView(values) && (values as Array<number|string>).some(v => typeof v === 'string' && isNaN(Number(v))));
+        const scale = config.interpolator ?? config;
+        const isCategorical = ColorMap.isCategorical(scale)
+            || (typeof scale === 'string' && (
+                (config.domainSpec.type === ColorMapDomainStrategy.USER && config.domainSpec.params.some(v => typeof v === 'string'))
+                || (!ArrayBuffer.isView(values) && (values as Array<number | string>).some(v => typeof v === 'string' && isNaN(Number(v))))
+            ));
 
         if (isCategorical) {
-            return ColorMap.resolveCategoricalDomainFromConfig(values as string[], config);
+            return ColorMap.resolveCategoricalDomainFromConfig(values, config);
         } else {
-            return ColorMap.resolveNumericDomainFromConfig(values as number[] | TypedArray, config, config.interpolator);
+            return ColorMap.resolveNumericDomainFromConfig(values as number[] | TypedArray, config, scale);
         }
     }
 
@@ -444,16 +485,26 @@ export class ColorMap {
      * @returns Function that maps normalized scalar values to CSS color strings.
      */
     private static buildInterpolator(
-        color: ColorMapInterpolator,
-        domain?: SequentialDomain | DivergingDomain | CategoricalDomain,
+        color: ColorScale,
+        domain?: SamplingDomain,
     ): (t: number) => string {
+        if (typeof color !== 'string') ColorMap.validatePalette(color);
         if (ColorMap.isCategorical(color)) {
-            const scheme = d3_scheme[color] as string[];
-            const n = domain?.length ?? scheme.length;
-            return (t: number) => {
-                const idx = Math.min(Math.round(t * (n - 1)), scheme.length - 1);
-                return scheme[idx];
-            };
+            const scheme = typeof color === 'string' ? d3_scheme[color] as string[] : color.colors;
+            const n = domain?.length || scheme.length;
+            return (t: number) => scheme[Math.max(0, Math.min(Math.round(t * (n - 1)), scheme.length - 1))];
+        }
+        if (typeof color !== 'string') {
+            if (color.type === 'diverging') {
+                const [low, center, high] = (domain as DivergingDomain | undefined) ?? [0, 0.5, 1];
+                if (low === high) return () => color.colors[1];
+                return d3_scale.scaleLinear<string>().domain([low, center, high]).range([...color.colors]).clamp(true);
+            }
+            const [low, high] = (domain as SequentialDomain | undefined) ?? [0, 1];
+            if (low === high) return () => color.colors[0];
+            return d3_scale.scaleLinear<string>()
+                .domain(color.colors.map((_, i) => low + (high - low) * i / (color.colors.length - 1)))
+                .range([...color.colors]).clamp(true);
         }
 
         if (ColorMap.isDiverging(color)) {

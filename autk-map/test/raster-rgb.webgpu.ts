@@ -1,7 +1,7 @@
 import type { FeatureCollection, Geometry } from 'geojson';
 import { AutkMap } from '../src/map';
 import type { RasterLayer } from '../src/layer-raster';
-import { ColorMapInterpolator } from '@urban-toolkit/autk-core';
+import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
 
 /** Render real RGB textures, scalar transitions, legends, and rejected updates without external datasets. */
 export async function runWebGpuCases() {
@@ -111,6 +111,30 @@ export async function runWebGpuCases() {
         assert(warnings === 2 && layer.rasterMode === 'scalar' && legend.style.visibility === 'visible', 'Rejected update changed mode or legend');
         same(scalar, await pixels(), 'Rejected update changed displayed pixels');
         checks.push('wrong dimensions and invalid range preserve the displayed image');
+
+        source.features[0].properties!.classes = Array.from({ length: 16 }, (_, i) =>
+            i < 8 ? (i % 4 < 2 ? 0 : 10) : (i % 4 < 2 ? 30 : 99));
+        map.updateRaster('image', { collection: source, property: 'classes' });
+        map.updateColorMap('image', { colorMap: {
+            type: 'categorical',
+            domainSpec: { type: ColorMapDomainStrategy.USER, params: [0, 10, 20, 30] },
+            colors: ['#ff0000', '#0000ff'],
+        } });
+        const categorical = await pixels();
+        near(rgba(categorical, 34, 94), [255, 0, 0, 255], 'Category zero must stay visible');
+        near(rgba(categorical, 94, 94), [0, 0, 255, 255], 'Category 10');
+        near(rgba(categorical, 34, 34), [0, 0, 255, 255], 'Category 30 must repeat the last swatch');
+        near(rgba(categorical, 94, 34), [0, 0, 0, 0], 'Unknown category must be transparent');
+        for (let x = 50; x < 78; x++) {
+            const [r, g, b, a] = rgba(categorical, x, 94);
+            assert(g === 0 && a === 255 && ((r === 255 && b === 0) || (r === 0 && b === 255)), 'Category boundary blended colors');
+        }
+        const legendRows = [...legend.querySelectorAll<HTMLElement>('.autk-map-legend-categories > div')];
+        assert(legendRows.map(row => row.textContent).join(',') === '0,10,20,30', 'Short palette hid category labels');
+        assert(legendRows[3].firstElementChild?.getAttribute('style')?.includes('rgb(0, 0, 255)') === true, 'Last legend swatch must match the raster');
+        map.updateColorMap('image', { colorMap: { type: 'categorical', colors: ['#00ff00'] } });
+        near(rgba(await pixels(), 94, 94), [0, 255, 0, 255], 'Palette-only patch must repaint the raster');
+        checks.push('categorical values, complete legend, nearest sampling, and palette-only updates');
 
         map.updateRaster('image', { collection: source, property: ['r', 'g', 'b'] });
         map.updateRenderInfo('image', { opacity: 0.5 });

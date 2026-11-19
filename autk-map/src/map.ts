@@ -181,6 +181,8 @@ export class AutkMap {
     private _workspaceCrsEstablished = false;
     /** Shared picking coordinator used by both render paths. */
     private _picking!: MapPickingController;
+    /** Thematic source used to re-encode vector values when a colormap's domain or kind changes. */
+    private _thematicSources?: WeakMap<VectorLayer | SpriteLayer, UpdateThematicParams>;
 
     /**
      * Creates an AutkMap instance bound to a canvas element.
@@ -601,7 +603,9 @@ export class AutkMap {
             return;
         }
 
-        const dataType = isNumericLike(sample) ? 'number' : typeof sample;
+        const config = layer.layerRenderInfo.colormap.config;
+        const dataType = config.type === 'categorical' && typeof sample === 'string'
+            ? 'string' : isNumericLike(sample) ? 'number' : typeof sample;
         if (dataType !== 'number' && dataType !== 'string') {
             console.warn(`Unsupported thematic property type on layer '${id}': ${dataType}`);
             this.updateRenderInfo(id, { renderInfo: { isColorMap: false } });
@@ -637,6 +641,7 @@ export class AutkMap {
         if (dataType === 'number') {
             const rawValues = features.map((feature) => {
                 const resolved = propertyResolver(feature);
+                if (colorMap.type && (resolved === undefined || resolved === null)) return undefined;
                 const numeric = Number(resolved);
                 return Number.isFinite(numeric) ? numeric : undefined;
             });
@@ -717,6 +722,7 @@ export class AutkMap {
         if (!layer.loadThematic(thematicData)) {
             return;
         }
+        (this._thematicSources ??= new WeakMap()).set(layer, { collection, property });
 
         layer.updateLayerRenderInfo({
             colormap: {
@@ -779,7 +785,12 @@ export class AutkMap {
             return;
         }
         const config = layer.layerRenderInfo.colormap.config;
-        const resolvedDomain = ColorMap.resolveDomainFromData(rasterValues, config);
+        const band = Array.isArray(props.bands) ? props.bands.find((entry: unknown) =>
+            entry !== null && typeof entry === 'object' && 'id' in entry && entry.id === property) : undefined;
+        const categories: unknown = band?.categories;
+        rasterLayer.setCategoryNames(Array.isArray(categories) && categories.every((value: unknown) => typeof value === 'string')
+            ? categories : undefined);
+        const resolvedDomain = rasterLayer.resolveColorDomain(rasterValues, config);
 
         layer.updateLayerRenderInfo({
             colormap: {
@@ -827,7 +838,8 @@ export class AutkMap {
         }
 
         try {
-            layer.loadRgbRaster(composeRgbRaster(values as [Float32Array, Float32Array, Float32Array], range));
+            const source = values as [Float32Array, Float32Array, Float32Array];
+            layer.loadRgbRaster(composeRgbRaster(source, range), source);
         } catch (error) {
             console.warn(`Raster update skipped for layer '${id}': ${(error as Error).message}`);
             return;
@@ -843,20 +855,34 @@ export class AutkMap {
      * @param id Layer identifier.
      * @param params Color-map update parameters.
      * @returns Nothing. The target layer render configuration is updated in place.
-     * @throws Never throws. Unknown layers are silently ignored.
+     * A custom categorical palette on an RGB raster decodes the original RGB values once.
+     * Later palette updates recolor the decoded classes.
+     * @throws If the custom palette, its domain, or RGB decoding is invalid. Unknown layers are silently ignored.
      */
     updateColorMap(id: string, { colorMap }: UpdateColorMapParams): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer) { return; }
-        if (layer.layerInfo.typeLayer === 'raster' && (layer as RasterLayer).rasterMode === 'rgb') { return; }
+        const rgb = layer.layerInfo.typeLayer === 'raster' && (layer as RasterLayer).rasterMode === 'rgb';
+        if (rgb && colorMap.type !== 'categorical') { return; }
         if (layer.layerInfo.typeLayer === 'tiles') { return; }
 
         const currentConfig = layer.layerRenderInfo.colormap.config;
 
-        const mergedColorMap: ColorMapConfig = {
-            interpolator: colorMap.interpolator ?? currentConfig.interpolator ?? ColorMapInterpolator.SEQ_BLUES,
-            domainSpec: colorMap.domainSpec ?? currentConfig.domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
-        };
+        const domainSpec = colorMap.domainSpec ?? currentConfig.domainSpec;
+        if (colorMap.type !== undefined || colorMap.colors !== undefined) {
+            if (colorMap.interpolator !== undefined || colorMap.type === undefined) {
+                throw new Error('Custom colors require an explicit type and cannot be combined with an interpolator.');
+            }
+            ColorMap.validatePalette(colorMap);
+        }
+        const mergedColorMap: ColorMapConfig = colorMap.type !== undefined
+            ? { type: colorMap.type, colors: [...colorMap.colors], domainSpec }
+            : colorMap.interpolator !== undefined
+                ? { interpolator: colorMap.interpolator, domainSpec }
+                : { ...currentConfig, domainSpec };
+        if (mergedColorMap.type && domainSpec.type === ColorMapDomainStrategy.USER) {
+            ColorMap.resolveDomainFromData([], mergedColorMap);
+        }
 
         const nextColormap = {
             ...layer.layerRenderInfo.colormap,
@@ -865,19 +891,39 @@ export class AutkMap {
 
         if (layer.layerInfo.typeLayer === 'raster') {
             const rasterLayer = layer as RasterLayer;
-            const rasterValues = rasterLayer.rasterValues;
+            const decoded = rgb ? rasterLayer.decodeRgbSource(mergedColorMap) : undefined;
+            if (decoded) {
+                rasterLayer.setCategoryNames(decoded.names);
+                if (decoded.unmatched > 0) {
+                    console.warn(`Raster '${id}' has ${decoded.unmatched} unmatched RGB pixel(s); displayed as NoData.`);
+                }
+            }
+            const rasterValues = decoded?.values ?? rasterLayer.rasterValues;
             if (rasterValues.length > 0) {
-                const domain = ColorMap.resolveDomainFromData(rasterValues, mergedColorMap);
+                const domain = rasterLayer.resolveColorDomain(rasterValues, mergedColorMap);
                 nextColormap.computedDomain = domain;
                 nextColormap.computedLabels = ColorMap.computeLabels(domain);
                 layer.updateLayerRenderInfo({ colormap: nextColormap });
                 rasterLayer.loadRaster(rasterValues);
                 rasterLayer.makeLayerDataDirty();
                 this._ui.refreshLegend(layer);
+                if (decoded) this._ui.refreshLayerList();
                 return;
             }
         } else {
             const vectorLayer = layer as VectorLayer | SpriteLayer;
+            const source = this._thematicSources?.get(vectorLayer);
+            const changedKind = ColorMap.isCategorical(currentConfig.interpolator ?? currentConfig)
+                !== ColorMap.isCategorical(mergedColorMap.interpolator ?? mergedColorMap);
+            if (source && (currentConfig.type || mergedColorMap.type)) {
+                layer.updateLayerRenderInfo({ colormap: nextColormap });
+                if (changedKind || currentConfig.type !== mergedColorMap.type || colorMap.domainSpec !== undefined) {
+                    this.updateThematic(id, source);
+                } else {
+                    this._ui.refreshLegend(layer);
+                }
+                return;
+            }
             const thematicValues = vectorLayer.thematic;
             if (thematicValues.length > 0) {
                 const existingDomain = layer.layerRenderInfo.colormap.computedDomain;

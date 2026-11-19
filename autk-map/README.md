@@ -275,6 +275,22 @@ A raster layer draws one band of a GeoTIFF-derived collection through the layer 
 map.loadCollection('elevation', { collection, type: 'raster', property: 'band_1' });
 ```
 
+Use the same `updateColorMap()` configuration for scalar rasters and vector thematic layers. A categorical interpolator maps values by their position in the domain, not by their numeric magnitude. Specify an ordered `USER` domain to keep colors stable across layers and data updates:
+
+```ts
+map.updateColorMap('land-cover', { colorMap: {
+    type: 'categorical',
+    domainSpec: { type: ColorMapDomainStrategy.USER, params: [10, 20, 30] },
+    colors: ['#377eb8', '#4daf4a', '#e41a1c'],
+} });
+```
+
+Without an explicit domain, categories follow first-seen order. Set a vector layer's domain before calling `updateThematic()`; palette-only updates do not require reloading the data. If the palette is short, the remaining categories reuse its last color and still appear in the legend. Categorical raster cells use nearest-neighbor sampling. NoData and values outside the domain are transparent; known cells use layer opacity rather than a numeric transfer function. Continuous scalar rasters retain their existing opacity transfer functions and smoothing.
+
+Custom palettes use `colors` with an explicit `type`, not a named `interpolator`. Use `type: 'sequential'` for two or more evenly spaced ramp stops, or `type: 'diverging'` for three stops at the low value, reference value, and high value. For an explicit asymmetric diverging domain, pass `[low, reference, high]` as the `USER` domain. Named scales continue to use `interpolator` instead of `type` and `colors`.
+
+For an RGB GeoTIFF whose original pixel colors represent classes, load the three RGB bands as usual and call `updateColorMap()` with a custom categorical palette. The first call requires a `USER` domain of names and one distinct source color per name. It decodes the original RGB values, not the stretched display colors. Unmatched pixels become transparent with a warning; if no pixels match, the layer stays RGB and the call throws. Later palette updates recolor the decoded classes without decoding again. Use `resampleMethod: 'nearest'` when loading a color-coded GeoTIFF to preserve exact colors if it is downsized. This map-side conversion does not change the database raster; use `loadGeoTiff({ categoricalRgb: palette, ... })` instead if you need to query the classes in `autk-db`.
+
 A raster alone is enough to start a map: its declared `bbox` establishes the map origin. Call `map.fitBounds()` after loading to frame it; loading does not move the camera automatically. No vector layer has to be loaded first.
 
 Satellite and aerial imagery has red, green and blue bands that should be shown as they are. Pass the three band paths to draw a true-color image; the color map and transfer function do not apply.
@@ -296,7 +312,7 @@ Values in 0 to 255 are shown unchanged. Other data, such as reflectance up to 10
 
 Each band must contain exactly `rasterResX * rasterResY` samples for the existing layer. Missing bands, mismatched dimensions, and invalid ranges log a warning and leave the image and display mode unchanged. Updates keep the existing grid and geometry; remove and reload a layer to change its dimensions or extent.
 
-Switching to RGB suppresses the scalar domain, legend, and palette control. Colormap updates and transfer functions do not apply to RGB pixels. Switching back to one band restores the previous scalar legend preference, recomputes its domain, and uses the stored scalar colormap and transfer function. Layer opacity works in both modes.
+Switching to RGB suppresses the scalar domain, legend, and palette control. RGB imagery ignores transfer functions and colormap updates, except for an explicit custom categorical palette that requests decoding. Switching back to one band restores the previous scalar legend preference, recomputes its domain, and uses the stored scalar colormap and transfer function. Layer opacity works in both modes.
 
 `loadGeoTiff()` limits a raster to one million cells by default and logs a warning when it resamples a larger image; raise `maxRasterCells` to keep more detail.
 

@@ -195,7 +195,7 @@ console.log(parcels.type); // 'polygons'
 * `loadOsm(params)`: Loads OpenStreetMap data from Overpass API or PBF-backed workflows.
 * `loadCsv(params)`, `loadJson(params)`: Imports tabular or JSON data.
 * `loadGeojson(params)`: Imports custom GeoJSON layers.
-* `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers.
+* `loadGeoTiff(params)`, `getGeoTiffLayer(tableName)`: Imports and exports GeoTIFF-derived raster layers. For color-coded RGB GeoTIFFs, pass `categoricalRgb: { type: 'categorical', domainSpec: { type: ColorMapDomainStrategy.USER, params: [...] }, colors: [...] }` with one distinct hex color per class name. The import uses exact RGB matches and nearest-neighbor downsampling and returns `band_1` with category names in its band metadata. Unmatched colors become NoData with a warning; an import with no matches fails.
 * `getLayer(layerTableName, options?)`: Exports a layer table as a GeoJSON `FeatureCollection`; `GetLayerOptions.osmElements` opts into individual OSM elements when preserved provenance is available.
 * `getBoundingBoxFromLayer(layerName)`: Computes a layer bounding box.
 * `getTableData(params)`: Reads table data for inspection or UI display.

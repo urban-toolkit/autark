@@ -39,6 +39,8 @@ export interface RasterBandMetadata {
   id: string;
   /** Human-readable label shown in UI controls and outputs. */
   label: string;
+  /** When present, each integer cell value indexes this ordered list of class names. */
+  categories?: string[];
 }
 
 /**

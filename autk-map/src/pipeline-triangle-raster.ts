@@ -55,6 +55,7 @@ export class PipelineTriangleRaster extends Pipeline {
     protected _rasterBuffer!: GPUTexture;
     /** Bind group that exposes the raster texture and sampler to the fragment shader. */
     protected _rasterBindGroup!: GPUBindGroup;
+    private _rasterFilter?: GPUFilterMode;
 
     /** Bind group layout for raster texture sampling resources. */
     protected _rasterBindGroupLayout!: GPUBindGroupLayout;
@@ -217,14 +218,6 @@ export class PipelineTriangleRaster extends Pipeline {
             format: 'rgba8unorm',
         });
 
-        const rasterSampler = this._renderer.device.createSampler({
-            label: 'Raster sampler',
-            magFilter: 'linear',
-            minFilter: 'linear',
-            addressModeU: 'clamp-to-edge',
-            addressModeV: 'clamp-to-edge',
-        });
-
         // Raster uniform bind group layout
         this._rasterBindGroupLayout = this._renderer.device.createBindGroupLayout({
             label: 'Raster bind group layout',
@@ -242,7 +235,20 @@ export class PipelineTriangleRaster extends Pipeline {
             ],
         });
 
-        // Raster uniform bind group
+        this._rasterFilter = undefined;
+        this.updateRasterSampler(raster);
+    }
+
+    private updateRasterSampler(raster: RasterLayer): void {
+        const filter = raster.isCategoricalRaster ? 'nearest' : 'linear';
+        if (this._rasterFilter === filter) return;
+        const rasterSampler = this._renderer.device.createSampler({
+            label: 'Raster sampler',
+            magFilter: filter,
+            minFilter: filter,
+            addressModeU: 'clamp-to-edge',
+            addressModeV: 'clamp-to-edge',
+        });
         this._rasterBindGroup = this._renderer.device.createBindGroup({
             layout: this._rasterBindGroupLayout,
             label: 'Raster bind group',
@@ -257,6 +263,7 @@ export class PipelineTriangleRaster extends Pipeline {
                 },
             ],
         });
+        this._rasterFilter = filter;
     }
 
     /**
@@ -271,6 +278,7 @@ export class PipelineTriangleRaster extends Pipeline {
      */
     updateRasterUniforms(raster: RasterLayer): void {
         if (!raster.rasterData || raster.rasterData.length === 0) { return; }
+        this.updateRasterSampler(raster);
 
         this._rasterTextureData = this._syncU8Data(this._rasterTextureData, raster.rasterData);
 

@@ -1,3 +1,12 @@
+import type { ColorMapDomainStrategy, CustomColorPalette } from '@urban-toolkit/autk-core';
+
+/** Source colors paired with their category names in matching order. */
+export type CategoricalRgbPalette = CustomColorPalette & {
+  type: 'categorical';
+  domainSpec: { type: ColorMapDomainStrategy.USER; params: string[] };
+  interpolator?: never;
+};
+
 export interface LoadGeoTiffParams {
   /** URL of the GeoTIFF file to fetch and load. */
   geotiffFileUrl?: string;
@@ -25,8 +34,10 @@ export interface LoadGeoTiffParams {
   maxPixels?: number;
   /**
    * Resampling method used when downsampling large rasters.
-   * Defaults to `'bilinear'`.
+   * Defaults to `'bilinear'`. Categorical RGB imports always use nearest-neighbor.
    */
   resampleMethod?: 'nearest' | 'bilinear';
+  /** Decode a three-band RGB GeoTIFF into one scalar band of named classes. */
+  categoricalRgb?: CategoricalRgbPalette;
   workspace?: string;
 }

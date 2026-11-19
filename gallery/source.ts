@@ -1,4 +1,5 @@
 import { CAMERA_TOUR_ROUTE } from './src/autk-map/camera-tour-route';
+import { CORINE_CLASSES } from './src/autk-map/corine-palette';
 
 /**
  * Minimal runnable programs shown under "View full source".
@@ -331,7 +332,14 @@ for (const layer of db.getLayersMetadata()) {
 // An opaque surface would cover the imagery beneath the vectors.
 map.updateRenderInfo('table_osm_surface', { isSkip: true });
 map.draw();`;
-        case 'B03': return variant === 'rgb' ? `${DB_MAP}
+        case 'B03': return variant === 'rgb' ? `import { ColorMapDomainStrategy, type ColorMapConfig } from '@urban-toolkit/autk-core';
+${DB_MAP}
+const classes = ${JSON.stringify(CORINE_CLASSES)};
+const palette = {
+  type: 'categorical',
+  domainSpec: { type: ColorMapDomainStrategy.USER, params: classes.map(([name]) => name) },
+  colors: classes.map(([, color]) => color as \`#\${string}\`),
+} satisfies ColorMapConfig;
 map.style.setPredefinedStyle('light');
 await db.loadOsm({
   pbfFileUrl: '/data/lisbon.osm.pbf',
@@ -341,18 +349,19 @@ await db.loadOsm({
 await db.loadGeoTiff({
   geotiffFileUrl: '/data/lisbon-corine-2018-rgb.tif',
   coordinateFormat: 'EPSG:4326',
-  outputTableName: 'imagery',
+  outputTableName: 'land_cover',
+  resampleMethod: 'nearest',
 });
-map.loadCollection('imagery', {
-  collection: await db.getRaster('imagery'),
+map.loadCollection('land_cover', {
+  collection: await db.getRaster('land_cover'),
   type: 'raster',
   property: ['band_1', 'band_2', 'band_3'],
-  loadConfig: { rgbRange: [0, 255] },
 });
+map.updateColorMap('land_cover', { colorMap: palette });
 for (const layer of db.getLayersMetadata()) {
   map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
 }
-map.updateRenderInfo('imagery', { opacity: ${state['raster-opacity'] ?? '0.78'} });
+map.updateRenderInfo('land_cover', { isColorMap: true, opacity: ${state['raster-opacity'] ?? '0.78'} });
 map.ui.setAttribution([{ text: '© OpenStreetMap contributors', url: 'https://www.openstreetmap.org/copyright' }]);
 map.fitBounds();
 map.draw();` : `import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';

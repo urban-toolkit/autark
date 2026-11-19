@@ -37,6 +37,8 @@ export type {
     ColorMapDomainSpec,
     /** Full colormap configuration combining interpolator and domain strategy. */
     ColorMapConfig,
+    ColorMapPatch,
+    CustomColorPalette,
 } from './types-colormap';
 
 export type {

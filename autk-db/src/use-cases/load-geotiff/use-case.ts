@@ -1,7 +1,8 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { fromArrayBuffer } from 'geotiff';
+import { ColorMap, ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
 
-import { GeotiffTable } from '../../interfaces';
+import { GeotiffTable, RasterBandMetadata } from '../../interfaces';
 import { LoadGeoTiffParams } from './interfaces';
 import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
@@ -31,7 +32,29 @@ export class LoadGeoTiffUseCase {
       maxRasterCells,
       maxPixels,
       resampleMethod = 'bilinear',
+      categoricalRgb,
     } = params;
+
+    const sourceColors = new Map<number, number>();
+    let categories: string[] | undefined;
+    if (categoricalRgb) {
+      const { type, colors, domainSpec, interpolator } = categoricalRgb;
+      if (type !== 'categorical' || interpolator !== undefined || domainSpec?.type !== ColorMapDomainStrategy.USER) {
+        throw new Error('Categorical RGB import requires a custom categorical palette and a USER domain.');
+      }
+      ColorMap.validatePalette(categoricalRgb);
+      categories = [...domainSpec.params];
+      if (categories.length !== colors.length || categories.some(name => typeof name !== 'string' || !name.trim())
+        || new Set(categories).size !== categories.length) {
+        throw new Error('Categorical RGB import requires one source color per unique, nonempty category name.');
+      }
+      colors.forEach((hex, index) => {
+        const digits = hex.length === 4 ? [...hex.slice(1)].map(digit => digit.repeat(2)).join('') : hex.slice(1);
+        const key = Number.parseInt(digits, 16);
+        if (sourceColors.has(key)) throw new Error('Categorical RGB import requires distinct source colors.');
+        sourceColors.set(key, index);
+      });
+    }
 
     if (!geotiffFileUrl && !geotiffArrayBuffer) {
       throw new Error('Either geotiffFileUrl or geotiffArrayBuffer must be provided.');
@@ -75,6 +98,9 @@ export class LoadGeoTiffUseCase {
     const fullWidth = Number(image.getWidth());
     const fullHeight = Number(image.getHeight());
     const bandCount = Number(image.getSamplesPerPixel());
+    if (categories && (bandCount !== 3 || image.getFileDirectory().getValue('PhotometricInterpretation') !== 2)) {
+      throw new Error('Categorical RGB import requires a three-band RGB GeoTIFF.');
+    }
     const fullPixelCount = fullWidth * fullHeight;
 
     const scale = fullPixelCount > cellLimit ? Math.sqrt(cellLimit / fullPixelCount) : 1;
@@ -89,28 +115,45 @@ export class LoadGeoTiffUseCase {
     const actualResX = (sourceMaxX - sourceMinX) / width;
     const actualResY = (sourceMaxY - sourceMinY) / height;
 
-    const rasters = await image.readRasters({ width, height, resampleMethod, interleave: false });
-
-    const bandNames: string[] = [];
+    const rasters = await image.readRasters({ width, height, resampleMethod: categories ? 'nearest' : resampleMethod, interleave: false });
+    const sourceBands = rasters as unknown as Array<ArrayLike<number>>;
+    const bands: RasterBandMetadata[] = [];
     const bandValues: Record<string, Float32Array> = {};
     const nodata = this.getNoDataValue(image);
-
-    for (let b = 0; b < bandCount; b++) {
-      const bandName = `band_${b + 1}`;
-      bandNames.push(bandName);
-      const source = (rasters as unknown as Array<ArrayLike<number>>)[b];
+    let unmatched = 0;
+    let matched = 0;
+    for (let b = 0; b < (categories ? 1 : bandCount); b++) {
+      const id = `band_${b + 1}`;
+      bands.push({ id, label: id, ...(categories ? { categories } : {}) });
+      const source = sourceBands[b];
       const values = new Float32Array(source.length);
       for (let row = 0; row < height; row++) {
         const sourceRowOffset = row * width;
         const targetRowOffset = (resolution[1] < 0 ? height - 1 - row : row) * width;
         for (let col = 0; col < width; col++) {
-          const value = Number(source[sourceRowOffset + col]);
+          const offset = sourceRowOffset + col;
+          const value = Number(source[offset]);
           const targetCol = resolution[0] < 0 ? width - 1 - col : col;
-          values[targetRowOffset + targetCol] = Number.isFinite(value) && (nodata === null || value !== nodata) ? value : Number.NaN;
+          let decoded = Number.NaN;
+          if (categories) {
+            const g = sourceBands[1][offset], b = sourceBands[2][offset];
+            // A shared TIFF NoData value masks a whole pixel, not an individual color channel.
+            if (!(nodata !== null && value === nodata && g === nodata && b === nodata)) {
+              const isByte = (channel: number) => Number.isInteger(channel) && channel >= 0 && channel <= 255;
+              const code = isByte(value) && isByte(g) && isByte(b) ? sourceColors.get(value * 65536 + g * 256 + b) : undefined;
+              if (code === undefined) unmatched++;
+              else { decoded = code; matched++; }
+            }
+          } else if (Number.isFinite(value) && (nodata === null || value !== nodata)) {
+            decoded = value;
+          }
+          values[targetRowOffset + targetCol] = decoded;
         }
       }
-      bandValues[bandName] = values;
+      bandValues[id] = values;
     }
+    if (categories && matched === 0) throw new Error(`No pixels matched the categorical RGB palette for '${outputTableName}'.`);
+    if (unmatched > 0) console.warn(`GeoTIFF '${outputTableName}' has ${unmatched} unmatched RGB pixel(s); stored as NoData.`);
 
     const transformedBounds = await this.resolveBounds(
       sourceMinX,
@@ -159,7 +202,7 @@ export class LoadGeoTiffUseCase {
       resY: actualResY,
       sourceCrs,
       targetCrs,
-      bands: bandNames.map((bandName) => ({ id: bandName, label: bandName })),
+      bands,
       values: bandValues,
     });
 
@@ -169,7 +212,7 @@ export class LoadGeoTiffUseCase {
       type: 'raster',
       name: outputTableName,
       columns: getColumnsFromDuckDbTableDescribe(describeResult.toArray()),
-      bands: bandNames.map((bandName) => ({ id: bandName, label: bandName })),
+      bands,
     };
   }
 

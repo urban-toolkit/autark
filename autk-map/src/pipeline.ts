@@ -343,7 +343,8 @@ export abstract class Pipeline {
      * @throws Never throws.
      */
     updateColorUniforms(layer: Layer): void {
-        const computedDomain = layer.layerRenderInfo.colormap.computedDomain;
+        const { config, computedDomain } = layer.layerRenderInfo.colormap;
+        const scale = config.interpolator ?? config;
 
         const isNumericDomain = Array.isArray(computedDomain)
             && computedDomain.length > 0
@@ -357,9 +358,9 @@ export abstract class Pipeline {
             highlightColor: this._renderer.style.getHighlightColor(),
             invalidValueColor: this._renderer.style.getInvalidValueColor(),
             colorMap: ColorMap.getColorMap(
-                layer.layerRenderInfo.colormap.config.interpolator,
+                scale,
                 undefined,
-                isCategoricalDomain ? computedDomain : undefined,
+                ColorMap.getSamplingDomain(scale, computedDomain),
             ),
             useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
             useHighlight: Boolean(layer.layerRenderInfo.isPick),
