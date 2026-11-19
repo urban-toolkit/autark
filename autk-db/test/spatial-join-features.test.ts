@@ -152,3 +152,31 @@ describe('spatial matches are pairs of whole features', () => {
     expect(output.features.map(f => f.properties?.sjoin.count.other_norm).sort()).toEqual([0, 1]);
   });
 });
+
+describe('aggregated columns are read by their whole names', () => {
+  // A bare `$v` is a JSONPath to DuckDB and `/v` a JSON pointer, which reads the decoy `v`. Inside a quoted key DuckDB
+  // decodes only `\"` and `\\`, so a key holding a tab has to reach it as it is.
+  const sums: Array<[string, number]> = [['$v', 6], ['/v', 8], ['tab\tv', 10]];
+  it.each(sums)('sums the property named %j', async (column, sum) => {
+    const rows = [{ $v: 2, '/v': 3, 'tab\tv': 4, v: 7 }, { $v: 4, '/v': 5, 'tab\tv': 6, v: 7 }];
+    const values = rows.map(row => `('${JSON.stringify(row).replace(/'/g, "''")}', ST_Point(0, 0))`).join(', ');
+    await conn.query(`INSERT INTO autk.root VALUES ('{}', ST_Point(0, 0)); INSERT INTO autk.other VALUES ${values};`);
+    const output = await join([{ column, aggregateFn: 'sum' }]);
+    expect(output.features[0].properties?.sjoin.sum[`other.${column}`]).toBe(sum);
+  });
+
+  it.each(['tab\tv', 'v'])('normalizes the sums of the property named %j', async column => {
+    // Three roots, each on one matched row: their sums 2, 6 and 4 normalize to 0, 1 and 0.5.
+    const rows: Array<[number, number]> = [[0, 2], [10, 6], [20, 4]];
+    const roots = rows.map(([x]) => `('{}', ST_Point(${x}, 0))`).join(', ');
+    const others = rows.map(([x, value]) => {
+      const properties = JSON.stringify({ [column]: value }).replace(/'/g, "''");
+      return `('${properties}', ST_Point(${x}, 0))`;
+    }).join(', ');
+    await conn.query(`INSERT INTO autk.root VALUES ${roots}; INSERT INTO autk.other VALUES ${others};`);
+    const output = await join([{ column, aggregateFn: 'sum', normalize: true }]);
+    const sums = output.features.map(feature => feature.properties?.sjoin.sum);
+    expect(sums.map(sum => [sum[`other.${column}`], sum[`other.${column}_norm`]]).sort((a, b) => a[0] - b[0]))
+      .toEqual([[2, 0], [4, 0.5], [6, 1]]);
+  });
+});

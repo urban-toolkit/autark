@@ -1,11 +1,13 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
-import { BuildHeatmapParams } from './interfaces';
+import { BuildHeatmapParams, HeatmapGroupBy } from './interfaces';
 import type { BoundingBox } from '@urban-toolkit/autk-core';
 import { RasterBandMetadata, Table, UserTable } from '../../interfaces';
 import { SpatialJoinUseCase } from '../spatial-join/use-case';
-import { getColumnsFromDuckDbTableDescribe, toPlain } from '../../utils';
+import { getColumnsFromDuckDbTableDescribe, quoteJsonPathKey, toPlain } from '../../utils';
 import { setRasterPayload } from '../../raster-store';
 import { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+
+type HeatmapBand = RasterBandMetadata & { jsonPath: string; normalize: boolean };
 
 /**
  * Builds a heatmap by creating a spatial grid, aggregating source data into cells via NEAR join,
@@ -58,7 +60,8 @@ export class BuildHeatmapUseCase {
                 tableRootName: gridTableName,
                 tableJoinName: params.tableJoinName,
                 near: params.near,
-                groupBy: params.groupBy,
+                // Normalize each output band separately, without adding keys to the joined properties.
+                groupBy: params.groupBy?.map(({ column, aggregateFn }) => ({ column, aggregateFn })),
             },
             [...tables, gridTable],
             workspace,
@@ -146,13 +149,18 @@ export class BuildHeatmapUseCase {
      */
     private async transformToRasterFormat(
         tableName: string,
-        bands: Array<RasterBandMetadata & { jsonPath: string }>,
+        bands: HeatmapBand[],
         workspace: string,
     ): Promise<void> {
         const qualifiedTableName = `${workspace}.${tableName}`;
-        const bandAssignments = bands
-            .map((band) => `                    '${band.id}': COALESCE(json_extract(properties, '${band.jsonPath}')::DOUBLE, 0)`) 
-            .join(',\n');
+        const bandAssignments = bands.map((band) => {
+            const path = band.jsonPath.replace(/'/g, "''");
+            const raw = `COALESCE(json_extract(properties, '${path}')::DOUBLE, 0)`;
+            const min = `MIN(${raw}) OVER ()`;
+            const max = `MAX(${raw}) OVER ()`;
+            const value = band.normalize ? `COALESCE((${raw} - ${min}) / NULLIF(${max} - ${min}, 0), 0)` : raw;
+            return `                    '${band.id}': ${value}`;
+        }).join(',\n');
 
         const transformQuery = `
             CREATE OR REPLACE TABLE ${qualifiedTableName} AS
@@ -175,7 +183,7 @@ ${bandAssignments}
      */
     private async materializeCompactRaster(
         tableName: string,
-        bands: Array<RasterBandMetadata & { jsonPath: string }>,
+        bands: RasterBandMetadata[],
         boundingBox: BoundingBox,
         rows: number,
         columns: number,
@@ -257,23 +265,56 @@ ${bandAssignments}
 
     /**
      * Derives raster band metadata from the group-by configuration.
+     *
+     * A band is labelled `<aggregateFn>_<table>`, with `_norm` added when it is normalized. When bands of one
+     * aggregate over different columns would share that label, each of them names its column too,
+     * `<aggregateFn>_<table>_<column>` with the column's dots as underscores. Any remaining duplicates
+     * receive a band-ID suffix without taking another band's preferred label.
      */
-    private getRasterBands(params: BuildHeatmapParams): Array<RasterBandMetadata & { jsonPath: string }> {
-        const groupBy = params.groupBy && params.groupBy.length > 0
+    private getRasterBands(params: BuildHeatmapParams): HeatmapBand[] {
+        const groupBy: HeatmapGroupBy[] = params.groupBy && params.groupBy.length > 0
             ? params.groupBy
-            : [{ column: '*', aggregateFn: 'count' as const }];
+            : [{ column: '*', aggregateFn: 'count' }];
 
-        return groupBy.map((column, index) => {
+        const bands = groupBy.map((column, index) => {
             const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
             const sourceKey = aggregateFn === 'count' || aggregateFn === 'weighted'
                 ? params.tableJoinName
                 : `${params.tableJoinName}.${column.column}`;
+            const norm = column.normalize ? '_norm' : '';
 
             return {
                 id: `band_${index + 1}`,
-                label: `${aggregateFn}_${params.tableJoinName}`,
-                jsonPath: `$.sjoin.${aggregateFn}.${sourceKey}`,
+                label: `${aggregateFn}_${params.tableJoinName}${norm}`,
+                // The join stores `<table>.<column>` as one key, so the path quotes it.
+                jsonPath: `$.sjoin.${aggregateFn}.${quoteJsonPathKey(sourceKey)}`,
+                normalize: column.normalize === true,
+                columnLabel: sourceKey === params.tableJoinName
+                    ? null
+                    : `${aggregateFn}_${params.tableJoinName}_${column.column.replace(/\./g, '_')}${norm}`,
             };
+        });
+
+        const labelCounts = new Map<string, number>();
+        for (const { label } of bands) labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+
+        const preferred = bands.map(({ columnLabel, ...band }) => ({
+            ...band,
+            label: columnLabel !== null && (labelCounts.get(band.label) ?? 0) > 1 ? columnLabel : band.label,
+        }));
+        const reserved = new Set(preferred.map(({ label }) => label));
+        const used = new Set<string>();
+        return preferred.map(band => {
+            let label = band.label;
+            if (used.has(label)) {
+                const base = `${label}_${band.id}`;
+                label = base;
+                for (let suffix = 2; reserved.has(label) || used.has(label); suffix++) {
+                    label = `${base}_${suffix}`;
+                }
+            }
+            used.add(label);
+            return { ...band, label };
         });
     }
 }

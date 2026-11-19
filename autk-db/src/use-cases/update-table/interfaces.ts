@@ -1,5 +1,6 @@
 import { FeatureCollection } from 'geojson';
 import { Table, Column } from '../../interfaces';
+import { quoteJsonPathKey } from '../../utils';
 
 /**
  * Strategy for replacing or updating an existing table.
@@ -36,7 +37,7 @@ export interface UpdateTableParams {
   /**
    * Required when `strategy` is `'update'`.
    *
-   * Supports direct column names (`'id'`) or nested property paths (`'properties.building_id'`) that resolve to `properties->>'building_id'` in SQL.
+   * Supports direct column names (`'id'`) or nested property paths (`'properties.building_id'`) that resolve to `properties->>'$."building_id"'` in SQL.
    */
   idColumn?: string;
   /** Workspace namespace used to qualify the table name. Defaults to the system workspace. */
@@ -59,7 +60,7 @@ export interface UpdateTableResult {
 /**
  * Parses an `idColumn` specification into a SQL-ready expression.
  *
- * Converts `'properties.building_id'` into `properties->>'building_id'` for DuckDB JSON access, or passes through plain column names unchanged.
+ * Converts `'properties.building_id'` into `properties->>'$."building_id"'` for DuckDB JSON access, with the key quoted so that DuckDB never reads it as a path, or passes through plain column names unchanged.
  *
  * @param idColumn - column reference such as `'id'` or `'properties.building_id'`.
  * @returns object containing the resolved SQL expression and whether the reference targets a nested property.
@@ -69,7 +70,7 @@ export interface UpdateTableResult {
  * // { isPropertiesPath: false, columnName: 'id', sqlExpression: 'id' }
  * @example
  * parseIdColumn('properties.building_id');
- * // { isPropertiesPath: true, columnName: 'building_id', sqlExpression: "properties->>'building_id'" }
+ * // { isPropertiesPath: true, columnName: 'building_id', sqlExpression: `properties->>'$."building_id"'` }
  */
 export function parseIdColumn(idColumn: string): {
   isPropertiesPath: boolean;
@@ -78,10 +79,11 @@ export function parseIdColumn(idColumn: string): {
 } {
   if (idColumn.startsWith('properties.')) {
     const propertyKey = idColumn.slice('properties.'.length);
+    const path = `$.${quoteJsonPathKey(propertyKey)}`;
     return {
       isPropertiesPath: true,
       columnName: propertyKey,
-      sqlExpression: `properties->>'${propertyKey}'`,
+      sqlExpression: `properties->>'${path.replace(/'/g, "''")}'`,
     };
   }
   

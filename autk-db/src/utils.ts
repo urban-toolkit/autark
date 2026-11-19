@@ -86,3 +86,21 @@ export function toPlain<T = unknown>(value: T): T {
   );
   return plainObj as T;
 }
+
+/**
+ * Quotes a key for a DuckDB JSONPath, as in `$."key"`.
+ *
+ * DuckDB reads a bare key that starts with `$` as a JSONPath and one that starts with `/` as a JSON pointer, so the key
+ * is always quoted. Inside the quotes DuckDB decodes only `\"` and `\\`, so only `"` and `\` are escaped: the `\t`,
+ * `\n` and `\u0007` that `JSON.stringify` writes for control characters would not match the stored key.
+ * A caller that puts the path in a SQL string literal still doubles its `'`.
+ *
+ * @param key - Raw key, as stored in the JSON.
+ * @returns The key in double quotes, with `"` and `\` escaped.
+ * @throws Never throws.
+ * @example
+ * const path = `$.${quoteJsonPathKey('$id')}`; // $."$id"
+ */
+export function quoteJsonPathKey(key: string): string {
+  return `"${key.replace(/["\\]/g, '\\$&')}"`;
+}

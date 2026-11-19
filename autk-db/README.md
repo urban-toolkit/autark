@@ -205,6 +205,8 @@ console.log(parcels.type); // 'polygons'
 * `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs.
 * `removeLayer(tableName)`: Drops a table from the current workspace.
 
+Heatmap bands keep positional IDs (`band_1`, `band_2`, and so on) in `groupBy` order. A band with `normalize: true` is scaled independently to 0–1 across the grid and has `_norm` in its label. When bands of the same aggregate would share a label, the label includes the source column where applicable; any remaining duplicates receive a band-ID suffix. Use the returned `bands` metadata when selecting by label.
+
 ## Spatial joins with compact rasters
 
 Use a raster loaded by `loadGeoTiff()` or produced by `buildHeatmap()` as `tableJoinName`, with a vector `tableRootName`. The root is updated in place, preserving its feature identities and geometry.
