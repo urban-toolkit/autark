@@ -1,19 +1,19 @@
 /**
- * Plot implementation re-exports.
+ * Plot registration and built-in plot re-exports.
  *
- * Aggregates all concrete plot classes so internal modules and the public API
- * can import from a single location instead of from individual implementation files.
+ * Every plot, built-in or user, is a definition drawn by `RegisteredPlot`;
+ * this module gathers the registration API, registers the built-in
+ * definitions, and exports the design space of the segregated view.
  */
 
-/** Bar plot supporting categorical values and one-dimensional bins. */
-export { Barchart } from './barchart';
-/** Line plot for temporal event and reduced series data. */
-export { Linechart } from './linechart';
-/** Parallel coordinates plot for multivariate feature exploration. */
-export { ParallelCoordinates } from './pcoordinates';
-/** Two-dimensional scatter plot with click and brush interactions. */
-export { Scatterplot } from './scatterplot';
-/** Table visualization with sortable columns and row selection. */
-export { TableVis } from './tablevis';
-/** Heat matrix mapping two categorical dimensions to a grid of color-encoded rectangles. */
-export { Heatmatrix } from './heatmatrix';
+/** Plots drawn by a registered definition, built-in or user: D3 drawing code plus SVG annotations. */
+export { RegisteredPlot, registerPlot, unregisterPlot, registeredPlot, hasRegisteredPlot, checkPlot } from './registered';
+/** Registers the built-in plots written as definitions. */
+import './built-in';
+export type { PlotArrangeContext, PlotDefinition, PlotDrawContext, PlotPartContext, PlotSeries } from './registered';
+/** Design space of the segregated view, inferred from the marks of a drawing. */
+export { htmlFill, inferPartialDesign, markKindOf, memberOffset, ownMatrix, parseFlow, parseRibbon, parseSector, ratioOf } from './partial-design';
+export type { DeclaredDesign, MarkKind, PartialDesign, PartialRule } from './partial-design';
+/** Tree of the rows of the `hierarchy` transform, as the treemap and sunburst draw it. */
+export { treeOf } from './hierarchy-tree';
+export type { TreeDatum } from './hierarchy-tree';

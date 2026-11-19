@@ -5,26 +5,28 @@ import type { EventEmitter } from '@urban-toolkit/autk-core';
 import type { PlotEventRecord } from './types-events';
 
 import { PlotBaseInteractive } from './plot-base-interactive';
+import type { ProvenanceModel } from './provenance';
+import type { FeatureShare } from './types-provenance';
 
 
 import {
-    Barchart,
-    Heatmatrix,
-    Linechart,
-    ParallelCoordinates,
-    Scatterplot,
-    TableVis,
+    RegisteredPlot,
+    registeredPlot,
+    hasRegisteredPlot,
 } from './plots';
 
 /**
  * Unified public entrypoint for autk-plot plot creation and interaction.
  *
- * `AutkPlot` wraps plot-specific implementations (`scatterplot`, `barchart`,
- * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`) behind a single constructor
- * and a stable API for selection and event handling.
+ * `AutkPlot` draws any registered plot (the built-in `scatterplot`, `barchart`,
+ * `parallel-coordinates`, `table`, `linechart`, `heatmatrix`, `boxplot`, `sankey`, `pie`,
+ * `donut`, `areachart`, `bubble`, `hexbin`, `calendar`, `waffle`, `stackedbar`, `treemap`,
+ * `sunburst`, `radar`, `ecdf`, `pareto`, `chord`, `density`, `violin`, or a user plot through
+ * `{ type: 'registered', plot }`) behind a single constructor and a stable API for selection and
+ * event handling.
  *
- * The wrapper delegates all behavior to the concrete plot instance selected by
- * `config.type` while exposing a plot-agnostic interface to consumers.
+ * Every plot is a definition drawn by `RegisteredPlot`; the wrapper delegates all behavior to it
+ * while exposing a plot-agnostic interface.
  *
  * @example
  * const plot = new AutkPlot(plotDiv, {
@@ -39,7 +41,7 @@ import {
  * });
  */
 export class AutkPlot {
-    /** Concrete plot implementation selected from the discriminated config. */
+    /** Plot drawing the configured definition. */
     private _plot: PlotBaseInteractive;
     /** Active plot type handled by this wrapper instance. */
     private _type: PlotType;
@@ -67,12 +69,12 @@ export class AutkPlot {
     }
 
     /**
-     * Gets the underlying concrete plot instance.
+     * Gets the underlying plot instance.
      *
-     * This is mainly useful for advanced scenarios that require direct access
-     * to implementation-specific behavior.
+     * This is mainly useful for advanced scenarios that require direct access to the drawing
+     * (its data, scales, and selection state).
      *
-     * @returns Internal plot implementation instance.
+     * @returns The plot instance that draws the plot.
      */
     get instance(): PlotBaseInteractive {
         return this._plot;
@@ -87,8 +89,20 @@ export class AutkPlot {
     }
 
     /**
+     * Gets the provenance graph of the current draw, from source features to marks.
+     *
+     * @returns Provenance graph answering direct and inverse queries.
+     * @example
+     * plot.provenance.direct([0]);              // feature:0 → … → mark
+     * plot.provenance.inverse(['mark:aggregate:4']); // mark → … → features
+     */
+    get provenance(): ProvenanceModel {
+        return this._plot.provenance;
+    }
+
+    /**
      * Gets the plot event dispatcher.
-     * @returns Typed event dispatcher exposed by the concrete plot.
+     * @returns Typed event dispatcher of the plot.
      */
     get events(): EventEmitter<PlotEventRecord> {
         return this._plot.events;
@@ -98,12 +112,15 @@ export class AutkPlot {
      * Applies a new selection to the plot as source feature ids.
      *
      * @param selection Source feature ids to highlight/select.
+     * @param shares Optional share of each feature covered by the selection in
+     * the emitting view, as sent in `PlotEventData.shares`.
      * @throws Never throws.
      * @example
      * plot.setSelection([0, 3, 7]);
+     * other.events.on('click', ({ selection, shares }) => plot.setSelection(selection, shares));
      */
-    public setSelection(selection: number[]): void {
-        this._plot.setSelection(selection);
+    public setSelection(selection: number[], shares?: FeatureShare[]): void {
+        this._plot.setSelection(selection, shares);
     }
 
     /**
@@ -119,7 +136,7 @@ export class AutkPlot {
     }
 
     /**
-     * Triggers a synchronous redraw of the underlying plot implementation.
+     * Triggers a synchronous redraw of the plot.
      *
      * @throws Never throws.
      * @example
@@ -130,50 +147,38 @@ export class AutkPlot {
     }
 
     /**
-     * Instantiates the concrete plot class from a discriminated config.
+     * Stops following the host size (`width: 'auto'`) and removes the plot
+     * from its host element.
      *
-     * This method is intentionally centralized so plot type dispatch remains
-     * explicit and easy to audit.
+     * @throws Never throws.
+     * @example
+     * plot.destroy();
+     */
+    public destroy(): void {
+        this._plot.destroy();
+    }
+
+    /**
+     * Draws the registered definition named by the configuration: `config.plot`
+     * for `{ type: 'registered' }`, or the built-in plot `config.type`.
      *
      * @param div Host HTML element where the plot should render.
      * @param config Discriminated plot configuration.
-     * @returns Concrete plot instance matching `config.type`.
-     * @throws If `config.type` is not supported.
+     * @returns Plot instance drawing that definition.
+     * @throws If no plot is registered under the name.
      */
     private createPlot(div: HTMLElement, config: UnifiedPlotConfig): PlotBaseInteractive {
         switch (config.type) {
-            case 'scatterplot': {
+            case 'registered': {
                 const { type, ...plotConfig } = config;
                 void type;
-                return new Scatterplot({ div, ...plotConfig });
-            }
-            case 'barchart': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Barchart({ div, ...plotConfig });
-            }
-            case 'parallel-coordinates': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new ParallelCoordinates({ div, ...plotConfig });
-            }
-            case 'table': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new TableVis({ div, ...plotConfig });
-            }
-            case 'linechart': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Linechart({ div, ...plotConfig });
-            }
-            case 'heatmatrix': {
-                const { type, ...plotConfig } = config;
-                void type;
-                return new Heatmatrix({ div, ...plotConfig });
+                return new RegisteredPlot({ div, ...plotConfig }, registeredPlot(config.plot));
             }
             default: {
-                throw new Error(`Unsupported plot type: ${config.type}`);
+                // Built-in plots are definitions registered like user plots.
+                const { type, ...plotConfig } = config;
+                if (!hasRegisteredPlot(type)) throw new Error(`Unsupported plot type: ${type}`);
+                return new RegisteredPlot({ div, ...plotConfig }, registeredPlot(type));
             }
         }
     }

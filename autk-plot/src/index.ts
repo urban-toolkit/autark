@@ -1,9 +1,9 @@
-// ─── Plot entry point ───────────────────────────────────────────────────────
+// ---- Plot entry point ---------------------------------------------------
 
 /** Unified plot wrapper used to instantiate and interact with plot types. */
 export { AutkPlot } from './plot';
 
-// ─── API and config types ───────────────────────────────────────────────────
+// ---- API and config types -----------------------------------------------
 
 export type { AutkDatum } from './types-plot';
 
@@ -17,12 +17,20 @@ export type {
 	ReduceSeriesTransformConfig,
 	PlotTransformConfig,
 	SortTransformConfig,
+	BoxStatsTransformConfig,
+	FlowsTransformConfig,
+	BinningHexTransformConfig,
+	HierarchyTransformConfig,
+	CumulativeTransformConfig,
+	FoldTransformConfig,
+	DensityTransformConfig,
+	RegisteredTransformConfig,
 	PlotConfig,
 	PlotType,
 	UnifiedPlotConfig,
 } from './api';
 
-// ─── Events ─────────────────────────────────────────────────────────────────
+// ---- Events -------------------------------------------------------------
 
 /** Supported plot interaction events emitted by plot instances. */
 export { PlotEvent } from './types-events';
@@ -31,15 +39,45 @@ export type { PlotEventData, PlotEventRecord } from './types-events';
 /** Shared plot base classes for data/transform and interactive behavior. */
 export { PlotBaseData } from './plot-base-data';
 export { PlotBaseInteractive } from './plot-base-interactive';
-/** Normalized transform payload consumed by plot implementations. */
+/** Rendered rows and bindings of an executed transform. */
 export type { ResolvedPlotTransform } from './plot-base-data';
 
-// ─── Shared style helpers ───────────────────────────────────────────────────
+// ---- Shared style helpers -----------------------------------------------
 
-/** Global default/highlight style helpers shared by plot implementations. */
+/** Default and highlight style helpers shared by every plot. */
 export { PlotStyle } from './plot-style';
 
-// ─── Transform helpers ─────────────────────────────────────────────────────
+// ---- Provenance ---------------------------------------------------------
+
+/** Provenance graph, relation algebra, and entity id helpers. */
+export { ProvenanceModel, compose, transpose, image, cardinality, featureId, markId } from './provenance';
+/** Contract checks for transform provenance, for registered transforms and tests. */
+export { checkProvenance, checkProvenanceReport, checkTransform, checkTransformReport } from './provenance/validate';
+/** Plot registration, shared by built-in and user plots, and the check of the drawing contract. */
+export { registerPlot, unregisterPlot, registeredPlot, hasRegisteredPlot, checkPlot } from './plots';
+export type { PlotArrangeContext, PlotDefinition, PlotDrawContext, PlotPartContext, PlotSeries } from './plots';
+/** Design space of the segregated view, inferred from the marks of a drawing. */
+export { htmlFill, inferPartialDesign, markKindOf, memberOffset, ownMatrix, parseFlow, parseRibbon, parseSector, ratioOf } from './plots';
+export type { DeclaredDesign, MarkKind, PartialDesign, PartialRule } from './plots';
+export { treeOf } from './plots';
+export type { TreeDatum } from './plots';
+export type { SegregatedPart } from './plot-base-interactive';
+export type { ContractReport, ContractViolation } from './provenance/validate';
+export type { PlotProvenanceConfig, FilterCondition, TopKConfig } from './api';
+export type {
+	ProvenanceId,
+	ProvenancePair,
+	ProvenanceCardinality,
+	ProvenanceStage,
+	ProvenanceRelation,
+	ProvenanceContribution,
+	TransformProvenance,
+	ProvenancePath,
+	MarkContribution,
+	FeatureShare,
+} from './types-provenance';
+
+// ---- Transform helpers --------------------------------------------------
 
 /** Shared data transformation engine and ready-to-use transform presets. */
 export * from './transforms';
