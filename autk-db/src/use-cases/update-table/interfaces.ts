@@ -81,7 +81,7 @@ export function parseIdColumn(idColumn: string): {
     return {
       isPropertiesPath: true,
       columnName: propertyKey,
-      sqlExpression: `properties->>'${propertyKey}'`,
+      sqlExpression: `properties->>'${propertyKey.replace(/'/g, "''")}'`,
     };
   }
   
