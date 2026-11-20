@@ -73,6 +73,11 @@ export type PlotConfig = {
      * and a bar chart's category or a line chart's bucket as it is written ("2020").
      */
     tickFormats?: string[];
+    /**
+     * Approximate number of ticks for each axis (x, y). D3 may adjust it to keep round values. When omitted, an axis
+     * keeps its usual count but gets fewer on a short axis (about one tick per 45 pixels on x, 30 on y), so small plots stay readable.
+     */
+    tickCounts?: number[];
     /** Domain specification controlling how the colormap range is derived. */
     domainSpec?: ColorMapDomainSpec;
     /** Color interpolator used for continuous (numeric) color encoding. */

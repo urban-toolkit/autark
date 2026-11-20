@@ -116,7 +116,10 @@ export class Scatterplot extends PlotBaseInteractive {
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Axes
-        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(this.tickFormat(0));
+        const xAxis = d3.axisBottom(this.mapX)
+            .ticks(this.tickCount(0, width))
+            .tickSizeInner(-height)
+            .tickFormat(this.tickFormat(0));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.x.axis')
@@ -139,7 +142,10 @@ export class Scatterplot extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(this.tickFormat(1));
+        const yAxis = d3.axisLeft(this.mapY)
+            .ticks(this.tickCount(1, height))
+            .tickSizeInner(-width)
+            .tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.y.axis')

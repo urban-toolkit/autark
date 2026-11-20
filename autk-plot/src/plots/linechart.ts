@@ -188,7 +188,7 @@ export class Linechart extends PlotBaseInteractive {
             .text((d) => d);
 
         const yAxis = d3.axisLeft(yScale)
-            .ticks(5)
+            .ticks(this.tickCount(1, innerH, 5))
             .tickSizeInner(-innerW)
             .tickFormat(this.tickFormat(1));
 
