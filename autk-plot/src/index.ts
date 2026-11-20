@@ -26,7 +26,7 @@ export type {
 
 /** Supported plot interaction events emitted by plot instances. */
 export { PlotEvent } from './types-events';
-export type { PlotEventData, PlotEventRecord } from './types-events';
+export type { BrushExtent, PlotEventData, PlotEventRecord } from './types-events';
 
 /** Shared plot base classes for data/transform and interactive behavior. */
 export { PlotBaseData } from './plot-base-data';

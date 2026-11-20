@@ -14,7 +14,7 @@ import {
     EventEmitter,
     valueAtPath,
 } from '@urban-toolkit/autk-core';
-import type { PlotEventRecord } from './types-events';
+import type { BrushExtent, PlotEventRecord } from './types-events';
 
 import { PlotStyle } from './plot-style';
 import { PlotEvent } from './types-events';
@@ -295,6 +295,17 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     }
 
     /**
+     * Converts a brushed box, in the plot area's pixels, to data units. Plots that can invert their scales override this.
+     *
+     * @param rect The box as `[x0, y0, x1, y1]` in pixels of the marks area.
+     * @param axes Which axes the brush covers.
+     * @returns The box in data units, or `undefined` when the plot does not support it.
+     */
+    protected brushExtent(_rect: [number, number, number, number], _axes: 'x' | 'y' | 'xy'): BrushExtent | undefined {
+        return undefined;
+    }
+
+    /**
      * Enables 2D rectangular brushing interactions.
      */
     protected brushEvent(): void {
@@ -317,7 +328,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH, { selection: plot.selection });
+                            plot.events.emit(PlotEvent.BRUSH, { selection: plot.selection, extent: plot.brushExtent([x0, y0, x1, y1], 'xy'), phase: event.type });
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH, plot._activeBrushes);
@@ -359,7 +370,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH_X, { selection: plot.selection });
+                            plot.events.emit(PlotEvent.BRUSH_X, { selection: plot.selection, extent: plot.brushExtent([x0, y0, x1, y1], 'x'), phase: event.type });
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH_X, plot._activeBrushes);
@@ -415,7 +426,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH_Y, { selection: plot.selection });
+                            plot.events.emit(PlotEvent.BRUSH_Y, { selection: plot.selection, extent: plot.brushExtent([x0, y0, x1, y1], 'y'), phase: event.type });
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH_Y, plot._activeBrushes);
@@ -778,7 +789,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             this.resolveSelectionFromRects(activeBrushes);
         }
         this.renderSelection();
-        this.events.emit(event, { selection: this.selection });
+        this.events.emit(event, { selection: this.selection, phase: 'end' });
     }
 
     /**
