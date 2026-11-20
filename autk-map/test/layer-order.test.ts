@@ -16,9 +16,10 @@ const square = (half: number): FeatureCollection => ({ type: 'FeatureCollection'
     ]] },
 }] });
 
-/** The layers of a map of a neighborhood: its ground, a heat raster, its roads and its bus stops. */
+/** The layers of a map of a neighborhood: its ground and a plaza on it, a heat raster, its roads and its bus stops. */
 const SOURCES: Record<string, LoadCollectionParams> = {
     surface: { collection: square(100), type: 'surface' },
+    plaza: { collection: square(40), type: 'surface' },
     heat: {
         collection: { type: 'FeatureCollection', bbox: [-100, -100, 100, 100], features: [
             { type: 'Feature', geometry: null, properties: { rasterResX: 2, rasterResY: 2, band: [1, 2, 3, 4] } },
@@ -130,6 +131,16 @@ describe('the order a map draws its layers in', () => {
         map.setLayerOrder(['surface', 'heat', 'roads']);
         map.setLayerOrder([]);
         expect(drawn(map)).toEqual(['surface', 'roads', 'heat']);
+    });
+
+    it('puts two layers of one type back in their load order when the order is emptied', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'plaza', 'roads']);
+        expect(stack(map)).toEqual(['surface', 'plaza', 'roads']);
+        map.setLayerOrder(['plaza', 'surface']);
+        expect(stack(map)).toEqual(['plaza', 'surface', 'roads']);
+        map.setLayerOrder([]);
+        expect(drawn(map)).toEqual(['surface', 'plaza', 'roads']);
     });
 
     it('draws buildings with depth over the other layers, wherever the order lists them', () => {
