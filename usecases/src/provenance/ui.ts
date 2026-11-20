@@ -1,9 +1,9 @@
 /**
  * The workspace around the plots: chart cards, the toolbox, the transforms
- * and Try it Yourself drawers, and the page settings.
+ * and Try It Yourself drawers, and the page settings.
  */
 
-import * as next from '@urban-toolkit/autk-plot';
+import * as autkPlot from '@urban-toolkit/autk-plot';
 import type { TransformReducer } from '@urban-toolkit/autk-plot';
 
 import type { ProvenanceApp } from './app';
@@ -21,7 +21,7 @@ import { clearError, reportError } from '../shared/ui';
 const INTERACTIONS: Record<string, string> = { click: 'click', brush: 'brush', brushX: 'brush x', brushY: 'brush y' };
 /** What each interaction chip means. */
 const INTERACTION_HINTS: Record<string, string> = {
-    click: 'Click a mark to select it, and again to take it out. After a selection made elsewhere, a click works on whole marks of this chart: those that selection reached, plus or minus the clicked one. Click the background to clear',
+    click: 'Click a mark to select it, again to take it out; click the background to clear. After a selection made elsewhere, a click starts from the whole marks it reached',
     brush: 'Drag a rectangle to select; click the background to clear',
     brushX: 'Drag horizontally to select; click the background to clear',
     brushY: 'Drag vertically to select; click the background to clear',
@@ -164,7 +164,7 @@ function syncActiveTools(): void {
     });
 }
 
-/** Shows one Try it Yourself tab; only the selected tab is in the tab order. */
+/** Shows one Try It Yourself tab; only the selected tab is in the tab order. */
 function showTab(name: string): void {
     document.querySelectorAll<HTMLElement>('#try-drawer .tab').forEach(tab => {
         const selected = tab.dataset.tab === name;
@@ -187,10 +187,10 @@ function applySetting(apply: () => void): void {
 /** Groups of the transforms drawer: all are registered definitions, by the package or by this page. */
 const TRANSFORM_GROUPS: [TransformEntry['origin'], string][] = [
     ['built-in', "autk-plot's 12 transforms"],
-    ['page', 'Registered by this page (registerTransform)'],
+    ['page', 'Registered by this page'],
 ];
 
-/** Opens Try it Yourself on the Transform tab, with the code of a built-in transform. */
+/** Opens Try It Yourself on the Transform tab, with the code of a built-in transform. */
 function showTransformCode(name: string): void {
     const index = LAB_TEMPLATES.findIndex(template => template.name === name);
     if (index < 0) return;
@@ -231,7 +231,7 @@ function clearTransformPick(): void {
 
 /** One transform of the drawer: a toggle that highlights the charts using it. */
 function appendTransform(list: HTMLElement, grid: HTMLElement, entry: TransformEntry, charts: string[]): void {
-    const { label, shape } = next.registeredTransform(entry.name);
+    const { label, shape } = autkPlot.registeredTransform(entry.name);
     const code = LAB_TEMPLATES.some(template => template.name === entry.name);
     const item = document.createElement('li');
     item.className = 'transform';
@@ -304,10 +304,11 @@ export function initUi(app: ProvenanceApp): void {
     filter.value = '';
     filter.addEventListener('change', () => applySetting(() => app.configure({ filter: filter.value === '' ? null : FILTERS[Number(filter.value)].condition })));
     reducer.addEventListener('change', () => applySetting(() => app.configure({ reducer: reducer.value as TransformReducer })));
-    document.querySelector('#clear')!.addEventListener('click', () => {
+    // The Clear of the page and the one inside Try It Yourself, which the open drawer covers.
+    document.querySelectorAll('#clear, [data-clear]').forEach(button => button.addEventListener('click', () => {
         clearTransformPick();
         applySetting(() => app.clear());
-    });
+    }));
 
     // Tools: charts and the map scroll into view (the map also resets its camera);
     // the other tools (and the top button) open drawers.
@@ -329,9 +330,9 @@ export function initUi(app: ProvenanceApp): void {
         // Arrow keys move between tabs, as in any tab list.
         tab.addEventListener('keydown', event => {
             if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-            const next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
-            showTab(next.dataset.tab!);
-            next.focus();
+            const target = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+            showTab(target.dataset.tab!);
+            target.focus();
         });
     });
     document.addEventListener('keydown', event => {

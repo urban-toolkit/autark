@@ -6,7 +6,7 @@
  * registered outside the package core (`moving-average.ts`).
  */
 
-import * as next from '@urban-toolkit/autk-plot';
+import * as autkPlot from '@urban-toolkit/autk-plot';
 import type { FilterCondition, PlotTransformConfig, TransformReducer, UnifiedPlotConfig } from '@urban-toolkit/autk-plot';
 
 import { PLOT_HEIGHT } from './config';
@@ -16,7 +16,7 @@ import type { Collection } from './data';
 export type LinkedPlot = {
     name: string;
     div: string;
-    event: next.PlotEvent;
+    event: autkPlot.PlotEvent;
     config: Omit<UnifiedPlotConfig, 'collection' | 'events'>;
 };
 
@@ -33,13 +33,13 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'scatterplot',
         div: '#scatter',
-        event: next.PlotEvent.BRUSH,
+        event: autkPlot.PlotEvent.BRUSH,
         config: { type: 'scatterplot', attributes: { axis: ['shape_area', 'shape_leng'] }, labels: { title: 'Regions' }, height: PLOT_HEIGHT },
     },
     {
         name: 'linechart',
         div: '#line',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'linechart',
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
@@ -52,7 +52,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'histogram',
         div: '#histogram',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'barchart',
             attributes: { axis: ['shape_area', '@transform'] },
@@ -65,7 +65,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'heatmatrix',
         div: '#heatmatrix',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'heatmatrix',
             attributes: { axis: ['shape_area', 'landuse'], color: '@transform' },
@@ -78,7 +78,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'parallel coordinates',
         div: '#pcoords',
-        event: next.PlotEvent.BRUSH_Y,
+        event: autkPlot.PlotEvent.BRUSH_Y,
         config: {
             type: 'parallel-coordinates',
             attributes: { axis: ['shape_area', 'shape_leng', 'landuse'] },
@@ -89,16 +89,16 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'table',
         div: '#table',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: { type: 'table', attributes: { axis: ['ntaname', 'landuse', 'shape_area'] }, labels: { title: 'Regions by name' } },
     },
     {
         name: 'boxplot',
         div: '#boxplot',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'boxplot',
-            attributes: { axis: ['landuse', 'shape_area'] },
+            attributes: { axis: ['landuse', 'shape_area', '@transform'] },
             labels: { axis: ['land use', 'shape_area'], title: 'Area by land use' },
             transform: { preset: 'box-stats' },
             height: PLOT_HEIGHT,
@@ -108,10 +108,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'sankey',
         div: '#sankey',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'sankey',
-            attributes: { axis: ['ntatype', 'landuse', 'cdta2020'] },
+            attributes: { axis: ['ntatype_name', 'landuse', 'cdta2020', '@transform'] },
             labels: { title: 'NTA type → land use → district' },
             transform: { preset: 'flows' },
             height: PLOT_HEIGHT + 20,
@@ -122,11 +122,11 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'pie',
         div: '#pie',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'pie',
             attributes: { axis: ['landuse', '@transform'] },
-            labels: { title: 'Regions by land use' },
+            labels: { title: 'By land use' },
             transform: { preset: 'binning-1d' },
             height: PLOT_HEIGHT,
             margins: { left: 10, right: 10, top: 40, bottom: 10 },
@@ -135,11 +135,11 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'donut',
         div: '#donut',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'donut',
             attributes: { axis: ['cdta2020', '@transform'] },
-            labels: { title: 'Regions by district: top 6 + Others' },
+            labels: { title: 'By district: top 6 + Others' },
             transform: { preset: 'binning-1d' },
             // Top-k: the 6 largest districts, the rest gathered into one slice (N:1).
             topK: { k: 6, others: 'Others' },
@@ -150,7 +150,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'moving average',
         div: '#area',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'areachart',
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
@@ -164,7 +164,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'calendar',
         div: '#calendar',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'calendar',
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
@@ -177,7 +177,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'bubbles',
         div: '#bubble',
-        event: next.PlotEvent.BRUSH,
+        event: autkPlot.PlotEvent.BRUSH,
         config: {
             type: 'bubble',
             attributes: { axis: ['shape_area', 'shape_leng', 'sjoin.count.noise'] },
@@ -188,10 +188,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'hexbin',
         div: '#hexbin',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'hexbin',
-            attributes: { axis: ['shape_area', 'shape_leng'] },
+            attributes: { axis: ['shape_area', 'shape_leng'], color: '@transform' },
             labels: { axis: ['shape_area', 'shape_leng'], title: 'Regions binned in hexagons' },
             transform: { preset: 'binning-hex', options: { radius: 22 } },
             height: PLOT_HEIGHT,
@@ -201,7 +201,7 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'waffle',
         div: '#waffle',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'waffle',
             attributes: { axis: ['landuse', '@transform'] },
@@ -215,10 +215,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'stacked bars',
         div: '#stacked',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'stackedbar',
-            attributes: { axis: ['cdta2020', 'landuse'] },
+            attributes: { axis: ['cdta2020', 'landuse', '@transform'] },
             labels: { axis: ['district', 'regions'], title: 'Land use by district' },
             transform: { preset: 'hierarchy' },
             height: PLOT_HEIGHT,
@@ -228,10 +228,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'treemap',
         div: '#treemap',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'treemap',
-            attributes: { axis: ['landuse', 'cdta2020'] },
+            attributes: { axis: ['landuse', 'cdta2020', '@transform'] },
             labels: { title: 'Land use → district' },
             transform: { preset: 'hierarchy' },
             height: PLOT_HEIGHT,
@@ -241,10 +241,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'sunburst',
         div: '#sunburst',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'sunburst',
-            attributes: { axis: ['landuse', 'cdta2020'] },
+            attributes: { axis: ['landuse', 'cdta2020', '@transform'] },
             labels: { title: 'Land use → district' },
             transform: { preset: 'hierarchy' },
             height: PLOT_HEIGHT,
@@ -254,10 +254,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'radar',
         div: '#radar',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'radar',
-            attributes: { axis: ['landuse', 'shape_area', 'shape_leng', 'sjoin.count.noise'] },
+            attributes: { axis: ['landuse', 'shape_area', 'shape_leng', 'sjoin.count.noise', '@transform'] },
             labels: { axis: ['land use', 'shape_area', 'shape_leng', 'complaints'], title: 'Mean profile of each land use' },
             transform: { preset: 'fold' },
             height: PLOT_HEIGHT,
@@ -267,10 +267,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'ECDF',
         div: '#ecdf',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'ecdf',
-            attributes: { axis: ['shape_area'] },
+            attributes: { axis: ['shape_area', '@transform'] },
             labels: { axis: ['shape_area', 'regions'], title: 'Cumulative distribution of areas' },
             transform: { preset: 'cumulative' },
             height: PLOT_HEIGHT,
@@ -280,11 +280,11 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'Pareto',
         div: '#pareto',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'pareto',
-            attributes: { axis: ['cdta2020'] },
-            labels: { axis: ['district', 'regions'], title: 'Regions by district (Pareto)' },
+            attributes: { axis: ['cdta2020', '@transform'] },
+            labels: { axis: ['district', 'regions'], title: 'By district (Pareto)' },
             transform: { preset: 'cumulative' },
             height: PLOT_HEIGHT,
             margins: { left: 50, right: 50, top: 40, bottom: 50 },
@@ -293,10 +293,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'chord',
         div: '#chord',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'chord',
-            attributes: { axis: ['landuse', 'cdta2020'] },
+            attributes: { axis: ['landuse', 'cdta2020', '@transform'] },
             labels: { title: 'Land use × district' },
             transform: { preset: 'flows' },
             height: PLOT_HEIGHT + 20,
@@ -307,10 +307,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'density',
         div: '#density',
-        event: next.PlotEvent.BRUSH_X,
+        event: autkPlot.PlotEvent.BRUSH_X,
         config: {
             type: 'density',
-            attributes: { axis: ['shape_area'] },
+            attributes: { axis: ['shape_area', '@transform'] },
             labels: { axis: ['shape_area', 'density'], title: 'Density of areas' },
             transform: { preset: 'density' },
             height: PLOT_HEIGHT,
@@ -320,10 +320,10 @@ export const PLOTS: LinkedPlot[] = [
     {
         name: 'violin',
         div: '#violin',
-        event: next.PlotEvent.CLICK,
+        event: autkPlot.PlotEvent.CLICK,
         config: {
             type: 'violin',
-            attributes: { axis: ['landuse', 'shape_area'] },
+            attributes: { axis: ['landuse', 'shape_area', '@transform'] },
             labels: { axis: ['land use', 'shape_area'], title: 'Area by land use' },
             transform: { preset: 'density' },
             height: PLOT_HEIGHT,
@@ -336,9 +336,9 @@ export const PLOTS: LinkedPlot[] = [
  * Transform a chart of the page runs: its own, or the one its plot gives by
  * default (the table sorts its rows).
  */
-export function transformOfChart(chart: LinkedPlot): next.PlotTransformConfig | undefined {
+export function transformOfChart(chart: LinkedPlot): autkPlot.PlotTransformConfig | undefined {
     if (chart.config.transform) return chart.config.transform;
-    const { defaults } = next.registeredPlot(chart.config.type);
+    const { defaults } = autkPlot.registeredPlot(chart.config.type);
     const given = typeof defaults === 'function' ? defaults({ ...chart.config } as unknown as Parameters<typeof defaults>[0]) : defaults;
     return given?.transform;
 }
@@ -357,7 +357,7 @@ export function withReducer(config: LinkedPlot['config'], reducer: TransformRedu
     if (!transform || reducer === 'count' || !REDUCED_PRESETS.includes(transform.preset)) return config;
     if (transform.preset === 'cumulative' && reducer !== 'sum') return config;
     const name = config.type === 'registered' ? (config as { plot: string }).plot : config.type;
-    const reducers = next.registeredPlot(name).reducers;
+    const reducers = autkPlot.registeredPlot(name).reducers;
     if (reducers && !reducers.includes(reducer)) return config;
     // The value axis names what is reduced.
     const labels = config.labels?.axis
@@ -377,10 +377,10 @@ export function withReducer(config: LinkedPlot['config'], reducer: TransformRedu
  * @param settings Page settings.
  * @throws If the plot refuses the config.
  */
-export function createPlot(div: HTMLElement, config: LinkedPlot['config'], event: next.PlotEvent, collection: Collection, settings: PlotSettings): next.AutkPlot {
+export function createPlot(div: HTMLElement, config: LinkedPlot['config'], event: autkPlot.PlotEvent, collection: Collection, settings: PlotSettings): autkPlot.AutkPlot {
     div.replaceChildren();
     // The width follows the card and redraws when it changes, keeping the selection.
-    return new next.AutkPlot(div, {
+    return new autkPlot.AutkPlot(div, {
         width: 'auto',
         height: PLOT_HEIGHT,
         // The use case shows the provenance path under every chart.

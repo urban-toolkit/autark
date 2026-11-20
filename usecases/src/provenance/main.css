@@ -101,7 +101,7 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
     white-space: nowrap;
 }
 .button .icon svg { width: 16px; height: 16px; }
-/* Main actions (Try it Yourself, Check and draw): the brand button of autarkjs.org ("Get Started"). */
+/* Main actions (Try It Yourself, Check and draw): the brand button of autarkjs.org ("Get Started"). */
 .button.brand {
     height: 38px;
     padding: 0 20px;
@@ -419,7 +419,7 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
 .used-by button:hover { border-color: var(--brand); color: var(--brand-strong); }
 .used-by .none { font-size: 11px; color: var(--muted); }
 
-/* ── Try it Yourself ───────────────────────────────────────────────────────── */
+/* ── Try It Yourself ───────────────────────────────────────────────────────── */
 
 .tabs {
     display: flex;
@@ -470,11 +470,12 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
 .flow-result .flow-tags code { background: #fff; color: var(--data-ink); border: 1px solid var(--data); }
 .flow-arrow { align-self: center; color: var(--brand); }
 
+/* The same grid in both tabs: what to start from and how it selects (or which chart draws it),
+   then the fields, the transform and its options, and below them the rows the code receives. */
 .lab-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
     gap: 12px 14px;
     /* Thin rules above and below keep the fields apart from the flow and the code. */
     margin: 4px 0 0;
@@ -486,14 +487,16 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0;
     font-size: 12px;
     color: var(--muted);
 }
-.lab-controls input { width: 170px; }
-/* Long template and transform names stay one line: the select shows them cut, the list in full. */
-.lab-controls select { max-width: 240px; }
-.lab-rows { align-self: center; color: var(--muted); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-#plab-options, #lab-options { width: 150px; }
+.lab-controls .span-2 { grid-column: span 2; }
+/* Every field fills its cell; long names in a select show cut, the list in full. */
+.lab-controls input, .lab-controls select { width: 100%; min-width: 0; }
+.lab-rows { grid-column: 1 / -1; margin: -4px 0 0; color: var(--muted); font-size: 12px; }
+.lab-rows:empty { display: none; }
+.lab-rows code { font-size: 11px; }
 .lab-controls input:disabled { background: var(--canvas); color: var(--muted); }
 
 /* Code editor: a colored copy of the code (code-editor.ts) drawn behind a transparent text area. */
@@ -567,7 +570,7 @@ textarea.code::selection { background: rgba(143, 162, 204, 0.35); color: transpa
 }
 
 /* Check and draw, centered below the code. */
-.lab-run { display: flex; justify-content: center; margin-top: 12px; }
+.lab-run { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 12px; }
 
 .lab-message { width: fit-content; max-width: 100%; margin: 10px auto; padding: 8px 14px; border-radius: 8px; font-size: 13px; text-align: center; }
 .lab-message:empty { display: none; }
@@ -658,6 +661,13 @@ textarea.code::selection { background: rgba(143, 162, 204, 0.35); color: transpa
     .flow-figure img { width: 40px; height: 40px; }
     .flow-icon svg { width: 36px; height: 36px; }
     .flow-arrow { justify-self: center; transform: rotate(90deg) scale(0.8); }
+}
+
+@media (max-width: 560px) {
+    /* Phones: one field per line, all the same width. */
+    .lab-controls { grid-template-columns: minmax(0, 1fr); }
+    .lab-controls .span-2 { grid-column: auto; }
+    .lab { padding: 12px 14px 18px; }
 }
 
 @media (max-width: 560px) {

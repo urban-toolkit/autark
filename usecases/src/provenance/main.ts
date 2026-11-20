@@ -17,11 +17,11 @@ async function main(): Promise<void> {
         });
         initUi(app);
         hideLoading();
-        // Local inspection from the browser console.
-        (window as unknown as Record<string, unknown>).autk = app.inspection;
+        // Inspection from the browser console, while developing only (scripts in figures/ and bench/ read it).
+        if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).autk = app.inspection;
     } catch (error) {
         console.error(error);
-        showError('Failed to load the Provenance case study.', 'Check the data paths and reload the page.');
+        showError('Failed to load the provenance use case.', 'Check the data paths and reload the page.');
     }
 }
 

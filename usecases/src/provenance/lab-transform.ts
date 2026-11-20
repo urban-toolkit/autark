@@ -1,5 +1,5 @@
 /**
- * Try it Yourself (transform): write a transform with provenance in the page,
+ * Try It Yourself (transform): write a transform with provenance in the page,
  * check it against the contract, and draw it linked to every other view.
  *
  * The code runs in this browser only, like code typed in the console: it is
@@ -10,7 +10,7 @@
  * shape; otherwise the lab explains which ones broke.
  */
 
-import * as next from '@urban-toolkit/autk-plot';
+import * as autkPlot from '@urban-toolkit/autk-plot';
 import type { ContractReport, RowShape, TransformDefinition, UnifiedPlotConfig } from '@urban-toolkit/autk-plot';
 
 import { attachHighlighter } from './code-editor';
@@ -111,8 +111,8 @@ export function projectNameNote(name: unknown, kind: 'chart' | 'transform'): str
     let existing: object | undefined;
     try {
         existing = kind === 'chart'
-            ? (next.hasRegisteredPlot(name) && name !== LAB_PLOT_NAME ? next.registeredPlot(name) : undefined)
-            : (name !== LAB_TRANSFORM ? next.registeredTransform(name) : undefined);
+            ? (autkPlot.hasRegisteredPlot(name) && name !== LAB_PLOT_NAME ? autkPlot.registeredPlot(name) : undefined)
+            : (name !== LAB_TRANSFORM ? autkPlot.registeredTransform(name) : undefined);
     } catch {
         existing = undefined;
     }
@@ -138,7 +138,7 @@ export function mayReplaceCode(edited: boolean): boolean {
  * @param shape Row family of the transform.
  */
 export function chartsFor(shape: RowShape): LinkedPlot[] {
-    return PLOTS.filter(chart => next.registeredPlot(chart.config.type).transforms?.includes(shape));
+    return PLOTS.filter(chart => autkPlot.registeredPlot(chart.config.type).transforms?.includes(shape));
 }
 
 /**
@@ -188,7 +188,7 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
         const choices = chartsFor(shape);
         plot.replaceChildren(...choices.map(chart => {
             const title = chart.config.labels?.title;
-            const label = next.registeredPlot(chart.config.type).label ?? chart.config.type;
+            const label = autkPlot.registeredPlot(chart.config.type).label ?? chart.config.type;
             return new Option(title ? `${label}: ${title}` : label, chart.name);
         }));
         plot.value = choices.some(chart => chart.name === preferred) ? preferred : choices[0]?.name ?? '';
@@ -209,7 +209,7 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
 
     const fail = (text: string) => {
         passed = false;
-        next.unregisterTransform(LAB_TRANSFORM);
+        autkPlot.unregisterTransform(LAB_TRANSFORM);
         draw(null);
         renderChecks(checks, null);
         say(text, 'error');
@@ -230,7 +230,10 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
         passed = false;
         draw(null);
         renderChecks(checks, null);
-        say(current.note ?? 'Edit the code and click "Check and draw".', 'ok');
+        // As in the D3 tab: the examples show the least a transform needs; the built-in ones are the package's code.
+        say(current.note ?? (current.group === 'example'
+            ? 'Plain JavaScript with the least Autark needs: the lines marked // Autark. Edit it and click "Check and draw".'
+            : 'The code autk-plot registers for this transform: the same contract. Edit it and click "Check and draw".'), 'ok');
     };
 
     const run = () => {
@@ -238,9 +241,11 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
         try {
             parsed = JSON.parse(options.value || '{}');
         } catch (error) {
-            return fail(`The options are not valid JSON: ${(error as Error).message}`);
+            return fail(`The options are not valid JSON (${(error as Error).message}): keys and text go in double quotes, as in {"bins": 10}.`);
         }
         const cols = columns.value.split(',').map(col => col.trim()).filter(Boolean);
+        // With no field, run reads columns[0] as undefined and may still return rows: refuse it here.
+        if (cols.length === 0) return fail('Name in Fields the region properties the transform reads, such as shape_area.');
 
         // Evaluate the code: it must return { shape, run }.
         let definition: TransformDefinition;
@@ -249,14 +254,14 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
         } catch (error) {
             return fail(`The code does not run: ${(error as Error).message}`);
         }
-        next.unregisterTransform(LAB_TRANSFORM);
+        autkPlot.unregisterTransform(LAB_TRANSFORM);
         try {
-            next.registerTransform(definition);
+            autkPlot.registerTransform(definition);
         } catch (error) {
             return fail(`The registry refused the definition: ${(error as Error).message}`);
         }
 
-        const report = next.checkTransformReport(definition, collection, parsed, cols);
+        const report = autkPlot.checkTransformReport(definition, collection, parsed, cols);
         renderChecks(checks, report);
         const failure = report.violations.filter(v => v.invariant === 0);
         if (failure.length > 0) {
@@ -270,9 +275,9 @@ export function setupLab(collection: Collection, draw: (config: LabPlotConfig | 
         if (report.violations.length > 0) {
             passed = false;
             // A transform that breaks the contract is not left registered for other plots.
-            next.unregisterTransform(LAB_TRANSFORM);
+            autkPlot.unregisterTransform(LAB_TRANSFORM);
             draw(null);
-            return say('Not drawn: with these violations, the provenance view would paint the wrong parts.', 'error');
+            return say('Not drawn: with these violations, the provenance view would highlight the wrong parts.', 'error');
         }
 
         setPlots(definition.shape, plot.value);

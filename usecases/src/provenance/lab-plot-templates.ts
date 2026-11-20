@@ -1,5 +1,5 @@
 /**
- * Starting points of Try it Yourself (D3 chart). Each one is the body of a
+ * Starting points of Try It Yourself (D3 chart). Each one is the body of a
  * function of `d3`, `autk` and `core` (`lab-scope.ts`) that returns a plot
  * definition. Two groups:
  * - D3 examples: ordinary D3 charts, where the lines the editor highlights
@@ -10,7 +10,7 @@
  *   D3 chart: a developer's chart is written like them.
  */
 
-import * as next from '@urban-toolkit/autk-plot';
+import * as autkPlot from '@urban-toolkit/autk-plot';
 import type { PlotMargins, PlotTransformConfig, TopKConfig } from '@urban-toolkit/autk-plot';
 
 import { BUILT_IN_TEMPLATES } from './lab-builtin-templates';
@@ -39,7 +39,7 @@ export type PlotLabTemplate = {
 };
 
 const LOLLIPOP = `// Lollipop in plain D3: the regions of each district (N:1).
-// No painting code: Autark finds that the x of each dot follows the value,
+// No highlight code: Autark finds that the x of each dot follows the value,
 // and slides the dot along its stick to the value of the selection.
 return {
   draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
@@ -69,7 +69,7 @@ return {
 `;
 
 const LINE = `// Line in plain D3: the complaints per day (N:N), points and the line through them.
-// No painting code: Autark finds that the height of each point follows the
+// No highlight code: Autark finds that the height of each point follows the
 // value, and draws the line of the selection itself.
 return {
   draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
@@ -99,7 +99,7 @@ return {
 `;
 
 const BOXPLOT = `// Box plot in plain D3: the areas of the regions of each land use (N:1).
-// No painting code: Autark finds that the edges of each box follow q1 and q3,
+// No highlight code: Autark finds that the edges of each box follow q1 and q3,
 // and draws each selected region at its own value.
 return {
   draw({ group, rows, width, height }) { // Autark: receives the rows and the marks group
@@ -135,7 +135,7 @@ return {
 `;
 
 const TABLE = `// Table in plain D3, as HTML: one row per region (1:1).
-// No painting code: each row fills from the left up to the part of its
+// No highlight code: each row fills from the left up to the part of its
 // region that a selection in another chart covers.
 return {
   draw({ html, rows, fields }) {          // Autark: HTML marks go in the html container (with no SVG marks, it takes the place of the SVG)
@@ -150,7 +150,6 @@ return {
     table.append('tbody')
       .selectAll('tr').data(rows).join('tr')
       .attr('class', 'autkMark')          // Autark: each row is a mark
-      .style('cursor', 'pointer')
       .selectAll('td').data(row => fields.map(field => row[field])).join('td')
       .style('padding', '2px 6px')
       .text(v => (typeof v === 'number' ? d3.format('.3~s')(v) : v));
@@ -159,7 +158,7 @@ return {
 `;
 
 const BEESWARM = `// Beeswarm in plain D3: one dot per region (1:1), spread by area without overlapping.
-// No painting code: each dot paints the part of its region that a selection
+// No highlight code: each dot highlights the part of its region that a selection
 // in another chart covers.
 return {
   draw({ group, rows, width, height, value }) { // Autark: receives the rows and the marks group
@@ -268,11 +267,11 @@ const EXAMPLES: PlotLabTemplate[] = [
 ];
 
 /** Event of the lab chart for the event of a chart on the page. */
-const LAB_EVENTS: Partial<Record<next.PlotEvent, LabEvent>> = {
-    [next.PlotEvent.CLICK]: 'click',
-    [next.PlotEvent.BRUSH]: 'brush',
-    [next.PlotEvent.BRUSH_X]: 'brush-x',
-    [next.PlotEvent.BRUSH_Y]: 'brush-y',
+const LAB_EVENTS: Partial<Record<autkPlot.PlotEvent, LabEvent>> = {
+    [autkPlot.PlotEvent.CLICK]: 'click',
+    [autkPlot.PlotEvent.BRUSH]: 'brush',
+    [autkPlot.PlotEvent.BRUSH_X]: 'brush-x',
+    [autkPlot.PlotEvent.BRUSH_Y]: 'brush-y',
 };
 
 /** The definition a built-in template returns. */

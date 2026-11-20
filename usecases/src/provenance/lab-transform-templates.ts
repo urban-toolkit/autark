@@ -1,5 +1,5 @@
 /**
- * Starting points of Try it Yourself (transform). Each one is the body of a
+ * Starting points of Try It Yourself (transform). Each one is the body of a
  * function of `d3`, `autk` and `core` (`lab-scope.ts`) that returns a
  * transform definition. Two groups:
  * - examples: transforms a developer might write, built from the public
@@ -39,7 +39,7 @@ const { binnedProvenance, collectBuckets, indexedBins } = autk; // import { binn
 
 return {
   name: 'by-initial',
-  // Row shape: { label, value } is read by bars, pie and donut.
+  // Row shape: { label, value } is read by bars, pie, donut and waffle.
   shape: 'category-value',
 
   // rows: one row per region, with its columns and autkIds = [region index].
@@ -79,7 +79,7 @@ const { collectBuckets, unnestedProvenance } = autk; // import { collectBuckets,
 
 return {
   name: 'by-weekday',
-  // Row shape: { bucket, value } is read by the line and area charts.
+  // Row shape: { bucket, value } is read by the line, area and calendar charts.
   shape: 'series',
 
   run(rows, options, columns) {
@@ -152,7 +152,7 @@ return {
     });
 
     // MISTAKE: sorts the bars by value AFTER building the provenance.
-    // Row k no longer matches rowId k, so each bar would paint the part of
+    // Row k no longer matches rowId k, so each bar would highlight the part of
     // another bar. Fix: sort "buckets" before computing "keys".
     const sorted = buckets.slice().sort((a, b) => b.value - a.value);
     return {

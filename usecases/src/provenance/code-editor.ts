@@ -1,5 +1,5 @@
 /**
- * Colored code for the Try it Yourself text areas, with no editor library.
+ * Colored code for the Try It Yourself text areas, with no editor library.
  *
  * The text area stays the editor; a highlighted copy of its text is drawn
  * behind it, and the text area's own text is transparent. One rule, for the
@@ -28,13 +28,13 @@ const stringOf = (text: string): string => `<span class="tok-string">${escape(te
 
 /** Fields of a plot definition (`PlotDefinition`) and of a transform definition (`TransformDefinition`). */
 const DEFINITION_FIELDS = new Set([
-    'name', 'label', 'draw', 'drawPart', 'color', 'value', 'design', 'transforms', 'requiresTransform', 'reducers',
+    'name', 'label', 'draw', 'highlight', 'color', 'value', 'transforms', 'requiresTransform', 'reducers',
     'transformOptions', 'colorDomain', 'colorAttribute', 'markStyle', 'arrange', 'baseColor', 'topK', 'defaults', 'validate',
     'run', 'shape',
 ]);
 
-/** What a drawing or a transform returns to Autark: the series and design of `draw`, the rows and provenance of `run`. */
-const RESULT_FIELDS = new Set(['series', 'design', 'rows', 'provenance']);
+/** What a drawing or a transform returns to Autark: the series and highlight of `draw`, the rows and provenance of `run`. */
+const RESULT_FIELDS = new Set(['series', 'highlight', 'rows', 'provenance']);
 
 /** Key a line starts with (`name: …`, `draw(…) {`), or null. */
 const keyOf = (code: string): string | null => code.match(/^\s*([A-Za-z_$][\w$]*)\s*[:(]/)?.[1] ?? null;
@@ -44,7 +44,7 @@ const isDocLine = (line: string): boolean => /^\s*(\/\*|\*)/.test(line);
 
 /**
  * Names of the contract in code: mark annotations (`autkMark`, `autkContext`,
- * `data-autk-part`…) and the packages (`autk`, read as `autk.x` or
+ * `data-autk-highlight`…) and the packages (`autk`, read as `autk.x` or
  * `const { … } = autk`, and `core`). Style classes (`autk-pie-label`) are not.
  */
 const AUTARK_NAMES = /\bautk[A-Z]\w*|data-autk-|\bautk\b(?![-\w])|=\s*core\s*;/;
@@ -84,7 +84,7 @@ function contractLines(lines: string[]): Set<number> {
         const code = codeOf(line).replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, "''");
         const key = keyOf(code);
         if (key && frames.length > 0) frames[frames.length - 1].keys.push([index, key]);
-        // A one-line result: `return { design: {}, series: [] };`.
+        // A one-line result: `return { highlight: {}, series: [] };`.
         if (/\breturn\s*\{/.test(code) && [...RESULT_FIELDS].some(field => new RegExp(`[{,]\\s*${field}\\s*[:,}]`).test(code))) banded.add(index);
         for (const [position, char] of [...code].entries()) {
             if (char === '{') frames.push({ keys: [], returned: /\breturn\s*$/.test(code.slice(0, position)) });

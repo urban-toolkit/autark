@@ -3,7 +3,7 @@
  * plots, and the plots drawn by the two labs.
  *
  * Every plot forwards its selection, with feature shares when it aggregates
- * rows, to all the others and to the map, and each one paints only the part
+ * rows, to all the others and to the map, and each one highlights only the part
  * of its marks that the selection produces. Picking regions on the map selects
  * them in every plot. The page filter keeps only the regions that meet its
  * condition in every plot (exclusion, 1:0); the map keeps all regions, so
@@ -11,7 +11,7 @@
  * it was lost.
  */
 
-import * as next from '@urban-toolkit/autk-plot';
+import * as autkPlot from '@urban-toolkit/autk-plot';
 import type { PlotEventData } from '@urban-toolkit/autk-plot';
 
 import { loadRegions } from './data';
@@ -27,16 +27,16 @@ export type Lab = {
     box: HTMLElement;
     message: HTMLElement;
     config: LabPlotConfig | null;
-    plot?: next.AutkPlot;
+    plot?: autkPlot.AutkPlot;
 };
 
 // User-defined transforms are registered once, before any plot uses them.
-next.registerTransform(movingAverage);
+autkPlot.registerTransform(movingAverage);
 
 export class ProvenanceApp {
     private regions!: Collection;
     private map?: ProvenanceMap;
-    private plots: next.AutkPlot[] = [];
+    private plots: autkPlot.AutkPlot[] = [];
     private labs: Lab[] = [];
     private settings: PlotSettings = { reducer: 'count', filter: null };
     /** Last selection sent between views, so a lab plot drawn later starts in sync. */
@@ -54,10 +54,10 @@ export class ProvenanceApp {
         onProgress: (message: string, note?: string) => void;
         onError: (error: unknown) => void;
     }): Promise<void> {
-        args.onProgress('Loading regions and noise complaints...');
+        args.onProgress('Loading regions and noise complaints…');
         this.regions = await loadRegions();
         this.labs = args.labs.map(lab => ({ ...lab, config: null }));
-        args.onProgress('Initializing map...');
+        args.onProgress('Loading the map…');
         this.map = await ProvenanceMap.load(args.canvas, this.regions);
         this.map?.onSelection(selection => {
             try {
@@ -137,12 +137,12 @@ export class ProvenanceApp {
     }
 
     /** The 24 plots and the drawn lab plots. */
-    private views(): next.AutkPlot[] {
+    private views(): autkPlot.AutkPlot[] {
         return [...this.plots, ...this.labs.flatMap(lab => (lab.plot ? [lab.plot] : []))];
     }
 
     /** Sends a selection from one view (or the map, `null`) to all the others. */
-    private select(data: PlotEventData, from: next.AutkPlot | null): void {
+    private select(data: PlotEventData, from: autkPlot.AutkPlot | null): void {
         this.views().forEach(plot => {
             if (plot !== from) plot.setSelection(data.selection, data.shares);
         });
@@ -156,8 +156,8 @@ export class ProvenanceApp {
         lab.box.replaceChildren();
         lab.plot = undefined;
         if (!lab.config) return undefined;
-        const event = lab.config.events?.[0] ?? next.PlotEvent.CLICK;
-        let plot: next.AutkPlot;
+        const event = lab.config.events?.[0] ?? autkPlot.PlotEvent.CLICK;
+        let plot: autkPlot.AutkPlot;
         try {
             plot = createPlot(lab.box, withReducer(lab.config as LinkedPlot['config'], this.settings.reducer), event, this.regions, this.settings);
         } catch (error) {

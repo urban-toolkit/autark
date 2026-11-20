@@ -1,5 +1,5 @@
 /**
- * Try it Yourself (D3 chart): write a chart in plain D3, check its annotations
+ * Try It Yourself (D3 chart): write a chart in plain D3, check its annotations
  * against the drawing contract, and draw it linked to every other view.
  *
  * Like the transform tab, the code runs in this browser only: it is evaluated
@@ -7,8 +7,8 @@
  * as `{ type: 'registered' }` only when every invariant holds.
  */
 
-import * as next from '@urban-toolkit/autk-plot';
-import type { AutkDatum, PartialDesign, PlotDefinition, PlotTransformConfig, TopKConfig, TransformDefinition } from '@urban-toolkit/autk-plot';
+import * as autkPlot from '@urban-toolkit/autk-plot';
+import type { AutkDatum, HighlightDesign, PlotDefinition, PlotTransformConfig, TopKConfig, TransformDefinition } from '@urban-toolkit/autk-plot';
 
 import { attachHighlighter } from './code-editor';
 import { PLOT_HEIGHT } from './config';
@@ -34,14 +34,14 @@ const PLOT_INVARIANTS: Invariant[] = [
     [1, 'Rows bound', 'Every mark binds a rendered row (the rows themselves, not copies)'],
     [2, 'All rows shown', 'Every row shows as a mark or as context (autkContext)'],
     [3, 'In the group', 'Marks are inside the marks group (or the HTML container)'],
-    [4, 'Shapes', 'Marks are SVG shapes or HTML elements (these, click only)'],
-    [5, 'Annotations', 'The data-autk-part and data-autk-origin annotations are valid'],
-    [6, 'Parts painted', 'On a test selection, every selected part is painted'],
+    [4, 'Shapes', 'Marks are SVG shapes or HTML elements (HTML marks: click only)'],
+    [5, 'Annotations', 'The data-autk-highlight annotations are valid (none or boolean)'],
+    [6, 'Parts highlighted', 'On a test selection, every selected part is highlighted'],
 ];
 
 /** Why an invariant was not checked. */
 const SKIPPED: Record<number, string> = {
-    6: 'not checked: it needs 1 to 4',
+    6: 'not checked: it needs 1 to 4, and a part to test',
 };
 
 /** Value of the Transform list for one row per region (no transform). */
@@ -110,32 +110,41 @@ export function transformConfigOf(choice: string, options: string): PlotTransfor
         : { preset: choice, ...given }) as PlotTransformConfig;
 }
 
-/** Mark families and rules of the design space, in plain words. */
-const KINDS: Record<PartialDesign['kind'], string> = {
+/** Mark families of the highlight, in plain words. */
+const KINDS: Record<HighlightDesign['kind'], string> = {
     rect: 'rectangles', point: 'points', sector: 'sectors', stroke: 'strokes', shape: 'shapes', html: 'HTML elements',
 };
 /** Side a length grows from, per axis. */
 const SIDES = { y: { start: 'from the top', end: 'from the base', center: 'from the center' }, x: { start: 'from the left', end: 'from the right', center: 'from the center' } };
 
 /**
- * Describes, in one short line, the partial view inferred for a mark family:
- * the marks, the channel that shows the value, and the part painted in it.
+ * Describes, in one short line, the highlight resolved for a mark family:
+ * the marks, the mode, what it repeats or draws, and the part shown.
  */
-function describeDesign(design: PartialDesign): string {
+export function describeHighlight(design: HighlightDesign): string {
     const fit = design.fit === undefined ? '' : ` (R² ${design.fit.toFixed(3)})`;
+    const marks = `${design.marks} ${KINDS[design.kind]}`;
+    if (design.mode === 'boolean') return `${marks} · boolean → the whole mark`;
+    if (design.mode === 'custom') {
+        const part = {
+            members: `a point per selected region, on the interval ${design.scale?.fields.join('–')}`,
+            trace: design.kind === 'stroke' ? 'leading share of the stroke' : 'leading share of the outline',
+            glyph: design.kind === 'html' ? 'box filled up to the fraction' : 'inner copy with the area of the fraction',
+        }[design.preset];
+        // A preset that stands in for lack of evidence says so, and how to get a subset render.
+        const note = design.unproven ? ' (no channel proven: fewer than three distinct values; declare the channel for a subset render)' : '';
+        return `${marks} · custom (${design.preset})${fit} → ${part}${note}`;
+    }
     const [channel, part] = {
-        units: ['units', 'selected units painted whole'],
-        length: [`length in ${design.axis}`, `part grows ${SIDES[design.axis === 'x' ? 'x' : 'y'][design.anchor ?? 'end']}`],
-        angle: ['angle', design.mode === 'sweep' ? 'leading share of the arc' : 'inner sector'],
-        band: [`${design.mode === 'ribbon' ? 'ribbon' : 'flow'} thickness`, 'narrower band'],
-        members: [`interval ${design.scale?.fields.join('–')}`, 'a point per selected region'],
-        width: ['stroke width', 'thinner stroke'],
-        position: [design.axis === 'radial' ? 'radial position' : `position in ${design.axis}`, 'slides to the selected value'],
-        area: ['area', 'copy with the area of the fraction'],
-        trace: ['no size channel', 'leading share of the stroke'],
-        glyph: ['no size channel', design.kind === 'html' ? 'box filled up to the fraction' : 'copy with the area of the fraction'],
-    }[design.rule];
-    return `${design.marks} ${KINDS[design.kind]} · ${channel}${fit} → ${part}`;
+        units: ['units', 'the selected units, whole'],
+        length: [`length in ${design.axis}`, `the subset's length, ${SIDES[design.axis === 'x' ? 'x' : 'y'][design.anchor ?? 'end']}`],
+        angle: ['angle', "the subset's sweep, from the same start"],
+        band: [`${design.shape === 'ribbon' ? 'ribbon' : 'flow'} thickness`, "the subset's band"],
+        width: ['stroke width', "the subset's stroke width"],
+        position: [design.axis === 'radial' ? 'radial position' : `position in ${design.axis}`, "at the subset's value"],
+        area: ['area', "the subset's area, inside the mark"],
+    }[design.channel];
+    return `${marks} · subset render: ${channel}${fit} → ${part}`;
 }
 
 /**
@@ -154,11 +163,11 @@ export function plotDefinitionOf(code: string): PlotDefinition {
 }
 
 /** Event of each option of the Select by list. */
-const LAB_EVENTS: Record<string, next.PlotEvent> = {
-    click: next.PlotEvent.CLICK,
-    brush: next.PlotEvent.BRUSH,
-    'brush-x': next.PlotEvent.BRUSH_X,
-    'brush-y': next.PlotEvent.BRUSH_Y,
+const LAB_EVENTS: Record<string, autkPlot.PlotEvent> = {
+    click: autkPlot.PlotEvent.CLICK,
+    brush: autkPlot.PlotEvent.BRUSH,
+    'brush-x': autkPlot.PlotEvent.BRUSH_X,
+    'brush-y': autkPlot.PlotEvent.BRUSH_Y,
 };
 
 /**
@@ -172,7 +181,7 @@ function rowsOf(collection: Collection, config: LabPlotConfig): unknown[] {
     const source = collection.features.map((feature, index) => ({ ...(feature.properties ?? {}), autkIds: [index] })) as AutkDatum[];
     const fields = (config.attributes?.axis ?? []).filter(field => field !== '@transform');
     try {
-        return next.run(source, config.transform!, fields).rows;
+        return autkPlot.run(source, config.transform!, fields).rows;
     } catch {
         return [undefined];
     }
@@ -189,7 +198,7 @@ export function plotLabConfig(columns: string, transform: PlotTransformConfig | 
         plot: LAB_PLOT,
         attributes: { axis: columns.split(',').map(col => col.trim()).filter(Boolean) },
         ...(transform ? { transform } : {}),
-        events: [LAB_EVENTS[event] ?? next.PlotEvent.CLICK],
+        events: [LAB_EVENTS[event] ?? autkPlot.PlotEvent.CLICK],
         labels: { title, ...(axisLabels ? { axis: axisLabels } : {}) },
         margins,
         ...(topK ? { topK } : {}),
@@ -214,24 +223,28 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
     if (fieldsLabel) fieldsLabel.title += `. Region properties: ${regionProperties(collection).join(', ')}`;
     // With no transform there are no options to give.
     const rowsHint = document.querySelector<HTMLElement>('#plab-rows');
+    // Fields of the rows of the chosen transform, to explain a drawing that reads one they lack.
+    let rowsFields: string[] = [];
     const enableOptions = () => {
         options.disabled = transform.value === NO_TRANSFORM;
         // The fields of the rows the drawing receives, from the shape the transform declares.
         if (!rowsHint) return;
         const config = transformConfigOf(transform.value, '');
         const name = config ? (config.preset === 'registered' ? (config as { name: string }).name : config.preset) : '';
-        const fields = name ? next.shapeFields(next.registeredTransform(name).shape) : [];
-        rowsHint.textContent = fields.length > 0
-            ? `rows: ${fields.slice(0, 6).join(', ')}${fields.length > 6 ? ', …' : ''}`
-            : 'rows: one per region, with its properties';
+        const fields = name ? autkPlot.shapeFields(autkPlot.registeredTransform(name).shape) : [];
+        rowsFields = fields;
+        const names = (list: string[]) => list.map(field => `<code>${field}</code>`).join(', ');
+        rowsHint.innerHTML = fields.length > 0
+            ? `<code>draw</code> receives rows with ${names(fields)} and <code>autkIds</code>.`
+            : `<code>draw</code> receives one row per region: its properties and <code>autkIds</code>.`;
     };
     const event = document.querySelector<HTMLSelectElement>('#plab-event')!;
     const checks = document.querySelector<HTMLElement>('#plab-checks')!;
     const message = document.querySelector<HTMLElement>('#plab-message')!;
     const design = document.querySelector<HTMLElement>('#plab-design')!;
     const plotBox = document.querySelector<HTMLElement>('#plab-plot-box')!;
-    const showDesign = (designs: PartialDesign[]) => {
-        design.replaceChildren(...designs.map(d => Object.assign(document.createElement('li'), { textContent: describeDesign(d) })));
+    const showDesign = (designs: HighlightDesign[]) => {
+        design.replaceChildren(...designs.map(d => Object.assign(document.createElement('li'), { textContent: describeHighlight(d) })));
         design.parentElement!.hidden = designs.length === 0;
     };
 
@@ -240,7 +253,7 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
         message.className = `lab-message ${kind}`;
     };
     const fail = (text: string) => {
-        next.unregisterPlot(LAB_PLOT);
+        autkPlot.unregisterPlot(LAB_PLOT);
         draw(null);
         renderChecks(checks, null);
         showDesign([]);
@@ -265,7 +278,7 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
         showDesign([]);
         // The examples show the least a plain D3 chart needs; the built-in charts also use the optional fields and helpers.
         say(chosen.group === 'example'
-            ? 'A plain D3 chart with the least Autark needs: the highlighted lines. Edit it and click "Check and draw".'
+            ? 'A plain D3 chart with the least Autark needs: the lines marked // Autark. Edit it and click "Check and draw".'
             : 'The code autk-plot registers for this chart: the same contract, plus optional fields and helpers. Edit it and click "Check and draw".', 'ok');
     };
 
@@ -279,7 +292,7 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
             const axisLabels = columns.value === chosen.columns ? chosen.axisLabels : undefined;
             config = plotLabConfig(columns.value, transformConfigOf(transform.value, options.value), event.value, title, chosen.margins, chosen.topK, axisLabels);
         } catch (error) {
-            return fail(`The options are not valid: ${(error as Error).message}`);
+            return fail(`The options are not valid JSON (${(error as Error).message}): keys and text go in double quotes, as in {"bins": 10}.`);
         }
         let definition: PlotDefinition;
         try {
@@ -298,7 +311,9 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
                 ? ` ${unknown.map(field => `"${field}"`).join(', ')} ${unknown.length === 1 ? 'is not a region property' : 'are not region properties'}. Region properties: ${properties.join(', ')}.`
                 : given.reducer && given.reducer !== 'count' && !given.value
                     ? ` A reducer other than count needs the property to reduce, such as {"reducer": "${String(given.reducer)}", "value": "shape_leng"}.`
-                    : '';
+                    : config.transform && ['binning-events', 'reduce-series'].includes(config.transform.preset)
+                        ? ' This transform reads a list of events (or a series) per region: name it first in Fields, such as sjoin.collect.noise.'
+                        : '';
             return fail(`With these fields and options the transform gives no rows: nothing to draw.${hint}`);
         }
 
@@ -309,7 +324,7 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
         document.body.append(probe);
         const { type, ...checked } = config;
         void type;
-        const report = next.checkPlot(definition, probe, { ...checked, collection, width, height: PLOT_HEIGHT });
+        const report = autkPlot.checkPlot(definition, probe, { ...checked, collection, width, height: PLOT_HEIGHT });
         // Marks that all sit at the same place usually read a field that does not exist (the
         // scale gives no position): the contract holds, but the chart shows nothing.
         const boxes = Array.from(probe.querySelectorAll('.autkMark')).map(mark => {
@@ -318,32 +333,43 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
         });
         // Without a layout (no size anywhere) there is nothing to compare.
         const samePlace = boxes.length > 1 && new Set(boxes).size === 1 && boxes[0] !== '0,0,0,0' && !boxes[0].endsWith(',0,0');
+        // With a layout, marks that all have no width or no height draw nothing (a scale given undefined).
+        const sized = probe.getBoundingClientRect().width > 0;
+        const noSize = sized && boxes.length > 0 && boxes.every(box => { const [, , w, h] = box.split(',').map(Number); return w === 0 || h === 0; });
         probe.remove();
 
         renderChecks(checks, report, PLOT_INVARIANTS, SKIPPED);
-        // The partial view of a refused drawing is not shown: it would not be drawn.
+        // The highlight of a refused drawing is not shown: it would not be drawn.
         showDesign(report.violations.length === 0 ? report.designs : []);
         const failure = report.violations.find(v => v.invariant === 0);
-        if (failure) return fail(`The drawing failed: ${plainMessage(failure.message, collection)}`);
+        if (failure) {
+            // Reading a field the rows lack is the usual cause after a change of transform: say what they have.
+            const hint = rowsFields.length > 0 && /undefined|null/.test(failure.message)
+                ? ` The rows of this transform have ${rowsFields.join(', ')}: does the code read another field?`
+                : '';
+            return fail(`The drawing failed: ${plainMessage(failure.message, collection).replace(/\.?$/, '.')}${hint}`);
+        }
         if (report.violations.length > 0) {
             draw(null);
             return say('Not drawn: with these violations, selection and the provenance view would not know what each mark stands for.', 'error');
         }
 
-        next.unregisterPlot(LAB_PLOT);
+        autkPlot.unregisterPlot(LAB_PLOT);
         try {
-            next.registerPlot(definition);
+            autkPlot.registerPlot(definition);
         } catch (error) {
             return fail(`The registry refused the definition: ${(error as Error).message}`);
         }
         const error = draw(config);
         if (error) return say(`The chart refused the configuration: ${plainMessage(error, collection)}`, 'error');
         const notes = [
-            samePlace ? ' Every mark is drawn at the same place: a field may not exist (read fields with value(row, i), which follows nested properties such as sjoin.count.noise).' : '',
+            noSize ? ' But no mark has a size, so the chart shows nothing: a field the code reads may not exist in the rows.' : '',
+            samePlace && !noSize ? ' Every mark is drawn at the same place: a field may not exist (read fields with value(row, i), which follows nested properties such as sjoin.count.noise).' : '',
             // The person's own code is told about its name; a template is what autk-plot registers.
             code.value === PLOT_LAB_TEMPLATES[loaded].code ? '' : projectNameNote((evaluateChart(code.value) as { name?: unknown }).name, 'chart'),
         ].join('');
-        say(`Contract met: linked to the map and the 24 charts (close the drawer to see them).${notes}`, 'ok');
+        // A chart that shows nothing is not shown as a success, even with the contract met.
+        say(`Contract met: linked to the map and the 24 charts (close the drawer to see them).${notes}`, noSize ? 'error' : 'ok');
     };
 
     // D3 examples, then the code of the built-in charts: a developer's chart is written like them.

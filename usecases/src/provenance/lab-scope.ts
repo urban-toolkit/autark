@@ -1,5 +1,5 @@
 /**
- * What code in Try it Yourself (charts and transforms) can read: `d3`, `autk`
+ * What code in Try It Yourself (charts and transforms) can read: `d3`, `autk`
  * (this package, `@urban-toolkit/autk-plot`) and `core`
  * (`@urban-toolkit/autk-core`). The built-in charts and transforms read their
  * imports from these, so their code runs here as is.

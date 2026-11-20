@@ -1,4 +1,4 @@
-// Generates the built-in templates of Try it Yourself from the package
+// Generates the built-in templates of Try It Yourself from the package
 // sources, so the page offers the very code autk-plot registers: the 24 charts
 // (D3 chart tab) and the 12 transforms (Transform tab).
 //
@@ -172,7 +172,7 @@ export function templatesModule(srcDir) {
         .map(t => `    { exported: ${JSON.stringify(t.exported)}, module: ${JSON.stringify(t.module)}, code: ${JSON.stringify(t.code)} },`)
         .join('\n');
     return `/**
- * Built-in templates of Try it Yourself, generated from the package sources by
+ * Built-in templates of Try It Yourself, generated from the package sources by
  * usecases/scripts/lab-templates.mjs. Do not edit: run
  * \`node usecases/scripts/lab-templates.mjs\` after changing a plot in
  * autk-plot/src/plots or a transform in autk-plot/src/transforms/presets.

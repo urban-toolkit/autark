@@ -29,7 +29,25 @@ export async function loadRegions(): Promise<Collection> {
         fetch(DATA.regions).then(res => res.json() as Promise<Collection>),
         fetch(DATA.noise).then(res => res.text()),
     ]);
-    return withNoiseEvents(regions, noise);
+    return withNtaTypeNames(withNoiseEvents(regions, noise));
+}
+
+/** Names of the NTA types found in Manhattan, by code (NYC 2020 NTA data dictionary). */
+const NTA_TYPES: Record<string, string> = { 0: 'Residential', 6: 'Special area', 9: 'Park' };
+
+/**
+ * Names the NTA type of each region as `ntatype_name` (the file only has the code, `ntatype`),
+ * so the charts that group by it show "Park" instead of "9".
+ *
+ * @param collection Regions with `ntatype`.
+ * @returns The same collection, each region with `ntatype_name`.
+ */
+export function withNtaTypeNames(collection: Collection): Collection {
+    for (const feature of collection.features) {
+        const code = String(feature.properties?.ntatype ?? '');
+        feature.properties = { ...(feature.properties ?? {}), ntatype_name: NTA_TYPES[code] ?? `Type ${code}` };
+    }
+    return collection;
 }
 
 /** WGS84 semi-major axis and eccentricity, for EPSG:3395 (World Mercator). */
