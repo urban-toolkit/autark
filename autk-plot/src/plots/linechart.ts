@@ -227,6 +227,12 @@ export class Linechart extends PlotBaseInteractive {
                 if (this._xTickLabel && item?.bucket !== undefined) { return this._xTickLabel(item.bucket); }
                 return item?.label ?? this.tickFormat(0)(d);
             });
+        // With custom tick text, ticks go where the text is non-empty, so the labeled positions are the page's choice.
+        if (this._xTickLabel) {
+            const label = this._xTickLabel;
+            const at = seriesData.filter((row) => label(row.bucket) !== '').map((row) => row.x);
+            xAxis.tickValues([...new Set(at)]);
+        }
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.x.axis')
