@@ -79,6 +79,43 @@ export type PlotConfig = {
     colorMapInterpolator?: ColorMapInterpolator;
     /** Color interpolator used when the color attribute contains categorical (string) values. Defaults to `OBSERVABLE10`. */
     categoricalColorMapInterpolator?: ColorMapInterpolator;
+    /**
+     * Called after every render (and on `refreshOverlay()`) so the page can draw its own marks in the plot's coordinates, such as
+     * a shaded time window. See `PlotOverlay`.
+     */
+    overlay?: (overlay: PlotOverlay) => void;
+    /**
+     * Bar chart with a color attribute that splits a category into groups (more rows than categories): how the groups' bars
+     * share a category. `overlay` (the default) draws them on top of each other, translucent, to compare distributions;
+     * `side-by-side` gives each group a slice of the band.
+     */
+    groupMode?: 'overlay' | 'side-by-side';
+    /** Bar chart: the gap between bars as a fraction of a band, 0 to 1. Defaults to 0.25. */
+    barPadding?: number;
+    /**
+     * Text of an x axis tick, from the category or bucket key (bar chart, line chart). Return an empty string to leave a tick
+     * unlabeled. Use it for labels in data units, such as the start of a histogram bin.
+     */
+    xTickLabel?: (key: string) => string;
+};
+
+/**
+ * What an overlay callback gets: an empty SVG group behind the marks (it ignores the pointer), the size of the plot area, and the
+ * scales of the latest render. Draw into `layer`; it is cleared before each call.
+ */
+export type PlotOverlay = {
+    layer: SVGGElement;
+    /** Size of the plot area in pixels (the layer's origin is its top left corner). */
+    width: number;
+    height: number;
+    /**
+     * Pixel position of an x position and of a y value. The line chart's x position is a rank of its buckets; the bar chart's is
+     * the index of a category, at the left edge of its band.
+     */
+    x: (value: number) => number;
+    y: (value: number) => number;
+    /** For plots whose x positions are ranks of buckets (the line chart): the rank of the first bucket not before `key`, or one past the last. */
+    rankOf?: (key: string) => number;
 };
 
 /**
@@ -177,6 +214,11 @@ export type ReduceSeriesTransformConfig = {
         value?: string;
         /** Reducer applied across features sharing the same timestamp. Defaults to `'avg'`. */
         reducer?: TransformReducer;
+        /**
+         * Feature property that names a group. Features with the same value form one series, reduced on their own, so a
+         * line chart draws one line per group instead of one line for all features. Rows then carry a `group`.
+         */
+        by?: string;
     };
 };
 

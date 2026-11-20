@@ -30,6 +30,7 @@ import * as d3 from 'd3';
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { PlotConfig } from '../api';
+import type { BrushExtent } from '../types-events';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 
@@ -63,6 +64,16 @@ export class Scatterplot extends PlotBaseInteractive {
         }
 
         this.draw();
+    }
+
+    /** The brushed box in data units (the scales run from data to pixels, so they are inverted). */
+    protected override brushExtent([x0, y0, x1, y1]: [number, number, number, number], axes: 'x' | 'y' | 'xy'): BrushExtent | undefined {
+        if (!this.mapX || !this.mapY) { return undefined; }
+        const sorted = (a: number, b: number): [number, number] => (a <= b ? [a, b] : [b, a]);
+        return {
+            ...(axes !== 'y' ? { x: sorted(this.mapX.invert(x0), this.mapX.invert(x1)) } : {}),
+            ...(axes !== 'x' ? { y: sorted(this.mapY.invert(y0), this.mapY.invert(y1)) } : {}),
+        };
     }
 
     /**

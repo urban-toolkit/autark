@@ -37,13 +37,15 @@
 import * as d3 from 'd3';
 
 import type { PlotConfig } from '../api';
+import type { BrushExtent } from '../types-events';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 
 import type { ExecutedPlotTransform } from '../transforms';
 
 /**
- * Line plot that aggregates feature-level series data into a single line.
+ * Line plot that aggregates feature-level series data into a single line, or into
+ * one line per group when the reduce-series transform groups features (`options.by`).
  *
  * Rendering rows are generated through shared transform presets and each point
  * preserves provenance via `autkIds`.
@@ -75,6 +77,50 @@ export class Linechart extends PlotBaseInteractive {
         this.draw();
     }
 
+    /** Scales of the latest render, from rank (x) and value (y) to pixels. */
+    protected mapX?: d3.ScaleLinear<number, number>;
+    protected mapY?: d3.ScaleLinear<number, number>;
+
+    /**
+     * The brushed box in data units. Points sit at their rank among the buckets, so x is a (fractional) rank, and `xBucket` gives
+     * the raw bucket key at each end, the nearest bucket inside the plot.
+     */
+    protected override brushExtent([x0, y0, x1, y1]: [number, number, number, number], axes: 'x' | 'y' | 'xy'): BrushExtent | undefined {
+        if (!this.mapX || !this.mapY) { return undefined; }
+        const rows = this._data as Array<{ x: number; bucket?: string }>;
+        const last = Math.max(0, (d3.max(rows, row => row.x) ?? 0));
+        const keyAt = (rank: number): string | undefined => rows.find(row => row.x === Math.min(last, Math.max(0, Math.round(rank))))?.bucket;
+        const [a, b] = [this.mapX.invert(x0), this.mapX.invert(x1)].sort((p, q) => p - q);
+        const keys = [keyAt(a), keyAt(b)];
+        return {
+            ...(axes !== 'y' ? { x: [a, b] as [number, number] } : {}),
+            ...(axes !== 'y' && keys[0] !== undefined && keys[1] !== undefined ? { xBucket: keys as [string, string] } : {}),
+            ...(axes !== 'x' ? { y: [this.mapY.invert(y1), this.mapY.invert(y0)] as [number, number] } : {}),
+        };
+    }
+
+    /** Runs the overlay callback again, for when the page's own state changed but the data did not. */
+    public override refreshOverlay(): void {
+        this.drawOverlay();
+    }
+
+    private drawOverlay(): void {
+        const layer = d3.select(this._div).select<SVGGElement>('.autkOverlay').node();
+        if (!this._overlay || !layer || !this.mapX || !this.mapY) { return; }
+        layer.replaceChildren();
+        const rows = this._data as Array<{ x: number; bucket?: string }>;
+        const sorted = rows.filter(row => row.bucket !== undefined).sort((p, q) => p.x - q.x);
+        const mapX = this.mapX, mapY = this.mapY;
+        this._overlay({
+            layer,
+            width: this._width - this._margins.left - this._margins.right,
+            height: this._height - this._margins.top - this._margins.bottom,
+            x: v => mapX(v),
+            y: v => mapY(v),
+            rankOf: key => sorted.find(row => (row.bucket as string) >= key)?.x ?? (d3.max(rows, row => row.x) ?? 0) + 1,
+        });
+    }
+
     /**
      * Normalizes temporal transform output into the rendered line-series schema.
      *
@@ -87,18 +133,30 @@ export class Linechart extends PlotBaseInteractive {
             return resolved;
         }
 
+        // Every group (series) shares one x axis: a bucket's x is its place among all the buckets, in order.
+        const buckets = [...new Set(result.rows.map(item => item.bucket))].sort((a, b) => this.compareBuckets(a, b));
+        const place = new Map(buckets.map((bucket, idx) => [bucket, idx]));
+        // Timestamp buckets get short labels: the date for a span of days, the date and hour for a shorter one.
+        const times = buckets.map(bucket => this.bucketTime(bucket));
+        const isTime = buckets.length > 0 && /^\d{4}-\d{2}-\d{2}/.test(buckets[0]) && times.every(date => Number.isFinite(date.getTime()));
+        const spanDays = isTime ? (times[times.length - 1].getTime() - times[0].getTime()) / 86400000 : 0;
+        const timeLabel = isTime ? d3.utcFormat(spanDays > 4 ? '%b %-d' : '%b %-d %Hh') : null;
+        const grouped = result.preset === 'reduce-series' && result.rows.some(item => item.group !== undefined);
         const rows = [...result.rows]
-            .sort((a, b) => this.compareBuckets(a.bucket, b.bucket))
-            .map((item, idx) => ({
-                x: idx,
-                label: this.formatBucketLabel(item.bucket),
+            .sort((a, b) => place.get(a.bucket)! - place.get(b.bucket)!)
+            .map(item => ({
+                x: place.get(item.bucket)!,
+                bucket: item.bucket,
+                label: timeLabel ? timeLabel(this.bucketTime(item.bucket)) : this.formatBucketLabel(item.bucket),
                 y: item.value,
                 autkIds: item.autkIds,
+                ...('group' in item && item.group !== undefined ? { group: item.group } : {}),
             }));
 
         return {
             rows,
             axisAttributes: ['label', 'y'],
+            ...(grouped ? { colorAttribute: 'group' } : {}),
         };
     }
 
@@ -110,7 +168,9 @@ export class Linechart extends PlotBaseInteractive {
      * @throws If the root SVG element cannot be created.
      */
     public render(): void {
-        const seriesData = this._data as Array<{ x: number; label: string; y: number; autkIds: number[] }>;
+        const seriesData = this._data as Array<{ x: number; bucket: string; label: string; y: number; autkIds: number[]; group?: string }>;
+        // One line per group; without groups, one line for everything.
+        const lines = d3.group(seriesData, (item) => item.group ?? '');
         const innerW = this._width - this._margins.left - this._margins.right;
         const innerH = this._height - this._margins.top - this._margins.bottom;
 
@@ -147,7 +207,7 @@ export class Linechart extends PlotBaseInteractive {
         }
 
         // ---- Scales
-        const n = Math.max(seriesData.length, 1);
+        const n = Math.max(d3.max(seriesData, (item) => item.x + 1) ?? 1, 1);
         const allY = seriesData.map((item) => item.y);
         const yMin = allY.length > 0 ? Math.min(...allY) : 0;
         const yMax = allY.length > 0 ? Math.max(...allY) : 50;
@@ -155,12 +215,24 @@ export class Linechart extends PlotBaseInteractive {
 
         const xScale = d3.scaleLinear().domain([0, n - 1]).range([0, innerW]);
         const yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerH, 0]);
+        this.mapX = xScale;
+        this.mapY = yScale;
 
         // ---- Axes
         // Ticks only where a bucket is: with two or three buckets, d3 would also place ticks halfway between them.
         const xAxis = d3.axisBottom(xScale)
             .tickValues(xScale.ticks(Math.min(n, 12)).filter(Number.isInteger))
-            .tickFormat((d) => seriesData[+d]?.label ?? this.tickFormat(0)(d));
+            .tickFormat((d) => {
+                const item = seriesData.find((row) => row.x === +d);
+                if (this._xTickLabel && item?.bucket !== undefined) { return this._xTickLabel(item.bucket); }
+                return item?.label ?? this.tickFormat(0)(d);
+            });
+        // With custom tick text, ticks go where the text is non-empty, so the labeled positions are the page's choice.
+        if (this._xTickLabel) {
+            const label = this._xTickLabel;
+            const at = seriesData.filter((row) => label(row.bucket) !== '').map((row) => row.x);
+            xAxis.tickValues([...new Set(at)]);
+        }
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.x.axis')
@@ -213,6 +285,16 @@ export class Linechart extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
+        // ---- Overlay (page-drawn marks behind the lines)
+        svg
+            .selectAll('.autkOverlay')
+            .data([0])
+            .join('g')
+            .attr('class', 'autkOverlay')
+            .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
+            .style('pointer-events', 'none');
+        this.drawOverlay();
+
         // ---- Marks group
         const cGroup = svg
             .selectAll('.autkBrush')
@@ -237,15 +319,17 @@ export class Linechart extends PlotBaseInteractive {
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y));
 
+        // A group's line takes the group's color (as `attributes.color` and `categoryColors` give it to the group's marks).
+        const lineColor = (group: string) => (group === '' ? '#4472c4' : this.getMarkColor({ group }));
         cGroup
-            .selectAll<SVGPathElement, Array<{ x: number; y: number }>>('.autk-line')
-            .data([seriesData])
+            .selectAll<SVGPathElement, [string, Array<{ x: number; y: number }>]>('.autk-line')
+            .data([...lines])
             .join('path')
             .attr('class', 'autk-line')
             .attr('fill', 'none')
-            .attr('stroke', '#4472c4')
+            .attr('stroke', ([group]) => lineColor(group))
             .attr('stroke-width', 1.5)
-            .attr('d', lineGen);
+            .attr('d', ([, points]) => lineGen(points));
 
         // ---- Dots (marks)
         cGroup
@@ -290,6 +374,20 @@ export class Linechart extends PlotBaseInteractive {
             return this.tickFormat(0)(numericBucket);
         }
         return bucket;
+    }
+
+    /**
+     * Reads a timestamp bucket key as the date and time written in it, whatever the page's time zone: a key with no
+     * zone is taken as UTC (binning-events writes its keys in UTC, "2024-03-05 14:00"), so its label, written in UTC,
+     * shows the day and hour of the key.
+     *
+     * @param bucket Raw bucket key from the transform result.
+     * @returns The key's instant; an invalid date when the key is not a timestamp.
+     */
+    private bucketTime(bucket: string): Date {
+        const iso = bucket.replace(' ', 'T');
+        const zoned = /(Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+        return new Date(iso.includes('T') && !zoned ? `${iso}Z` : iso);
     }
 
     /**
