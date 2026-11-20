@@ -151,17 +151,28 @@ export abstract class PlotBaseData {
     }
 
     /**
-     * Returns the tick format of an axis: the d3 format the configuration's `tickFormats` give it, or, when the
-     * configuration gives none, SI prefixes from one up ("1k") and decimals under one ("0.5", not "500m").
+     * Returns the tick format of an axis: the d3 format the configuration's `tickFormats` give it, or, when they give
+     * it none, SI prefixes from one up ("1k") and decimals under one ("0.5", not "500m").
      *
      * @param axis Index of the axis in `tickFormats`.
      * @param emptyFormat D3 format used in place of an empty one the configuration gives.
      * @returns Function that writes a tick value.
      */
     protected tickFormat(axis: number, emptyFormat?: string): (value: d3.NumberValue) => string {
-        if (!this._tickFormats) return defaultTickFormat;
-        const specifier = this._tickFormats[axis];
+        if (!this.hasTickFormat(axis)) return defaultTickFormat;
+        const specifier = this._tickFormats![axis];
         return d3.format(emptyFormat === undefined ? specifier : specifier || emptyFormat);
+    }
+
+    /**
+     * Whether the configuration's `tickFormats` give an axis a format of its own. An axis they give none, with no
+     * `tickFormats` or with a missing or undefined entry for it (`['.2f']` for two axes), keeps its default.
+     *
+     * @param axis Index of the axis in `tickFormats`.
+     * @returns `true` when the axis has a format of its own.
+     */
+    protected hasTickFormat(axis: number): boolean {
+        return this._tickFormats?.[axis] !== undefined && this._tickFormats[axis] !== null;
     }
 
     /**

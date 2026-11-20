@@ -130,10 +130,12 @@ export class Barchart extends PlotBaseInteractive {
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
+        // A category reads as it is written (2020, not 2.02k), unless the configuration's tickFormats give the x axis
+        // a format, which then writes a category that reads as a number.
         const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
             const value = String(d);
             const numericValue = Number(value);
-            return Number.isFinite(numericValue) && value.trim() !== ''
+            return this.hasTickFormat(0) && Number.isFinite(numericValue) && value.trim() !== ''
                 ? this.tickFormat(0, '~s')(numericValue)
                 : value;
         });

@@ -278,15 +278,15 @@ export class Linechart extends PlotBaseInteractive {
     /**
      * Formats a bucket label for axis rendering.
      *
-     * Numeric buckets are formatted using the configured x-axis tick format;
-     * all other labels are returned unchanged.
+     * A bucket reads as it is written (2020, not 2.02k), unless the configuration's
+     * tickFormats give the x axis a format, which then writes a numeric bucket.
      *
      * @param bucket Raw bucket label from the transform result.
      * @returns Display label used on the x axis.
      */
     private formatBucketLabel(bucket: string): string {
         const numericBucket = Number(bucket);
-        if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+        if (this.hasTickFormat(0) && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
             return this.tickFormat(0)(numericBucket);
         }
         return bucket;
