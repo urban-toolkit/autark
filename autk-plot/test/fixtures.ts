@@ -1,14 +1,17 @@
 /// <reference types="vite/client" />
 
-import landuse from '../../gallery/public/data/mnt_neighs_proj_landuse.geojson?raw';
 import regions from '../../gallery/public/data/mnt_neighs_proj.geojson?raw';
+import landuse from '../../usecases/public/data/mnt_neighs_proj_landuse.geojson?raw';
 
 import type { Collection } from './synthetic';
 
 export type { Collection } from './synthetic';
 export { withSyntheticEvents, withSyntheticSeries } from './synthetic';
 
-/** Gallery datasets the tests read; they are never modified. */
+/**
+ * Datasets the tests read; they are never modified. The neighborhoods come from
+ * the gallery; the same neighborhoods with their land use, from the use cases.
+ */
 const DATASETS: Record<string, string> = {
     'mnt_neighs_proj.geojson': regions,
     'mnt_neighs_proj_landuse.geojson': landuse,
