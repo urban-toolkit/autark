@@ -694,6 +694,8 @@ export class AutkMap {
             }
         }
 
+        this.warnIfPaletteShort(id, resolvedDomain, colorMap);
+
         const thematicData: LayerThematic[] = [];
         if (thematicByFeatureId) {
             for (const component of components) {
@@ -734,6 +736,27 @@ export class AutkMap {
         this._ui.refreshLegend(layer);
 
         layer.makeLayerDataDirty();
+    }
+
+    /**
+     * Warns when a categorical scale has more categories than it has colors (a named scheme's, or a custom palette's).
+     *
+     * The categories past the last color are all drawn in that last color, so two different categories look alike
+     * and nothing else says why.
+     *
+     * @param id Layer identifier, for the message.
+     * @param domain Resolved domain of the layer's color map.
+     * @param config Color-map configuration of the layer.
+     */
+    private warnIfPaletteShort(id: string, domain: ResolvedDomain, config: ColorMapConfig): void {
+        if (typeof domain[0] !== 'string') { return; }
+        const size = ColorMap.getCategoricalSchemeSize(config.interpolator ?? config);
+        if (size === null || domain.length <= size) { return; }
+        const source = config.interpolator ? `the ${config.interpolator} scheme` : 'the custom palette';
+        console.warn(
+            `Layer '${id}': ${domain.length} categories but ${source} has ${size} colors, so the ` +
+            `categories past the ${size}th are all drawn in the last color. Use more colors or fewer categories.`
+        );
     }
 
     /**
