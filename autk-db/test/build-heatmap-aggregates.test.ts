@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Feature } from 'geojson';
 import { loadDb } from '../src/duckdb-node';
 import { getRasterPayload } from '../src/raster-store';
+import type { BuildHeatmapParams } from '../src/use-cases/build-heatmap';
 
 const native = vi.hoisted(() => ({ db: undefined as AsyncDuckDB | undefined }));
 vi.mock('../src/duckdb', () => ({ loadDb: async () => native.db }));
@@ -75,6 +76,23 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     // 1 / (distance + 1) for each reading near the center.
     const weighted = [1, 1 + 1 / 1.1, 0, 1 + 2 / 1.1, 1, 1 + 1 / 1.1];
     bands.weighted_readings.forEach((cell, index) => expect(cell).toBeCloseTo(weighted[index], 5));
+  });
+
+  it.each<[string, Pick<BuildHeatmapParams, 'groupBy'>]>([
+    ['without groupBy', {}],
+    ['with an empty groupBy', { groupBy: [] }],
+  ])('counts the rows near each center in the one band of a heatmap %s', async (_label, fields) => {
+    await loadReadings(readings);
+    const table = await db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'counted', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      ...fields,
+    });
+
+    // The band a `{ column: '*', aggregateFn: 'count' }` entry builds: its id, its label and the counts the first test reads.
+    const count = [{ id: 'band_1', label: 'count_readings' }];
+    expect(table.bands).toEqual(count);
+    expect(getRasterPayload(db.getCurrentWorkspace(), 'counted')!.bands).toEqual(count);
+    expect(bandsOf('counted')).toEqual({ count_readings: [1, 2, 0, 3, 1, 2] });
   });
 
   it('builds a normalized band from the values the join rescales from 0 to 1 across the cells', async () => {
