@@ -47,6 +47,12 @@ export type ResolvedPlotTransform = {
  * Normalizes input rows, validates configured bindings, runs transforms, and
  * resolves the active rendered schema used by subclasses during drawing.
  */
+/**
+ * Fewest pixels between two ticks when the configuration gives no `tickCounts`, for x and y: an x label needs its width,
+ * a y label only its line height.
+ */
+const TICK_SPACING = [45, 30] as const;
+
 export abstract class PlotBaseData {
     /** Host element where the plot is rendered. */
     protected _div!: HTMLElement;
@@ -72,6 +78,8 @@ export abstract class PlotBaseData {
     protected _title!: string;
     /** D3 tick-format specifiers the configuration gives the axis renderers, or `undefined` when it gives none. */
     protected _tickFormats: string[] | undefined;
+    /** Approximate tick count per axis ([x, y]); see `tickCount`. */
+    protected _tickCounts!: number[];
 
     /** Outer plot width in pixels. */
     protected _width: number = 800;
@@ -137,6 +145,7 @@ export abstract class PlotBaseData {
 
         this._title = config.labels?.title || 'Autk Plot';
         this._tickFormats = config.tickFormats;
+        this._tickCounts = config.tickCounts ?? [];
 
         this._width = config.width || 800;
         this._height = config.height || 500;
@@ -382,5 +391,20 @@ export abstract class PlotBaseData {
                 domainSpec: this._domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
             },
         );
+    }
+
+    /**
+     * Number of ticks for an axis: the configured count, or one per `TICK_SPACING` pixels of axis length (at least 2),
+     * capped at `fallback`, the count the axis used before. A plot of the default size keeps its ticks; a small one gets
+     * fewer, where a fixed count would crowd it.
+     *
+     * @param axis - 0 for x, 1 for y.
+     * @param length - Axis length in pixels.
+     * @param fallback - Count used when the axis is long enough; D3's default is 10.
+     */
+    protected tickCount(axis: 0 | 1, length: number, fallback: number = 10): number {
+        const configured = this._tickCounts[axis];
+        if (configured !== undefined && Number.isFinite(configured) && configured > 0) return configured;
+        return Math.min(fallback, Math.max(2, Math.round(length / TICK_SPACING[axis])));
     }
 }

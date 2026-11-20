@@ -167,7 +167,10 @@ export class Barchart extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(this.tickFormat(1));
+        const yAxis = d3.axisLeft(this.mapY)
+            .ticks(this.tickCount(1, height))
+            .tickSizeInner(-width)
+            .tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.y.axis')
