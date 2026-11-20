@@ -67,6 +67,44 @@ describe('1D binning labels', () => {
     });
 });
 
+describe('Binning rows whose value holds no number', () => {
+    // Values from 0 to 1 in four bins, as Curio's histogram of heights reads its building parts.
+    const numbers = [0, 0.25, 0.5, 0.75, 1].map((v, i) => ({ v, kind: 'a', autkIds: [i] }));
+    const ranges: [string, number][] = [['0.0-0.25', 1], ['0.25-0.50', 1], ['0.50-0.75', 1], ['0.75-1.0', 2]];
+
+    /** `numbers` with a row that holds no number before them and one after, each made by `none`. */
+    function withNone(none: (id: number) => Record<string, unknown>) {
+        return [none(5), ...numbers, none(6)];
+    }
+
+    it.each<[string, (id: number) => Record<string, unknown>]>([
+        ['no value', (id) => ({ kind: 'a', autkIds: [id] })],
+        ['a null value', (id) => ({ v: null, kind: 'a', autkIds: [id] })],
+        ['a NaN value', (id) => ({ v: NaN, kind: 'a', autkIds: [id] })],
+    ])('puts the rows with %s in an unknown bin after every numeric bin, the bins in order', (_label, none) => {
+        const rows = run(withNone(none), { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
+
+        expect(rows.map((row) => [row.label, row.count])).toEqual([...ranges, ['unknown', 2]]);
+        expect(rows.slice(0, 4).map((row) => row.order)).toEqual([0, 1, 2, 3]);
+        expect(rows[4].order).toBeGreaterThan(3);
+    });
+
+    it('makes no unknown bin where every value holds a number', () => {
+        const rows = run(numbers, { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
+
+        expect(rows.map((row) => [row.label, row.count])).toEqual(ranges);
+    });
+
+    it('puts a heat matrix\'s unknown column after every numeric column', () => {
+        const rows = withNone((id) => ({ kind: 'a', autkIds: [id] }));
+        const cells = (run(rows, { preset: 'binning-2d', options: { binsX: 4 } }, ['v', 'kind']).rows as Binning2dCellRow[])
+            .sort((a, b) => a.xOrder - b.xOrder)
+            .map((cell) => [cell.x, cell.count]);
+
+        expect(cells).toEqual([...ranges, ['unknown', 2]]);
+    });
+});
+
 describe('2D binning labels', () => {
     it('keeps each of ten x bins from 0 to 1 in its own cell, labeled by its edges', () => {
         const result = run(rowsOf(zeroToOne), { preset: 'binning-2d' }, ['v', 'kind']);
