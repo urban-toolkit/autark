@@ -10,6 +10,9 @@
 
 import { vec3, mat4 } from 'gl-matrix';
 
+/** How many eye heights away the far plane is, at least (the floor is the camera's own far plane). */
+const FAR_PER_HEIGHT = 4;
+
 /**
  * Initial camera state used to seed or reset a `Camera` instance.
  */
@@ -72,8 +75,10 @@ export class Camera {
     protected wUp: vec3 = vec3.create();
     /** Near clipping plane distance. */
     protected wNear: number = 0;
-    /** Far clipping plane distance. */
+    /** Far clipping plane distance: the least the camera uses, which grows with the eye's height (see `update`). */
     protected wFar: number = 0;
+    /** The far plane the projection was last built with. */
+    protected wFarUsed: number = 0;
     /** Vertical field of view in radians. */
     protected fovy = (45 * Math.PI) / 180.0;
     /** Current projection matrix. */
@@ -163,8 +168,13 @@ export class Camera {
         return this.wNear;
     }
 
+    /**
+     * The far plane of the current perspective projection: `wFar`, or more when the camera is high (see `update`).
+     * An orthographic camera returns `wFar`.
+     */
     public getFar(): number {
-        return this.wFar;
+        if (this.orthographic) return this.wFar;
+        return Math.max(this.wFar, this.wFarUsed);
     }
 
     public getViewportHeight(): number {
@@ -428,11 +438,15 @@ export class Camera {
         if (this.orthographic) return;
         const aspect = this.viewportWidth / this.viewportHeight;
         mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
+        // The far plane follows the eye's height. A camera looking down at the ground has the ground a height away,
+        // and a tilted one sees it farther, so a fixed far plane (500 km) made a map vanish when zoomed out past it.
+        // FAR_PER_HEIGHT covers a view tilted down to about 14 degrees; `wFar` stays as the floor.
+        this.wFarUsed = Math.max(this.wFar, Math.abs(this.wEye[2]) * FAR_PER_HEIGHT);
         // Reversed-Z: swap near/far so near→1 and far→0 in NDC.
         // Combined with depthClearValue=0 and depthCompare='greater-equal' this
         // distributes float32 precision logarithmically, eliminating z-fighting
         // at distance without requiring an absurdly large far plane.
-        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wFar, this.wNear);
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wFarUsed, this.wNear);
     }
 
     /**
