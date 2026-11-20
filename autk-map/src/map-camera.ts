@@ -9,6 +9,7 @@
  */
 
 import { Camera } from '@urban-toolkit/autk-core';
+import type { CameraProjection } from '@urban-toolkit/autk-core';
 
 /**
  * Camera that runs a callback after each change to its view or viewport.
@@ -71,6 +72,12 @@ export class MapCamera extends Camera {
     /** Switches to an orthographic view, then reports the change. */
     override setOrthographicBounds(left: number, right: number, bottom: number, top: number): void {
         super.setOrthographicBounds(left, right, bottom, top);
+        this._onChange?.();
+    }
+
+    /** Switches between a perspective and a lasting orthographic projection, then reports the change. */
+    override setProjection(projection: CameraProjection): void {
+        super.setProjection(projection);
         this._onChange?.();
     }
 }
