@@ -85,7 +85,7 @@ export abstract class PlotBaseData {
     /** Plot title text. */
     protected _title!: string;
     /** D3 tick-format specifiers used by axis renderers. */
-    protected _tickFormats!: string[];
+    protected _tickFormats: string[] | undefined;
 
     /** Outer plot width in pixels. */
     protected _width: number = DEFAULT_WIDTH;
@@ -159,15 +159,17 @@ export abstract class PlotBaseData {
         const axisLabels = config.labels?.axis ?? [];
         this.validateSourceAttributeBindings(axisAttributes, config.attributes?.color, config.transform);
 
+        // The '@transform' slot only says where the computed value goes; it is never a label.
         this._axisLabels = axisLabels.length > 0
             ? axisLabels
-            : [...axisAttributes];
+            // Dropped, not blanked: the label of the computed value stays unset, as with no slot.
+            : axisAttributes.filter(attribute => attribute !== '@transform');
         this._sourceAxisAttributes = [...axisAttributes];
 
         this._sourceColorAttribute = config.attributes?.color;
 
         this._title = config.labels?.title || 'Autk Plot';
-        this._tickFormats = config.tickFormats ?? ['', ''];
+        this._tickFormats = config.tickFormats;
 
         this._autoWidth = config.width === 'auto';
         this._width = (config.width === 'auto' ? undefined : config.width) || DEFAULT_WIDTH;

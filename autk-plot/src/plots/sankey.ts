@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'sankey',
  *   collection: geojson,
- *   attributes: { axis: ['type', 'category', 'group'] },
+ *   attributes: { axis: ['type', 'category', 'group', '@transform'] },
  *   transform: { preset: 'flows' },
  *   labels: { title: 'Type → category → group' }
  * });
@@ -30,7 +30,7 @@ const NODE_PADDING = 8;
 /** Fill opacity of links that are not highlighted. */
 const LINK_OPACITY = 0.45;
 
-const flowOf = (row: AutkDatum) => row as unknown as FlowRow;
+const flowOf = (row: AutkDatum) => row as FlowRow;
 
 /** Band of a link between two vertical edges: a closed, smoothly curved path. */
 function bandPath(sx: number, sy: number, tx: number, ty: number, width: number): string {
@@ -48,13 +48,13 @@ export const sankey: PlotDefinition = {
     reducers: ['count', 'sum'],
     topK: false,
     markStyle: (row, highlighted) => ({ 'fill-opacity': flowOf(row).kind === 'link' && !highlighted ? LINK_OPACITY : 1 }),
-    design: { rect: { rule: 'length', axis: 'y', anchor: 'start' }, shape: { rule: 'band', mode: 'flow' } },
+    highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'start' }, shape: { mode: 'subset', channel: 'band', shape: 'flow' } },
 
     draw({ group, rows, width, height }) {
         const nodes = rows.filter(row => flowOf(row).kind === 'node');
         const links = rows.filter(row => flowOf(row).kind === 'link');
-        const node = (row: AutkDatum) => row as unknown as FlowNodeRow;
-        const link = (row: AutkDatum) => row as unknown as FlowLinkRow;
+        const node = (row: AutkDatum) => row as FlowNodeRow;
+        const link = (row: AutkDatum) => row as FlowLinkRow;
 
         // Node heights share one scale, chosen so the fullest column fits.
         const columns = d3.groups(nodes, row => node(row).column).sort((a, b) => a[0] - b[0]);
@@ -67,6 +67,7 @@ export const sankey: PlotDefinition = {
 
         const boxes = new Map<AutkDatum, { x0: number; x1: number; y0: number; y1: number }>();
         const byKey = new Map<string, AutkDatum>();
+        const box = (row: AutkDatum) => boxes.get(row)!;
         for (const [index, column] of columns) {
             const x0 = lastColumn === 0 ? 0 : index * (width - NODE_WIDTH) / lastColumn;
             let y = 0;
@@ -79,11 +80,13 @@ export const sankey: PlotDefinition = {
         }
 
         // Links leave and enter nodes ordered by the position of their other end, which reduces crossings.
-        const boxOf = (key: string) => boxes.get(byKey.get(key)!)!;
+        const boxOf = (key: string) => box(byKey.get(key)!);
         const outOffset = new Map<string, number>();
         const inOffset = new Map<string, number>();
         const bands = new Map<AutkDatum, string>();
-        for (const row of [...links].sort((a, b) => boxOf(link(a).source).y0 - boxOf(link(b).source).y0 || boxOf(link(a).target).y0 - boxOf(link(b).target).y0)) {
+        const byEnds = (a: AutkDatum, b: AutkDatum) =>
+            boxOf(link(a).source).y0 - boxOf(link(b).source).y0 || boxOf(link(a).target).y0 - boxOf(link(b).target).y0;
+        for (const row of [...links].sort(byEnds)) {
             const { source, target, value } = link(row);
             const w = Math.max(0, value) * k;
             const sy = boxOf(source).y0 + (outOffset.get(source) ?? 0);
@@ -105,19 +108,17 @@ export const sankey: PlotDefinition = {
             .attr('class', 'autkMark')
             .attr('d', row => bands.get(row)!)
             .style('stroke', 'none')
-            .style('cursor', 'pointer')
             .append('title')
             .text(title);
         group.selectAll('rect.autkMark')
             .data(nodes)
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', row => boxes.get(row)!.x0)
-            .attr('y', row => boxes.get(row)!.y0)
+            .attr('x', row => box(row).x0)
+            .attr('y', row => box(row).y0)
             .attr('width', NODE_WIDTH)
-            .attr('height', row => Math.max(1, boxes.get(row)!.y1 - boxes.get(row)!.y0))
+            .attr('height', row => Math.max(1, box(row).y1 - box(row).y0))
             .style('stroke', '#2f2f2f')
-            .style('cursor', 'pointer')
             .append('title')
             .text(title);
 
@@ -126,8 +127,8 @@ export const sankey: PlotDefinition = {
             .data(nodes)
             .join('text')
             .attr('class', 'autk-sankey-label')
-            .attr('x', row => (node(row).column === lastColumn ? boxes.get(row)!.x0 - 4 : boxes.get(row)!.x1 + 4))
-            .attr('y', row => (boxes.get(row)!.y0 + boxes.get(row)!.y1) / 2)
+            .attr('x', row => (node(row).column === lastColumn ? box(row).x0 - 4 : box(row).x1 + 4))
+            .attr('y', row => (box(row).y0 + box(row).y1) / 2)
             .attr('dy', '0.35em')
             .attr('text-anchor', row => (node(row).column === lastColumn ? 'end' : 'start'))
             .style('font-size', '10px')

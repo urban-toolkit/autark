@@ -35,7 +35,7 @@ const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Parses a `YYYY-MM-DD` bucket key as 00:00 UTC of that day. */
-const dayOf = (row: AutkDatum) => new Date(`${(row as unknown as BinningEventsBucketRow).bucket}T00:00:00Z`);
+const dayOf = (row: AutkDatum) => new Date(`${(row as BinningEventsBucketRow).bucket}T00:00:00Z`);
 
 /** Days of a daily series (`binning-events` by day, or any `series` transform with `YYYY-MM-DD` buckets), colored by their reduced value. */
 export const calendar: PlotDefinition = {
@@ -56,10 +56,10 @@ export const calendar: PlotDefinition = {
     // Daily buckets by default; a configured resolution is kept, and checked above or by draw.
     transformOptions: (_area, configured) => ({ resolution: configured.resolution ?? 'day' }),
     // Days have one size: the value is in the color, never in the geometry.
-    design: { rect: { rule: 'glyph' } },
+    highlight: { rect: { mode: 'custom', preset: 'glyph' } },
 
     draw({ group, rows, width, height }) {
-        if (rows.some(row => !DAY_KEY.test(String((row as unknown as BinningEventsBucketRow).bucket)))) {
+        if (rows.some(row => !DAY_KEY.test(String((row as BinningEventsBucketRow).bucket)))) {
             throw new Error('Calendar requires daily buckets (YYYY-MM-DD).');
         }
         const times = rows.map(row => dayOf(row).getTime()).filter(Number.isFinite);
@@ -120,9 +120,8 @@ export const calendar: PlotDefinition = {
             .attr('width', cell)
             .attr('height', cell)
             .style('stroke', '#ffffff')
-            .style('cursor', 'pointer')
             .append('title')
-            .text(row => `${(row as unknown as BinningEventsBucketRow).bucket}: ${d3.format('~s')(Number(row.value))}`);
+            .text(row => `${(row as BinningEventsBucketRow).bucket}: ${d3.format('~s')(Number(row.value))}`);
 
         // Day numbers, when cells are large enough to hold them.
         group.selectAll('text.autk-calendar-number')

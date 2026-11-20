@@ -29,7 +29,7 @@ export const tablevis: PlotDefinition = {
     // Sorted by the first column unless configured.
     defaults: config => ({ transform: { preset: 'sort', options: { column: config.attributes?.axis?.[0] ?? '', direction: 'asc' } } }),
 
-    draw({ html, rows, fields, value, axisLabels, options, setOptions }) {
+    draw({ html, rows, fields, value, axisLabels, options, setOptions, interactive }) {
         const sorted = (options.column as string | undefined) ?? fields[0];
         const direction = options.direction === 'desc' ? 'desc' : 'asc';
 
@@ -51,7 +51,8 @@ export const tablevis: PlotDefinition = {
             .style('text-align', 'left');
 
         // A click on a header sorts by its column; on the sorted column, it reverses the order.
-        table.append('thead').append('tr')
+        // A static table (no events) keeps its order.
+        const headers = table.append('thead').append('tr')
             .selectAll('th')
             .data(fields)
             .join('th')
@@ -61,12 +62,14 @@ export const tablevis: PlotDefinition = {
             .style('position', 'sticky')
             .style('top', '0')
             .style('text-align', 'center')
-            .style('cursor', 'pointer')
+            .style('cursor', interactive ? 'pointer' : 'default')
             .style('user-select', 'none')
             .style('color', field => (field === sorted ? '#cc3300' : '#000'))
             .style('text-decoration', field => (field === sorted ? 'underline' : 'none'))
-            .text((field, index) => axisLabels[index] ?? field)
-            .on('click', (_event, field) => setOptions({ column: field, direction: field === sorted && direction === 'asc' ? 'desc' : 'asc' }));
+            .text((field, index) => axisLabels[index] ?? field);
+        if (interactive) {
+            headers.on('click', (_event, field) => setOptions({ column: field, direction: field === sorted && direction === 'asc' ? 'desc' : 'asc' }));
+        }
 
         const number = d3.format('');
         table.append('tbody')
@@ -75,7 +78,6 @@ export const tablevis: PlotDefinition = {
             .join('tr')
             .attr('class', 'autkMark')
             .style('border-bottom', '1px solid #eee')
-            .style('cursor', 'pointer')
             .selectAll('td')
             .data(row => fields.map((_field, index) => value(row, index)))
             .join('td')

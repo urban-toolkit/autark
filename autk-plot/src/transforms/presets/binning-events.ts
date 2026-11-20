@@ -50,7 +50,11 @@ export type BinningEventsBucketRow = {
  * @param columns Ordered source columns; `columns[0]` is the event-array attribute.
  * @returns Rows of the `series` shape and their provenance.
  */
-export function runBinningEvents(rows: AutkDatum[], options: NonNullable<BinningEventsTransformConfig['options']>, columns: string[]): Omit<ExecutedBinningEventsTransform, 'preset'> {
+export function runBinningEvents(
+    rows: AutkDatum[],
+    options: NonNullable<BinningEventsTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedBinningEventsTransform, 'preset'> {
     const eventsAttr = columns[0] ?? '';
     const timestampAttr = options.timestamp ?? 'timestamp';
     const valueAttr = options.value ?? 'value';

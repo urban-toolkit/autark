@@ -33,10 +33,11 @@ import {
  *   type: 'scatterplot',
  *   collection,
  *   attributes: { axis: ['x', 'y'] },
- *   labels: { axis: ['x', 'y'], title: 'Example' }
+ *   labels: { axis: ['x', 'y'], title: 'Example' },
+ *   events: [PlotEvent.CLICK],
  * });
  *
- * plot.events.on('click', ({ selection }) => {
+ * plot.events.on(PlotEvent.CLICK, ({ selection }) => {
  *   console.log(selection);
  * });
  */

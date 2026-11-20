@@ -4,13 +4,14 @@
  * Reads the nodes of a `hierarchy` transform, one ring per level around an empty center, each
  * segment with an angle proportional to its reduced value. Every level is a mark. Children must
  * add up to their parent, so only additive reducers (count, sum) are accepted. A selection
- * elsewhere fills the inner part of each segment with the selected fraction of its area.
+ * elsewhere shows the leading share of each segment: the sweep of the selected value, from the
+ * same start angle.
  *
  * @example
  * new AutkPlot(plotDiv, {
  *   type: 'sunburst',
  *   collection: geojson,
- *   attributes: { axis: ['category', 'group'] },
+ *   attributes: { axis: ['category', 'group', '@transform'] },
  *   transform: { preset: 'hierarchy' },
  *   labels: { title: 'Features by category and group' }
  * });
@@ -28,7 +29,7 @@ import type { PlotDefinition } from './registered';
 /** Radius of the empty center, as a fraction of the chart radius. */
 const HOLE = 0.18;
 
-const nodeOf = (row: AutkDatum) => row as unknown as HierarchyNodeRow;
+const nodeOf = (row: AutkDatum) => row as HierarchyNodeRow;
 
 /** Ring segments of an additive `hierarchy` transform, one per node. */
 export const sunburst: PlotDefinition = {
@@ -38,7 +39,7 @@ export const sunburst: PlotDefinition = {
     requiresTransform: true,
     reducers: ['count', 'sum'],
     topK: false,
-    design: { sector: { rule: 'angle', mode: 'radial' } },
+    highlight: { sector: { mode: 'subset', channel: 'angle' } },
 
     draw({ group, rows, width, height }) {
         const depth = d3.max(rows, row => nodeOf(row).level + 1) ?? 1;
@@ -62,12 +63,12 @@ export const sunburst: PlotDefinition = {
             .attr('d', row => arc(span(row)))
             .style('stroke', '#ffffff')
             .style('stroke-width', 1)
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => `${nodeOf(row).path.join(' · ')}: ${d3.format('~s')(nodeOf(row).value)}`);
 
         // Labels of segments wide and deep enough; they never intercept clicks.
-        const fits = (s: ReturnType<typeof span>) => (s.endAngle - s.startAngle) * (s.innerRadius + s.outerRadius) / 2 > 34 && s.outerRadius - s.innerRadius > 12;
+        const fits = (s: ReturnType<typeof span>) =>
+            (s.endAngle - s.startAngle) * (s.innerRadius + s.outerRadius) / 2 > 34 && s.outerRadius - s.innerRadius > 12;
         center.selectAll('text.autk-sunburst-label')
             .data(drawn.filter(row => fits(span(row))))
             .join('text')

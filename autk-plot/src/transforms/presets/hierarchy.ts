@@ -65,7 +65,11 @@ type HierarchyUnit = Row & { autkIds: number[]; __key: string; __value: number |
  * @returns Rows of the `hierarchy` shape and their provenance, with the depth.
  * @throws If no column is given.
  */
-export function runHierarchy(rows: AutkDatum[], options: NonNullable<HierarchyTransformConfig['options']>, columns: string[]): Omit<ExecutedHierarchyTransform, 'preset'> {
+export function runHierarchy(
+    rows: AutkDatum[],
+    options: NonNullable<HierarchyTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedHierarchyTransform, 'preset'> {
     if (columns.length === 0) {
         throw new Error('hierarchy: at least one column is required.');
     }

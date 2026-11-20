@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'radar',
  *   collection: geojson,
- *   attributes: { axis: ['category', 'shape_area', 'shape_leng'] },
+ *   attributes: { axis: ['category', 'shape_area', 'shape_leng', '@transform'] },
  *   transform: { preset: 'fold' },
  *   labels: { title: 'Profile of each category' }
  * });
@@ -28,7 +28,7 @@ import type { PlotDefinition, PlotSeries } from './registered';
 /** Radius of a vertex mark in pixels. */
 const VERTEX_RADIUS = 4;
 
-const cellOf = (row: AutkDatum) => row as unknown as FoldCellRow;
+const cellOf = (row: AutkDatum) => row as FoldCellRow;
 
 /** Categories in polygon order, and the gray shade of each. */
 function categoryShades(rows: AutkDatum[]): { categories: string[]; shade: (category: string) => string } {
@@ -48,7 +48,7 @@ export const radar: PlotDefinition = {
         return row => shade(cellOf(row).category);
     },
     // Values grow from the center: the part of a vertex is the same vertex nearer to it.
-    design: { point: { rule: 'position', axis: 'radial' } },
+    highlight: { point: { mode: 'subset', channel: 'position', axis: 'radial' } },
 
     draw({ group, rows, width, height, transform, axisLabels, legend }) {
         const measures = shapeOutput(transform, 'fold')?.measures ?? [];
@@ -114,7 +114,9 @@ export const radar: PlotDefinition = {
                 .style('stroke-width', 1.5)
                 .style('pointer-events', 'none');
             // A profile, not an area of parts: drawn for every reducer.
-            return { element: polygon.node()!, rows: cells, path: polygonOf, area: false };
+            const node = polygon.node();
+            if (!node) throw new Error('SVG element could not be created.');
+            return { element: node, rows: cells, path: polygonOf, area: false };
         });
 
         center.selectAll('circle.autkMark')
@@ -125,7 +127,6 @@ export const radar: PlotDefinition = {
             .attr('cy', row => pointAt(cellOf(row).measureIndex, cellOf(row).value)[1])
             .attr('r', VERTEX_RADIUS)
             .style('stroke', '#ffffff')
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => `${cellOf(row).label}: ${d3.format('.2~f')(cellOf(row).value)}`);
 

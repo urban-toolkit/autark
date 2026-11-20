@@ -52,15 +52,19 @@ export type Binning2dCellRow = {
 /**
  * Runs a binning-2d transform and returns plot-ready cell rows.
  *
- * Builds a bin-label mapper for each axis, then groups rows by their (x, y) label pair and
- * reduces the value column with the configured reducer.
+ * Builds a bin mapper for each axis, then groups rows by their (x, y) bin pair (never by label, so
+ * two cells never merge) and reduces the value column with the configured reducer.
  *
  * @param rows Input feature rows.
  * @param options Transform options (`transform.options`): reducer, bins per axis, and value column.
  * @param columns `columns[0]` is the x column, `columns[1]` the y column.
  * @returns Rows of the `binning-2d` shape and their provenance.
  */
-export function runBinning2d(rows: AutkDatum[], options: NonNullable<Binning2dTransformConfig['options']>, columns: string[]): Omit<ExecutedBinning2dTransform, 'preset'> {
+export function runBinning2d(
+    rows: AutkDatum[],
+    options: NonNullable<Binning2dTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedBinning2dTransform, 'preset'> {
     const xAttr = columns[0] ?? '';
     const yAttr = columns[1] ?? '';
     const valueAttr = options.value;
@@ -77,9 +81,9 @@ export function runBinning2d(rows: AutkDatum[], options: NonNullable<Binning2dTr
     const reduced = collectBuckets({
         rows,
         bucketOf: (row) => {
-            const xLabel = xMapper.label(valueAtPath(row, xAttr));
-            const yLabel = yMapper.label(valueAtPath(row, yAttr));
-            return `${xLabel}${SEP}${yLabel}`;
+            const xKey = xMapper.key(valueAtPath(row, xAttr));
+            const yKey = yMapper.key(valueAtPath(row, yAttr));
+            return `${xKey}${SEP}${yKey}`;
         },
         valueOf: (reducer === 'count' || !valueAttr) ? undefined : (row) => {
             const v = Number(valueAtPath(row, valueAttr));
@@ -90,12 +94,12 @@ export function runBinning2d(rows: AutkDatum[], options: NonNullable<Binning2dTr
 
     // Cells are identified by the indices of their x and y bins, empty cells included.
     const keys = reduced.map(bucket => bucket.key);
-    const xBins = indexedBins(xMapper.labels(), keys.map(key => key.slice(0, key.indexOf(SEP))), 'x');
-    const yBins = indexedBins(yMapper.labels(), keys.map(key => key.slice(key.indexOf(SEP) + 1)), 'y');
+    const xBins = indexedBins(xMapper.keys(), keys.map(key => key.slice(0, key.indexOf(SEP))), 'x');
+    const yBins = indexedBins(yMapper.keys(), keys.map(key => key.slice(key.indexOf(SEP) + 1)), 'y');
     const cells = new Map<string, ProvenanceId>();
-    for (const [xLabel, xId] of xBins) {
-        for (const [yLabel, yId] of yBins) {
-            cells.set(`${xLabel}${SEP}${yLabel}`, `cell:${xId.slice(2)},${yId.slice(2)}`);
+    for (const [xKey, xId] of xBins) {
+        for (const [yKey, yId] of yBins) {
+            cells.set(`${xKey}${SEP}${yKey}`, `cell:${xId.slice(2)},${yId.slice(2)}`);
         }
     }
 
@@ -110,13 +114,13 @@ export function runBinning2d(rows: AutkDatum[], options: NonNullable<Binning2dTr
         }),
         rows: reduced.map(bucket => {
             const sepIdx = bucket.key.indexOf(SEP);
-            const xLabel = bucket.key.slice(0, sepIdx);
-            const yLabel = bucket.key.slice(sepIdx + 1);
+            const xKey = bucket.key.slice(0, sepIdx);
+            const yKey = bucket.key.slice(sepIdx + 1);
             return {
-                x: xLabel,
-                y: yLabel,
-                xOrder: xMapper.order(xLabel),
-                yOrder: yMapper.order(yLabel),
+                x: xMapper.label(xKey),
+                y: yMapper.label(yKey),
+                xOrder: xMapper.order(xKey),
+                yOrder: yMapper.order(yKey),
                 value: bucket.value,
                 count: bucket.count,
                 autkIds: bucket.autkIds,

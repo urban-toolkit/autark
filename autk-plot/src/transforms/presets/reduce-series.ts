@@ -52,7 +52,11 @@ export type ReduceSeriesBucketRow = {
  * @param columns Ordered source columns; `columns[0]` is the series attribute.
  * @returns Rows of the `series` shape and their provenance.
  */
-export function runReduceSeries(rows: AutkDatum[], options: NonNullable<ReduceSeriesTransformConfig['options']>, columns: string[]): Omit<ExecutedReduceSeriesTransform, 'preset'> {
+export function runReduceSeries(
+    rows: AutkDatum[],
+    options: NonNullable<ReduceSeriesTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedReduceSeriesTransform, 'preset'> {
     const seriesAttr = columns[0] ?? '';
     const timestampAttr = options.timestamp ?? 'timestamp';
     const valueAttr = options.value ?? 'value';

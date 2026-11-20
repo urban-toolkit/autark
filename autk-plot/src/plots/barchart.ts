@@ -28,7 +28,6 @@ export const barchart: PlotDefinition = {
     // A registered transform is read like binning-1d when it yields label and value rows.
     transforms: ['binning-1d', 'category-value'],
     defaults: config => ({
-        tickFormats: ['~s', '~s'],
         ...(config.transform ? { labels: { axis: ['label', 'value'], title: 'Distribution' } } : {}),
     }),
     // Without a transform, each feature is a bar: it needs its label and its value.
@@ -38,9 +37,9 @@ export const barchart: PlotDefinition = {
     },
     // Bars grow from the bottom: the selected part is a slice from the base,
     // even when there are too few bars for the geometry to prove it.
-    design: { rect: { rule: 'length', axis: 'y', anchor: 'end' } },
+    highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } },
 
-    draw({ group, rows, value, width, height, format, axisX, axisY, partRange, tickCount }) {
+    draw({ group, rows, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount }) {
         const label = (row: AutkDatum) => String(value(row, 0));
         const amount = (row: AutkDatum) => Number(value(row, 1)) || 0;
 
@@ -50,11 +49,12 @@ export const barchart: PlotDefinition = {
         const beyond = partRange && !partRange.additive ? partRange.extent[1] : 0;
         const y = d3.scaleLinear([0, Math.max(d3.max(rows, amount) ?? 0, 1, beyond)], [height, 0]);
 
-        // Bin labels are numbers; category labels are kept as they are.
+        // A label is written as it is ("2020", a bin "0.25-0.50"), or with the x format the
+        // configuration gives, when it reads as a number.
         const tick = format(0, '~s');
         axisX(d3.axisBottom(x).tickSizeOuter(0).tickFormat(d => {
             const text = String(d);
-            return text.trim() !== '' && Number.isFinite(Number(text)) ? tick(Number(text)) : text;
+            return hasFormat(0) && text.trim() !== '' && Number.isFinite(Number(text)) ? tick(Number(text)) : text;
         }))
             .selectAll('.tick text')
             .style('text-anchor', 'end')

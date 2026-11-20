@@ -30,11 +30,10 @@ export const parallelCoordinates: PlotDefinition = {
     label: 'Parallel coordinates',
     color: 'stroke',
     topK: false,
-    defaults: { tickFormats: ['~s', '~s'] },
     markStyle: (_row, highlighted) => ({ opacity: highlighted ? 1 : 0.7, 'stroke-width': highlighted ? 3 : 2 }),
-    design: { stroke: { rule: 'trace' } },
+    highlight: { stroke: { mode: 'custom', preset: 'trace' } },
 
-    draw({ svg, group, rows, fields, value, width, height, margins, format, axisLabels, colorAttribute, colorBy }) {
+    draw({ svg, group, rows, fields, value, width, height, margins, format, axisLabels, colorAttribute, colorBy, interactive }) {
         // A scale per axis: linear when every value is a number, points otherwise.
         const scales = new Map<string, AxisScale>(fields.map((field, index): [string, AxisScale] => {
             const values = rows.map(row => value(row, index)).filter(v => v !== null && v !== undefined);
@@ -78,7 +77,8 @@ export const parallelCoordinates: PlotDefinition = {
             else g.call(d3.axisLeft(axis.scale));
         });
 
-        // Axis names over the brush areas; a click colors the lines by that attribute.
+        // Axis names over the brush areas; a click colors the lines by that attribute,
+        // unless the plot is static (no events).
         let colored = colorAttribute;
         const names = svg.append('g')
             .attr('class', 'autkAxisLabels')
@@ -91,16 +91,18 @@ export const parallelCoordinates: PlotDefinition = {
             .attr('x', field => x(field) ?? 0)
             .attr('y', -9)
             .style('font-weight', '600')
-            .style('cursor', 'pointer')
+            .style('cursor', interactive ? 'pointer' : 'default')
             .text((field, index) => axisLabels[index] ?? field);
         const showColored = () => names
             .style('fill', field => (field === colored ? '#cc3300' : '#000'))
             .style('text-decoration', field => (field === colored ? 'underline' : 'none'));
-        names.on('click', (_event, field) => {
-            colored = colored === field ? undefined : field;
-            colorBy(colored);
-            showColored();
-        });
+        if (interactive) {
+            names.on('click', (_event, field) => {
+                colored = colored === field ? undefined : field;
+                colorBy(colored);
+                showColored();
+            });
+        }
         showColored();
     },
 };

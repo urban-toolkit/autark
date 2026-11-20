@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'density',
  *   collection: geojson,
- *   attributes: { axis: ['shape_area'] },
+ *   attributes: { axis: ['shape_area', '@transform'] },
  *   transform: { preset: 'density' },
  *   labels: { axis: ['area', 'density'], title: 'Distribution of areas' }
  * });
@@ -27,7 +27,7 @@ import type { PlotDefinition, PlotSeries } from './registered';
 /** Radius of a grid point mark in pixels. */
 const POINT_RADIUS = 2.5;
 
-const pointOf = (row: AutkDatum) => row as unknown as DensityPointRow;
+const pointOf = (row: AutkDatum) => row as DensityPointRow;
 
 /** Groups in curve order, and the gray shade of each. */
 function groupShades(rows: AutkDatum[]): { groups: string[]; shade: (group: string) => string } {
@@ -42,7 +42,6 @@ export const densitychart: PlotDefinition = {
     transforms: ['density'],
     requiresTransform: true,
     topK: false,
-    defaults: { tickFormats: ['~s', ''] },
     baseColor: rows => {
         const { shade } = groupShades(rows);
         return row => shade(pointOf(row).group);
@@ -76,7 +75,9 @@ export const densitychart: PlotDefinition = {
                 .style('stroke', shade(name))
                 .style('stroke-width', 1.5)
                 .style('pointer-events', 'none');
-            return { element: curve.node()!, rows: points, path: areaOf };
+            const node = curve.node();
+            if (!node) throw new Error('SVG element could not be created.');
+            return { element: node, rows: points, path: areaOf };
         });
 
         group.selectAll('circle.autkMark')
@@ -86,13 +87,12 @@ export const densitychart: PlotDefinition = {
             .attr('cx', row => x(pointOf(row).x))
             .attr('cy', row => y(pointOf(row).value))
             .attr('r', POINT_RADIUS)
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => {
                 const n = pointOf(row).autkIds.length;
                 return `${pointOf(row).label}: ${n} ${n === 1 ? 'feature' : 'features'} within one bandwidth`;
             });
 
-        return { design: { point: { rule: 'position', axis: 'y', baseline: y(0) } }, series };
+        return { highlight: { point: { mode: 'subset', channel: 'position', axis: 'y', baseline: y(0) } }, series };
     },
 };

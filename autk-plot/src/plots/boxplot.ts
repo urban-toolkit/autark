@@ -3,14 +3,14 @@
  *
  * Reads the summaries of a `box-stats` transform: quartile box, median line, Tukey whiskers, and
  * outlier dots. Order statistics are produced by specific features, not by all of them, so a
- * selection elsewhere is not a part of a box: each selected feature is drawn as a dot at its own
- * value (the `members` design), and its tooltip names its role in the summary.
+ * selection elsewhere is not a part of a box: a custom highlight draws each selected feature as a
+ * dot at its own value (the `members` preset), and its tooltip names its role in the summary.
  *
  * @example
  * new AutkPlot(plotDiv, {
  *   type: 'boxplot',
  *   collection: geojson,
- *   attributes: { axis: ['category', 'shape_area'] },
+ *   attributes: { axis: ['category', 'shape_area', '@transform'] },
  *   transform: { preset: 'box-stats' },
  *   labels: { axis: ['category', 'area'], title: 'Area by category' }
  * });
@@ -23,7 +23,7 @@ import type { AutkDatum } from '../types-plot';
 
 import type { PlotDefinition } from './registered';
 
-const statsOf = (row: AutkDatum) => row as unknown as BoxStatsRow;
+const statsOf = (row: AutkDatum) => row as BoxStatsRow;
 
 /** Role of a feature in the summary of its box. */
 function roleOf(row: BoxStatsRow, feature: number, value: number): 'median' | 'outlier' | 'box' | 'whisker' {
@@ -39,7 +39,6 @@ export const boxplot: PlotDefinition = {
     transforms: ['box-stats'],
     requiresTransform: true,
     topK: false,
-    defaults: { tickFormats: ['', '~s'] },
 
     draw({ group, rows, width, height, axisX, axisY, format }) {
         const boxes = rows.map(statsOf);
@@ -81,7 +80,6 @@ export const boxplot: PlotDefinition = {
             .attr('y', row => y(statsOf(row).q3))
             .attr('height', row => Math.max(1, y(statsOf(row).q1) - y(statsOf(row).q3)))
             .style('stroke', '#2f2f2f')
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => {
                 const r = statsOf(row);
@@ -111,11 +109,11 @@ export const boxplot: PlotDefinition = {
 
         // Box edges are the quartiles on the value scale: a selected feature is a dot at its value.
         const [a, k] = [y(0), y(1) - y(0)];
-        return { design: { rect: { rule: 'members', axis: 'y', scale: { a, k, fields: ['q1', 'q3'] } } } };
+        return { highlight: { rect: { mode: 'custom', preset: 'members', axis: 'y', scale: { a, k, fields: ['q1', 'q3'] } } } };
     },
 
     // The automatic dots, over the median lines, each naming the role of its feature.
-    drawPart({ group, parts, drawAuto }) {
+    highlight({ group, parts, drawAuto }) {
         drawAuto();
         const boxes = new Map(parts.map(part => [part.mark, statsOf(part.datum)]));
         group.selectAll<SVGCircleElement, unknown>('.autkPartial[data-autk-feature]')

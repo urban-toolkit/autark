@@ -81,7 +81,7 @@ export function reduceBuckets(options: ReduceBucketsOptions): ReducedBucket[] {
 export function collectBuckets(options: ReduceBucketsOptions): CollectedBucket[] {
     const { rows, bucketOf, reducer } = options;
     if (reducer !== undefined && !REDUCERS.includes(reducer)) {
-        throw new Error(`Unknown reducer "${String(reducer)}" (expected ${REDUCERS.join(', ')}).`);
+        throw new Error(`Transform options: unknown reducer "${String(reducer)}" (expected ${REDUCERS.join(', ')}).`);
     }
     // Only an own `valueOf` counts: every object literal inherits Object.prototype.valueOf,
     // which would otherwise be called on each row when the option is left out.

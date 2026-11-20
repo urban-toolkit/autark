@@ -27,13 +27,12 @@ export const scatterplot: PlotDefinition = {
     name: 'scatterplot',
     label: 'Scatterplot',
     topK: false,
-    defaults: { tickFormats: ['~s', '~s'] },
     validate: config => {
         if ((config.attributes?.axis?.length ?? 0) < 2) throw new Error('Scatterplot requires two dimensions.');
     },
     // A point is one feature: its part is the share of that feature, shown as
     // an inner disc of that area, never as a value.
-    design: { point: { rule: 'glyph' } },
+    highlight: { point: { mode: 'custom', preset: 'glyph' } },
 
     draw(context) {
         const { group, rows, value } = context;
@@ -76,7 +75,7 @@ export function gridAxes(context: PlotDrawContext): [d3.ScaleLinear<number, numb
     // Rows with no number on an axis (such as the cells of binning-2d) would all sit at zero.
     for (const index of [0, 1]) {
         if (rows.length > 0 && !rows.some(row => Number.isFinite(Number(value(row, index))) && value(row, index) !== '')) {
-            throw new Error(`Points need numbers on both axes: field ${index + 1} has none in these rows.`);
+            throw new Error(`Scatterplot requires numbers on both axes: field ${index + 1} has none in these rows.`);
         }
     }
     const extent = (index: number) => d3.extent(rows, (row: AutkDatum) => Number(value(row, index)) || 0) as [number, number];

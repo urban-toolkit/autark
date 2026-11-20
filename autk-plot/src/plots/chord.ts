@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'chord',
  *   collection: geojson,
- *   attributes: { axis: ['category', 'group'] },
+ *   attributes: { axis: ['category', 'group', '@transform'] },
  *   transform: { preset: 'flows' },
  *   labels: { title: 'Category × group' }
  * });
@@ -35,7 +35,7 @@ const RIBBON_OPACITY = 0.45;
 /** Angular range in radians, clockwise from 12 o'clock. */
 type Range = { start: number; end: number };
 
-const flowOf = (row: AutkDatum) => row as unknown as FlowRow;
+const flowOf = (row: AutkDatum) => row as FlowRow;
 
 /** Arcs and ribbons of an additive two-column `flows` transform, one per node and per link. */
 export const chord: PlotDefinition = {
@@ -51,13 +51,13 @@ export const chord: PlotDefinition = {
         }
     },
     markStyle: (row, highlighted) => ({ 'fill-opacity': flowOf(row).kind === 'link' && !highlighted ? RIBBON_OPACITY : 1 }),
-    design: { sector: { rule: 'angle', mode: 'sweep' }, shape: { rule: 'band', mode: 'ribbon' } },
+    highlight: { sector: { mode: 'subset', channel: 'angle' }, shape: { mode: 'subset', channel: 'band', shape: 'ribbon' } },
 
     draw({ group, rows, width, height }) {
         const nodes = rows.filter(row => flowOf(row).kind === 'node');
         const links = rows.filter(row => flowOf(row).kind === 'link');
-        const node = (row: AutkDatum) => row as unknown as FlowNodeRow;
-        const link = (row: AutkDatum) => row as unknown as FlowLinkRow;
+        const node = (row: AutkDatum) => row as FlowNodeRow;
+        const link = (row: AutkDatum) => row as FlowLinkRow;
         // Room around the circle for the arc labels.
         const inner = Math.max(10, Math.min(width, height) / 2 - ARC_WIDTH - 30);
 
@@ -71,6 +71,7 @@ export const chord: PlotDefinition = {
         const k = Number.isFinite(scale) ? scale : 0;
         const arcs = new Map<AutkDatum, Range>();
         const byKey = new Map(nodes.map(row => [node(row).key, row]));
+        const arcOf = (row: AutkDatum) => arcs.get(row)!;
         columns.forEach((column, index) => {
             let angle = (index === 1 ? 0 : Math.PI) + POLE_GAP;
             for (const row of column) {
@@ -81,7 +82,7 @@ export const chord: PlotDefinition = {
         });
 
         // Each ribbon takes a sub-range of both arcs, ordered by the position of its other end.
-        const rangeOf = (key: string) => arcs.get(byKey.get(key)!)!;
+        const rangeOf = (key: string) => arcOf(byKey.get(key)!);
         const middle = (r: Range) => (r.start + r.end) / 2;
         const used = new Map<string, number>();
         const take = (key: string, span: number): Range => {
@@ -114,18 +115,17 @@ export const chord: PlotDefinition = {
             .data([...links, ...nodes])
             .join('path')
             .attr('class', 'autkMark')
-            .attr('d', row => (flowOf(row).kind === 'link' ? ribbonPath(ribbons.get(row)!) : arc(arcs.get(row)!)))
+            .attr('d', row => (flowOf(row).kind === 'link' ? ribbonPath(ribbons.get(row)!) : arc(arcOf(row))))
             .style('stroke', row => (flowOf(row).kind === 'node' ? '#2f2f2f' : 'none'))
             .style('stroke-width', 0.5)
-            .style('cursor', 'pointer')
             .append('title')
             .text(title);
 
         // Radial labels outside the circle: each reads outward from its arc, so neighbors never overlap.
         const labelRadius = inner + ARC_WIDTH + 4;
-        const labelAngle = (row: AutkDatum) => middle(arcs.get(row)!);
+        const labelAngle = (row: AutkDatum) => middle(arcOf(row));
         center.selectAll('text.autk-chord-label')
-            .data(nodes.filter(row => arcs.get(row)!.end - arcs.get(row)!.start > 0.02))
+            .data(nodes.filter(row => arcOf(row).end - arcOf(row).start > 0.02))
             .join('text')
             .attr('class', 'autk-chord-label')
             .attr('transform', row => {

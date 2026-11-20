@@ -36,7 +36,7 @@ export const heatmatrix: PlotDefinition = {
     requiresTransform: true,
     topK: false,
     // Cells have one size: the value is in the color, never in the geometry.
-    design: { rect: { rule: 'glyph' } },
+    highlight: { rect: { mode: 'custom', preset: 'glyph' } },
 
     draw({ group, rows, width, height, value, axisX, axisY }) {
         const xLabel = (row: AutkDatum) => String(value(row, 0));

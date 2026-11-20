@@ -67,7 +67,11 @@ export type BoxStatsRow = {
  * @param columns `columns[0]` is the category column, `columns[1]` the numeric column.
  * @returns Rows of the `box-stats` shape and their provenance.
  */
-export function runBoxStats(rows: AutkDatum[], options: NonNullable<BoxStatsTransformConfig['options']>, columns: string[]): Omit<ExecutedBoxStatsTransform, 'preset'> {
+export function runBoxStats(
+    rows: AutkDatum[],
+    options: NonNullable<BoxStatsTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedBoxStatsTransform, 'preset'> {
     const categoryAttr = columns[0] ?? '';
     const valueAttr = columns[1] ?? '';
     const whisker = options.whisker ?? 1.5;

@@ -5,8 +5,9 @@
  * plot only draws its rows; selection, color, linking, and the segregated view are generic and
  * driven by annotations. Marks carry the class `autkMark` and bind a rendered row, inside `group`
  * (or the `html` container); a row drawn but not selectable binds an `autkContext` element. The
- * part of each mark follows the design inferred in `partial-design.ts`, unless `data-autk-part`
- * forces a rule (`shrink`, `fill-y`, `fill-x`, `none`) or `drawPart` replaces it. `checkPlot`
+ * part of each mark follows its highlight (`partial-design.ts`): boolean, a subset render through
+ * the plot's own encoding, or custom, declared by the plot or inferred from the drawing; a
+ * function as `highlight` draws it instead, and `data-autk-highlight` sets one mark's own. `checkPlot`
  * checks the annotations on sample data, and every draw repeats the checks.
  */
 
@@ -14,22 +15,24 @@ import * as d3 from 'd3';
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
 
-import type { PlotConfig, PlotTransformConfig, TransformReducer } from '../api';
+import type { PlotConfig, PlotMargins, PlotTransformConfig, TransformReducer } from '../api';
 import type { ResolvedPlotTransform } from '../plot-base-data';
 import type { ExecutedPlotTransform } from '../transforms';
 import type { AutkDatum } from '../types-plot';
+import type { ProvenanceContribution, ProvenanceId } from '../types-provenance';
 import type { ContractReport, ContractViolation } from '../provenance/validate';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 import type { SegregatedPart } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
+import { defaultTickFormat } from '../number-format';
 import { featureId } from '../provenance';
 import { PlotEvent } from '../types-events';
 
 import { freezeDefinition, registeredTransform, transformOf } from '../transforms/registry';
 
-import { centerOf, drawAutoPart, htmlFill, inferPartialDesign, markKindOf, outline, ratioOf, seriesPath, withDeclaredDesigns } from './partial-design';
-import type { AutoPartContext, DeclaredDesign, MarkKind, PartialDesign } from './partial-design';
+import { centerOf, drawAutoPart, htmlFill, inferHighlight, markKindOf, outline, ratioOf, ruleOf, seriesPath, withDeclaredHighlight } from './partial-design';
+import type { AutoPartContext, CustomPreset, HighlightDesign, HighlightRule, MarkKind, SubsetChannel } from './partial-design';
 
 /** What a registered plot's `draw` receives. */
 export type PlotDrawContext = {
@@ -43,6 +46,12 @@ export type PlotDrawContext = {
     rows: AutkDatum[];
     /** Row fields of the axes: the transform's (e.g. `label`, `value`) or `attributes.axis`. */
     fields: string[];
+    /**
+     * Whether the configuration asks for any interaction (`events`). A plot without one is
+     * static: its drawing adds no interaction of its own either, such as sorting a table by a
+     * clicked column. Marks get the pointer cursor from the plot, only when clicks select.
+     */
+    interactive: boolean;
     /** Value of a row on axis `index` (default 0). */
     value: (row: AutkDatum, index?: number) => unknown;
     /** Current color of a row's mark. */
@@ -51,15 +60,25 @@ export type PlotDrawContext = {
     width: number;
     height: number;
     /**
-     * Draws a bottom axis under the drawing area, labeled with `labels.axis[0]`.
-     * Configure the D3 axis as usual; ticks drawn across the plot (a negative
-     * `tickSizeInner`) take the grid color. The returned group can be styled further.
+     * Draws a bottom axis under the drawing area. Configure the D3 axis as usual; ticks drawn
+     * across the plot (a negative `tickSizeInner`) take the grid color. The returned group can
+     * be styled further.
+     *
+     * @param label The field the axis shows, by its index in the fields (its label from
+     * `labels.axis`, or its name), or the text itself. Defaults to the first field, as in a
+     * vertical chart; a horizontal bar chart passes 1, the field of its values.
      */
-    axisX: <Domain extends d3.AxisDomain>(axis: d3.Axis<Domain>) => d3.Selection<SVGGElement, unknown, null, undefined>;
-    /** Draws a left axis beside the drawing area, labeled with `labels.axis[1]`. */
-    axisY: <Domain extends d3.AxisDomain>(axis: d3.Axis<Domain>) => d3.Selection<SVGGElement, unknown, null, undefined>;
-    /** Number format of axis `index` from `tickFormats`, or `fallback` when none is set. */
+    axisX: <Domain extends d3.AxisDomain>(axis: d3.Axis<Domain>, label?: number | string) => d3.Selection<SVGGElement, unknown, null, undefined>;
+    /** Draws a left axis beside the drawing area; `label` as in `axisX`, defaulting to the second field. */
+    axisY: <Domain extends d3.AxisDomain>(axis: d3.Axis<Domain>, label?: number | string) => d3.Selection<SVGGElement, unknown, null, undefined>;
+    /**
+     * Number format of axis `index`: the d3 format `tickFormats` give it, or, when they give it none
+     * (no `tickFormats`, or a missing entry), SI prefixes from one up ("1.5k") and decimals under one
+     * ("0.5", not "500m"). `fallback` stands in for an empty format (`''`) the configuration gives.
+     */
     format: (index: number, fallback?: string) => (value: d3.NumberValue) => string;
+    /** Whether `tickFormats` give axis `index` a format: a category or bucket that reads as a number is then written with it, otherwise as it is. */
+    hasFormat: (index: number) => boolean;
     /** Tick count of a value axis up to `top`: `count`, or one tick per unit when the values are whole (counts) and `top` is smaller. */
     tickCount: (top: number, values: number[], count: number) => number;
     /** Draws a legend of colored swatches: a row above the drawing area, or a column at its top left. */
@@ -130,8 +149,8 @@ export type PlotSeries = {
     area?: boolean;
 };
 
-/** What a registered plot's `drawPart` receives. */
-export type PlotPartContext = {
+/** What a plot's own custom highlight (`highlight` as a function) receives. */
+export type PlotHighlightContext = {
     /** Marks group; previous partial elements were already removed. */
     group: d3.Selection<SVGGElement, unknown, null, undefined>;
     /** Selected part of each row: its datum, mark id, and fraction in `[0, 1]`. */
@@ -140,9 +159,28 @@ export type PlotPartContext = {
     marksOf: (row: AutkDatum) => SVGGraphicsElement[];
     /** Color of the selected part. */
     color: string;
-    /** Draws the automatic parts (as without `drawPart`), for a plot that adds to them. */
+    /** Draws the parts with the inferred highlight (or the one `draw` returns), for a function that adds to them. */
     drawAuto: () => void;
 };
+
+/**
+ * How a plot shows a selection from another view, in one of three modes:
+ *
+ * - `'boolean'`: the whole mark;
+ * - `'subset'` (the default): the mark drawn again with the subset's value through the plot's own
+ *   encoding, on the channel inferred from the geometry; or, per mark family, a declared channel,
+ *   e.g. `{ rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } }`;
+ * - custom: a ready-made preset for every family (`'glyph'`, `'trace'`) or per family
+ *   (`{ point: { mode: 'custom', preset: 'glyph' } }`), or a function that draws the parts.
+ *   `trace` draws the leading fraction of a line, or of the outline of a filled mark; `members`
+ *   is only per family, with the `scale` of its marks (declared, returned by `draw`, or inferred).
+ */
+export type PlotHighlight =
+    | 'boolean'
+    | 'subset'
+    | Exclude<CustomPreset, 'members'>
+    | Partial<Record<MarkKind, HighlightRule>>
+    | ((context: PlotHighlightContext) => void);
 
 /**
  * A plot: D3 drawing code plus what the plot accepts and knows.
@@ -158,22 +196,22 @@ export type PlotDefinition = {
     label?: string;
     /**
      * Draws the marks for the rendered rows. Called on every draw. It may return
-     * design parameters known only while drawing (e.g. the scale of `members`),
-     * which complete `design`, and the series drawn through the marks.
+     * highlight parameters known only while drawing (e.g. the scale of `members`),
+     * which complete `highlight` per mark family (a word or a function is refused here: it
+     * belongs to `highlight`), and the series drawn through the marks.
      */
-    draw: (context: PlotDrawContext) => void | { design?: Partial<Record<MarkKind, DeclaredDesign>>; series?: PlotSeries[] };
-    /** Draws the selected part of marks; give each element the class `autkPartial`. */
-    drawPart?: (context: PlotPartContext) => void;
+    draw: (context: PlotDrawContext) => void | { highlight?: Partial<Record<MarkKind, HighlightRule>>; series?: PlotSeries[] };
+    /**
+     * How a mark shows the part of it that a selection from another view produces: `'boolean'`,
+     * `'subset'` (the default, inferred from the geometry), a custom preset, a highlight per mark
+     * family (families left out are inferred), or a function that draws the parts (give each
+     * element the class `autkPartial` and `data-autk-provenance`). See `PlotHighlight`.
+     */
+    highlight?: PlotHighlight;
     /** Mark property the plot colors. Defaults to `fill`. */
     color?: 'fill' | 'stroke';
-    /** Row field the marks encode, for the design inference. Defaults to the second axis field, or `value`. */
+    /** Row field the marks encode, for the highlight inference. Defaults to the second axis field, or `value`. */
     value?: string;
-    /**
-     * Segregated view design of each mark family, when the plot knows its
-     * channel (e.g. `{ rect: { rule: 'length', axis: 'y', anchor: 'end' } }`).
-     * Families left out are inferred from the geometry.
-     */
-    design?: Partial<Record<MarkKind, DeclaredDesign>>;
     /**
      * Transforms the plot reads: transform names, or row shapes (`RowShape`)
      * that any transform, built-in or user, may yield. Any transform when absent.
@@ -223,8 +261,61 @@ export type PlotDefinition = {
 /** Built-in plot names: always registered, never replaced nor removed. */
 const builtIns = new Set<string>();
 
-/** Segregated view rules of `data-autk-part`. */
-const PART_RULES = ['auto', 'shrink', 'fill-y', 'fill-x', 'none'];
+/** Values of `data-autk-highlight`, a mark's own highlight over its family's. */
+const MARK_HIGHLIGHTS = ['none', 'boolean'];
+
+const SUBSET_CHANNELS: readonly SubsetChannel[] = ['length', 'position', 'band', 'angle', 'width', 'area', 'units'];
+const CUSTOM_PRESETS: readonly CustomPreset[] = ['glyph', 'trace', 'members'];
+const MARK_KINDS: readonly MarkKind[] = ['rect', 'point', 'sector', 'stroke', 'shape', 'html'];
+
+/** Values of `highlight` given as a word: the boolean, the inferred subset render, or a preset for every family. */
+const HIGHLIGHT_WORDS = ['boolean', 'subset', 'glyph', 'trace'];
+
+/**
+ * Checks a declared highlight.
+ *
+ * @param highlight Declared highlight.
+ * @param where Name of the plot, for the message.
+ * @throws If a word, mark family, mode, channel, or preset is unknown.
+ */
+function checkHighlight(highlight: PlotHighlight | undefined, where: string): void {
+    if (highlight === undefined || typeof highlight === 'function') return;
+    if (typeof highlight === 'string') {
+        if (HIGHLIGHT_WORDS.includes(highlight)) return;
+        const hint = (highlight as string) === 'members'
+            ? '; members needs the scale of its mark family, as { rect: { mode: \'custom\', preset: \'members\', scale } }'
+            : '';
+        throw new Error(`Plot "${where}": highlight "${highlight}" is unknown `
+            + `(expected ${HIGHLIGHT_WORDS.join(', ')}, a highlight per mark family, or a function)${hint}.`);
+    }
+    if (typeof highlight !== 'object' || highlight === null) {
+        throw new Error(`Plot "${where}": highlight must be a word (${HIGHLIGHT_WORDS.join(', ')}), a highlight per mark family, or a function.`);
+    }
+    for (const [kind, rule] of Object.entries(highlight)) {
+        if (!MARK_KINDS.includes(kind as MarkKind)) {
+            throw new Error(`Plot "${where}": highlight names an unknown mark family "${kind}" (expected ${MARK_KINDS.join(', ')}).`);
+        }
+        const mode = (rule as { mode?: unknown } | undefined)?.mode;
+        if (mode === 'boolean') continue;
+        if (mode === 'subset') {
+            const channel = (rule as { channel?: unknown }).channel;
+            if (!SUBSET_CHANNELS.includes(channel as SubsetChannel)) {
+                throw new Error(`Plot "${where}": the subset highlight of ${kind} needs a channel `
+                    + `(${SUBSET_CHANNELS.join(', ')}), not "${String(channel)}".`);
+            }
+            continue;
+        }
+        if (mode === 'custom') {
+            const preset = (rule as { preset?: unknown }).preset;
+            if (!CUSTOM_PRESETS.includes(preset as CustomPreset)) {
+                throw new Error(`Plot "${where}": the custom highlight of ${kind} needs a preset (${CUSTOM_PRESETS.join(', ')}), `
+                    + `not "${String(preset)}"; a plot's own custom highlight is highlight as a function.`);
+            }
+            continue;
+        }
+        throw new Error(`Plot "${where}": the highlight of ${kind} has an unknown mode "${String(mode)}" (expected boolean, subset, or custom).`);
+    }
+}
 
 /** Space between an axis label and the tick labels of its axis, in pixels. */
 const AXIS_LABEL_GAP = 10;
@@ -238,19 +329,41 @@ const registry = new Map<string, PlotDefinition>();
  * Registers a plot so `{ type: 'registered', plot: name }` draws with it.
  *
  * @param definition Plot to register.
- * @throws If the name is empty or taken, or `draw` is not a function.
+ * @throws If the name is empty or taken, `draw` is not a function, or `highlight` is unknown.
+ * @example
+ * registerPlot({
+ *   name: 'dots',
+ *   draw({ group, rows, width, height, value, axisX, axisY }) {
+ *     const x = d3.scaleBand(rows.map(r => String(value(r, 0))), [0, width]);
+ *     const y = d3.scaleLinear([0, d3.max(rows, r => Number(value(r, 1))) ?? 1], [height, 0]);
+ *     group.selectAll('circle').data(rows).join('circle')
+ *       .attr('class', 'autkMark') // a selectable mark, bound to its own row
+ *       .attr('cx', r => x(String(value(r, 0)))! + x.bandwidth() / 2)
+ *       .attr('cy', r => y(Number(value(r, 1))))
+ *       .attr('r', 5);
+ *     axisX(d3.axisBottom(x));
+ *     axisY(d3.axisLeft(y));
+ *   },
+ * });
+ *
+ * const plot = new AutkPlot(plotDiv, {
+ *   type: 'registered',
+ *   plot: 'dots',
+ *   collection: geojson,
+ *   attributes: { axis: ['category', '@transform'] },
+ *   transform: { preset: 'binning-1d' },
+ *   events: [PlotEvent.CLICK],
+ * });
  */
 export function registerPlot(definition: PlotDefinition): void {
     if (!definition || typeof definition.name !== 'string' || definition.name.trim() === '') {
-        throw new Error('A registered plot needs a non-empty name.');
+        throw new Error('registerPlot: the plot needs a non-empty name.');
     }
     if (registry.has(definition.name) || definition.name === 'registered') {
-        throw new Error(`A plot is already registered as "${definition.name}".`);
+        throw new Error(`registerPlot: a plot named "${definition.name}" is already registered.`);
     }
-    if (typeof definition.draw !== 'function') throw new Error(`Plot "${definition.name}": draw must be a function.`);
-    if (definition.drawPart !== undefined && typeof definition.drawPart !== 'function') {
-        throw new Error(`Plot "${definition.name}": drawPart must be a function.`);
-    }
+    if (typeof definition.draw !== 'function') throw new Error(`registerPlot: "${definition.name}" needs a draw function.`);
+    checkHighlight(definition.highlight, definition.name);
     registry.set(definition.name, definition);
 }
 
@@ -272,7 +385,7 @@ export function registerBuiltInPlot(definition: PlotDefinition): void {
  * @throws If the name is a built-in plot.
  */
 export function unregisterPlot(name: string): boolean {
-    if (builtIns.has(name)) throw new Error(`"${name}" is a built-in plot and cannot be unregistered.`);
+    if (builtIns.has(name)) throw new Error(`unregisterPlot: "${name}" is a built-in plot and cannot be unregistered.`);
     return registry.delete(name);
 }
 
@@ -360,7 +473,7 @@ function prepareConfig(config: PlotConfig, definition: PlotDefinition): void {
             throw new Error(`${label} only supports the ${names} transform preset${presets.length > 1 ? 's' : ''}.`);
         }
     }
-    if (config.topK && definition.topK === false) throw new Error('PlotBaseData: topK is not supported by this plot type.');
+    if (config.topK && definition.topK === false) throw new Error(`${definition.label ?? definition.name} does not support topK.`);
 }
 
 /**
@@ -388,15 +501,12 @@ function checkReducer(reducer: TransformReducer | undefined, definition: PlotDef
  */
 export function registeredPlot(name: string | undefined): PlotDefinition {
     const definition = name === undefined ? undefined : registry.get(name);
-    if (!definition) throw new Error(`No plot is registered as "${name}".`);
+    if (!definition) throw new Error(`registeredPlot: no plot is registered as "${name}". Call registerPlot first.`);
     return definition;
 }
 
 /** Whether draws refuse a drawing that breaks the contract; `checkPlot` turns it off to report. */
 let enforcing = true;
-
-/** Ids of clip paths, unique across plots on the page. */
-let clipCount = 0;
 
 /**
  * Plot drawn by a registered definition, with the generic interactions,
@@ -413,8 +523,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
     private _group: SVGGElement | null = null;
     /** Container of HTML marks of the current drawing. */
     private _html: HTMLDivElement | null = null;
-    /** Segregated view design of each mark family, inferred at every draw. */
-    partialDesigns: PartialDesign[] = [];
+    /** Highlight of each mark family, declared or inferred at every draw. */
+    highlightDesigns: HighlightDesign[] = [];
+    /** Whether the configuration asks for the boolean highlight (`provenance.highlight`). */
+    private _booleanHighlight = false;
     /** Result of the configured transform at the last draw. */
     private _transformResult: ExecutedPlotTransform | undefined;
     /** Series the plot drew through its marks at the last draw. */
@@ -432,11 +544,20 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * @throws If the drawing breaks the contract (see `checkPlot`).
      */
     constructor(config: PlotConfig, definition: PlotDefinition) {
+        // registerPlot checks it too; checkPlot draws definitions that were never registered.
+        checkHighlight(definition.highlight, definition.name);
         prepareConfig(config, definition);
         super(config);
         definition.validate?.(config);
         this.definition = definition;
         this._colorProperty = definition.color ?? 'fill';
+        const configured: unknown = config.provenance?.highlight;
+        if (configured !== undefined && configured !== 'boolean') {
+            throw new Error(`Plot "${definition.name}": provenance.highlight can only be 'boolean' (the whole mark); `
+                + `other modes are the plot's highlight, not "${String(configured)}".`);
+        }
+        this._booleanHighlight = configured === 'boolean';
+        this._configuredMargins = { ...this._margins };
         this.draw();
     }
 
@@ -497,12 +618,15 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * @throws If `draw` throws, or, while enforcing, if the drawing breaks the contract.
      */
     public render(): void {
+        // Each render starts from the configured margins; a second one keeps the room it was given.
+        if (!this._growingMargins && this._configuredMargins) this._margins = { ...this._configuredMargins };
         const width = this._width - this._margins.left - this._margins.right;
         const height = this._height - this._margins.top - this._margins.bottom;
 
         const svg = d3.select(this._div).selectChildren<SVGSVGElement, number>('svg')
             .data([0]).join('svg')
-            .attr('id', 'plot')
+            // A class, not an id: a page holds many plots, and an id would repeat.
+            .attr('class', 'autk-plot')
             .attr('width', this._width).attr('height', this._height)
             .style('width', `${this._width}px`).style('height', `${this._height}px`)
             // Pages may hide the host until a plot draws (the Autark gallery does).
@@ -521,7 +645,6 @@ export class RegisteredPlot extends PlotBaseInteractive {
 
         if (this._title) {
             svg.append('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + width / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -534,28 +657,34 @@ export class RegisteredPlot extends PlotBaseInteractive {
             .attr('class', 'autkBrush autkMarksGroup')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`);
         this._group = group.node();
+        const svgNode = svg.node();
+        const groupNode = group.node();
+        const htmlNode = html.node();
+        if (!svgNode || !groupNode || !htmlNode) throw new Error('SVG element could not be created.');
 
         const fields = this.renderAxisAttributes;
         const reducer = this._provenance.reducer;
         this._baseColor = this.definition.baseColor?.(this._data);
         const drawn = this.definition.draw({
-            svg: d3.select(svg.node()!),
-            group: d3.select(group.node()!),
-            html: d3.select(html.node()!),
+            svg: d3.select(svgNode),
+            group: d3.select(groupNode),
+            html: d3.select(htmlNode),
             rows: this._data,
             fields,
+            interactive: this._enabledEvents.length > 0,
             value: (row, index = 0) => valueAtPath(row, fields[index]),
             color: row => this.getMarkColor(row),
             width,
             height,
-            axisX: axis => this.drawAxis(svg, 'x', axis, width, height),
-            axisY: axis => this.drawAxis(svg, 'y', axis, width, height),
-            format: (index, fallback) => d3.format(this._tickFormats[index] || fallback || ''),
+            axisX: (axis, label) => this.drawAxis(svg, 'x', axis, width, height, label),
+            axisY: (axis, label) => this.drawAxis(svg, 'y', axis, width, height, label),
+            format: (index, fallback) => (this.hasTickFormat(index) ? d3.format(this._tickFormats?.[index] || fallback || '') : defaultTickFormat),
+            hasFormat: index => this.hasTickFormat(index),
             tickCount: (top, values, count) => (top < count && values.every(Number.isInteger) ? Math.max(1, Math.ceil(top)) : count),
-            legend: (keys, color, direction) => drawLegend(d3.select(group.node()!), keys, color, direction, width),
+            legend: (keys, color, direction) => drawLegend(d3.select(groupNode), keys, color, direction, width),
             partRange: !reducer ? undefined
                 : reducer === 'count' || reducer === 'sum' ? { additive: true }
-                : { additive: false, extent: (d3.extent(this._provenance.contributions, unit => unit.value) as [number, number] | [undefined, undefined]).map(v => v ?? 0) as [number, number] },
+                : { additive: false, extent: this.contributionExtent() },
             transform: this._transformConfig ? this._transformResult : undefined,
             options: { ...((this._transformConfig?.options ?? {}) as Record<string, unknown>) },
             axisLabels: [...this._axisLabels],
@@ -579,8 +708,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
                 .style('display', 'flex').style('flex-direction', 'column');
             if (this._title) {
                 html.insert('div', ':first-child')
-                    .attr('id', 'plotTitle')
-                    .attr('class', 'plot-title')
+                        .attr('class', 'plot-title')
                     .style('text-align', 'center')
                     .style('font-weight', '600')
                     .style('margin', '0 0 6px')
@@ -589,20 +717,48 @@ export class RegisteredPlot extends PlotBaseInteractive {
         }
         // A plot that draws its own brush areas (one per axis) brushes there, not on the whole group.
         if (!svg.selectAll('.autkBrush:not(.autkMarksGroup)').empty()) group.classed('autkBrush', false);
-        this.rotateCrowdedTicks(svg.node()!);
-        this.placeAxisLabels(svg.node()!);
+        this.rotateCrowdedTicks(svgNode);
+        // A title the margin cannot hold clear of its tick labels gets room: `draw` grows the margin,
+        // by at most half the plot area, and draws the plot once more.
+        const room = this.placeAxisLabels(svgNode);
+        if ((room.bottom > 0 || room.left > 0) && !this._growingMargins) {
+            this._grownMargins = {
+                ...this._margins,
+                bottom: this._margins.bottom + Math.min(room.bottom, height / 2),
+                left: this._margins.left + Math.min(room.left, width / 2),
+            };
+        }
         this.applyMarkStyles(d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark'));
+        // The pointer says a click selects: only on plots whose clicks do.
+        if (this._enabledEvents.includes(PlotEvent.CLICK)) d3.select(this._div).selectAll<HTMLElement, unknown>('.autkMark').style('cursor', 'pointer');
         const valueField = this.definition.value ?? fields[1] ?? 'value';
         const valueOf = (row: AutkDatum) => {
             const value = Number(valueAtPath(row, valueField));
             return Number.isFinite(value) ? value : Number((row as Record<string, unknown>).value);
         };
-        this.partialDesigns = withDeclaredDesigns(inferPartialDesign(
+        if (drawn && drawn.highlight !== undefined) {
+            // What draw returns completes the families; a word or a function belongs to the definition.
+            const returned: unknown = drawn.highlight;
+            if (typeof returned !== 'object' || returned === null) {
+                throw new Error(`Plot "${this.definition.name}": draw returns highlight as a highlight per mark family; `
+                    + `a word (${HIGHLIGHT_WORDS.join(', ')}) or a function goes in the definition's highlight.`);
+            }
+            checkHighlight(drawn.highlight, this.definition.name);
+        }
+        const inferred = inferHighlight(
             Array.from(this._div.querySelectorAll('.autkMark')),
             valueOf,
             this.aggregatesRows,
             this._colorProperty,
-        ), { ...this.definition.design, ...(drawn ? drawn.design : undefined) });
+        );
+        this.highlightDesigns = withDeclaredHighlight(inferred, this.declaredHighlight(inferred, drawn ? drawn.highlight : undefined));
+        // A declared members preset takes its scale from the declaration or from inference; with
+        // neither, it would draw nothing.
+        const unscaled = this.highlightDesigns.find(design => design.mode === 'custom' && design.preset === 'members' && !design.scale);
+        if (unscaled) {
+            throw new Error(`Plot "${this.definition.name}": the members highlight of ${unscaled.kind} needs a scale `
+                + '({ a, k, fields }), and the drawing gives none to infer.');
+        }
         // The clear area goes under the marks after the drawing, so the user code finds the group
         // empty: a plain `group.selectAll('rect')` never takes it for a mark.
         group.insert('rect', ':first-child')
@@ -614,7 +770,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         this.drawingViolations = this.checkDrawing();
         if (enforcing && this.drawingViolations.length > 0) {
             const shown = this.drawingViolations.slice(0, 3).map(v => `(${v.invariant}) ${v.message}`).join('; ');
-            throw new Error(`Plot "${this.definition.name}" breaks the drawing contract: ${shown}`);
+            throw new Error(`Plot "${this.definition.name}": the drawing breaks its contract: ${shown.replace(/\.?$/, '.')}`);
         }
     }
 
@@ -628,24 +784,26 @@ export class RegisteredPlot extends PlotBaseInteractive {
         axis: d3.Axis<Domain>,
         width: number,
         height: number,
+        label: number | string = side === 'x' ? 0 : 1,
     ): d3.Selection<SVGGElement, unknown, null, undefined> {
         const { left, top, bottom } = this._margins;
         const g = svg.insert('g', '.autkMarksGroup')
-            .attr('id', side === 'x' ? 'axisX' : 'axisY')
             .attr('class', `${side} axis`)
             .attr('transform', side === 'x' ? `translate(${left}, ${top + height})` : `translate(${left}, ${top})`);
         g.call(axis);
         if (axis.tickSizeInner() < 0) g.selectAll('.tick line').style('stroke', PlotStyle.grid);
-        const label = g.append('text')
+        const title = g.append('text')
             .attr('class', 'axis-label title')
             // An axis group has fill="none"; page styles still win over this attribute.
             .attr('fill', 'currentColor')
             // Centered on its axis; placeAxisLabels then sets it a gap away from the tick labels.
             .attr('text-anchor', 'middle')
-            .text(this._axisLabels[side === 'x' ? 0 : 1] ?? '');
-        if (side === 'x') label.attr('x', width / 2).attr('y', bottom / 2 + 10);
-        else label.attr('transform', 'rotate(-90)').attr('y', -left / 2 - 7).attr('x', -height / 2);
-        return d3.select(g.node()!) as d3.Selection<SVGGElement, unknown, null, undefined>;
+            .text(typeof label === 'string' ? label : this._axisLabels[label] ?? '');
+        if (side === 'x') title.attr('x', width / 2).attr('y', bottom / 2 + 10);
+        else title.attr('transform', 'rotate(-90)').attr('y', -left / 2 - 7).attr('x', -height / 2);
+        const node = g.node();
+        if (!node) throw new Error('SVG element could not be created.');
+        return d3.select(node) as d3.Selection<SVGGElement, unknown, null, undefined>;
     }
 
     /**
@@ -654,7 +812,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * only in a browser; elsewhere labels stay as drawn.
      */
     private rotateCrowdedTicks(svg: SVGSVGElement): void {
-        const texts = Array.from(svg.querySelectorAll<SVGTextElement>('#axisX .tick text'));
+        const texts = Array.from(svg.querySelectorAll<SVGTextElement>('.x.axis .tick text'));
         if (texts.length < 2 || texts.some(text => text.getAttribute('transform'))) return;
         const boxes = texts.map(text => text.getBoundingClientRect()).sort((a, b) => a.left - b.left);
         if (boxes.some(box => box.width === 0)) return;
@@ -671,26 +829,45 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * Sets each axis label, centered on its axis, one gap past its tick labels: the x label below
      * them, the y label (rotated) to their left, within the margin. Text is measured only in a
      * browser; elsewhere labels stay where `drawAxis` put them.
+     *
+     * @returns The room each margin lacks to hold its label clear of the tick labels (0 when it has it).
      */
-    private placeAxisLabels(svg: SVGSVGElement): void {
+    private placeAxisLabels(svg: SVGSVGElement): { bottom: number; left: number } {
+        const room = { bottom: 0, left: 0 };
         const { left, bottom } = this._margins;
         for (const side of ['x', 'y'] as const) {
-            const label = svg.querySelector<SVGTextElement>(`#axis${side.toUpperCase()} > .axis-label`);
+            const label = svg.querySelector<SVGTextElement>(`.${side}.axis > .axis-label`);
             if (!label?.textContent) continue;
             const own = label.getBoundingClientRect();
-            const ticks = Array.from(svg.querySelectorAll(`#axis${side.toUpperCase()} .tick text`))
+            const ticks = Array.from(svg.querySelectorAll(`.${side}.axis .tick text`))
                 .map(text => text.getBoundingClientRect())
                 .filter(box => box.width > 0 && box.height > 0);
             if (own.width === 0 || ticks.length === 0) continue;
             const y = Number(label.getAttribute('y'));
+            // Whether the label, moved by `shift` along its axis, is drawn over a tick label.
+            const covers = (shift: number) => {
+                const box = side === 'x'
+                    ? { left: own.left, right: own.right, top: own.top + shift, bottom: own.bottom + shift }
+                    : { left: own.left + shift, right: own.right + shift, top: own.top, bottom: own.bottom };
+                return ticks.some(tick => tick.left < box.right && box.left < tick.right && tick.top < box.bottom && box.top < tick.bottom);
+            };
+            // The label goes one gap past the tick labels, within the margin; the margin lacks room
+            // only when, held within it, the label would still be drawn over a tick label.
             if (side === 'x') {
                 const below = Math.max(...ticks.map(box => box.bottom)) + AXIS_LABEL_GAP;
-                label.setAttribute('y', String(Math.min(bottom - 4, y + below - own.top)));
+                const wanted = y + below - own.top;
+                const held = Math.min(bottom - 4, wanted);
+                if (covers(held - y)) room.bottom = wanted - held;
+                label.setAttribute('y', String(held));
             } else {
                 const beside = Math.min(...ticks.map(box => box.left)) - AXIS_LABEL_GAP;
-                label.setAttribute('y', String(Math.max(-left + own.width + 2, y - (own.right - beside))));
+                const wanted = y - (own.right - beside);
+                const held = Math.max(-left + own.width + 2, wanted);
+                if (covers(held - y)) room.left = held - wanted;
+                label.setAttribute('y', String(held));
             }
         }
+        return room;
     }
 
     /** SVG marks are colored on fill or stroke; HTML marks on their background. */
@@ -698,7 +875,9 @@ export class RegisteredPlot extends PlotBaseInteractive {
         super.applyMarkStyles(marks.filter((_d, i, nodes) => nodes[i] instanceof SVGElement));
         // HTML marks: a highlighted background, with text that stays readable on it.
         marks.filter((_d, i, nodes) => !(nodes[i] instanceof SVGElement))
-            .style('background-color', d => (this.isMarkHighlighted(d) ? this.highlightColor : this.renderColorAttribute ? this.getMarkColor(d) : 'transparent'))
+            .style('background-color', d => (this.isMarkHighlighted(d)
+                ? this.highlightColor
+                : this.renderColorAttribute ? this.getMarkColor(d) : 'transparent'))
             .style('color', d => (this.isMarkHighlighted(d) ? PlotStyle.provenanceText : null));
         const style = this.definition?.markStyle;
         if (style) {
@@ -711,7 +890,63 @@ export class RegisteredPlot extends PlotBaseInteractive {
         marks.filter((d, i, nodes) => this.isMarkHighlighted(d) && markKindOf(nodes[i] as Element, this._colorProperty) === 'stroke').raise();
     }
 
-    /** Every registered plot gets the segregated view, from its annotations or `drawPart`. */
+    /**
+     * The highlight declared for each mark family: the configuration's or the plot's boolean, a
+     * preset for every family, or the plot's families completed by what `draw` returned. A
+     * subset render left to inference (`'subset'`, a function, or nothing) declares no family.
+     */
+    private declaredHighlight(
+        inferred: HighlightDesign[],
+        drawn: Partial<Record<MarkKind, HighlightRule>> | undefined,
+    ): 'boolean' | Partial<Record<MarkKind, HighlightRule>> {
+        const own = this.definition.highlight;
+        if (this._booleanHighlight || own === 'boolean') return 'boolean';
+        const preset: Partial<Record<MarkKind, HighlightRule>> = own === 'glyph' || own === 'trace'
+            ? Object.fromEntries(inferred.map(design => [design.kind, { mode: 'custom', preset: own }]))
+            : {};
+        const families = own && typeof own === 'object' ? own : {};
+        return { ...preset, ...families, ...drawn };
+    }
+
+    /** Margins of the configuration: each render starts from them. */
+    private _configuredMargins: PlotMargins | undefined;
+    /** Whether this render is the second one, with margins grown for the axis titles. */
+    private _growingMargins = false;
+    /** Margins with room for the axis titles, which the last render found it lacked. */
+    private _grownMargins: PlotMargins | undefined;
+
+    /**
+     * Draws the plot; when an axis title had no room clear of its tick labels, draws it once more
+     * with the margin grown, transform included, since a transform may depend on the drawing area
+     * (the hexagons of binning-hex).
+     */
+    public override draw(): void {
+        super.draw();
+        const grown = this._grownMargins;
+        if (!grown) return;
+        this._grownMargins = undefined;
+        this._margins = grown;
+        this._growingMargins = true;
+        try {
+            super.draw();
+        } finally {
+            this._growingMargins = false;
+        }
+    }
+
+    /** Whether `tickFormats` give axis `index` a format of its own (a missing, undefined or null entry does not). */
+    private hasTickFormat(index: number): boolean {
+        const format = this._tickFormats?.[index];
+        return format !== undefined && format !== null;
+    }
+
+    /** Smallest and largest value a unit contributes to a row (`[0, 0]` with no unit). */
+    private contributionExtent(): [number, number] {
+        const [low, high] = d3.extent(this._provenance.contributions, unit => unit.value);
+        return [low ?? 0, high ?? 0];
+    }
+
+    /** Every registered plot gets the segregated view, from its highlight. */
     protected override supportsSegregatedView(): boolean {
         return true;
     }
@@ -722,13 +957,14 @@ export class RegisteredPlot extends PlotBaseInteractive {
     }
 
     /**
-     * Draws the selected part of each mark: with `drawPart` when given,
-     * otherwise with a copy of the mark following its `data-autk-part` rule.
+     * Draws the selected part of each mark: with the plot's own function when its highlight is
+     * one (and the configuration does not ask for the boolean highlight), otherwise with the
+     * highlight of its mark family, or of the mark itself (`data-autk-highlight`).
      */
     protected override renderSegregatedMarks(): void {
         const group = this.marksGroup;
         if (group.empty()) return;
-        group.selectAll('.autkPartial, .autkPartialSeries, .autkPartialClips').remove();
+        group.selectAll('.autkPartial, .autkPartialSeries').remove();
         d3.select(this._div).selectAll<HTMLElement, unknown>('.autkMark[data-autk-filled]')
             .style('background-image', null).attr('data-autk-filled', null).attr('data-autk-units', null);
 
@@ -738,12 +974,14 @@ export class RegisteredPlot extends PlotBaseInteractive {
         const marks = new Map<object, SVGGraphicsElement[]>();
         d3.select(this._div).selectAll<SVGGraphicsElement, unknown>('.autkMark').each(function (d) {
             if (d == null || typeof d !== 'object') return;
-            if (!marks.has(d)) marks.set(d, []);
-            marks.get(d)!.push(this);
+            const own = marks.get(d) ?? [];
+            own.push(this);
+            marks.set(d, own);
         });
 
-        if (this.definition.drawPart) {
-            this.definition.drawPart({
+        const own = this.definition.highlight;
+        if (typeof own === 'function' && !this._booleanHighlight) {
+            own({
                 group, parts, marksOf: row => marks.get(row) ?? [], color: this.highlightColor,
                 drawAuto: () => this.drawAutoParts(group, parts, marks),
             });
@@ -753,31 +991,38 @@ export class RegisteredPlot extends PlotBaseInteractive {
         this.drawAutoParts(group, parts, marks);
     }
 
-    /** Draws the part of every mark with its automatic (or `data-autk-part`) rule. */
+    /** Draws the part of every mark with the highlight of its family (or its own `data-autk-highlight`). */
     private drawAutoParts(
         group: d3.Selection<SVGGElement, unknown, null, undefined>,
         parts: SegregatedPart[],
         marks: Map<object, SVGGraphicsElement[]>,
     ): void {
-        const clips = group.append('defs').attr('class', 'autkPartialClips');
-        const designs = new Map(this.partialDesigns.map(design => [design.kind, design]));
+        const designs = new Map(this.highlightDesigns.map(design => [design.kind, design]));
+        // Every part is measured first and inserted afterwards: measuring a mark
+        // (getBBox) after a DOM insertion forces a new layout, which made one
+        // selection quadratic in the number of marks. Writes keep their order.
+        const writes: (() => void)[] = [];
+        let membersByRow: Map<ProvenanceId, ProvenanceContribution[]> | undefined;
         const context: AutoPartContext = {
             color: this.highlightColor,
             outline: PlotStyle.provenanceStroke,
-            clips: { append: (id, build) => build(clips.append('clipPath').attr('id', id).node()!) },
             selected: new Set(this.selection),
             membersOf: part => {
+                // Selected contributions by mark, indexed once per render, on the first part that asks.
+                if (!membersByRow) {
+                    const selected = new Set(this.selection.map(featureId));
+                    membersByRow = d3.group(this._provenance.contributions.filter(unit => selected.has(unit.source)), unit => unit.target);
+                }
                 const rowId = this.rowIdOf(part.datum);
-                const selected = new Set(this.selection.map(featureId));
-                return this._provenance.contributions
-                    .filter(unit => unit.target === rowId && selected.has(unit.source))
+                return (rowId === undefined ? [] : membersByRow.get(rowId) ?? [])
                     .map(unit => ({ feature: Number(unit.source.slice('feature:'.length)), value: unit.value }));
             },
         };
         this._moved = [];
         for (const part of parts) {
-            for (const mark of marks.get(part.datum) ?? []) this.copyPart(mark, part, clips, designs, context);
+            for (const mark of marks.get(part.datum) ?? []) this.copyPart(mark, part, designs, context, writes);
         }
+        for (const write of writes) write();
         const partOf = new Map(parts.map(part => [part.datum as object, part]));
         if (this._series.length > 0) this.drawPlotSeries(partOf);
         else this.drawSeries(group, marks, partOf, designs);
@@ -858,24 +1103,25 @@ export class RegisteredPlot extends PlotBaseInteractive {
         }
         path.style.setProperty('pointer-events', 'none');
         const parent = series.parentNode;
-        const firstPoint = Array.from(parent?.children ?? []).find(child => child.classList.contains('autkMark') && markKindOf(child, this._colorProperty) === 'point');
+        const firstPoint = Array.from(parent?.children ?? [])
+            .find(child => child.classList.contains('autkMark') && markKindOf(child, this._colorProperty) === 'point');
         parent?.insertBefore(path, firstPoint ?? series.nextSibling);
     }
 
     /**
      * Redraws the single `autkSeries` path (line or area) through the moved
-     * points of a `position` design, for a plot that returns no series: marks
+     * points of a `position` render, for a plot that returns no series: marks
      * without a part sit at the baseline. An area is drawn only when parts add up.
      */
     private drawSeries(
         group: d3.Selection<SVGGElement, unknown, null, undefined>,
         marks: Map<object, SVGGraphicsElement[]>,
         partOf: Map<object, SegregatedPart>,
-        designs: Map<MarkKind, PartialDesign>,
+        designs: Map<MarkKind, HighlightDesign>,
     ): void {
         const series = group.selectAll<SVGPathElement, unknown>('.autkSeries').nodes();
         const design = designs.get('point');
-        if (series.length !== 1 || design?.rule !== 'position') return;
+        if (series.length !== 1 || design?.mode !== 'subset' || design.channel !== 'position') return;
 
         const points: [number, number][] = [];
         for (const [row, elements] of marks) {
@@ -895,29 +1141,37 @@ export class RegisteredPlot extends PlotBaseInteractive {
     }
 
     /**
-     * Inserts, after the mark, a copy that shows only its selected part.
+     * Prepares a copy of the mark that shows only its selected part, and queues
+     * its insertion after the mark. Reads the mark's geometry now; every DOM
+     * write goes to `writes`, run once all marks are measured.
      */
     private copyPart(
         mark: SVGGraphicsElement,
         part: SegregatedPart,
-        clips: d3.Selection<SVGDefsElement, unknown, null, undefined>,
-        designs: Map<MarkKind, PartialDesign>,
+        designs: Map<MarkKind, HighlightDesign>,
         context: AutoPartContext,
+        writes: (() => void)[],
     ): void {
-        const rule = mark.getAttribute('data-autk-part') ?? 'auto';
-        if (rule === 'none') return;
+        const own = mark.getAttribute('data-autk-highlight');
+        if (own === 'none') return;
         const kind = markKindOf(mark, this._colorProperty);
-        const design = rule === 'auto' ? designs.get(kind) : undefined;
-        if (rule === 'auto' && !design) return;
+        const family = designs.get(kind);
+        if (!family) return;
+        // A mark may ask for the whole-mark highlight over its family's.
+        const design: HighlightDesign = own === 'boolean'
+            ? { kind, marks: family.marks, mode: 'boolean', reason: 'declared by the mark (data-autk-highlight)' }
+            : family;
+        const rule = ruleOf(design);
 
         // An HTML mark is filled to its part, from the anchor of the rule.
         if (kind === 'html') {
-            const forced = { rule: rule === 'fill-y' || rule === 'fill-x' ? 'length' as const : 'glyph' as const, axis: rule === 'fill-y' ? 'y' as const : 'x' as const, anchor: rule === 'fill-y' ? 'end' as const : 'start' as const };
-            const used = design ?? forced;
             const host = mark as unknown as HTMLElement;
-            host.style.setProperty('background-image', htmlFill(used, ratioOf(part, used.rule), this.highlightColor));
-            host.setAttribute('data-autk-filled', String(part.fraction));
-            host.setAttribute('data-autk-units', `${part.part.selectedUnits}/${part.part.totalUnits}`);
+            const fill = htmlFill(design, ratioOf(part, rule), this.highlightColor);
+            writes.push(() => {
+                host.style.setProperty('background-image', fill);
+                host.setAttribute('data-autk-filled', String(part.fraction));
+                host.setAttribute('data-autk-units', `${part.part.selectedUnits}/${part.part.totalUnits}`);
+            });
             return;
         }
 
@@ -940,40 +1194,22 @@ export class RegisteredPlot extends PlotBaseInteractive {
         // A subset statistic drawn inside a mark whose color encodes the value
         // takes the color of the statistic, and the outline of the selection,
         // since a data color alone does not tell it from the marks around it.
-        const statistic = design && (design.rule === 'glyph' || design.rule === 'area') ? this.statisticColor(part) : null;
+        const statistic = rule === 'glyph' || rule === 'area' ? this.statisticColor(part) : null;
         if (statistic) {
             copy.style.setProperty(property, statistic);
             outline(copy, context.outline);
         }
 
-        if (design) {
+        const drawn = drawAutoPart(mark, part, design, copy, context, statistic !== null);
+        // Moved points and traced lines are drawn over the marks they cross.
+        if (rule === 'position' || rule === 'trace') this._moved.push(...drawn);
+        writes.push(() => {
             let after: Node = mark;
-            for (const drawn of drawAutoPart(mark, part, design, copy, context, statistic !== null)) {
-                mark.parentNode?.insertBefore(drawn, after.nextSibling);
-                after = drawn;
-                // Moved points and traced lines are drawn over the marks they cross.
-                if (design.rule === 'position' || design.rule === 'trace') this._moved.push(drawn);
+            for (const element of drawn) {
+                mark.parentNode?.insertBefore(element, after.nextSibling);
+                after = element;
             }
-            return;
-        }
-
-        const box = mark.getBBox();
-        const own = mark.getAttribute('transform') ?? '';
-        if (rule === 'shrink') {
-            const [ox, oy] = originOf(mark, box);
-            const s = Math.sqrt(part.fraction);
-            copy.setAttribute('transform', `${own} translate(${ox}, ${oy}) scale(${s}) translate(${-ox}, ${-oy})`.trim());
-        } else {
-            const id = `autk-part-${++clipCount}`;
-            const f = part.fraction;
-            clips.append('clipPath').attr('id', id).append('rect')
-                .attr('x', box.x)
-                .attr('y', rule === 'fill-y' ? box.y + box.height * (1 - f) : box.y)
-                .attr('width', rule === 'fill-x' ? box.width * f : box.width)
-                .attr('height', rule === 'fill-y' ? box.height * f : box.height);
-            copy.setAttribute('clip-path', `url(#${id})`);
-        }
-        mark.parentNode?.insertBefore(copy, mark.nextSibling);
+        });
     }
 
     /**
@@ -994,8 +1230,9 @@ export class RegisteredPlot extends PlotBaseInteractive {
      */
     protected override markIntersectsRect(node: SVGGeometryElement, x0: number, y0: number, x1: number, y1: number): boolean {
         const group = this.marksGroup.node();
-        const toNode = group && typeof node.getScreenCTM === 'function' && typeof group.getScreenCTM === 'function'
-            ? node.getScreenCTM()?.inverse().multiply(group.getScreenCTM()!)
+        const groupMatrix = group && typeof group.getScreenCTM === 'function' ? group.getScreenCTM() : null;
+        const toNode = groupMatrix && typeof node.getScreenCTM === 'function'
+            ? node.getScreenCTM()?.inverse().multiply(groupMatrix)
             : null;
         if (!toNode || toNode.isIdentity) return super.markIntersectsRect(node, x0, y0, x1, y1);
 
@@ -1012,8 +1249,8 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * 1. Every mark binds a rendered row. 2. Every rendered row produced by features has a mark,
      * or is drawn as context (`autkContext`, e.g. a treemap group frame). 3. Marks are inside the
      * marks group (or the HTML container). 4. Marks are SVG shapes with a box, or HTML elements
-     * (click only). 5. `data-autk-part` and `data-autk-origin` are valid. (6, the segregated view
-     * on a test selection, is run by `checkPlot`.)
+     * (click only). 5. The highlight annotations are valid (`data-autk-highlight`). (6, the
+     * segregated view on a test selection, is run by `checkPlot`.)
      */
     private checkDrawing(): ContractViolation[] {
         const violations: ContractViolation[] = [];
@@ -1031,7 +1268,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
         d3.select(this._div).selectAll<Element, unknown>('.autkMark').each(function (d, index) {
             const tag = `<${this.tagName.toLowerCase()}> mark ${index}`;
             if (d == null || typeof d !== 'object' || !rows.has(d)) {
-                report(1, `${tag} binds ${d == null ? 'no datum' : typeof d !== 'object' ? `a ${typeof d}, not one of the rows it received (bind the rows themselves)` : 'an object that is not a rendered row (a copy?)'}`);
+                const bound = d == null ? 'no datum'
+                    : typeof d !== 'object' ? `a ${typeof d}, not one of the rows it received (bind the rows themselves)`
+                    : 'an object that is not a rendered row (a copy?)';
+                report(1, `${tag} binds ${bound}`);
             } else {
                 marked.add(d);
             }
@@ -1044,10 +1284,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
             } else if (brushes) {
                 report(4, `${tag} is HTML: HTML marks support click, not brush`);
             }
-            const rule = this.getAttribute('data-autk-part');
-            if (rule !== null && !PART_RULES.includes(rule)) report(5, `${tag} has data-autk-part="${rule}" (expected ${PART_RULES.join(', ')})`);
-            const origin = this.getAttribute('data-autk-origin');
-            if (origin !== null && parseOrigin(origin) === null) report(5, `${tag} has data-autk-origin="${origin}" (expected "x,y")`);
+            const highlight = this.getAttribute('data-autk-highlight');
+            if (highlight !== null && !MARK_HIGHLIGHTS.includes(highlight)) {
+                report(5, `${tag} has data-autk-highlight="${highlight}" (expected ${MARK_HIGHLIGHTS.join(' or ')})`);
+            }
         });
 
         // Rows drawn only as context, such as the frame of a treemap group.
@@ -1059,10 +1299,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
             if (broken) report(2, `<${this.tagName.toLowerCase()}> context ${index} has NaN in its geometry (${broken}): its row is not drawn`);
         });
         this._data.forEach((row, index) => {
-            // A row produced by no feature (a zero density) has nothing to select or paint.
+            // A row produced by no feature (a zero density) has nothing to select or highlight.
             const empty = Array.isArray(row.autkIds) && row.autkIds.length === 0;
             if (!marked.has(row) && !context.has(row) && !empty) {
-                report(2, `row ${index} (${this.rowIdOf(row) ?? '?'}) has no mark: it can be neither selected nor painted (draw it as autkMark, or as autkContext if it is only context)`);
+                report(2, `row ${index} (${this.rowIdOf(row) ?? '?'}) has no mark: it can be neither selected nor highlighted `
+                    + '(draw it as autkMark, or as autkContext if it is only context)');
             }
         });
         return violations;
@@ -1079,17 +1320,24 @@ export class RegisteredPlot extends PlotBaseInteractive {
         this.setSelection(half, shares);
         // Only rows drawn as marks show a part; context rows do not.
         const marked = new Set<unknown>();
-        // A mark annotated `data-autk-part="none"` asks for no part.
-        d3.select(this._div).selectAll('.autkMark:not([data-autk-part="none"])').each(d => { marked.add(d); });
+        // A mark annotated `data-autk-highlight="none"` asks for no part.
+        d3.select(this._div).selectAll('.autkMark:not([data-autk-highlight="none"])').each(d => { marked.add(d); });
         const expected = new Set(this.segregatedParts().filter(p => marked.has(p.datum)).map(p => p.mark));
-        const drawn = new Set(Array.from(this._div.querySelectorAll('.autkPartial, .autkMark[data-autk-filled]')).map(e => e.getAttribute('data-autk-provenance')));
+        const drawn = new Set(Array.from(this._div.querySelectorAll('.autkPartial, .autkMark[data-autk-filled]'))
+            .map(element => element.getAttribute('data-autk-provenance')));
         const misplaced = Array.from(this._div.querySelectorAll('.autkPartial')).filter(e => !this.marksGroup.node()?.contains(e));
         this.setSelection([]);
         if (expected.size === 0) return null;
 
         const violations: ContractViolation[] = [];
         const missing = Array.from(expected).filter(mark => !drawn.has(mark));
-        if (missing.length > 0) violations.push({ invariant: 6, message: `${missing.length} of ${expected.size} selected parts are not drawn (e.g. ${missing[0]}); partial elements need class autkPartial and data-autk-provenance` });
+        if (missing.length > 0) {
+            violations.push({
+                invariant: 6,
+                message: `${missing.length} of ${expected.size} selected parts are not drawn (e.g. ${missing[0]}); `
+                    + 'partial elements need class autkPartial and data-autk-provenance',
+            });
+        }
         if (misplaced.length > 0) violations.push({ invariant: 6, message: `${misplaced.length} partial elements are outside the marks group` });
         return violations;
     }
@@ -1109,33 +1357,28 @@ function invalidGeometry(element: Element): string | null {
     return GEOMETRY.find(name => /NaN/.test(element.getAttribute(name) ?? '')) ?? null;
 }
 
-/** Parses `data-autk-origin="x,y"`. */
-function parseOrigin(value: string): [number, number] | null {
-    const numbers = value.split(',').map(Number);
-    return numbers.length === 2 && numbers.every(Number.isFinite) ? [numbers[0], numbers[1]] : null;
-}
-
-/** Scaling origin of a mark: `data-autk-origin`, or the center of its box. */
-function originOf(mark: Element, box: DOMRect): [number, number] {
-    const origin = mark.getAttribute('data-autk-origin');
-    return (origin && parseOrigin(origin)) || [box.x + box.width / 2, box.y + box.height / 2];
-}
-
 /**
  * Draws a plot definition on sample data and checks it against the drawing
  * contract, reporting which invariant each violation breaks.
  *
  * A host outside the document is attached off screen while the check runs:
- * a browser measures no geometry outside the document, and the design of the
- * partial view is inferred from that geometry. It is detached again after.
+ * a browser measures no geometry outside the document, and the highlight is
+ * inferred from that geometry. It is detached again after.
  *
  * @param definition Plot to check.
  * @param div Host element for the check drawing (it is left drawn).
  * @param config Plot configuration (collection, attributes, transform, ...).
  * @returns Violations by invariant (invariant `0` when `draw` throws or the plot refuses the
- * config), and the segregated view design inferred for each mark family.
+ * config), and the highlight resolved for each mark family.
+ * @example
+ * const report = checkPlot(definition, document.createElement('div'), {
+ *   collection: geojson,
+ *   attributes: { axis: ['category', '@transform'] },
+ *   transform: { preset: 'binning-1d' },
+ * });
+ * report.violations.forEach(v => console.warn(`invariant ${v.invariant}: ${v.message}`));
  */
-export function checkPlot(definition: PlotDefinition, div: HTMLElement, config: Omit<PlotConfig, 'div'>): ContractReport & { designs: PartialDesign[] } {
+export function checkPlot(definition: PlotDefinition, div: HTMLElement, config: Omit<PlotConfig, 'div'>): ContractReport & { designs: HighlightDesign[] } {
     if (div.isConnected || typeof document === 'undefined' || !document.body) return checkConnected(definition, div, config);
     const probe = document.createElement('div');
     probe.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden';
@@ -1150,7 +1393,7 @@ export function checkPlot(definition: PlotDefinition, div: HTMLElement, config: 
 }
 
 /** `checkPlot` on a host in the document. */
-function checkConnected(definition: PlotDefinition, div: HTMLElement, config: Omit<PlotConfig, 'div'>): ContractReport & { designs: PartialDesign[] } {
+function checkConnected(definition: PlotDefinition, div: HTMLElement, config: Omit<PlotConfig, 'div'>): ContractReport & { designs: HighlightDesign[] } {
     enforcing = false;
     let plot: RegisteredPlot;
     try {
@@ -1175,5 +1418,5 @@ function checkConnected(definition: PlotDefinition, div: HTMLElement, config: Om
         if (parts === null) skipped.push(6);
         else violations.push(...parts);
     }
-    return { violations, skipped, ...(plot.drawingTruncated ? { truncated: true } : {}), designs: plot.partialDesigns };
+    return { violations, skipped, ...(plot.drawingTruncated ? { truncated: true } : {}), designs: plot.highlightDesigns };
 }

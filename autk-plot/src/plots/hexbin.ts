@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'hexbin',
  *   collection: geojson,
- *   attributes: { axis: ['shape_area', 'shape_leng'] },
+ *   attributes: { axis: ['shape_area', 'shape_leng'], color: '@transform' },
  *   transform: { preset: 'binning-hex', options: { radius: 16 } }
  * });
  */
@@ -48,7 +48,7 @@ export const hexbin: PlotDefinition = {
     transformOptions: area => area,
     // Light to medium tones of the scheme, under the provenance color.
     colorDomain: PlotStyle.softSequentialDomain,
-    design: { shape: { rule: 'glyph' } },
+    highlight: { shape: { mode: 'custom', preset: 'glyph' } },
 
     draw({ group, rows, width, height, transform, format, axisX, axisY }) {
         const grid = shapeOutput(transform, 'binning-hex')
@@ -60,13 +60,12 @@ export const hexbin: PlotDefinition = {
         axisY(d3.axisLeft(y).ticks(5).tickFormat(format(1, '~s')));
 
         group.selectAll('path.autkMark')
-            .data(rows as unknown as BinningHexRow[])
+            .data(rows as BinningHexRow[])
             .join('path')
             .attr('class', 'autkMark')
             .attr('d', row => hexagonPath(grid.radius, row.cx, row.cy))
             .style('stroke', '#ffffff')
             .style('stroke-width', 0.75)
-            .style('cursor', 'pointer')
             .selectAll('title').data(row => [row]).join('title')
             .text(row => `${row.label}\nn = ${row.count}, value = ${d3.format('~s')(row.value)}`);
     },

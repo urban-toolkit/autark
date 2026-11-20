@@ -36,7 +36,7 @@ export const waffle: PlotDefinition = {
     requiresTransform: true,
     reducers: ['count'],
     topK: false,
-    design: { rect: { rule: 'units' } },
+    highlight: { rect: { mode: 'subset', channel: 'units' } },
 
     draw({ group, rows, width, height, value }) {
         // One block per group, in data order, a blank line between blocks.
@@ -78,7 +78,6 @@ export const waffle: PlotDefinition = {
             .attr('width', size)
             .attr('height', size)
             .attr('rx', size * 0.15)
-            .style('cursor', 'pointer')
             .append('title')
             .text((row, i) => `${value(row, 0)}: feature ${squares[i].feature}`);
     },

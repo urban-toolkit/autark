@@ -84,7 +84,7 @@ export function binnedProvenance(options: {
     const { rows, buckets, bins, binLabel, aggregateLabel = 'aggregates', rowKeys, reducer } = options;
     const unknown = [...buckets.map(bucket => bucket.key), ...rowKeys].find(key => !bins.has(key));
     if (unknown !== undefined) {
-        throw new Error(`binnedProvenance: the key "${unknown}" has no bin; every bucket key and row key needs one (indexedBins)`);
+        throw new Error(`binnedProvenance: the key "${unknown}" has no bin; every bucket key and row key needs one (indexedBins).`);
     }
     const aggregateOf = (key: string) => bins.get(key)!.replace(/^[^:]+:/, 'aggregate:');
 

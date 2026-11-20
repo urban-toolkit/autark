@@ -22,6 +22,7 @@ import type { PlotConfig } from '../api';
 import { PlotStyle } from '../plot-style';
 import type { AutkDatum } from '../types-plot';
 
+import type { HighlightRule, MarkKind } from './partial-design';
 import type { PlotDefinition, PlotDrawContext, PlotSeries } from './registered';
 
 /** Orders buckets as dates, then as numbers, then as text. */
@@ -36,20 +37,21 @@ function compareBuckets(a: string, b: string): number {
 /** Labels of a series transform: time and value, or bucket and value for events. */
 function seriesLabels(config: PlotConfig): Partial<PlotConfig> {
     const series = config.transform?.preset === 'reduce-series';
-    return { tickFormats: ['~s', '~s'], labels: { axis: series ? ['time', 'value'] : ['bucket', 'value'], title: series ? 'Series' : 'Events over time' } };
+    return { labels: { axis: series ? ['time', 'value'] : ['bucket', 'value'], title: series ? 'Series' : 'Events over time' } };
 }
 
 /** Draws the points and the line, and under them the area when `filled`. */
-function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDefinition['design']; series: PlotSeries[] } {
-    const { group, width, height, value, format, axisX, axisY, partRange } = context;
+function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Partial<Record<MarkKind, HighlightRule>>; series: PlotSeries[] } {
+    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange } = context;
     const bucket = (row: AutkDatum) => String(value(row, 0));
     const amount = (row: AutkDatum) => Number(value(row, 1));
     const rows = context.rows.slice().sort((a, b) => compareBuckets(bucket(a), bucket(b)));
     const index = new Map(rows.map((row, i) => [row, i]));
-    // Numeric buckets take the x format; other labels are kept as they are.
+    const positionOf = (row: AutkDatum) => index.get(row)!;
+    // A bucket is written as it is ("2020"), or with the x format the configuration gives, when it reads as a number.
     const label = (row: AutkDatum) => {
         const n = Number(bucket(row));
-        return Number.isFinite(n) && String(n) === bucket(row) ? format(0)(n) : bucket(row);
+        return hasFormat(0) && Number.isFinite(n) && String(n) === bucket(row) ? format(0)(n) : bucket(row);
     };
 
     // Parts lie between 0 and their bucket (count, sum), or anywhere in the reduced values (avg, min, max).
@@ -60,7 +62,9 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDe
     const x = d3.scaleLinear([0, Math.max(rows.length, 1) - 1], [0, width]);
     const y = d3.scaleLinear([partRange?.additive && low >= 0 ? 0 : low - pad, high + pad], [height, 0]);
 
-    axisX(d3.axisBottom(x).ticks(Math.min(Math.max(rows.length, 1), 12)).tickFormat(i => (rows[+i] ? label(rows[+i]) : format(0)(+i))))
+    // Ticks at buckets only: with two or three, d3 places some halfway between them.
+    const buckets = x.ticks(Math.min(Math.max(rows.length, 1), 12)).filter(Number.isInteger);
+    axisX(d3.axisBottom(x).tickValues(buckets).tickFormat(i => (rows[+i] ? label(rows[+i]) : String(i))))
         .selectAll('.tick text')
         .style('font-size', '11px')
         .attr('transform', 'rotate(-45)')
@@ -76,7 +80,7 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDe
         const [bottom, top] = y.domain();
         const base = clamped(Math.min(Math.max(0, bottom), top));
         const areaOf = (v: (row: AutkDatum) => number | null) => d3.area<AutkDatum>()
-            .x(row => x(index.get(row)!))
+            .x(row => x(positionOf(row)))
             .y0(base)
             .y1(row => clamped(v(row) ?? 0))(rows);
         const area = group.append('path')
@@ -87,12 +91,14 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDe
             .style('fill', PlotStyle.default)
             .style('fill-opacity', 0.35)
             .style('pointer-events', 'none');
-        series.push({ element: area.node()!, rows, path: areaOf });
+        const node = area.node();
+        if (!node) throw new Error('SVG element could not be created.');
+        series.push({ element: node, rows, path: areaOf });
     }
 
     const lineOf = (v: (row: AutkDatum) => number | null) => d3.line<AutkDatum>()
         .defined(row => v(row) !== null)
-        .x(row => x(index.get(row)!))
+        .x(row => x(positionOf(row)))
         .y(row => y(v(row)!))(rows);
     const line = group.append('path')
         .datum(rows)
@@ -101,13 +107,15 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDe
         .attr('stroke', PlotStyle.default)
         .attr('stroke-width', 1.5)
         .attr('d', lineOf(amount));
-    series.push({ element: line.node()!, rows, path: lineOf });
+    const node = line.node();
+    if (!node) throw new Error('SVG element could not be created.');
+    series.push({ element: node, rows, path: lineOf });
 
     group.selectAll('circle.autkMark')
         .data(rows)
         .join('circle')
         .attr('class', 'autkMark')
-        .attr('cx', row => x(index.get(row)!))
+        .attr('cx', row => x(positionOf(row)))
         .attr('cy', row => y(amount(row)))
         .attr('r', 5)
         .append('title')
@@ -125,7 +133,7 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { design: PlotDe
         .text(d => d);
 
     // A point's value is its height above 0: the part of a bucket sits at the subset value.
-    return { design: { point: { rule: 'position', axis: 'y', baseline: y(0) } }, series };
+    return { highlight: { point: { mode: 'subset', channel: 'position', axis: 'y', baseline: y(0) } }, series };
 }
 
 /** Points of a series transform, one per bucket, joined by a line. */

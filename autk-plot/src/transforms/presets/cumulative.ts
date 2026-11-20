@@ -72,7 +72,11 @@ export type CumulativeRow = {
  * numeric and the total.
  * @throws If the reducer is not additive.
  */
-export function runCumulative(rows: AutkDatum[], options: NonNullable<CumulativeTransformConfig['options']>, columns: string[]): Omit<ExecutedCumulativeTransform, 'preset'> {
+export function runCumulative(
+    rows: AutkDatum[],
+    options: NonNullable<CumulativeTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedCumulativeTransform, 'preset'> {
     const attr = columns[0] ?? '';
     const reducer = options.reducer ?? 'count';
     if (reducer !== 'count' && reducer !== 'sum') {

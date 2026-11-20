@@ -107,7 +107,11 @@ function extentOf(rows: AutkDatum[], attr: string): [number, number] {
  * @param columns `columns[0]` is the x column, `columns[1]` the y column.
  * @returns Rows of the `binning-hex` shape and their provenance, with the data extent and radius.
  */
-export function runBinningHex(rows: AutkDatum[], options: NonNullable<BinningHexTransformConfig['options']>, columns: string[]): Omit<ExecutedBinningHexTransform, 'preset'> {
+export function runBinningHex(
+    rows: AutkDatum[],
+    options: NonNullable<BinningHexTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedBinningHexTransform, 'preset'> {
     const xAttr = columns[0] ?? '';
     const yAttr = columns[1] ?? '';
     const valueAttr = options.value;

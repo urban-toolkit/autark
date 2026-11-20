@@ -97,7 +97,10 @@ export function checkProvenanceReport(
         for (const pair of relation.pairs) {
             if (!stageIds.get(source)?.has(pair.source)) { report(3, `relation ${source} → ${target} has unknown source "${pair.source}"`); break; }
             if (!stageIds.get(target)?.has(pair.target)) { report(3, `relation ${source} → ${target} has unknown target "${pair.target}"`); break; }
-            if (!Number.isFinite(pair.weight) || pair.weight < 0) { report(3, `relation ${source} → ${target} has weight ${pair.weight} (must be finite and ≥ 0)`); break; }
+            if (!Number.isFinite(pair.weight) || pair.weight < 0) {
+                report(3, `relation ${source} → ${target} has weight ${pair.weight} (must be finite and ≥ 0)`);
+                break;
+            }
         }
     });
 
@@ -228,6 +231,9 @@ function provenanceStructureError(rows: unknown, provenance: TransformProvenance
  * @param options `transform.options` to run with.
  * @param columns Source columns, as in `attributes.axis` without `'@transform'`.
  * @returns Violations, empty when the transform honors the contract.
+ * @example
+ * const violations = checkTransform(registeredTransform('by-initial'), geojson, {}, ['name']);
+ * if (violations.length > 0) console.warn(violations.join('\n'));
  */
 export function checkTransform(
     definition: TransformDefinition,

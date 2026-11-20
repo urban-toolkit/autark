@@ -69,7 +69,11 @@ export type DensityPointRow = {
  * @param columns `[value]` for one curve, or `[group, value]` for one curve per group.
  * @returns Rows of the `density` shape and their provenance, with the groups and the bandwidth.
  */
-export function runDensity(rows: AutkDatum[], options: NonNullable<DensityTransformConfig['options']>, columns: string[]): Omit<ExecutedDensityTransform, 'preset'> {
+export function runDensity(
+    rows: AutkDatum[],
+    options: NonNullable<DensityTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedDensityTransform, 'preset'> {
     const [groupAttr, valueAttr] = columns.length >= 2 ? [columns[0], columns[1]] : [null, columns[0] ?? ''];
     const pointsPerCurve = Math.max(2, options.points ?? DEFAULT_POINTS);
 

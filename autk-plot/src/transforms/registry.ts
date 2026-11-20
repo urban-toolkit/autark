@@ -121,10 +121,31 @@ const registry = new Map<string, TransformDefinition>();
 const builtIns = new Set<string>();
 
 /**
- * Adds a transform to the registry.
+ * Adds a transform to the registry, used as `transform: { preset: 'registered', name }`.
  *
  * @param definition Transform contract: name, row shape, and `run`.
  * @throws If the name is empty or taken, the shape is unknown, or `run` is not a function.
+ * @example
+ * // Regions grouped by the initial of a column: many regions per bar (N:1).
+ * registerTransform({
+ *   name: 'by-initial',
+ *   shape: 'category-value',
+ *   run(rows, _options, columns) {
+ *     const buckets = collectBuckets({
+ *       rows,
+ *       bucketOf: row => String(row[columns[0]] ?? '').charAt(0).toUpperCase() || null,
+ *       reducer: 'count',
+ *     });
+ *     const keys = buckets.map(b => b.key);
+ *     return {
+ *       rows: buckets.map(b => ({ label: b.key, value: b.value, autkIds: b.autkIds })),
+ *       provenance: binnedProvenance({
+ *         rows, buckets, bins: indexedBins(keys, keys, 'initial'),
+ *         binLabel: 'initials', rowKeys: keys, reducer: 'count',
+ *       }),
+ *     };
+ *   },
+ * });
  */
 export function registerTransform(definition: TransformDefinition): void {
     const { name, shape, run } = definition;
@@ -178,7 +199,7 @@ export function freezeDefinition<T extends object>(definition: T): T {
  * @throws If the name is a built-in transform.
  */
 export function unregisterTransform(name: string): boolean {
-    if (builtIns.has(name)) throw new Error(`"${name}" is a built-in transform and cannot be unregistered.`);
+    if (builtIns.has(name)) throw new Error(`unregisterTransform: "${name}" is a built-in transform and cannot be unregistered.`);
     return registry.delete(name);
 }
 
@@ -192,7 +213,7 @@ export function unregisterTransform(name: string): boolean {
 export function registeredTransform(name: string): TransformDefinition {
     const definition = registry.get(name);
     if (!definition) {
-        throw new Error(`No transform is registered as "${name}". Call registerTransform first.`);
+        throw new Error(`registeredTransform: no transform is registered as "${name}". Call registerTransform first.`);
     }
     return definition;
 }
@@ -291,8 +312,11 @@ export function shapeProblems(output: TransformOutput, shape: RowShape): string[
     const { fields, extras = [], references = {}, unique } = SHAPES[shape];
     const missing = rows.findIndex(row => !Array.isArray(row?.autkIds) || fields.some(field => row[field] === undefined));
     if (missing >= 0) {
-        const quoted = [...fields, 'autkIds'].map(field => `"${field}"`);
-        problems.push(`row ${missing} lacks ${quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')}, or ${quoted[quoted.length - 1]}` : quoted[0]} required by the "${shape}" shape`);
+        const row = rows[missing];
+        const lacking = [...fields.filter(field => row?.[field] === undefined), ...(Array.isArray(row?.autkIds) ? [] : ['autkIds'])];
+        const quoted = lacking.map(field => `"${field}"`);
+        const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}` : quoted[0];
+        problems.push(`row ${missing} lacks ${list}, required by the "${shape}" shape`);
     }
     if (unique) {
         const seen = new Map<unknown, number>();
@@ -303,7 +327,8 @@ export function shapeProblems(output: TransformOutput, shape: RowShape): string[
             return false;
         });
         if (repeated >= 0) {
-            problems.push(`rows ${seen.get(rows[repeated][unique])} and ${repeated} share the ${unique} "${String(rows[repeated][unique])}": each row of the "${shape}" shape is one mark, named by its ${unique}`);
+            problems.push(`rows ${seen.get(rows[repeated][unique])} and ${repeated} share the ${unique} `
+                + `"${String(rows[repeated][unique])}": each row of the "${shape}" shape is one mark, named by its ${unique}`);
         }
     }
     for (const [kind, { fields: ends, of }] of Object.entries(references)) {

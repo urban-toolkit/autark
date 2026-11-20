@@ -1,9 +1,9 @@
-// ---- Plot entry point ---------------------------------------------------
+// ─── Plot entry point ───────────────────────────────────────────────────────
 
 /** Unified plot wrapper used to instantiate and interact with plot types. */
 export { AutkPlot } from './plot';
 
-// ---- API and config types -----------------------------------------------
+// ─── API and config types ───────────────────────────────────────────────────
 
 export type { AutkDatum } from './types-plot';
 
@@ -30,7 +30,7 @@ export type {
 	UnifiedPlotConfig,
 } from './api';
 
-// ---- Events -------------------------------------------------------------
+// ─── Events ─────────────────────────────────────────────────────────────────
 
 /** Supported plot interaction events emitted by plot instances. */
 export { PlotEvent } from './types-events';
@@ -42,12 +42,14 @@ export { PlotBaseInteractive } from './plot-base-interactive';
 /** Rendered rows and bindings of an executed transform. */
 export type { ResolvedPlotTransform } from './plot-base-data';
 
-// ---- Shared style helpers -----------------------------------------------
+// ─── Shared style helpers ───────────────────────────────────────────────────
 
 /** Default and highlight style helpers shared by every plot. */
 export { PlotStyle } from './plot-style';
+/** Number formats of the axes and bin labels: SI prefixes from one up, decimals under one ("0.5", not "500m"). */
+export { defaultTickFormat, formatSiOrDecimal } from './number-format';
 
-// ---- Provenance ---------------------------------------------------------
+// ─── Provenance ─────────────────────────────────────────────────────────────
 
 /** Provenance graph, relation algebra, and entity id helpers. */
 export { ProvenanceModel, compose, transpose, image, cardinality, featureId, markId } from './provenance';
@@ -55,10 +57,9 @@ export { ProvenanceModel, compose, transpose, image, cardinality, featureId, mar
 export { checkProvenance, checkProvenanceReport, checkTransform, checkTransformReport } from './provenance/validate';
 /** Plot registration, shared by built-in and user plots, and the check of the drawing contract. */
 export { registerPlot, unregisterPlot, registeredPlot, hasRegisteredPlot, checkPlot } from './plots';
-export type { PlotArrangeContext, PlotDefinition, PlotDrawContext, PlotPartContext, PlotSeries } from './plots';
-/** Design space of the segregated view, inferred from the marks of a drawing. */
-export { htmlFill, inferPartialDesign, markKindOf, memberOffset, ownMatrix, parseFlow, parseRibbon, parseSector, ratioOf } from './plots';
-export type { DeclaredDesign, MarkKind, PartialDesign, PartialRule } from './plots';
+export type { PlotArrangeContext, PlotDefinition, PlotDrawContext, PlotHighlight, PlotHighlightContext, PlotSeries } from './plots';
+/** Highlight of a selection from another view (boolean, subset, custom), as a plot declares it and `checkPlot` reports it. */
+export type { CustomPreset, HighlightDesign, HighlightMode, HighlightRule, MarkKind, SubsetChannel } from './plots';
 export { treeOf } from './plots';
 export type { TreeDatum } from './plots';
 export type { SegregatedPart } from './plot-base-interactive';
@@ -77,7 +78,7 @@ export type {
 	FeatureShare,
 } from './types-provenance';
 
-// ---- Transform helpers --------------------------------------------------
+// ─── Transform helpers ──────────────────────────────────────────────────────
 
 /** Shared data transformation engine and ready-to-use transform presets. */
 export * from './transforms';

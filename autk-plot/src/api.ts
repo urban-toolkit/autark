@@ -10,7 +10,9 @@ import type { ColorMapInterpolator } from '@urban-toolkit/autk-core';
 import type { PlotEvent } from './types-events';
 
 
-// ---- Core and shared types ----------------------------------------------
+// ---------------------------------------------------------------------------
+// Core / shared types
+// ---------------------------------------------------------------------------
 
 /**
  * Supported plot variants in the unified autk-plot API.
@@ -66,7 +68,12 @@ export type PlotConfig = {
         /** Color legend label. */
         color?: string;
     };
-    /** Feature property names to map to visual channels. */
+    /**
+     * Feature property names to map to visual channels. With a transform that
+     * computes a value, `'@transform'` marks where that value goes: after the
+     * input columns in `axis`, or in `color` when the plot draws it as a color.
+     * The mark is optional and changes nothing in the drawing.
+     */
     attributes?: {
         /** Property names mapped to axes. */
         axis?: string[];
@@ -135,6 +142,14 @@ export type PlotProvenanceConfig = {
      * expanded. Defaults to `false`, so the plot keeps the height its host gives it.
      */
     path?: boolean | 'open';
+    /**
+     * How the marks show a selection from another view. By default each plot
+     * shows the part of each mark that the selection produces (a subset render
+     * through its own encoding, or a custom highlight); `'boolean'` highlights
+     * the whole marks instead. Any other value is refused: a plot chooses its
+     * other highlight modes in its definition (`PlotDefinition.highlight`).
+     */
+    highlight?: 'boolean';
 };
 
 /**
@@ -147,7 +162,9 @@ export type UnifiedPlotConfig = Omit<PlotConfig, 'div'> & {
     type: PlotType;
 };
 
-// ---- Transform types ----------------------------------------------------
+// ---------------------------------------------------------------------------
+// Transform types
+// ---------------------------------------------------------------------------
 
 /** Supported reducer names for built-in transform presets. */
 export type TransformReducer = 'count' | 'sum' | 'avg' | 'min' | 'max';
@@ -273,6 +290,7 @@ export type PlotTransformConfig =
  * The transform receives `options` and the source columns of
  * `PlotConfig.attributes.axis`, and must return rows of its declared shape with
  * provenance that honors the contract checked by `checkTransform`.
+ * Use `'@transform'` after the source columns to mark the output slot.
  */
 export type RegisteredTransformConfig = {
     preset: 'registered';
@@ -289,6 +307,7 @@ export type RegisteredTransformConfig = {
  * numeric column (`axis[0]`, `axis[1]`) for one curve per group. Every row
  * spreads over the grid points within one bandwidth of its value with real
  * weights (fractional coverage), and each curve integrates to 1.
+ * Use `'@transform'` after the columns to mark the output slot.
  */
 export type DensityTransformConfig = {
     preset: 'density';
@@ -306,7 +325,7 @@ export type DensityTransformConfig = {
  * Groups rows by the categorical columns in `PlotConfig.attributes.axis`, from
  * the top level (`axis[0]`) down: e.g. group → category. Every level is a
  * partition of the level below, so features, leaves, and parents relate `N:1`
- * along the whole chain.
+ * along the whole chain. Use `'@transform'` after the levels to mark the output slot.
  */
 export type HierarchyTransformConfig = {
     preset: 'hierarchy';
@@ -325,6 +344,7 @@ export type HierarchyTransformConfig = {
  * accumulates them: point `k` reduces the rows of bars `0…k`. Numeric columns
  * are ordered by value (an empirical cumulative distribution); categorical
  * columns by reduced value, largest first (a Pareto chart).
+ * Use `'@transform'` in `axis[1]` to mark the output slot.
  */
 export type CumulativeTransformConfig = {
     preset: 'cumulative';
@@ -349,6 +369,7 @@ export type CumulativeTransformConfig = {
  * Reads a categorical column (`PlotConfig.attributes.axis[0]`) and one or more
  * numeric measures (`axis[1…]`). Each row unfolds into one unit per measure
  * (`1:N`), and units are reduced per category and measure (`N:1`).
+ * Use `'@transform'` after the measures to mark the output slot.
  */
 export type FoldTransformConfig = {
     preset: 'fold';
@@ -367,6 +388,7 @@ export type FoldTransformConfig = {
  * `PlotConfig.attributes.axis[0]` (x) and `axis[1]` (y). Hexagons are regular
  * in pixels: values are mapped to a `width × height` area first. The `hexbin`
  * plot sets `width` and `height` to its drawing area.
+ * Use `'@transform'` in `PlotConfig.attributes.color` to mark the output slot.
  */
 export type BinningHexTransformConfig = {
     preset: 'binning-hex';
@@ -391,7 +413,7 @@ export type BinningHexTransformConfig = {
  * (at least two). Every row follows a path through one category per column;
  * consecutive steps of equal paths are reduced into links, and categories into
  * nodes. Each row contributes one segment per step, so rows and links relate
- * `N:N` through the segments.
+ * `N:N` through the segments. Use `'@transform'` after the columns to mark the output slot.
  */
 export type FlowsTransformConfig = {
     preset: 'flows';
@@ -410,6 +432,7 @@ export type FlowsTransformConfig = {
  * Groups rows by the categorical column in `PlotConfig.attributes.axis[0]`
  * and summarizes the numeric column in `axis[1]` with quartiles, Tukey
  * whiskers, and outliers. Rows with non-finite values are skipped.
+ * Use `'@transform'` in `axis[2]` to mark the output slot.
  */
 export type BoxStatsTransformConfig = {
     preset: 'box-stats';

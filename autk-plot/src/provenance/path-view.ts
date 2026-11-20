@@ -121,7 +121,9 @@ export function renderProvenancePathView(host: HTMLElement, state: ProvenancePat
         .join('button')
         .attr('class', 'autk-provenance-toggle')
         .attr('type', 'button')
-        .attr('title', 'Provenance path: how many entities the selection reaches at each stage, from the source features (D0) to the marks (M). direct: the selection came from another view; inverse: from marks selected here, back to the features')
+        .attr('title', 'Provenance path: how many entities the selection reaches at each stage, '
+            + 'from the source features (D0) to the marks (M). direct: the selection came from another view; '
+            + 'inverse: from marks selected here, back to the features')
         .attr('aria-expanded', (s) => String(s.open))
         .style('display', 'flex')
         .style('width', '100%')

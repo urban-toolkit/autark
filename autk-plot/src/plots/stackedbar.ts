@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'stackedbar',
  *   collection: geojson,
- *   attributes: { axis: ['group', 'category'] },
+ *   attributes: { axis: ['group', 'category', '@transform'] },
  *   transform: { preset: 'hierarchy' },
  *   labels: { axis: ['group', 'features'], title: 'Category by group' }
  * });
@@ -24,7 +24,7 @@ import type { AutkDatum } from '../types-plot';
 
 import type { PlotDefinition } from './registered';
 
-const nodeOf = (row: AutkDatum) => row as unknown as HierarchyNodeRow;
+const nodeOf = (row: AutkDatum) => row as HierarchyNodeRow;
 
 /** Subgroup labels in legend order, and the gray shade of each. */
 function subgroupShades(rows: AutkDatum[]): { subgroups: string[]; shade: (subgroup: string) => string } {
@@ -40,7 +40,6 @@ export const stackedbar: PlotDefinition = {
     requiresTransform: true,
     reducers: ['count', 'sum'],
     topK: false,
-    defaults: { tickFormats: ['', '~s'] },
     validate: config => {
         if ((config.attributes?.axis ?? []).filter(a => a !== '@transform').length !== 2) {
             throw new Error('Stacked bar chart requires two columns: group and subgroup.');
@@ -50,7 +49,7 @@ export const stackedbar: PlotDefinition = {
         const { shade } = subgroupShades(rows);
         return row => shade(nodeOf(row).label);
     },
-    design: { rect: { rule: 'length', axis: 'y', anchor: 'end' } },
+    highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } },
 
     draw({ group, rows, width, height, axisX, axisY, format, tickCount, legend }) {
         const groups = rows.filter(row => nodeOf(row).level === 0);
@@ -77,6 +76,7 @@ export const stackedbar: PlotDefinition = {
 
         // Segments stacked from the base, in legend order.
         const boxes = new Map<AutkDatum, { x: number; y: number; height: number }>();
+        const box = (row: AutkDatum) => boxes.get(row)!;
         for (const bar of groups) {
             let base = 0;
             const segments = leaves.filter(row => nodeOf(row).parent === nodeOf(bar).key)
@@ -92,13 +92,12 @@ export const stackedbar: PlotDefinition = {
             .data(leaves.filter(row => boxes.has(row)))
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', row => boxes.get(row)!.x)
+            .attr('x', row => box(row).x)
             .attr('width', x.bandwidth())
-            .attr('y', row => boxes.get(row)!.y)
-            .attr('height', row => Math.max(0, boxes.get(row)!.height))
+            .attr('y', row => box(row).y)
+            .attr('height', row => Math.max(0, box(row).height))
             .style('stroke', '#ffffff')
             .style('stroke-width', 0.75)
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => `${nodeOf(row).path.join(' · ')}: ${d3.format('~s')(nodeOf(row).value)}`);
     },

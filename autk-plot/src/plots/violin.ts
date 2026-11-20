@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'violin',
  *   collection: geojson,
- *   attributes: { axis: ['category', 'shape_area'] },
+ *   attributes: { axis: ['category', 'shape_area', '@transform'] },
  *   transform: { preset: 'density' },
  *   labels: { axis: ['category', 'area'], title: 'Area by category' }
  * });
@@ -26,7 +26,7 @@ import type { PlotDefinition } from './registered';
 /** Overlap between neighboring strips, in pixels, so anti-aliasing leaves no seams. */
 const SEAM = 0.5;
 
-const pointOf = (row: AutkDatum) => row as unknown as DensityPointRow;
+const pointOf = (row: AutkDatum) => row as DensityPointRow;
 
 /** Strips of a `density` transform, one per grid point of each category. */
 export const violin: PlotDefinition = {
@@ -35,13 +35,12 @@ export const violin: PlotDefinition = {
     transforms: ['density'],
     requiresTransform: true,
     topK: false,
-    defaults: { tickFormats: ['', '~s'] },
     validate: config => {
         if ((config.attributes?.axis ?? []).filter(a => a !== '@transform').length < 2) {
             throw new Error('Violin requires a group and a numeric column.');
         }
     },
-    design: { rect: { rule: 'length', axis: 'x', anchor: 'center' } },
+    highlight: { rect: { mode: 'subset', channel: 'length', axis: 'x', anchor: 'center' } },
 
     draw({ group, rows, width, height, axisX, axisY, format }) {
         const points = rows.map(pointOf);
@@ -77,7 +76,6 @@ export const violin: PlotDefinition = {
             .attr('width', row => 2 * strip(row).half)
             .attr('y', row => strip(row).y0 - SEAM / 2)
             .attr('height', row => Math.max(0.5, strip(row).y1 - strip(row).y0) + SEAM)
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => {
                 const n = pointOf(row).autkIds.length;

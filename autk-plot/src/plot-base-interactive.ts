@@ -558,7 +558,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             d3.select(this).on('click', function () {
                 if (d == null || typeof d !== 'object') return;
                 // A click adds the mark to the current selection, or takes it out, also when that
-                // selection came from another view (the map): as in the original module.
+                // selection came from another view (the map).
                 if (plot._selectedMarkDatums.has(d as object)) {
                     plot._selectedMarkDatums.delete(d as object);
                 } else {

@@ -3,7 +3,8 @@
  *
  * Reads the groups of a `binning-1d` transform, one slice each, starting at 12 o'clock in data
  * order. Slices must add up to the whole, so only additive reducers (count, sum) are accepted. A
- * selection elsewhere shows an inner slice of the selected area, growing from the hole outward.
+ * selection elsewhere shows the leading share of each slice: the sweep of the selected value, from
+ * the same start angle.
  *
  * @example
  * new AutkPlot(plotDiv, {
@@ -28,6 +29,7 @@ const MIN_LABEL_ANGLE = 0.3;
 function drawPie({ group, rows, width, height, value }: PlotDrawContext, innerRatio: number): void {
     const amount = (row: AutkDatum) => Math.max(0, Number(value(row, 1)) || 0);
     const arcs = new Map(d3.pie<AutkDatum>().sort(null).value(amount)(rows).map(arc => [arc.data, arc]));
+    const arcOf = (row: AutkDatum) => arcs.get(row)!;
     const outer = Math.max(1, Math.min(width, height) / 2 - 2);
     const arc = d3.arc<d3.PieArcDatum<AutkDatum>>().innerRadius(outer * innerRatio).outerRadius(outer);
     const middle = outer * (innerRatio > 0 ? (1 + innerRatio) / 2 : 0.6);
@@ -39,19 +41,18 @@ function drawPie({ group, rows, width, height, value }: PlotDrawContext, innerRa
         .data(rows)
         .join('path')
         .attr('class', 'autkMark')
-        .attr('d', row => arc(arcs.get(row)!))
+        .attr('d', row => arc(arcOf(row)))
         .style('stroke', '#ffffff')
         .style('stroke-width', 1.5)
-        .style('cursor', 'pointer')
         .append('title')
         .text(row => `${value(row, 0)}: ${d3.format('~s')(amount(row))}`);
 
     // Labels inside slices wide enough to hold them; they never intercept clicks.
     center.selectAll('text.autk-pie-label')
-        .data(rows.filter(row => arcs.get(row)!.endAngle - arcs.get(row)!.startAngle >= MIN_LABEL_ANGLE))
+        .data(rows.filter(row => arcOf(row).endAngle - arcOf(row).startAngle >= MIN_LABEL_ANGLE))
         .join('text')
         .attr('class', 'autk-pie-label')
-        .attr('transform', row => `translate(${labelArc.centroid(arcs.get(row)!)})`)
+        .attr('transform', row => `translate(${labelArc.centroid(arcOf(row))})`)
         .attr('text-anchor', 'middle')
         .attr('dy', '0.35em')
         .style('font-size', '11px')
@@ -67,8 +68,8 @@ export const piechart: PlotDefinition = {
     transforms: ['binning-1d', 'category-value'],
     requiresTransform: true,
     reducers: ['count', 'sum'],
-    // The part of a slice is the inner slice of the selected area.
-    design: { sector: { rule: 'angle', mode: 'radial' } },
+    // The part of a slice is the sweep of the selected value, from the slice's start.
+    highlight: { sector: { mode: 'subset', channel: 'angle' } },
     draw: context => drawPie(context, 0),
 };
 

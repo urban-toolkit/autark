@@ -10,7 +10,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'treemap',
  *   collection: geojson,
- *   attributes: { axis: ['category', 'group'] },
+ *   attributes: { axis: ['category', 'group', '@transform'] },
  *   transform: { preset: 'hierarchy' },
  *   labels: { title: 'Features by category and group' }
  * });
@@ -28,7 +28,7 @@ import type { PlotDefinition } from './registered';
 /** Height of a group label band in pixels. */
 const LABEL_BAND = 14;
 
-const nodeOf = (row: AutkDatum) => row as unknown as HierarchyNodeRow;
+const nodeOf = (row: AutkDatum) => row as HierarchyNodeRow;
 
 /** Leaf rectangles of an additive `hierarchy` transform, one per deepest node. */
 export const treemap: PlotDefinition = {
@@ -38,7 +38,7 @@ export const treemap: PlotDefinition = {
     requiresTransform: true,
     reducers: ['count', 'sum'],
     topK: false,
-    design: { rect: { rule: 'area' } },
+    highlight: { rect: { mode: 'subset', channel: 'area' } },
 
     draw({ group, rows, width, height }) {
         const nodes = rows.map(nodeOf);
@@ -67,6 +67,12 @@ export const treemap: PlotDefinition = {
             .style('fill', '#f6f8fa')
             .style('stroke', '#d0d7de')
             .style('pointer-events', 'none');
+        // A label longer than its group is cut with an ellipsis (about 6 px per character at 10 px).
+        const groupLabel = (row: AutkDatum) => {
+            const text = `${nodeOf(row).label} (${d3.format('~s')(nodeOf(row).value)})`;
+            const fits = Math.floor((box(row).x1 - box(row).x0 - 8) / 6);
+            return text.length <= fits ? text : `${text.slice(0, Math.max(1, fits - 1)).trimEnd()}…`;
+        };
         group.selectAll('text.autk-treemap-group-label')
             .data(groups.filter(row => box(row).x1 - box(row).x0 > 30))
             .join('text')
@@ -77,7 +83,7 @@ export const treemap: PlotDefinition = {
             .style('font-weight', '600')
             .style('fill', '#24292f')
             .style('pointer-events', 'none')
-            .text(row => `${nodeOf(row).label} (${d3.format('~s')(nodeOf(row).value)})`);
+            .text(groupLabel);
 
         group.selectAll('rect.autkMark')
             .data(leaves)
@@ -86,7 +92,6 @@ export const treemap: PlotDefinition = {
             .attr('x', row => box(row).x0).attr('y', row => box(row).y0)
             .attr('width', row => Math.max(0, box(row).x1 - box(row).x0))
             .attr('height', row => Math.max(0, box(row).y1 - box(row).y0))
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => `${nodeOf(row).path.join(' · ')}: ${d3.format('~s')(nodeOf(row).value)}`);
 

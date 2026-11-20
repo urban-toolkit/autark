@@ -17,7 +17,7 @@ import type {
     ProvenanceStage,
 } from '../types-provenance';
 
-import { cardinality, compose, image, transpose } from './relations';
+import { cardinality, compose, image, preimage, tupleKey } from './relations';
 
 /**
  * Provenance id of a source feature.
@@ -53,6 +53,18 @@ export class ProvenanceModel {
     private _reducer: TransformReducer | undefined;
     /** Contributions grouped by rendered row id. */
     private _contributionsByRow: Map<ProvenanceId, ProvenanceContribution[]> = new Map();
+    /**
+     * Source feature index of each contribution in `_contributionsByRow`, aligned
+     * with it (`-1` when the source is not a feature). Lets `contribution` test
+     * the selection without building one id string per selected feature.
+     */
+    private _featuresByRow: Map<ProvenanceId, number[]> = new Map();
+    /** Reduced value of every unit of a row (`contribution().totalValue`), computed once per row. */
+    private _totalValues: Map<ProvenanceId, number | null> = new Map();
+    /** Position of each contribution in `_contributions`, grouped by rendered row id. */
+    private _indicesByRow: Map<ProvenanceId, number[]> = new Map();
+    /** Selection-independent part of `featureShares`, built on first use and cleared when marks are registered. */
+    private _shareIndex: { keys: string[]; totals: Map<string, number> } | undefined;
     /** Cached result of `cardinalities`, cleared when marks are registered. */
     private _cardinalities: { source: string; target: string; cardinality: ProvenanceCardinality }[] | undefined;
 
@@ -75,11 +87,22 @@ export class ProvenanceModel {
         this._contributions = contributions;
         this._reducer = reducer;
 
-        for (const contribution of contributions) {
-            const list = this._contributionsByRow.get(contribution.target) ?? [];
+        contributions.forEach((contribution, index) => {
+            let list = this._contributionsByRow.get(contribution.target);
+            let features = this._featuresByRow.get(contribution.target);
+            let indices = this._indicesByRow.get(contribution.target);
+            if (!list || !features || !indices) {
+                list = [];
+                features = [];
+                indices = [];
+                this._contributionsByRow.set(contribution.target, list);
+                this._featuresByRow.set(contribution.target, features);
+                this._indicesByRow.set(contribution.target, indices);
+            }
             list.push(contribution);
-            this._contributionsByRow.set(contribution.target, list);
-        }
+            features.push(featureIndexOf(contribution.source));
+            indices.push(index);
+        });
     }
 
     /** Stages in pipeline order. */
@@ -136,6 +159,7 @@ export class ProvenanceModel {
      */
     registerMarks(rowIds: ProvenanceId[]): void {
         this._cardinalities = undefined;
+        this._shareIndex = undefined;
         const last = this._stages[this._stages.length - 1];
         if (last.name === 'M') {
             this._stages = this._stages.slice(0, -1);
@@ -144,9 +168,10 @@ export class ProvenanceModel {
 
         // Rendered rows usually belong to the last stage, but may span several
         // (e.g. Sankey links and nodes).
-        const unique = Array.from(new Set(rowIds));
+        const uniqueSet = new Set(rowIds);
+        const unique = Array.from(uniqueSet);
         const sources = this._stages
-            .filter(stage => stage.ids.some(id => unique.includes(id)))
+            .filter(stage => stage.ids.some(id => uniqueSet.has(id)))
             .map(stage => stage.name);
         this._stages = [...this._stages, { name: 'M', label: 'marks', ids: unique.map(markId) }];
         this._relations = [...this._relations, {
@@ -178,7 +203,12 @@ export class ProvenanceModel {
         if (!this.hasMarks) return prefixes[prefixes.length - 1];
 
         const toMarks = this._relations[this._relations.length - 1].pairs;
-        return prefixes.flatMap(prefix => compose(prefix, toMarks));
+        // A prefix whose targets render no mark composes to nothing: skip it.
+        const rendered = new Set<ProvenanceId>();
+        for (const pair of toMarks) rendered.add(pair.source);
+        return prefixes
+            .filter(prefix => prefix.some(pair => rendered.has(pair.target)))
+            .flatMap(prefix => compose(prefix, toMarks));
     }
 
     /**
@@ -201,7 +231,8 @@ export class ProvenanceModel {
                 path.push({ stage: stage.name, label: stage.label, ids });
                 return;
             }
-            const sources = new Set(relation.pairs.map(pair => pair.source));
+            const sources = new Set<ProvenanceId>();
+            for (const pair of relation.pairs) sources.add(pair.source);
             const dropped = ids.filter(id => !sources.has(id)).length;
             ids = image(relation.pairs, ids);
             ids.forEach(id => reached.add(id));
@@ -224,7 +255,7 @@ export class ProvenanceModel {
         const path: ProvenancePath = [{ stage: lastStage.name, label: lastStage.label, ids: current }];
         const last = this._relations.length - 1;
         // Rows behind the selected marks, which may belong to several stages.
-        const fromMarks = this.hasMarks ? image(transpose(this._relations[last].pairs), current) : [];
+        const fromMarks = this.hasMarks ? preimage(this._relations[last].pairs, current) : [];
 
         for (let index = last; index >= 0; index--) {
             const stage = this._stages[index];
@@ -232,7 +263,7 @@ export class ProvenanceModel {
             if (this.hasMarks && index === last) {
                 current = fromMarks.filter(id => inStage.has(id));
             } else {
-                const reached = new Set(image(transpose(this._relations[index].pairs), current));
+                const reached = new Set(preimage(this._relations[index].pairs, current));
                 fromMarks.filter(id => inStage.has(id)).forEach(id => reached.add(id));
                 current = Array.from(reached);
             }
@@ -254,15 +285,44 @@ export class ProvenanceModel {
      */
     contribution(rowId: ProvenanceId, selected: ReadonlySet<number>): MarkContribution {
         const units = this._contributionsByRow.get(rowId) ?? [];
-        const selectedIds = new Set(Array.from(selected, featureId));
-        const chosen = units.filter(unit => selectedIds.has(unit.source));
+        const features = this._featuresByRow.get(rowId) ?? [];
         const reducer = this._reducer ?? 'count';
 
+        // One pass over the row's units, without building the list of chosen
+        // units: the same sums, in the same order, as reduceUnits over them.
+        let count = 0;
+        let sum = 0;
+        let min = Infinity;
+        let max = -Infinity;
+        for (let index = 0; index < units.length; index++) {
+            const feature = features[index];
+            if (feature < 0 || !selected.has(feature)) continue;
+            const value = units[index].value;
+            count++;
+            sum += value;
+            // Pairwise Math.min/max: the semantics of Math.min(...values) (NaN, -0) without the spread.
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+        }
+        const value = count === 0 ? null
+            : reducer === 'count' ? count
+                : reducer === 'sum' ? sum
+                    : reducer === 'avg' ? sum / count
+                        : reducer === 'min' ? min
+                            : max;
+
+        // The row total does not depend on the selection.
+        let totalValue = this._totalValues.get(rowId);
+        if (totalValue === undefined) {
+            totalValue = reduceUnits(units, reducer);
+            this._totalValues.set(rowId, totalValue);
+        }
+
         return {
-            selectedUnits: chosen.length,
+            selectedUnits: count,
             totalUnits: units.length,
-            value: reduceUnits(chosen, reducer),
-            totalValue: reduceUnits(units, reducer),
+            value,
+            totalValue,
             additive: reducer === 'count' || reducer === 'sum',
         };
     }
@@ -281,26 +341,27 @@ export class ProvenanceModel {
      * @returns Shares of the features with at least one unit in the selected rows.
      */
     featureShares(rowIds: Iterable<ProvenanceId>): FeatureShare[] {
-        const selectedRows = new Set(rowIds);
-        const stageOf = new Map<ProvenanceId, string>();
-        for (const stage of this._stages) {
-            for (const id of stage.ids) stageOf.set(id, stage.name);
+        // Units of the selected rows, in their order among all contributions, so
+        // features are reported in the order a scan of every unit would reach them.
+        const picked: number[] = [];
+        for (const rowId of new Set(rowIds)) {
+            for (const index of this._indicesByRow.get(rowId) ?? []) picked.push(index);
         }
+        picked.sort((a, b) => a - b);
 
-        // Units per feature, stage, and group: total, and inside the selected rows.
-        // Each unit counts once unless it carries a fractional weight (density).
-        const totals = new Map<string, number>();
-        const selected = new Map<string, number>();
-        for (const unit of this._contributions) {
-            const key = JSON.stringify([unit.source, stageOf.get(unit.target) ?? '', unit.group ?? '']);
-            const weight = unit.weight ?? 1;
-            totals.set(key, (totals.get(key) ?? 0) + weight);
-            if (selectedRows.has(unit.target)) selected.set(key, (selected.get(key) ?? 0) + weight);
+        // Units per feature, stage, and group inside the selected rows. Each unit
+        // counts once unless it carries a fractional weight (density).
+        const { keys, totals } = this.shareIndex();
+        const selected = new Map<string, { source: ProvenanceId; units: number }>();
+        for (const index of picked) {
+            const unit = this._contributions[index];
+            const entry = selected.get(keys[index]);
+            if (entry) entry.units += unit.weight ?? 1;
+            else selected.set(keys[index], { source: unit.source, units: unit.weight ?? 1 });
         }
 
         const best = new Map<ProvenanceId, FeatureShare>();
-        for (const [key, selectedUnits] of selected) {
-            const source = (JSON.parse(key) as string[])[0];
+        for (const [key, { source, units: selectedUnits }] of selected) {
             const share = {
                 feature: Number(source.slice('feature:'.length)),
                 selectedUnits,
@@ -313,6 +374,43 @@ export class ProvenanceModel {
         }
         return Array.from(best.values());
     }
+
+    /**
+     * Key of every contribution by feature, stage, and group, and the total
+     * units of each key. Independent of the selection, so built once per draw.
+     *
+     * @returns Keys aligned with the contributions, and units per key.
+     */
+    private shareIndex(): { keys: string[]; totals: Map<string, number> } {
+        if (this._shareIndex) return this._shareIndex;
+        const stageOf = new Map<ProvenanceId, string>();
+        for (const stage of this._stages) {
+            for (const id of stage.ids) stageOf.set(id, stage.name);
+        }
+        const keys: string[] = new Array(this._contributions.length);
+        const totals = new Map<string, number>();
+        this._contributions.forEach((unit, index) => {
+            const key = tupleKey(unit.source, stageOf.get(unit.target) ?? '', unit.group ?? '');
+            keys[index] = key;
+            totals.set(key, (totals.get(key) ?? 0) + (unit.weight ?? 1));
+        });
+        this._shareIndex = { keys, totals };
+        return this._shareIndex;
+    }
+}
+
+/**
+ * Source feature index of a provenance id.
+ *
+ * @param id Provenance id, `feature:<index>` for source features.
+ * @returns The index, or `-1` when the id is not a source feature.
+ */
+function featureIndexOf(id: ProvenanceId): number {
+    if (!id.startsWith('feature:')) return -1;
+    const rest = id.slice('feature:'.length);
+    const index = Number(rest);
+    // Only ids that featureId() would produce: a non-negative integer written canonically.
+    return Number.isInteger(index) && index >= 0 && String(index) === rest ? index : -1;
 }
 
 /**
@@ -324,11 +422,19 @@ export class ProvenanceModel {
  */
 export function reduceUnits(units: ProvenanceContribution[], reducer: TransformReducer): number | null {
     if (units.length === 0) return null;
-    const values = units.map(unit => unit.value);
     if (reducer === 'count') return units.length;
-    const sum = values.reduce((acc, v) => acc + v, 0);
+    // Loops instead of Math.min(...values): spreading many units overflows the call stack.
+    let sum = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const unit of units) {
+        sum += unit.value;
+        // Pairwise Math.min/max: the semantics of Math.min(...values) (NaN, -0) without the spread.
+        min = Math.min(min, unit.value);
+        max = Math.max(max, unit.value);
+    }
     if (reducer === 'sum') return sum;
-    if (reducer === 'avg') return sum / values.length;
-    if (reducer === 'min') return Math.min(...values);
-    return Math.max(...values);
+    if (reducer === 'avg') return sum / units.length;
+    if (reducer === 'min') return min;
+    return max;
 }

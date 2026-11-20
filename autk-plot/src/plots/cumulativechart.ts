@@ -11,7 +11,7 @@
  * new AutkPlot(plotDiv, {
  *   type: 'ecdf',
  *   collection: geojson,
- *   attributes: { axis: ['shape_area'] },
+ *   attributes: { axis: ['shape_area', '@transform'] },
  *   transform: { preset: 'cumulative' },
  *   labels: { axis: ['area', 'share of features'], title: 'Distribution of areas' }
  * });
@@ -24,22 +24,24 @@ import { shapeOutput } from '../transforms';
 import type { CumulativeRow } from '../transforms';
 import type { AutkDatum } from '../types-plot';
 
+import type { HighlightRule, MarkKind } from './partial-design';
 import type { PlotDefinition, PlotDrawContext, PlotSeries } from './registered';
 
 /** Radius of a cumulative point mark in pixels. */
 const POINT_RADIUS = 3.5;
 
-const rowOf = (row: AutkDatum) => row as unknown as CumulativeRow;
+const rowOf = (row: AutkDatum) => row as CumulativeRow;
 const percent = d3.format('.0%');
 
 /** Order of the accumulation: ascending values for an ECDF, largest bar first for a Pareto chart. */
-const orderOf = (kind: 'ecdf' | 'pareto', options: Record<string, unknown> | undefined) => (options?.order as string | undefined) ?? (kind === 'pareto' ? 'value' : 'key');
+const orderOf = (kind: 'ecdf' | 'pareto', options: Record<string, unknown> | undefined) =>
+    (options?.order as string | undefined) ?? (kind === 'pareto' ? 'value' : 'key');
 
 /** Draws the bars (Pareto), the line, and the points of a cumulative transform. */
-function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { design: PlotDefinition['design']; series: PlotSeries[] } {
+function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { highlight: Partial<Record<MarkKind, HighlightRule>>; series: PlotSeries[] } {
     const { group, rows, width, height, axisX, axisY, format, transform, tickCount } = context;
     const cumulative = shapeOutput(transform, 'cumulative');
-    if (!cumulative) return { design: {}, series: [] };
+    if (!cumulative) return { highlight: {}, series: [] };
     if (kind === 'ecdf' && !cumulative.numeric && rows.length > 0) throw new Error('ECDF requires a numeric column.');
     const total = cumulative.total;
     const bars = rows.filter(row => rowOf(row).kind === 'bar');
@@ -66,8 +68,8 @@ function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { de
         axisY(d3.axisLeft(count).ticks(tickCount(count.domain()[1], bars.map(row => rowOf(row).value), 5)).tickSizeInner(-width).tickFormat(format(1, '~s')));
         // Shares on the right.
         group.append('g')
-            .attr('id', 'axisShare')
-            .attr('class', 'y axis')
+            // An axis of its own kind: the plot's y axis is the counts.
+            .attr('class', 'share axis')
             .attr('transform', `translate(${width}, 0)`)
             .call(d3.axisRight(share).ticks(5).tickFormat(percent));
     }
@@ -83,7 +85,6 @@ function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { de
             .attr('width', x.bandwidth())
             .attr('height', row => Math.max(0, height - y(rowOf(row).value)))
             .style('stroke', '#ffffff')
-            .style('cursor', 'pointer')
             .append('title')
             .text(row => `${rowOf(row).label}: ${d3.format('~s')(rowOf(row).value)} (${percent(rowOf(row).share)})`);
     }
@@ -128,13 +129,17 @@ function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { de
         .attr('cx', xOf)
         .attr('cy', row => share(rowOf(row).share))
         .attr('r', POINT_RADIUS)
-        .style('cursor', 'pointer')
         .append('title')
         .text(row => `up to ${rowOf(row).label}: ${d3.format('~s')(rowOf(row).value)} (${percent(rowOf(row).share)})`);
 
+    const lineNode = line.node();
+    if (!lineNode) throw new Error('SVG element could not be created.');
     return {
-        design: { rect: { rule: 'length', axis: 'y', anchor: 'end' }, point: { rule: 'position', axis: 'y', baseline: share(0) } },
-        series: [{ element: line.node()!, rows: points, path: lineOf }],
+        highlight: {
+            rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' },
+            point: { mode: 'subset', channel: 'position', axis: 'y', baseline: share(0) },
+        },
+        series: [{ element: lineNode, rows: points, path: lineOf }],
     };
 }
 
@@ -146,7 +151,6 @@ function cumulative(kind: 'ecdf' | 'pareto'): PlotDefinition {
         transforms: ['cumulative'],
         requiresTransform: true,
         topK: false,
-        defaults: { tickFormats: ['~s', '~s'] },
         validate: config => {
             if (kind === 'ecdf' && orderOf(kind, config.transform?.options as Record<string, unknown>) !== 'key') {
                 throw new Error("ECDF accumulates values in ascending order (order: 'key').");
