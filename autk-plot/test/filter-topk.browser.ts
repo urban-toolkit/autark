@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -20,7 +20,7 @@ const THRESHOLD = 10_000_000;
 
 function mount(config: Partial<UnifiedPlotConfig>) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, { collection: collection(), provenance: { path: 'open' }, ...config } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { collection: collection(), provenance: { path: 'open' }, ...config } as UnifiedPlotConfig);
     const rows = () => plot.instance['_data'] as unknown as AutkDatum[];
     const partials = () => Array.from(div.querySelectorAll('.autkPartial'));
     const notes = () => Array.from(div.querySelectorAll('.autk-provenance-note')).map(n => n.textContent);
@@ -31,7 +31,7 @@ const histogram = (extra: Partial<UnifiedPlotConfig> = {}): Partial<UnifiedPlotC
     type: 'barchart',
     attributes: { axis: ['shape_area', '@transform'] },
     transform: { preset: 'binning-1d', options: { bins: 10 } },
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
     ...extra,
 });
 
@@ -94,7 +94,7 @@ describe('top-k', () => {
         type: 'barchart',
         attributes: { axis: ['ntaname', 'shape_area'] },
         topK: { k: 5, others },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
     const ranked = areas().map((a, i) => [a, i] as const).sort((x, y) => y[0] - x[0]);
     const top = sortNumbers(ranked.slice(0, 5).map(([, i]) => i));

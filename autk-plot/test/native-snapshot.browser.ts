@@ -3,7 +3,7 @@
  *
  * Built-in plots are moving to the registration API that user plots use
  * (`registerPlot`). Their segregated view then comes from the inferred design
- * instead of code written for each plot, so `partial-design-catalog.test.ts`
+ * instead of code written for each plot, so `highlight-inference-catalog.test.ts`
  * no longer compares two independent drawings for them. These snapshots keep
  * that comparison: they were recorded from the hand-written plots
  * (`baselines/natives.json`) and every rewritten plot must reproduce them.
@@ -22,11 +22,12 @@
  * "color attribute" case are the ones that plot drew after clearing its
  * selection, which a plot drawn by the shared infrastructure draws at once.
  *
- * Cases recorded later (wave 1: heat matrix, hexbin, waffle, pie, donut; wave 2:
- * box plot, calendar, treemap, stacked bars, violin, sunburst; wave 3: line,
- * area, radar, density, ECDF, Pareto; wave 4: Sankey, chord, parallel
- * coordinates, table) also record the outline of partial marks, wave 3 the
- * lines and areas of the subset, and wave 4 how marks and parts look. Changes
+ * The cases of the plots added to the original catalog (heat matrix, hexbin,
+ * waffle, pie, donut, box plot, calendar, treemap, stacked bars, violin,
+ * sunburst, line, area, radar, density, ECDF, Pareto, Sankey, chord, parallel
+ * coordinates, table) also record the outline of partial marks; those with
+ * series also record the lines and areas of the subset, and Sankey, chord,
+ * parallel coordinates and table how marks and parts look. Changes
  * accepted on purpose are applied to the recording at comparison time, in
  * `accepted()`, not edited in the file. Recording adds only cases that are
  * missing, so a recording is never replaced by the rewritten plot it checks.
@@ -35,7 +36,7 @@
 import * as d3 from 'd3';
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents, withSyntheticSeries } from './fixtures';
@@ -68,9 +69,9 @@ type Case = {
     steps: Step[];
     /** Also record the outline (stroke and width) of partial marks; cases recorded later than the first ones. */
     strokes?: true;
-    /** Also record the lines and areas of the selected subset (cases recorded from wave 3 on). */
+    /** Also record the lines and areas of the selected subset (plots with series and after). */
     series?: true;
-    /** Also record how marks and parts look: outline, opacities, background, text color (cases recorded from wave 4 on). */
+    /** Also record how marks and parts look: outline, opacities, background, text color (Sankey, chord, parallel coordinates, table). */
     looks?: true;
 };
 
@@ -84,7 +85,7 @@ export const NATIVE_CASES: Case[] = [
             type: 'barchart', ...histogram,
             labels: { axis: ['area range', 'neighborhoods count'], title: 'Histogram example' },
             margins: { left: 60, right: 20, top: 50, bottom: 80 }, width: 790,
-            events: [next.PlotEvent.BRUSH_X], provenance: { path: 'open' },
+            events: [autkPlot.PlotEvent.BRUSH_X], provenance: { path: 'open' },
         },
         steps: [
             { kind: 'select', ids: [0, 7] },
@@ -95,7 +96,7 @@ export const NATIVE_CASES: Case[] = [
     {
         name: 'barchart: histogram click',
         collection: regions,
-        config: { type: 'barchart', ...histogram, events: [next.PlotEvent.CLICK] },
+        config: { type: 'barchart', ...histogram, events: [autkPlot.PlotEvent.CLICK] },
         steps: [
             { kind: 'click-mark', index: 4 },
             { kind: 'click-mark', index: 1 },
@@ -110,7 +111,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'barchart', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' },
             labels: { axis: ['land use type', 'neighborhoods count'], title: 'Land Use Histogram Example' },
-            events: [next.PlotEvent.BRUSH_X],
+            events: [autkPlot.PlotEvent.BRUSH_X],
         },
         steps: [{ kind: 'brush', selection: [100, 400] }, { kind: 'select', ids: [1, 2, 3, 20] }],
     },
@@ -119,7 +120,7 @@ export const NATIVE_CASES: Case[] = [
         collection: regions,
         config: {
             type: 'barchart', attributes: { axis: ['ntaname', 'shape_area'] },
-            labels: { axis: ['ntaname', 'shape_area'], title: 'Barchart example' }, events: [next.PlotEvent.CLICK],
+            labels: { axis: ['ntaname', 'shape_area'], title: 'Barchart example' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [
             { kind: 'click-mark', index: 0 },
@@ -152,7 +153,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'barchart', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' },
             topK: { k: 3, others: true }, filter: { attribute: 'shape_area', op: '>', value: 10_000_000 },
-            provenance: { path: 'open' }, events: [next.PlotEvent.CLICK],
+            provenance: { path: 'open' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 0 }],
     },
@@ -161,7 +162,7 @@ export const NATIVE_CASES: Case[] = [
         collection: regions,
         config: {
             type: 'scatterplot', attributes: { axis: ['shape_area', 'shape_leng'] },
-            labels: { axis: ['shape_area', 'shape_leng'], title: 'Scatterplot example' }, events: [next.PlotEvent.BRUSH],
+            labels: { axis: ['shape_area', 'shape_leng'], title: 'Scatterplot example' }, events: [autkPlot.PlotEvent.BRUSH],
         },
         steps: [{ kind: 'brush', selection: [[0, 100], [400, 370]] }, { kind: 'select', ids: [] }],
     },
@@ -170,7 +171,7 @@ export const NATIVE_CASES: Case[] = [
         collection: regions,
         config: {
             type: 'scatterplot', attributes: { axis: ['shape_area', 'shape_leng'] },
-            labels: { axis: ['Area', 'Length'], title: 'Plot example' }, events: [next.PlotEvent.CLICK],
+            labels: { axis: ['Area', 'Length'], title: 'Plot example' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'click-mark', index: 0 }, { kind: 'click-mark', index: 10 }, { kind: 'click-clear' }],
     },
@@ -189,7 +190,7 @@ export const NATIVE_CASES: Case[] = [
         collection: landuse,
         config: {
             type: 'bubble', attributes: { axis: ['shape_area', 'shape_leng', 'shape_area'] },
-            labels: { axis: ['Area', 'Length'], title: 'Bubbles' }, events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH],
+            labels: { axis: ['Area', 'Length'], title: 'Bubbles' }, events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH],
         },
         steps: [
             { kind: 'click-mark', index: 5 },
@@ -198,7 +199,7 @@ export const NATIVE_CASES: Case[] = [
             { kind: 'select', ids: 'half', shares: 'third' },
         ],
     },
-    // ---- Wave 1: heat matrix, hexbin, waffle, pie, donut (outlines of partial marks recorded too)
+    // ---- Heat matrix, hexbin, waffle, pie, donut (outlines of partial marks recorded too)
     {
         name: 'heatmatrix: click (gallery)',
         collection: landuse,
@@ -207,7 +208,7 @@ export const NATIVE_CASES: Case[] = [
             type: 'heatmatrix', attributes: { axis: ['shape_area', 'landuse'], color: '@transform' },
             labels: { axis: ['Shape Area', 'Land Use'], title: 'Neighborhoods by Area and Land Use' },
             transform: { preset: 'binning-2d', options: { binsX: 5 } },
-            margins: { left: 100, right: 20, top: 50, bottom: 80 }, width: 790, events: [next.PlotEvent.CLICK],
+            margins: { left: 100, right: 20, top: 50, bottom: 80 }, width: 790, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [
             { kind: 'select', ids: [12, 21] },
@@ -234,7 +235,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'heatmatrix', attributes: { axis: ['landuse', 'shape_area'], color: '@transform' },
             transform: { preset: 'binning-2d', options: { binsY: 3, reducer: 'max', value: 'shape_area' } },
-            events: [next.PlotEvent.BRUSH],
+            events: [autkPlot.PlotEvent.BRUSH],
         },
         steps: [{ kind: 'brush', selection: [[0, 0], [300, 200]] }, { kind: 'select', ids: [4, 9] }],
     },
@@ -246,7 +247,7 @@ export const NATIVE_CASES: Case[] = [
             type: 'hexbin', attributes: { axis: ['shape_area', 'shape_leng'] },
             labels: { axis: ['Area', 'Length'], title: 'Hexbin' },
             transform: { preset: 'binning-hex', options: { radius: 24 } },
-            events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH],
+            events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH],
         },
         steps: [
             { kind: 'click-mark', index: 2 },
@@ -271,7 +272,7 @@ export const NATIVE_CASES: Case[] = [
         strokes: true,
         config: {
             type: 'waffle', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' },
-            labels: { title: 'Regions by land use' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Regions by land use' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'click-mark', index: 7 }, { kind: 'select', ids: 'half' }, { kind: 'click-clear' }],
     },
@@ -281,7 +282,7 @@ export const NATIVE_CASES: Case[] = [
         strokes: true,
         config: {
             type: 'pie', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' },
-            labels: { title: 'Regions by land use' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Regions by land use' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 0 }, { kind: 'click-clear' }],
     },
@@ -301,18 +302,18 @@ export const NATIVE_CASES: Case[] = [
         strokes: true,
         config: {
             type: 'donut', attributes: { axis: ['cdta2020', '@transform'] }, transform: { preset: 'binning-1d' },
-            topK: { k: 4, others: true }, provenance: { path: 'open' }, events: [next.PlotEvent.CLICK],
+            topK: { k: 4, others: true }, provenance: { path: 'open' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 1 }],
     },
-    // ---- Wave 2: box plot, calendar, treemap, stacked bars, violin, sunburst
+    // ---- Box plot, calendar, treemap, stacked bars, violin, sunburst
     {
         name: 'boxplot: selected features as dots, click',
         collection: landuse,
         strokes: true,
         config: {
             type: 'boxplot', attributes: { axis: ['landuse', 'shape_area'] }, transform: { preset: 'box-stats' },
-            labels: { axis: ['land use', 'area'], title: 'Area by land use' }, events: [next.PlotEvent.CLICK],
+            labels: { axis: ['land use', 'area'], title: 'Area by land use' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: [0, 1, 2, 3, 4, 5] }, { kind: 'click-mark', index: 1 }, { kind: 'click-clear' }, { kind: 'select', ids: 'half' }],
     },
@@ -323,7 +324,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'calendar', attributes: { axis: ['sjoin.collect.noise', '@transform'] },
             transform: { preset: 'binning-events', options: { timestamp: 'date' } },
-            labels: { title: 'Events per day' }, events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH],
+            labels: { title: 'Events per day' }, events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH],
         },
         steps: [
             { kind: 'select', ids: 'half' },
@@ -348,7 +349,7 @@ export const NATIVE_CASES: Case[] = [
         strokes: true,
         config: {
             type: 'treemap', attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'hierarchy' },
-            labels: { title: 'Regions by land use and district' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Regions by land use and district' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 2 }, { kind: 'click-clear' }],
     },
@@ -369,7 +370,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'stackedbar', attributes: { axis: ['cdta2020', 'landuse'] }, transform: { preset: 'hierarchy' },
             labels: { axis: ['district', 'regions'], title: 'Land use by district' },
-            events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH_X],
+            events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH_X],
         },
         steps: [
             { kind: 'select', ids: 'half' },
@@ -394,7 +395,7 @@ export const NATIVE_CASES: Case[] = [
         strokes: true,
         config: {
             type: 'violin', attributes: { axis: ['landuse', 'shape_leng'] }, transform: { preset: 'density' },
-            labels: { axis: ['land use', 'length'], title: 'Length by land use' }, events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH],
+            labels: { axis: ['land use', 'length'], title: 'Length by land use' }, events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH],
         },
         steps: [
             { kind: 'select', ids: 'half' },
@@ -409,11 +410,11 @@ export const NATIVE_CASES: Case[] = [
         strokes: true,
         config: {
             type: 'sunburst', attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'hierarchy' },
-            labels: { title: 'Regions by land use and district' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Regions by land use and district' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 0 }, { kind: 'click-mark', index: 9 }, { kind: 'click-clear' }],
     },
-    // ---- Wave 3: plots with series (line, area, radar, density, ECDF, Pareto); subset lines and areas recorded too
+    // ---- Plots with series (line, area, radar, density, ECDF, Pareto); subset lines and areas recorded too
     {
         name: 'linechart: events count, click, brush, half',
         collection: events,
@@ -422,7 +423,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'linechart', attributes: { axis: ['sjoin.collect.noise', '@transform'] },
             transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'month' } },
-            events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH_X],
+            events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH_X],
         },
         steps: [
             { kind: 'select', ids: 'half' },
@@ -463,7 +464,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'areachart', attributes: { axis: ['sjoin.collect.noise', '@transform'] },
             transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'month' } },
-            labels: { axis: ['month', 'events'], title: 'Events per month' }, events: [next.PlotEvent.CLICK],
+            labels: { axis: ['month', 'events'], title: 'Events per month' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 2 }, { kind: 'click-clear' }],
     },
@@ -485,7 +486,7 @@ export const NATIVE_CASES: Case[] = [
         series: true,
         config: {
             type: 'radar', attributes: { axis: ['landuse', 'shape_area', 'shape_leng'] }, transform: { preset: 'fold' },
-            labels: { title: 'Profile of each land use' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Profile of each land use' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 1 }, { kind: 'click-clear' }, { kind: 'select', ids: [0, 1] }],
     },
@@ -496,7 +497,7 @@ export const NATIVE_CASES: Case[] = [
         series: true,
         config: {
             type: 'density', attributes: { axis: ['shape_leng'] }, transform: { preset: 'density' },
-            labels: { axis: ['length', 'density'], title: 'Distribution of lengths' }, events: [next.PlotEvent.BRUSH_X],
+            labels: { axis: ['length', 'density'], title: 'Distribution of lengths' }, events: [autkPlot.PlotEvent.BRUSH_X],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'brush', selection: [100, 250] }, { kind: 'select', ids: [] }],
     },
@@ -515,7 +516,7 @@ export const NATIVE_CASES: Case[] = [
         series: true,
         config: {
             type: 'ecdf', attributes: { axis: ['shape_leng'] }, transform: { preset: 'cumulative' },
-            labels: { axis: ['length', 'share of regions'], title: 'Distribution of lengths' }, events: [next.PlotEvent.CLICK],
+            labels: { axis: ['length', 'share of regions'], title: 'Distribution of lengths' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 10 }, { kind: 'click-clear' }],
     },
@@ -527,11 +528,11 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'pareto', attributes: { axis: ['cdta2020'] }, transform: { preset: 'cumulative' },
             labels: { axis: ['district', 'regions'], title: 'Regions by district' },
-            events: [next.PlotEvent.CLICK, next.PlotEvent.BRUSH_X],
+            events: [autkPlot.PlotEvent.CLICK, autkPlot.PlotEvent.BRUSH_X],
         },
         steps: [{ kind: 'select', ids: 'half' }, { kind: 'click-mark', index: 2 }, { kind: 'brush', selection: [0, 150] }, { kind: 'click-clear' }],
     },
-    // ---- Wave 4: Sankey, chord, parallel coordinates, table; how marks and parts look recorded too
+    // ---- Sankey, chord, parallel coordinates, table; how marks and parts look recorded too
     {
         name: 'sankey: node and link clicks, half',
         collection: landuse,
@@ -539,7 +540,7 @@ export const NATIVE_CASES: Case[] = [
         looks: true,
         config: {
             type: 'sankey', attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'flows' },
-            labels: { title: 'Land use → district' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Land use → district' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [
             { kind: 'select', ids: 'half' },
@@ -567,7 +568,7 @@ export const NATIVE_CASES: Case[] = [
         looks: true,
         config: {
             type: 'chord', attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'flows' },
-            labels: { title: 'Land use × district' }, events: [next.PlotEvent.CLICK],
+            labels: { title: 'Land use × district' }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [
             { kind: 'select', ids: 'half' },
@@ -584,7 +585,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'parallel-coordinates', attributes: { axis: ['shape_area', 'shape_leng', 'landuse'] },
             labels: { axis: ['Area', 'Length', 'Land use'], title: 'Parallel Coordinates' },
-            events: [next.PlotEvent.BRUSH_Y],
+            events: [autkPlot.PlotEvent.BRUSH_Y],
         },
         steps: [
             { kind: 'brush', selection: [60, 220] },
@@ -601,7 +602,7 @@ export const NATIVE_CASES: Case[] = [
         looks: true,
         config: {
             type: 'table', attributes: { axis: ['ntaname', 'landuse', 'shape_area'] },
-            labels: { axis: ['Name', 'Land use', 'Area'] }, events: [next.PlotEvent.CLICK],
+            labels: { axis: ['Name', 'Land use', 'Area'] }, events: [autkPlot.PlotEvent.CLICK],
         },
         steps: [
             { kind: 'click-element', selector: 'th', index: 2 },
@@ -675,7 +676,7 @@ type Snapshot = {
     series?: { commands: string; numbers: number[]; fill: string | null; stroke: string | null }[];
 };
 
-function brush(plot: next.AutkPlot, div: HTMLElement, selection: Step & { kind: 'brush' }): void {
+function brush(plot: autkPlot.AutkPlot, div: HTMLElement, selection: Step & { kind: 'brush' }): void {
     const behaviors = (plot.instance as unknown as { _brushBehaviors: Map<string, d3.BrushBehavior<unknown>> })._brushBehaviors;
     const group = div.querySelector<SVGGElement>('.autkBrush')!;
     const behavior = behaviors.get(group.getAttribute('autkBrushId') || '0')!;
@@ -686,10 +687,18 @@ function replay(testCase: Case): Snapshot[] {
     const div = document.createElement('div');
     document.body.append(div);
     const collection = testCase.collection();
-    const plot = new next.AutkPlot(div, { ...testCase.config, collection } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { ...testCase.config, collection } as UnifiedPlotConfig);
+    // The hand-written classes kept their margins, with an axis title over long tick labels; a
+    // margin now grows to clear them (autark #134; see axis-titles). The snapshots compare the
+    // drawing at the configured margins, held for every draw of the replay. Where there is no
+    // layout (jsdom), no margin grows anyway.
+    const held = plot.instance as unknown as { _growingMargins: boolean; _margins: object; _configuredMargins: object };
+    held._growingMargins = true;
+    held._margins = { ...held._configuredMargins };
+    plot.draw();
 
     let emitted: Snapshot['emitted'] = [];
-    for (const event of Object.values(next.PlotEvent)) {
+    for (const event of Object.values(autkPlot.PlotEvent)) {
         plot.events.on(event, (data: PlotEventData) => emitted.push({
             event,
             selection: [...data.selection].sort((a, b) => a - b),
@@ -714,12 +723,12 @@ function replay(testCase: Case): Snapshot[] {
                 ...(testCase.strokes ? { stroke: strokeOf(p) } : {}),
                 ...(testCase.looks ? { look: lookOf(p) } : {}),
             })).sort(byId),
-            axes: Array.from(div.querySelectorAll('#axisX, #axisY')).map(axis => ({
-                id: axis.id,
+            axes: Array.from(div.querySelectorAll('.x.axis, .y.axis')).map(axis => ({
+                id: axis.classList.contains('x') ? 'axisX' : 'axisY',
                 ticks: Array.from(axis.querySelectorAll('.tick text')).map(t => t.textContent ?? ''),
                 label: axis.querySelector('.axis-label')?.textContent ?? null,
             })),
-            title: div.querySelector('#plotTitle')?.textContent ?? null,
+            title: div.querySelector('.plot-title')?.textContent ?? null,
             selection: [...plot.selection].sort((a, b) => a - b),
             emitted,
             path: div.querySelector('.autk-provenance')?.textContent ?? null,
@@ -794,7 +803,7 @@ function near(actual: unknown, expected: unknown): unknown {
  * 1 px), where the fill does not set the part apart: a part colored by its
  * subset statistic (avg, min, max), and a dot. Geometry and fills are unchanged.
  *
- * Series (wave 3): a moved point is a copy of its mark, so it keeps the mark's
+ * Series: a moved point is a copy of its mark, so it keeps the mark's
  * radius (the hand-written dots were 0.5 to 1 px smaller); the line or area of
  * the subset is drawn with the style of the series it redraws, in the
  * highlight color (each hand-written plot chose its own width and opacity).
@@ -802,10 +811,10 @@ function near(actual: unknown, expected: unknown): unknown {
  * a subset average can take; the hand-written charts clamped the subset to the
  * edges of the plot instead, drawing values that are not the averages. Those
  * cases keep every vertical coordinate and the value ticks of the plot as
- * drawn now (checked against the averages in `catalog-wave1.test.ts`); the
+ * drawn now (checked against the averages in `catalog-identity-partition.test.ts`); the
  * rest (x, selections, units, fills) is still compared.
  *
- * Wave 4: the part of a Sankey or chord mark keeps the outline of its mark
+ * Sankey, chord, parallel coordinates and table: the part of a Sankey or chord mark keeps the outline of its mark
  * (the hand-written arc parts had none) and looks like a highlighted mark, so
  * it is opaque (they used 0.9); a traced line part is opaque like a
  * highlighted line (`opacity: 1` written out). The table draws its title like
@@ -815,7 +824,7 @@ function near(actual: unknown, expected: unknown): unknown {
  */
 function accepted(name: string, snapshots: Snapshot[], actual: Snapshot[]): Snapshot[] {
     // In these cases every part shows a statistic (avg, min, max).
-    const STATISTIC_OUTLINE = `${rgb(next.PlotStyle.provenanceStroke)} 1`;
+    const STATISTIC_OUTLINE = `${rgb(autkPlot.PlotStyle.provenanceStroke)} 1`;
     const outline = (rewrite: (stroke: string | null | undefined) => string | null | undefined) =>
         snapshots.forEach(snapshot => snapshot.partials.forEach(partial => { partial.stroke = rewrite(partial.stroke); }));
     if (name.startsWith('heatmatrix:') && !name.includes('reducer')) outline(() => null);
@@ -823,6 +832,65 @@ function accepted(name: string, snapshots: Snapshot[], actual: Snapshot[]): Snap
     if (name.startsWith('pie:') || name.startsWith('donut:')) outline(stroke => stroke?.replace(/ 1$/, ' 1.5'));
 
     const plot = name.slice(0, name.indexOf(':'));
+    // binning-1d keeps the empty ranges of a numeric column: the histogram gains a bar of height
+    // 0 where the original skipped one, so the bars narrow along x. Heights, parts, selections and
+    // events stay the recorded ones; only x and width follow the new band. The x ticks are the bin
+    // labels, by their true edges (autark #134), one more than recorded for each empty range.
+    if (name.startsWith('barchart: histogram')) {
+        snapshots.forEach((snapshot, index) => {
+            const now = actual[index];
+            if (!now) return;
+            const along = new Map([...now.marks, ...now.partials].map(element => [`${element.tag} ${element.id}`, element.box]));
+            const narrowed = <T extends { tag: string; id: string | null; box: number[] | null }>(element: T): T => {
+                const box = along.get(`${element.tag} ${element.id}`);
+                return element.box && box ? { ...element, box: [box[0], element.box[1], box[2], element.box[3]] } : element;
+            };
+            const recordedMarks = new Map(snapshot.marks.map(mark => [mark.id, narrowed(mark)]));
+            const added = now.marks.filter(mark => !recordedMarks.has(mark.id));
+            if (added.some(mark => !mark.box || mark.box[3] !== 0)) throw new Error(`${name}: a bar other than an empty range was added`);
+            snapshot.marks = now.marks.map(mark => recordedMarks.get(mark.id) ?? mark);
+            snapshot.partials = snapshot.partials.map(narrowed);
+            const ticks = (axes: Snapshot['axes']) => axes.find(axis => axis.id === 'axisX')?.ticks ?? [];
+            const recordedTicks = ticks(snapshot.axes);
+            const nowTicks = ticks(now.axes);
+            if (nowTicks.length !== recordedTicks.length + added.length || new Set(nowTicks).size !== nowTicks.length) {
+                throw new Error(`${name}: ${nowTicks.length} x ticks, where ${recordedTicks.length} were recorded and ${added.length} empty ranges added`);
+            }
+            snapshot.axes = snapshot.axes.map(axis => (axis.id === 'axisX' ? { ...axis, ticks: nowTicks } : axis));
+            // The provenance path names a bar by its label: the same path, but for the bin labels.
+            const ranges = (path: string) => path.replace(/[\d.]+[kMG]?-[\d.]+[kMG]?/g, 'range');
+            if (snapshot.path && now.path && ranges(snapshot.path) === ranges(now.path)) snapshot.path = now.path;
+        });
+    }
+    // An axis the configuration gives no format writes a category or bucket as it is ("2021",
+    // recorded "2.021k") and a value under one as a decimal ("0.5", recorded "500m"), as fixed
+    // upstream in autark #134. A tick may differ only by writing the same number that way.
+    const SI: Record<string, number> = { y: 1e-24, z: 1e-21, a: 1e-18, f: 1e-15, p: 1e-12, n: 1e-9, µ: 1e-6, μ: 1e-6, m: 1e-3, k: 1e3, M: 1e6, G: 1e9, T: 1e12 };
+    const valueOf = (tick: string) => {
+        const unit = SI[tick.slice(-1)];
+        return unit === undefined ? Number(tick) : Number(tick.slice(0, -1)) * unit;
+    };
+    snapshots.forEach((snapshot, index) => snapshot.axes.forEach(axis => {
+        const now = actual[index]?.axes.find(candidate => candidate.id === axis.id)?.ticks;
+        if (!now || now.length !== axis.ticks.length) return;
+        axis.ticks = axis.ticks.map((tick, i) => {
+            const a = valueOf(tick);
+            const b = valueOf(now[i]);
+            return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a)) && !/[a-zµμ]$/i.test(now[i]) ? now[i] : tick;
+        });
+    }));
+    // One highlight model: the part of a sector is a subset render, the sector of the subset's
+    // value from the same start on the same ring, no longer the inner sector of the same area.
+    // The recorded part gives its fraction, (r² − r₀²) / (R² − r₀²); the sweep takes it instead.
+    if (plot === 'pie' || plot === 'donut' || plot === 'sunburst') {
+        snapshots.forEach(snapshot => snapshot.partials.forEach(partial => {
+            const mark = snapshot.marks.find(m => m.id === partial.id);
+            if (!mark?.box || !partial.box || mark.box.length !== 4) return;
+            const [inner, outer, start, sweep] = mark.box;
+            const fraction = (partial.box[1] ** 2 - inner ** 2) / (outer ** 2 - inner ** 2);
+            partial.box = [inner, outer, start, sweep * fraction].map(round);
+        }));
+    }
     const looks = (look: string | undefined, field: number, value: string) => {
         const parts = (look ?? '').split(' | ');
         parts[field] = value;

@@ -1,4 +1,4 @@
-import { ownMatrix, parseSector } from '../src';
+import { ownMatrix, parseSector } from '../src/plots/partial-design';
 
 /**
  * Minimal `getBBox` for jsdom, which does not implement SVG layout.

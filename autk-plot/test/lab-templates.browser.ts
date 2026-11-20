@@ -1,5 +1,5 @@
 /**
- * The built-in charts and transforms of Try it Yourself are the code autk-plot registers.
+ * The built-in charts and transforms of Try It Yourself are the code autk-plot registers.
  *
  * `usecases/src/provenance/lab-builtin-templates.ts` is generated from
  * `src/plots` and `src/transforms/presets` by `scripts/lab-templates.mjs`.
@@ -12,7 +12,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, PlotDefinition, TransformDefinition, UnifiedPlotConfig } from '../src';
 
 import { LAB_PLOT, plotDefinitionOf, plotLabConfig, transformConfigOf, transformFields } from '../../usecases/src/provenance/lab-plot';
@@ -52,17 +52,17 @@ function drawingOf(div: HTMLElement): string[] {
         `${element.tagName.toLowerCase()} ${Array.from(element.attributes).map(a => `${a.name}=${a.value.replace(/autk-part-(radial-)?\d+/g, 'autk-part-#')}`).sort().join(' ')}`);
 }
 
-describe('built-in chart templates of Try it Yourself', () => {
+describe('built-in chart templates of Try It Yourself', () => {
     beforeAll(() => {
         installSvgBBox();
-        next.registerTransform(movingAverage);
+        autkPlot.registerTransform(movingAverage);
     });
-    afterAll(() => next.unregisterTransform(movingAverage.name));
+    afterAll(() => autkPlot.unregisterTransform(movingAverage.name));
 
     test('cover the 24 built-in charts, once each', () => {
         const names = builtIns.map(t => (evaluateChart(t.code) as PlotDefinition).name);
         expect(new Set(names).size).toBe(24);
-        expect(names.every(name => next.hasRegisteredPlot(name))).toBe(true);
+        expect(names.every(name => autkPlot.hasRegisteredPlot(name))).toBe(true);
     });
 
     test.each(builtIns.map(t => [t.title, t] as const))('%s: run as a user plot, it draws what the built-in chart draws', (_title, template) => {
@@ -70,13 +70,13 @@ describe('built-in chart templates of Try it Yourself', () => {
         void type;
         void plot;
         const builtIn = (evaluateChart(template.code) as PlotDefinition).name;
-        next.unregisterPlot(LAB_PLOT);
-        next.registerPlot(plotDefinitionOf(template.code));
+        autkPlot.unregisterPlot(LAB_PLOT);
+        autkPlot.registerPlot(plotDefinitionOf(template.code));
 
         const draw = (which: Partial<UnifiedPlotConfig>) => {
             const div = document.createElement('div');
             document.body.append(div);
-            const drawn = new next.AutkPlot(div, { ...config, ...which, collection: regions(), width: 480, height: 280 } as UnifiedPlotConfig);
+            const drawn = new autkPlot.AutkPlot(div, { ...config, ...which, collection: regions(), width: 480, height: 280 } as UnifiedPlotConfig);
             drawn.setSelection([0, 1, 2, 3, 4, 5, 6, 7]);
             const result = drawingOf(div);
             div.remove();
@@ -88,38 +88,38 @@ describe('built-in chart templates of Try it Yourself', () => {
             expect(asUserPlot.length).toBeGreaterThan(0);
             expect(asUserPlot).toEqual(asBuiltIn);
         } finally {
-            next.unregisterPlot(LAB_PLOT);
+            autkPlot.unregisterPlot(LAB_PLOT);
         }
     });
 });
 
-describe('built-in transform templates of Try it Yourself', () => {
+describe('built-in transform templates of Try It Yourself', () => {
     const transforms = LAB_TEMPLATES.filter(t => t.group === 'built-in');
     beforeAll(() => installSvgBBox());
-    afterAll(() => next.unregisterTransform(LAB_TRANSFORM));
+    afterAll(() => autkPlot.unregisterTransform(LAB_TRANSFORM));
 
     test('cover the 12 built-in transforms, once each', () => {
         const names = transforms.map(t => (evaluateChart(t.code) as TransformDefinition).name);
         expect(new Set(names).size).toBe(12);
-        expect(names.every(name => next.registeredTransform(name).name === name)).toBe(true);
+        expect(names.every(name => autkPlot.registeredTransform(name).name === name)).toBe(true);
     });
 
     test.each(transforms.map(t => [t.title, t] as const))('%s: run as a user transform, it gives the built-in output and draws the same chart', (_title, template) => {
         const builtIn = (evaluateChart(template.code) as TransformDefinition).name;
         const columns = template.columns.split(',').map(c => c.trim()).filter(Boolean);
         const options = JSON.parse(template.options) as Record<string, unknown>;
-        next.unregisterTransform(LAB_TRANSFORM);
+        autkPlot.unregisterTransform(LAB_TRANSFORM);
         const definition = transformDefinitionOf(template.code);
-        next.registerTransform(definition);
+        autkPlot.registerTransform(definition);
 
         // The same rows and provenance, and the whole contract.
         const rows = () => regions().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[];
-        const asUser = next.run(rows(), { preset: 'registered', name: LAB_TRANSFORM, options }, columns);
-        const asBuiltIn = next.run(rows(), { preset: builtIn, options } as never, columns);
+        const asUser = autkPlot.run(rows(), { preset: 'registered', name: LAB_TRANSFORM, options }, columns);
+        const asBuiltIn = autkPlot.run(rows(), { preset: builtIn, options } as never, columns);
         expect(asUser.rows.length).toBeGreaterThan(0);
         expect(asUser.rows).toEqual(asBuiltIn.rows);
         expect(asUser.provenance).toEqual(asBuiltIn.provenance);
-        expect(next.checkTransformReport(definition, regions(), options, columns).violations).toEqual([]);
+        expect(autkPlot.checkTransformReport(definition, regions(), options, columns).violations).toEqual([]);
 
         // Drawn by the chart of the page the lab offers first, as the built-in transform is.
         const chart = PLOTS.find(p => p.name === template.plot)!;
@@ -128,7 +128,7 @@ describe('built-in transform templates of Try it Yourself', () => {
         const draw = (transform: UnifiedPlotConfig['transform']) => {
             const div = document.createElement('div');
             document.body.append(div);
-            const drawn = new next.AutkPlot(div, { ...config, transform, collection: regions(), width: 480, height: 280 } as UnifiedPlotConfig);
+            const drawn = new autkPlot.AutkPlot(div, { ...config, transform, collection: regions(), width: 480, height: 280 } as UnifiedPlotConfig);
             drawn.setSelection([0, 1, 2, 3, 4, 5, 6, 7]);
             const result = drawingOf(div);
             drawn.destroy();

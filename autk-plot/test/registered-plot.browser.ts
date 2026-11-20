@@ -10,7 +10,8 @@
 import * as d3 from 'd3';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
+import * as geometry from '../src/plots/partial-design';
 import type { AutkDatum, PlotDefinition, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { LAB_PLOT, plotDefinitionOf, plotLabConfig, transformConfigOf, transformFields } from '../../usecases/src/provenance/lab-plot';
@@ -83,7 +84,7 @@ function bars(name: string, part?: string): PlotDefinition {
                 .attr('class', 'autkMark')
                 .attr('x', r => x(String(r.label))!).attr('width', x.bandwidth())
                 .attr('y', r => y(Number(r.value))).attr('height', r => height - y(Number(r.value)));
-            if (part) marks.attr('data-autk-part', part);
+            if (part) marks.attr('data-autk-highlight', part);
         },
     };
 }
@@ -100,7 +101,7 @@ const DOTS: PlotDefinition = {
 
 const registered: string[] = [];
 function register(definition: PlotDefinition): PlotDefinition {
-    next.registerPlot(definition);
+    autkPlot.registerPlot(definition);
     registered.push(definition.name);
     return definition;
 }
@@ -108,7 +109,7 @@ function register(definition: PlotDefinition): PlotDefinition {
 function mount(config: Omit<UnifiedPlotConfig, 'type' | 'collection'>, collection = regions()) {
     const div = document.createElement('div');
     document.body.append(div);
-    const plot = new next.AutkPlot(div, { type: 'registered', collection, width: 480, height: 280, ...config } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { type: 'registered', collection, width: 480, height: 280, ...config } as UnifiedPlotConfig);
     const rows = () => plot.instance['_data'] as unknown as AutkDatum[];
     const marks = () => Array.from(div.querySelectorAll<SVGElement>('.autkMark'));
     const partials = () => Array.from(div.querySelectorAll<SVGElement>('.autkPartial'));
@@ -117,27 +118,27 @@ function mount(config: Omit<UnifiedPlotConfig, 'type' | 'collection'>, collectio
 
 beforeAll(() => installSvgBBox());
 afterEach(() => {
-    registered.splice(0).forEach(name => next.unregisterPlot(name));
-    next.unregisterPlot(LAB_PLOT);
+    registered.splice(0).forEach(name => autkPlot.unregisterPlot(name));
+    autkPlot.unregisterPlot(LAB_PLOT);
     document.body.innerHTML = '';
 });
 
 describe('registry', () => {
     test('a name is registered once; unknown names and bad definitions are rejected clearly', () => {
         register(DOTS);
-        expect(() => next.registerPlot(DOTS)).toThrow(/already registered/);
-        expect(() => next.registerPlot({ ...DOTS, name: ' ' })).toThrow(/non-empty name/);
-        expect(() => next.registerPlot({ name: 'x', draw: 1 as never })).toThrow(/draw must be a function/);
-        expect(() => mount({ plot: 'nope', attributes: { axis: ['shape_area'] } })).toThrow(/No plot is registered as "nope"/);
+        expect(() => autkPlot.registerPlot(DOTS)).toThrow(/already registered/);
+        expect(() => autkPlot.registerPlot({ ...DOTS, name: ' ' })).toThrow(/non-empty name/);
+        expect(() => autkPlot.registerPlot({ name: 'x', draw: 1 as never })).toThrow(/registerPlot: "x" needs a draw function/);
+        expect(() => mount({ plot: 'nope', attributes: { axis: ['shape_area'] } })).toThrow(/registeredPlot: no plot is registered as "nope"/);
     });
 });
 
 describe('interactions come from the annotations', () => {
     test('a click on a mark selects the features of its row, with shares', () => {
         register(bars('bars'));
-        const { plot, rows, marks } = mount({ plot: 'bars', ...BARS, events: [next.PlotEvent.CLICK] });
+        const { plot, rows, marks } = mount({ plot: 'bars', ...BARS, events: [autkPlot.PlotEvent.CLICK] });
         let emitted: PlotEventData | undefined;
-        plot.events.on(next.PlotEvent.CLICK, data => { emitted = data; });
+        plot.events.on(autkPlot.PlotEvent.CLICK, data => { emitted = data; });
         marks()[0].dispatchEvent(new MouseEvent('click'));
         expect(emitted!.selection.sort((a, b) => a - b)).toEqual([...rows()[0].autkIds!].sort((a, b) => a - b));
         expect(emitted!.shares).toHaveLength(rows()[0].autkIds!.length);
@@ -148,43 +149,85 @@ describe('interactions come from the annotations', () => {
         const { plot, marks } = mount({ plot: 'dots', attributes: { axis: ['shape_area'] } });
         plot.setSelection([0]);
         const rgb = (color: string) => d3.color(color)!.formatRgb();
-        expect(rgb(marks()[0].style.fill)).toBe(rgb(next.PlotStyle.provenance));
-        expect(rgb(marks()[1].style.fill)).toBe(rgb(next.PlotStyle.default));
+        expect(rgb(marks()[0].style.fill)).toBe(rgb(autkPlot.PlotStyle.provenance));
+        expect(rgb(marks()[1].style.fill)).toBe(rgb(autkPlot.PlotStyle.default));
     });
 });
 
 describe('segregated view without painting code', () => {
-    const selectHalf = (plot: next.AutkPlot) => plot.setSelection(regions().features.map((_f, i) => i).filter(i => i % 2 === 0));
+    const selectHalf = (plot: autkPlot.AutkPlot) => plot.setSelection(regions().features.map((_f, i) => i).filter(i => i % 2 === 0));
 
-    test('shrink: the copy is scaled by √f about the box center, so its area is f', () => {
-        register(bars('bars', 'shrink'));
+    /** Each partial copy with the mark it shows a part of. */
+    const pairs = (marks: () => SVGElement[], partials: () => SVGElement[]) => partials().map(copy => ({
+        copy, mark: marks().find(m => m.getAttribute('data-autk-provenance') === copy.getAttribute('data-autk-provenance'))!,
+    }));
+
+    test('subset render: the bar drawn again with the subset value, on the same channel and base', () => {
+        register(bars('bars'));
         const { plot, marks, partials } = mount({ plot: 'bars', ...BARS });
         selectHalf(plot);
         expect(partials().length).toBeGreaterThan(0);
-        for (const copy of partials()) {
-            const mark = marks().find(m => m.getAttribute('data-autk-provenance') === copy.getAttribute('data-autk-provenance'))!;
+        for (const { copy, mark } of pairs(marks, partials)) {
             const [selected, total] = copy.getAttribute('data-autk-units')!.split('/').map(Number);
-            const scale = Number(/scale\(([^)]+)\)/.exec(copy.getAttribute('transform')!)![1]);
-            expect(scale * scale).toBeCloseTo(selected / total, 12);
-            expect(d3.color(copy.style.fill)!.formatRgb()).toBe(d3.color(next.PlotStyle.provenance)!.formatRgb());
+            // Scaled in height from the base: the subset's count on the plot's own scale.
+            const [, sy] = /scale\(([^,]+), ([^)]+)\)/.exec(copy.getAttribute('transform')!)!.slice(1).map(Number);
+            expect(sy).toBeCloseTo(selected / total, 12);
+            expect(d3.color(copy.style.fill)!.formatRgb()).toBe(d3.color(autkPlot.PlotStyle.provenance)!.formatRgb());
             expect(copy.style.pointerEvents).toBe('none');
             expect(copy.nextElementSibling === mark || copy.previousElementSibling === mark).toBe(true);
         }
     });
 
-    test('fill-y: the copy is clipped to the bottom fraction of its box', () => {
-        register(bars('bars-y', 'fill-y'));
-        const { plot, marks, partials, div } = mount({ plot: 'bars-y', ...BARS });
-        selectHalf(plot);
-        for (const copy of partials()) {
-            const mark = marks().find(m => m.getAttribute('data-autk-provenance') === copy.getAttribute('data-autk-provenance'))!;
-            const clip = div.querySelector(`${copy.getAttribute('clip-path')!.slice(4, -1)} rect`)!;
-            const [selected, total] = copy.getAttribute('data-autk-units')!.split('/').map(Number);
-            const height = Number(mark.getAttribute('height'));
-            const bottom = Number(mark.getAttribute('y')) + height;
-            expect(Number(clip.getAttribute('height'))).toBeCloseTo(height * selected / total, 9);
-            expect(Number(clip.getAttribute('y')) + Number(clip.getAttribute('height'))).toBeCloseTo(bottom, 9);
-        }
+    test('boolean: the whole mark, asked by a mark, by the plot, or by the configuration', () => {
+        const whole = (copy: SVGElement, mark: SVGElement) => !copy.getAttribute('transform') && copy.getAttribute('height') === mark.getAttribute('height');
+
+        // A mark asks for it over its family's subset render.
+        register(bars('by-mark', 'boolean'));
+        const byMark = mount({ plot: 'by-mark', ...BARS });
+        selectHalf(byMark.plot);
+        expect(byMark.partials().length).toBeGreaterThan(0);
+        expect(pairs(byMark.marks, byMark.partials).every(({ copy, mark }) => whole(copy, mark))).toBe(true);
+
+        // The plot declares it for every family.
+        register({ ...bars('by-plot'), highlight: 'boolean' });
+        const byPlot = mount({ plot: 'by-plot', ...BARS });
+        selectHalf(byPlot.plot);
+        expect(pairs(byPlot.marks, byPlot.partials).every(({ copy, mark }) => whole(copy, mark))).toBe(true);
+        expect((byPlot.plot.instance as unknown as { highlightDesigns: autkPlot.HighlightDesign[] }).highlightDesigns).toMatchObject([{ kind: 'rect', mode: 'boolean' }]);
+
+        // The configuration asks for it, over the plot's own highlight and its highlight.
+        register({ ...bars('own'), highlight: ({ group, parts }) => { group.selectAll('line.autkPartial').data(parts).join('line').attr('class', 'autkPartial').attr('data-autk-provenance', p => p.mark); } });
+        const byConfig = mount({ plot: 'own', ...BARS, provenance: { highlight: 'boolean' } });
+        selectHalf(byConfig.plot);
+        expect(byConfig.partials().length).toBeGreaterThan(0);
+        expect(byConfig.partials().every(p => p.tagName === 'rect')).toBe(true);
+        expect(pairs(byConfig.marks, byConfig.partials).every(({ copy, mark }) => whole(copy, mark))).toBe(true);
+    });
+
+    test('a declared highlight names a known mode, channel, and preset', () => {
+        const declare = (highlight: unknown) => () => autkPlot.registerPlot({ ...bars('declared'), highlight: highlight as autkPlot.PlotHighlight });
+        expect(declare({ rect: { mode: 'subset', channel: 'height' } })).toThrow(/needs a channel \(length, position, band, angle, width, area, units\), not "height"/);
+        expect(declare({ rect: { mode: 'custom', preset: 'sparkle' } })).toThrow(/needs a preset \(glyph, trace, members\), not "sparkle"; a plot's own custom highlight is highlight/);
+        expect(declare({ rect: { mode: 'paint' } })).toThrow(/unknown mode "paint" \(expected boolean, subset, or custom\)/);
+        expect(declare({ bar: { mode: 'boolean' } })).toThrow(/unknown mark family "bar"/);
+        expect(declare('partial')).toThrow(/highlight "partial" is unknown \(expected boolean, subset, glyph, trace, a highlight per mark family, or a function\)/);
+        expect(declare('members')).toThrow(/members needs the scale of its mark family/);
+        expect(declare(3)).toThrow(/highlight must be a word/);
+        expect(autkPlot.hasRegisteredPlot('declared')).toBe(false);
+    });
+
+    test('the modes as words: subset (the default), a preset for every family, and the boolean', () => {
+        const designs = (definition: PlotDefinition) => {
+            register(definition);
+            const { plot } = mount({ plot: definition.name, ...BARS });
+            return (plot.instance as unknown as { highlightDesigns: autkPlot.HighlightDesign[] }).highlightDesigns;
+        };
+        // 'subset' asks for what an undeclared plot gets: the channel inferred from the geometry.
+        const subset = designs({ ...bars('as-subset'), highlight: 'subset' });
+        expect(subset).toMatchObject([{ kind: 'rect', mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' }]);
+        expect(designs(bars('undeclared'))).toEqual(subset);
+        expect(designs({ ...bars('as-glyph'), highlight: 'glyph' })).toMatchObject([{ kind: 'rect', mode: 'custom', preset: 'glyph', reason: 'declared by the plot' }]);
+        expect(designs({ ...bars('as-boolean'), highlight: 'boolean' })).toMatchObject([{ kind: 'rect', mode: 'boolean' }]);
     });
 
     test('one-to-one marks show the share sent by the emitting view', () => {
@@ -195,10 +238,10 @@ describe('segregated view without painting code', () => {
         expect(Number(/scale\(([^)]+)\)/.exec(partials()[0].getAttribute('transform')!)![1])).toBeCloseTo(0.5, 12);
     });
 
-    test('drawPart replaces the rules; none skips a mark', () => {
+    test('highlight replaces the rules; none skips a mark', () => {
         const custom = register({
             ...bars('custom'),
-            drawPart({ group, parts }) {
+            highlight({ group, parts }) {
                 group.selectAll('line.autkPartial').data(parts).join('line')
                     .attr('class', 'autkPartial').attr('data-autk-provenance', p => p.mark);
             },
@@ -217,7 +260,7 @@ describe('segregated view without painting code', () => {
 
 describe('the drawing contract refuses each broken annotation', () => {
     const check = (definition: PlotDefinition, config: Omit<UnifiedPlotConfig, 'type' | 'collection'> = BARS) =>
-        next.checkPlot(definition, document.createElement('div'), { ...config, collection: regions(), width: 480, height: 280 });
+        autkPlot.checkPlot(definition, document.createElement('div'), { ...config, collection: regions(), width: 480, height: 280 });
     const invariants = (definition: PlotDefinition, config?: Omit<UnifiedPlotConfig, 'type' | 'collection'>) =>
         new Set(check(definition, config).violations.map(v => v.invariant));
     const drawing = (draw: PlotDefinition['draw']): PlotDefinition => ({ name: 'broken', draw });
@@ -247,11 +290,13 @@ describe('the drawing contract refuses each broken annotation', () => {
         }))).toEqual(new Set([4]));
     });
 
-    test('5: an unknown part rule or origin', () => {
-        expect(invariants(drawing(({ group, rows }) => {
+    test('5: an unknown mark highlight', () => {
+        const report = check(drawing(({ group, rows }) => {
             group.selectAll('rect').data(rows).join('rect').attr('class', 'autkMark')
-                .attr('data-autk-part', 'grow').attr('data-autk-origin', 'center');
-        }))).toEqual(new Set([5]));
+                .attr('width', 5).attr('height', 5).attr('data-autk-highlight', 'subset');
+        }));
+        expect(new Set(report.violations.map(v => v.invariant))).toEqual(new Set([5]));
+        expect(report.violations[0].message).toMatch(/data-autk-highlight="subset" \(expected none or boolean\)/);
     });
 
     test('2 and 4: geometry with NaN (D3 writes it for an undefined coordinate) is refused on marks and context', () => {
@@ -268,13 +313,13 @@ describe('the drawing contract refuses each broken annotation', () => {
             const parent = target === 'html' ? html.node()! : html.node()!.parentElement!;
             d3.select(parent).selectAll('div.row').data(rows).join('div').attr('class', 'row autkMark');
         });
-        expect(check(rowsAsDivs('html'), { ...BARS, events: [next.PlotEvent.CLICK] }).violations).toEqual([]);
-        expect(invariants(rowsAsDivs('outside'), { ...BARS, events: [next.PlotEvent.CLICK] })).toEqual(new Set([3]));
-        expect(invariants(rowsAsDivs('html'), { ...BARS, events: [next.PlotEvent.BRUSH] })).toEqual(new Set([4]));
+        expect(check(rowsAsDivs('html'), { ...BARS, events: [autkPlot.PlotEvent.CLICK] }).violations).toEqual([]);
+        expect(invariants(rowsAsDivs('outside'), { ...BARS, events: [autkPlot.PlotEvent.CLICK] })).toEqual(new Set([3]));
+        expect(invariants(rowsAsDivs('html'), { ...BARS, events: [autkPlot.PlotEvent.BRUSH] })).toEqual(new Set([4]));
     });
 
-    test('6: a drawPart that paints nothing', () => {
-        expect(invariants({ ...bars('silent'), drawPart: () => undefined })).toEqual(new Set([6]));
+    test('6: a highlight that paints nothing', () => {
+        expect(invariants({ ...bars('silent'), highlight: () => undefined })).toEqual(new Set([6]));
     });
 
     test('0: a draw that throws; and plots refuse a broken drawing at every draw', () => {
@@ -282,7 +327,7 @@ describe('the drawing contract refuses each broken annotation', () => {
         register({ ...drawing(({ group, rows }) => {
             group.selectAll('rect').data(rows.slice(1)).join('rect').attr('class', 'autkMark');
         }), name: 'missing' });
-        expect(() => mount({ plot: 'missing', ...BARS })).toThrow(/breaks the drawing contract: \(2\) row 0/);
+        expect(() => mount({ plot: 'missing', ...BARS })).toThrow(/: the drawing breaks its contract: \(2\) row 0/);
     });
 });
 
@@ -295,13 +340,13 @@ describe('plot lab templates', () => {
         return config;
     };
     const checkTemplate = (index: number) =>
-        next.checkPlot(plotDefinitionOf(PLOT_LAB_TEMPLATES[index].code), document.createElement('div'), { ...configOf(index), collection: withSyntheticEvents(regions()), width: 480, height: 280 });
+        autkPlot.checkPlot(plotDefinitionOf(PLOT_LAB_TEMPLATES[index].code), document.createElement('div'), { ...configOf(index), collection: withSyntheticEvents(regions()), width: 480, height: 280 });
 
     test('the D3 examples of the lab honor the contract, each with its inferred design', () => {
         const rules = ['Lollipop', 'Line', 'Box plot', 'HTML table', 'Beeswarm'].map(title => {
             const report = checkTemplate(indexOf(title));
             expect(report, title).toMatchObject({ violations: [], skipped: [] });
-            return report.designs.map(d => `${d.kind}:${d.rule}${d.axis ? ':' + d.axis : ''}`).join(' ');
+            return report.designs.map(d => `${d.kind}:${geometry.ruleOf(d)}${'axis' in d && d.axis ? ':' + d.axis : ''}`).join(' ');
         });
         // The lollipop point slides along its stick; the line points slide down; the boxes span their members; table rows and 1:1 dots show the fraction.
         expect(rules).toEqual(['point:position:x', 'point:position:y', 'rect:members:y', 'html:glyph', 'point:glyph']);
@@ -310,7 +355,7 @@ describe('plot lab templates', () => {
     test('no template draws an element with NaN geometry, marks and context alike', () => {
         for (const template of PLOT_LAB_TEMPLATES) {
             const div = document.createElement('div');
-            next.checkPlot(plotDefinitionOf(template.code), div, { ...configOf(PLOT_LAB_TEMPLATES.indexOf(template)), collection: withSyntheticEvents(regions()), width: 480, height: 280 });
+            autkPlot.checkPlot(plotDefinitionOf(template.code), div, { ...configOf(PLOT_LAB_TEMPLATES.indexOf(template)), collection: withSyntheticEvents(regions()), width: 480, height: 280 });
             const broken = Array.from(div.querySelectorAll('*')).filter(e => Array.from(e.attributes).some(a => /NaN/.test(a.value)));
             expect(broken.map(e => e.outerHTML.slice(0, 80)), template.title).toEqual([]);
         }
@@ -330,10 +375,10 @@ describe('plot lab templates', () => {
     });
 
     test('equivalence: the D3 treemap selects and paints exactly like the built-in treemap', () => {
-        const config = { attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'hierarchy' as const }, events: [next.PlotEvent.CLICK], margins: { left: 10, right: 10, top: 40, bottom: 10 } };
+        const config = { attributes: { axis: ['landuse', 'cdta2020'] }, transform: { preset: 'hierarchy' as const }, events: [autkPlot.PlotEvent.CLICK], margins: { left: 10, right: 10, top: 40, bottom: 10 } };
         const builtIn = document.createElement('div');
-        const original = new next.AutkPlot(builtIn, { type: 'treemap', collection: regions(), width: 480, height: 280, ...config });
-        next.registerPlot(plotDefinitionOf(D3_TREEMAP));
+        const original = new autkPlot.AutkPlot(builtIn, { type: 'treemap', collection: regions(), width: 480, height: 280, ...config });
+        autkPlot.registerPlot(plotDefinitionOf(D3_TREEMAP));
         const custom = mount({ plot: LAB_PLOT, ...config });
 
         const byMark = (div: HTMLElement, selector: string) => new Map(Array.from(div.querySelectorAll(selector))
@@ -347,9 +392,9 @@ describe('plot lab templates', () => {
         for (const [mark, element] of customMarks) expect(box(element)).toEqual(box(originalMarks.get(mark)!));
 
         // A click on the same leaf emits the same selection and shares.
-        const clickOn = (plot: next.AutkPlot, marks: Map<string, Element>, mark: string) => {
+        const clickOn = (plot: autkPlot.AutkPlot, marks: Map<string, Element>, mark: string) => {
             let emitted: PlotEventData | undefined;
-            plot.events.on(next.PlotEvent.CLICK, data => { emitted = data; });
+            plot.events.on(autkPlot.PlotEvent.CLICK, data => { emitted = data; });
             marks.get(mark)!.dispatchEvent(new MouseEvent('click'));
             return emitted!;
         };

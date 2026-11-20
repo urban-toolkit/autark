@@ -13,8 +13,9 @@
 import * as d3 from 'd3';
 import { afterEach, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
-import type { PartialDesign, PlotDefinition, UnifiedPlotConfig } from '../src';
+import * as autkPlot from '../src';
+import * as geometry from '../src/plots/partial-design';
+import type { HighlightDesign, PlotDefinition, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
 import type { Collection } from './fixtures';
@@ -31,9 +32,9 @@ const twoCategories = (): Collection => {
 };
 
 /** Plain D3 bars, as a user writes them. */
-const userBars = (name: string, design?: PlotDefinition['design']): PlotDefinition => ({
+const userBars = (name: string, highlight?: PlotDefinition['highlight']): PlotDefinition => ({
     name,
-    design,
+    highlight,
     draw({ group, rows, width, height, value }) {
         const x = d3.scaleBand(rows.map(r => String(value(r, 0))), [0, width]);
         const y = d3.scaleLinear([0, d3.max(rows, r => Number(value(r, 1))) ?? 1], [height, 0]);
@@ -46,17 +47,17 @@ const userBars = (name: string, design?: PlotDefinition['design']): PlotDefiniti
 
 const registered: string[] = [];
 function register(definition: PlotDefinition): void {
-    next.registerPlot(definition);
+    autkPlot.registerPlot(definition);
     registered.push(definition.name);
 }
 afterEach(() => {
-    registered.splice(0).forEach(name => next.unregisterPlot(name));
+    registered.splice(0).forEach(name => autkPlot.unregisterPlot(name));
     document.body.innerHTML = '';
 });
 
 function mount(config: Omit<UnifiedPlotConfig, 'collection'>, collection: Collection = regions()) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, { width: 400, height: 300, collection, ...config } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { width: 400, height: 300, collection, ...config } as UnifiedPlotConfig);
     const part = (mark: Element) => effectiveBox(div.querySelector(`.autkPartial[data-autk-provenance="${mark.getAttribute('data-autk-provenance')}"]`));
     return { div, plot, marks: () => Array.from(div.querySelectorAll('.autkMark')), part };
 }
@@ -65,12 +66,12 @@ const bins = { attributes: { axis: ['kind', '@transform'] }, transform: { preset
 
 describe('built-in plots are registered definitions', () => {
     test('their names are reserved: they cannot be replaced nor unregistered', () => {
-        expect(next.hasRegisteredPlot('barchart')).toBe(true);
-        expect(next.hasRegisteredPlot('scatterplot')).toBe(true);
-        expect(next.hasRegisteredPlot('bubble')).toBe(true);
-        expect(() => next.registerPlot(userBars('barchart'))).toThrow(/already registered/);
-        expect(() => next.registerPlot(userBars('registered'))).toThrow(/already registered/);
-        expect(() => next.unregisterPlot('barchart')).toThrow(/built-in plot/);
+        expect(autkPlot.hasRegisteredPlot('barchart')).toBe(true);
+        expect(autkPlot.hasRegisteredPlot('scatterplot')).toBe(true);
+        expect(autkPlot.hasRegisteredPlot('bubble')).toBe(true);
+        expect(() => autkPlot.registerPlot(userBars('barchart'))).toThrow(/already registered/);
+        expect(() => autkPlot.registerPlot(userBars('registered'))).toThrow(/already registered/);
+        expect(() => autkPlot.unregisterPlot('barchart')).toThrow(/built-in plot/);
     });
 
     test('a built-in plot drawn through the registered type is the same plot', () => {
@@ -85,14 +86,14 @@ describe('built-in plots are registered definitions', () => {
         expect(() => mount({ type: 'barchart', attributes: { axis: ['landuse', 'shape_area'] }, transform: { preset: 'fold' } }))
             .toThrow('Barchart only supports the binning-1d transform preset.');
         expect(() => mount({ type: 'scatterplot', attributes: { axis: ['shape_area', 'shape_leng'] }, topK: { k: 3 } }))
-            .toThrow(/topK is not supported/);
+            .toThrow(/does not support topK./);
         expect(() => mount({ type: 'scatterplot', attributes: { axis: ['shape_area'] } })).toThrow('Scatterplot requires two dimensions.');
         expect(() => mount({ type: 'bubble', attributes: { axis: ['shape_area', 'shape_leng'] } })).toThrow('Bubble chart requires x, y, and size attributes.');
     });
 
     test('the plot shows itself in a host hidden until it draws (as in the Autark gallery)', () => {
         const { div } = mount({ type: 'barchart', ...bins }, twoCategories());
-        expect((div.querySelector('svg#plot') as SVGElement).style.visibility).toBe('visible');
+        expect((div.querySelector('svg.autk-plot') as SVGElement).style.visibility).toBe('visible');
         expect((div.querySelector('.autk-registered-html') as HTMLElement).style.visibility).toBe('visible');
     });
 
@@ -105,15 +106,15 @@ describe('built-in plots are registered definitions', () => {
             .toThrow('Donut chart requires an additive reducer (count or sum).');
 
         // A registered transform's reducer is known once it has run.
-        next.registerTransform({
+        autkPlot.registerTransform({
             name: 'avg-by-landuse',
             shape: 'category-value',
             run(rows) {
-                const buckets = next.collectBuckets({ rows, bucketOf: row => String(row.landuse), valueOf: row => Number(row.shape_area), reducer: 'avg' });
+                const buckets = autkPlot.collectBuckets({ rows, bucketOf: row => String(row.landuse), valueOf: row => Number(row.shape_area), reducer: 'avg' });
                 const keys = buckets.map(b => b.key);
                 return {
                     rows: buckets.map(b => ({ label: b.key, value: b.value, autkIds: b.autkIds })) as never,
-                    provenance: next.binnedProvenance({ rows, buckets, bins: next.indexedBins(keys, keys, 'landuse'), binLabel: 'land uses', rowKeys: keys, reducer: 'avg' }),
+                    provenance: autkPlot.binnedProvenance({ rows, buckets, bins: autkPlot.indexedBins(keys, keys, 'landuse'), binLabel: 'land uses', rowKeys: keys, reducer: 'avg' }),
                 };
             },
         });
@@ -121,14 +122,14 @@ describe('built-in plots are registered definitions', () => {
             expect(() => mount({ type: 'pie', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'registered', name: 'avg-by-landuse' } }))
                 .toThrow('Pie chart requires an additive reducer (count or sum).');
         } finally {
-            next.unregisterTransform('avg-by-landuse');
+            autkPlot.unregisterTransform('avg-by-landuse');
         }
     });
 
     test('defaults fill only what the configuration leaves unset', () => {
         const { div } = mount({ type: 'barchart', ...bins, labels: { axis: ['kind', 'regions'] } }, twoCategories());
-        expect(div.querySelector('#plotTitle')?.textContent).toBe('Distribution');
-        expect(div.querySelector('#axisY .axis-label')?.textContent).toBe('regions');
+        expect(div.querySelector('.plot-title')?.textContent).toBe('Distribution');
+        expect(div.querySelector('.y.axis .axis-label')?.textContent).toBe('regions');
     });
 });
 
@@ -145,12 +146,12 @@ describe('the drawing context gives built-in helpers to every plot', () => {
             },
         });
         const { div } = mount({ type: 'registered', plot: 'axes', attributes: { axis: ['shape_area', 'shape_leng'] }, labels: { axis: ['Area', 'Length'] } });
-        const children = Array.from(div.querySelector('svg')!.children).map(c => c.id || c.getAttribute('class'));
-        expect(children.indexOf('axisX')).toBeLessThan(children.indexOf('autkBrush autkMarksGroup'));
-        expect(children.indexOf('axisY')).toBeLessThan(children.indexOf('autkBrush autkMarksGroup'));
-        expect(div.querySelector('#axisX .axis-label')?.textContent).toBe('Area');
-        expect(div.querySelector('#axisY .axis-label')?.textContent).toBe('Length');
-        expect(Array.from(div.querySelectorAll('#axisX .tick text')).map(t => t.textContent)).toEqual(['0', '500k', '1M']);
+        const children = Array.from(div.querySelector('svg')!.children).map(c => c.getAttribute('class'));
+        expect(children.indexOf('x axis')).toBeLessThan(children.indexOf('autkBrush autkMarksGroup'));
+        expect(children.indexOf('y axis')).toBeLessThan(children.indexOf('autkBrush autkMarksGroup'));
+        expect(div.querySelector('.x.axis .axis-label')?.textContent).toBe('Area');
+        expect(div.querySelector('.y.axis .axis-label')?.textContent).toBe('Length');
+        expect(Array.from(div.querySelectorAll('.x.axis .tick text')).map(t => t.textContent)).toEqual(['0', '500k', '1M']);
     });
 
     test('a plot sizes its transform to the drawing area, reads its result, and adjusts the color domain', () => {
@@ -181,7 +182,7 @@ describe('the drawing context gives built-in helpers to every plot', () => {
     });
 
     test('partRange tells where parts lie: under their row (count, sum), or anywhere in the reduced values (avg)', () => {
-        let seen: next.PlotDrawContext['partRange'];
+        let seen: autkPlot.PlotDrawContext['partRange'];
         register({ ...userBars('peek'), draw(context) { seen = context.partRange; userBars('peek').draw(context); } });
         mount({ type: 'registered', plot: 'peek', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d', options: { reducer: 'avg', value: 'shape_leng' } } });
         const lengths = regions().features.map(f => Number(f.properties!.shape_leng));
@@ -199,7 +200,7 @@ describe('a declared design is the same for built-in and user plots', () => {
         register(userBars('inferred'));
         const { plot, marks, part } = mount({ type: 'registered', plot: 'inferred', ...bins }, twoCategories());
         plot.setSelection([0]);
-        expect((plot.instance as unknown as { partialDesigns: PartialDesign[] }).partialDesigns[0].rule).toBe('glyph');
+        expect(geometry.ruleOf((plot.instance as unknown as { highlightDesigns: HighlightDesign[] }).highlightDesigns[0])).toBe('glyph');
         const [bar, box] = [effectiveBox(marks()[0])!, part(marks()[0])!];
         expect(box.width).toBeLessThan(bar.width);
     });
@@ -214,7 +215,7 @@ describe('a declared design is the same for built-in and user plots', () => {
     });
 
     test('a user plot declaring the same design draws the same parts', () => {
-        register(userBars('declared', { rect: { rule: 'length', axis: 'y', anchor: 'end' } }));
+        register(userBars('declared', { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } }));
         const { plot, marks, part } = mount({ type: 'registered', plot: 'declared', ...bins }, twoCategories());
         plot.setSelection([0]);
         const [bar, box] = [effectiveBox(marks()[0])!, part(marks()[0])!];
@@ -242,12 +243,12 @@ describe('a declared design is the same for built-in and user plots', () => {
         avg.plot.setSelection([0]);
         const mark = avg.marks().find(m => avg.div.querySelector(`.autkPartial[data-autk-provenance="${m.getAttribute('data-autk-provenance')}"]`))!;
         const cell = avg.div.querySelector<SVGElement>(`.autkPartial[data-autk-provenance="${mark.getAttribute('data-autk-provenance')}"]`)!;
-        expect((avg.plot.instance as unknown as { partialDesigns: PartialDesign[] }).partialDesigns[0].rule).toBe('glyph');
+        expect(geometry.ruleOf((avg.plot.instance as unknown as { highlightDesigns: HighlightDesign[] }).highlightDesigns[0])).toBe('glyph');
         expect(avg.part(mark)!.width).toBeCloseTo(effectiveBox(mark)!.width / 2);
         expect(avg.part(mark)!.height).toBeCloseTo(20);
         // Outlined as the selection (the highlight, darker), since its data color alone does not set it apart.
         const highlight = d3.color((avg.plot.instance as unknown as { highlightColor: string }).highlightColor)!.formatHex();
-        expect(d3.color(cell.style.stroke)!.formatHex()).toBe(next.PlotStyle.provenanceStroke);
+        expect(d3.color(cell.style.stroke)!.formatHex()).toBe(autkPlot.PlotStyle.provenanceStroke);
         expect(cell.style.strokeWidth).toBe('1');
         expect(d3.color(cell.style.fill)!.formatHex()).not.toBe(highlight);
         expect(cell.style.fill).not.toBe((mark as SVGElement).style.fill);
@@ -275,7 +276,7 @@ describe('a declared design is the same for built-in and user plots', () => {
     test('in a mark whose area encodes the value, a subset statistic is a copy of area statistic/value', () => {
         register({
             name: 'disks',
-            design: { point: { rule: 'area' } },
+            highlight: { point: { mode: 'subset', channel: 'area' } },
             draw({ group, rows, width, value }) {
                 const x = d3.scaleBand(rows.map(r => String(value(r, 0))), [0, width]);
                 const r = d3.scaleSqrt([0, d3.max(rows, row => Number(value(row, 1))) || 1], [0, 30]);
@@ -310,7 +311,7 @@ describe('a declared design is the same for built-in and user plots', () => {
     });
 });
 
-describe('what wave 2 needed is open to user plots too', () => {
+describe('colors, members, and empty rows are open to user plots too', () => {
     test('marks are colored by a row field, or by the base color the plot gives, when the configuration sets no color', () => {
         register({
             name: 'tiles',
@@ -324,7 +325,7 @@ describe('what wave 2 needed is open to user plots too', () => {
         expect(new Set(tiles.marks().map(m => (m as SVGElement).style.fill)).size).toBeGreaterThan(1);
 
         register({ ...userBars('shaded'), baseColor: rows => row => (row === rows[0] ? 'rgb(17, 17, 17)' : 'rgb(238, 238, 238)') });
-        const shaded = mount({ type: 'registered', plot: 'shaded', ...bins, events: [next.PlotEvent.CLICK] }, twoCategories());
+        const shaded = mount({ type: 'registered', plot: 'shaded', ...bins, events: [autkPlot.PlotEvent.CLICK] }, twoCategories());
         expect(shaded.marks().map(m => (m as SVGElement).style.fill)).toEqual(['rgb(17, 17, 17)', 'rgb(238, 238, 238)']);
         // A selected mark is highlighted whatever its base color.
         shaded.marks()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -341,9 +342,9 @@ describe('what wave 2 needed is open to user plots too', () => {
                 group.selectAll('rect').data(rows).join('rect').attr('class', 'autkMark')
                     .attr('x', r => x(String(r.category))!).attr('width', x.bandwidth())
                     .attr('y', r => y(Number(r.q3))).attr('height', r => y(Number(r.q1)) - y(Number(r.q3)));
-                return { design: { rect: { rule: 'members', axis: 'y', scale: { a: y(0), k: y(1) - y(0), fields: ['q1', 'q3'] } } } };
+                return { highlight: { rect: { mode: 'custom', preset: 'members', axis: 'y', scale: { a: y(0), k: y(1) - y(0), fields: ['q1', 'q3'] } } } };
             },
-            drawPart({ group, drawAuto }) {
+            highlight({ group, drawAuto }) {
                 drawAuto();
                 group.selectAll('.autkPartial').attr('data-checked', 'yes');
             },
@@ -359,7 +360,7 @@ describe('what wave 2 needed is open to user plots too', () => {
         expect(Number(a.getAttribute('data-autk-value'))).toBe(area(0));
         expect((y(a) - y(b)) / (area(0) - area(1))).toBeLessThan(0);
         expect(a.getAttribute('data-checked')).toBe('yes');
-        expect(d3.color(a.style.stroke)!.formatHex()).toBe(next.PlotStyle.provenanceStroke);
+        expect(d3.color(a.style.stroke)!.formatHex()).toBe(autkPlot.PlotStyle.provenanceStroke);
         expect(a.querySelector('title')!.textContent).toMatch(/^feature 0: /);
     });
 
@@ -397,23 +398,23 @@ describe('x tick labels that collide are turned (the Pareto chart of districts)'
         const restore = measureTicks();
         try {
             const crowded = mount({ type: 'pareto', attributes: { axis: ['cdta2020'] }, transform: { preset: 'cumulative' }, width: 300 });
-            const turned = Array.from(crowded.div.querySelectorAll('#axisX .tick text'));
+            const turned = Array.from(crowded.div.querySelectorAll('.x.axis .tick text'));
             expect(turned.length).toBeGreaterThan(1);
             expect(turned.every(text => text.getAttribute('transform') === 'rotate(-45)')).toBe(true);
 
             const roomy = mount({ type: 'pareto', attributes: { axis: ['landuse'] }, transform: { preset: 'cumulative' }, width: 900 });
-            expect(Array.from(roomy.div.querySelectorAll('#axisX .tick text')).some(text => text.getAttribute('transform'))).toBe(false);
+            expect(Array.from(roomy.div.querySelectorAll('.x.axis .tick text')).some(text => text.getAttribute('transform'))).toBe(false);
         } finally {
             restore();
         }
     });
 });
 
-describe('what wave 4 needed is open to user plots too', () => {
+describe('HTML marks, mark styles, and brush areas are open to user plots too', () => {
     test('a drawing made only of HTML (the table) has no SVG: its title is HTML, and a header click sorts it', () => {
-        const { div } = mount({ type: 'table', attributes: { axis: ['ntaname', 'shape_area'] }, labels: { title: 'Regions' }, events: [next.PlotEvent.CLICK] });
+        const { div } = mount({ type: 'table', attributes: { axis: ['ntaname', 'shape_area'] }, labels: { title: 'Regions' }, events: [autkPlot.PlotEvent.CLICK] });
         expect(div.querySelector('svg')).toBeNull();
-        expect(div.querySelector('#plotTitle')!.textContent).toBe('Regions');
+        expect(div.querySelector('.plot-title')!.textContent).toBe('Regions');
         const areas = () => Array.from(div.querySelectorAll('tbody tr')).map(tr => Number(tr.children[1].textContent));
         div.querySelectorAll('th')[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(areas()).toEqual(areas().slice().sort((a, b) => a - b));
@@ -444,7 +445,7 @@ describe('what wave 4 needed is open to user plots too', () => {
                     .attr('transform', (_d, i) => `translate(${margins.left + 10 + i * 100}, ${margins.top})`);
             },
         });
-        const axes = mount({ type: 'registered', plot: 'two-axes', attributes: { axis: ['shape_area'] }, events: [next.PlotEvent.BRUSH_Y] });
+        const axes = mount({ type: 'registered', plot: 'two-axes', attributes: { axis: ['shape_area'] }, events: [autkPlot.PlotEvent.BRUSH_Y] });
         expect(axes.div.querySelector('.autkMarksGroup')!.classList.contains('autkBrush')).toBe(false);
         expect(axes.div.querySelectorAll('.autkBrush')).toHaveLength(2);
     });

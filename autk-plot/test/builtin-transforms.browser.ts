@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, TransformDefinition, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents, withSyntheticSeries } from './fixtures';
@@ -27,20 +27,20 @@ const BUILT_INS = [
 
 const registered: string[] = [];
 function register(definition: TransformDefinition): void {
-    next.registerTransform(definition);
+    autkPlot.registerTransform(definition);
     registered.push(definition.name);
 }
 afterEach(() => {
-    registered.splice(0).forEach(name => next.unregisterTransform(name));
+    registered.splice(0).forEach(name => autkPlot.unregisterTransform(name));
     document.body.innerHTML = '';
 });
 
 /** A user transform with the code of a built-in one, under another name. */
-const copyOf = (builtIn: string, name: string): TransformDefinition => ({ ...next.registeredTransform(builtIn), name });
+const copyOf = (builtIn: string, name: string): TransformDefinition => ({ ...autkPlot.registeredTransform(builtIn), name });
 
 function mount(config: Omit<UnifiedPlotConfig, 'collection'>, collection: Collection = regions()) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, { width: 480, height: 320, collection, ...config } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { width: 480, height: 320, collection, ...config } as UnifiedPlotConfig);
     return { div, plot, marks: () => Array.from(div.querySelectorAll('.autkMark')) };
 }
 
@@ -50,29 +50,29 @@ const drawingOf = (div: HTMLElement) => Array.from(div.querySelectorAll('.autkMa
 
 describe('built-in transforms are registered definitions', () => {
     test('the 12 built-in transforms are in the registry, each with its row shape', () => {
-        expect(BUILT_INS.map(name => next.registeredTransform(name).name)).toEqual(BUILT_INS);
-        expect(next.registeredTransform('binning-1d').shape).toBe('category-value');
-        expect(next.registeredTransform('binning-events').shape).toBe('series');
-        expect(next.registeredTransform('reduce-series').shape).toBe('series');
-        expect(next.registeredTransform('hierarchy').shape).toBe('hierarchy');
+        expect(BUILT_INS.map(name => autkPlot.registeredTransform(name).name)).toEqual(BUILT_INS);
+        expect(autkPlot.registeredTransform('binning-1d').shape).toBe('category-value');
+        expect(autkPlot.registeredTransform('binning-events').shape).toBe('series');
+        expect(autkPlot.registeredTransform('reduce-series').shape).toBe('series');
+        expect(autkPlot.registeredTransform('hierarchy').shape).toBe('hierarchy');
     });
 
     test('their names are reserved: they cannot be replaced nor unregistered', () => {
-        expect(() => next.registerTransform(copyOf('binning-1d', 'binning-1d'))).toThrow(/already registered/);
-        expect(() => next.unregisterTransform('binning-1d')).toThrow(/built-in transform/);
-        expect(() => next.registerTransform(copyOf('binning-1d', 'registered'))).toThrow(/already registered/);
+        expect(() => autkPlot.registerTransform(copyOf('binning-1d', 'binning-1d'))).toThrow(/already registered/);
+        expect(() => autkPlot.unregisterTransform('binning-1d')).toThrow(/built-in transform/);
+        expect(() => autkPlot.registerTransform(copyOf('binning-1d', 'registered'))).toThrow(/already registered/);
     });
 
     test('a built-in transform named through the registered preset is the same transform', () => {
-        const direct = next.run(rows(), { preset: 'binning-1d', options: { bins: 5 } }, ['shape_area']);
-        const named = next.run(rows(), { preset: 'registered', name: 'binning-1d', options: { bins: 5 } }, ['shape_area']);
+        const direct = autkPlot.run(rows(), { preset: 'binning-1d', options: { bins: 5 } }, ['shape_area']);
+        const named = autkPlot.run(rows(), { preset: 'registered', name: 'binning-1d', options: { bins: 5 } }, ['shape_area']);
         expect(named.rows).toEqual(direct.rows);
         expect(named.provenance).toEqual(direct.provenance);
         expect(named).toMatchObject({ preset: 'registered', name: 'binning-1d', shape: 'category-value' });
     });
 
     test('an unknown transform is an error, not another transform', () => {
-        expect(() => next.run(rows(), { preset: 'nope' } as never, ['shape_area'])).toThrow(/No transform is registered as "nope"/);
+        expect(() => autkPlot.run(rows(), { preset: 'nope' } as never, ['shape_area'])).toThrow(/registeredTransform: no transform is registered as "nope"/);
     });
 });
 
@@ -100,10 +100,10 @@ describe('a plot reads a transform by its row shape, built-in or user alike', ()
     });
 
     test('shapeOutput gives the extras only for the shape asked', () => {
-        const fold = next.run(rows(), { preset: 'fold' }, ['landuse', 'shape_area', 'shape_leng']);
-        expect(next.shapeOutput(fold, 'fold')?.measures).toEqual(['shape_area', 'shape_leng']);
-        expect(next.shapeOutput(fold, 'hierarchy')).toBeUndefined();
-        expect(next.shapeOutput(undefined, 'fold')).toBeUndefined();
+        const fold = autkPlot.run(rows(), { preset: 'fold' }, ['landuse', 'shape_area', 'shape_leng']);
+        expect(autkPlot.shapeOutput(fold, 'fold')?.measures).toEqual(['shape_area', 'shape_leng']);
+        expect(autkPlot.shapeOutput(fold, 'hierarchy')).toBeUndefined();
+        expect(autkPlot.shapeOutput(undefined, 'fold')).toBeUndefined();
     });
 
     test('a plot refuses a transform whose name and shape it does not read', () => {
@@ -143,7 +143,7 @@ describe('a plot reads a transform by its row shape, built-in or user alike', ()
 });
 
 describe('the shape is checked for every transform', () => {
-    const hierarchyRows = () => next.run(rows(), { preset: 'hierarchy' }, ['landuse']);
+    const hierarchyRows = () => autkPlot.run(rows(), { preset: 'hierarchy' }, ['landuse']);
 
     test('a run whose rows lack a field of the shape is refused, naming the field', () => {
         register({ name: 'no-path', shape: 'hierarchy', run: (input, options, columns) => {
@@ -151,7 +151,7 @@ describe('the shape is checked for every transform', () => {
             void input; void options; void columns;
             return { rows: (output.rows as AutkDatum[]).map(({ path, ...row }) => { void path; return row; }) as AutkDatum[], provenance: output.provenance, depth: 1 };
         } });
-        expect(() => next.run(rows(), { preset: 'registered', name: 'no-path' }, ['landuse'])).toThrow(/lacks .*"path".* required by the "hierarchy" shape/);
+        expect(() => autkPlot.run(rows(), { preset: 'registered', name: 'no-path' }, ['landuse'])).toThrow(/lacks .*"path".* required by the "hierarchy" shape/);
     });
 
     test('a run without the extras of its shape is refused, and the checker reports it as invariant 0', () => {
@@ -160,8 +160,8 @@ describe('the shape is checked for every transform', () => {
             return { rows: out as AutkDatum[], provenance };
         } };
         register(noDepth);
-        expect(() => next.run(rows(), { preset: 'registered', name: 'no-depth' }, ['landuse'])).toThrow('the "hierarchy" shape needs "depth" in the output');
-        const report = next.checkTransformReport(noDepth, regions(), {}, ['landuse']);
+        expect(() => autkPlot.run(rows(), { preset: 'registered', name: 'no-depth' }, ['landuse'])).toThrow('the "hierarchy" shape needs "depth" in the output');
+        const report = autkPlot.checkTransformReport(noDepth, regions(), {}, ['landuse']);
         expect(report.violations).toEqual([{ invariant: 0, message: 'the "hierarchy" shape needs "depth" in the output' }]);
     });
 
@@ -184,9 +184,9 @@ describe('the shape is checked for every transform', () => {
         expect(Object.keys(inputs)).toEqual(BUILT_INS);
         for (const name of BUILT_INS) {
             const [columns, options] = inputs[name];
-            const output = next.run(rows(data), { preset: name, options } as never, columns);
+            const output = autkPlot.run(rows(data), { preset: name, options } as never, columns);
             expect(output.rows.length, name).toBeGreaterThan(0);
-            expect(next.checkTransformReport(next.registeredTransform(name), data, options, columns).violations, name).toEqual([]);
+            expect(autkPlot.checkTransformReport(autkPlot.registeredTransform(name), data, options, columns).violations, name).toEqual([]);
         }
     });
 });

@@ -10,8 +10,9 @@
 import * as d3 from 'd3';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
-import type { AutkDatum, PartialDesign, PlotDefinition, UnifiedPlotConfig } from '../src';
+import * as autkPlot from '../src';
+import * as geometry from '../src/plots/partial-design';
+import type { AutkDatum, HighlightDesign, PlotDefinition, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
 import { installSvgBBox } from './svg-geometry';
@@ -23,7 +24,7 @@ const HEIGHT = 200;
 
 const registered: string[] = [];
 afterEach(() => {
-    registered.splice(0).forEach(name => next.unregisterPlot(name));
+    registered.splice(0).forEach(name => autkPlot.unregisterPlot(name));
     document.body.innerHTML = '';
 });
 beforeAll(() => installSvgBBox());
@@ -31,16 +32,16 @@ beforeAll(() => installSvgBBox());
 /** Registers a drawing and mounts it, with a selection of every other feature. */
 function mount(draw: PlotDefinition['draw'], config: Omit<UnifiedPlotConfig, 'type' | 'collection'> = BY_DISTRICT, extra: Partial<PlotDefinition> = {}, collection = regions()) {
     const name = `design-${registered.length}`;
-    next.registerPlot({ name, draw, ...extra });
+    autkPlot.registerPlot({ name, draw, ...extra });
     registered.push(name);
     const div = document.createElement('div');
     document.body.append(div);
-    const plot = new next.AutkPlot(div, {
+    const plot = new autkPlot.AutkPlot(div, {
         type: 'registered', plot: name, collection, width: WIDTH + 80, height: HEIGHT + 80,
         margins: { left: 40, right: 40, top: 40, bottom: 40 }, ...config,
     } as UnifiedPlotConfig);
-    const instance = plot.instance as unknown as { partialDesigns: PartialDesign[]; segregatedParts(): next.SegregatedPart[] };
-    const select = (features: number[], shares?: next.FeatureShare[]) => plot.setSelection(features, shares);
+    const instance = plot.instance as unknown as { highlightDesigns: HighlightDesign[]; segregatedParts(): autkPlot.SegregatedPart[] };
+    const select = (features: number[], shares?: autkPlot.FeatureShare[]) => plot.setSelection(features, shares);
     const half = collection.features.map((_f, i) => i).filter(i => i % 2 === 0);
     const marks = () => Array.from(div.querySelectorAll<SVGGraphicsElement>('.autkMark'));
     const partOf = (mark: Element) => Array.from(div.querySelectorAll<SVGGraphicsElement>('.autkPartial'))
@@ -49,12 +50,12 @@ function mount(draw: PlotDefinition['draw'], config: Omit<UnifiedPlotConfig, 'ty
         const part = instance.segregatedParts().find(p => p.mark === mark.getAttribute('data-autk-provenance'))!;
         return part.part.additive || part.part.value === null ? part.fraction : part.part.value / part.part.totalValue!;
     };
-    return { div, plot, designs: () => instance.partialDesigns, select, half, marks, partOf, ratio };
+    return { div, plot, designs: () => instance.highlightDesigns, select, half, marks, partOf, ratio };
 }
 
 /** Point through an element's own transform (translate and scale). */
 function through(element: Element, x: number, y: number): [number, number] {
-    const [a, , , d, e, f] = next.ownMatrix(element);
+    const [a, , , d, e, f] = geometry.ownMatrix(element);
     return [a * x + e, d * y + f];
 }
 
@@ -81,7 +82,7 @@ function verticalBars(rows: AutkDatum[], group: d3.Selection<SVGGElement, unknow
 describe('the channel is inferred from the marks', () => {
     test('length: vertical bars grow from the bottom, and the part keeps the base', () => {
         const { designs, select, half, marks, partOf, ratio } = mount(({ group, rows }) => verticalBars(rows, group));
-        expect(designs()).toMatchObject([{ kind: 'rect', rule: 'length', axis: 'y', anchor: 'end' }]);
+        expect(designs()).toMatchObject([{ kind: 'rect', mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' }]);
         expect(designs()[0].fit).toBeCloseTo(1, 9);
         select(half);
         for (const mark of marks()) {
@@ -102,7 +103,7 @@ describe('the channel is inferred from the marks', () => {
             group.selectAll('rect').data(rows).join('rect').attr('class', 'autkMark')
                 .attr('x', 0).attr('width', r => x(Number(r.value))).attr('y', r => y(String(r.label))!).attr('height', y.bandwidth());
         });
-        expect(left.designs()).toMatchObject([{ rule: 'length', axis: 'x', anchor: 'start' }]);
+        expect(left.designs()).toMatchObject([{ mode: 'subset', channel: 'length', axis: 'x', anchor: 'start' }]);
 
         const centered = mount(({ group, rows }) => {
             const y = d3.scaleBand(rows.map(r => String(r.label)), [0, HEIGHT]);
@@ -111,7 +112,7 @@ describe('the channel is inferred from the marks', () => {
                 .attr('x', r => WIDTH / 2 - half(Number(r.value))).attr('width', r => 2 * half(Number(r.value)))
                 .attr('y', r => y(String(r.label))!).attr('height', y.bandwidth());
         });
-        expect(centered.designs()).toMatchObject([{ rule: 'length', axis: 'x', anchor: 'center' }]);
+        expect(centered.designs()).toMatchObject([{ mode: 'subset', channel: 'length', axis: 'x', anchor: 'center' }]);
         centered.select(centered.half);
         for (const mark of centered.marks()) {
             const copy = centered.partOf(mark);
@@ -123,7 +124,7 @@ describe('the channel is inferred from the marks', () => {
         }
     });
 
-    test('angle: pie and donut sectors keep the area of the part, as the built-in pie does', () => {
+    test('angle: pie and donut sectors are drawn again with the sweep of the part, on the same ring', () => {
         for (const inner of [0, 50]) {
             const { designs, select, half, marks, div, ratio } = mount(({ group, rows }) => {
                 const arcs = d3.pie<AutkDatum>().value(r => Number(r.value)).sort(null)(rows);
@@ -133,13 +134,16 @@ describe('the channel is inferred from the marks', () => {
                     d3.select(this).datum(a.data);
                 });
             });
-            expect(designs()).toMatchObject([{ kind: 'sector', rule: 'angle' }]);
+            expect(designs()).toMatchObject([{ kind: 'sector', mode: 'subset', channel: 'angle' }]);
             select(half);
             for (const mark of marks()) {
                 const copy = Array.from(div.querySelectorAll('.autkPartial')).find(p => p.getAttribute('data-autk-provenance') === mark.getAttribute('data-autk-provenance'));
                 if (!copy) continue;
-                const radius = Number(div.querySelector(`${copy.getAttribute('clip-path')!.slice(4, -1)} circle`)!.getAttribute('r'));
-                expect((radius ** 2 - inner ** 2) / (100 ** 2 - inner ** 2)).toBeCloseTo(ratio(mark), 9);
+                const slice = geometry.parseSector(mark.getAttribute('d'))!;
+                const part = geometry.parseSector(copy.getAttribute('d'))!;
+                expect(copy.getAttribute('clip-path')).toBeNull();
+                expect([part.start, part.inner, part.outer]).toEqual([slice.start, slice.inner, slice.outer].map(v => expect.closeTo(v, 9)));
+                expect(part.sweep).toBeCloseTo(slice.sweep * ratio(mark), 9);
             }
         }
     });
@@ -151,7 +155,7 @@ describe('the channel is inferred from the marks', () => {
                 .attr('x1', 0).attr('x2', WIDTH).attr('y1', (_r, i) => i * 15).attr('y2', (_r, i) => i * 15)
                 .attr('stroke-width', r => w(Number(r.value)));
         }, BY_DISTRICT, { color: 'stroke' });
-        expect(designs()).toMatchObject([{ kind: 'stroke', rule: 'width' }]);
+        expect(designs()).toMatchObject([{ kind: 'stroke', mode: 'subset', channel: 'width' }]);
         select(half);
         for (const mark of marks()) {
             const copy = partOf(mark);
@@ -165,7 +169,7 @@ describe('the channel is inferred from the marks', () => {
             group.selectAll('polyline').data(rows).join('polyline').attr('class', 'autkMark')
                 .attr('fill', 'none').attr('points', r => `0,${y(Number(value(r)))} ${WIDTH},${HEIGHT - y(Number(value(r)))}`);
         }, { attributes: { axis: ['shape_area'] } }, { color: 'stroke' });
-        expect(designs()).toMatchObject([{ kind: 'stroke', rule: 'trace' }]);
+        expect(designs()).toMatchObject([{ kind: 'stroke', mode: 'custom', preset: 'trace' }]);
         select(half, regions().features.map((_f, feature) => ({ feature, selectedUnits: 1, totalUnits: 4 })));
         const copy = partOf(marks()[0])!;
         expect(copy.getAttribute('pathLength')).toBe('1');
@@ -183,8 +187,8 @@ describe('the channel is inferred from the marks', () => {
             group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark')
                 .attr('cx', r => x(String(r.bucket))!).attr('cy', r => y(Number(r.value))).attr('r', 4);
         }, { attributes: { axis: ['sjoin.collect.noise', '@transform'] }, transform: { preset: 'binning-events', options: { timestamp: 'date' } } }, {}, events);
-        expect(designs()).toMatchObject([{ kind: 'point', rule: 'position', axis: 'y' }]);
-        expect(designs()[0].baseline).toBeCloseTo(HEIGHT, 6);
+        expect(designs()).toMatchObject([{ kind: 'point', mode: 'subset', channel: 'position', axis: 'y' }]);
+        expect((designs()[0] as { baseline?: number }).baseline).toBeCloseTo(HEIGHT, 6);
         select(half);
         for (const mark of marks()) {
             const copy = partOf(mark);
@@ -203,8 +207,8 @@ describe('the channel is inferred from the marks', () => {
             group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark')
                 .attr('cx', r => x(Number(r.value))).attr('cy', r => y(String(r.label))!).attr('r', 5);
         });
-        expect(lollipop.designs()).toMatchObject([{ rule: 'position', axis: 'x' }]);
-        expect(lollipop.designs()[0].baseline).toBeCloseTo(0, 6);
+        expect(lollipop.designs()).toMatchObject([{ mode: 'subset', channel: 'position', axis: 'x' }]);
+        expect((lollipop.designs()[0] as { baseline?: number }).baseline).toBeCloseTo(0, 6);
 
         const radial = mount(({ group, rows }) => {
             const r = d3.scaleLinear([0, d3.max(rows, row => Number(row.value))!], [0, 90]);
@@ -213,7 +217,7 @@ describe('the channel is inferred from the marks', () => {
                 .attr('cx', (row, i) => Math.sin((2 * Math.PI * i) / rows.length) * r(Number(row.value)))
                 .attr('cy', (row, i) => -Math.cos((2 * Math.PI * i) / rows.length) * r(Number(row.value)));
         });
-        expect(radial.designs()).toMatchObject([{ rule: 'position', axis: 'radial' }]);
+        expect(radial.designs()).toMatchObject([{ mode: 'subset', channel: 'position', axis: 'radial' }]);
         radial.select(radial.half);
         for (const mark of radial.marks()) {
             const copy = radial.partOf(mark);
@@ -229,7 +233,7 @@ describe('the channel is inferred from the marks', () => {
             group.selectAll('rect').data(rows).join('rect').attr('class', 'autkMark')
                 .attr('x', (_r, i) => (i % 5) * 60).attr('y', (_r, i) => Math.floor(i / 5) * 60).attr('width', 50).attr('height', 50);
         });
-        expect(designs()).toMatchObject([{ kind: 'rect', rule: 'glyph' }]);
+        expect(designs()).toMatchObject([{ kind: 'rect', mode: 'custom', preset: 'glyph' }]);
         select(half);
         for (const mark of marks()) {
             const copy = partOf(mark);
@@ -247,7 +251,7 @@ describe('the channel is inferred from the marks', () => {
                     .attr('x', k * 12).attr('y', i * 12).attr('width', 10).attr('height', 10);
             }));
         });
-        expect(designs()).toMatchObject([{ rule: 'units' }]);
+        expect(designs()).toMatchObject([{ mode: 'subset', channel: 'units' }]);
         const picked = [0, 1, 2, 5, 8];
         select(picked);
         const painted = Array.from(div.querySelectorAll('.autkPartial')).map(p => Number(p.getAttribute('data-autk-feature'))).sort((a, b) => a - b);
@@ -260,13 +264,13 @@ describe('the channel is inferred from the marks', () => {
             group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark')
                 .attr('cx', (_r, i) => i * 10).attr('cy', r => y(Number(value(r, 1)))).attr('r', 4);
         }, { attributes: { axis: ['shape_area', 'shape_leng'] } });
-        expect(designs()).toMatchObject([{ kind: 'point', rule: 'glyph' }]);
+        expect(designs()).toMatchObject([{ kind: 'point', mode: 'custom', preset: 'glyph' }]);
     });
 
     test('averages: a bar shows the average of the subset, which may exceed the bar', () => {
         const { designs, select, half, marks, partOf, ratio } = mount(({ group, rows }) => verticalBars(rows, group),
             { attributes: { axis: ['cdta2020', '@transform'] }, transform: { preset: 'binning-1d', options: { reducer: 'avg', value: 'shape_area' } } });
-        expect(designs()[0].rule).toBe('length');
+        expect(geometry.ruleOf(designs()[0])).toBe('length');
         select(half);
         const ratios = marks().filter(m => partOf(m)).map(m => ratio(m));
         expect(ratios.some(r => r > 1)).toBe(true);
@@ -284,13 +288,13 @@ describe('the channel is inferred from the marks', () => {
                 return `M0,${sy}C200,${sy} 200,${ty} 400,${ty}L400,${ty + t}C200,${ty + t} 200,${sy + t} 0,${sy + t}Z`;
             });
         });
-        expect(designs()).toMatchObject([{ kind: 'shape', rule: 'band', mode: 'flow' }]);
+        expect(designs()).toMatchObject([{ kind: 'shape', mode: 'subset', channel: 'band', shape: 'flow' }]);
         select(half);
         for (const mark of marks()) {
             const copy = partOf(mark);
             if (!copy) continue;
-            const m = next.parseFlow(mark.getAttribute('d'))!;
-            const p = next.parseFlow(copy.getAttribute('d'))!;
+            const m = geometry.parseFlow(mark.getAttribute('d'))!;
+            const p = geometry.parseFlow(copy.getAttribute('d'))!;
             expect(p.edge).toEqual(m.edge);
             expect(p.offset[1]).toBeCloseTo(m.offset[1] * ratio(mark), 9);
         }
@@ -310,13 +314,13 @@ describe('the channel is inferred from the marks', () => {
                 angle += sweep;
             }
         });
-        expect(designs()).toMatchObject([{ kind: 'shape', rule: 'band', mode: 'ribbon' }]);
+        expect(designs()).toMatchObject([{ kind: 'shape', mode: 'subset', channel: 'band', shape: 'ribbon' }]);
         select(half);
         for (const mark of marks()) {
             const copy = partOf(mark);
             if (!copy) continue;
-            const m = next.parseRibbon(mark.getAttribute('d'))!;
-            const p = next.parseRibbon(copy.getAttribute('d'))!;
+            const m = geometry.parseRibbon(mark.getAttribute('d'))!;
+            const p = geometry.parseRibbon(copy.getAttribute('d'))!;
             expect(p.source[0]).toBeCloseTo(m.source[0], 9);
             expect(p.source[1]).toBeCloseTo(m.source[1] * ratio(mark), 9);
             expect(p.target[1]).toBeCloseTo(m.target[1] * ratio(mark), 9);
@@ -332,13 +336,13 @@ describe('the channel is inferred from the marks', () => {
                 d3.select(this).datum(a.data);
             });
         });
-        expect(designs()).toMatchObject([{ kind: 'sector', rule: 'angle', mode: 'sweep' }]);
+        expect(designs()).toMatchObject([{ kind: 'sector', mode: 'subset', channel: 'angle' }]);
         select(half);
         for (const mark of marks()) {
             const copy = partOf(mark);
             if (!copy) continue;
-            const m = next.parseSector(mark.getAttribute('d'))!;
-            const p = next.parseSector(copy.getAttribute('d'))!;
+            const m = geometry.parseSector(mark.getAttribute('d'))!;
+            const p = geometry.parseSector(copy.getAttribute('d'))!;
             expect(p.start).toBeCloseTo(m.start, 9);
             expect([p.inner, p.outer]).toEqual([m.inner, m.outer]);
             expect(p.sweep).toBeCloseTo(m.sweep * ratio(mark), 9);
@@ -353,7 +357,7 @@ describe('the channel is inferred from the marks', () => {
                 .attr('x', r => x(String(r.category))!).attr('width', x.bandwidth())
                 .attr('y', r => y(Number(r.q3))).attr('height', r => y(Number(r.q1)) - y(Number(r.q3)));
         }, { attributes: { axis: ['landuse', 'shape_area'] }, transform: { preset: 'box-stats' } });
-        expect(designs()).toMatchObject([{ kind: 'rect', rule: 'members', axis: 'y', scale: { fields: ['q1', 'q3'] } }]);
+        expect(designs()).toMatchObject([{ kind: 'rect', mode: 'custom', preset: 'members', axis: 'y', scale: { fields: ['q1', 'q3'] } }]);
         const picked = [0, 3, 7, 11, 20];
         select(picked);
         const dots = Array.from(div.querySelectorAll('circle.autkPartial'));
@@ -368,8 +372,8 @@ describe('the channel is inferred from the marks', () => {
         const { designs, select, half, marks, plot } = mount(({ html, rows }) => {
             html.append('table').append('tbody').selectAll('tr').data(rows).join('tr').attr('class', 'autkMark')
                 .selectAll('td').data(r => [r.ntaname]).join('td').text(String);
-        }, { attributes: { axis: ['ntaname', 'shape_area'] }, events: [next.PlotEvent.CLICK] });
-        expect(designs()).toMatchObject([{ kind: 'html', rule: 'glyph' }]);
+        }, { attributes: { axis: ['ntaname', 'shape_area'] }, events: [autkPlot.PlotEvent.CLICK] });
+        expect(designs()).toMatchObject([{ kind: 'html', mode: 'custom', preset: 'glyph' }]);
         select(half, half.map(feature => ({ feature, selectedUnits: 1, totalUnits: 4 })));
         const first = marks()[0] as unknown as HTMLElement;
         // Browsers serialize 25.00% as 25%.
@@ -377,7 +381,7 @@ describe('the channel is inferred from the marks', () => {
         expect(marks()[1].getAttribute('data-autk-filled')).toBeNull();
         // Rows are selected by click, like any mark.
         let selection: number[] = [];
-        plot.events.on(next.PlotEvent.CLICK, data => { selection = data.selection; });
+        plot.events.on(autkPlot.PlotEvent.CLICK, data => { selection = data.selection; });
         select([]);
         marks()[2].dispatchEvent(new MouseEvent('click'));
         expect(selection).toEqual([2]);
@@ -399,7 +403,7 @@ describe('the channel is inferred from the marks', () => {
                 html.selectAll('div').data(rows).join('div').attr('class', 'autkMark')
                     .style('width', r => `${w(Number(r.value))}px`).style('height', '10px');
             });
-            expect(designs()).toMatchObject([{ kind: 'html', rule: 'length', axis: 'x', anchor: 'start' }]);
+            expect(designs()).toMatchObject([{ kind: 'html', mode: 'subset', channel: 'length', axis: 'x', anchor: 'start' }]);
             select(half);
             for (const mark of marks()) {
                 const fill = (mark as unknown as HTMLElement).style.backgroundImage;
@@ -413,14 +417,16 @@ describe('the channel is inferred from the marks', () => {
         }
     });
 
-    test('an explicit data-autk-part overrides the inferred rule', () => {
+    test('a mark annotated data-autk-highlight="boolean" shows the whole mark over its family\'s subset render', () => {
         const { designs, select, half, marks, partOf } = mount(({ group, rows }) => {
             verticalBars(rows, group);
-            group.selectAll('rect.bar').attr('data-autk-part', 'shrink');
+            group.selectAll('rect.bar').attr('data-autk-highlight', 'boolean');
         });
-        expect(designs()[0].rule).toBe('length');
+        expect(geometry.ruleOf(designs()[0])).toBe('length');
         select(half);
-        const copy = marks().map(partOf).find(Boolean)!;
-        expect(copy.getAttribute('transform')).toMatch(/scale\([\d.]+\)/);
+        const mark = marks().find(candidate => partOf(candidate))!;
+        const copy = partOf(mark)!;
+        expect(copy.getAttribute('transform')).toBeNull();
+        expect(copy.getAttribute('height')).toBe(mark.getAttribute('height'));
     });
 });

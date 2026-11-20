@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { FeatureShare, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
@@ -20,7 +20,7 @@ const number = (node: Element | null | undefined, attribute: string) => Number(n
 /** Builds a plot in a detached div and returns DOM helpers. */
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const partials = () => Array.from(div.querySelectorAll('.autkPartial'));
     const mark = (id: string) => div.querySelector(`.autkMark[data-autk-provenance="${id}"]`);
     return { div, plot, partials, mark };
@@ -31,7 +31,7 @@ const linechart = (resolution: 'month' | 'year' = 'month'): UnifiedPlotConfig =>
     collection: withSyntheticEvents(loadGalleryCollection('mnt_neighs_proj.geojson')),
     attributes: { axis: ['sjoin.collect.noise', '@transform'] },
     transform: { preset: 'binning-events', options: { timestamp: 'date', resolution } },
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
 });
 
 describe('heatmatrix (N:1)', () => {
@@ -102,7 +102,7 @@ describe('linechart (N:N)', () => {
     test('clicking a bucket emits the share of each feature it covers', () => {
         const { div, plot } = mount(linechart());
         const emitted: { selection: number[]; shares?: FeatureShare[] }[] = [];
-        plot.events.on(next.PlotEvent.CLICK, (data) => emitted.push(data));
+        plot.events.on(autkPlot.PlotEvent.CLICK, (data) => emitted.push(data));
 
         div.querySelectorAll('.autkMark')[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
@@ -179,7 +179,7 @@ describe('linked views end to end', () => {
             collection: withSyntheticEvents(loadGalleryCollection('mnt_neighs_proj.geojson')),
             attributes: { axis: ['shape_area', 'shape_leng'] },
         });
-        line.plot.events.on(next.PlotEvent.CLICK, ({ selection, shares }) => scatter.plot.setSelection(selection, shares));
+        line.plot.events.on(autkPlot.PlotEvent.CLICK, ({ selection, shares }) => scatter.plot.setSelection(selection, shares));
 
         line.div.querySelectorAll('.autkMark')[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
 

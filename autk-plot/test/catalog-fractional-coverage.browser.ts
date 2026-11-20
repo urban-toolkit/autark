@@ -1,5 +1,5 @@
 /**
- * Catalog wave 3: fractional coverage (weights in ℝ≥0).
+ * Catalog: plots of fractional coverage (weights in ℝ≥0).
  *
  * - density: each feature spreads an Epanechnikov kernel over the grid points
  *   within one bandwidth of its value; points sum real weights (N:N)
@@ -12,7 +12,7 @@
 import * as d3 from 'd3';
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { DensityPointRow, FeatureShare, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -24,7 +24,7 @@ const landuses = () => regions().features.map(f => f.properties!.landuse as stri
 
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const points = () => plot.instance['_data'] as unknown as DensityPointRow[];
     const rowId = (row: unknown) => plot.instance['rowIdOf'](row) as string;
     // Row ids hold JSON, so partials are matched by attribute value rather than by CSS selector.
@@ -38,14 +38,14 @@ const density = (bandwidth?: number): UnifiedPlotConfig => ({
     collection: regions(),
     attributes: { axis: ['shape_leng'] },
     transform: { preset: 'density', options: bandwidth ? { bandwidth } : {} },
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
 });
 const violin = (): UnifiedPlotConfig => ({
     type: 'violin',
     collection: regions(),
     attributes: { axis: ['landuse', 'shape_leng'] },
     transform: { preset: 'density' },
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
 });
 
 /** Area under a curve sampled at `[x, y]` points (trapezoids). */
@@ -138,7 +138,7 @@ describe('density chart', () => {
         const source = mount(density(H));
         const target = mount({ type: 'scatterplot', collection: regions(), attributes: { axis: ['shape_area', 'shape_leng'] } });
         const emitted: PlotEventData[] = [];
-        source.plot.events.on(next.PlotEvent.CLICK, data => { emitted.push(data); target.plot.setSelection(data.selection, data.shares); });
+        source.plot.events.on(autkPlot.PlotEvent.CLICK, data => { emitted.push(data); target.plot.setSelection(data.selection, data.shares); });
 
         const marks = Array.from(source.div.querySelectorAll('.autkMark'));
         marks.find(m => (m as unknown as { __data__: DensityPointRow }).__data__.autkIds.length > 0)!

@@ -1,5 +1,5 @@
 /**
- * Catalog wave 1: plots built only from relations the model already had.
+ * Catalog: plots of identity, partition, and unnest relations.
  *
  * - pie / donut   — partition (N:1), `binning-1d` with an additive reducer
  * - areachart     — unnest then partition (N:N), like the line chart
@@ -12,7 +12,7 @@ import { describe, expect, test } from 'vitest';
 
 import { ColorMapInterpolator } from '@urban-toolkit/autk-core';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { BinningHexRow, FeatureShare, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
@@ -25,7 +25,7 @@ const featureIndices = (ids: string[]) => sortNumbers(ids.map(id => Number(id.sl
 
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const marks = () => Array.from(div.querySelectorAll<SVGElement>('.autkMark'));
     const partials = () => Array.from(div.querySelectorAll<SVGElement>('.autkPartial'));
     const rows = () => plot.instance['_data'] as unknown as Array<{ autkIds: number[] } & Record<string, unknown>>;
@@ -33,7 +33,7 @@ function mount(config: UnifiedPlotConfig) {
 }
 
 /** Every rendered row leads back, through the relations, to exactly its `autkIds`. */
-function expectInverseMatchesAutkIds(plot: next.AutkPlot, rows: Array<{ autkIds: number[] }>) {
+function expectInverseMatchesAutkIds(plot: autkPlot.AutkPlot, rows: Array<{ autkIds: number[] }>) {
     for (const row of rows) {
         const rowId = plot.instance['rowIdOf'](row) as string;
         const path = plot.provenance.inverse([`mark:${rowId}`]);
@@ -42,7 +42,7 @@ function expectInverseMatchesAutkIds(plot: next.AutkPlot, rows: Array<{ autkIds:
 }
 
 /** Selects every feature of the first row but one, so the row is split. */
-function splitFirstRow(plot: next.AutkPlot, rows: Array<{ autkIds: number[] }>) {
+function splitFirstRow(plot: autkPlot.AutkPlot, rows: Array<{ autkIds: number[] }>) {
     const row = rows.find(r => r.autkIds.length >= 2)!;
     const chosen = row.autkIds.slice(0, row.autkIds.length - 1);
     plot.setSelection(chosen);
@@ -61,7 +61,7 @@ describe('pie and donut (partition, N:1)', () => {
         collection: regions(),
         attributes: { axis: ['landuse', '@transform'] },
         transform: { preset: 'binning-1d', options: reducer === 'count' ? {} : { reducer, value: 'shape_area' } },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('one slice per land use, sized by count, chained D0 → bins → aggregates → marks', () => {
@@ -73,20 +73,21 @@ describe('pie and donut (partition, N:1)', () => {
         expectInverseMatchesAutkIds(plot, rows());
     });
 
-    test('segregated view: the inner slice covers the selected fraction of the slice area', () => {
+    test('segregated view: the subset render, the slice of the selected count from the same start', () => {
         const { plot, partials, rows, marks } = mount(pie());
         const { row, chosen } = splitFirstRow(plot, rows());
         const partial = partials().find(p => p.getAttribute('data-autk-provenance') === `mark:${plot.instance['rowIdOf'](row)}`)!;
         expect(units(partial)).toEqual([chosen.length, row.autkIds.length]);
 
-        // Same angles, outer radius √f · R, so the area is f of the slice.
+        // The pie's own encoding: the angle of the subset's count, on the same radii.
         const slice = effectiveSector(marks().find(m => m.getAttribute('data-autk-provenance') === partial.getAttribute('data-autk-provenance')))!;
         const part = effectiveSector(partial)!;
-        expect([part.start, part.sweep, part.inner]).toEqual([slice.start, slice.sweep, 0]);
-        expect(part.outer).toBeCloseTo(slice.outer * Math.sqrt(chosen.length / row.autkIds.length), 3);
+        expect([part.start, part.inner]).toEqual([slice.start, 0]);
+        expect(part.outer).toBeCloseTo(slice.outer, 3);
+        expect(part.sweep).toBeCloseTo(slice.sweep * chosen.length / row.autkIds.length, 6);
     });
 
-    test('donut: the inner slice grows from the hole, r² = r₀² + f(R² − r₀²)', () => {
+    test('donut: the subset render keeps the ring and shortens the sweep to the selected count', () => {
         const { plot, partials, rows, marks } = mount(pie('donut'));
         const { row, chosen } = splitFirstRow(plot, rows());
         const partial = partials().find(p => p.getAttribute('data-autk-provenance') === `mark:${plot.instance['rowIdOf'](row)}`)!;
@@ -95,8 +96,8 @@ describe('pie and donut (partition, N:1)', () => {
         expect(r0 / R).toBeCloseTo(0.55);
         const f = chosen.length / row.autkIds.length;
         const part = effectiveSector(partial)!;
-        expect(part.outer).toBeCloseTo(Math.sqrt(r0 * r0 + f * (R * R - r0 * r0)), 3);
-        expect(part.inner).toBeCloseTo(r0, 3);
+        expect([part.inner, part.outer, part.start]).toEqual([r0, R, slice.start].map(v => expect.closeTo(v, 3)));
+        expect(part.sweep).toBeCloseTo(slice.sweep * f, 6);
     });
 
     test('non-additive reducers are rejected: slices must add up to the whole', () => {
@@ -106,7 +107,7 @@ describe('pie and donut (partition, N:1)', () => {
     test('a click on a slice selects its features and emits their shares', () => {
         const { div, plot, rows } = mount(pie());
         const emitted: PlotEventData[] = [];
-        plot.events.on(next.PlotEvent.CLICK, data => emitted.push(data));
+        plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
         div.querySelector('.autkMark')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(sortNumbers(emitted[0].selection)).toEqual(sortNumbers(rows()[0].autkIds));
         expect(emitted[0].shares!.every(s => s.selectedUnits === s.totalUnits)).toBe(true);
@@ -122,7 +123,7 @@ describe('area chart (unnest then partition, N:N)', () => {
             preset: 'binning-events',
             options: reducer === 'count' ? { timestamp: 'date' } : { timestamp: 'date', reducer, value: 'value' },
         },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('fills the region under the line, with the line chart relations', () => {
@@ -175,10 +176,10 @@ describe('pie slice into a one-to-one view (inverse direction)', () => {
             collection: regions(),
             attributes: { axis: ['landuse', '@transform'] },
             transform: { preset: 'binning-1d' },
-            events: [next.PlotEvent.CLICK],
+            events: [autkPlot.PlotEvent.CLICK],
         });
         const { plot, partials } = mount({ type: 'scatterplot', collection: regions(), attributes: { axis: ['shape_area', 'shape_leng'] } });
-        pie.plot.events.on(next.PlotEvent.CLICK, ({ selection, shares }) => plot.setSelection(selection, shares));
+        pie.plot.events.on(autkPlot.PlotEvent.CLICK, ({ selection, shares }) => plot.setSelection(selection, shares));
         pie.div.querySelector('.autkMark')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
         // A slice holds each of its regions whole, so every point is filled.
@@ -192,7 +193,7 @@ describe('bubble chart (identity, 1:1)', () => {
         type: 'bubble',
         collection: regions(),
         attributes: { axis },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('bubble area is proportional to the size attribute, larger bubbles first', () => {
@@ -228,7 +229,7 @@ describe('hexbin (partition into hexagons, N:1)', () => {
         width: 480,
         height: 300,
         margins: { left: 40, right: 20, top: 30, bottom: 30 },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('every feature falls in exactly one hexagon, within its radius', () => {
@@ -305,7 +306,7 @@ describe('calendar (unnest then partition, N:N)', () => {
         collection: withEvents(),
         attributes: { axis: ['sjoin.collect.noise', '@transform'] },
         transform: { preset: 'binning-events', options: { timestamp: 'date', ...(resolution ? { resolution } : {}) } },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('one mark per day with events, in the row of its weekday', () => {
@@ -348,7 +349,7 @@ describe('waffle (partition, N:1, one square per unit)', () => {
         collection: regions(),
         attributes: { axis: ['landuse', '@transform'] },
         transform: { preset: 'binning-1d', options: reducer === 'count' ? {} : { reducer, value: 'shape_area' } },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
     const featuresOf = (els: Element[]) => sortNumbers(els.map(el => Number(el.getAttribute('data-autk-feature'))));
 

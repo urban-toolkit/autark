@@ -1,5 +1,5 @@
 /**
- * Catalog wave 2: plots built from new relations, all with integer weights.
+ * Catalog: plots of chained relations, all with integer weights.
  *
  * - hierarchy (chained partition, N:1 at every level): stacked bars,
  *   treemap, sunburst
@@ -11,7 +11,8 @@
 import * as d3 from 'd3';
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
+import * as geometry from '../src/plots/partial-design';
 import type { CumulativeRow, FlowRow, FoldCellRow, HierarchyNodeRow, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -29,7 +30,7 @@ const units = (el: Element) => el.getAttribute('data-autk-units')!.split('/').ma
 
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const marks = () => Array.from(div.querySelectorAll<SVGElement>('.autkMark'));
     const partials = () => Array.from(div.querySelectorAll<SVGElement>('.autkPartial'));
     const rows = <T>() => plot.instance['_data'] as unknown as T[];
@@ -39,7 +40,7 @@ function mount(config: UnifiedPlotConfig) {
 }
 
 /** Every given row leads back, through the relations, to exactly its `autkIds`. */
-function expectInverseMatchesAutkIds(plot: next.AutkPlot, rows: Array<{ autkIds: number[] }>) {
+function expectInverseMatchesAutkIds(plot: autkPlot.AutkPlot, rows: Array<{ autkIds: number[] }>) {
     for (const row of rows) {
         const rowId = plot.instance['rowIdOf'](row) as string;
         const path = plot.provenance.inverse([`mark:${rowId}`]);
@@ -48,7 +49,7 @@ function expectInverseMatchesAutkIds(plot: next.AutkPlot, rows: Array<{ autkIds:
 }
 
 /** Selects every feature of a row but one, so the row is split. */
-function splitRow(plot: next.AutkPlot, row: { autkIds: number[] }) {
+function splitRow(plot: autkPlot.AutkPlot, row: { autkIds: number[] }) {
     const chosen = row.autkIds.slice(0, row.autkIds.length - 1);
     plot.setSelection(chosen);
     return chosen;
@@ -77,11 +78,11 @@ const spanOf = (div: HTMLElement, row: object) => effectiveSector(drawnOf(div, r
 // ---------------------------------------------------------------------------
 
 describe('hierarchy preset (chained partition)', () => {
-    const run = (axis: string[]) => next.run(
+    const run = (axis: string[]) => autkPlot.run(
         regions().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as never,
         { preset: 'hierarchy' },
         axis,
-    ) as next.ExecutedHierarchyTransform;
+    ) as autkPlot.ExecutedHierarchyTransform;
 
     test('every feature falls in one leaf, and every parent is the sum of its children', () => {
         const result = run(['landuse', 'cdta2020']);
@@ -97,7 +98,7 @@ describe('hierarchy preset (chained partition)', () => {
     test('relations go up the chain: features → leaves → parents, N:1 at every step', () => {
         const result = run(['landuse', 'cdta2020', 'ntatype']);
         expect(result.provenance.stages.map(s => s.label)).toEqual(['ntatype', 'cdta2020', 'landuse']);
-        const model = new next.ProvenanceModel(
+        const model = new autkPlot.ProvenanceModel(
             [{ name: 'D0', label: 'features', ids: props().map((_p, i) => `feature:${i}`) }, ...result.provenance.stages],
             result.provenance.relations,
         );
@@ -111,7 +112,7 @@ describe('stacked bars (two-level hierarchy)', () => {
         collection: regions(),
         attributes: { axis: ['cdta2020', 'landuse'] },
         transform: { preset: 'hierarchy' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('stacked: one segment per district and land use, stacking up to the district total', () => {
@@ -155,7 +156,7 @@ describe('treemap and sunburst (hierarchy)', () => {
         collection: regions(),
         attributes: { axis: ['landuse', 'cdta2020'] },
         transform: { preset: 'hierarchy' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('treemap: leaves are the marks, inside the frame of their parent', () => {
@@ -199,7 +200,7 @@ describe('treemap and sunburst (hierarchy)', () => {
         expectInverseMatchesAutkIds(plot, nodes);
     });
 
-    test('sunburst segregated view: r² = r₀² + f(r₁² − r₀²) for every touched ring', () => {
+    test('sunburst segregated view: the subset render keeps each ring and shortens the sweep to the selected share', () => {
         const { div, plot, rows, partialOf } = mount(tree('sunburst'));
         const leaf = rows<HierarchyNodeRow>().find(r => r.level === 1 && r.autkIds.length >= 2)!;
         const chosen = splitRow(plot, leaf);
@@ -207,13 +208,15 @@ describe('treemap and sunburst (hierarchy)', () => {
         const f = chosen.length / leaf.autkIds.length;
         const part = effectiveSector(partialOf(leaf))!;
         expect(part.inner).toBeCloseTo(span.inner);
-        expect(part.outer).toBeCloseTo(Math.sqrt(span.inner ** 2 + f * (span.outer ** 2 - span.inner ** 2)), 3);
+        expect(part.outer).toBeCloseTo(span.outer, 3);
+        expect(part.start).toBeCloseTo(span.start, 6);
+        expect(part.sweep).toBeCloseTo(span.sweep * f, 6);
     });
 
     test('clicking a parent ring selects all its features, fully covered within their level', () => {
         const { plot, marks } = mount(tree('sunburst'));
         const emitted: PlotEventData[] = [];
-        plot.events.on(next.PlotEvent.CLICK, data => emitted.push(data));
+        plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
         const parent = marks().find(m => datumOf<HierarchyNodeRow>(m).level === 0)!;
         parent.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(sortNumbers(emitted[0].selection)).toEqual(sortNumbers(datumOf<HierarchyNodeRow>(parent).autkIds));
@@ -231,7 +234,7 @@ describe('radar (fold: unfold by measure, then partition)', () => {
         collection: regions(),
         attributes: { axis: ['landuse', 'shape_area', 'shape_leng'] },
         transform: { preset: 'fold' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
     const normalized = (measure: string) => {
         const values = props().map(p => p[measure] as number);
@@ -268,7 +271,7 @@ describe('radar (fold: unfold by measure, then partition)', () => {
     test('a feature is fully covered within a measure when its cell is clicked', () => {
         const { plot, marks } = mount(radar());
         const emitted: PlotEventData[] = [];
-        plot.events.on(next.PlotEvent.CLICK, data => emitted.push(data));
+        plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
         marks()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(emitted[0].shares!.every(s => s.selectedUnits === s.totalUnits)).toBe(true);
     });
@@ -284,14 +287,14 @@ describe('ECDF and Pareto (cumulative: partition, then prefix)', () => {
         collection: regions(),
         attributes: { axis: [attr] },
         transform: { preset: 'cumulative' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
     const pareto = (): UnifiedPlotConfig => ({
         type: 'pareto',
         collection: regions(),
         attributes: { axis: ['cdta2020'] },
         transform: { preset: 'cumulative' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('ECDF: one step per distinct value; point k holds every feature up to it', () => {
@@ -364,7 +367,7 @@ describe('chord (pairs of categories)', () => {
         collection: regions(),
         attributes: { axis },
         transform: { preset: 'flows' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('chord: each arc is exactly covered by the ends of its ribbons', () => {
@@ -375,7 +378,7 @@ describe('chord (pairs of categories)', () => {
         const drawn = (row: FlowRow) => marks().find(m => datumOf(m) === row)!;
         for (const node of all.filter(r => r.kind === 'node')) {
             const ends = all.filter(r => r.kind === 'link').flatMap(link => {
-                const ribbon = next.parseRibbon(drawn(link).getAttribute('d'))!;
+                const ribbon = geometry.parseRibbon(drawn(link).getAttribute('d'))!;
                 return [link.source === node.key ? ribbon.source[1] : null, link.target === node.key ? ribbon.target[1] : null].filter(v => v !== null);
             }) as number[];
             expect(d3.sum(ends)).toBeCloseTo(effectiveSector(drawn(node))!.sweep);

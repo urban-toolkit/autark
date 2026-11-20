@@ -7,7 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -58,8 +58,8 @@ function resize(div: HTMLElement, width: number): void {
 function mount(config: Omit<UnifiedPlotConfig, 'collection'>, hostWidth?: number, div = document.createElement('div')) {
     document.body.append(div);
     if (hostWidth !== undefined) setHostWidth(div, hostWidth);
-    const plot = new next.AutkPlot(div, { collection: regions(), ...config } as UnifiedPlotConfig);
-    const svgWidth = () => (div.querySelector('svg#plot') as SVGSVGElement | null)?.style.width;
+    const plot = new autkPlot.AutkPlot(div, { collection: regions(), ...config } as UnifiedPlotConfig);
+    const svgWidth = () => (div.querySelector('svg.autk-plot') as SVGSVGElement | null)?.style.width;
     return { div, plot, svgWidth };
 }
 
@@ -69,7 +69,7 @@ const bars = (): Omit<UnifiedPlotConfig, 'collection'> => ({
     transform: { preset: 'binning-1d' },
     width: 'auto',
     height: 280,
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
     provenance: { path: true },
 } as Omit<UnifiedPlotConfig, 'collection'>);
 
@@ -105,13 +105,13 @@ describe("width: 'auto'", () => {
         expect(parts).toBeGreaterThan(0);
 
         const emitted = vi.fn();
-        plot.events.on(next.PlotEvent.CLICK, emitted);
+        plot.events.on(autkPlot.PlotEvent.CLICK, emitted);
         resize(div, 720);
 
         expect(svgWidth()).toBe('720px');
         expect(plot.selection.sort((a, b) => a - b)).toEqual([...chosen].sort((a, b) => a - b));
         expect(div.querySelectorAll('.autkPartial')).toHaveLength(parts);
-        expect(div.querySelectorAll('svg#plot')).toHaveLength(1);
+        expect(div.querySelectorAll('svg.autk-plot')).toHaveLength(1);
         expect(emitted).not.toHaveBeenCalled();
         expect(div.querySelector<HTMLElement>('.autk-provenance')!.style.width).toBe('720px');
     });
@@ -150,12 +150,18 @@ describe("width: 'auto'", () => {
             width: 'auto',
             height: 300,
             margins,
-            events: [next.PlotEvent.CLICK],
+            events: [autkPlot.PlotEvent.CLICK],
         } as Omit<UnifiedPlotConfig, 'collection'>, 480);
         const options = () => (plot.instance['_transformConfig'] as { options: { width: number } }).options;
-        expect(options().width).toBe(480 - margins.left - margins.right);
+        // The drawing area within the margins as drawn: a margin grows where an axis title would
+        // cover its tick labels (in a browser; jsdom measures nothing, so they stay as configured).
+        const area = (width: number) => {
+            const drawn = plot.instance['_margins'] as typeof margins;
+            return width - drawn.left - drawn.right;
+        };
+        expect(options().width).toBe(area(480));
         resize(div, 760);
-        expect(options().width).toBe(760 - margins.left - margins.right);
+        expect(options().width).toBe(area(760));
     });
 
     test('a plot replaced in its host stops following it', () => {
@@ -184,15 +190,15 @@ describe("width: 'auto'", () => {
     });
 
     test('a plot whose first draw throws leaves no observer behind', () => {
-        next.registerPlot({ name: 'auto-width-broken', draw: () => { throw new Error('broken drawing'); } });
+        autkPlot.registerPlot({ name: 'auto-width-broken', draw: () => { throw new Error('broken drawing'); } });
         try {
             const div = document.createElement('div');
             document.body.append(div);
             setHostWidth(div, 480);
-            expect(() => new next.AutkPlot(div, { type: 'registered', plot: 'auto-width-broken', collection: regions(), attributes: { axis: ['shape_area'] }, width: 'auto', height: 200 } as UnifiedPlotConfig)).toThrow();
+            expect(() => new autkPlot.AutkPlot(div, { type: 'registered', plot: 'auto-width-broken', collection: regions(), attributes: { axis: ['shape_area'] }, width: 'auto', height: 200 } as UnifiedPlotConfig)).toThrow();
             expect(FakeResizeObserver.live).toHaveLength(0);
         } finally {
-            next.unregisterPlot('auto-width-broken');
+            autkPlot.unregisterPlot('auto-width-broken');
         }
     });
 

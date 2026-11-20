@@ -7,7 +7,7 @@
 import * as d3 from 'd3';
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { BoxStatsRow, FlowRow, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -18,7 +18,7 @@ const featureIndices = (ids: string[]) => sortNumbers(ids.map(id => Number(id.sl
 
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const partials = () => Array.from(div.querySelectorAll('.autkPartial'));
     return { div, plot, partials };
 }
@@ -29,9 +29,9 @@ describe('boxplot with box-stats (order statistics)', () => {
         collection: collection(),
         attributes: { axis: ['landuse', 'shape_area'] },
         transform: { preset: 'box-stats' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
-    const rowsOf = (plot: next.AutkPlot) => plot.instance['_data'] as unknown as BoxStatsRow[];
+    const rowsOf = (plot: autkPlot.AutkPlot) => plot.instance['_data'] as unknown as BoxStatsRow[];
 
     test('quartiles, median witnesses, and whiskers match the data', () => {
         const { plot } = mount(boxplot());
@@ -87,9 +87,9 @@ describe('sankey with flows (segments make link provenance exact)', () => {
         collection: collection(),
         attributes: { axis: COLUMNS },
         transform: { preset: 'flows', options: { reducer, value: 'shape_area' } },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
-    const rowsOf = (plot: next.AutkPlot) => plot.instance['_data'] as unknown as FlowRow[];
+    const rowsOf = (plot: autkPlot.AutkPlot) => plot.instance['_data'] as unknown as FlowRow[];
     const markOf = (row: FlowRow) => `mark:${row.kind}:${row.key}`;
 
     test('stages: features → segments (1:N) → links (N:1) → nodes (N:N)', () => {
@@ -146,8 +146,8 @@ describe('sankey with flows (segments make link provenance exact)', () => {
         for (const kind of ['link', 'node'] as const) {
             const { div, plot } = mount(sankey());
             const row = rowsOf(plot).find(r => r.kind === kind)!;
-            const emitted: next.PlotEventData[] = [];
-            plot.events.on(next.PlotEvent.CLICK, (data) => emitted.push(data));
+            const emitted: autkPlot.PlotEventData[] = [];
+            plot.events.on(autkPlot.PlotEvent.CLICK, (data) => emitted.push(data));
 
             Array.from(div.querySelectorAll('.autkMark'))
                 .find(mark => mark.getAttribute('data-autk-provenance') === markOf(row))!

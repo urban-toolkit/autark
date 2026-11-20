@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { UnifiedPlotConfig } from '../src';
 import { renderProvenancePathView } from '../src/provenance/path-view';
 import type { ProvenancePathViewState } from '../src/provenance/path-view';
@@ -17,14 +17,14 @@ const histogram = (extra: Partial<UnifiedPlotConfig> = {}): UnifiedPlotConfig =>
     collection: loadGalleryCollection('mnt_neighs_proj.geojson'),
     attributes: { axis: ['shape_area', '@transform'] },
     transform: { preset: 'binning-1d', options: { bins: 10 } },
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
     ...extra,
 });
 
 /** Builds a plot with the widget on (unless the config says otherwise) and returns helpers to read and drive it. */
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, { provenance: { path: true }, ...config } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { provenance: { path: true }, ...config } as UnifiedPlotConfig);
     const widget = () => div.querySelector('.autk-provenance');
     const toggle = () => div.querySelector<HTMLButtonElement>('.autk-provenance-toggle')!;
     const chips = () => Array.from(div.querySelectorAll('.autk-provenance-stage')).map(n => n.textContent);
@@ -99,7 +99,7 @@ describe('provenance path widget', () => {
 
     test('the widget is off by default, so the plot keeps the height its host gives it', () => {
         const div = document.createElement('div');
-        new next.AutkPlot(div, histogram());
+        new autkPlot.AutkPlot(div, histogram());
         expect(div.querySelector('.autk-provenance')).toBeNull();
     });
 });
@@ -138,20 +138,20 @@ describe('provenance path widget: cardinalities', () => {
 
 describe('provenance path widget: mark parts', () => {
     test('a plot with one field (a beeswarm) lists its parts when it receives shares', () => {
-        next.registerPlot({
+        autkPlot.registerPlot({
             name: 'one-field-dots',
             draw: ({ group, rows }) => { group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark').attr('r', 3); },
         });
         try {
             const div = document.createElement('div');
-            const plot = new next.AutkPlot(div, {
+            const plot = new autkPlot.AutkPlot(div, {
                 type: 'registered', plot: 'one-field-dots', provenance: { path: 'open' },
                 collection: loadGalleryCollection('mnt_neighs_proj.geojson'), attributes: { axis: ['shape_area'] },
             } as UnifiedPlotConfig);
             expect(() => plot.setSelection([0, 1], [{ feature: 0, selectedUnits: 1, totalUnits: 3 }, { feature: 1, selectedUnits: 2, totalUnits: 3 }])).not.toThrow();
             expect(div.querySelector('.autk-provenance-parts')?.textContent).toMatch(/: 0\.33\/1|: 1\/3|\//);
         } finally {
-            next.unregisterPlot('one-field-dots');
+            autkPlot.unregisterPlot('one-field-dots');
         }
     });
 });

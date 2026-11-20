@@ -1,13 +1,14 @@
 /**
- * Fixes of the use case review before the migration: the page reducer is applied by what each
- * plot can draw (charts of the page and of Try it Yourself alike) and named on the value axis,
- * the Try it Yourself fields follow the chosen transform and chart, and its built-in templates
+ * The page of the provenance use case: the page reducer is applied by what each
+ * plot can draw (charts of the page and of Try It Yourself alike) and named on the value axis,
+ * the Try It Yourself fields follow the chosen transform and chart, and its built-in templates
  * draw what their titles say.
  */
 
+import * as d3 from 'd3';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 
 import { LAB_PLOT, optionsOfChoice, plotDefinitionOf, plotLabConfig, setupPlotLab } from '../../usecases/src/provenance/lab-plot';
 import { PLOT_LAB_TEMPLATES } from '../../usecases/src/provenance/lab-plot-templates';
@@ -15,6 +16,7 @@ import { movingAverage } from '../../usecases/src/provenance/moving-average';
 import { LAB_TRANSFORM, plainMessage, projectNameNote, regionProperties, setupLab } from '../../usecases/src/provenance/lab-transform';
 import type { LabPlotConfig } from '../../usecases/src/provenance/lab-transform';
 import { LAB_TEMPLATES } from '../../usecases/src/provenance/lab-transform-templates';
+import { shapeProblems } from '../src/transforms/registry';
 import { PLOTS, withReducer } from '../../usecases/src/provenance/plot';
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
 
@@ -22,9 +24,9 @@ const regions = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
 
 const chart = (name: string) => PLOTS.find(plot => plot.name === name)!;
 
-beforeAll(() => next.registerTransform(movingAverage));
-afterAll(() => next.unregisterTransform(movingAverage.name));
-afterEach(() => { if (next.hasRegisteredPlot(LAB_PLOT)) next.unregisterPlot(LAB_PLOT); });
+beforeAll(() => autkPlot.registerTransform(movingAverage));
+afterAll(() => autkPlot.unregisterTransform(movingAverage.name));
+afterEach(() => { if (autkPlot.hasRegisteredPlot(LAB_PLOT)) autkPlot.unregisterPlot(LAB_PLOT); });
 
 describe('page reducer', () => {
     test('sums the perimeter and says so on the value axis', () => {
@@ -41,9 +43,9 @@ describe('page reducer', () => {
         expect(withReducer(pie.config, 'sum').transform?.options).toMatchObject({ reducer: 'sum' });
     });
 
-    test('applies to a Try it Yourself chart as to the page chart it copies', () => {
+    test('applies to a Try It Yourself chart as to the page chart it copies', () => {
         const donut = PLOT_LAB_TEMPLATES.find(template => template.group === 'built-in' && template.title.startsWith('Donut'))!;
-        next.registerPlot(plotDefinitionOf(donut.code));
+        autkPlot.registerPlot(plotDefinitionOf(donut.code));
         const config = plotLabConfig(donut.columns, donut.transform, donut.event, donut.chartTitle!, donut.margins, donut.topK);
         expect(withReducer(config, 'avg')).toBe(config);
         expect(withReducer(config, 'sum').transform?.options).toMatchObject({ reducer: 'sum', value: 'shape_leng' });
@@ -62,7 +64,7 @@ describe('tooltips', () => {
         for (const plot of PLOTS) {
             if (plot.config.type === 'table') continue;
             const div = document.createElement('div');
-            new next.AutkPlot(div, { ...withReducer(plot.config, 'count'), collection, width: 480, height: 280, events: [plot.event] } as never);
+            new autkPlot.AutkPlot(div, { ...withReducer(plot.config, 'count'), collection, width: 480, height: 280, events: [plot.event] } as never);
             const marks = Array.from(div.querySelectorAll('.autkMark'));
             if (marks.length === 0 || marks.some(mark => !mark.querySelector('title')?.textContent)) missing.push(plot.name);
         }
@@ -70,7 +72,7 @@ describe('tooltips', () => {
     });
 });
 
-describe('Try it Yourself, D3 chart tab', () => {
+describe('Try It Yourself, D3 chart tab', () => {
     test('a built-in template keeps the top-k cut of its page chart', () => {
         const donut = PLOT_LAB_TEMPLATES.find(template => template.group === 'built-in' && template.title.startsWith('Donut'))!;
         expect(donut.topK).toEqual(chart('donut').config.topK);
@@ -88,9 +90,9 @@ describe('Try it Yourself, D3 chart tab', () => {
     });
 });
 
-describe('Try it Yourself, found by the newcomer walkthrough', () => {
+describe('Try It Yourself, messages and fields', () => {
     afterEach(() => {
-        next.unregisterTransform(LAB_TRANSFORM);
+        autkPlot.unregisterTransform(LAB_TRANSFORM);
         document.body.innerHTML = '';
     });
 
@@ -171,9 +173,34 @@ describe('Try it Yourself, found by the newcomer walkthrough', () => {
     test('the D3 tab shows the fields of the rows the drawing receives', () => {
         const lab = plotLab();
         lab.change('#plab-transform', 'binning-1d');
-        expect(lab.element('#plab-rows').textContent).toBe('rows: label, value');
+        expect(lab.element('#plab-rows').textContent).toBe('draw receives rows with label, value and autkIds.');
         lab.change('#plab-transform', '');
-        expect(lab.element('#plab-rows').textContent).toBe('rows: one per region, with its properties');
+        expect(lab.element('#plab-rows').textContent).toBe('draw receives one row per region: its properties and autkIds.');
+    });
+
+    test('options that are not JSON say how JSON is written', () => {
+        const lab = plotLab();
+        lab.element<HTMLInputElement>('#plab-options').value = "{bins: 10}";
+        lab.run();
+        expect(lab.element('#plab-message').textContent).toMatch(/^The options are not valid JSON \(.*\): keys and text go in double quotes, as in \{"bins": 10\}\.$/);
+    });
+
+    test('a transform of events given a field with no events says which field holds them', () => {
+        const lab = plotLab();
+        lab.change('#plab-transform', 'binning-events');
+        lab.element<HTMLInputElement>('#plab-columns').value = 'landuse, @transform';
+        lab.run();
+        expect(lab.element('#plab-message').textContent).toMatch(/gives no rows.*reads a list of events \(or a series\) per region: name it first in Fields, such as sjoin\.collect\.noise\.$/);
+    });
+
+    test('a drawing that reads a field the new transform does not give says which fields the rows have', () => {
+        const lab = plotLab();
+        const index = PLOT_LAB_TEMPLATES.findIndex(template => template.title.startsWith('Line of complaints per day'));
+        lab.change('#plab-template', String(index));
+        lab.change('#plab-transform', 'binning-1d');
+        lab.element<HTMLInputElement>('#plab-columns').value = 'landuse, @transform';
+        lab.run();
+        expect(lab.element('#plab-message').textContent).toMatch(/^The drawing failed: .*The rows of this transform have label, value: does the code read another field\?$/);
     });
 
     test('a built-in template keeps the axis labels of its page chart while its fields are unchanged', () => {
@@ -258,7 +285,7 @@ describe('Try it Yourself, found by the newcomer walkthrough', () => {
 describe('provenance path', () => {
     test('a part of a heat matrix cell names both of its categories', () => {
         const div = document.createElement('div');
-        const plot = new next.AutkPlot(div, {
+        const plot = new autkPlot.AutkPlot(div, {
             type: 'heatmatrix', collection: regions(), width: 480, height: 320, provenance: { path: 'open' },
             attributes: { axis: ['shape_area', 'landuse'], color: '@transform' }, transform: { preset: 'binning-2d' },
         } as never);
@@ -268,9 +295,9 @@ describe('provenance path', () => {
     });
 });
 
-describe('Try it Yourself, Transform tab', () => {
+describe('Try It Yourself, Transform tab', () => {
     afterEach(() => {
-        next.unregisterTransform(LAB_TRANSFORM);
+        autkPlot.unregisterTransform(LAB_TRANSFORM);
         document.body.innerHTML = '';
     });
 
@@ -304,7 +331,7 @@ describe('Try it Yourself, Transform tab', () => {
             <p id="lab-message"></p>
             <ol id="lab-checks"></ol>`;
         const drawn: (LabPlotConfig | null)[] = [];
-        setupLab(regions(), config => { drawn.push(config); return undefined; });
+        setupLab(withSyntheticEvents(regions()), config => { drawn.push(config); return undefined; });
         const select = (id: string, value: string) => {
             const element = document.querySelector<HTMLSelectElement>(id)!;
             element.value = value;
@@ -321,8 +348,89 @@ describe('Try it Yourself, Transform tab', () => {
                 document.querySelector<HTMLButtonElement>('#lab-run')!.click();
                 expect(document.querySelector('#lab-message')!.textContent, `${name} → ${plot}`).toBe('Contract met: linked to the map and the 24 charts (close the drawer to see them).');
                 // The chart actually draws the config the lab gives it.
-                expect(() => new next.AutkPlot(document.createElement('div'), { ...drawn[drawn.length - 1]!, collection: regions(), width: 480, height: 280 } as never), `${name} → ${plot}`).not.toThrow();
+                expect(() => new autkPlot.AutkPlot(document.createElement('div'), { ...drawn[drawn.length - 1]!, collection: withSyntheticEvents(regions()), width: 480, height: 280 } as never), `${name} → ${plot}`).not.toThrow();
             }
         }
+    });
+});
+
+describe('contracts, axes, and data of the page', () => {
+    afterEach(() => {
+        autkPlot.unregisterTransform(LAB_TRANSFORM);
+        document.body.innerHTML = '';
+    });
+
+    test('checkPlot refuses a highlight with a typo before drawing, as registerPlot does', () => {
+        const report = autkPlot.checkPlot({
+            name: 'typo',
+            highlight: { rect: { mode: 'subset', channel: 'lenght' } } as never,
+            draw: ({ group, rows }) => { group.selectAll('rect').data(rows).join('rect').attr('class', 'autkMark').attr('width', 4).attr('height', 4); },
+        }, document.createElement('div'), { collection: regions(), attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' }, width: 480, height: 280 } as never);
+        expect(report.violations).toEqual([{ invariant: 0, message: expect.stringMatching(/the subset highlight of rect needs a channel \(.*\), not "lenght"/) }]);
+    });
+
+    test('an axis takes the label of the field it shows: a horizontal bar chart labels its x axis with the values', () => {
+        const seen: string[][] = [];
+        autkPlot.registerPlot({
+            name: 'horizontal-bars',
+            draw({ svg, group, rows, width, height, axisX, axisY }) {
+                const y = d3.scaleBand(rows.map(d => String(d.label)), [0, height]);
+                const x = d3.scaleLinear([0, d3.max(rows, d => Number(d.value)) ?? 1], [0, width]);
+                group.selectAll('rect').data(rows).join('rect').attr('class', 'autkMark')
+                    .attr('y', d => y(String(d.label))!).attr('height', y.bandwidth()).attr('width', d => x(Number(d.value)));
+                axisX(d3.axisBottom(x), 1);
+                axisY(d3.axisLeft(y), 0);
+                seen.push(['.x.axis', '.y.axis'].map(axis => svg.select(`${axis} .axis-label`).text()));
+                svg.selectAll('.x.axis, .y.axis').remove();
+                axisX(d3.axisBottom(x), 'regions');
+                axisY(d3.axisLeft(y));
+                seen.push(['.x.axis', '.y.axis'].map(axis => svg.select(`${axis} .axis-label`).text()));
+            },
+        });
+        try {
+            new autkPlot.AutkPlot(document.createElement('div'), {
+                type: 'registered', plot: 'horizontal-bars', collection: regions(), width: 480, height: 280,
+                attributes: { axis: ['landuse', '@transform'] }, labels: { axis: ['land use', 'count'] }, transform: { preset: 'binning-1d' },
+            } as never);
+            // By index: the label of that field; by text: the text; with neither: the field of its side.
+            expect(seen).toEqual([['count', 'land use'], ['regions', 'count']]);
+        } finally {
+            autkPlot.unregisterPlot('horizontal-bars');
+        }
+    });
+
+    test('a histogram keeps its empty range (value 0, no region); categories add none', () => {
+        const rows = regions().features.map((feature, index) => ({ ...feature.properties, autkIds: [index] }));
+        const ranges = autkPlot.run(rows, { preset: 'binning-1d', options: { bins: 10 } }, ['shape_area']).rows as { label: string; value: number; autkIds: number[] }[];
+        expect(ranges).toHaveLength(10);
+        expect(ranges.filter(row => row.autkIds.length === 0)).toEqual([expect.objectContaining({ label: '30.9M-34.6M', value: 0, count: 0 })]);
+        const categories = autkPlot.run(rows, { preset: 'binning-1d' }, ['landuse']).rows as { autkIds: number[] }[];
+        expect(categories.every(row => row.autkIds.length > 0)).toBe(true);
+    });
+
+    test('the Sankey of the page names the NTA types instead of their codes', () => {
+        const regionsOfPage = withSyntheticEvents(regions());
+        expect([...new Set(regionsOfPage.features.map(feature => feature.properties!.ntatype_name))].sort()).toEqual(['Park', 'Residential', 'Special area']);
+        expect(PLOTS.find(plot => plot.name === 'sankey')!.config.attributes?.axis?.[0]).toBe('ntatype_name');
+    });
+
+    test('a row missing a field of its shape names only that field', () => {
+        const problems = shapeProblems({ rows: [{ label: 'a', autkIds: [0] }], provenance: {} as never }, 'category-value');
+        expect(problems[0]).toBe('row 0 lacks "value", required by the "category-value" shape');
+    });
+
+    test('the Transform tab asks for Fields instead of running with none', () => {
+        document.body.innerHTML = `
+            <select id="lab-template"></select>
+            <input id="lab-columns" /><input id="lab-options" />
+            <select id="lab-plot"></select>
+            <button id="lab-run"></button>
+            <textarea id="lab-code"></textarea>
+            <p id="lab-message"></p>
+            <ol id="lab-checks"></ol>`;
+        setupLab(regions(), () => undefined);
+        document.querySelector<HTMLInputElement>('#lab-columns')!.value = ' ';
+        document.querySelector<HTMLButtonElement>('#lab-run')!.click();
+        expect(document.querySelector('#lab-message')!.textContent).toBe('Name in Fields the region properties the transform reads, such as shape_area.');
     });
 });

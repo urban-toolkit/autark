@@ -7,13 +7,13 @@
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import { afterEach, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { UnifiedPlotConfig } from '../src';
 
 /** Colors as the package starts, restored after each test (they are process-wide). */
 const DEFAULTS = { _highlight: '#5dade2', _provenance: '#63d8c0', _provenanceStroke: '#2fae95', _provenanceText: '#073b2c' };
 afterEach(() => {
-    Object.assign(next.PlotStyle as unknown as Record<string, string>, DEFAULTS);
+    Object.assign(autkPlot.PlotStyle as unknown as Record<string, string>, DEFAULTS);
     document.body.innerHTML = '';
 });
 
@@ -40,12 +40,12 @@ function host(): HTMLElement {
 
 describe('Niteroi', () => {
     test('PlotStyle.setHighlightColor colors the selection, as before', () => {
-        next.PlotStyle.setHighlightColor('#1a7a2e');
+        autkPlot.PlotStyle.setHighlightColor('#1a7a2e');
         const div = host();
-        const plot = new next.AutkPlot(div, {
+        const plot = new autkPlot.AutkPlot(div, {
             type: 'scatterplot', collection: roads(6),
             attributes: { axis: ['compute.intercept', 'compute.angle'] },
-            width: 600, height: 380, events: [next.PlotEvent.BRUSH],
+            width: 600, height: 380, events: [autkPlot.PlotEvent.BRUSH],
         } as UnifiedPlotConfig);
 
         plot.setSelection([0, 2]);
@@ -53,22 +53,22 @@ describe('Niteroi', () => {
         const fills = Array.from(div.querySelectorAll<SVGElement>('.autkMark')).map(mark => mark.style.fill);
         const selected = fills.filter(fill => fill === 'rgb(26, 122, 46)' || fill === '#1a7a2e');
         expect(selected).toHaveLength(2);
-        expect(next.PlotStyle.provenance).toBe('#1a7a2e');
+        expect(autkPlot.PlotStyle.provenance).toBe('#1a7a2e');
     });
 
     test('the outline and the text over a new selection color follow it', () => {
-        next.PlotStyle.setProvenanceColor('#1a7a2e');
-        expect(next.PlotStyle.provenanceStroke).not.toBe(DEFAULTS._provenanceStroke);
+        autkPlot.PlotStyle.setProvenanceColor('#1a7a2e');
+        expect(autkPlot.PlotStyle.provenanceStroke).not.toBe(DEFAULTS._provenanceStroke);
         // A dark green reads white text; a light one reads a darker shade.
-        expect(next.PlotStyle.provenanceText).toBe('#ffffff');
-        next.PlotStyle.setProvenanceColor('#c8f5e9');
-        expect(next.PlotStyle.provenanceText).not.toBe('#ffffff');
+        expect(autkPlot.PlotStyle.provenanceText).toBe('#ffffff');
+        autkPlot.PlotStyle.setProvenanceColor('#c8f5e9');
+        expect(autkPlot.PlotStyle.provenanceText).not.toBe('#ffffff');
     });
 
     test('a line chart built from an empty collection draws once roads are selected', () => {
         const div = host();
         const all = roads(4);
-        const plot = new next.AutkPlot(div, {
+        const plot = new autkPlot.AutkPlot(div, {
             type: 'linechart', collection: { type: 'FeatureCollection', features: [] },
             attributes: { axis: ['lst_timeseries', '@transform'] },
             transform: { preset: 'reduce-series', options: { timestamp: 'timestamp', value: 'value' } },

@@ -9,7 +9,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, PlotType, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
@@ -23,15 +23,15 @@ const sortNumbers = (values: number[]) => [...values].sort((a, b) => a - b);
 type Config = Omit<UnifiedPlotConfig, 'type' | 'collection'>;
 
 /** A registered plot: one dot per row, drawn by user code. */
-const DOTS: next.PlotDefinition = {
+const DOTS: autkPlot.PlotDefinition = {
     name: 'filter-dots',
     draw({ group, rows }) {
         group.selectAll('circle').data(rows).join('circle')
             .attr('class', 'autkMark').attr('cx', (_r, i) => i * 3).attr('cy', 10).attr('r', 2);
     },
 };
-beforeAll(() => next.registerPlot(DOTS));
-afterAll(() => next.unregisterPlot(DOTS.name));
+beforeAll(() => autkPlot.registerPlot(DOTS));
+afterAll(() => autkPlot.unregisterPlot(DOTS.name));
 const events = { axis: ['sjoin.collect.noise', '@transform'] };
 const daily = { preset: 'binning-events' as const, options: { timestamp: 'date', resolution: 'day' as const } };
 
@@ -66,10 +66,10 @@ const CONFIGS: Record<PlotType, Config> = {
 
 function mount(type: PlotType, extra: Partial<UnifiedPlotConfig> = {}) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, {
+    const plot = new autkPlot.AutkPlot(div, {
         type,
         collection: collection(),
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
         provenance: { path: 'open' },
         ...CONFIGS[type],
         ...extra,
@@ -140,7 +140,7 @@ describe('top-k on the pie and the donut (cut and gather)', () => {
 
     test('plots without a rankable value per row reject top-k', () => {
         for (const type of ['treemap', 'stackedbar', 'waffle', 'hexbin'] as const) {
-            expect(() => mount(type, { topK: { k: 2 } })).toThrow(/topK is not supported/);
+            expect(() => mount(type, { topK: { k: 2 } })).toThrow(/does not support topK./);
         }
     });
 });

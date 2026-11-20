@@ -1,5 +1,5 @@
 /**
- * Holes found in the review before the migration: a transform that passes the contract is read
+ * Contracts: a transform that passes the contract is read
  * by every plot of its shape, a plot's own checks give correct messages, and built-ins cannot be
  * changed through a lookup.
  */
@@ -7,7 +7,7 @@
 import * as d3 from 'd3';
 import { afterEach, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, PlotDefinition, TransformDefinition, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -17,14 +17,14 @@ const regions = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
 const transforms: string[] = [];
 const plots: string[] = [];
 afterEach(() => {
-    transforms.splice(0).forEach(name => next.unregisterTransform(name));
-    plots.splice(0).forEach(name => next.unregisterPlot(name));
+    transforms.splice(0).forEach(name => autkPlot.unregisterTransform(name));
+    plots.splice(0).forEach(name => autkPlot.unregisterPlot(name));
 });
 
 /** Registers a user transform made from a built-in one, with its output changed. */
 function userTransform(builtIn: string, name: string, change: (output: ReturnType<TransformDefinition['run']>) => void = () => undefined): void {
-    const original = next.registeredTransform(builtIn);
-    next.registerTransform({
+    const original = autkPlot.registeredTransform(builtIn);
+    autkPlot.registerTransform({
         name,
         shape: original.shape,
         run: (rows, options, columns) => {
@@ -38,7 +38,7 @@ function userTransform(builtIn: string, name: string, change: (output: ReturnTyp
 
 function mount(config: Omit<UnifiedPlotConfig, 'collection'>) {
     const div = document.createElement('div');
-    new next.AutkPlot(div, { width: 480, height: 320, collection: regions(), ...config } as UnifiedPlotConfig);
+    new autkPlot.AutkPlot(div, { width: 480, height: 320, collection: regions(), ...config } as UnifiedPlotConfig);
     return div;
 }
 
@@ -53,7 +53,7 @@ describe('the contract of a shape is what its plots read', () => {
                 delete row.target;
             }
         });
-        const report = next.checkTransformReport(next.registeredTransform('renamed-flows'), regions(), {}, ['ntatype', 'landuse']);
+        const report = autkPlot.checkTransformReport(autkPlot.registeredTransform('renamed-flows'), regions(), {}, ['ntatype', 'landuse']);
         expect(report.violations.map(v => v.message).join('\n')).toMatch(/must name the "key" of a node row in "source" and "target"/);
         expect(() => mount({ type: 'sankey', attributes: { axis: ['ntatype', 'landuse', '@transform'] }, transform: { preset: 'registered', name: 'renamed-flows' } }))
             .toThrow(/Transform "renamed-flows": .*"source" and "target"/);
@@ -87,7 +87,7 @@ describe('a plot\'s own checks', () => {
         group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark').attr('r', 2);
     };
     const register = (definition: PlotDefinition) => {
-        next.registerPlot(definition);
+        autkPlot.registerPlot(definition);
         plots.push(definition.name);
     };
     const config = (plot: string, transform?: UnifiedPlotConfig['transform']) => ({ type: 'registered' as const, plot, attributes: { axis: ['landuse', '@transform'] }, ...(transform ? { transform } : {}) });
@@ -129,18 +129,18 @@ describe('shared drawing helpers, the same for built-in and user plots', () => {
         ] as Omit<UnifiedPlotConfig, 'collection'>[]) {
             const lines = Array.from(mount(config).querySelectorAll<SVGLineElement>('.y.axis .tick line'));
             expect(lines.length, config.type).toBeGreaterThan(0);
-            expect(new Set(lines.map(line => d3.color(line.style.stroke)?.formatHex())), config.type).toEqual(new Set([next.PlotStyle.grid]));
+            expect(new Set(lines.map(line => d3.color(line.style.stroke)?.formatHex())), config.type).toEqual(new Set([autkPlot.PlotStyle.grid]));
         }
     });
 
     test('a user plot draws a legend and whole ticks with the helpers the built-in ones use', () => {
-        next.registerPlot({
+        autkPlot.registerPlot({
             name: 'with-helpers',
             draw: ({ group, rows, value, width, height, axisY, tickCount, legend }) => {
                 const y = d3.scaleLinear([0, d3.max(rows, row => Number(value(row, 1))) ?? 1], [height, 0]);
                 axisY(d3.axisLeft(y).ticks(tickCount(y.domain()[1], rows.map(row => Number(value(row, 1))), 10)).tickSizeInner(-width));
                 const labels = rows.map(row => String(value(row, 0)));
-                legend(labels, next.PlotStyle.shades(labels), 'row');
+                legend(labels, autkPlot.PlotStyle.shades(labels), 'row');
                 group.selectAll('circle.autkMark').data(rows).join('circle').attr('class', 'autkMark').attr('r', 2);
             },
         });
@@ -160,7 +160,7 @@ describe('shared drawing helpers, the same for built-in and user plots', () => {
     });
 });
 
-describe('selection and drawing found by the newcomer walkthrough', () => {
+describe('selection and drawing', () => {
     test('after a selection from another view, a click adds its mark to that selection, or takes it out (as in the original)', () => {
         for (const config of [
             { type: 'barchart', attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' } },
@@ -168,9 +168,9 @@ describe('selection and drawing found by the newcomer walkthrough', () => {
             { type: 'treemap', attributes: { axis: ['landuse', 'cdta2020', '@transform'] }, transform: { preset: 'hierarchy' } },
         ] as Omit<UnifiedPlotConfig, 'collection'>[]) {
             const div = document.createElement('div');
-            const plot = new next.AutkPlot(div, { width: 480, height: 320, collection: regions(), events: [next.PlotEvent.CLICK], ...config } as UnifiedPlotConfig);
+            const plot = new autkPlot.AutkPlot(div, { width: 480, height: 320, collection: regions(), events: [autkPlot.PlotEvent.CLICK], ...config } as UnifiedPlotConfig);
             const emitted: number[][] = [];
-            plot.events.on(next.PlotEvent.CLICK, data => emitted.push([...data.selection].sort((a, b) => a - b)));
+            plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push([...data.selection].sort((a, b) => a - b)));
             // The map selects one region; a click on a mark that does not hold it adds the mark's regions.
             const marks = Array.from(div.querySelectorAll('.autkMark'));
             const idsOf = (mark: Element) => (mark as unknown as { __data__: AutkDatum }).__data__.autkIds ?? [];
@@ -184,7 +184,7 @@ describe('selection and drawing found by the newcomer walkthrough', () => {
 
     test('a plain D3 join on rect draws every row: the group is empty when draw starts, and the clear area comes after', () => {
         let childrenAtStart = -1;
-        next.registerPlot({
+        autkPlot.registerPlot({
             name: 'plain-rects',
             draw: ({ group, rows, width, height }) => {
                 childrenAtStart = group.selectChildren().size();
@@ -204,12 +204,12 @@ describe('selection and drawing found by the newcomer walkthrough', () => {
     });
 });
 
-describe('found by the third newcomer walkthrough', () => {
+describe('messages that say what to fix', () => {
     test('an unknown reducer is refused with the list of reducers, for built-in and user transforms alike', () => {
         const rows = regions().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[];
-        expect(() => next.run(rows, { preset: 'binning-1d', options: { reducer: 'median', value: 'shape_leng' } } as never, ['landuse']))
-            .toThrow('Unknown reducer "median" (expected count, sum, avg, min, max).');
-        expect(() => next.collectBuckets({ rows, bucketOf: () => 'a', valueOf: undefined, reducer: 'mode' as never })).toThrow(/Unknown reducer "mode"/);
+        expect(() => autkPlot.run(rows, { preset: 'binning-1d', options: { reducer: 'median', value: 'shape_leng' } } as never, ['landuse']))
+            .toThrow('Transform options: unknown reducer "median" (expected count, sum, avg, min, max).');
+        expect(() => autkPlot.collectBuckets({ rows, bucketOf: () => 'a', valueOf: undefined, reducer: 'mode' as never })).toThrow(/unknown reducer "mode"/);
     });
 
     test('a bar chart with no transform and one field says it needs a label and a value', () => {
@@ -218,40 +218,40 @@ describe('found by the third newcomer walkthrough', () => {
 
     test('points with no numbers on an axis are refused instead of all drawn at zero', () => {
         expect(() => mount({ type: 'scatterplot', attributes: { axis: ['shape_area', 'shape_leng', '@transform'] }, transform: { preset: 'binning-2d' } }))
-            .toThrow('Points need numbers on both axes: field 1 has none in these rows.');
+            .toThrow('Scatterplot requires numbers on both axes: field 1 has none in these rows.');
     });
 
     test('rows that share their label (or bucket) are refused: each one is a mark of its own', () => {
         userTransform('binning-1d', 'same-label', output => { (output.rows as AutkDatum[]).forEach(row => { (row as Record<string, unknown>).label = 'X'; }); });
-        const report = next.checkTransformReport(next.registeredTransform('same-label'), regions(), {}, ['landuse']);
+        const report = autkPlot.checkTransformReport(autkPlot.registeredTransform('same-label'), regions(), {}, ['landuse']);
         expect(report.violations.map(v => v.message).join('\n')).toMatch(/rows 0 and 1 share the label "X"/);
     });
 
     test('marks bound to numbers are told to bind the rows themselves, not that they are copies', () => {
-        next.registerPlot({ name: 'numbers', draw: ({ group, rows }) => { group.selectAll('circle').data(d3.range(rows.length)).join('circle').attr('class', 'autkMark').attr('r', 2); } });
+        autkPlot.registerPlot({ name: 'numbers', draw: ({ group, rows }) => { group.selectAll('circle').data(d3.range(rows.length)).join('circle').attr('class', 'autkMark').attr('r', 2); } });
         plots.push('numbers');
-        const report = next.checkPlot(next.registeredPlot('numbers'), document.createElement('div'), { collection: regions(), attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' } } as never);
+        const report = autkPlot.checkPlot(autkPlot.registeredPlot('numbers'), document.createElement('div'), { collection: regions(), attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' } } as never);
         expect(report.violations.map(v => v.message).join('\n')).toMatch(/binds a number, not one of the rows it received \(bind the rows themselves\)/);
     });
 });
 
 describe('found on the migrated page', () => {
     test('a capped report says that there are more violations than the ones it keeps', () => {
-        next.registerPlot({ name: 'no-marks', draw: ({ group, rows }) => { group.selectAll('circle').data(rows).join('circle').attr('r', 2); } });
+        autkPlot.registerPlot({ name: 'no-marks', draw: ({ group, rows }) => { group.selectAll('circle').data(rows).join('circle').attr('r', 2); } });
         plots.push('no-marks');
-        const many = next.checkPlot(next.registeredPlot('no-marks'), document.createElement('div'), { collection: regions(), attributes: { axis: ['shape_area'] } } as never);
+        const many = autkPlot.checkPlot(autkPlot.registeredPlot('no-marks'), document.createElement('div'), { collection: regions(), attributes: { axis: ['shape_area'] } } as never);
         expect(many.violations).toHaveLength(20);
         expect(many.truncated).toBe(true);
-        const few = next.checkPlot(next.registeredPlot('no-marks'), document.createElement('div'), { collection: regions(), attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' } } as never);
+        const few = autkPlot.checkPlot(autkPlot.registeredPlot('no-marks'), document.createElement('div'), { collection: regions(), attributes: { axis: ['landuse', '@transform'] }, transform: { preset: 'binning-1d' } } as never);
         expect(few.violations.length).toBeLessThan(20);
         expect(few.truncated).toBeUndefined();
     });
 
     test('binnedProvenance names a key that has no bin instead of failing inside', () => {
         const rows = regions().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[];
-        const buckets = next.collectBuckets({ rows, bucketOf: row => String(row.landuse), valueOf: undefined, reducer: 'count' });
+        const buckets = autkPlot.collectBuckets({ rows, bucketOf: row => String(row.landuse), valueOf: undefined, reducer: 'count' });
         const keys = buckets.map(bucket => bucket.key);
-        expect(() => next.binnedProvenance({ rows, buckets, bins: next.indexedBins(keys, keys, 'bin'), binLabel: 'bins', rowKeys: ['X', ...keys.slice(1)], reducer: 'count' }))
+        expect(() => autkPlot.binnedProvenance({ rows, buckets, bins: autkPlot.indexedBins(keys, keys, 'bin'), binLabel: 'bins', rowKeys: ['X', ...keys.slice(1)], reducer: 'count' }))
             .toThrow('binnedProvenance: the key "X" has no bin; every bucket key and row key needs one (indexedBins)');
     });
 
@@ -263,11 +263,11 @@ describe('found on the migrated page', () => {
 
 describe('built-ins cannot be changed through a lookup', () => {
     test('the definitions of built-in plots and transforms are frozen, nested objects too', () => {
-        const barchart = next.registeredPlot('barchart');
+        const barchart = autkPlot.registeredPlot('barchart');
         expect(() => { (barchart as { draw: unknown }).draw = () => undefined; }).toThrow(TypeError);
-        expect(() => { (barchart.design as Record<string, unknown>).rect = { rule: 'glyph' }; }).toThrow(TypeError);
-        const fold = next.registeredTransform('fold');
+        expect(() => { (barchart.highlight as Record<string, unknown>).rect = { mode: 'custom', preset: 'glyph' }; }).toThrow(TypeError);
+        const fold = autkPlot.registeredTransform('fold');
         expect(() => { (fold as { run: unknown }).run = () => undefined; }).toThrow(TypeError);
-        expect(Object.isFrozen(next.registeredPlot('pie'))).toBe(true);
+        expect(Object.isFrozen(autkPlot.registeredPlot('pie'))).toBe(true);
     });
 });

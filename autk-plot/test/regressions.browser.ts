@@ -1,13 +1,11 @@
 /**
- * Regression tests for the defects found in the independent review.
- *
- * Each test reproduces the reported failing scenario. Sankey shares per column
- * and per step (review item 8) are covered in `new-plots.test.ts`.
+ * Regressions: each test reproduces a defect that was fixed. Sankey shares per
+ * column and per step are covered in `boxplot-sankey.test.ts`.
  */
 
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
@@ -24,16 +22,16 @@ function collectionOf(properties: Record<string, unknown>[]): Collection {
 
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const emitted: PlotEventData[] = [];
-    plot.events.on(next.PlotEvent.CLICK, data => emitted.push(data));
+    plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
     const click = (node: Element | undefined) => node!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     return { div, plot, emitted, click };
 }
 
 const num = (node: Element | null | undefined, attr: string) => Number(node?.getAttribute(attr));
 
-describe('review fixes', () => {
+describe('regressions', () => {
     test('1 · linechart with negative sums keeps every point inside the plot', () => {
         const height = 400;
         const margins = { left: 40, right: 20, top: 20, bottom: 40 };
@@ -71,8 +69,8 @@ describe('review fixes', () => {
     });
 
     test('4 · flows keeps distinct links when labels contain "→"', () => {
-        const result = next.run([{ a: 'A→B', b: 'C', autkIds: [0] }, { a: 'A', b: 'B→C', autkIds: [1] }], { preset: 'flows' }, ['a', 'b']);
-        const links = (result.rows as next.FlowRow[]).filter((row): row is next.FlowLinkRow => row.kind === 'link');
+        const result = autkPlot.run([{ a: 'A→B', b: 'C', autkIds: [0] }, { a: 'A', b: 'B→C', autkIds: [1] }], { preset: 'flows' }, ['a', 'b']);
+        const links = (result.rows as autkPlot.FlowRow[]).filter((row): row is autkPlot.FlowLinkRow => row.kind === 'link');
         expect(links.map(l => [l.source, l.target, l.autkIds])).toEqual([
             ['0:A→B', '1:C', [0]],
             ['0:A', '1:B→C', [1]],
@@ -112,7 +110,7 @@ describe('review fixes', () => {
             transform: { preset: 'binning-1d' },
             filter: { attribute: 'shape_area', op: '<', value: 0 },
         });
-        expect(div.querySelectorAll('#axisY .tick').length).toBeGreaterThan(0);
+        expect(div.querySelectorAll('.y.axis .tick').length).toBeGreaterThan(0);
     });
 
     test('7 · bars with no positive value keep a finite y axis', () => {
@@ -121,7 +119,7 @@ describe('review fixes', () => {
             collection: collectionOf([{ n: 'a', v: 0 }, { n: 'b', v: 0 }]),
             attributes: { axis: ['n', 'v'] },
         });
-        const ticks = Array.from(div.querySelectorAll('#axisY .tick')).map(n => n.getAttribute('transform') ?? '');
+        const ticks = Array.from(div.querySelectorAll('.y.axis .tick')).map(n => n.getAttribute('transform') ?? '');
         expect(ticks.length).toBeGreaterThan(1);
         expect(ticks.some(t => t.includes('NaN'))).toBe(false);
     });
@@ -148,6 +146,6 @@ describe('review fixes', () => {
             transform: { preset: 'binning-events' },
         });
         expect(plot.provenance.cardinalities.every(c => c.cardinality === 'empty')).toBe(true);
-        expect(next.cardinality([])).toBe('empty');
+        expect(autkPlot.cardinality([])).toBe('empty');
     });
 });

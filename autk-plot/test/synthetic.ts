@@ -8,6 +8,8 @@
 
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 
+import { withNtaTypeNames } from '../../usecases/src/provenance/data';
+
 export type Collection = FeatureCollection<Geometry, GeoJsonProperties>;
 
 /**
@@ -53,5 +55,6 @@ export function withSyntheticEvents(collection: Collection): Collection {
         };
     });
 
-    return collection;
+    // The page also names the NTA types (`ntatype_name`), which its Sankey reads.
+    return withNtaTypeNames(collection);
 }

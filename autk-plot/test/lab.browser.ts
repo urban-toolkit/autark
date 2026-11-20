@@ -9,7 +9,7 @@
 
 import { afterEach, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, TransformDefinition, UnifiedPlotConfig } from '../src';
 
 import { LAB_TRANSFORM, setupLab, transformDefinitionOf } from '../../usecases/src/provenance/lab-transform';
@@ -44,7 +44,7 @@ function labDom(): void {
 }
 
 afterEach(() => {
-    next.unregisterTransform(LAB_TRANSFORM);
+    autkPlot.unregisterTransform(LAB_TRANSFORM);
     document.body.innerHTML = '';
 });
 
@@ -52,25 +52,25 @@ describe('validator report', () => {
     const rows = () => regions().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[];
 
     test('a valid transform has no violations; a non-additive one skips invariant 6', () => {
-        const count = next.run(rows(), { preset: 'binning-1d' }, ['shape_area']);
-        expect(next.checkProvenanceReport(rows().length, count.rows as AutkDatum[], count.provenance)).toEqual({ violations: [], skipped: [] });
-        const avg = next.run(rows(), { preset: 'binning-1d', options: { reducer: 'avg', value: 'shape_leng' } }, ['shape_area']);
-        expect(next.checkProvenanceReport(rows().length, avg.rows as AutkDatum[], avg.provenance)).toEqual({ violations: [], skipped: [6] });
+        const count = autkPlot.run(rows(), { preset: 'binning-1d' }, ['shape_area']);
+        expect(autkPlot.checkProvenanceReport(rows().length, count.rows as AutkDatum[], count.provenance)).toEqual({ violations: [], skipped: [] });
+        const avg = autkPlot.run(rows(), { preset: 'binning-1d', options: { reducer: 'avg', value: 'shape_leng' } }, ['shape_area']);
+        expect(autkPlot.checkProvenanceReport(rows().length, avg.rows as AutkDatum[], avg.provenance)).toEqual({ violations: [], skipped: [6] });
     });
 
     test('each violation names its invariant, and 4 is skipped when the graph is malformed', () => {
-        const result = next.run(rows(), { preset: 'binning-1d' }, ['shape_area']);
+        const result = autkPlot.run(rows(), { preset: 'binning-1d' }, ['shape_area']);
         const renamed = { ...result.provenance, stages: result.provenance.stages.map((s, i) => (i === 0 ? { ...s, name: 'X' } : s)) };
-        const report = next.checkProvenanceReport(rows().length, result.rows as AutkDatum[], renamed);
+        const report = autkPlot.checkProvenanceReport(rows().length, result.rows as AutkDatum[], renamed);
         expect(new Set(report.violations.map(v => v.invariant))).toEqual(new Set([2, 3]));
         expect(report.skipped).toEqual([4]);
         // The string API keeps returning the same messages.
-        expect(next.checkProvenance(rows().length, result.rows as AutkDatum[], renamed)).toEqual(report.violations.map(v => v.message));
+        expect(autkPlot.checkProvenance(rows().length, result.rows as AutkDatum[], renamed)).toEqual(report.violations.map(v => v.message));
     });
 
     test('a run that throws is invariant 0, and nothing else is checked', () => {
         const throwing: TransformDefinition = { name: 'x', shape: 'series', run: () => { throw new Error('boom'); } };
-        expect(next.checkTransformReport(throwing, regions())).toEqual({
+        expect(autkPlot.checkTransformReport(throwing, regions())).toEqual({
             violations: [{ invariant: 0, message: 'run threw: boom' }],
             skipped: [1, 2, 3, 4, 5, 6],
         });
@@ -81,11 +81,11 @@ describe('lab templates', () => {
     test('regions by initial honors the contract and draws as bars and pie', () => {
         const definition = definitionOf(0);
         const [options, columns] = inputsOf(0);
-        expect(next.checkTransformReport(definition, regions(), options, columns)).toEqual({ violations: [], skipped: [] });
+        expect(autkPlot.checkTransformReport(definition, regions(), options, columns)).toEqual({ violations: [], skipped: [] });
 
-        next.registerTransform(definition);
+        autkPlot.registerTransform(definition);
         for (const type of ['barchart', 'pie'] as const) {
-            const plot = new next.AutkPlot(document.createElement('div'), {
+            const plot = new autkPlot.AutkPlot(document.createElement('div'), {
                 type,
                 collection: regions(),
                 attributes: { axis: [...columns, '@transform'] },
@@ -100,10 +100,10 @@ describe('lab templates', () => {
     test('complaints by weekday honors the contract and keeps the week order', () => {
         const definition = definitionOf(1);
         const [options, columns] = inputsOf(1);
-        expect(next.checkTransformReport(definition, withEvents(), options, columns)).toEqual({ violations: [], skipped: [] });
+        expect(autkPlot.checkTransformReport(definition, withEvents(), options, columns)).toEqual({ violations: [], skipped: [] });
 
-        next.registerTransform(definition);
-        const plot = new next.AutkPlot(document.createElement('div'), {
+        autkPlot.registerTransform(definition);
+        const plot = new autkPlot.AutkPlot(document.createElement('div'), {
             type: 'linechart',
             collection: withEvents(),
             attributes: { axis: [...columns, '@transform'] },
@@ -121,7 +121,7 @@ describe('lab templates', () => {
 
     test('the broken example is refused on the inverse query and the sums', () => {
         const [options, columns] = inputsOf(2);
-        const report = next.checkTransformReport(definitionOf(2), regions(), options, columns);
+        const report = autkPlot.checkTransformReport(definitionOf(2), regions(), options, columns);
         expect(new Set(report.violations.map(v => v.invariant))).toEqual(new Set([4, 6]));
     });
 });
@@ -147,7 +147,7 @@ describe('lab controls', () => {
         click();
         expect(checks()).toEqual(['pass', 'pass', 'pass', 'pass', 'pass', 'pass']);
         expect(drawn[drawn.length - 1]).toMatchObject({ type: 'barchart', transform: { preset: 'registered', name: LAB_TRANSFORM } });
-        expect(next.registeredTransform(LAB_TRANSFORM).shape).toBe('category-value');
+        expect(autkPlot.registeredTransform(LAB_TRANSFORM).shape).toBe('category-value');
     });
 
     test('the broken template is not drawn, and the failed invariants are shown', () => {
@@ -173,7 +173,7 @@ describe('lab controls', () => {
         expect(drawn[drawn.length - 1]).toMatchObject({ type: 'linechart', attributes: { axis: ['noise_daily', '@transform'] } });
 
         // Each day: the complaints of that day over the regions (every region has every day).
-        const series = next.run(collection.features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[],
+        const series = autkPlot.run(collection.features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[],
             { preset: 'reduce-series', options: { timestamp: 'day', value: 'complaints', reducer: 'avg' } }, ['noise_daily']);
         const total = collection.features.reduce((sum, f) => sum + (f.properties!.sjoin.collect.noise as unknown[]).length, 0);
         const days = (collection.features[0].properties!.noise_daily as unknown[]).length;

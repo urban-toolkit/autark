@@ -19,8 +19,9 @@
 
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
-import type { AutkDatum, PartialDesign, PlotType, UnifiedPlotConfig } from '../src';
+import * as autkPlot from '../src';
+import * as geometry from '../src/plots/partial-design';
+import type { AutkDatum, HighlightDesign, PlotType, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
 import { effectiveSector, installSvgBBox } from './svg-geometry';
@@ -66,7 +67,7 @@ const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(tolerance.re
 
 /** Point through an element's own transform. */
 function through(element: Element, x: number, y: number): [number, number] {
-    const [a, , , d, e, f] = next.ownMatrix(element);
+    const [a, , , d, e, f] = geometry.ownMatrix(element);
     return [a * x + e, d * y + f];
 }
 const num = (element: Element, name: string) => Number(element.getAttribute(name));
@@ -98,49 +99,49 @@ const polygonArea = (p: [number, number][]) => Math.abs(p.reduce((s, [x, y], i) 
 const polygonCenter = (p: [number, number][]) => [p.reduce((s, q) => s + q[0], 0) / p.length, p.reduce((s, q) => s + q[1], 0) / p.length];
 
 /** Whether a built-in partial mark draws the part the automatic rule would draw. */
-function agrees(mark: Element, partial: Element, design: PartialDesign, r: number, selected: Set<number>, unitValue: (feature: number) => number): boolean {
+function agrees(mark: Element, partial: Element, design: HighlightDesign, r: number, selected: Set<number>, unitValue: (feature: number) => number): boolean {
     const clamped = Math.min(1, Math.max(0, r));
     if (!(partial instanceof SVGElement)) {
         // HTML: the same fill direction and stops as the automatic fill.
         const parse = (fill: string) => [/linear-gradient\((to \w+)/.exec(fill)?.[1], ...Array.from(fill.matchAll(/([\d.]+)%/g), m => Number(m[1]))];
         const [direction, ...stops] = parse((partial as HTMLElement).style.backgroundImage);
-        const [expected, ...expectedStops] = parse(next.htmlFill(design, r, 'red'));
+        const [expected, ...expectedStops] = parse(geometry.htmlFill(design, r, 'red'));
         return direction === expected && stops.length === expectedStops.length && stops.every((s, i) => close(s as number, expectedStops[i] as number));
     }
-    switch (design.rule) {
+    // Parameters of the design, whatever its mode.
+    const spec = design as unknown as { axis?: 'x' | 'y' | 'radial'; anchor?: 'start' | 'end' | 'center'; baseline?: number; shape?: 'flow' | 'ribbon'; scale?: { a: number; k: number; fields: [string, string] } };
+    switch (geometry.ruleOf(design)) {
+        case 'whole':
+            return true;
         case 'units':
             return selected.has(Number(partial.getAttribute('data-autk-feature')));
         case 'length': {
             const m = boxOf(mark);
             const p = boxOf(partial);
             if (!m || !p) return false;
-            const [start, size, pStart, pSize, cross, pCross] = design.axis === 'y'
+            const [start, size, pStart, pSize, cross, pCross] = spec.axis === 'y'
                 ? [m.y, m.h, p.y, p.h, m.w, p.w]
                 : [m.x, m.w, p.x, p.w, m.h, p.h];
-            const anchor = design.anchor === 'start' ? start : design.anchor === 'center' ? start + size / 2 : start + size;
-            const pAnchor = design.anchor === 'start' ? pStart : design.anchor === 'center' ? pStart + pSize / 2 : pStart + pSize;
+            const anchor = spec.anchor === 'start' ? start : spec.anchor === 'center' ? start + size / 2 : start + size;
+            const pAnchor = spec.anchor === 'start' ? pStart : spec.anchor === 'center' ? pStart + pSize / 2 : pStart + pSize;
             return close(pSize, size * r) && close(pAnchor, anchor) && close(pCross, cross);
         }
         case 'angle': {
+            // The subset render: the sector of the subset's value, from the same start, on the same ring.
             const m = effectiveSector(mark);
-            // As drawn: a partial slice may be its slice clipped by a circle.
             const p = effectiveSector(partial);
             if (!m || !p) return false;
-            if (design.mode === 'sweep') {
-                return close(p.start, m.start) && close(p.inner, m.inner) && close(p.outer, m.outer) && close(p.sweep, m.sweep * clamped);
-            }
-            return close(p.sweep, m.sweep) && close(p.inner, m.inner)
-                && close((p.outer ** 2 - m.inner ** 2) / (m.outer ** 2 - m.inner ** 2), clamped);
+            return close(p.start, m.start) && close(p.inner, m.inner) && close(p.outer, m.outer) && close(p.sweep, m.sweep * clamped);
         }
         case 'band': {
-            if (design.mode === 'flow') {
-                const m = next.parseFlow(mark.getAttribute('d'));
-                const p = next.parseFlow(partial.getAttribute('d'));
+            if (spec.shape === 'flow') {
+                const m = geometry.parseFlow(mark.getAttribute('d'));
+                const p = geometry.parseFlow(partial.getAttribute('d'));
                 if (!m || !p) return false;
                 return m.edge.flat().every((v, i) => close(p.edge.flat()[i], v)) && close(p.offset[0], m.offset[0] * clamped) && close(p.offset[1], m.offset[1] * clamped);
             }
-            const m = next.parseRibbon(mark.getAttribute('d'));
-            const p = next.parseRibbon(partial.getAttribute('d'));
+            const m = geometry.parseRibbon(mark.getAttribute('d'));
+            const p = geometry.parseRibbon(partial.getAttribute('d'));
             if (!m || !p) return false;
             return close(p.radius, m.radius)
                 && close(p.source[0], m.source[0]) && close(p.source[1], m.source[1] * clamped)
@@ -148,13 +149,13 @@ function agrees(mark: Element, partial: Element, design: PartialDesign, r: numbe
         }
         case 'members': {
             const m = boxOf(mark);
-            if (!m || !design.scale || partial.tagName.toLowerCase() !== 'circle') return false;
+            if (!m || !spec.scale || partial.tagName.toLowerCase() !== 'circle') return false;
             const feature = Number(partial.getAttribute('data-autk-feature'));
-            const [band, middle] = design.axis === 'y' ? [m.w, m.x + m.w / 2] : [m.h, m.y + m.h / 2];
-            const along = design.scale.a + design.scale.k * unitValue(feature);
-            const across = middle + next.memberOffset(feature, band);
+            const [band, middle] = spec.axis === 'y' ? [m.w, m.x + m.w / 2] : [m.h, m.y + m.h / 2];
+            const along = spec.scale.a + spec.scale.k * unitValue(feature);
+            const across = middle + geometry.memberOffset(feature, band);
             const [cx, cy] = [num(partial, 'cx'), num(partial, 'cy')];
-            return selected.has(feature) && close(design.axis === 'y' ? cy : cx, along) && close(design.axis === 'y' ? cx : cy, across);
+            return selected.has(feature) && close(spec.axis === 'y' ? cy : cx, along) && close(spec.axis === 'y' ? cx : cy, across);
         }
         case 'width':
             return close(Number(partial.getAttribute('stroke-width') ?? (partial as SVGElement).style.strokeWidth), Number(mark.getAttribute('stroke-width') ?? (mark as SVGElement).style.strokeWidth) * clamped);
@@ -165,9 +166,9 @@ function agrees(mark: Element, partial: Element, design: PartialDesign, r: numbe
             const p = boxOf(partial);
             if (!m || !p) return false;
             const [cx, cy, px, py] = [m.x + m.w / 2, m.y + m.h / 2, p.x + p.w / 2, p.y + p.h / 2];
-            const b = design.baseline ?? 0;
-            if (design.axis === 'radial') return close(px, r * cx) && close(py, r * cy);
-            return design.axis === 'y' ? close(py, b + r * (cy - b)) && close(px, cx) : close(px, b + r * (cx - b)) && close(py, cy);
+            const b = spec.baseline ?? 0;
+            if (spec.axis === 'radial') return close(px, r * cx) && close(py, r * cy);
+            return spec.axis === 'y' ? close(py, b + r * (cy - b)) && close(px, cx) : close(px, b + r * (cx - b)) && close(py, cy);
         }
         case 'area':
         case 'glyph': {
@@ -185,20 +186,27 @@ function agrees(mark: Element, partial: Element, design: PartialDesign, r: numbe
 }
 
 /** Parts measured and parts that agree, per mark family. */
-type Family = { design: PartialDesign; measured: number; agreed: number; near: number };
+type Family = { design: HighlightDesign; measured: number; agreed: number; near: number };
 type Row = { type: string; families: Family[]; measured: number; agreed: number };
 
 function evaluate(type: Exclude<PlotType, 'registered'>): Row {
     const div = document.createElement('div');
     document.body.append(div);
     const data = collection();
-    const plot = new next.AutkPlot(div, { type, collection: data, events: [next.PlotEvent.CLICK], ...CONFIGS[type] } as UnifiedPlotConfig);
+    const plot = new autkPlot.AutkPlot(div, { type, collection: data, events: [autkPlot.PlotEvent.CLICK], ...CONFIGS[type] } as UnifiedPlotConfig);
+    // At the configured margins, held: where there is a layout, a margin grows to clear an axis
+    // title (see axis-titles), and the hexagons of binning-hex follow the drawing area, so the
+    // number of parts would depend on the environment. The inference is compared the same either way.
+    const held = plot.instance as unknown as { _growingMargins: boolean; _margins: object; _configuredMargins: object };
+    held._growingMargins = true;
+    held._margins = { ...held._configuredMargins };
+    plot.draw();
     const instance = plot.instance as unknown as {
         renderAxisAttributes: string[];
         aggregatesRows: boolean;
         _colorProperty: 'fill' | 'stroke';
-        segregatedParts(): next.SegregatedPart[];
-        _provenance: next.ProvenanceModel;
+        segregatedParts(): autkPlot.SegregatedPart[];
+        _provenance: autkPlot.ProvenanceModel;
     };
     const marks = Array.from(div.querySelectorAll<SVGGraphicsElement>('.autkMark'));
     const field = instance.renderAxisAttributes[1] ?? 'value';
@@ -206,7 +214,7 @@ function evaluate(type: Exclude<PlotType, 'registered'>): Row {
         const value = Number((row as Record<string, unknown>)[field]);
         return Number.isFinite(value) ? value : Number((row as Record<string, unknown>).value);
     };
-    const designs = next.inferPartialDesign(marks, valueOf, instance.aggregatesRows, instance._colorProperty);
+    const designs = geometry.inferHighlight(marks, valueOf, instance.aggregatesRows, instance._colorProperty);
 
     const half = data.features.map((_f, i) => i).filter(i => i % 2 === 0);
     if (instance.aggregatesRows) plot.setSelection(half);
@@ -222,11 +230,11 @@ function evaluate(type: Exclude<PlotType, 'registered'>): Row {
         const mark = sameId.find(m => m.tagName === partial.tagName) ?? sameId[0];
         const part = id ? parts.get(id) : undefined;
         if (!mark || !part) continue;
-        const family = families.find(f => f.design.kind === next.markKindOf(mark, instance._colorProperty));
+        const family = families.find(f => f.design.kind === geometry.markKindOf(mark, instance._colorProperty));
         if (!family) continue;
         family.measured += 1;
         const unitValue = (feature: number) => instance._provenance.contributions.find(u => u.target === id!.slice('mark:'.length) && u.source === `feature:${feature}`)?.value ?? NaN;
-        const check = () => agrees(mark, partial, family.design, next.ratioOf(part, family.design.rule), new Set(half), unitValue);
+        const check = () => agrees(mark, partial, family.design, geometry.ratioOf(part, geometry.ruleOf(family.design)), new Set(half), unitValue);
         tolerance = EXACT;
         if (check()) family.agreed += 1;
         tolerance = NEAR;
@@ -257,7 +265,7 @@ describe('automatic designs against the built-in catalog', () => {
     });
 
     test('each plot gets the expected rule', () => {
-        const rules = Object.fromEntries(rows.map(r => [r.type, r.families.map(f => `${f.design.kind}:${f.design.rule}`).sort().join(' ')]));
+        const rules = Object.fromEntries(rows.map(r => [r.type, r.families.map(f => `${f.design.kind}:${geometry.ruleOf(f.design)}`).sort().join(' ')]));
         expect(rules).toMatchObject({
             barchart: 'rect:length', stackedbar: 'rect:length', violin: 'rect:length', pareto: 'point:position rect:length',
             linechart: 'point:position', areachart: 'point:position', ecdf: 'point:position', density: 'point:position', radar: 'point:position',
@@ -266,15 +274,15 @@ describe('automatic designs against the built-in catalog', () => {
             'parallel-coordinates': 'stroke:trace', waffle: 'rect:units', table: 'html:glyph',
             scatterplot: 'point:glyph', bubble: 'point:glyph', heatmatrix: 'rect:glyph', calendar: 'rect:glyph', treemap: 'rect:glyph', hexbin: 'shape:glyph',
         });
-        // Thick rings show the inner sector; the thin chord arcs show the leading share of the sweep.
-        const angle = (type: string) => rows.find(r => r.type === type)!.families.find(f => f.design.rule === 'angle')!.design.mode;
-        expect(['pie', 'donut', 'sunburst', 'chord'].map(angle)).toEqual(['radial', 'radial', 'radial', 'sweep']);
+        // Thick rings and thin arcs alike are a subset render: the same start and ring, the subset's sweep.
+        const angle = (type: string) => rows.find(r => r.type === type)!.families.find(f => f.design.kind === 'sector')!.design.mode;
+        expect(['pie', 'donut', 'sunburst', 'chord'].map(angle)).toEqual(['subset', 'subset', 'subset', 'subset']);
     });
 
     test('Sankey nodes grow from the top, and HTML table rows fill from the left to their share', () => {
         const sankey = rows.find(r => r.type === 'sankey')!;
-        expect(sankey.families.find(f => f.design.kind === 'rect')!.design).toMatchObject({ rule: 'length', axis: 'y', anchor: 'start' });
+        expect(sankey.families.find(f => f.design.kind === 'rect')!.design).toMatchObject({ mode: 'subset', channel: 'length', axis: 'y', anchor: 'start' });
         const table = rows.find(r => r.type === 'table')!;
-        expect(table.families).toMatchObject([{ design: { kind: 'html', rule: 'glyph' }, measured: 38, agreed: 38 }]);
+        expect(table.families).toMatchObject([{ design: { kind: 'html', mode: 'custom', preset: 'glyph' }, measured: 38, agreed: 38 }]);
     });
 });

@@ -1,14 +1,14 @@
 /**
  * Provenance model: stages, relations, cardinalities, and contributions.
  *
- * Reproduces the e04 histogram-brush results inside the real `AutkPlot`, and
- * checks that the explicit relations agree with the `autkIds` the original
- * pipeline accumulates, for every transform preset.
+ * Reproduces the histogram-brush example of the gallery inside `AutkPlot`, and
+ * checks that the explicit relations agree with the `autkIds` the transforms
+ * accumulate, for every transform preset.
  */
 
 import { describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, PlotTransformConfig, ProvenancePair } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents, withSyntheticSeries } from './fixtures';
@@ -22,28 +22,29 @@ function sourceRows(collection: Collection): AutkDatum[] {
 
 /** Builds the provenance graph of a transform run, as `PlotBaseData` does. */
 function modelOf(collection: Collection, config: PlotTransformConfig, columns: string[]) {
-    const executed = next.run(sourceRows(collection), config, columns);
-    const d0 = { name: 'D0', label: 'features', ids: collection.features.map((_f, i) => next.featureId(i)) };
+    const executed = autkPlot.run(sourceRows(collection), config, columns);
+    const d0 = { name: 'D0', label: 'features', ids: collection.features.map((_f, i) => autkPlot.featureId(i)) };
     const { stages, relations, contributions, reducer, rowIds } = executed.provenance;
-    return { executed, rowIds, model: new next.ProvenanceModel([d0, ...stages], relations, contributions, reducer) };
+    return { executed, rowIds, model: new autkPlot.ProvenanceModel([d0, ...stages], relations, contributions, reducer) };
 }
 
 const featureIndices = (ids: string[]) => ids.map(id => Number(id.slice('feature:'.length))).sort((a, b) => a - b);
 
-const histogram = (): next.UnifiedPlotConfig => ({
+const histogram = (): autkPlot.UnifiedPlotConfig => ({
     type: 'barchart',
     collection: loadGalleryCollection('mnt_neighs_proj.geojson'),
     attributes: { axis: ['shape_area', '@transform'] },
     transform: { preset: 'binning-1d', options: { bins: 10 } },
-    events: [next.PlotEvent.CLICK],
+    events: [autkPlot.PlotEvent.CLICK],
 });
 
-describe('e04 histogram-brush scenario inside AutkPlot', () => {
-    const plot = new next.AutkPlot(document.createElement('div'), histogram());
+describe('the histogram-brush example of the gallery', () => {
+    const plot = new autkPlot.AutkPlot(document.createElement('div'), histogram());
     const { stages, cardinalities } = plot.provenance;
 
-    test('stage sizes are D0 38, D1 10, D2 9, M 9', () => {
-        expect(stages.map(stage => [stage.name, stage.ids.length])).toEqual([['D0', 38], ['D1', 10], ['D2', 9], ['M', 9]]);
+    // The empty range (bin 8) is a row too, with no feature: the axis does not skip it.
+    test('stage sizes are D0 38, D1 10, D2 10, M 10', () => {
+        expect(stages.map(stage => [stage.name, stage.ids.length])).toEqual([['D0', 38], ['D1', 10], ['D2', 10], ['M', 10]]);
     });
 
     test('feature 0 follows bin:4 → aggregate:4 → mark:aggregate:4', () => {
@@ -58,9 +59,11 @@ describe('e04 histogram-brush scenario inside AutkPlot', () => {
         expect(featureIndices(path[3].ids)).toEqual([0, 7, 8, 10, 26, 29]);
     });
 
-    test('bin 8 belongs to D1 but has no aggregate', () => {
+    test('bin 8 is empty: its aggregate is a mark of value 0 that no feature reaches', () => {
         expect(stages[1].ids).toContain('bin:8');
-        expect(plot.provenance.relations[1].pairs.some(pair => pair.source === 'bin:8')).toBe(false);
+        expect(plot.provenance.relations[0].pairs.some(pair => pair.target === 'bin:8')).toBe(false);
+        expect(plot.provenance.relations[1].pairs.filter(pair => pair.source === 'bin:8').map(pair => pair.target)).toEqual(['aggregate:8']);
+        expect(plot.provenance.inverse(['mark:aggregate:8'])[3].ids).toEqual([]);
     });
 
     test('cardinalities are N:1, 1:1, 1:1 and N:1 overall', () => {
@@ -117,7 +120,7 @@ describe('cardinalities and multiplicity', () => {
     });
 
     test('a plot without transform is one-to-one from features to marks', () => {
-        const plot = new next.AutkPlot(document.createElement('div'), {
+        const plot = new autkPlot.AutkPlot(document.createElement('div'), {
             type: 'scatterplot',
             collection: loadGalleryCollection('mnt_neighs_proj.geojson'),
             attributes: { axis: ['shape_area', 'shape_leng'] },
@@ -149,9 +152,9 @@ describe('contribution of a selection to a mark', () => {
 });
 
 describe('segregated barchart', () => {
-    const render = (config: Partial<next.UnifiedPlotConfig> = {}) => {
+    const render = (config: Partial<autkPlot.UnifiedPlotConfig> = {}) => {
         const div = document.createElement('div');
-        const plot = new next.AutkPlot(div, { ...histogram(), ...config });
+        const plot = new autkPlot.AutkPlot(div, { ...histogram(), ...config });
         const bar = (mark: string) => div.querySelector<SVGRectElement>(`.autkMark[data-autk-provenance="${mark}"]`)!;
         const partials = () => Array.from(div.querySelectorAll<SVGRectElement>('.autkPartial'));
         const height = (node: Element) => effectiveBox(node)!.height;
@@ -167,7 +170,7 @@ describe('segregated barchart', () => {
         expect(part.getAttribute('data-autk-provenance')).toBe('mark:aggregate:4');
         expect(part.getAttribute('data-autk-units')).toBe('1/6');
         expect(height(part)).toBeCloseTo(height(bar('mark:aggregate:4')) / 6);
-        expect(bar('mark:aggregate:4').style.fill).not.toBe(next.PlotStyle.highlight);
+        expect(bar('mark:aggregate:4').style.fill).not.toBe(autkPlot.PlotStyle.highlight);
     });
 
     test('two selected features fill 2/6 and clearing removes the part', () => {
@@ -198,10 +201,10 @@ describe('segregated barchart', () => {
         const hex = (color: string) => '#' + (color.match(/\d+/g) ?? []).map(n => Number(n).toString(16).padStart(2, '0')).join('');
         const segregated = render();
         segregated.plot.setSelection([0]);
-        expect(hex(segregated.partials()[0].style.fill)).toBe(next.PlotStyle.provenance);
+        expect(hex(segregated.partials()[0].style.fill)).toBe(autkPlot.PlotStyle.provenance);
 
         const local = render();
         local.div.querySelectorAll('.autkMark')[4].dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        expect(hex(local.bar('mark:aggregate:4').style.fill)).toBe(next.PlotStyle.provenance);
+        expect(hex(local.bar('mark:aggregate:4').style.fill)).toBe(autkPlot.PlotStyle.provenance);
     });
 });

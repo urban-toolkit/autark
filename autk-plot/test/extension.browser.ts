@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
-import * as next from '../src';
+import * as autkPlot from '../src';
 import type { AutkDatum, PlotEventData, PlotTransformConfig, TransformDefinition, UnifiedPlotConfig } from '../src';
 
 import { movingAverage } from '../../usecases/src/provenance/moving-average';
@@ -27,7 +27,7 @@ const byInitial: TransformDefinition = {
     shape: 'category-value',
     run(rows, _options, columns) {
         const attr = columns[0] ?? 'ntaname';
-        const buckets = next.collectBuckets({
+        const buckets = autkPlot.collectBuckets({
             rows,
             bucketOf: row => String(row[attr] ?? '').charAt(0).toUpperCase() || null,
             // Counting: no value per row (see collectBuckets on valueOf).
@@ -37,14 +37,14 @@ const byInitial: TransformDefinition = {
         const keys = buckets.map(b => b.key);
         return {
             rows: buckets.map(b => ({ label: b.key, value: b.value, autkIds: b.autkIds })) as AutkDatum[],
-            provenance: next.binnedProvenance({ rows, buckets, bins: next.indexedBins(keys, keys, 'initial'), binLabel: 'initials', rowKeys: keys, reducer: 'count' }),
+            provenance: autkPlot.binnedProvenance({ rows, buckets, bins: autkPlot.indexedBins(keys, keys, 'initial'), binLabel: 'initials', rowKeys: keys, reducer: 'count' }),
         };
     },
 };
 
 function mount(config: UnifiedPlotConfig) {
     const div = document.createElement('div');
-    const plot = new next.AutkPlot(div, config);
+    const plot = new autkPlot.AutkPlot(div, config);
     const rows = () => plot.instance['_data'] as unknown as Array<Record<string, unknown> & { autkIds: number[] }>;
     const rowId = (row: unknown) => plot.instance['rowIdOf'](row) as string;
     const partialOf = (row: unknown) => Array.from(div.querySelectorAll('.autkPartial'))
@@ -53,20 +53,20 @@ function mount(config: UnifiedPlotConfig) {
 }
 
 beforeEach(() => {
-    next.registerTransform(movingAverage);
-    next.registerTransform(byInitial);
+    autkPlot.registerTransform(movingAverage);
+    autkPlot.registerTransform(byInitial);
 });
 afterEach(() => {
-    next.unregisterTransform(movingAverage.name);
-    next.unregisterTransform(byInitial.name);
+    autkPlot.unregisterTransform(movingAverage.name);
+    autkPlot.unregisterTransform(byInitial.name);
 });
 
 describe('registry', () => {
     test('a name can be registered once; unknown names and shapes are rejected clearly', () => {
-        expect(() => next.registerTransform(movingAverage)).toThrow(/already registered/);
-        expect(() => next.registerTransform({ ...byInitial, name: 'x', shape: 'matrix' as never })).toThrow(/unknown row shape/);
-        expect(() => next.registerTransform({ ...byInitial, name: ' ' })).toThrow(/non-empty name/);
-        expect(() => mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: { ...MA, name: 'nope' } })).toThrow(/No transform is registered as "nope"/);
+        expect(() => autkPlot.registerTransform(movingAverage)).toThrow(/already registered/);
+        expect(() => autkPlot.registerTransform({ ...byInitial, name: 'x', shape: 'matrix' as never })).toThrow(/unknown row shape/);
+        expect(() => autkPlot.registerTransform({ ...byInitial, name: ' ' })).toThrow(/non-empty name/);
+        expect(() => mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: { ...MA, name: 'nope' } })).toThrow(/registeredTransform: no transform is registered as "nope"/);
     });
 
     test('plots accept only the row shapes they can read', () => {
@@ -77,7 +77,7 @@ describe('registry', () => {
 
 describe('a transform registered outside the core: moving average', () => {
     test('honors the contract', () => {
-        expect(next.checkTransform(movingAverage, withEvents(), MA.options, ['sjoin.collect.noise'])).toEqual([]);
+        expect(autkPlot.checkTransform(movingAverage, withEvents(), MA.options, ['sjoin.collect.noise'])).toEqual([]);
     });
 
     test('each day averages the events of its 7-day window', () => {
@@ -102,9 +102,9 @@ describe('a transform registered outside the core: moving average', () => {
     });
 
     test('a selected day covers each region by the exact share of its event weight', () => {
-        const { div, plot, rowId } = mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: MA, events: [next.PlotEvent.CLICK] });
+        const { div, plot, rowId } = mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: MA, events: [autkPlot.PlotEvent.CLICK] });
         const emitted: PlotEventData[] = [];
-        plot.events.on(next.PlotEvent.CLICK, data => emitted.push(data));
+        plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
         const marks = Array.from(div.querySelectorAll('.autkMark'));
         const rows = () => marks.map(m => (m as unknown as { __data__: { bucket: string; autkIds: number[] } }).__data__);
         const index = rows().findIndex(r => r.autkIds.length > 0);
@@ -129,11 +129,11 @@ describe('a transform built from the public blocks: regions by initial', () => {
         collection: regions(),
         attributes: { axis: ['ntaname', '@transform'] },
         transform: { preset: 'registered', name: 'by-initial' },
-        events: [next.PlotEvent.CLICK],
+        events: [autkPlot.PlotEvent.CLICK],
     });
 
     test('honors the contract and draws in the barchart and the pie', () => {
-        expect(next.checkTransform(byInitial, regions(), {}, ['ntaname'])).toEqual([]);
+        expect(autkPlot.checkTransform(byInitial, regions(), {}, ['ntaname'])).toEqual([]);
         for (const type of ['barchart', 'pie'] as const) {
             const { div, rows } = mount(initial(type));
             expect(div.querySelectorAll('.autkMark')).toHaveLength(rows().length);
@@ -159,7 +159,7 @@ describe('the validator catches each broken invariant', () => {
             return out;
         },
     });
-    const check = (definition: TransformDefinition) => next.checkTransform(definition, withEvents(), MA.options, ['sjoin.collect.noise']).join('\n');
+    const check = (definition: TransformDefinition) => autkPlot.checkTransform(definition, withEvents(), MA.options, ['sjoin.collect.noise']).join('\n');
 
     test('row ids not aligned with rows', () => {
         expect(check(broken('a', out => { out.provenance.rowIds.pop(); }))).toMatch(/ids for \d+ rows/);
@@ -181,12 +181,12 @@ describe('the validator catches each broken invariant', () => {
     });
 
     test('plots refuse a malformed output at once, instead of drawing wrong marks', () => {
-        next.registerTransform(broken('malformed', out => { out.provenance.rowIds.pop(); }));
+        autkPlot.registerTransform(broken('malformed', out => { out.provenance.rowIds.pop(); }));
         try {
             expect(() => mount({ type: 'linechart', collection: withEvents(), attributes: events, transform: { preset: 'registered', name: 'malformed', options: MA.options } }))
                 .toThrow(/Transform "malformed": provenance.rowIds must have one id per row/);
         } finally {
-            next.unregisterTransform('malformed');
+            autkPlot.unregisterTransform('malformed');
         }
     });
 });
@@ -194,8 +194,8 @@ describe('the validator catches each broken invariant', () => {
 describe('public building blocks', () => {
     test('collectBuckets counts when valueOf is left out, as plain JavaScript callers do', () => {
         const rows = [{ k: 'a', autkIds: [0] }, { k: 'a', autkIds: [1] }, { k: 'b', autkIds: [2] }];
-        const options = { rows, bucketOf: (row: { k?: unknown }) => String(row.k), reducer: 'count' } as unknown as Parameters<typeof next.collectBuckets>[0];
-        expect(next.collectBuckets(options).map(b => [b.key, b.value])).toEqual([['a', 2], ['b', 1]]);
+        const options = { rows, bucketOf: (row: { k?: unknown }) => String(row.k), reducer: 'count' } as unknown as Parameters<typeof autkPlot.collectBuckets>[0];
+        expect(autkPlot.collectBuckets(options).map(b => [b.key, b.value])).toEqual([['a', 2], ['b', 1]]);
     });
 });
 
@@ -222,8 +222,8 @@ describe('conformance: every built-in preset honors the same contract', () => {
     for (const [label, config, columns, collection] of cases) {
         test(label, () => {
             const rows = collection().features.map((f, i) => ({ ...f.properties, autkIds: [i] })) as AutkDatum[];
-            const result = next.run(rows, config, columns);
-            expect(next.checkProvenance(rows.length, result.rows as AutkDatum[], result.provenance)).toEqual([]);
+            const result = autkPlot.run(rows, config, columns);
+            expect(autkPlot.checkProvenance(rows.length, result.rows as AutkDatum[], result.provenance)).toEqual([]);
         });
     }
 });

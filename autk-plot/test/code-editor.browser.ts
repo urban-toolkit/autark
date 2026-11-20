@@ -1,5 +1,5 @@
 /**
- * Colored code of Try it Yourself: the highlighted copy keeps the text
+ * Colored code of Try It Yourself: the highlighted copy keeps the text
  * exactly (so it lines up with the text area), marks the `// Autark` lines,
  * and colors Autark names, also inside strings.
  */
@@ -51,7 +51,7 @@ describe('highlightCode', () => {
             'const chart = {',
             "    name: 'chart',",
             "    label: 'Chart',",
-            "    design: { rect: { rule: 'glyph' } },",
+            "    highlight: { rect: { mode: 'custom', preset: 'glyph' } },",
             '    draw({ group, rows, width }) {',
             '        const x = d3.scaleBand(rows.map(label), [0, width]);',
             "        group.selectAll('rect').data(rows).join('rect')",
