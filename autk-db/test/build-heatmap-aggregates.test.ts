@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Feature } from 'geojson';
 import { loadDb } from '../src/duckdb-node';
 import { getRasterPayload } from '../src/raster-store';
-import type { BuildHeatmapParams } from '../src/use-cases/build-heatmap';
+import type { BuildHeatmapParams, HeatmapGroupBy } from '../src/use-cases/build-heatmap';
 
 const native = vi.hoisted(() => ({ db: undefined as AsyncDuckDB | undefined }));
 vi.mock('../src/duckdb', () => ({ loadDb: async () => native.db }));
@@ -93,6 +93,26 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     expect(table.bands).toEqual(count);
     expect(getRasterPayload(db.getCurrentWorkspace(), 'counted')!.bands).toEqual(count);
     expect(bandsOf('counted')).toEqual({ count_readings: [1, 2, 0, 3, 1, 2] });
+  });
+
+  // The type leaves out `collect`, but a JavaScript caller or a spec that was not type checked can pass it.
+  it.each<[string, { column: string; aggregateFn?: string }]>([
+    ['no aggregateFn', { column: 'value' }],
+    ['aggregateFn "collect"', { column: 'value', aggregateFn: 'collect' }],
+  ])('refuses a groupBy entry with %s, naming its column and the aggregates that give a cell its value', async (given, entry) => {
+    await loadReadings(readings);
+    await expect(db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'heat', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      groupBy: [{ column: '*', aggregateFn: 'count' }, entry as HeatmapGroupBy],
+    })).rejects.toThrow(`Heatmap "heat": the groupBy entry for column "value" has ${given}, but a cell holds one value; `
+      + 'use count, weighted, sum, avg, min or max.');
+
+    // It is refused before the grid is built, so the workspace holds no table of that name.
+    const tables = await (db as any).conn.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = '${db.getCurrentWorkspace()}'`);
+    const names = tables.toArray().map((row: { table_name: string }) => row.table_name);
+    expect(names).toContain('readings');
+    expect(names).not.toContain('heat');
   });
 
   it('builds a normalized band from the values the join rescales from 0 to 1 across the cells', async () => {
