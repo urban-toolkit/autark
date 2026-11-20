@@ -69,6 +69,14 @@ export interface LoadTerrainParams extends Omit<EnableTerrainTilesParams, 'sourc
 }
 
 /**
+ * Builds the content of a map tooltip for the feature under the pointer.
+ *
+ * It gets the feature's component id (its position in the layer) and returns the content: a string, shown as text, or
+ * an element for richer content, or `null` for no tooltip. Content is never interpreted as HTML.
+ */
+export type TooltipProvider = (componentId: number) => string | HTMLElement | null;
+
+/**
  * A rectangle `[minX, minY, maxX, maxY]` in the coordinate system of the data the map was given (the workspace
  * coordinate system, in meters, for data from `AutkDb`), not relative to the map origin.
  */

@@ -53,7 +53,8 @@ import {
 } from '@urban-toolkit/autk-core';
 
 import type { ElevationValidationStats } from '@urban-toolkit/autk-core';
-import type { MapEventRecord } from './types-events';
+import { MapEvent } from './types-events';
+import type { HoverEventData, MapEventRecord } from './types-events';
 
 import {
     LayerData,
@@ -68,6 +69,7 @@ import {
     LoadMeshParams,
     MapBounds,
     MapDrawOptions,
+    TooltipProvider,
     UpdateColorMapParams,
     UpdateRenderInfoParams,
     UpdateRasterParams,
@@ -985,6 +987,9 @@ export class AutkMap {
         }
         layer.updateLayerRenderInfo(nextInfo);
 
+        // A tooltip showing for a layer that has just been hidden would stay on screen with nothing under it.
+        if ('isSkip' in info && this._tooltip?.layerId === id) { this._ui.hideTooltip(); }
+
         if (needsLegend) { this._ui.refreshLegend(layer); }
         if (needsLayerList) { this._ui.refreshLayerList(); }
         if ('isSkip' in nextInfo && layer.layerInfo.typeLayer === 'tiles') { this.refreshAttribution(); }
@@ -1040,6 +1045,98 @@ export class AutkMap {
         }
 
         layer.clearHighlightedIds();
+    }
+
+    /**
+     * Turns hover tracking on or off.
+     *
+     * While it is on, the map reads the feature of the pick layer under the pointer as the pointer moves over the canvas,
+     * and emits {@link MapEvent.HOVER} with it. It reads at most about ten times a second (each read renders one frame),
+     * waits until the pointer moves again, and stops while the map is dragged or zoomed. It needs a layer with picking
+     * on. Off by default, so a map that does not use it pays nothing.
+     *
+     * @param enabled Whether to track the pointer.
+     * @returns Nothing.
+     * @example
+     * map.updateRenderInfo('parks', { isPick: true });
+     * map.setHover(true);
+     * map.events.on(MapEvent.HOVER, ({ id }) => console.log(id));
+     */
+    setHover(enabled: boolean): void {
+        this._mouseEvents.setHoverEnabled(enabled);
+    }
+
+    /**
+     * Shows a tooltip beside the pointer for the features of a layer, or removes it.
+     *
+     * `provider` is called with the component id of the feature under the pointer (see {@link TooltipProvider}) and
+     * returns what to show, or `null` for nothing. The tooltip follows the pointer, appears for features of that layer
+     * only, and hides when the pointer leaves the canvas or the view moves. It needs picking on the layer, so this turns
+     * it on (a double click then also selects), and it turns hover tracking on; picking is exclusive, so another layer
+     * given picking later takes the tooltip's layer off it. Pass `null` to remove the tooltip and stop the hover
+     * tracking. Unknown layers are ignored. Nothing is shown for a layer that is not drawn.
+     *
+     * @param layerId Layer identifier.
+     * @param provider Builds the tooltip content for a feature, or `null` to remove the tooltip.
+     * @returns Nothing.
+     * @throws Never throws. An error in `provider` is logged and hides the tooltip.
+     * @example
+     * map.setTooltip('parks', (id) => `${names[id]}: ${areas[id].toFixed(1)} ha`);
+     */
+    setTooltip(layerId: string, provider: TooltipProvider | null): void {
+        if (provider === null) {
+            this._tooltip = null;
+            this.setHover(false);
+            this._ui.hideTooltip();
+            return;
+        }
+        if (!this._layerManager.searchByLayerId(layerId)) { return; }
+
+        this._tooltip = { layerId, provider };
+        this.updateRenderInfo(layerId, { isPick: true });
+        this.setHover(true);
+        if (!this._tooltipListener) {
+            this._tooltipListener = (hover) => this.showHoverTooltip(hover);
+            this._mapEvents.on(MapEvent.HOVER, this._tooltipListener);
+        }
+    }
+
+    /** The tooltip set by {@link setTooltip}, if any. */
+    private _tooltip: { layerId: string; provider: TooltipProvider } | null = null;
+    /** Listener on the hover event, registered the first time a tooltip is set. */
+    private _tooltipListener: ((hover: HoverEventData) => void) | null = null;
+
+    /** Shows or hides the tooltip for a hover result. */
+    private showHoverTooltip({ layerId, id, x, y }: HoverEventData): void {
+        const tooltip = this._tooltip;
+        if (!tooltip || id === null || layerId !== tooltip.layerId) {
+            this._ui.hideTooltip();
+            return;
+        }
+        try {
+            const content = tooltip.provider(id);
+            if (content === null || content === '') {
+                this._ui.hideTooltip();
+            } else {
+                this._ui.showTooltip(content, x, y);
+            }
+        } catch (error) {
+            console.error(`Tooltip of layer "${layerId}": ${(error as Error).message}`);
+            this._ui.hideTooltip();
+        }
+    }
+
+    /**
+     * Reports that nothing is hovered any more: drops a hover read in flight and emits {@link MapEvent.HOVER} with
+     * `id: null`.
+     *
+     * The map calls it when the pointer leaves the canvas or the view moves.
+     *
+     * @returns Nothing.
+     */
+    clearHover(): void {
+        this._picking.invalidateHover();
+        this._mapEvents.emit(MapEvent.HOVER, { layerId: this.activePickingLayer?.layerInfo.id ?? '', id: null, x: 0, y: 0 });
     }
 
     /**

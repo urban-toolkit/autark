@@ -28,6 +28,8 @@ export type { TerrainDebugOptions } from './renderer-terrain';
 
 /** Parameter types for the main `AutkMap` loading and update APIs. */
 export type {
+    /** Builds the content of a map tooltip for a feature, from its component id. */
+    TooltipProvider,
     /** A rectangle `[minX, minY, maxX, maxY]` in the coordinates of the data given to the map. */
     MapBounds,
     MapOptions,
@@ -106,6 +108,6 @@ export type { MapStylePresetId, MapStyleShape } from './map-style';
 export { MapEvent, MouseStatus } from './types-events';
 
 /** Typed event payloads emitted by the map event bus. */
-export type { MapEventData, MapEventRecord } from './types-events';
+export type { HoverEventData, MapEventData, MapEventRecord } from './types-events';
 
 export type { ElevationValidationOptions, ElevationValidationStats } from '@urban-toolkit/autk-core';

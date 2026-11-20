@@ -34,6 +34,10 @@ export type PendingPick = {
     x: number;
     /** Y coordinate to read from the picking texture. */
     y: number;
+    /** `select` toggles the highlight and emits `picking`; `hover` only emits `hover`. */
+    kind: 'select' | 'hover';
+    /** For a hover, the epoch it was requested in; a result from an older one is dropped. */
+    epoch: number;
 };
 
 /**
@@ -76,19 +80,44 @@ export class MapPickingController {
      */
     consumePendingPick(): PendingPick | null {
         const activePickingLayer = this.layerManager.layers.find((layer) => layer.layerRenderInfo.isPick) ?? null;
-        if (!activePickingLayer || activePickingLayer.layerRenderInfo.isSkip || !activePickingLayer.layerRenderInfo.pickedComps) {
+        if (!activePickingLayer || activePickingLayer.layerRenderInfo.isSkip) {
             return null;
         }
 
-        const [x, y] = activePickingLayer.layerRenderInfo.pickedComps;
-        activePickingLayer.layerRenderInfo.pickedComps = undefined;
+        const info = activePickingLayer.layerRenderInfo;
+        const select = info.pickedComps;
+        const hover = info.hoverComps;
+        if (!select && !hover) {
+            return null;
+        }
+
+        // A pick the user asked for goes first; a hover waiting beside it is dropped, since the next move asks again.
+        const kind = select ? 'select' : 'hover';
+        const [x, y] = (select ?? hover) as number[];
+        info.pickedComps = undefined;
+        info.hoverComps = undefined;
 
         if (!(activePickingLayer instanceof VectorLayer) && !(activePickingLayer instanceof SpriteLayer)) {
-            activePickingLayer.clearHighlightedIds();
+            if (kind === 'select') {
+                activePickingLayer.clearHighlightedIds();
+            }
             return null;
         }
 
-        return { layer: activePickingLayer, pickableLayer: activePickingLayer, x, y };
+        return { layer: activePickingLayer, pickableLayer: activePickingLayer, x, y, kind, epoch: this._hoverEpoch };
+    }
+
+    /** Bumped when a hover result in flight should no longer be reported. */
+    private _hoverEpoch = 0;
+
+    /**
+     * Drops any hover read that is still in flight, so its result is not reported after the pointer has left or the view
+     * has moved.
+     *
+     * @returns Nothing.
+     */
+    invalidateHover(): void {
+        this._hoverEpoch++;
     }
 
     /**
@@ -103,7 +132,10 @@ export class MapPickingController {
     enqueuePickingReadback(pendingPick: PendingPick): number | null {
         const pickReadbackSlot = this.renderer.reservePickingReadbackSlot(1);
         if (pickReadbackSlot === null) {
-            console.warn('Picking readback buffers are still busy; skipping this picking frame.');
+            // A hover is asked for again a moment later, so a busy slot is ordinary there and not worth a warning.
+            if (pendingPick.kind !== 'hover') {
+                console.warn('Picking readback buffers are still busy; skipping this picking frame.');
+            }
             return null;
         }
 
@@ -132,6 +164,15 @@ export class MapPickingController {
         this.renderer.readPickingResults(pickReadbackSlot, 1).then((ids) => {
             const id = ids[0] ?? -1;
             const { layer, pickableLayer } = pendingPick;
+
+            if (pendingPick.kind === 'hover') {
+                if (pendingPick.epoch === this._hoverEpoch) {
+                    this.mapEvents.emit(MapEvent.HOVER, {
+                        layerId: layer.layerInfo.id, id: id >= 0 ? id : null, x: pendingPick.x, y: pendingPick.y,
+                    });
+                }
+                return;
+            }
 
             if (id >= 0) {
                 pickableLayer.toggleHighlightedIds([id]);

@@ -12,6 +12,9 @@
 import { MouseStatus } from './types-events';
 import { AutkMap } from './map';
 
+/** The fewest milliseconds between two hover reads; each one renders a frame. */
+const HOVER_INTERVAL_MS = 100;
+
 /**
  * Handles pointer interactions for the map canvas.
  *
@@ -39,6 +42,18 @@ export class MouseEvents {
     private _lastGestureCenter: number[] | null = null;
     /** Previous two-finger distance in canvas-local CSS pixels. */
     private _lastGestureDistance: number | null = null;
+
+    /** Whether the pointer is tracked for hover; see {@link AutkMap.setHover}. */
+    private _hoverEnabled = false;
+    /** Whether a hover was asked for (or its result may be on screen) since the pointer last left. */
+    private _hoverActive = false;
+    /** The pointer position of the latest move over the canvas, for the next hover read. */
+    private _hoverPoint: number[] | null = null;
+    /** When the last hover read was asked for, from `performance.now()`. */
+    private _lastHoverAt = -Infinity;
+    /** Pending trailing hover read, so the position the pointer stops at is read too. */
+    private _hoverTimer: ReturnType<typeof setTimeout> | null = null;
+    private _onPointerLeave: () => void;
 
     /** Bound wheel handler reference used for safe add/remove listener calls. */
     private _onWheel: (e: WheelEvent) => void;
@@ -76,6 +91,7 @@ export class MouseEvents {
         this._onContextMenu = this.contextMenu.bind(this);
         this._onPointerMove = this.pointerMove.bind(this);
         this._onDblClick = this.mouseDoubleClick.bind(this);
+        this._onPointerLeave = () => this._endHover();
     }
 
     /**
@@ -105,6 +121,7 @@ export class MouseEvents {
         canvas.addEventListener('wheel', this._onWheel, { passive: false });
         canvas.addEventListener('contextmenu', this._onContextMenu as any, false);
         canvas.addEventListener('dblclick', this._onDblClick, false);
+        canvas.addEventListener('pointerleave', this._onPointerLeave, false);
         document.addEventListener('pointerdown', this._onPointerDown, { capture: true });
         document.addEventListener('pointermove', this._onPointerMove, { capture: true });
         document.addEventListener('pointerup',   this._onPointerUp,   { capture: true });
@@ -130,6 +147,8 @@ export class MouseEvents {
         canvas.removeEventListener('wheel', this._onWheel);
         canvas.removeEventListener('contextmenu', this._onContextMenu as any);
         canvas.removeEventListener('dblclick', this._onDblClick);
+        canvas.removeEventListener('pointerleave', this._onPointerLeave);
+        this._endHover();
         document.removeEventListener('pointerdown', this._onPointerDown, { capture: true });
         document.removeEventListener('pointermove', this._onPointerMove, { capture: true });
         document.removeEventListener('pointerup',   this._onPointerUp,   { capture: true });
@@ -212,7 +231,11 @@ export class MouseEvents {
             this._status = MouseStatus.DRAG;
         }
 
-        if (this._status !== MouseStatus.DRAG) return;
+        if (this._status !== MouseStatus.DRAG) {
+            this._trackHover(event);
+            return;
+        }
+        this._endHover();
 
         const cssWidth = this._map.renderer.cssWidth;
         const cssHeight = this._map.renderer.cssHeight;
@@ -287,6 +310,7 @@ export class MouseEvents {
     mouseWheel(event: WheelEvent) {
         event.preventDefault();
         event.stopPropagation();
+        this._endHover();
 
         const rect = this._map.renderer.canvas.getBoundingClientRect();
         const x = (event.clientX - rect.left) / this._map.renderer.cssWidth;
@@ -392,6 +416,73 @@ export class MouseEvents {
             center: [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5],
             distance: Math.hypot(dx, dy),
         };
+    }
+
+    /**
+     * Turns hover tracking on or off. Turning it off ends a hover in progress.
+     *
+     * @param enabled Whether pointer moves over the canvas are read for hover.
+     * @returns Nothing.
+     */
+    setHoverEnabled(enabled: boolean): void {
+        this._hoverEnabled = enabled;
+        if (!enabled) {
+            this._endHover();
+        }
+    }
+
+    /**
+     * Follows the pointer for hover: reads the feature under it, but at most once per `HOVER_INTERVAL_MS`.
+     *
+     * The first move reads at once; moves inside the interval leave one trailing read, which uses the latest position, so
+     * the pointer is also read where it stops. A move over anything but the canvas (an overlay, the legend) ends the hover.
+     * Touch input has no hover.
+     *
+     * @param event Pointer move with no button down.
+     * @returns Nothing.
+     */
+    private _trackHover(event: PointerEvent): void {
+        if (!this._hoverEnabled || event.pointerType === 'touch') return;
+        if (event.target !== this._map.renderer.canvas) {
+            this._endHover();
+            return;
+        }
+
+        this._hoverPoint = this._getPoint(event);
+        this._hoverActive = true;
+        if (this._hoverTimer !== null) return; // a trailing read is already waiting, and will use this position
+
+        const wait = this._lastHoverAt + HOVER_INTERVAL_MS - performance.now();
+        if (wait <= 0) {
+            this._readHover();
+        } else {
+            this._hoverTimer = setTimeout(() => {
+                this._hoverTimer = null;
+                this._readHover();
+            }, wait);
+        }
+    }
+
+    /** Asks the pick layer to read the feature at the latest pointer position, on the next frame. */
+    private _readHover(): void {
+        const layer = this._map.activePickingLayer;
+        if (!layer || !this._hoverPoint) return;
+        layer.layerRenderInfo.hoverComps = [...this._hoverPoint];
+        this._lastHoverAt = performance.now();
+        this._map.requestRender();
+    }
+
+    /** Ends a hover: cancels a waiting read and, if one had been asked for, reports that nothing is hovered. */
+    private _endHover(): void {
+        if (this._hoverTimer !== null) {
+            clearTimeout(this._hoverTimer);
+            this._hoverTimer = null;
+        }
+        this._hoverPoint = null;
+        if (this._hoverActive) {
+            this._hoverActive = false;
+            this._map.clearHover();
+        }
     }
 
     /**

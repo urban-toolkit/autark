@@ -57,6 +57,8 @@ export class AutkMapUi {
     protected _legend: HTMLDivElement | null = null;
     /** Performance overlay showing smoothed FPS and render time. */
     protected _performanceOverlay: HTMLDivElement | null = null;
+    /** Tooltip next to the pointer, created the first time one is shown. */
+    private _tooltip: HTMLDivElement | null = null;
     /** Persistent menu toggle handler removed during teardown. */
     protected _onMenuIconClick: ((event: MouseEvent) => void) | null = null;
     /** Branding shown independently of the optional map controls. */
@@ -254,14 +256,73 @@ export class AutkMapUi {
         this._subMenu?.remove();
         this._legend?.remove();
         this._performanceOverlay?.remove();
+        this._tooltip?.remove();
 
         this._onMenuIconClick = null;
         this._menuIcon = null;
         this._subMenu = null;
         this._legend = null;
         this._performanceOverlay = null;
+        this._tooltip = null;
         this._activeLayer = null;
         this._legendSelectionExplicit = false;
+    }
+
+    /**
+     * Shows a tooltip beside the pointer.
+     *
+     * The tooltip sits to the lower right of the pointer, and flips to the other side of it where it would leave the
+     * canvas. It never takes pointer events, so it does not get in the way of the map. A string is shown as text, never
+     * as HTML; an element is shown as it is.
+     *
+     * @param content Text, or an element for richer content.
+     * @param x Pointer position relative to the canvas, in CSS pixels.
+     * @param y Pointer position relative to the canvas, in CSS pixels.
+     * @returns Nothing. Does nothing while the canvas has no parent element.
+     */
+    showTooltip(content: string | HTMLElement, x: number, y: number): void {
+        const canvas = this.map.canvas;
+        if (!canvas.parentElement) return;
+
+        if (!this._tooltip) {
+            const tooltip = document.createElement('div');
+            tooltip.id = 'autkMapTooltip';
+            Object.assign(tooltip.style, {
+                position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: '12',
+                backgroundColor: '#fff', color: '#222', borderRadius: '6px', padding: '6px 10px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.25)', fontFamily: 'system-ui, sans-serif', fontSize: '12px',
+                lineHeight: '1.35', maxWidth: '300px', overflowWrap: 'anywhere',
+            });
+            canvas.parentElement.appendChild(tooltip);
+            this._tooltip = tooltip;
+        }
+
+        const tooltip = this._tooltip;
+        if (typeof content === 'string') {
+            tooltip.textContent = content;
+        } else {
+            tooltip.replaceChildren(content);
+        }
+        tooltip.style.display = 'block';
+
+        const gap = 14;
+        const width = tooltip.offsetWidth;
+        const height = tooltip.offsetHeight;
+        const left = x + gap + width > canvas.clientWidth ? x - gap - width : x + gap;
+        const top = y + gap + height > canvas.clientHeight ? y - gap - height : y + gap;
+        tooltip.style.left = `${canvas.offsetLeft + Math.max(0, left)}px`;
+        tooltip.style.top = `${canvas.offsetTop + Math.max(0, top)}px`;
+    }
+
+    /**
+     * Hides the tooltip.
+     *
+     * @returns Nothing.
+     */
+    hideTooltip(): void {
+        if (this._tooltip) {
+            this._tooltip.style.display = 'none';
+        }
     }
 
     /**
