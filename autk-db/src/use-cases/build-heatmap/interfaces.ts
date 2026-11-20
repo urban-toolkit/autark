@@ -27,7 +27,10 @@ export interface BuildHeatmapParams {
     near: NearConfig;
     /** Name of the output table that will hold the heatmap result. */
     outputTableName: string;
-    /** Optional group-by columns to aggregate into separate raster bands. */
+    /**
+     * Optional group-by columns to aggregate into separate raster bands. Without it, or when it is empty, one band
+     * counts the rows near each cell, as `[{ column: '*', aggregateFn: 'count' }]` does.
+     */
     groupBy?: HeatmapGroupBy[];
     /** Grid dimensions for the heatmap overlay. */
     grid: {
