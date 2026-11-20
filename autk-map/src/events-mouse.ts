@@ -419,15 +419,6 @@ export class MouseEvents {
     }
 
     /**
-     * Computes pointer coordinates in canvas-local CSS pixels.
-     *
-     * The returned coordinates are measured from the top-left corner of the
-     * renderer canvas using the canvas's current client bounding box.
-     *
-     * @param event Pointer or mouse event containing viewport coordinates.
-     * @returns Two-element array `[x, y]` relative to the canvas bounds in CSS pixels.
-     */
-    /**
      * Turns hover tracking on or off. Turning it off ends a hover in progress.
      *
      * @param enabled Whether pointer moves over the canvas are read for hover.
@@ -494,6 +485,15 @@ export class MouseEvents {
         }
     }
 
+    /**
+     * Computes pointer coordinates in canvas-local CSS pixels.
+     *
+     * The returned coordinates are measured from the top-left corner of the
+     * renderer canvas using the canvas's current client bounding box.
+     *
+     * @param event Pointer or mouse event containing viewport coordinates.
+     * @returns Two-element array `[x, y]` relative to the canvas bounds in CSS pixels.
+     */
     private _getPoint(event: PointerEvent | MouseEvent): number[] {
         const canvas = this._map.renderer.canvas;
         const rect = canvas.getBoundingClientRect();

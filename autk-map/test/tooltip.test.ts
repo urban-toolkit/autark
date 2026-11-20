@@ -88,8 +88,8 @@ describe('AutkMap.setTooltip', () => {
 
 describe('a tooltip and a layer that is hidden', () => {
     it('hides when the tooltip layer is hidden, and not for another layer', () => {
-        const parks = { layerRenderInfo: {}, updateLayerRenderInfo: vi.fn(), clearHighlightedIds: vi.fn() };
-        const roads = { layerRenderInfo: {}, updateLayerRenderInfo: vi.fn(), clearHighlightedIds: vi.fn() };
+        const parks = { layerInfo: { typeLayer: 'polygons' }, layerRenderInfo: {}, updateLayerRenderInfo: vi.fn(), clearHighlightedIds: vi.fn() };
+        const roads = { layerInfo: { typeLayer: 'lines' }, layerRenderInfo: {}, updateLayerRenderInfo: vi.fn(), clearHighlightedIds: vi.fn() };
         const { map, ui } = mapWith({ parks, roads });
         map._tooltip = { layerId: 'parks', provider: () => 'x' };
         // updateRenderInfo is the real method here
