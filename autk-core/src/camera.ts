@@ -583,8 +583,8 @@ export class Camera {
     /**
      * Returns the parallel ray of the orthographic view through a screen position.
      *
-     * @param x - Normalized screen X (0–1, left to right).
-     * @param y - Normalized screen Y (0–1, bottom to top).
+     * @param x - Normalized screen X, from 0 at the left to 1 at the right.
+     * @param y - Normalized screen Y, from 0 at the bottom to 1 at the top.
      * @returns The ray's start on the plane of the eye, and its unit direction, the view direction.
      */
     private orthographicRay(x: number, y: number): [number[], vec3] {
