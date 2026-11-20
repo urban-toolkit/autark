@@ -47,6 +47,8 @@ export type ReduceSeriesBucketRow = {
     count: number;
     /** Merged source feature ids represented by the bucket. */
     autkIds: number[];
+    /** The group (`options.by`) the row belongs to; absent when the transform is not grouped. */
+    group?: string;
 };
 
 // ---- Runner -------------------------------------------------------------
@@ -64,21 +66,23 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
     const timestampAttr = config.options?.timestamp ?? 'timestamp';
     const valueAttr = config.options?.value ?? 'value';
     const reducer = config.options?.reducer ?? 'avg';
+    const groupAttr = config.options?.by;
 
     /** Intermediate flattened series-point row consumed by `reduceBuckets()`. */
-    type PointRow = { autkIds: number[]; __bucket: string; __value: number | null };
+    type PointRow = { autkIds: number[]; __bucket: string; __value: number | null; __group: string };
     const pointRows: PointRow[] = [];
 
     rows.forEach((row, rowIndex) => {
         const ids = Array.isArray(row?.autkIds) ? row.autkIds as number[] : [];
         const rowAutkIds = ids.length > 0 ? ids : [rowIndex];
         const series = valueAtPath(row, seriesAttr);
+        const group = groupAttr ? String(valueAtPath(row, groupAttr) ?? '') : '';
         if (!Array.isArray(series)) return;
 
         series.forEach((point: unknown, index: number) => {
             // Plain number — use array index as bucket key.
             if (typeof point === 'number' && Number.isFinite(point)) {
-                pointRows.push({ autkIds: rowAutkIds, __bucket: String(index), __value: point });
+                pointRows.push({ autkIds: rowAutkIds, __bucket: String(index), __value: point, __group: group });
                 return;
             }
 
@@ -99,12 +103,12 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
             const v = Number(valueAtPath(point as Record<string, unknown>, valueAttr));
             if (!Number.isFinite(v)) return;
 
-            pointRows.push({ autkIds: rowAutkIds, __bucket: bucket, __value: v });
+            pointRows.push({ autkIds: rowAutkIds, __bucket: bucket, __value: v, __group: group });
         });
     });
 
-    const reduced = reduceBuckets({
-        rows: pointRows,
+    const reduce = (rows: PointRow[]) => reduceBuckets({
+        rows,
         bucketOf: (row) => String(row.__bucket ?? ''),
         valueOf: (row) => {
             const v = (row as PointRow).__value;
@@ -113,13 +117,22 @@ export function runReduceSeries(rows: AutkDatum[], config: ReduceSeriesTransform
         reducer,
     });
 
+    // Without `by` all features are one series; with it, each group is reduced on its own.
+    const groups = new Map<string, PointRow[]>();
+    for (const r of pointRows) {
+        const g = groupAttr ? r.__group : '';
+        const list = groups.get(g);
+        if (list) list.push(r); else groups.set(g, [r]);
+    }
+
     return {
         preset: 'reduce-series',
-        rows: reduced.map(item => ({
+        rows: [...groups].flatMap(([group, rows]) => reduce(rows).map(item => ({
             bucket: item.key,
             value: item.value,
             count: item.count,
             autkIds: item.autkIds,
-        })),
+            ...(groupAttr ? { group } : {}),
+        }))),
     };
 }
