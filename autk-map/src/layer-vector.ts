@@ -421,6 +421,29 @@ export abstract class VectorLayer extends Layer {
     }
 
     /**
+     * Makes the skipped components exactly the given ones.
+     *
+     * Unlike {@link setSkippedIds}, which toggles each id and so depends on what was skipped before, the result
+     * does not depend on the earlier state, and repeating a call changes nothing. Components that were skipped and
+     * are not listed are shown again. Duplicate ids count once.
+     *
+     * @param ids Component ids that should be skipped; every other component is drawn.
+     * @returns Marks layer render state and GPU data as dirty for the next frame, unless nothing changes.
+     */
+    replaceSkippedIds(ids: number[]): void {
+        const wanted = new Set(ids);
+        const toggle: number[] = [];
+        for (const id of this._skippedIds) {
+            if (!wanted.has(id)) { toggle.push(id); }
+        }
+        for (const id of wanted) {
+            if (!this._skippedIds.has(id)) { toggle.push(id); }
+        }
+        if (toggle.length === 0) { return; }
+        this.setSkippedIds(toggle);
+    }
+
+    /**
      * Clears all highlighted component ids and vertex flags.
      *
      * @returns Marks layer render state and GPU data as dirty for the next frame.
