@@ -79,7 +79,11 @@ Besides the attributes, labels and styling options, the config accepts:
 
 ### Provenance and the segregated view
 
-Every transform records weighted relations between its inputs and outputs, from the source features to the rendered marks, and classifies each step as 1:1, N:1, 1:N or N:N. Selections use them in both directions: an aggregated mark paints only the part produced by the selected features, and a mark selected in an aggregated view sends the share of each feature it covers. The relations extend the `autkIds` of the previous versions, which are kept unchanged.
+Every transform records weighted relations between its inputs and outputs, from the source features to the rendered marks, and classifies each step as 1:1, N:1, 1:N or N:N. Selections use them in both directions: an aggregated mark highlights only the part produced by the selected features, and a mark selected in an aggregated view sends the share of each feature it covers. The relations extend the `autkIds` of the previous versions, which are kept unchanged.
+
+A mark shows a selection from another view in one of three highlight modes: `boolean` (the whole mark), `subset` (the default: the mark drawn again with the value of the selected subset, through the plot's own encoding) or custom (a preset: `glyph`, `trace`, `members`, or a function of the plot). For a plain D3 chart, the channel of the subset render is inferred from the geometry of its marks (a least-squares fit, R² ≥ 0.99 over at least three distinct values); when no channel is proven, a preset stands in. `provenance: { highlight: 'boolean' }` in a configuration gives any plot the whole-mark highlight.
+
+A plot is interactive only with `events`: with none, it selects nothing, sorts no table and recolors no axis on click, but still shows the selections of other views and its tooltips.
 
 ### Transform API summary
 
@@ -87,7 +91,8 @@ Every transform records weighted relations between its inputs and outputs, from 
 
 * `run(rows, config, channels)`: Runs a built-in transform preset.
 * `reduceBuckets(params)`: Applies low-level bucket aggregation.
-* Transform presets: `binning-1d`, `binning-2d`, `binning-events`, `reduce-series`, `sort`, `box-stats`, `flows`, `binning-hex`, `hierarchy`, `cumulative`, `fold`, and `density`.
+* Transform presets: `binning-1d`, `binning-2d`, `binning-events`, `reduce-series`, `sort`, `box-stats`, `flows`, `binning-hex`, `hierarchy`, `cumulative`, `fold`, and `density`. `binning-1d` keeps the empty ranges of a numeric column (value 0, no `autkIds`), so a histogram does not skip them.
+* In `attributes.axis`, an optional `'@transform'` after the input columns marks where the value the transform computes goes (in `attributes.color` when that value is drawn as a color); it is never an axis label.
 * Reducers: `count`, `sum`, `avg`, `min`, and `max`.
 * Time resolutions: `hour`, `day`, `weekday`, `monthday`, `month`, and `year`.
 
@@ -96,7 +101,7 @@ Every transform records weighted relations between its inputs and outputs, from 
 The 24 built-in plots and the 12 built-in transforms are registered with the same functions as yours, and drawn and run by the same code: none is privileged. Their definitions are reference examples: `registeredPlot('barchart')` and `registeredTransform('fold')` return them (frozen), and their sources in `src/plots` and `src/transforms/presets` use only public exports. Built-in names are reserved.
 
 * `registerTransform(definition)`: Adds a transform with provenance, used as `{ preset: 'registered', name }`. Its rows have one of eleven shapes (`category-value`, `series`, `hierarchy`, `flows`…), and every plot that reads that shape draws them. `checkTransformReport` checks its six provenance invariants.
-* `registerPlot(definition)`: Turns plain D3 drawing code into a chart, used as `{ type: 'registered', plot: name }`. The code only annotates its selectable marks (class `autkMark`, with their own row as D3 datum); selection, linking and the segregated view come with it, and the painted part is inferred from the geometry of the marks. Only `name` and `draw` are required; optional fields declare the design of the painted part, the series to redraw, the transforms and reducers the plot reads, and the style of a highlighted mark, and the drawing context offers axes, formats, a legend and tick counts. `checkPlot` checks its six drawing invariants.
+* `registerPlot(definition)`: Turns plain D3 drawing code into a chart, used as `{ type: 'registered', plot: name }`. The code only annotates its selectable marks (class `autkMark`, with their own row as D3 datum); selection, linking and the segregated view come with it, and the highlight is inferred from the geometry of the marks. Only `name` and `draw` are required; optional fields declare the highlight (`highlight`), the series to redraw, the transforms and reducers the plot reads, and the style of a highlighted mark, and the drawing context offers axes, formats, a legend and tick counts. `checkPlot` checks its six drawing invariants.
 
 ### Writing a chart
 
@@ -129,7 +134,7 @@ new AutkPlot(container, {
 });
 ```
 
-`width` and `height` are the drawing area inside the margins (`margins` in the config). Besides `group` and `rows`, the context gives `html` (a container for HTML marks), `fields`, `format(i)`, `axisLabels`, `legend` and `tickCount`. Autark colors the marks (gray, and the selection color); style anything else by state with `markStyle`. Optional fields declare the transforms and reducers the chart reads (`transforms`, `requiresTransform`, `reducers`), the design of the painted part (`design`, or `drawPart`), and defaults and checks of the config (`defaults`, `validate`).
+`width` and `height` are the drawing area inside the margins (`margins` in the config). Besides `group` and `rows`, the context gives `html` (a container for HTML marks), `fields`, `format(i)` (the axis's `tickFormats`, or by default SI prefixes from one up and decimals under one: `0.5`, not `500m`), `hasFormat(i)` (whether `tickFormats` give that axis a format: a numeric category is otherwise written as it is), `axisLabels`, `legend`, `tickCount` and `interactive` (whether the configuration asks for any `events`). `axisX` and `axisY` label an axis with the field it shows: by default the first and second fields, or `axisX(axis, 1)` for the field of index 1 (a horizontal bar chart), or a text. Autark colors the marks (gray, and the selection color) and gives them the pointer cursor when clicks select; style anything else by state with `markStyle`. Optional fields declare the transforms and reducers the chart reads (`transforms`, `requiresTransform`, `reducers`), the highlight (`highlight`: a word such as `'boolean'`, `'subset'`, `'glyph'` or `'trace'`, a rule per mark family such as `{ rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } }`, or a function that draws the parts), and defaults and checks of the config (`defaults`, `validate`).
 
 ### Writing a transform
 
