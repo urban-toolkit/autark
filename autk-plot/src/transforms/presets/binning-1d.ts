@@ -13,6 +13,7 @@ import type { AutkDatum } from '../../types-plot';
 import type { Binning1dTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
+import { formatSiOrDecimal } from '../../number-format';
 
 // ---- Executed transform -------------------------------------------------
 
@@ -208,6 +209,5 @@ function formatBinEdges(edges: number[], binWidth: number): string[] {
  * @returns The edge's text.
  */
 function formatBinEdge(value: number, digits: number): string {
-    const text = d3.format(`.${digits}s`)(value);
-    return /[yzafpnµμm]$/.test(text) ? d3.format(`.${digits}r`)(value) : text;
+    return formatSiOrDecimal(value, d3.format(`.${digits}s`), d3.format(`.${digits}r`));
 }

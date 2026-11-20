@@ -62,9 +62,6 @@ export class Barchart extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) { 
-            config.tickFormats = ['~s', '~s']; 
-        }
         if (config.transform) {
             if (config.transform.preset !== 'binning-1d') {
                 throw new Error('Barchart only supports the binning-1d transform preset.');
@@ -137,7 +134,7 @@ export class Barchart extends PlotBaseInteractive {
             const value = String(d);
             const numericValue = Number(value);
             return Number.isFinite(numericValue) && value.trim() !== ''
-                ? d3.format(this._tickFormats[0] || '~s')(numericValue)
+                ? this.tickFormat(0, '~s')(numericValue)
                 : value;
         });
 
@@ -168,7 +165,7 @@ export class Barchart extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
+        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.y.axis')

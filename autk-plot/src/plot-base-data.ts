@@ -4,6 +4,8 @@ import type {
     Geometry,
 } from 'geojson';
 
+import * as d3 from 'd3';
+
 import type { AutkDatum } from './types-plot';
 
 import type {
@@ -22,6 +24,7 @@ import type { ColorMapDomainSpec, ResolvedDomain } from '@urban-toolkit/autk-cor
 
 import { run } from './transforms';
 import type { ExecutedPlotTransform } from './transforms';
+import { defaultTickFormat } from './number-format';
 
 /**
  * Normalized transform payload returned by `resolveTransformResult()`.
@@ -67,8 +70,8 @@ export abstract class PlotBaseData {
 
     /** Plot title text. */
     protected _title!: string;
-    /** D3 tick-format specifiers used by axis renderers. */
-    protected _tickFormats!: string[];
+    /** D3 tick-format specifiers the configuration gives the axis renderers, or `undefined` when it gives none. */
+    protected _tickFormats: string[] | undefined;
 
     /** Outer plot width in pixels. */
     protected _width: number = 800;
@@ -133,7 +136,7 @@ export abstract class PlotBaseData {
         this._sourceColorAttribute = config.attributes?.color;
 
         this._title = config.labels?.title || 'Autk Plot';
-        this._tickFormats = config.tickFormats ?? ['', ''];
+        this._tickFormats = config.tickFormats;
 
         this._width = config.width || 800;
         this._height = config.height || 500;
@@ -145,6 +148,20 @@ export abstract class PlotBaseData {
         this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
 
         this._transformConfig = config.transform;
+    }
+
+    /**
+     * Returns the tick format of an axis: the d3 format the configuration's `tickFormats` give it, or, when the
+     * configuration gives none, SI prefixes from one up ("1k") and decimals under one ("0.5", not "500m").
+     *
+     * @param axis Index of the axis in `tickFormats`.
+     * @param emptyFormat D3 format used in place of an empty one the configuration gives.
+     * @returns Function that writes a tick value.
+     */
+    protected tickFormat(axis: number, emptyFormat?: string): (value: d3.NumberValue) => string {
+        if (!this._tickFormats) return defaultTickFormat;
+        const specifier = this._tickFormats[axis];
+        return d3.format(emptyFormat === undefined ? specifier : specifier || emptyFormat);
     }
 
     /**

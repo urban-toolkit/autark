@@ -67,7 +67,10 @@ export type PlotConfig = {
     };
     /** Optional data transform applied before rendering. */
     transform?: PlotTransformConfig;
-    /** D3 format strings for each axis tick. */
+    /**
+     * D3 format strings for each axis tick. Without them, a bar chart, line chart, scatterplot or parallel coordinates
+     * writes a tick with an SI prefix from one up ("1k", "2.5M") and as a decimal under one ("0.5", "0.25").
+     */
     tickFormats?: string[];
     /** Domain specification controlling how the colormap range is derived. */
     domainSpec?: ColorMapDomainSpec;

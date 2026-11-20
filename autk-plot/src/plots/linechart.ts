@@ -57,9 +57,6 @@ export class Linechart extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) { 
-            config.tickFormats = ['~s', '~s']; 
-        }
 
         if (!config.transform) {
             throw new Error('Linechart requires a transform configuration.');
@@ -160,9 +157,10 @@ export class Linechart extends PlotBaseInteractive {
         const yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerH, 0]);
 
         // ---- Axes
+        // Ticks only where a bucket is: with two or three buckets, d3 would also place ticks halfway between them.
         const xAxis = d3.axisBottom(xScale)
-            .ticks(Math.min(n, 12))
-            .tickFormat((d) => seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
+            .tickValues(xScale.ticks(Math.min(n, 12)).filter(Number.isInteger))
+            .tickFormat((d) => seriesData[+d]?.label ?? this.tickFormat(0)(d));
 
         const xAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.x.axis')
@@ -192,7 +190,7 @@ export class Linechart extends PlotBaseInteractive {
         const yAxis = d3.axisLeft(yScale)
             .ticks(5)
             .tickSizeInner(-innerW)
-            .tickFormat(d3.format(this._tickFormats[1]));
+            .tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
             .selectAll<SVGGElement, unknown>('.y.axis')
@@ -289,7 +287,7 @@ export class Linechart extends PlotBaseInteractive {
     private formatBucketLabel(bucket: string): string {
         const numericBucket = Number(bucket);
         if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-            return d3.format(this._tickFormats[0])(numericBucket);
+            return this.tickFormat(0)(numericBucket);
         }
         return bucket;
     }

@@ -56,9 +56,6 @@ export class ParallelCoordinates extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) {
-            config.tickFormats = ['~s', '~s'];
-        }
         super(config);
 
         this._colorProperty = 'stroke';
@@ -194,7 +191,7 @@ export class ParallelCoordinates extends PlotBaseInteractive {
                 d3.select(nodes[i]).call(
                     d3.axisLeft(scale as d3.ScaleLinear<number, number>)
                         .ticks(5)
-                        .tickFormat((value) => d3.format(this._tickFormats[0] || '~s')(Number(value))) as any
+                        .tickFormat((value) => this.tickFormat(0, '~s')(Number(value))) as any
                 );
             } else if (scale && dimType === 'categorical') {
                 d3.select(nodes[i]).call(d3.axisLeft(scale as d3.ScalePoint<string>) as any);
