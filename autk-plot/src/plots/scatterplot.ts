@@ -188,7 +188,7 @@ export class Scatterplot extends PlotBaseInteractive {
             .attr('class', 'autkMark')
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, xAttribute)) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, yAttribute)) || 0 : 0))
-            .attr('r', 5)
+            .attr('r', this._markRadius)
             .style('fill', d => this.getMarkColor(d))
             .style('visibility', 'inherit');
 

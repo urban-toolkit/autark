@@ -86,6 +86,8 @@ export type PlotConfig = {
      * an entry that is not a CSS color falls back to the scheme's color. Ignored for a numeric color attribute.
      */
     categoryColors?: string[];
+    /** Radius in pixels of the scatter plot's marks. Defaults to 5. Other plots, the line chart's points among them, ignore it. */
+    markRadius?: number;
 };
 
 /**

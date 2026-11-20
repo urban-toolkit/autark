@@ -88,6 +88,9 @@ export abstract class PlotBaseData {
     /** Optional transform config shared by plot implementations that support transformed views. */
     protected _transformConfig?: PlotTransformConfig;
 
+    /** Radius in pixels of circle marks (from config). */
+    protected _markRadius: number = 5;
+
     /** Explicit colors for categorical values, in domain order (from config). */
     protected _categoryColors: string[] | undefined = undefined;
 
@@ -150,6 +153,7 @@ export abstract class PlotBaseData {
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
         this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
         this._categoryColors = config.categoryColors;
+        this._markRadius = config.markRadius ?? 5;
 
         this._transformConfig = config.transform;
     }
