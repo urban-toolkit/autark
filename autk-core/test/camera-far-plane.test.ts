@@ -37,4 +37,10 @@ describe('Camera far plane', () => {
         camera.update();
         expect(camera.getFar()).toBe(5e5);
     });
+
+    it('reports its own far plane once orthographic, not the one a high perspective view used', () => {
+        const camera = cameraAt(2e6);
+        camera.setOrthographicBounds(0, 1000, 0, 800);
+        expect(camera.getFar()).toBe(5e5);
+    });
 });

@@ -168,8 +168,12 @@ export class Camera {
         return this.wNear;
     }
 
-    /** The far plane of the current projection: `wFar`, or more when the camera is high (see `update`). */
+    /**
+     * The far plane of the current perspective projection: `wFar`, or more when the camera is high (see `update`).
+     * An orthographic camera returns `wFar`.
+     */
     public getFar(): number {
+        if (this.orthographic) return this.wFar;
         return Math.max(this.wFar, this.wFarUsed);
     }
 
