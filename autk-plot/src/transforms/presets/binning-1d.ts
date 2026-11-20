@@ -15,6 +15,9 @@ import type { Binning1dTransformConfig } from '../../api';
 import { reduceBuckets } from '../kernel';
 import { formatSiOrDecimal } from '../../number-format';
 
+/** Label of the bin of a quantitative attribute's values that hold no number: missing, null or not finite. */
+const UNKNOWN = 'unknown';
+
 // ---- Executed transform -------------------------------------------------
 
 /**
@@ -103,7 +106,7 @@ export type BinMapper = {
     key: (value: unknown) => string;
     /** Label of a bin: its category, or its numeric range such as `"1.0k-2.0k"`. */
     label: (key: string) => string;
-    /** Sort key of a bin: the category's first-seen rank, or the numeric range's index. */
+    /** Sort key of a bin: the category's first-seen rank, or the numeric range's index, the unknown bin after the ranges. */
     order: (key: string) => number;
 };
 
@@ -113,7 +116,8 @@ export type BinMapper = {
  * Detects whether the attribute is categorical or quantitative. Categorical
  * attributes map to their string representation; quantitative attributes are
  * divided into `numBins` fixed-width ranges, keyed by their index and labeled
- * by their SI-formatted boundaries.
+ * by their SI-formatted boundaries. A value of a quantitative attribute that holds
+ * no number (missing, null or not finite) goes to an `unknown` bin after the ranges.
  *
  * @param rows - Input data used to infer the attribute's type and numeric range.
  * @param attr - Dot-path attribute name to map.
@@ -129,8 +133,8 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
         return trimmed.length > 0 && Number.isFinite(Number(trimmed));
     };
 
+    // A number that is not finite, such as NaN, holds no value, as null does: it does not make the attribute categorical.
     const isCategorical = sampleValues.some(v =>
-        (typeof v === 'number' && !Number.isFinite(v)) ||
         (typeof v === 'string' && !isNumericLike(v)) ||
         (typeof v !== 'number' && typeof v !== 'string')
     );
@@ -169,13 +173,15 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     // Rows are grouped by bin index, so two bins never merge, even if their labels read alike.
     return {
         key: (v: unknown) => {
-            const n = Number(v);
-            if (!Number.isFinite(n)) return 'unknown';
+            // A value that holds no number, missing, null or NaN, goes to a bin of its own: null is not 0.
+            const n = v == null ? NaN : Number(v);
+            if (!Number.isFinite(n)) return UNKNOWN;
             const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
             return String(Math.max(0, Math.min(Math.floor(normalized), numBins - 1)));
         },
         label: (key: string) => labels[Number(key)] ?? key,
-        order: (key: string) => (key === 'unknown' ? 0 : Number(key)),
+        // The numeric bins are 0 to numBins - 1; the unknown bin comes after all of them.
+        order: (key: string) => (key === UNKNOWN ? numBins : Number(key)),
     };
 }
 
