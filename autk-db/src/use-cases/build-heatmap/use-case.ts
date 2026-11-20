@@ -46,6 +46,21 @@ export class BuildHeatmapUseCase {
             throw new Error(`Table ${params.tableJoinName} not found.`);
         }
 
+        // Without groupBy, one band counts the rows near each cell. The join and the bands take this one list,
+        // so the join writes the count that the band reads.
+        const groupBy: HeatmapGroupBy[] = params.groupBy?.length
+            ? params.groupBy
+            : [{ column: '*', aggregateFn: 'count' }];
+        // A cell holds one value. Without an aggregate the join lists the values near it, as `collect` lists the
+        // rows near it, and no band reads a list, so such an entry is refused before the grid is built.
+        for (const { column, aggregateFn } of groupBy) {
+            if (!aggregateFn || aggregateFn.toLowerCase() === 'collect') {
+                const given = aggregateFn ? `aggregateFn "${aggregateFn}"` : 'no aggregateFn';
+                throw new Error(`Heatmap "${params.outputTableName}": the groupBy entry for column "${column}" has ${given}, `
+                    + 'but a cell holds one value; use count, weighted, sum, avg, min or max.');
+            }
+        }
+
         const gridTableName = params.outputTableName;
         const gridTable = await this.createGridTable({
             boundingBox,
@@ -54,12 +69,6 @@ export class BuildHeatmapUseCase {
             outputTableName: gridTableName,
             workspace,
         });
-
-        // Without groupBy, one band counts the rows near each cell. The join and the bands take this one list,
-        // so the join writes the count that the band reads.
-        const groupBy: HeatmapGroupBy[] = params.groupBy?.length
-            ? params.groupBy
-            : [{ column: '*', aggregateFn: 'count' }];
 
         await this.spatialJoinUseCase.exec(
             {

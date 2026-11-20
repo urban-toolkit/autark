@@ -9,7 +9,7 @@ export type HeatmapAggregateFunction = Exclude<AggregateFunction, 'collect'>;
 export interface HeatmapGroupBy {
     /** Column name to aggregate. Use `'*'` for row-level aggregations like `count`. */
     column: string;
-    /** Aggregation function to apply on the grouped values. */
+    /** Aggregation function to apply on the grouped values. A cell holds one value, so an entry without one is refused. */
     aggregateFn?: HeatmapAggregateFunction;
     /** When `true`, normalizes the aggregated value between 0 and 1. */
     normalize?: boolean;
