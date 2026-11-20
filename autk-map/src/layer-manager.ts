@@ -39,7 +39,8 @@ import { PolylineLayer } from './layer-polyline';
  * shared local origin from the first loaded collection, and assigns z-indices
  * according to the map's layering rules. Base OSM layers occupy fixed slots,
  * dynamic layers are ordered by insertion, and buildings are always rendered
- * last.
+ * last. An order set with {@link LayerManager.setLayerOrder} then rearranges
+ * the layers it lists.
  */
 /** CPU draw-order slot for tile layers. Never used as physical height. */
 export const TILE_LAYER_Z_INDEX = -1;
@@ -54,6 +55,12 @@ export class LayerManager {
 
     /** Layer ids of non-OSM, non-buildings layers in insertion order. */
     private _dynamicOrder: string[] = [];
+
+    /** Registered layers in the order they were added. */
+    private _added: Layer[] = [];
+
+    /** Layer ids in the order a caller set, bottom first; empty for the order by type. */
+    private _order: string[] = [];
 
     /** Registered layers sorted by render z-index. */
     get layers(): Layer[] { return this._layers; }
@@ -143,11 +150,26 @@ export class LayerManager {
         if (!OSM_BASE_LAYER_ORDER.includes(typeLayer) && typeLayer !== 'buildings' && typeLayer !== 'tiles') {
             this._dynamicOrder.push(id);
         }
-        this._layers.push(layer);
+        this._added.push(layer);
         this._recomputeZIndices();
-        this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
 
         return layer;
+    }
+
+    /**
+     * Sets the order the layers are drawn in, bottom first.
+     *
+     * The layers listed trade places, so they are drawn in this order; the
+     * layers not listed keep theirs. An id whose layer is not registered yet
+     * takes its place when it is. An empty list returns to the order by type.
+     *
+     * @param ids Layer ids, bottom first.
+     * @returns Nothing. The z-indices and the order of {@link layers} are updated.
+     * @throws Never throws.
+     */
+    setLayerOrder(ids: string[]): void {
+        this._order = [...new Set(ids)];
+        this._recomputeZIndices();
     }
 
     /**
@@ -165,7 +187,7 @@ export class LayerManager {
 
         layer.setChangeListener(null);
         layer.destroy();
-        this._layers = this._layers.filter((candidate) => candidate.layerInfo.id !== layerId);
+        this._added = this._added.filter((candidate) => candidate.layerInfo.id !== layerId);
         this._dynamicOrder = this._dynamicOrder.filter((id) => id !== layerId);
         this._recomputeZIndices();
     }
@@ -214,13 +236,17 @@ export class LayerManager {
      * - Dynamic layers: slots N, N+1, … in load-insertion order
      * - Buildings: always last (N + dynamic count)
      *
+     * Layers in one slot keep the order they were added in. With an order set,
+     * the layers it lists then trade places, and every layer's z-index becomes
+     * its place in the stack.
+     *
      * @returns Nothing. Updates each registered layer's `layerInfo.zIndex` in
-     * place.
+     * place and rebuilds {@link layers} sorted by it.
      */
     private _recomputeZIndices(): void {
         const buildingsZ = 0; // OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.length;
 
-        for (const layer of this._layers) {
+        for (const layer of this._added) {
             const { typeLayer, id } = layer.layerInfo;
             const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(typeLayer);
 
@@ -234,5 +260,13 @@ export class LayerManager {
                 layer.layerInfo.zIndex = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.indexOf(id);
             }
         }
+        this._layers = [...this._added].sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+        if (this._order.length === 0) { return; }
+
+        // The listed layers take the places they hold, in the caller's order.
+        const rank = (layer: Layer) => this._order.indexOf(layer.layerInfo.id);
+        const ordered = this._layers.filter((layer) => rank(layer) !== -1).sort((a, b) => rank(a) - rank(b));
+        this._layers = this._layers.map((layer) => (rank(layer) === -1 ? layer : ordered.shift()!));
+        this._layers.forEach((layer, place) => { layer.layerInfo.zIndex = place; });
     }
 }

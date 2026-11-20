@@ -1010,6 +1010,29 @@ export class AutkMap {
     }
 
     /**
+     * Sets the order the map draws its layers in, bottom first.
+     *
+     * Without one, tile layers are drawn first, then surface, parks, water and
+     * roads layers, then every other layer in the order it was loaded, so a
+     * raster loaded before the roads still covers them. The layers listed here
+     * trade places, so they are drawn in this order; the layers not listed keep
+     * theirs. A layer loaded later takes the place its id has in the list.
+     * Buildings are drawn with depth over the other layers wherever they are
+     * listed. An empty list returns to the order by type.
+     *
+     * @param ids Layer ids, bottom first.
+     * @returns Nothing. The layer list is refreshed and a frame is requested.
+     * @throws Never throws.
+     * @example
+     * map.setLayerOrder(['surface', 'heat', 'roads']); // the heat raster under the roads
+     */
+    setLayerOrder(ids: string[]): void {
+        this._layerManager.setLayerOrder(ids);
+        this._ui.refreshLayerList();
+        this.requestRender();
+    }
+
+    /**
      * Replaces the highlighted selection of a pickable layer.
      *
      * @param id Layer identifier.
