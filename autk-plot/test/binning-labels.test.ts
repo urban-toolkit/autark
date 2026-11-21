@@ -117,11 +117,14 @@ describe('Binning rows whose value holds no number', () => {
         return [none(5), ...numbers, none(6)];
     }
 
-    it.each<[string, (id: number) => Record<string, unknown>]>([
+    /** The ways a row holds no number, each made from the row's id: no value, a null value and a NaN value. */
+    const noNumber: [string, (id: number) => Record<string, unknown>][] = [
         ['no value', (id) => ({ kind: 'a', autkIds: [id] })],
         ['a null value', (id) => ({ v: null, kind: 'a', autkIds: [id] })],
         ['a NaN value', (id) => ({ v: NaN, kind: 'a', autkIds: [id] })],
-    ])('puts the rows with %s in an unknown bin after every numeric bin, the bins in order', (_label, none) => {
+    ];
+
+    it.each(noNumber)('puts the rows with %s in an unknown bin after every numeric bin, the bins in order', (_label, none) => {
         const rows = run(withNone(none), { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
 
         expect(rows.map((row) => [row.label, row.count])).toEqual([...ranges, ['unknown', 2]]);
@@ -142,6 +145,12 @@ describe('Binning rows whose value holds no number', () => {
             .map((cell) => [cell.x, cell.count]);
 
         expect(cells).toEqual([...ranges, ['unknown', 2]]);
+    });
+
+    it.each(noNumber)('puts every row in an unknown bin where each has %s', (_label, none) => {
+        const rows = run([0, 1, 2].map(none), { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
+
+        expect(rows.map((row) => [row.label, row.count])).toEqual([['unknown', 3]]);
     });
 });
 
