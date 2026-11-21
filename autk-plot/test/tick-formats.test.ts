@@ -114,6 +114,13 @@ describe('Category and bucket labels of a plot given no tickFormats', () => {
         };
         expect(ticks(bins, '.x.axis .tick text')).toEqual(['0.40']);
     });
+
+    it('writes a bar chart\'s negative categories with one minus sign, whole or fractional', () => {
+        // Each reads with the hyphen-minus a whole category is written with, not d3's minus sign, U+2212.
+        const levels = featuresOf([-5, -0.5, -(0.1 + 0.2)].map((level, i) => ({ level, count: i + 1 })));
+        expect(ticks({ type: 'barchart', collection: levels, attributes: { axis: ['level', 'count'] } }, '.x.axis .tick text'))
+            .toEqual(['-5', '-0.5', '-0.3']);
+    });
 });
 
 describe('Tick labels of a plot given tickFormats', () => {
