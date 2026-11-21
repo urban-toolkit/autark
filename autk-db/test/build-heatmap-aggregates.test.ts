@@ -153,7 +153,7 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
       ...feature, properties: { ...feature.properties, other: 2 * (feature.properties?.value as number) },
     })));
     await db.buildHeatmap({
-      tableJoinName: 'readings', outputTableName: 'labelled', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      tableJoinName: 'readings', outputTableName: 'labeled', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
       groupBy: [
         { column: 'value', aggregateFn: 'avg' },
         { column: 'other', aggregateFn: 'avg' },
@@ -164,7 +164,7 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     });
 
     // The two averages of different columns name their columns; the normalized one, the max and the count need not.
-    const bands = bandsOf('labelled');
+    const bands = bandsOf('labeled');
     expect(Object.keys(bands)).toEqual([
       'avg_readings_value', 'avg_readings_other', 'avg_readings_norm', 'max_readings', 'count_readings',
     ]);

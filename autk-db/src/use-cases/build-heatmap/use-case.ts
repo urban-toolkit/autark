@@ -281,7 +281,7 @@ ${bandAssignments}
     /**
      * Derives raster band metadata from the group-by list the join aggregated, one band per entry.
      *
-     * A band is labelled `<aggregateFn>_<table>`, with `_norm` added when it is normalized. When bands of one
+     * A band is labeled `<aggregateFn>_<table>`, with `_norm` added when it is normalized. When bands of one
      * aggregate over different columns would share that label, each of them names its column too,
      * `<aggregateFn>_<table>_<column>` with the column's dots as underscores. Any remaining duplicates
      * receive a band-ID suffix without taking another band's preferred label.
