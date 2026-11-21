@@ -126,13 +126,10 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         this.restoreLocalSelectionAfterDraw();
     }
 
-    /**
-     * Places the axis titles clear of their tick labels. Where the margins cannot
-     * hold a title so placed, the plot area gives up the room, at most half of it,
-     * and the plot is drawn again: the svg keeps its size, and no title is cut by
-     * its edge or drawn over a label.
-     */
+    /** Places the axis titles clear of their tick labels. */
     protected override afterRender(): void {
+        // Where the margins cannot hold a title so placed, the plot area gives up the room, at most half of it,
+        // and the plot is drawn again: the svg keeps its size, and no title is cut by its edge or drawn over a label.
         const svg = () => d3.select(this._div).select<SVGSVGElement>('svg.autk-plot').node();
         const overflow = placeAxisTitles(svg(), this._margins);
         const bottom = Math.max(0, Math.ceil(overflow.bottom));

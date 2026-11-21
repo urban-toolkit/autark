@@ -77,7 +77,7 @@ export abstract class PlotBaseData {
     protected _width: number = 800;
     /** Outer plot height in pixels. */
     protected _height: number = 500;
-    /** Plot margins in pixels: the configured ones, grown when a draw needs room for its axis titles. */
+    /** Plot margins in pixels. */
     protected _margins!: PlotMargins;
     /** Margins from the configuration, in pixels; each draw starts from them. */
     private _configuredMargins!: PlotMargins;
@@ -151,27 +151,29 @@ export abstract class PlotBaseData {
     }
 
     /**
-     * Returns the tick format of an axis: the d3 format the configuration's `tickFormats` give it, or, when they give
-     * it none, SI prefixes from one up ("1k") and decimals under one ("0.5", not "500m").
+     * Returns the tick format of an axis.
      *
      * @param axis Index of the axis in `tickFormats`.
      * @param emptyFormat D3 format used in place of an empty one the configuration gives.
      * @returns Function that writes a tick value.
      */
     protected tickFormat(axis: number, emptyFormat?: string): (value: d3.NumberValue) => string {
+        // The d3 format the configuration's tickFormats give the axis or, when they give it none, SI prefixes
+        // from one up ("1k") and decimals under one ("0.5", not "500m").
         if (!this.hasTickFormat(axis)) return defaultTickFormat;
         const specifier = this._tickFormats![axis];
         return d3.format(emptyFormat === undefined ? specifier : specifier || emptyFormat);
     }
 
     /**
-     * Whether the configuration's `tickFormats` give an axis a format of its own. An axis they give none, with no
-     * `tickFormats` or with a missing or undefined entry for it (`['.2f']` for two axes), keeps its default.
+     * Whether the configuration's `tickFormats` give an axis a format of its own.
      *
      * @param axis Index of the axis in `tickFormats`.
      * @returns `true` when the axis has a format of its own.
      */
     protected hasTickFormat(axis: number): boolean {
+        // No tickFormats, or a missing, undefined or null entry for the axis (['.2f'] for two axes), is no format
+        // of its own: the axis keeps its default.
         return this._tickFormats?.[axis] !== undefined && this._tickFormats[axis] !== null;
     }
 
@@ -181,6 +183,7 @@ export abstract class PlotBaseData {
      * @throws If active render bindings do not resolve on the rendered data.
      */
     public draw(): void {
+        // Each draw starts from the configured margins, which afterRender may grow to make room for the axis titles.
         this._margins = { ...this._configuredMargins };
         this._data = this.buildSourceRows();
         this._transformAttributes = undefined;
