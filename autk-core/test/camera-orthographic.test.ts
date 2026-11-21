@@ -253,10 +253,27 @@ describe('a lasting orthographic Camera', () => {
       const untouched = make();
       cam.setProjection(cam.getProjection());
       expect(state(cam)).toEqual(state(untouched));
-      // A reset, as a host framing a map or the R key makes, leaves them alike too.
+      // A reset, as a host framing a map or the R key makes, leaves them alike too. It ends fixed bounds, and a camera
+      // set to 'orthographic' while they held stays orthographic, as its twin does once set so.
       for (const camera of [cam, untouched]) camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 5000]);
+      if (make === bounded) untouched.setProjection('orthographic');
       expect(state(cam)).toEqual(state(untouched));
     }
+  });
+
+  it('stays orthographic through a later resetCamera when set so while the bounds of setOrthographicBounds hold', () => {
+    const cam = new Camera();
+    cam.resize(1600, 1000);
+    cam.setOrthographicBounds(0, 1000, 0, 800);
+    cam.setProjection('orthographic');
+    // fitBounds, setView, the R key and hosts frame a map with resetCamera, which ends the bounds.
+    cam.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 5000]);
+    cam.update();
+    expect(cam.getProjection()).toBe('orthographic');
+    expect(isOrthographic(cam.getProjectionMatrix())).toBe(true);
+    const corner = project(cam, [halfHeight(5000) * 1.6, halfHeight(5000), 0]);
+    expect(corner[0]).toBeCloseTo(1, 4);
+    expect(corner[1]).toBeCloseTo(1, 4);
   });
 
   it('keeps the ground under the cursor there when it zooms a tilted view', () => {
