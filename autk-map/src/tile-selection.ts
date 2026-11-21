@@ -243,7 +243,7 @@ function clipTileFootprint(polygon: readonly Point[], [left, bottom]: Point, [ri
 }
 
 export interface TerrainImageryDetail {
-    /** Perspective camera that sees the finished terrain, not the overlay camera. */
+    /** Camera that sees the finished terrain, perspective or orthographic, not the overlay camera. */
     camera: Camera;
     viewport: readonly [number, number];
     heightAt: (x: number, y: number) => number;
@@ -361,5 +361,16 @@ export function selectAdaptiveTiles(
     const z = ordered.reduce((finest, leaf) => Math.max(finest, leaf.tile.z), base.z);
     const wantedZoom = ordered.reduce((finest, leaf) => Math.max(finest,
         Math.min(source.maxZoom, leaf.tile.z + Math.max(0, Math.ceil(Math.log2(leaf.priority))))), z);
+    if (detailCamera.getProjection() === 'orthographic') {
+        // An orthographic view draws all of its ground at one scale, so the tiles of a zoom all need the same detail,
+        // and a budget that ran out partway through a zoom would leave part of the view sharper than the rest. Each
+        // tile gives way to its ancestor at the coarsest zoom selected: the finest zoom that covers the whole view.
+        const coarsest = Math.min(...ordered.map(({ tile }) => tile.z));
+        const tiles = new Map(ordered.map(({ tile }) => {
+            const ancestor = ancestorTile(tile, tile.z - coarsest)!;
+            return [key(ancestor), ancestor] as const;
+        }));
+        return { ...base, z: coarsest, wantedZoom, tiles: [...tiles.values()] };
+    }
     return { ...base, z, wantedZoom, tiles: ordered.map(({ tile }) => tile) };
 }
