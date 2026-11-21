@@ -103,7 +103,7 @@ describe('Category and bucket labels of a plot given no tickFormats', () => {
         // 0.1 + 0.2 is 0.30000000000000004.
         const levels = featuresOf([0.1 + 0.2, 12.3456789, 1500000].map((level, i) => ({ level, count: i + 1 })));
         expect(ticks({ type: 'barchart', collection: levels, attributes: { axis: ['level', 'count'] } }, '.x.axis .tick text'))
-            .toEqual(['0.3', '12.3457', '1500000']);
+            .toEqual(['0.3', '12.3456789', '1500000']);
 
         // A bin's label can read as a number, as a column of one value's does, but it is written already.
         const bins: UnifiedPlotConfig = {
@@ -120,6 +120,30 @@ describe('Category and bucket labels of a plot given no tickFormats', () => {
         const levels = featuresOf([-5, -0.5, -(0.1 + 0.2)].map((level, i) => ({ level, count: i + 1 })));
         expect(ticks({ type: 'barchart', collection: levels, attributes: { axis: ['level', 'count'] } }, '.x.axis .tick text'))
             .toEqual(['-5', '-0.5', '-0.3']);
+    });
+
+    it('writes two fractional categories that differ past the sixth significant digit with two labels', () => {
+        // Two longitudes 7 millionths of a degree apart: at six significant digits, both would read "-73.9352".
+        const levels = featuresOf([-73.935242, -73.935249].map((level, i) => ({ level, count: i + 1 })));
+        expect(ticks({ type: 'barchart', collection: levels, attributes: { axis: ['level', 'count'] } }, '.x.axis .tick text'))
+            .toEqual(['-73.935242', '-73.935249']);
+    });
+
+    it('writes a fractional category of more than six significant digits with each of them', () => {
+        const levels = featuresOf([{ level: 1234567.5, count: 1 }]);
+        expect(ticks({ type: 'barchart', collection: levels, attributes: { axis: ['level', 'count'] } }, '.x.axis .tick text'))
+            .toEqual(['1234567.5']);
+    });
+
+    it('keeps every digit of a bin label that reads as a number', () => {
+        // A column of one value is one bin, labeled by that value at the digits it needs: 583912.25 reads "583912.3".
+        const bins: UnifiedPlotConfig = {
+            type: 'barchart',
+            collection: featuresOf([{ level: 583912.25 }, { level: 583912.25 }]),
+            attributes: { axis: ['level', '@transform'] },
+            transform: { preset: 'binning-1d' },
+        };
+        expect(ticks(bins, '.x.axis .tick text')).toEqual(['583912.3']);
     });
 });
 
