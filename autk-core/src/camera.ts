@@ -83,8 +83,9 @@ export class Camera {
     protected wFar: number = 0;
     /**
      * Distance from the eye to the point it looks at, between the near and far
-     * distances, which sizes an orthographic view. {@link resetCamera} sets it,
-     * a zoom changes it, and a pan or a tilt keeps it, though those moves leave
+     * distances, which sizes an orthographic view and places the point
+     * {@link getLookAt} gives in one. {@link resetCamera} sets it, a zoom
+     * changes it, and a pan or a tilt keeps it, though those moves leave
      * `wLookAt` one unit ahead of the eye.
      */
     private wLookAtDistance: number = 1;
@@ -166,7 +167,21 @@ export class Camera {
         return [this.wEye[0], this.wEye[1], this.wEye[2]];
     }
 
+    /**
+     * Returns the point the camera looks at.
+     *
+     * `resetCamera(getUp(), getLookAt(), getEye())` keeps the view, in
+     * perspective and in an orthographic view set with {@link setProjection}.
+     *
+     * @returns The point `[x, y, z]` in world space.
+     * @throws Never throws.
+     */
     public getLookAt(): [number, number, number] {
+        if (this.projection === 'orthographic' && !this.orthographic) {
+            // Zoom, pan and tilt leave wLookAt one unit ahead of the eye, nearer than the point the view is sized at.
+            const distance = this.wLookAtDistance;
+            return [0, 1, 2].map((i) => this.wEye[i] + this.wEyeDir[i] * distance) as [number, number, number];
+        }
         return [this.wLookAt[0], this.wLookAt[1], this.wLookAt[2]];
     }
 
@@ -347,14 +362,10 @@ export class Camera {
      * Sets the projection the camera keeps until it is set again.
      *
      * An orthographic camera looks along the same line as the perspective one,
-     * with parallel rays. At the point it looks at, it shows what the
-     * perspective camera shows there: its bounds follow the eye's distance to
-     * that point, which {@link resetCamera} sets, a zoom changes, and a pan or a
-     * tilt keeps. So switching keeps the scale there, also in a level view or
-     * over raised ground, and zoom, pan, tilt and {@link resetCamera} work as in
-     * perspective. It draws everything within the far distance in front of the
-     * eye or behind it, so buildings taller than the eye is high are drawn
-     * whole.
+     * with parallel rays, and at the point it looks at it shows what the
+     * perspective camera shows there. So switching keeps the scale there, and
+     * zoom, pan, tilt and {@link resetCamera} work as in perspective. It draws
+     * everything within the far distance, in front of the eye or behind it.
      *
      * Setting the projection {@link getProjection} already reports changes
      * nothing. While the bounds of {@link setOrthographicBounds} hold, the
