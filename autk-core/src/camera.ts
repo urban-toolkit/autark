@@ -368,9 +368,10 @@ export class Camera {
      * everything within the far distance, in front of the eye or behind it.
      *
      * Setting the projection {@link getProjection} already reports changes
-     * nothing. While the bounds of {@link setOrthographicBounds} hold, the
-     * camera is orthographic, so `setProjection('orthographic')` keeps them and
-     * `setProjection('perspective')` ends them.
+     * nothing that is drawn. While the bounds of {@link setOrthographicBounds}
+     * hold, the camera is orthographic: `setProjection('orthographic')` keeps
+     * them, and the camera stays orthographic after {@link resetCamera} ends
+     * them; `setProjection('perspective')` ends them.
      *
      * @param projection - `'perspective'`, the default, or `'orthographic'`.
      * @throws Never throws.
@@ -378,8 +379,10 @@ export class Camera {
      * camera.setProjection('orthographic');
      */
     public setProjection(projection: CameraProjection): void {
-        if (projection === this.getProjection()) return;
+        const unchanged = projection === this.getProjection();
+        // Recorded also while fixed bounds already draw orthographically, so that it outlasts them.
         this.projection = projection;
+        if (unchanged) return;
         this.orthographic = null;
         this.update();
     }
