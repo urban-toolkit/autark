@@ -48,6 +48,18 @@ function besideLookAt(cam: Camera): Array<[number, number, number]> {
   return [right, up].map((axis) => [0, 1, 2].map((i) => lookAt[i] + axis[i] * offset) as [number, number, number]);
 }
 
+/** The ground point drawn at a screen position, `x` and `y` from 0 to 1, found from the camera's matrix alone. */
+function groundUnder(cam: Camera, x: number, y: number): [number, number] {
+  const inverse = mat4.invert(new Array<number>(16).fill(0), Array.from(cam.getViewProjectionMatrix()))!;
+  // Two points drawn at this screen position, at two depths: the line through them crosses the ground once.
+  const [a, b] = [0.25, 0.75].map((depth) => {
+    const p = vec4.transformMat4([0, 0, 0, 0], [x * 2 - 1, y * 2 - 1, depth, 1], inverse);
+    return [p[0] / p[3], p[1] / p[3], p[2] / p[3]];
+  });
+  const s = a[2] / (a[2] - b[2]);
+  return [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+}
+
 /** Checks that two cameras draw points at the same places on screen. */
 function expectDrawnAlike(cam: Camera, other: Camera, points: Array<[number, number, number]>) {
   for (const point of points) {
@@ -206,6 +218,22 @@ describe('a lasting orthographic Camera', () => {
       // A reset, as a host framing a map or the R key makes, leaves them alike too.
       for (const camera of [cam, untouched]) camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 5000]);
       expect(state(cam)).toEqual(state(untouched));
+    }
+  });
+
+  it('keeps the ground under the cursor there when it zooms a tilted view', () => {
+    const cam = orthographic();
+    cam.pitch(-0.6);
+    cam.update();
+    for (const [x, y] of [[0.75, 0.25], [0.2, 0.9]]) {
+      const ground = groundUnder(cam, x, y);
+      const before = 1 / cam.getProjectionMatrix()[5]; // half the view's height
+      cam.zoom(-1, x, y);
+      cam.update();
+      const [drawnX, drawnY] = project(cam, [ground[0], ground[1], 0]);
+      expect(drawnX).toBeCloseTo(x * 2 - 1, 4);
+      expect(drawnY).toBeCloseTo(y * 2 - 1, 4);
+      expect(1 / cam.getProjectionMatrix()[5]).toBeLessThan(before * 0.95);
     }
   });
 });
