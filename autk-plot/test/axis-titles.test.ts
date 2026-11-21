@@ -208,4 +208,28 @@ describe('Axis titles clear of their tick labels', () => {
         expect(titleOf(bars.x).getAttribute('transform')).toBeNull();
         expect(titleOf(lines.x).getAttribute('transform')).toBeNull();
     });
+
+    it('draws a bar chart again from its configured margins once its x title no longer needs the room', () => {
+        // 300 px wide, as above: the x title moves below the long rotated labels, and the bottom margin grows.
+        const { plot, x } = draw({
+            type: 'barchart',
+            collection: landUses,
+            attributes: { axis: ['landuse', 'area'] },
+            labels: { axis: ['Land use', 'Area'] },
+            width: 300,
+        });
+        expect(originOf(x)[1]).toBeLessThan(450);
+
+        // One-letter land uses leave the title clear of every label.
+        plot.updateCollection(collectionOf([
+            { landuse: 'C', kind: 'k1', area: 10 },
+            { landuse: 'R', kind: 'k2', area: 20 },
+            { landuse: 'I', kind: 'k1', area: 30 },
+            { landuse: 'S', kind: 'k2', area: 40 },
+        ]));
+
+        // The default bottom margin of a plot 500 px high, and main's place for the title.
+        expect(x.getAttribute('transform')).toBe('translate(40, 450)');
+        expect(titleOf(x).getAttribute('y')).toBe('35');
+    });
 });
