@@ -56,6 +56,24 @@ function groundOf(camera: Camera) {
     };
 }
 
+/** The tiles of a selection that hold a ground point. */
+function tilesHolding(selection: TileSelection, [x, y]: readonly [number, number]) {
+    const [lon, lat] = crsToLonLat(CRS, x + ORIGIN[0], y + ORIGIN[1]);
+    return selection.tiles.filter((tile) => {
+        const coord = lonLatToTileCoord(lon, lat, tile.z);
+        return Math.floor(coord.x) === tile.x && Math.floor(coord.y) === tile.y;
+    });
+}
+
+/** Whether a point lies in a convex polygon, whichever way round its vertices go. */
+function insidePolygon(polygon: ReadonlyArray<readonly [number, number]>, [x, y]: readonly [number, number]): boolean {
+    const sides = polygon.map(([ax, ay], i) => {
+        const [bx, by] = polygon[(i + 1) % polygon.length]!;
+        return Math.sign((bx - ax) * (y - ay) - (by - ay) * (x - ax));
+    });
+    return sides.every((side) => side >= 0) || sides.every((side) => side <= 0);
+}
+
 /** One zoom for every tile, every tile over the view's box, and every point of the view in exactly one tile. */
 function expectOneZoomOver(selection: TileSelection, { box: [minX, minY, maxX, maxY], points }: ReturnType<typeof groundOf>) {
     expect(new Set(selection.tiles.map((tile) => tile.z))).toEqual(new Set([selection.z]));
@@ -65,12 +83,8 @@ function expectOneZoomOver(selection: TileSelection, { box: [minX, minY, maxX, m
         const [x1, y1] = lonLatToCrs(CRS, east, north);
         expect(x0 - ORIGIN[0] < maxX && x1 - ORIGIN[0] > minX && y0 - ORIGIN[1] < maxY && y1 - ORIGIN[1] > minY).toBe(true);
     }
-    for (const [x, y] of points) {
-        const [lon, lat] = crsToLonLat(CRS, x + ORIGIN[0], y + ORIGIN[1]);
-        expect(selection.tiles.filter((tile) => {
-            const coord = lonLatToTileCoord(lon, lat, tile.z);
-            return Math.floor(coord.x) === tile.x && Math.floor(coord.y) === tile.y;
-        })).toHaveLength(1);
+    for (const point of points) {
+        expect(tilesHolding(selection, point)).toHaveLength(1);
     }
 }
 
@@ -90,5 +104,26 @@ describe('imagery detail in a tilted orthographic view', () => {
         const selection = selectAdaptiveTiles({ camera: overlay, origin: ORIGIN, crs: CRS }, SOURCE, {}, [],
             { camera, viewport: [3200, 2000], heightAt: () => 0 })!;
         expectOneZoomOver(selection, ground);
+    });
+
+    it('covers a steeply tilted view within its reach, behind the plane of the eye too, with its footprint and its tiles', () => {
+        // Tilted 85 degrees, the view draws ground from far behind the plane of the eye to far in front of it.
+        const camera = tiltedOrthographic((85 * Math.PI) / 180);
+        const reach = 20 * camera.getEye()[2]; // the selection's reach: 20 eye heights
+        expect(drawnGround(camera, 0.5, 0).along).toBeLessThan(-reach);
+        expect(drawnGround(camera, 0.5, 1).along).toBeGreaterThan(reach);
+
+        // The ground drawn within the reach, under five columns of screen positions, on both sides of the eye's plane.
+        const rows = Array.from({ length: 19 }, (_, i) => (i + 1) / 20);
+        const ground = [0.05, 0.25, 0.5, 0.75, 0.95].flatMap((x) => rows.map((y) => drawnGround(camera, x, y)))
+            .filter(({ along }) => Math.abs(along) <= reach * 0.9);
+        expect(ground.filter(({ along }) => along < 0).length).toBeGreaterThan(5);
+        expect(ground.filter(({ along }) => along > 0).length).toBeGreaterThan(5);
+        const points = ground.map(({ point }) => point);
+
+        const footprint = camera.getGroundFootprint(reach);
+        expect(points.filter((point) => !insidePolygon(footprint, point))).toEqual([]);
+        const selection = selectAdaptiveTiles({ camera, origin: ORIGIN, crs: CRS }, SOURCE)!;
+        expect(points.filter((point) => tilesHolding(selection, point).length !== 1)).toEqual([]);
     });
 });
