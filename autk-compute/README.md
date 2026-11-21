@@ -54,7 +54,7 @@ If the GPU rejects the pass, `gpgpuPipeline` (and `ComputeGpgpu.run`) rejects wi
 
 `uniforms` contains scalar constants in uniform buffers. Despite their historical names, `uniformArrays` and `uniformMatrices` are **global read-only storage buffers**, shared by every feature. Large globals are read in place rather than copied into function-local arrays or passed by value. This avoids the uniform-buffer size limit and large-array compiler stack issues; it is not a promise of faster computation.
 
-Inside `wgslBody`, access an array as `weights[index]`, with `weights_length: u32`. Matrices are flattened row-major: `matrix[row * matrix_cols + col]`, with `matrix_rows` and `matrix_cols` of type `u32`. Empty globals report zero logical length/rows; avoid indexing outside the logical dimensions. Per-feature `attributeArrays`/`attributeMatrices` keep their existing behavior.
+Inside `wgslBody`, access an array as `weights[index]`, with `weights_length: u32`. Matrices are flattened row-major: `matrix[row * matrix_cols + col]`, with `matrix_rows` and `matrix_cols` of type `u32`. Empty globals report zero logical length/rows; avoid indexing outside the logical dimensions. Per-feature `attributeArrays`/`attributeMatrices` keep their existing behavior; a row of a per-feature matrix's value that is itself a list of rows gives its rows in its place, so a MultiLineString's `geometry.coordinates` packs as one list of its points, in their order.
 
 ```ts
 const result = await compute.gpgpuPipeline({

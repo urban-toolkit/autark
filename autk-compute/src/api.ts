@@ -139,7 +139,11 @@ export interface GpgpuPipelineParams {
     /** Per-feature fixed-length arrays keyed by WGSL variable name. */
     attributeArrays?: Record<string, number>;
 
-    /** Per-feature matrices keyed by WGSL variable name. */
+    /**
+     * Per-feature matrices keyed by WGSL variable name. A row of a feature's value that is itself a
+     * list of rows gives its rows in its place, so a MultiLineString's `geometry.coordinates` packs
+     * as one list of its points, in their order.
+     */
     attributeMatrices?: Record<string, { rows: number | 'auto'; cols: number }>;
 
     /** Global scalar constants shared across the dispatch, backed by uniform buffers. */

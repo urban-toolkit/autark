@@ -39,6 +39,22 @@ const WGSL_RESERVED_WORDS = new Set([
 ]);
 const INTERNAL_WGSL_SYMBOLS = new Set(['ArrayF32', 'OutputArray', 'compute_value', 'main', 'idx', 'id', 'i']);
 
+/** Whether a matrix value's row is itself a list of rows, as each line of a MultiLineString is a list of points. */
+function holdsRows(row: unknown): row is unknown[] {
+    return Array.isArray(row) && row.some(Array.isArray);
+}
+
+/**
+ * The rows a matrix attribute packs from a feature's value. A row that is itself a list of rows gives
+ * its rows in its place, so a MultiLineString's `geometry.coordinates` packs as one list of its
+ * points, in their order. A value whose rows are rows of numbers, as a LineString's coordinates, is
+ * packed as it is.
+ */
+function matrixRows(value: unknown): unknown[] {
+    if (!Array.isArray(value)) return [];
+    return value.some(holdsRows) ? value.flatMap((row) => (holdsRows(row) ? matrixRows(row) : [row])) : value;
+}
+
 /**
  * GPGPU compute engine for feature-level GeoJSON analysis.
  *
@@ -468,8 +484,7 @@ export class ComputeGpgpu extends GpuPipeline {
             const feat = features[i];
             for (const acc of accessors) {
                 if (acc.kind === 'matrix_auto') {
-                    const val = valueAtPath(feat, acc.path);
-                    const len = Array.isArray(val) ? val.length : 0;
+                    const len = matrixRows(valueAtPath(feat, acc.path)).length;
                     acc.actualRows[i] = len;
                     if (len > acc.maxRows) {
                         acc.maxRows = len;
@@ -522,10 +537,11 @@ export class ComputeGpgpu extends GpuPipeline {
                     }
                 } else if (acc.kind === 'matrix_fixed' || acc.kind === 'matrix_auto') {
                     const rCount = acc.kind === 'matrix_fixed' ? acc.rows : acc.maxRows;
-                    const sourceMatrix = Array.isArray(val) ? val : [];
+                    const sourceMatrix = matrixRows(val);
                     const offset = i * rCount * acc.cols;
                     for (let r = 0; r < rCount; r++) {
-                        const sourceRow = Array.isArray(sourceMatrix[r]) ? sourceMatrix[r] : [];
+                        const row = sourceMatrix[r];
+                        const sourceRow: unknown[] = Array.isArray(row) ? row : [];
                         for (let c = 0; c < acc.cols; c++) {
                             const num = c < sourceRow.length ? Number(sourceRow[c]) : 0;
                             arr[offset + r * acc.cols + c] = Number.isFinite(num) ? num : 0;
