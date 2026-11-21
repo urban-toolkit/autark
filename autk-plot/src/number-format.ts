@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 
-/** The SI prefixes d3 writes for values under one: "500m" for 0.5, which reads like metres. */
+/** The SI prefixes d3 writes for values under one: "500m" for 0.5, which reads like meters. */
 const PREFIX_UNDER_ONE = /[yzafpnµμm]$/;
 
 /**
