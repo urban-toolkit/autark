@@ -89,6 +89,40 @@ function drawn(map: AutkMap): string[] {
     return calls;
 }
 
+/** Every order of `items`. */
+function permutations<T>(items: readonly T[]): T[][] {
+    if (items.length === 0) { return [[]]; }
+    return items.flatMap((item, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [item, ...rest]));
+}
+
+/** Every list of distinct ids from `ids`, in every order, the empty list included. */
+function everyOrder(ids: readonly string[]): string[][] {
+    const subsets = ids.reduce<string[][]>((all, id) => [...all, ...all.map((subset) => [...subset, id])], [[]]);
+    return subsets.flatMap((subset) => permutations(subset));
+}
+
+/**
+ * The stack `setLayerOrder(order)` must draw, found by trying every stack of the layers: of the stacks with the
+ * listed layers in the order given and the others in their order by type, those that reverse the fewest pairs of
+ * the order by type, and of those, the one where each listed layer is as low as it can be.
+ */
+function stackByRule(byType: readonly string[], order: readonly string[]): string[] {
+    const listed = order.filter((id) => byType.includes(id));
+    const others = byType.filter((id) => !listed.includes(id));
+    const valid = permutations(byType).filter((candidate) =>
+        candidate.filter((id) => listed.includes(id)).join() === listed.join()
+        && candidate.filter((id) => others.includes(id)).join() === others.join());
+    const reversed = (candidate: string[]) => byType.reduce((count, id, i) =>
+        count + byType.slice(i + 1).filter((above) => candidate.indexOf(above) < candidate.indexOf(id)).length, 0);
+    const fewest = Math.min(...valid.map(reversed));
+    const best = valid.filter((candidate) => reversed(candidate) === fewest);
+    const places = (candidate: string[]) => listed.map((id) => candidate.indexOf(id));
+    const lowest = listed.map((_, i) => Math.min(...best.map((candidate) => places(candidate)[i])));
+    const chosen = best.find((candidate) => places(candidate).join() === lowest.join());
+    if (!chosen) { throw new Error(`No stack has every listed layer as low as it can be for [${order}].`); }
+    return chosen;
+}
+
 describe('the order a map draws its layers in', () => {
     it('draws surface and roads first, then the other layers in load order, when no order is set', () => {
         const { map } = mapWithoutGpu();
@@ -159,5 +193,41 @@ describe('the order a map draws its layers in', () => {
         expect(drawn(map)).toEqual(byType);
         map.setLayerOrder(['stops', 'buildings']);
         expect(drawn(map)).toEqual(byType);
+    });
+
+    it('moves the stops under the surface without moving the surface over the roads and the heat', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'roads', 'heat', 'stops']);
+        map.setLayerOrder(['stops', 'surface']);
+        expect(drawn(map)).toEqual(['stops', 'surface', 'roads', 'heat']);
+    });
+
+    it('keeps the roads under the bus stops when a raster the order lists loads after it', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'roads', 'stops']);
+        map.setLayerOrder(['heat', 'roads']);
+        expect(stack(map)).toEqual(['surface', 'roads', 'stops']);
+        load(map, ['heat']);
+        expect(drawn(map)).toEqual(['surface', 'heat', 'roads', 'stops']);
+    });
+
+    it('moves the fewest layers past others, even when that moves a listed layer up', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'roads', 'heat', 'stops']);
+        // Moving the surface up passes the roads once; keeping it at the bottom would move both the heat and the stops under the roads.
+        map.setLayerOrder(['heat', 'stops', 'surface']);
+        expect(drawn(map)).toEqual(['roads', 'heat', 'stops', 'surface']);
+    });
+
+    it('draws the stack its rule describes for every order of five layers', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'plaza', 'heat', 'roads', 'stops']);
+        const byType = stack(map);
+        expect(byType).toEqual(['surface', 'plaza', 'roads', 'heat', 'stops']);
+        // `trees` is not loaded, so the rule leaves it out.
+        for (const order of everyOrder([...byType, 'trees'])) {
+            map.setLayerOrder(order);
+            expect(stack(map), `setLayerOrder(${JSON.stringify(order)})`).toEqual(stackByRule(byType, order));
+        }
     });
 });
