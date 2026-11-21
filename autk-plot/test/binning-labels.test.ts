@@ -83,6 +83,14 @@ describe('1D binning labels', () => {
             .map((cell) => cell.x);
         expect(cells).toEqual(labels);
     });
+
+    it('counts a value on a bin edge in the bin that edge opens', () => {
+        // 0.3 / 0.1 is 2.9999999999999996, and 0.6 and 0.7 fall short of their edges the same way. The maximum, 1, stays in the last bin.
+        expect(bars([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])).toEqual([
+            ['0.0-0.10', 1], ['0.10-0.20', 1], ['0.20-0.30', 1], ['0.30-0.40', 1], ['0.40-0.50', 1],
+            ['0.50-0.60', 1], ['0.60-0.70', 1], ['0.70-0.80', 1], ['0.80-0.90', 1], ['0.90-1.0', 2],
+        ]);
+    });
 });
 
 describe('Binning rows whose value holds no number', () => {
