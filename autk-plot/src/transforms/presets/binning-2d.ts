@@ -36,13 +36,13 @@ export type ExecutedBinning2dTransform = {
 /**
  * A single aggregated cell ready for plot rendering.
  *
- * `x` and `y` are the bin labels for this cell — either a category string or a
- * formatted numeric range such as `"1k-2k"`.
+ * `x` and `y` are the bin labels for this cell: either a category string or a
+ * formatted numeric range such as `"1000-2000"`.
  */
 export type Binning2dCellRow = {
-    /** Bin label for the x axis — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label for the x axis: a category string or a formatted numeric range such as `"1000-2000"`. */
     x: string;
-    /** Bin label for the y axis — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label for the y axis: a category string or a formatted numeric range such as `"1000-2000"`. */
     y: string;
     /** Numeric sort key for the x bin (bin index for quantitative, insertion order for categorical). */
     xOrder: number;

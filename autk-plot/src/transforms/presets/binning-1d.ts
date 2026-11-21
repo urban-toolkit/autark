@@ -13,7 +13,6 @@ import type { AutkDatum } from '../../types-plot';
 import type { Binning1dTransformConfig } from '../../api';
 
 import { reduceBuckets } from '../kernel';
-import { formatSiOrDecimal } from '../../number-format';
 
 /** Label of the bin of a quantitative attribute's values that hold no number: missing, null or not finite. */
 const UNKNOWN = 'unknown';
@@ -42,11 +41,11 @@ export type ExecutedBinning1dTransform = {
 /**
  * A single bin row ready for plot rendering.
  *
- * `label` is either a category string or a formatted numeric range such as `"1k-2k"`.
+ * `label` is either a category string or a formatted numeric range such as `"1000-2000"`.
  * `order` is the numeric sort key for the bin (bin index for quantitative, insertion order for categorical).
  */
 export type Binning1dBinRow = {
-    /** Bin label — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label: a category string or a formatted numeric range such as `"1000-2000"`. */
     label: string;
     /** Numeric sort key for this bin (bin index for quantitative, insertion order for categorical). */
     order: number;
@@ -110,7 +109,7 @@ export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig
 export type BinMapper = {
     /** Key of the bin a value falls in: its category, or the index of its numeric range. */
     key: (value: unknown) => string;
-    /** Label of a bin: its category, or its numeric range such as `"1.0k-2.0k"`. */
+    /** Label of a bin: its category, or its numeric range such as `"1000-2000"`. */
     label: (key: string) => string;
     /** Sort key of a bin: the category's first-seen rank, or the numeric range's index, the unknown bin after the ranges. */
     order: (key: string) => number;
@@ -122,7 +121,7 @@ export type BinMapper = {
  * Detects whether the attribute is categorical or quantitative. Categorical
  * attributes map to their string representation; quantitative attributes are
  * divided into `numBins` fixed-width ranges, keyed by their index and labeled
- * by their SI-formatted boundaries. A value of a quantitative attribute that holds
+ * by their boundaries, written as plain decimals. A value of a quantitative attribute that holds
  * no number (missing, null or not finite) goes to an `unknown` bin after the ranges.
  *
  * @param rows - Input data used to infer the attribute's type and numeric range.
@@ -200,8 +199,8 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
 /**
  * Formats bin edges at the fewest significant digits, two or more, that tell each
  * edge from the next and print every edge within a tenth of a bin width of its value.
- * Values of a thousand and more keep their SI prefix ("1.5k"); values under one read
- * as decimals ("0.25", where the SI format gives "250m").
+ * Edges read as plain decimals, with no SI prefix: "1990", not "1.990k", and "0.25",
+ * not "250m".
  *
  * @param edges - Bin edges in ascending order.
  * @param binWidth - Width of a bin.
@@ -220,12 +219,13 @@ function formatBinEdges(edges: number[], binWidth: number): string[] {
 }
 
 /**
- * Formats one bin edge at the given number of significant digits.
+ * Formats one bin edge as a plain decimal at the given number of significant digits.
+ * Zero keeps its digits ("0.0"), which d3's decimal format drops ("0").
  *
  * @param value - Edge value.
  * @param digits - Significant digits.
  * @returns The edge's text.
  */
 function formatBinEdge(value: number, digits: number): string {
-    return formatSiOrDecimal(value, d3.format(`.${digits}s`), d3.format(`.${digits}r`));
+    return value === 0 ? value.toPrecision(digits) : d3.format(`.${digits}r`)(value);
 }
