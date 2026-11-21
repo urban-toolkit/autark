@@ -1010,6 +1010,47 @@ export class AutkMap {
     }
 
     /**
+     * Sets the order the map draws its layers in, bottom first.
+     *
+     * Without one, the map draws its layers in the order by type: tile layers
+     * first, then surface, parks, water and roads layers, then every other
+     * layer in the order it was loaded, so a raster loaded before the roads
+     * still covers them. With an order set:
+     *
+     * - the layers listed are drawn in the order given;
+     * - the layers not listed keep their order among themselves;
+     * - a layer moves past another only when the order requires it: of the
+     *   stacks that meet both rules, the map draws the one that reverses the
+     *   fewest pairs of layers compared with the order by type, and of those,
+     *   the one where each listed layer is as low as it can be.
+     *
+     * A layer loaded later takes its place by the same rule. Buildings are
+     * drawn with depth over the other layers wherever they are, so the order
+     * leaves them out: listing them changes nothing. Each layer keeps its
+     * `zIndex`, the slot of its type. An empty list returns to the order by
+     * type.
+     *
+     * @param ids Layer ids, bottom first.
+     * @returns Nothing. The layer list and the credits, which follow the order,
+     * are refreshed and a frame is requested.
+     * @throws Never throws.
+     * @example
+     * map.setLayerOrder(['surface', 'heat', 'roads']); // the heat raster under the roads
+     * @example
+     * // With surface, roads, heat and stops drawn in that order by type:
+     * map.setLayerOrder(['stops', 'surface']);
+     * // Drawn: stops, surface, roads, heat. Moving the surface up over the
+     * // stops instead would reverse as many pairs, and it would draw the surface
+     * // over the roads and the heat; the map keeps the listed layers lower.
+     */
+    setLayerOrder(ids: string[]): void {
+        this._layerManager.setLayerOrder(ids);
+        this._ui.refreshLayerList();
+        this.refreshAttribution();
+        this.requestRender();
+    }
+
+    /**
      * Replaces the highlighted selection of a pickable layer.
      *
      * @param id Layer identifier.
