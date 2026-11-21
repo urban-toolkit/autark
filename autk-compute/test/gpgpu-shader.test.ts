@@ -74,6 +74,41 @@ describe('global storage arrays and matrices (#105)', () => {
     });
 });
 
+describe("a matrix attribute packs a geometry's points", () => {
+    /** The dispatch of a pass that reads each feature's `geometry.coordinates` as a matrix of rows of two values. */
+    async function packed(features: FeatureCollection['features'], rows: number | 'auto' = 'auto'): Promise<ComputeConfig> {
+        const pipeline = new ComputeGpgpu();
+        let seen: ComputeConfig | undefined;
+        vi.spyOn(pipeline as any, 'runCompute').mockImplementation(async (config: any) => {
+            seen = config;
+            return { out0: new Float32Array(features.length) };
+        });
+        await pipeline.run({
+            collection: { type: 'FeatureCollection', features }, variableMapping: { seg: 'geometry.coordinates' },
+            attributeMatrices: { seg: { rows, cols: 2 } }, wgslBody: 'return seg[0u];', resultField: 'out',
+        });
+        if (!seen) throw new Error('No dispatch');
+        return seen;
+    }
+    const line = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: [[0, 0], [1, 0], [2, 0]] } };
+    const lines = {
+        type: 'Feature' as const, properties: {},
+        geometry: { type: 'MultiLineString' as const, coordinates: [[[5, 5], [6, 5]], [[7, 5], [8, 6]]] },
+    };
+
+    it('packs a MultiLineString as one list of its points, in their order, and a LineString as before', async () => {
+        // Each feature holds as many rows as the longest, here the MultiLineString's four points: the line's last is padding.
+        const { inputs } = await packed([line, lines]);
+        expect(Array.from(inputs.seg.data)).toEqual([0, 0, 1, 0, 2, 0, 0, 0, 5, 5, 6, 5, 7, 5, 8, 6]);
+        expect(Array.from(inputs.seg__varrows.data)).toEqual([3, 4]);
+    });
+
+    it('packs the first points of a MultiLineString into a matrix of a fixed number of rows', async () => {
+        const { inputs } = await packed([lines, line], 3);
+        expect(Array.from(inputs.seg.data)).toEqual([5, 5, 6, 5, 7, 5, 0, 0, 1, 0, 2, 0]);
+    });
+});
+
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
 type FakeDevice = ReturnType<typeof fakeDevice>;
 const STORAGE = 128;
