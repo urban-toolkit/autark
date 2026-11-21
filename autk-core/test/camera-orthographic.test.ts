@@ -236,4 +236,23 @@ describe('a lasting orthographic Camera', () => {
       expect(1 / cam.getProjectionMatrix()[5]).toBeLessThan(before * 0.95);
     }
   });
+
+  it('shows what the perspective view shows when it is switched after a wheel zoom and a pan', () => {
+    // These moves leave the point the camera looks at one unit ahead of the eye.
+    const moved = () => {
+      const camera = new Camera({ eye: [100, 200, 1000], lookAt: [100, 200, 0], up: [0, 1, 0] });
+      camera.resize(1600, 1000);
+      camera.zoom(-1, 0.75, 0.25);
+      camera.translate(0.1, 0);
+      camera.update();
+      return camera;
+    };
+    const perspective = moved();
+    const cam = moved();
+    cam.setProjection('orthographic');
+    cam.update();
+    // Points beside the ground the view center looks at, straight below the eye.
+    const [x, y, height] = perspective.getEye();
+    expectDrawnAlike(cam, perspective, [[x + height * 0.1, y, 0], [x, y + height * 0.1, 0]]);
+  });
 });
