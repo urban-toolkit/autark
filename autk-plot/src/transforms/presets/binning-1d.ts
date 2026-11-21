@@ -18,7 +18,10 @@ import { formatSiOrDecimal } from '../../number-format';
 /** Label of the bin of a quantitative attribute's values that hold no number: missing, null or not finite. */
 const UNKNOWN = 'unknown';
 
-/** A difference under this fraction of a bin width is rounding error: a bin edge this close to 0 is 0. */
+/**
+ * A difference under this fraction of a bin width is rounding error: a bin edge this close to 0 is 0, and a value
+ * this close below an edge is on it.
+ */
 const ROUNDING_TOLERANCE = 1e-9;
 
 // ---- Executed transform -------------------------------------------------
@@ -183,7 +186,9 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
             // A value that holds no number, missing, null or NaN, goes to a bin of its own: null is not 0.
             const n = v == null ? NaN : Number(v);
             if (!Number.isFinite(n)) return UNKNOWN;
-            const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
+            // A value on an edge counts in the bin that edge opens, though 0.3 / 0.1 is 2.9999999999999996; the
+            // maximum stays in the last bin.
+            const normalized = span === 0 ? 0 : (n - minValue) / binWidth + ROUNDING_TOLERANCE;
             return String(Math.max(0, Math.min(Math.floor(normalized), numBins - 1)));
         },
         label: (key: string) => labels[Number(key)] ?? key,
