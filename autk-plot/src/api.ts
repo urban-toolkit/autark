@@ -70,7 +70,9 @@ export type PlotConfig = {
     /**
      * D3 format strings for each axis tick. An axis they give no format, with no `tickFormats` or with a missing entry
      * for it, writes a value with an SI prefix from one up ("1k", "2.5M") and as a decimal under one ("0.5", "0.25"),
-     * and a bar chart's category or a line chart's bucket as it is written ("2020").
+     * and a line chart's bucket as it is written ("2020"). It writes a bar chart's category as it is written too,
+     * unless it is a number that is not whole, written as JavaScript writes numbers: that one is rounded to 15
+     * significant digits, with no trailing zeros, so 0.30000000000000004 reads "0.3" and 12.3456789 keeps every digit.
      */
     tickFormats?: string[];
     /** Domain specification controlling how the colormap range is derived. */
