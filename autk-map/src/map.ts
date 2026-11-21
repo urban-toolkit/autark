@@ -1030,7 +1030,8 @@ export class AutkMap {
      * the order by type.
      *
      * @param ids Layer ids, bottom first.
-     * @returns Nothing. The layer list is refreshed and a frame is requested.
+     * @returns Nothing. The layer list and the credits, which follow the order,
+     * are refreshed and a frame is requested.
      * @throws Never throws.
      * @example
      * map.setLayerOrder(['surface', 'heat', 'roads']); // the heat raster under the roads
@@ -1044,6 +1045,7 @@ export class AutkMap {
     setLayerOrder(ids: string[]): void {
         this._layerManager.setLayerOrder(ids);
         this._ui.refreshLayerList();
+        this.refreshAttribution();
         this.requestRender();
     }
 
