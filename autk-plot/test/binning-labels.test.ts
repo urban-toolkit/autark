@@ -65,6 +65,24 @@ describe('1D binning labels', () => {
             '0.0-1.0k', '1.0k-2.0k', '2.0k-3.0k', '3.0k-4.0k', '4.0k-5.0k',
         ]);
     });
+
+    it('writes a bin edge at zero as 0.0, in one and two dimensions', () => {
+        // The edges are -0.3 + i * 0.1, and -0.3 + 3 * 0.1 is 5.6e-17, not 0. d3 writes a minus sign, U+2212.
+        const minus = String.fromCharCode(0x2212);
+        const values = [-0.3, -0.25, -0.15, -0.05, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.7];
+        const labels = [
+            `${minus}0.30-${minus}0.20`, `${minus}0.20-${minus}0.10`, `${minus}0.10-0.0`, '0.0-0.10', '0.10-0.20',
+            '0.20-0.30', '0.30-0.40', '0.40-0.50', '0.50-0.60', '0.60-0.70',
+        ];
+
+        expect(bars(values).map(([label]) => label)).toEqual(labels);
+        expect(bars([-0.1, -0.05, 0.05, 0.15, 0.2], 3).map(([label]) => label)).toEqual([`${minus}0.10-0.0`, '0.0-0.10', '0.10-0.20']);
+
+        const cells = (run(rowsOf(values), { preset: 'binning-2d' }, ['v', 'kind']).rows as Binning2dCellRow[])
+            .sort((a, b) => a.xOrder - b.xOrder)
+            .map((cell) => cell.x);
+        expect(cells).toEqual(labels);
+    });
 });
 
 describe('Binning rows whose value holds no number', () => {
