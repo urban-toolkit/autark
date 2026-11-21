@@ -296,7 +296,7 @@ export class Camera {
      * Switches the camera to a top-down orthographic projection over a rectangle of ground.
      *
      * The camera keeps these bounds until {@link resetCamera} or
-     * {@link setProjection} is called: {@link resize} and {@link update} keep the
+     * `setProjection('perspective')` is called: {@link resize} and {@link update} keep the
      * projection, and the ground and ray helpers follow the bounds. World `z`
      * from -10 to 90 is inside the depth range. Ordinary 2D layers remain on the
      * common ground plane and use drawing order. For a view that follows the
@@ -339,7 +339,12 @@ export class Camera {
      * over raised ground, and zoom, pan, tilt and {@link resetCamera} work as in
      * perspective. It draws everything within the far distance in front of the
      * eye or behind it, so buildings taller than the eye is high are drawn
-     * whole. Either projection ends the bounds of {@link setOrthographicBounds}.
+     * whole.
+     *
+     * Setting the projection {@link getProjection} already reports changes
+     * nothing. While the bounds of {@link setOrthographicBounds} hold, the
+     * camera is orthographic, so `setProjection('orthographic')` keeps them and
+     * `setProjection('perspective')` ends them.
      *
      * @param projection - `'perspective'`, the default, or `'orthographic'`.
      * @throws Never throws.
@@ -347,6 +352,7 @@ export class Camera {
      * camera.setProjection('orthographic');
      */
     public setProjection(projection: CameraProjection): void {
+        if (projection === this.getProjection()) return;
         this.projection = projection;
         this.orthographic = null;
         this.update();
