@@ -176,4 +176,36 @@ describe('a lasting orthographic Camera', () => {
     const [perspective, cam] = twins([0, 1, 0], [100, 200, 1600], [100, 200, 2000]);
     expectDrawnAlike(cam, perspective, besideLookAt(perspective));
   });
+
+  it('changes nothing when set to the projection it already has, also while the bounds of setOrthographicBounds hold', () => {
+    // What a camera draws, and where its ground helpers put two corners of the view.
+    const state = (cam: Camera) => {
+      cam.update(); // as each frame does
+      return {
+        projection: cam.getProjection(),
+        matrix: Array.from(cam.getViewProjectionMatrix()),
+        corners: [cam.getGroundPoint(0, 0, 1e6), cam.getGroundPoint(1, 1, 1e6)],
+      };
+    };
+    const bounded = () => {
+      const cam = new Camera();
+      cam.resize(1000, 800);
+      cam.setOrthographicBounds(0, 1000, 0, 800);
+      return cam;
+    };
+    const perspective = () => {
+      const cam = new Camera({ eye: [100, 200, 1000], lookAt: [100, 200, 0], up: [0, 1, 0] });
+      cam.resize(1600, 1000);
+      return cam;
+    };
+    for (const make of [bounded, orthographic, perspective]) {
+      const cam = make();
+      const untouched = make();
+      cam.setProjection(cam.getProjection());
+      expect(state(cam)).toEqual(state(untouched));
+      // A reset, as a host framing a map or the R key makes, leaves them alike too.
+      for (const camera of [cam, untouched]) camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 5000]);
+      expect(state(cam)).toEqual(state(untouched));
+    }
+  });
 });
