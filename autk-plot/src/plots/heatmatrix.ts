@@ -66,7 +66,7 @@ export class Heatmatrix extends PlotBaseInteractive {
     public render(): void {
         const svg = d3.select(this._div)
             .selectAll('svg.autk-plot').data([0]).join('svg')
-            .attr('class', 'autk-plot')
+            .classed('autk-plot', true)
             .attr('width', this._width)
             .attr('height', this._height)
             .style('visibility', 'visible');

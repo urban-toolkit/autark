@@ -78,7 +78,7 @@ export class Scatterplot extends PlotBaseInteractive {
             .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('class', 'autk-plot')
+            .classed('autk-plot', true)
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
