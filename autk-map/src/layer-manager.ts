@@ -159,11 +159,11 @@ export class LayerManager {
     /**
      * Sets the order the layers are drawn in, bottom first.
      *
-     * The layers listed trade places, so they are drawn in this order; the
-     * layers not listed keep theirs. Buildings are drawn with depth wherever
-     * they are, so the order leaves them out. An id whose layer is not
-     * registered yet takes its place when it is. An empty list returns to the
-     * order by type.
+     * The layers listed are drawn in this order, and the others keep their
+     * order, with as few layers moved past others as can be: the rule is in
+     * `applyLayerOrder`. Buildings are drawn with depth wherever they are, so
+     * the order leaves them out. An id whose layer is not registered yet takes
+     * its place when it is. An empty list returns to the order by type.
      *
      * @param ids Layer ids, bottom first.
      * @returns Nothing. The z-indices and the order of {@link layers} are updated.
@@ -239,8 +239,8 @@ export class LayerManager {
      * - Buildings: always last (N + dynamic count)
      *
      * Layers in one slot keep the order they were added in. With an order set,
-     * the layers it lists then trade places, and every layer's z-index becomes
-     * its place in the stack.
+     * the stack is then rearranged as `applyLayerOrder` describes, and every
+     * layer's z-index becomes its place in the stack.
      *
      * @returns Nothing. Updates each registered layer's `layerInfo.zIndex` in
      * place and rebuilds {@link layers} sorted by it.
@@ -265,11 +265,65 @@ export class LayerManager {
         this._layers = [...this._added].sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
         if (this._order.length === 0) { return; }
 
-        // The listed layers take the places they hold, in the caller's order. Buildings are drawn
-        // with depth wherever they are, so the order leaves them out and they keep their places.
-        const rank = (layer: Layer) => (layer instanceof Triangles3DLayer ? -1 : this._order.indexOf(layer.layerInfo.id));
-        const ordered = this._layers.filter((layer) => rank(layer) !== -1).sort((a, b) => rank(a) - rank(b));
-        this._layers = this._layers.map((layer) => (rank(layer) === -1 ? layer : ordered.shift()!));
+        this._layers = applyLayerOrder(this._layers, this._order);
         this._layers.forEach((layer, place) => { layer.layerInfo.zIndex = place; });
     }
+}
+
+/**
+ * Rearranges a stack in the order by type so the layers an order lists are drawn in that order.
+ *
+ * The layers the order does not list keep their order among themselves. Of the stacks that keep
+ * both orders, this is the one that reverses the fewest pairs of layers compared with the order
+ * by type, and of those, the one where each listed layer is as low as it can be. Buildings are
+ * drawn with depth wherever they are, so the order leaves them out and they keep their places.
+ *
+ * @param byType Layers in the order by type, bottom first.
+ * @param order Distinct layer ids, bottom first. Ids of layers not in the stack are ignored.
+ * @returns The layers in the order they are drawn, bottom first.
+ */
+function applyLayerOrder(byType: Layer[], order: readonly string[]): Layer[] {
+    const flat = byType.filter((layer) => !(layer instanceof Triangles3DLayer));
+    const listed = order.map((id) => flat.find((layer) => layer.layerInfo.id === id)).filter((layer) => layer !== undefined);
+    const others = flat.filter((layer) => !listed.includes(layer));
+    // Pairs of listed layers follow the order and the others keep theirs, so the fewest pairs are
+    // reversed when the listed layers move past the fewest of the others.
+    const overByType = listed.map((layer) => others.filter((other) => flat.indexOf(other) < flat.indexOf(layer)).length);
+    const over = fewestPasses(overByType, others.length);
+    const drawn = others.flatMap((other, k) => [...listed.filter((_, n) => over[n] === k), other]);
+    drawn.push(...listed.filter((_, n) => over[n] === others.length));
+    let next = 0;
+    return byType.map((layer) => (layer instanceof Triangles3DLayer ? layer : drawn[next++]));
+}
+
+/**
+ * Places listed layers among the other layers, keeping them in their order and moving them past
+ * as few of the others as it can.
+ *
+ * @param overByType For each listed layer, in the order, how many of the others it is drawn
+ * over by type.
+ * @param others How many other layers there are.
+ * @returns For each listed layer, how many of the others it is drawn over: never fewer than the
+ * layer before it, with the fewest passes in all, and each as low as it can be.
+ */
+function fewestPasses(overByType: readonly number[], others: number): number[] {
+    // passes[n][k]: the fewest passes of listed layers 0 to n with layer n drawn over k others;
+    // `before` holds the fewest passes of the layers before it, none of them over more than k.
+    const passes: number[][] = [];
+    overByType.forEach((from, n) => {
+        let before = n === 0 ? 0 : Infinity;
+        passes.push(Array.from({ length: others + 1 }, (_, k) => {
+            if (n > 0) { before = Math.min(before, passes[n - 1][k]); }
+            return Math.abs(k - from) + before;
+        }));
+    });
+    // From the top listed layer down: the lowest choice with the fewest passes, no higher than the layer above.
+    const over = new Array<number>(overByType.length);
+    let limit = others;
+    for (let n = overByType.length - 1; n >= 0; n--) {
+        const row = passes[n].slice(0, limit + 1);
+        limit = row.indexOf(Math.min(...row));
+        over[n] = limit;
+    }
+    return over;
 }
