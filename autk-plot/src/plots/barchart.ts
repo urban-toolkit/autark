@@ -40,6 +40,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import { defaultCategoryFormat } from '../number-format';
 
 /**
  * Bar plot implementation supporting categorical values and binned mode.
@@ -130,14 +131,14 @@ export class Barchart extends PlotBaseInteractive {
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
-        // A category reads as it is written (2020, not 2.02k), unless the configuration's tickFormats give the x axis
-        // a format, which then writes a category that reads as a number.
+        // A category reads as it is written (2020, not 2.02k), and a number that is not whole as a decimal (0.3, not
+        // 0.30000000000000004), unless the configuration's tickFormats give the x axis a format, which then writes a
+        // category that reads as a number.
         const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
             const value = String(d);
+            if (!this.hasTickFormat(0)) return defaultCategoryFormat(value);
             const numericValue = Number(value);
-            return this.hasTickFormat(0) && Number.isFinite(numericValue) && value.trim() !== ''
-                ? this.tickFormat(0, '~s')(numericValue)
-                : value;
+            return Number.isFinite(numericValue) && value.trim() !== '' ? this.tickFormat(0, '~s')(numericValue) : value;
         });
 
         const xAxisSelection = svg

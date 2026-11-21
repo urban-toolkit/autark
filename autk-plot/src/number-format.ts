@@ -30,3 +30,18 @@ const decimalTick = d3.format('~r');
 export function defaultTickFormat(value: d3.NumberValue): string {
     return formatSiOrDecimal(+value, siTick, decimalTick);
 }
+
+/**
+ * Writes a category of a plot whose configuration gives no `tickFormats`: as it is written, the year 2020 and the
+ * zip code 10001 with every digit and a bin's label such as "0.40" with its own. Only a number that is not whole,
+ * written as JavaScript writes numbers, reads as a decimal at six significant digits, trimmed, as the default ticks
+ * write one: 0.30000000000000004 reads "0.3" and 12.3456789 reads "12.3457".
+ *
+ * @param category - Category as written.
+ * @returns The category's label.
+ */
+export function defaultCategoryFormat(category: string): string {
+    const value = Number(category);
+    const fractional = Number.isFinite(value) && !Number.isInteger(value) && String(value) === category;
+    return fractional ? decimalTick(value) : category;
+}
