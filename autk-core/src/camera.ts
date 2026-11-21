@@ -325,7 +325,7 @@ export class Camera {
      * Sets the projection the camera keeps until it is set again.
      *
      * An orthographic camera looks along the same line as the perspective one,
-     * with parallel rays. At the ground point the view centre looks at, it shows
+     * with parallel rays. At the ground point the view center looks at, it shows
      * what the perspective camera shows there, and its bounds follow the eye's
      * distance to that point, so zoom, pan, tilt and {@link resetCamera} work as
      * in perspective. It draws everything within the far distance in front of
@@ -568,7 +568,7 @@ export class Camera {
     /**
      * Returns half the width and height of the view that {@link setProjection} makes orthographic.
      *
-     * They are those of the perspective view at the ground point the view centre
+     * They are those of the perspective view at the ground point the view center
      * looks at, from the eye's distance to that point, kept between the near and
      * far distances. A view that meets no ground uses the far distance.
      *
