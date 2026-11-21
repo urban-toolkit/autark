@@ -45,10 +45,11 @@ const SOURCES: Record<string, LoadCollectionParams> = {
 /** A map that loads its layers through a real LayerManager, without the GPU pipelines AutkMap would create. */
 function mapWithoutGpu() {
     const map = Object.create(AutkMap.prototype) as any;
-    const ui = { refreshLayerList: vi.fn(), refreshLegend: vi.fn() };
+    const ui = { refreshLayerList: vi.fn(), refreshLegend: vi.fn(), setAttribution: vi.fn() };
     const requestRender = vi.fn();
     map._layerManager = new LayerManager();
     map._ui = ui;
+    map._terrainCredits = [];
     map.requestRender = requestRender;
     map.createLayer = (info: LayerInfo, render: LayerRenderInfo, data: LayerData) => map._layerManager.addLayer(info, render, data);
     return { map: map as AutkMap, ui, requestRender };
@@ -66,6 +67,15 @@ function load(map: AutkMap, ids: string[]): void {
             map.loadCollection(id, SOURCES[id]!);
         }
     }
+}
+
+/** Adds a tile layer that credits `attribution`, without the GPU pipeline and the view `loadTiles` sets up. */
+function addTiles(map: AutkMap, id: string, attribution: string): void {
+    map.layerManager.addTileLayer(
+        { id, zIndex: 0, typeLayer: 'tiles' },
+        { opacity: 1, colormap: { config: { interpolator: 'seq-reds' } as never }, isSkip: false },
+        { source: { urlTemplate: `https://${id}.example/{z}/{x}/{y}.png`, attribution } },
+    );
 }
 
 /** The ids of the layers in the map's stack, bottom first. */
@@ -229,5 +239,16 @@ describe('the order a map draws its layers in', () => {
             map.setLayerOrder(order);
             expect(stack(map), `setLayerOrder(${JSON.stringify(order)})`).toEqual(stackByRule(byType, order));
         }
+    });
+
+    it('shows the credits of the tile layers in the order it draws them', () => {
+        const { map, ui } = mapWithoutGpu();
+        load(map, ['surface']);
+        addTiles(map, 'imagery', '© Imagery');
+        addTiles(map, 'labels', '© Labels');
+        expect(map.layerManager.visibleAttribution()).toEqual([{ text: '© Imagery' }, { text: '© Labels' }]);
+        map.setLayerOrder(['labels', 'imagery']);
+        expect(stack(map)).toEqual(['labels', 'imagery', 'surface']);
+        expect(ui.setAttribution).toHaveBeenLastCalledWith([{ text: '© Labels' }, { text: '© Imagery' }]);
     });
 });
