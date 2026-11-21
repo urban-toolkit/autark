@@ -107,6 +107,31 @@ describe("a matrix attribute packs a geometry's points", () => {
         const { inputs } = await packed([lines, line], 3);
         expect(Array.from(inputs.seg.data)).toEqual([5, 5, 6, 5, 7, 5, 0, 0, 1, 0, 2, 0]);
     });
+
+    it("packs a Polygon's rings and a MultiPolygon's polygons one after another, with nothing between them", async () => {
+        // The outer ring's five points, then the hole's four; then each polygon's ring of four points. Nothing marks
+        // where a ring ends, so a pass that walks edges must know the ring lengths itself.
+        const polygon = {
+            type: 'Feature' as const, properties: {},
+            geometry: { type: 'Polygon' as const, coordinates: [
+                [[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
+                [[1, 1], [2, 1], [2, 2], [1, 1]],
+            ] },
+        };
+        const polygons = {
+            type: 'Feature' as const, properties: {},
+            geometry: { type: 'MultiPolygon' as const, coordinates: [
+                [[[10, 10], [11, 10], [11, 11], [10, 10]]],
+                [[[20, 20], [21, 20], [21, 21], [20, 20]]],
+            ] },
+        };
+        const { inputs } = await packed([polygon, polygons]);
+        expect(Array.from(inputs.seg.data)).toEqual([
+            0, 0, 4, 0, 4, 4, 0, 4, 0, 0, 1, 1, 2, 1, 2, 2, 1, 1,
+            10, 10, 11, 10, 11, 11, 10, 10, 20, 20, 21, 20, 21, 21, 20, 20, 0, 0,
+        ]);
+        expect(Array.from(inputs.seg__varrows.data)).toEqual([9, 8]);
+    });
 });
 
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
