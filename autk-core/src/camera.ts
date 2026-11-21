@@ -198,6 +198,21 @@ export class Camera {
         return new Float32Array(mat4.mul(mat4.create(), this.mProjectionMatrix, this.mViewMatrix));
     }
 
+    /**
+     * Returns the direction of the ray through a screen position, in world space.
+     *
+     * In perspective, the ray starts at the eye ({@link getEye}). In an
+     * orthographic view, every ray has the view direction, and the ray through
+     * a screen position starts at that position on the plane of the eye, not at
+     * the eye: unproject the position with the inverse of
+     * {@link getViewProjectionMatrix} to find a point on it, or use
+     * {@link getGroundPoint} for where it meets the ground.
+     *
+     * @param x - Normalized screen X, from 0 at the left to 1 at the right.
+     * @param y - Normalized screen Y, from 0 at the bottom to 1 at the top.
+     * @returns The unit direction `[x, y, z]`.
+     * @throws Never throws.
+     */
     public getWorldRayDirection(x: number, y: number): [number, number, number] {
         const direction = this.screenCoordToWorldDir(x, y);
         return [direction[0], direction[1], direction[2]];

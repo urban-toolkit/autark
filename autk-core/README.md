@@ -141,6 +141,8 @@ not guarantee high-accuracy conversion. Geocentric inputs require a separate 3D 
 
 `camera.setProjection('orthographic')` draws with parallel rays until `camera.setProjection('perspective')`, and `camera.getProjection()` reports which one the camera draws with. At the point the camera looks at, the orthographic view shows what the perspective view shows there, and zoom, pan, tilt and `resetCamera` keep working. `camera.setOrthographicBounds(left, right, bottom, top)` is a separate view: it looks straight down at a fixed rectangle of ground until `resetCamera` or `setProjection('perspective')`.
 
+In an orthographic view, `getWorldRayDirection` gives every screen position the view direction, and the ray through a position starts at that position on the plane of the eye, not at `getEye()`. `getGroundPoint` gives where that ray meets the ground.
+
 ## Resources
 
 - [Documentation](https://autarkjs.org/introduction.html)
