@@ -202,7 +202,8 @@ export class Camera {
      * A ray that points away from the ground, or is parallel to it, has no hit;
      * a hit farther than `maxDistance` is too far to be useful. In both cases the
      * point `maxDistance` along the ray is returned instead. An orthographic
-     * ray starts on the plane of the eye, and its hit may lie behind that plane.
+     * ray starts on the plane of the eye, and its hit may lie behind that plane;
+     * a hit more than `maxDistance` behind it gives the point `maxDistance` behind it.
      *
      * @param x - Normalized screen X (0–1, left to right).
      * @param y - Normalized screen Y (0–1, bottom to top).
@@ -218,10 +219,10 @@ export class Camera {
             return [bounds.left + (bounds.right - bounds.left) * x, bounds.bottom + (bounds.top - bounds.bottom) * y];
         }
         if (this.projection === 'orthographic') {
-            // The camera also draws the ground behind the plane of the eye.
+            // The camera also draws the ground behind the plane of the eye, so a hit past maxDistance keeps its side.
             const [origin, direction] = this.orthographicRay(x, y);
             const groundDistance = Math.abs(direction[2]) > 1e-6 ? -origin[2] / direction[2] : Number.POSITIVE_INFINITY;
-            const distance = Math.abs(groundDistance) <= maxDistance ? groundDistance : maxDistance;
+            const distance = Math.min(Math.max(groundDistance, -maxDistance), maxDistance);
             return [origin[0] + direction[0] * distance, origin[1] + direction[1] * distance];
         }
         const eye = this.wEye;
