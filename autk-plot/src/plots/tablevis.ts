@@ -35,6 +35,7 @@ import type { SortTransformConfig, PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
+import { PlotEvent } from '../types-events';
 
 /**
  * Table-based visualization with sorting and row selection interactions.
@@ -185,12 +186,15 @@ export class TableVis extends PlotBaseInteractive {
      * Re-renders rows and re-attaches click handlers after selection styles are applied.
      *
      * This keeps pinned-row ordering and click behavior in sync after selection updates.
+     * Click handlers are attached only when the table's events enable click.
      */
     protected override onSelectionUpdated(): void {
         const tbody = d3.select(this._div).select<HTMLTableSectionElement>('.autk-table tbody');
         if (tbody.node()) {
             this.renderRows(tbody);
-            this.clickEvent();
+            if (this._enabledEvents.includes(PlotEvent.CLICK)) {
+                this.clickEvent();
+            }
         }
     }
 

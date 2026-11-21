@@ -32,7 +32,6 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
-import { PlotStyle } from '../plot-style';
 
 /**
  * Two-dimensional scatter plot with optional click/brush interactions.
@@ -57,9 +56,6 @@ export class Scatterplot extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if(config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) {
-            config.tickFormats = ['~s', '~s'];
-        }
         super(config);
 
         if (this.renderAxisAttributes.length < 2) {
@@ -79,10 +75,10 @@ export class Scatterplot extends PlotBaseInteractive {
 
         const svg = d3
             .select(this._div)
-            .selectAll('#plot')
+            .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('id', 'plot')
+            .classed('autk-plot', true)
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
@@ -101,10 +97,9 @@ export class Scatterplot extends PlotBaseInteractive {
 
         // ---- Title (optional)
         svg
-            .selectAll<SVGTextElement, string>('#plotTitle')
+            .selectAll<SVGTextElement, string>('.plot-title')
             .data([this._title])
             .join('text')
-            .attr('id', 'plotTitle')
             .attr('class', 'plot-title')
             .attr('x', this._margins.left + width / 2)
             .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -121,13 +116,12 @@ export class Scatterplot extends PlotBaseInteractive {
         this.mapY = d3.scaleLinear().domain(yExtent).range([height, 0]);
 
         // ---- Axes
-        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(d3.format(this._tickFormats[0]));
+        const xAxis = d3.axisBottom(this.mapX).tickSizeInner(-height).tickFormat(this.tickFormat(0));
 
         const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
+            .selectAll<SVGGElement, unknown>('.x.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisX')
             .attr('class', 'x axis')
             .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
@@ -145,13 +139,12 @@ export class Scatterplot extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
+        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
+            .selectAll<SVGGElement, unknown>('.y.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisY')
             .attr('class', 'y axis')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');
@@ -196,7 +189,7 @@ export class Scatterplot extends PlotBaseInteractive {
             .attr('cx', (d) => this.mapX(d ? Number(valueAtPath(d, xAttribute)) || 0 : 0))
             .attr('cy', (d) => this.mapY(d ? Number(valueAtPath(d, yAttribute)) || 0 : 0))
             .attr('r', 5)
-            .style('fill', PlotStyle.default)
+            .style('fill', d => this.getMarkColor(d))
             .style('visibility', 'inherit');
 
         this.configureSignalListeners();

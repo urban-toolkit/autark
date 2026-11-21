@@ -39,7 +39,6 @@ import * as d3 from 'd3';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
-import { PlotStyle } from '../plot-style';
 
 import type { ExecutedPlotTransform } from '../transforms';
 
@@ -58,9 +57,6 @@ export class Linechart extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) { 
-            config.tickFormats = ['~s', '~s']; 
-        }
 
         if (!config.transform) {
             throw new Error('Linechart requires a transform configuration.');
@@ -120,10 +116,10 @@ export class Linechart extends PlotBaseInteractive {
 
         const svg = d3
             .select(this._div)
-            .selectAll('#plot')
+            .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('id', 'plot')
+            .classed('autk-plot', true)
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
@@ -138,10 +134,9 @@ export class Linechart extends PlotBaseInteractive {
         // ---- Title (optional)
         if (this._title && this._title.length > 0) {
             svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
+                .selectAll<SVGTextElement, string>('.plot-title')
                 .data([this._title])
                 .join('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + innerW / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -162,20 +157,20 @@ export class Linechart extends PlotBaseInteractive {
         const yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerH, 0]);
 
         // ---- Axes
+        // Ticks only where a bucket is: with two or three buckets, d3 would also place ticks halfway between them.
         const xAxis = d3.axisBottom(xScale)
-            .ticks(Math.min(n, 12))
-            .tickFormat((d) => seriesData[+d]?.label ?? d3.format(this._tickFormats[0])(+d));
+            .tickValues(xScale.ticks(Math.min(n, 12)).filter(Number.isInteger))
+            .tickFormat((d) => seriesData[+d]?.label ?? this.tickFormat(0)(d));
 
         const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
+            .selectAll<SVGGElement, unknown>('.x.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisX')
             .attr('class', 'x axis')
             .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
         xAxisSelection.call(xAxis);
-        xAxisSelection.selectAll<SVGTextElement, unknown>('text')
+        xAxisSelection.selectAll<SVGTextElement, unknown>('.tick text')
             .style('font-size', '11px')
             .attr('transform', 'rotate(-45)')
             .attr('text-anchor', 'end')
@@ -195,13 +190,12 @@ export class Linechart extends PlotBaseInteractive {
         const yAxis = d3.axisLeft(yScale)
             .ticks(5)
             .tickSizeInner(-innerW)
-            .tickFormat(d3.format(this._tickFormats[1]));
+            .tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
+            .selectAll<SVGGElement, unknown>('.y.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisY')
             .attr('class', 'y axis')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');
@@ -262,7 +256,7 @@ export class Linechart extends PlotBaseInteractive {
             .attr('cx', (d) => xScale(d.x))
             .attr('cy', (d) => yScale(d.y))
             .attr('r', 5)
-            .style('fill', PlotStyle.default)
+            .style('fill', d => this.getMarkColor(d))
             .style('visibility', 'inherit');
 
         // ---- Empty state
@@ -284,16 +278,16 @@ export class Linechart extends PlotBaseInteractive {
     /**
      * Formats a bucket label for axis rendering.
      *
-     * Numeric buckets are formatted using the configured x-axis tick format;
-     * all other labels are returned unchanged.
+     * A bucket reads as it is written (2020, not 2.02k), unless the configuration's
+     * tickFormats give the x axis a format, which then writes a numeric bucket.
      *
      * @param bucket Raw bucket label from the transform result.
      * @returns Display label used on the x axis.
      */
     private formatBucketLabel(bucket: string): string {
         const numericBucket = Number(bucket);
-        if (Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
-            return d3.format(this._tickFormats[0])(numericBucket);
+        if (this.hasTickFormat(0) && Number.isFinite(numericBucket) && String(numericBucket) === bucket) {
+            return this.tickFormat(0)(numericBucket);
         }
         return bucket;
     }

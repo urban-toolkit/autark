@@ -4,6 +4,8 @@ import type {
     Geometry,
 } from 'geojson';
 
+import * as d3 from 'd3';
+
 import type { AutkDatum } from './types-plot';
 
 import type {
@@ -22,6 +24,7 @@ import type { ColorMapDomainSpec, ResolvedDomain } from '@urban-toolkit/autk-cor
 
 import { run } from './transforms';
 import type { ExecutedPlotTransform } from './transforms';
+import { defaultTickFormat } from './number-format';
 
 /**
  * Normalized transform payload returned by `resolveTransformResult()`.
@@ -67,15 +70,17 @@ export abstract class PlotBaseData {
 
     /** Plot title text. */
     protected _title!: string;
-    /** D3 tick-format specifiers used by axis renderers. */
-    protected _tickFormats!: string[];
+    /** D3 tick-format specifiers the configuration gives the axis renderers, or `undefined` when it gives none. */
+    protected _tickFormats: string[] | undefined;
 
     /** Outer plot width in pixels. */
     protected _width: number = 800;
     /** Outer plot height in pixels. */
     protected _height: number = 500;
-    /** Plot margins in pixels. */
+    /** Plot margins in pixels: the configured ones, grown when a draw needs room for its axis titles. */
     protected _margins!: PlotMargins;
+    /** Margins from the configuration, in pixels; each draw starts from them. */
+    private _configuredMargins!: PlotMargins;
 
     /** Resolved color domain, computed from data after each transform. */
     protected _resolvedDomain: ResolvedDomain | undefined = undefined;
@@ -131,11 +136,12 @@ export abstract class PlotBaseData {
         this._sourceColorAttribute = config.attributes?.color;
 
         this._title = config.labels?.title || 'Autk Plot';
-        this._tickFormats = config.tickFormats ?? ['', ''];
+        this._tickFormats = config.tickFormats;
 
         this._width = config.width || 800;
         this._height = config.height || 500;
-        this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
+        this._configuredMargins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
+        this._margins = { ...this._configuredMargins };
 
         this._domainSpec = config.domainSpec;
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
@@ -145,11 +151,37 @@ export abstract class PlotBaseData {
     }
 
     /**
+     * Returns the tick format of an axis: the d3 format the configuration's `tickFormats` give it, or, when they give
+     * it none, SI prefixes from one up ("1k") and decimals under one ("0.5", not "500m").
+     *
+     * @param axis Index of the axis in `tickFormats`.
+     * @param emptyFormat D3 format used in place of an empty one the configuration gives.
+     * @returns Function that writes a tick value.
+     */
+    protected tickFormat(axis: number, emptyFormat?: string): (value: d3.NumberValue) => string {
+        if (!this.hasTickFormat(axis)) return defaultTickFormat;
+        const specifier = this._tickFormats![axis];
+        return d3.format(emptyFormat === undefined ? specifier : specifier || emptyFormat);
+    }
+
+    /**
+     * Whether the configuration's `tickFormats` give an axis a format of its own. An axis they give none, with no
+     * `tickFormats` or with a missing or undefined entry for it (`['.2f']` for two axes), keeps its default.
+     *
+     * @param axis Index of the axis in `tickFormats`.
+     * @returns `true` when the axis has a format of its own.
+     */
+    protected hasTickFormat(axis: number): boolean {
+        return this._tickFormats?.[axis] !== undefined && this._tickFormats[axis] !== null;
+    }
+
+    /**
      * Rebuilds source rows, applies transforms, validates bindings, and delegates rendering.
      *
      * @throws If active render bindings do not resolve on the rendered data.
      */
     public draw(): void {
+        this._margins = { ...this._configuredMargins };
         this._data = this.buildSourceRows();
         this._transformAttributes = undefined;
         this._transformColorAttribute = undefined;
@@ -158,6 +190,7 @@ export abstract class PlotBaseData {
         this.validateRenderedAttributeBindings();
         this.computeColorDomain();
         this.render();
+        this.afterRender();
     }
 
     /**
@@ -265,6 +298,11 @@ export abstract class PlotBaseData {
      * Renders plot DOM, SVG, or HTML nodes for the current internal state.
      */
     abstract render(): void;
+
+    /**
+     * Lifecycle hook invoked after `render()` within `draw()`, with the plot drawn.
+     */
+    protected afterRender(): void {}
 
     /**
      * Maps a preset-specific executed transform into the rendered row schema

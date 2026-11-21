@@ -40,6 +40,7 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { PlotConfig } from '../api';
 
 import { PlotBaseInteractive } from '../plot-base-interactive';
+import { defaultCategoryFormat } from '../number-format';
 
 /**
  * Bar plot implementation supporting categorical values and binned mode.
@@ -62,9 +63,6 @@ export class Barchart extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) { 
-            config.tickFormats = ['~s', '~s']; 
-        }
         if (config.transform) {
             if (config.transform.preset !== 'binning-1d') {
                 throw new Error('Barchart only supports the binning-1d transform preset.');
@@ -87,10 +85,10 @@ export class Barchart extends PlotBaseInteractive {
     render(): void {
         const svg = d3
             .select(this._div)
-            .selectAll('#plot')
+            .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('id', 'plot')
+            .classed('autk-plot', true)
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
@@ -110,10 +108,9 @@ export class Barchart extends PlotBaseInteractive {
         // ---- Title (optional)
         if (this._title && this._title.length > 0) {
             svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
+                .selectAll<SVGTextElement, string>('.plot-title')
                 .data([this._title])
                 .join('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + width / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -134,26 +131,27 @@ export class Barchart extends PlotBaseInteractive {
         this.mapY = d3.scaleLinear().domain([0, Math.max(yExtent[1], 1)]).range([height, 0]);
 
         // ---- Axes
+        // A category reads as it is written (2020, not 2.02k), and a number that is not whole as a decimal (0.3, not
+        // 0.30000000000000004), unless the configuration's tickFormats give the x axis a format, which then writes a
+        // category that reads as a number.
         const xAxis = d3.axisBottom(this.mapX).tickSizeOuter(0).tickFormat((d) => {
             const value = String(d);
+            if (!this.hasTickFormat(0)) return defaultCategoryFormat(value);
             const numericValue = Number(value);
-            return Number.isFinite(numericValue) && value.trim() !== ''
-                ? d3.format(this._tickFormats[0] || '~s')(numericValue)
-                : value;
+            return Number.isFinite(numericValue) && value.trim() !== '' ? this.tickFormat(0, '~s')(numericValue) : value;
         });
 
         const xAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisX')
+            .selectAll<SVGGElement, unknown>('.x.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisX')
             .attr('class', 'x axis')
             .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
 
         xAxisSelection
             .call(xAxis)
-            .selectAll('text')
+            .selectAll('.tick text')
             .style('text-anchor', 'end')
             .attr('dx', '-.8em')
             .attr('dy', '-.40em')
@@ -170,13 +168,12 @@ export class Barchart extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text((d) => d);
 
-        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(d3.format(this._tickFormats[1]));
+        const yAxis = d3.axisLeft(this.mapY).tickSizeInner(-width).tickFormat(this.tickFormat(1));
 
         const yAxisSelection = svg
-            .selectAll<SVGGElement, unknown>('#axisY')
+            .selectAll<SVGGElement, unknown>('.y.axis')
             .data([0])
             .join('g')
-            .attr('id', 'axisY')
             .attr('class', 'y axis')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');

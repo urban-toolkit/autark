@@ -56,9 +56,6 @@ export class ParallelCoordinates extends PlotBaseInteractive {
      */
     constructor(config: PlotConfig) {
         if (config.events === undefined) { config.events = []; }
-        if (config.tickFormats === undefined) {
-            config.tickFormats = ['~s', '~s'];
-        }
         super(config);
 
         this._colorProperty = 'stroke';
@@ -77,10 +74,10 @@ export class ParallelCoordinates extends PlotBaseInteractive {
 
         const svg = d3
             .select(this._div)
-            .selectAll('#plot')
+            .selectAll('svg.autk-plot')
             .data([0])
             .join('svg')
-            .attr('id', 'plot')
+            .classed('autk-plot', true)
             .style('width', `${this._width}px`)
             .style('height', `${this._height}px`)
             .style('visibility', 'visible');
@@ -100,10 +97,9 @@ export class ParallelCoordinates extends PlotBaseInteractive {
         // ---- Title (optional)
         if (this._title && this._title.length > 0) {
             svg
-                .selectAll<SVGTextElement, string>('#plotTitle')
+                .selectAll<SVGTextElement, string>('.plot-title')
                 .data([this._title])
                 .join('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + width / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -195,7 +191,7 @@ export class ParallelCoordinates extends PlotBaseInteractive {
                 d3.select(nodes[i]).call(
                     d3.axisLeft(scale as d3.ScaleLinear<number, number>)
                         .ticks(5)
-                        .tickFormat((value) => d3.format(this._tickFormats[0] || '~s')(Number(value))) as any
+                        .tickFormat((value) => this.tickFormat(0, '~s')(Number(value))) as any
                 );
             } else if (scale && dimType === 'categorical') {
                 d3.select(nodes[i]).call(d3.axisLeft(scale as d3.ScalePoint<string>) as any);

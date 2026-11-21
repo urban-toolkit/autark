@@ -1,0 +1,74 @@
+// @vitest-environment happy-dom
+import type { Feature, FeatureCollection } from 'geojson';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import { AutkPlot } from '../src';
+import type { UnifiedPlotConfig } from '../src';
+
+const collection: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+        { name: 'a', kind: 'k1', year: '2020' },
+        { name: 'b', kind: 'k2', year: '2021' },
+        { name: 'c', kind: 'k1', year: '2022' },
+    ].map(({ name, kind, year }, i): Feature => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [i, i] },
+        properties: { name, kind, x: i + 1, y: 2 * i, series: [{ timestamp: year, value: i }] },
+    })),
+};
+
+// One plot of each kind autk-plot draws in an svg, each in a container of the page's own. The first
+// container is `#plot`, the name autk-plot's README gives its own.
+const plots: [string, UnifiedPlotConfig][] = [
+    ['plot', { type: 'scatterplot', collection, attributes: { axis: ['x', 'y'] } }],
+    ['bars', { type: 'barchart', collection, attributes: { axis: ['name', 'x'] } }],
+    ['lines', { type: 'linechart', collection, attributes: { axis: ['series', '@transform'] }, transform: { preset: 'reduce-series' } }],
+    ['cells', { type: 'heatmatrix', collection, attributes: { axis: ['name', 'kind'], color: '@transform' }, transform: { preset: 'binning-2d' } }],
+    ['lanes', { type: 'parallel-coordinates', collection, attributes: { axis: ['x', 'y'] } }],
+];
+
+beforeAll(() => {
+    for (const [id, config] of plots) {
+        const div = document.createElement('div');
+        div.id = id;
+        document.body.appendChild(div);
+        new AutkPlot(div, config);
+    }
+});
+
+describe('Plots in one page', () => {
+    it('draws each plot in its own container', () => {
+        for (const [id] of plots) {
+            expect(document.getElementById(id)?.querySelectorAll('svg').length).toBe(1);
+        }
+    });
+
+    it('gives no element an id another element has', () => {
+        const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
+        expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([]);
+    });
+
+    it('lets a page-wide selector of a container reach only the plot in it', () => {
+        expect(document.querySelectorAll('#plot .autkMark').length).toBe(3);
+        expect(document.querySelectorAll('#plot .plot-title').length).toBe(1);
+        expect(document.querySelectorAll('#plot .x.axis').length).toBe(1);
+        expect(document.querySelectorAll('#plot .y.axis').length).toBe(1);
+    });
+
+    it('keeps a class the page gives a plot\'s svg through a redraw', () => {
+        const classes = plots.map(([, config]) => {
+            const div = document.createElement('div');
+            document.body.appendChild(div);
+            const plot = new AutkPlot(div, config);
+            div.querySelector('svg')?.classList.add('dashboard-chart');
+            plot.draw();
+            const svgs = Array.from(div.querySelectorAll('svg'), (svg) => Array.from(svg.classList));
+            div.remove();
+            return [config.type, svgs];
+        });
+
+        // Each plot draws again in the one svg it made, which keeps the page's class beside its own.
+        expect(classes).toEqual(plots.map(([, config]) => [config.type, [['autk-plot', 'dashboard-chart']]]));
+    });
+});

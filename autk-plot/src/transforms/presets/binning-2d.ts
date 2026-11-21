@@ -36,13 +36,13 @@ export type ExecutedBinning2dTransform = {
 /**
  * A single aggregated cell ready for plot rendering.
  *
- * `x` and `y` are the bin labels for this cell — either a category string or a
- * formatted numeric range such as `"1k-2k"`.
+ * `x` and `y` are the bin labels for this cell: either a category string or a
+ * formatted numeric range such as `"1000-2000"`.
  */
 export type Binning2dCellRow = {
-    /** Bin label for the x axis — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label for the x axis: a category string or a formatted numeric range such as `"1000-2000"`. */
     x: string;
-    /** Bin label for the y axis — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label for the y axis: a category string or a formatted numeric range such as `"1000-2000"`. */
     y: string;
     /** Numeric sort key for the x bin (bin index for quantitative, insertion order for categorical). */
     xOrder: number;
@@ -62,8 +62,8 @@ export type Binning2dCellRow = {
  * Runs a heat matrix transform and returns plot-ready cell rows.
  *
  * Detects whether each axis attribute is categorical or quantitative, builds a
- * bin-label mapper for each axis, then groups rows by the resulting (x, y) label
- * pair and reduces the value column using the specified reducer.
+ * bin mapper for each axis, then groups rows by the resulting (x, y) bin pair
+ * and reduces the value column using the specified reducer.
  *
  * @param rows - Input feature data to aggregate.
  * @param config - Transform configuration, including reducer, per-axis bin counts, and optional value column.
@@ -86,9 +86,9 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
     const reduced = reduceBuckets({
         rows,
         bucketOf: (row) => {
-            const xLabel = xMapper.label(valueAtPath(row, xAttr));
-            const yLabel = yMapper.label(valueAtPath(row, yAttr));
-            return `${xLabel}${SEP}${yLabel}`;
+            const xKey = xMapper.key(valueAtPath(row, xAttr));
+            const yKey = yMapper.key(valueAtPath(row, yAttr));
+            return `${xKey}${SEP}${yKey}`;
         },
         valueOf: (reducer === 'count' || !valueAttr) ? undefined : (row) => {
             const v = Number(valueAtPath(row, valueAttr));
@@ -101,13 +101,13 @@ export function runBinning2d(rows: AutkDatum[], config: Binning2dTransformConfig
         preset: 'binning-2d',
         rows: reduced.map(bucket => {
             const sepIdx = bucket.key.indexOf(SEP);
-            const xLabel = bucket.key.slice(0, sepIdx);
-            const yLabel = bucket.key.slice(sepIdx + 1);
+            const xKey = bucket.key.slice(0, sepIdx);
+            const yKey = bucket.key.slice(sepIdx + 1);
             return {
-                x: xLabel,
-                y: yLabel,
-                xOrder: xMapper.order(xLabel),
-                yOrder: yMapper.order(yLabel),
+                x: xMapper.label(xKey),
+                y: yMapper.label(yKey),
+                xOrder: xMapper.order(xKey),
+                yOrder: yMapper.order(yKey),
                 value: bucket.value,
                 count: bucket.count,
                 autkIds: bucket.autkIds,

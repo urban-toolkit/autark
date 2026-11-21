@@ -12,7 +12,7 @@ export type Row = { autkIds?: number[]; [key: string]: unknown };
  * Output of a single aggregated bucket after reduction.
  */
 export type ReducedBucket = {
-    /** The bucket identifier (e.g. `"2024-03"`, `"1k-2k"`). */
+    /** The bucket identifier, such as a time bucket (`"2024-03"`) or a bin's index (`"3"`). */
     key: string;
     /** The reduced numeric result (count, sum, avg, min, or max). */
     value: number;

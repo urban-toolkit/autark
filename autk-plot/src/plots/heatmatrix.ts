@@ -65,8 +65,8 @@ export class Heatmatrix extends PlotBaseInteractive {
      */
     public render(): void {
         const svg = d3.select(this._div)
-            .selectAll('#plot').data([0]).join('svg')
-            .attr('id', 'plot')
+            .selectAll('svg.autk-plot').data([0]).join('svg')
+            .classed('autk-plot', true)
             .attr('width', this._width)
             .attr('height', this._height)
             .style('visibility', 'visible');
@@ -80,9 +80,8 @@ export class Heatmatrix extends PlotBaseInteractive {
 
         // ---- Title
         if (this._title && this._title.length > 0) {
-            svg.selectAll<SVGTextElement, string>('#plotTitle')
+            svg.selectAll<SVGTextElement, string>('.plot-title')
                 .data([this._title]).join('text')
-                .attr('id', 'plotTitle')
                 .attr('class', 'plot-title')
                 .attr('x', this._margins.left + width / 2)
                 .attr('y', Math.max(this._margins.top * 0.5, 10))
@@ -104,8 +103,8 @@ export class Heatmatrix extends PlotBaseInteractive {
         const mapY = d3.scaleBand().domain(yValues).range([0, height]).padding(0.05);
 
         // ---- Axes
-        const xAxisSelection = svg.selectAll<SVGGElement, unknown>('#axisX').data([0]).join('g')
-            .attr('id', 'axisX').attr('class', 'x axis')
+        const xAxisSelection = svg.selectAll<SVGGElement, unknown>('.x.axis').data([0]).join('g')
+            .attr('class', 'x axis')
             .attr('transform', `translate(${this._margins.left}, ${this._height - this._margins.bottom})`)
             .style('visibility', 'visible');
         xAxisSelection.call(d3.axisBottom(mapX).tickSizeOuter(0));
@@ -123,8 +122,8 @@ export class Heatmatrix extends PlotBaseInteractive {
             .style('visibility', 'visible')
             .text(d => d);
 
-        const yAxisSelection = svg.selectAll<SVGGElement, unknown>('#axisY').data([0]).join('g')
-            .attr('id', 'axisY').attr('class', 'y axis')
+        const yAxisSelection = svg.selectAll<SVGGElement, unknown>('.y.axis').data([0]).join('g')
+            .attr('class', 'y axis')
             .attr('transform', `translate(${this._margins.left}, ${this._margins.top})`)
             .style('visibility', 'visible');
         yAxisSelection.call(d3.axisLeft(mapY).tickSizeOuter(0));
