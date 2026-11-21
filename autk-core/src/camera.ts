@@ -81,6 +81,13 @@ export class Camera {
     protected wNear: number = 0;
     /** Far clipping plane distance. */
     protected wFar: number = 0;
+    /**
+     * Distance from the eye to the point it looks at, between the near and far
+     * distances, which sizes an orthographic view. {@link resetCamera} sets it,
+     * a zoom changes it, and a pan or a tilt keeps it, though those moves leave
+     * `wLookAt` one unit ahead of the eye.
+     */
+    private wLookAtDistance: number = 1;
     /** Vertical field of view in radians. */
     protected fovy = (45 * Math.PI) / 180.0;
     /** Current projection matrix. */
@@ -325,11 +332,13 @@ export class Camera {
      * Sets the projection the camera keeps until it is set again.
      *
      * An orthographic camera looks along the same line as the perspective one,
-     * with parallel rays. At the ground point the view center looks at, it shows
-     * what the perspective camera shows there, and its bounds follow the eye's
-     * distance to that point, so zoom, pan, tilt and {@link resetCamera} work as
-     * in perspective. It draws everything within the far distance in front of
-     * the eye or behind it, so buildings taller than the eye is high are drawn
+     * with parallel rays. At the point it looks at, it shows what the
+     * perspective camera shows there: its bounds follow the eye's distance to
+     * that point, which {@link resetCamera} sets, a zoom changes, and a pan or a
+     * tilt keeps. So switching keeps the scale there, also in a level view or
+     * over raised ground, and zoom, pan, tilt and {@link resetCamera} work as in
+     * perspective. It draws everything within the far distance in front of the
+     * eye or behind it, so buildings taller than the eye is high are drawn
      * whole. Either projection ends the bounds of {@link setOrthographicBounds}.
      *
      * @param projection - `'perspective'`, the default, or `'orthographic'`.
@@ -398,12 +407,15 @@ export class Camera {
     public zoom(delta: number, x: number, y: number): void {
         const zoomScale = Math.max(Math.abs(this.wEye[2]), 1) * 0.2;
         delta = -delta * zoomScale;
-        // Orthographic rays are parallel, so the eye moves toward the ground point under the cursor instead.
-        const ground = this.projection === 'orthographic' && !this.orthographic ? this.getGroundPoint(x, y, this.wFar) : null;
-        const dir = ground
-            ? vec3.normalize(vec3.create(), [ground[0] - this.wEye[0], ground[1] - this.wEye[1], -this.wEye[2]])
-            : this.screenCoordToWorldDir(x, y);
+        let dir = this.screenCoordToWorldDir(x, y);
+        if (this.projection === 'orthographic' && !this.orthographic) {
+            // Orthographic rays are parallel, so the eye moves toward the point under the cursor at the look-at distance.
+            const [origin, forward] = this.orthographicRay(x, y);
+            dir = vec3.normalize(vec3.create(), [0, 1, 2].map((i) => origin[i] + forward[i] * this.wLookAtDistance - this.wEye[i]));
+        }
         vec3.scaleAndAdd(this.wEye, this.wEye, dir, delta);
+        // The distance to the point looked at changes by as much as the eye moves along the view.
+        this.wLookAtDistance = Math.min(Math.max(this.wLookAtDistance - delta * vec3.dot(dir, this.wEyeDir), this.wNear), this.wFar);
         vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
     }
 
@@ -568,16 +580,14 @@ export class Camera {
     /**
      * Returns half the width and height of the view that {@link setProjection} makes orthographic.
      *
-     * They are those of the perspective view at the ground point the view center
-     * looks at, from the eye's distance to that point, kept between the near and
-     * far distances. A view that meets no ground uses the far distance.
+     * They are those of the perspective view at the point the camera looks at,
+     * from the eye's distance to that point, which a zoom changes and a pan or a
+     * tilt keeps.
      *
      * @returns `[halfWidth, halfHeight]` in world units.
      */
     private orthographicHalfSize(): [number, number] {
-        const toGround = this.wEyeDir[2] < 0 ? -this.wEye[2] / this.wEyeDir[2] : Number.POSITIVE_INFINITY;
-        const distance = Math.min(Math.max(toGround, this.wNear), this.wFar);
-        const halfHeight = distance * Math.tan(this.fovy / 2);
+        const halfHeight = this.wLookAtDistance * Math.tan(this.fovy / 2);
         return [halfHeight * (this.viewportWidth / this.viewportHeight), halfHeight];
     }
 
@@ -597,13 +607,15 @@ export class Camera {
     }
 
     /**
-     * Recomputes the normalized eye direction from current eye and look-at.
+     * Recomputes the normalized eye direction, and the distance to the look-at
+     * point, from current eye and look-at.
      *
      * @throws Never throws.
      */
     protected updateEyeDirAndLen(): void {
         this.wEyeDir = vec3.create();
         vec3.sub(this.wEyeDir, this.wLookAt, this.wEye);
+        this.wLookAtDistance = Math.min(Math.max(vec3.length(this.wEyeDir), this.wNear), this.wFar);
         vec3.normalize(this.wEyeDir, this.wEyeDir);
     }
 }
