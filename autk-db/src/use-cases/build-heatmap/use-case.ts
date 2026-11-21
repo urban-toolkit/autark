@@ -46,6 +46,21 @@ export class BuildHeatmapUseCase {
             throw new Error(`Table ${params.tableJoinName} not found.`);
         }
 
+        // Without groupBy, one band counts the rows near each cell. The join and the bands take this one list,
+        // so the join writes the count that the band reads.
+        const groupBy: HeatmapGroupBy[] = params.groupBy?.length
+            ? params.groupBy
+            : [{ column: '*', aggregateFn: 'count' }];
+        // A cell holds one value. Without an aggregate the join lists the values near it, as `collect` lists the
+        // rows near it, and no band reads a list, so such an entry is refused before the grid is built.
+        for (const { column, aggregateFn } of groupBy) {
+            if (!aggregateFn || aggregateFn.toLowerCase() === 'collect') {
+                const given = aggregateFn ? `aggregateFn "${aggregateFn}"` : 'no aggregateFn';
+                throw new Error(`Heatmap "${params.outputTableName}": the groupBy entry for column "${column}" has ${given}, `
+                    + 'but a cell holds one value; use count, weighted, sum, avg, min or max.');
+            }
+        }
+
         const gridTableName = params.outputTableName;
         const gridTable = await this.createGridTable({
             boundingBox,
@@ -61,14 +76,14 @@ export class BuildHeatmapUseCase {
                 tableJoinName: params.tableJoinName,
                 near: params.near,
                 // Normalize each output band separately, without adding keys to the joined properties.
-                groupBy: params.groupBy?.map(({ column, aggregateFn }) => ({ column, aggregateFn })),
+                groupBy: groupBy.map(({ column, aggregateFn }) => ({ column, aggregateFn })),
             },
             [...tables, gridTable],
             workspace,
             { coordinateFormat: workspaceCoordinateFormat },
         );
 
-        const rasterBands = this.getRasterBands(params);
+        const rasterBands = this.getRasterBands(params, groupBy);
         await this.transformToRasterFormat(gridTableName, rasterBands, workspace);
         await this.materializeCompactRaster(
             gridTableName,
@@ -264,18 +279,14 @@ ${bandAssignments}
     }
 
     /**
-     * Derives raster band metadata from the group-by configuration.
+     * Derives raster band metadata from the group-by list the join aggregated, one band per entry.
      *
-     * A band is labelled `<aggregateFn>_<table>`, with `_norm` added when it is normalized. When bands of one
+     * A band is labeled `<aggregateFn>_<table>`, with `_norm` added when it is normalized. When bands of one
      * aggregate over different columns would share that label, each of them names its column too,
      * `<aggregateFn>_<table>_<column>` with the column's dots as underscores. Any remaining duplicates
      * receive a band-ID suffix without taking another band's preferred label.
      */
-    private getRasterBands(params: BuildHeatmapParams): HeatmapBand[] {
-        const groupBy: HeatmapGroupBy[] = params.groupBy && params.groupBy.length > 0
-            ? params.groupBy
-            : [{ column: '*', aggregateFn: 'count' }];
-
+    private getRasterBands(params: BuildHeatmapParams, groupBy: HeatmapGroupBy[]): HeatmapBand[] {
         const bands = groupBy.map((column, index) => {
             const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
             const sourceKey = aggregateFn === 'count' || aggregateFn === 'weighted'
