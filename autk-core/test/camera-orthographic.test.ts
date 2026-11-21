@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mat4, vec4 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Camera } from '../src/camera';
 
 /** Whether a projection matrix is orthographic: its last row is (0, 0, 0, 1), so no point is divided by its distance. */
@@ -24,6 +24,39 @@ function orthographic(height = 1000): Camera {
 
 /** Half the height of the ground a 45 degree view shows at `distance`. */
 const halfHeight = (distance: number) => distance * Math.tan((45 / 2) * (Math.PI / 180));
+
+/** A perspective camera and an orthographic one, alike otherwise, on a 1600 by 1000 canvas. */
+function twins(up: number[], lookAt: number[], eye: number[]): [Camera, Camera] {
+  const perspective = new Camera({ up, lookAt, eye });
+  perspective.resize(1600, 1000);
+  const cam = new Camera({ up, lookAt, eye });
+  cam.resize(1600, 1000);
+  cam.setProjection('orthographic');
+  cam.update();
+  return [perspective, cam];
+}
+
+/** Two points beside the point a camera looks at, right of it and above it on screen, a tenth of the eye's distance to it away. */
+function besideLookAt(cam: Camera): Array<[number, number, number]> {
+  const eye = cam.getEye();
+  const lookAt = cam.getLookAt();
+  const forward = vec3.sub([0, 0, 0], lookAt, eye);
+  const offset = vec3.length(forward) * 0.1;
+  vec3.normalize(forward, forward);
+  const right = vec3.normalize([0, 0, 0], vec3.cross([0, 0, 0], forward, cam.getUp()));
+  const up = vec3.cross([0, 0, 0], right, forward);
+  return [right, up].map((axis) => [0, 1, 2].map((i) => lookAt[i] + axis[i] * offset) as [number, number, number]);
+}
+
+/** Checks that two cameras draw points at the same places on screen. */
+function expectDrawnAlike(cam: Camera, other: Camera, points: Array<[number, number, number]>) {
+  for (const point of points) {
+    const [x, y] = project(cam, point);
+    const [otherX, otherY] = project(other, point);
+    expect(x).toBeCloseTo(otherX, 4);
+    expect(y).toBeCloseTo(otherY, 4);
+  }
+}
 
 describe('a lasting orthographic Camera', () => {
   it('stays orthographic through update, resize and resetCamera, until it is set back to perspective', () => {
@@ -120,5 +153,27 @@ describe('a lasting orthographic Camera', () => {
       expect(tiltedRoof).toBeLessThan(1);
       expect(tiltedRoof).toBeGreaterThan(tiltedGround);
     }
+  });
+
+  it('shows a level view what a perspective view shows at the point it looks at, also after a wheel zoom', () => {
+    // The gallery's street-level camera: the eye 12 up, looking at a point 45 ahead and 15 up.
+    const [perspective, cam] = twins([0, 0, 1], [45, 0, 15], [0, 0, 12]);
+    const beside = besideLookAt(perspective);
+    expectDrawnAlike(cam, perspective, beside);
+
+    // A wheel step in at the middle of the view brings both eyes closer to that point, and draws it larger.
+    const [before] = project(cam, beside[0]!);
+    for (const camera of [perspective, cam]) {
+      camera.zoom(-1, 0.5, 0.5);
+      camera.update();
+    }
+    expectDrawnAlike(cam, perspective, beside);
+    expect(project(cam, beside[0]!)[0]).toBeGreaterThan(before * 1.02);
+  });
+
+  it('shows ground raised above z = 0 what a perspective view shows at the point it looks at', () => {
+    // Terrain heights are absolute: here the eye is 2000 up, looking straight down at ground 1600 up.
+    const [perspective, cam] = twins([0, 1, 0], [100, 200, 1600], [100, 200, 2000]);
+    expectDrawnAlike(cam, perspective, besideLookAt(perspective));
   });
 });
