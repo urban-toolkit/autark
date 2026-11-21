@@ -1017,8 +1017,9 @@ export class AutkMap {
      * raster loaded before the roads still covers them. The layers listed here
      * trade places, so they are drawn in this order; the layers not listed keep
      * theirs. A layer loaded later takes the place its id has in the list.
-     * Buildings are drawn with depth over the other layers wherever they are
-     * listed. An empty list returns to the order by type.
+     * Buildings are drawn with depth over the other layers wherever they are,
+     * so the order leaves them out: listing them changes nothing. An empty
+     * list returns to the order by type.
      *
      * @param ids Layer ids, bottom first.
      * @returns Nothing. The layer list is refreshed and a frame is requested.

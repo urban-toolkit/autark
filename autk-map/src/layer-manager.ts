@@ -160,8 +160,10 @@ export class LayerManager {
      * Sets the order the layers are drawn in, bottom first.
      *
      * The layers listed trade places, so they are drawn in this order; the
-     * layers not listed keep theirs. An id whose layer is not registered yet
-     * takes its place when it is. An empty list returns to the order by type.
+     * layers not listed keep theirs. Buildings are drawn with depth wherever
+     * they are, so the order leaves them out. An id whose layer is not
+     * registered yet takes its place when it is. An empty list returns to the
+     * order by type.
      *
      * @param ids Layer ids, bottom first.
      * @returns Nothing. The z-indices and the order of {@link layers} are updated.
@@ -263,8 +265,9 @@ export class LayerManager {
         this._layers = [...this._added].sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
         if (this._order.length === 0) { return; }
 
-        // The listed layers take the places they hold, in the caller's order.
-        const rank = (layer: Layer) => this._order.indexOf(layer.layerInfo.id);
+        // The listed layers take the places they hold, in the caller's order. Buildings are drawn
+        // with depth wherever they are, so the order leaves them out and they keep their places.
+        const rank = (layer: Layer) => (layer instanceof Triangles3DLayer ? -1 : this._order.indexOf(layer.layerInfo.id));
         const ordered = this._layers.filter((layer) => rank(layer) !== -1).sort((a, b) => rank(a) - rank(b));
         this._layers = this._layers.map((layer) => (rank(layer) === -1 ? layer : ordered.shift()!));
         this._layers.forEach((layer, place) => { layer.layerInfo.zIndex = place; });
