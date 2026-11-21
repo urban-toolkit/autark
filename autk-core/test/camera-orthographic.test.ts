@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Camera } from '../src/camera';
+import { CameraMotion } from '../src/camera-motion';
 
 /** Whether a projection matrix is orthographic: its last row is (0, 0, 0, 1), so no point is divided by its distance. */
 function isOrthographic(m: mat4): boolean {
@@ -68,6 +69,43 @@ function expectDrawnAlike(cam: Camera, other: Camera, points: Array<[number, num
     expect(x).toBeCloseTo(otherX, 4);
     expect(y).toBeCloseTo(otherY, 4);
   }
+}
+
+/**
+ * Plays a motion on each camera at once, in frames 50 ms apart on a replaced browser clock, and runs `onFrame` after
+ * each frame, from the first of each step, at its start, to the last, at its end.
+ */
+async function playInFrames(motion: CameraMotion, cameras: Camera[], onFrame: () => void): Promise<void> {
+  let now = 0;
+  let requested: FrameRequestCallback[] = [];
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => requested.push(callback));
+  let playing = cameras.length;
+  for (const camera of cameras) void motion.play(camera).then(() => playing--);
+  for (let frame = 0; frame < 1000; frame++) {
+    // A step starts, and asks for its first frame, once the promises before it settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (playing === 0) return;
+    const due = requested;
+    requested = [];
+    for (const callback of due) callback(now);
+    onFrame();
+    now += 50;
+  }
+  throw new Error('The motion did not end within 1000 frames');
+}
+
+/**
+ * Compares an orthographic camera's scale with its perspective twin's at the ground the twin's view center looks at:
+ * how many times farther from the middle of the view the orthographic camera draws a point beside that ground. Also
+ * gives where the orthographic camera draws that ground.
+ */
+function againstTwin(perspective: Camera, cam: Camera): { ratio: number; middle: [number, number, number] } {
+  const [x, y] = perspective.getGroundPoint(0.5, 0.5, 1e6);
+  const view = perspective.getModelViewMatrix();
+  // 100 units along the screen's right axis, the first row of the view matrix.
+  const beside: [number, number, number] = [x + view[0] * 100, y + view[4] * 100, view[8] * 100];
+  return { ratio: project(cam, beside)[0] / project(perspective, beside)[0], middle: project(cam, [x, y, 0]) };
 }
 
 describe('a lasting orthographic Camera', () => {
@@ -254,5 +292,68 @@ describe('a lasting orthographic Camera', () => {
     // Points beside the ground the view center looks at, straight below the eye.
     const [x, y, height] = perspective.getEye();
     expectDrawnAlike(cam, perspective, [[x + height * 0.1, y, 0], [x, y + height * 0.1, 0]]);
+  });
+
+  it('keeps its view when a host frames it again with the eye, look-at and up it reports, after a wheel zoom and a pan', () => {
+    // A host keeps a map's view this way while it draws the map again.
+    const moved = () => {
+      const camera = orthographic();
+      camera.zoom(-1, 0.75, 0.25);
+      camera.translate(0.1, 0);
+      camera.update();
+      return camera;
+    };
+    const cam = moved();
+    const restored = moved();
+    restored.resetCamera(restored.getUp(), restored.getLookAt(), restored.getEye());
+    restored.update();
+    // Points beside the ground the view center looks at, straight below the eye.
+    const [x, y, height] = cam.getEye();
+    expectDrawnAlike(restored, cam, [[x + height * 0.3, y, 0], [x, y - height * 0.2, 0]]);
+  });
+});
+
+describe('a lasting orthographic Camera in a CameraMotion', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  /** A perspective camera and an orthographic twin 1000 up over the origin, looking straight down. */
+  const topDown = () => twins([0, 1, 0], [0, 0, 0], [0, 0, 1000]);
+  /**
+   * The same twins tilted 60 degrees toward the horizon, as a drag with Shift tilts. The tilt keeps the eye's distance
+   * to the point it looks at, 1000, which sizes the orthographic view, while the view center now meets the ground 2000
+   * away, at the scene center that a CameraMotion turns about.
+   */
+  const tilted = () => {
+    const cameras = topDown();
+    for (const camera of cameras) {
+      camera.pitch(-Math.PI / 3);
+      camera.update();
+    }
+    return cameras;
+  };
+
+  const motions: Array<[string, () => [Camera, Camera], () => CameraMotion]> = [
+    ['a roll', topDown, () => new CameraMotion().roll(15, 1)],
+    ['a yaw', tilted, () => new CameraMotion().yaw(90, 3)],
+    ['a pitch', tilted, () => new CameraMotion().pitch(20, 1)],
+    ['a zoom out', tilted, () => new CameraMotion().zoomOut(2, 1)],
+    ['a zoom in', tilted, () => new CameraMotion().zoomIn(2, 1)],
+    ['a roll, a yaw, a pitch and a zoom in turn', tilted, () => new CameraMotion().roll(15, 1).yaw(90, 1).pitch(20, 1).zoomOut(2, 1)],
+  ];
+
+  it.each(motions)('changes its scale through %s only as its perspective twin does at the scene center, in every frame', async (_name, start, motion) => {
+    const [perspective, cam] = start();
+    const { ratio: before } = againstTwin(perspective, cam);
+    await playInFrames(motion(), [perspective, cam], () => {
+      const { ratio, middle } = againstTwin(perspective, cam);
+      expect(ratio).toBeCloseTo(before, 3);
+      // Both turn about the scene center, which stays in the middle of the view.
+      expect(middle[0]).toBeCloseTo(0, 3);
+      expect(middle[1]).toBeCloseTo(0, 3);
+    });
+    expect(cam.getProjection()).toBe('orthographic');
   });
 });
