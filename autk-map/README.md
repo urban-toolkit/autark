@@ -234,6 +234,7 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.
 * `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
+* `setLayerOrder(ids)`: Draws the layers listed in the order given, bottom first, and moves as few other layers as it can; see Layer order and elevation below.
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
 * `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
@@ -250,8 +251,35 @@ base colors. Explicit legend choices survive data refreshes and picking changes.
 
 ## Layer order and elevation
 
-`LayerInfo.zIndex` controls CPU layer ordering only. Polygons, borders, rasters,
-points, and polylines use a common ground plane and blend in layer order; each
+Without an order set, a map draws its layers in the order by type: tile layers
+first, then surface, parks, water and roads layers, then every other 2D layer
+in the order it was loaded. `LayerInfo.zIndex` holds each layer's slot in that
+order: -1 for tiles, 0 to 3 for surface, parks, water and roads, then 5 and up
+in load order; buildings, drawn with depth as described below, hold 4.
+
+`map.setLayerOrder(ids)` sets another order, with layer ids bottom first:
+
+* the layers listed are drawn in the order given;
+* the layers not listed keep their order among themselves;
+* a layer moves past another only when the order requires it: of the stacks
+  that meet both rules, the map draws the one that reverses the fewest pairs of
+  layers compared with the order by type, and of those, the one where each
+  listed layer is as low as it can be.
+
+For example, with `surface`, `roads`, `heat` and `stops` drawn in that order by
+type, `map.setLayerOrder(['stops', 'surface'])` draws `stops`, `surface`,
+`roads`, `heat`. Moving the surface up over the stops instead would reverse as
+many pairs, and it would draw the surface over the roads and the heat; the map
+keeps the listed layers lower.
+
+A layer loaded after the call takes its place by the same rule, and
+`setLayerOrder([])` returns to the order by type. Buildings are drawn with
+depth wherever they are, as described below, so the order leaves them out:
+listing them changes nothing. Setting an order leaves each `zIndex` as it is.
+The layer menu and the tile credits follow the order the layers are drawn in.
+
+Layer order is CPU drawing order only. Polygons, borders, rasters, points, and
+polylines use a common ground plane and blend in the order they are drawn; each
 polygon fill is followed by its border before the next layer is drawn. Adding
 or reordering layers does not raise geometry or change its apparent size.
 
