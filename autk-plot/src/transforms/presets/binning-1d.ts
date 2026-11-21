@@ -18,6 +18,9 @@ import { formatSiOrDecimal } from '../../number-format';
 /** Label of the bin of a quantitative attribute's values that hold no number: missing, null or not finite. */
 const UNKNOWN = 'unknown';
 
+/** A difference under this fraction of a bin width is rounding error: a bin edge this close to 0 is 0. */
+const ROUNDING_TOLERANCE = 1e-9;
+
 // ---- Executed transform -------------------------------------------------
 
 /**
@@ -163,10 +166,14 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     const span = maxValue - minValue;
     const binWidth = span === 0 ? 1 : span / numBins;
 
-    // A single value is one bin, labeled by that value; otherwise each bin is labeled by its edges.
+    // A single value is one bin, labeled by that value; otherwise each bin is labeled by its edges. An edge that
+    // rounding leaves next to 0, such as -0.3 + 3 * 0.1 (5.6e-17), is 0.
     const edges = span === 0
         ? [minValue]
-        : Array.from({ length: numBins + 1 }, (_, i) => (i === numBins ? maxValue : minValue + i * binWidth));
+        : Array.from({ length: numBins + 1 }, (_, i) => {
+            const edge = i === numBins ? maxValue : minValue + i * binWidth;
+            return Math.abs(edge) < binWidth * ROUNDING_TOLERANCE ? 0 : edge;
+        });
     const texts = formatBinEdges(edges, binWidth);
     const labels = span === 0 ? texts : texts.slice(0, -1).map((text, i) => `${text}-${texts[i + 1]}`);
 
