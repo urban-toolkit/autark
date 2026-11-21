@@ -55,4 +55,20 @@ describe('Plots in one page', () => {
         expect(document.querySelectorAll('#plot .x.axis').length).toBe(1);
         expect(document.querySelectorAll('#plot .y.axis').length).toBe(1);
     });
+
+    it('keeps a class the page gives a plot\'s svg through a redraw', () => {
+        const classes = plots.map(([, config]) => {
+            const div = document.createElement('div');
+            document.body.appendChild(div);
+            const plot = new AutkPlot(div, config);
+            div.querySelector('svg')?.classList.add('dashboard-chart');
+            plot.draw();
+            const svgs = Array.from(div.querySelectorAll('svg'), (svg) => Array.from(svg.classList));
+            div.remove();
+            return [config.type, svgs];
+        });
+
+        // Each plot draws again in the one svg it made, which keeps the page's class beside its own.
+        expect(classes).toEqual(plots.map(([, config]) => [config.type, [['autk-plot', 'dashboard-chart']]]));
+    });
 });
