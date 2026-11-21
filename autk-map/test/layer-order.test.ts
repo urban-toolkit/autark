@@ -251,4 +251,16 @@ describe('the order a map draws its layers in', () => {
         expect(stack(map)).toEqual(['labels', 'imagery', 'surface']);
         expect(ui.setAttribution).toHaveBeenLastCalledWith([{ text: '© Labels' }, { text: '© Imagery' }]);
     });
+
+    it('keeps the zIndex of each layer, the slot of its type, when an order is set', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'roads', 'buildings', 'heat', 'stops']);
+        addTiles(map, 'imagery', '© Imagery');
+        const zIndices = () => Object.fromEntries(map.layerManager.layers.map((layer) => [layer.layerInfo.id, layer.layerInfo.zIndex]));
+        const byType = { imagery: -1, surface: 0, roads: 3, buildings: 4, heat: 5, stops: 6 };
+        expect(zIndices()).toEqual(byType);
+        map.setLayerOrder(['stops', 'heat', 'roads', 'surface', 'imagery']);
+        expect(drawn(map)).toEqual(['buildings geometry', 'stops', 'heat', 'roads', 'surface', 'imagery', 'buildings composite']);
+        expect(zIndices()).toEqual(byType);
+    });
 });
