@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mat4, vec4 } from 'gl-matrix';
 import { Camera } from '@urban-toolkit/autk-core';
 import { selectAdaptiveTiles } from '../src/tile-selection';
 import type { TileSelection } from '../src/tile-selection';
@@ -10,19 +11,41 @@ const SOURCE = resolveTileSource({ urlTemplate: 'https://t/{z}/{x}/{y}', attribu
 const CRS = 'EPSG:3857';
 const ORIGIN = lonLatToCrs(CRS, -43.2, -22.9);
 
-/** A camera 2000 units above the origin, on a 1600 by 1000 canvas, tilted one radian from straight down, made orthographic. */
-function tiltedOrthographic(): Camera {
-    const camera = new Camera({ eye: [0, 0, 2000], lookAt: [0, 0, 0], up: [0, 1, 0] });
-    camera.pitch(-1);
+/**
+ * A camera 2000 units above the origin, on a 1600 by 1000 canvas, looking at the ground `tilt` radians from straight
+ * down, made orthographic. A host frames a tilted view this way, with the point it looks at on the ground.
+ */
+function tiltedOrthographic(tilt = 1): Camera {
+    const camera = new Camera({ eye: [0, 0, 2000], lookAt: [0, 2000 * Math.tan(tilt), 0], up: [0, 1, 0] });
     camera.resize(1600, 1000);
     camera.setProjection('orthographic');
     camera.update();
     return camera;
 }
 
+/**
+ * The ground point drawn at a screen position, `x` and `y` from 0 to 1, found from the camera's matrix alone and not
+ * from its ground helpers, and its distance along the view from the plane of the eye, negative behind that plane.
+ */
+function drawnGround(camera: Camera, x: number, y: number): { point: [number, number]; along: number } {
+    const inverse = mat4.invert(new Array<number>(16).fill(0), Array.from(camera.getViewProjectionMatrix()))!;
+    // Two points drawn at this screen position, at two depths: the line through them crosses the ground once.
+    const [a, b] = [0.25, 0.75].map((depth) => {
+        const p = vec4.transformMat4([0, 0, 0, 0], [x * 2 - 1, y * 2 - 1, depth, 1], inverse);
+        return [p[0] / p[3], p[1] / p[3], p[2] / p[3]];
+    });
+    const s = a[2] / (a[2] - b[2]);
+    const point: [number, number] = [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+    const eye = camera.getEye();
+    const lookAt = camera.getLookAt();
+    const view = [0, 1, 2].map((i) => lookAt[i] - eye[i]);
+    const along = ((point[0] - eye[0]) * view[0] + (point[1] - eye[1]) * view[1] - eye[2] * view[2]) / Math.hypot(...view);
+    return { point, along };
+}
+
 /** The ground the view draws: the box around its corners, and the points under a grid of screen positions. */
 function groundOf(camera: Camera) {
-    const at = (x: number, y: number) => camera.getGroundPoint(x, y, camera.getFar());
+    const at = (x: number, y: number) => drawnGround(camera, x, y).point;
     const corners = [at(0, 0), at(1, 0), at(1, 1), at(0, 1)];
     const xs = corners.map(([x]) => x);
     const ys = corners.map(([, y]) => y);
