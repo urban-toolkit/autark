@@ -149,4 +149,15 @@ describe('the order a map draws its layers in', () => {
         map.setLayerOrder(['buildings', 'surface', 'heat', 'roads']);
         expect(drawn(map)).toEqual(['buildings geometry', 'surface', 'heat', 'roads', 'buildings composite']);
     });
+
+    it('draws an order that lists buildings as if it did not list them', () => {
+        const { map } = mapWithoutGpu();
+        load(map, ['surface', 'roads', 'buildings', 'heat', 'stops']);
+        const byType = ['buildings geometry', 'surface', 'roads', 'heat', 'stops', 'buildings composite'];
+        // Each order lists one other layer, which alone moves nothing.
+        map.setLayerOrder(['buildings', 'surface']);
+        expect(drawn(map)).toEqual(byType);
+        map.setLayerOrder(['stops', 'buildings']);
+        expect(drawn(map)).toEqual(byType);
+    });
 });
