@@ -158,9 +158,10 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
         };
     }
 
+    // Where no value holds a number, every row goes to the unknown bin.
     const nums = sampleValues.map(Number).filter(Number.isFinite);
     if (nums.length === 0) {
-        return { key: (v: unknown) => String(v ?? ''), label: (key: string) => key, order: () => 0 };
+        return { key: () => UNKNOWN, label: (key: string) => key, order: () => numBins };
     }
 
     const minValue = Math.min(...nums);
