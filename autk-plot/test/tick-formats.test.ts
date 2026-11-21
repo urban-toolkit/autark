@@ -98,6 +98,22 @@ describe('Category and bucket labels of a plot given no tickFormats', () => {
     it('writes a line chart\'s buckets as they are, years too', () => {
         expect(ticks({ type: 'linechart', collection: years, ...series }, '.x.axis .tick text')).toEqual(['2020', '2021', '2022']);
     });
+
+    it('writes a bar chart\'s fractional categories as decimals, and its whole ones and its bins as they are', () => {
+        // 0.1 + 0.2 is 0.30000000000000004.
+        const levels = featuresOf([0.1 + 0.2, 12.3456789, 1500000].map((level, i) => ({ level, count: i + 1 })));
+        expect(ticks({ type: 'barchart', collection: levels, attributes: { axis: ['level', 'count'] } }, '.x.axis .tick text'))
+            .toEqual(['0.3', '12.3457', '1500000']);
+
+        // A bin's label can read as a number, as a column of one value's does, but it is written already.
+        const bins: UnifiedPlotConfig = {
+            type: 'barchart',
+            collection: featuresOf([{ level: 0.4 }, { level: 0.4 }]),
+            attributes: { axis: ['level', '@transform'] },
+            transform: { preset: 'binning-1d' },
+        };
+        expect(ticks(bins, '.x.axis .tick text')).toEqual(['0.40']);
+    });
 });
 
 describe('Tick labels of a plot given tickFormats', () => {
