@@ -1026,8 +1026,9 @@ export class AutkMap {
      *
      * A layer loaded later takes its place by the same rule. Buildings are
      * drawn with depth over the other layers wherever they are, so the order
-     * leaves them out: listing them changes nothing. An empty list returns to
-     * the order by type.
+     * leaves them out: listing them changes nothing. Each layer keeps its
+     * `zIndex`, the slot of its type. An empty list returns to the order by
+     * type.
      *
      * @param ids Layer ids, bottom first.
      * @returns Nothing. The layer list and the credits, which follow the order,

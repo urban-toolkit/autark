@@ -62,7 +62,7 @@ export class LayerManager {
     /** Layer ids in the order a caller set, bottom first; empty for the order by type. */
     private _order: string[] = [];
 
-    /** Registered layers sorted by render z-index. */
+    /** Registered layers in the order they are drawn, bottom first. */
     get layers(): Layer[] { return this._layers; }
 
     /** World-space origin derived from the current bounding box center. */
@@ -166,7 +166,8 @@ export class LayerManager {
      * its place when it is. An empty list returns to the order by type.
      *
      * @param ids Layer ids, bottom first.
-     * @returns Nothing. The z-indices and the order of {@link layers} are updated.
+     * @returns Nothing. The order of {@link layers} is updated; the z-indices
+     * keep the slots of their types.
      * @throws Never throws.
      */
     setLayerOrder(ids: string[]): void {
@@ -239,11 +240,12 @@ export class LayerManager {
      * - Buildings: always last (N + dynamic count)
      *
      * Layers in one slot keep the order they were added in. With an order set,
-     * the stack is then rearranged as `applyLayerOrder` describes, and every
-     * layer's z-index becomes its place in the stack.
+     * the stack is then rearranged as `applyLayerOrder` describes; the
+     * z-indices keep their slots.
      *
      * @returns Nothing. Updates each registered layer's `layerInfo.zIndex` in
-     * place and rebuilds {@link layers} sorted by it.
+     * place and rebuilds {@link layers}: sorted by it, then rearranged by the
+     * order set.
      */
     private _recomputeZIndices(): void {
         const buildingsZ = 0; // OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.length;
@@ -262,11 +264,8 @@ export class LayerManager {
                 layer.layerInfo.zIndex = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.indexOf(id);
             }
         }
-        this._layers = [...this._added].sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
-        if (this._order.length === 0) { return; }
-
-        this._layers = applyLayerOrder(this._layers, this._order);
-        this._layers.forEach((layer, place) => { layer.layerInfo.zIndex = place; });
+        const byType = [...this._added].sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+        this._layers = this._order.length === 0 ? byType : applyLayerOrder(byType, this._order);
     }
 }
 
