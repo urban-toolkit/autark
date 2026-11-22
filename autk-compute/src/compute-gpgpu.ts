@@ -15,12 +15,13 @@ import {
 } from '@urban-toolkit/autk-core';
 
 import { GpuPipeline } from './compute-pipeline';
+import { packGeometry } from './pack-geometry';
 
 import type { GpgpuPipelineParams } from './api';
 
 import type { GlobalVarMeta, ComputeConfig } from './types-gpgpu';
 
-type ComputeFeature = Feature<Geometry, GeoJsonProperties>;
+type ComputeFeature = Feature<Geometry | null, GeoJsonProperties>;
 type GlobalInputArrays = Record<string, Float32Array>;
 
 const WGSL_IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -37,7 +38,7 @@ const WGSL_RESERVED_WORDS = new Set([
     'vec2', 'vec2f', 'vec2h', 'vec2i', 'vec2u', 'vec3', 'vec3f', 'vec3h', 'vec3i', 'vec3u',
     'vec4', 'vec4f', 'vec4h', 'vec4i', 'vec4u', 'while', '_',
 ]);
-const INTERNAL_WGSL_SYMBOLS = new Set(['ArrayF32', 'OutputArray', 'compute_value', 'main', 'idx', 'id', 'i']);
+const INTERNAL_WGSL_SYMBOLS = new Set(['ArrayF32', 'OutputArray', 'AutkGeometryNode', 'compute_value', 'main', 'idx', 'id', 'i']);
 
 /**
  * GPGPU compute engine for feature-level GeoJSON analysis.
@@ -64,7 +65,7 @@ export class ComputeGpgpu extends GpuPipeline {
      *   resultField: 'doubledArea',
      * });
      */
-    async run(params: GpgpuPipelineParams): Promise<FeatureCollection> {
+    async run<G extends Geometry | null>(params: GpgpuPipelineParams<G>): Promise<FeatureCollection<G>> {
         const { collection, variableMapping, attributeArrays = {}, attributeMatrices = {}, wgslBody } = params;
 
         const outputColumns = params.outputColumns ?? (params.resultField ? [params.resultField] : []);
@@ -80,13 +81,24 @@ export class ComputeGpgpu extends GpuPipeline {
 
         this.validateShaderIdentifiers(params);
 
+        const mappings = Object.entries(variableMapping);
+        const geometryVars = mappings.filter(([, path]) => path === 'geometry').map(([name]) => name);
+        const numericMapping = Object.fromEntries(mappings.filter(([, path]) => path !== 'geometry'));
         const { orderedVarNames, inputArrays, scalarVars, arrayVars, matrixVars } = this.extractInputData(
-            features, variableMapping, attributeArrays, attributeMatrices, featureCount,
+            features, numericMapping, attributeArrays, attributeMatrices, featureCount,
         );
         const { globalVarNames, globalInputArrays, globalMeta } = this.extractGlobalData(params);
 
-        const shader = this.buildShader(scalarVars, arrayVars, matrixVars, globalMeta, wgslBody, outputColumns.length);
-        const allInputArrays = { ...inputArrays, ...globalInputArrays };
+        const shader = this.buildShader(scalarVars, arrayVars, matrixVars, geometryVars, globalMeta, wgslBody, outputColumns.length);
+        const allInputArrays: Record<string, Float32Array | Uint32Array> = { ...inputArrays, ...globalInputArrays };
+        if (geometryVars.length) {
+            const { topology, points } = packGeometry(features);
+            for (const name of geometryVars) {
+                orderedVarNames.push(`${name}_topology`, `${name}_points`);
+                allInputArrays[`${name}_topology`] = topology;
+                allInputArrays[`${name}_points`] = points;
+            }
+        }
         const storageGlobals = new Set(globalMeta.filter(meta => meta.kind !== 'scalar').map(meta => meta.name));
 
         const result = await this.dispatch(
@@ -232,7 +244,7 @@ export class ComputeGpgpu extends GpuPipeline {
         featureVarNames: string[],
         globalVarNames: string[],
         storageGlobals: Set<string>,
-        inputArrays: { [varName: string]: Float32Array },
+        inputArrays: Record<string, Float32Array | Uint32Array>,
         shader: string,
         featureCount: number,
         numOutputs: number,
@@ -269,7 +281,7 @@ export class ComputeGpgpu extends GpuPipeline {
      *
      * @param params Pipeline parameters to validate.
      */
-    private validateShaderIdentifiers(params: GpgpuPipelineParams): void {
+    private validateShaderIdentifiers(params: GpgpuPipelineParams<Geometry | null>): void {
         const {
             variableMapping,
             attributeArrays = {},
@@ -304,6 +316,17 @@ export class ComputeGpgpu extends GpuPipeline {
         }
 
         for (const name of featureNames) {
+            const path = variableMapping[name];
+            if (path === 'geometry.coordinates') {
+                throw new Error(`ComputeGpgpu: map "${name}" to "geometry" to access GeoJSON coordinates and topology.`);
+            }
+            if (path === 'geometry') {
+                if (name in attributeMatrices || name in attributeArrays) {
+                    throw new Error(`ComputeGpgpu: geometry "${name}" is inferred and cannot be configured as an array or matrix.`);
+                }
+                this.claimGeneratedSymbols(claimedSymbols, [name, `${name}_points`, `${name}_topology`, `${name}_node`], `geometry "${name}"`);
+                continue;
+            }
             const kind = name in attributeMatrices
                 ? 'matrix'
                 : name in attributeArrays
@@ -555,7 +578,7 @@ export class ComputeGpgpu extends GpuPipeline {
      * @param params Pipeline parameters containing uniform definitions.
      * @returns Ordered global variable names, packed input arrays, and shader metadata.
      */
-    private extractGlobalData(params: GpgpuPipelineParams) {
+    private extractGlobalData(params: GpgpuPipelineParams<Geometry | null>) {
         const { uniforms = {}, uniformArrays = {}, uniformMatrices = {} } = params;
         const globalVarNames: string[] = [];
         const globalInputArrays: GlobalInputArrays = {};
@@ -601,12 +624,12 @@ export class ComputeGpgpu extends GpuPipeline {
      * @param outputColumns Output field names aligned with `out0`, `out1`, and so on.
      * @returns New FeatureCollection with results written to `feature.properties.compute`.
      */
-    private applyResultsToFeatures(
-        geojson: FeatureCollection,
-        features: ComputeFeature[],
+    private applyResultsToFeatures<G extends Geometry | null>(
+        geojson: FeatureCollection<G>,
+        features: Feature<G>[],
         result: Record<string, TypedArray>,
         outputColumns: string[],
-    ): FeatureCollection {
+    ): FeatureCollection<G> {
         const newFeatures = features.map((feature, i) => {
             const properties = feature.properties ? { ...feature.properties } : {};
             const computeProps = properties.compute ? { ...properties.compute } : {};
@@ -616,7 +639,7 @@ export class ComputeGpgpu extends GpuPipeline {
             properties.compute = computeProps;
             return { ...feature, properties };
         });
-        return { ...geojson, features: newFeatures } as FeatureCollection;
+        return { ...geojson, features: newFeatures };
     }
 
     /**
@@ -625,6 +648,7 @@ export class ComputeGpgpu extends GpuPipeline {
      * @param scalarVars Scalar variable names.
      * @param arrayVars Array variable metadata.
      * @param matrixVars Matrix variable metadata.
+     * @param geometryVars Inferred GeoJSON geometry variable names.
      * @param globalMeta Global scalar and read-only storage metadata.
      * @param wgslBody User-provided WGSL function body.
      * @param numOutputs Number of output columns.
@@ -640,6 +664,7 @@ export class ComputeGpgpu extends GpuPipeline {
             variableRows?: boolean;
             rowsVarName?: string;
         }>,
+        geometryVars: string[],
         globalMeta: GlobalVarMeta[],
         wgslBody: string,
         numOutputs: number,
@@ -700,6 +725,24 @@ export class ComputeGpgpu extends GpuPipeline {
                 `${name}_cols: u32`
             );
             computeFunctionArgs.push(name, variableRows ? `${name}_rows` : `${rows}u`, `${cols}u`);
+        }
+
+        if (geometryVars.length) {
+            bufferDecls.push('struct AutkGeometryNode { index: u32, kind: u32, pointStart: u32, pointEnd: u32, next: u32 }');
+        }
+        for (const name of geometryVars) {
+            bufferDecls.push(
+                `@group(0) @binding(${bindingIdx++}) var<storage, read> ${name}_topology: array<u32>;`,
+                `@group(0) @binding(${bindingIdx++}) var<storage, read> ${name}_points: array<vec4f>;`,
+                `fn ${name}_node(nodeIndex: u32) -> AutkGeometryNode {
+                    let offset = 1u + ${name}_topology[0] + nodeIndex * 4u;
+                    return AutkGeometryNode(nodeIndex, ${name}_topology[offset], ${name}_topology[offset + 1u],
+                        ${name}_topology[offset + 2u], ${name}_topology[offset + 3u]);
+                }`,
+            );
+            locals.push(`  _ = ${name}_points[0];`);
+            computeFunctionParams.push(`${name}: AutkGeometryNode`);
+            computeFunctionArgs.push(`${name}_node(${name}_topology[idx + 1u])`);
         }
 
         for (const meta of globalMeta) {

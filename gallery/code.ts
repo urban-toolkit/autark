@@ -1,3 +1,5 @@
+import { ROAD_LENGTH_WGSL } from './src/autk-map/road-length';
+
 /** The core API calls for each task; the full runnable program is under "View full source". */
 export function exampleCode(id: string, state: Record<string, string>): string {
     const provider = state['source-select'] || 'osmLight';
@@ -74,7 +76,7 @@ map.requestRender();`;
         case 'A02': return "for (const table of ['noise', 'parking']) {\n  await db.spatialQuery({ tableRootName: 'neighborhoods', tableJoinName: table, groupBy });\n}";
         case 'A03': return `await db.spatialQuery({\n  tableRootName: ${variant === 'buildings' ? "'table_osm_buildings'" : "'table_osm_roads'"},\n  tableJoinName: 'noise', near: { distance: 1000 }, groupBy,\n});`;
         case 'A04': return `await db.buildHeatmap({\n  tableJoinName: 'noise', near: { distance: 1000 }, outputTableName: 'heatmap',\n  grid: { rows: ${variant === 'fine' ? 60 : 30}, columns: ${variant === 'fine' ? 60 : 30} },\n  groupBy,\n});\nmap.loadCollection('heatmap', { collection: await db.getRaster('heatmap'), type: 'raster', property: 'band_1' });`;
-        case 'A05': return `const result = await new ComputeGpgpu().run({\n  collection,\n  variableMapping: ${variant === 'roads' ? "{ x: 'lanes' }" : "{ x: 'shape_area', y: 'shape_leng' }"},\n  resultField: 'result',\n  wgslBody: '${variant === 'roads' ? 'return x;' : 'return (4 * 3.1415927 * x) / (y * y);'}',\n});`;
+        case 'A05': return `const result = await new ComputeGpgpu().run({\n  collection,\n  variableMapping: ${variant === 'roads' ? "{ road: 'geometry' }" : "{ x: 'shape_area', y: 'shape_leng' }"},\n  resultField: 'result',\n  wgslBody: ${variant === 'roads' ? `\`\n${ROAD_LENGTH_WGSL}\n\`` : "'return (4 * 3.1415927 * x) / (y * y);'"},\n});`;
         case 'A06': case 'A07': case 'A08': return "const result = await new ComputeRender().run({\n  layers: [{ id, collection, type }],\n  viewpoints: { collection: roads, sampling: { directions: 1 } },\n  aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },\n});";
         default: throw new Error(`Missing code excerpt for ${id}`);
     }

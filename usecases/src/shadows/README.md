@@ -8,7 +8,7 @@ Compare a monthly shadow baseline with a selected building's estimated contribut
 2. `split-roads.sql`: divide LineStrings into segments no longer than **20 m**, using workspace planar coordinates. Each segment receives a stable `geojson_id` (`road/<OSM way ID>/segment/<index>`); the original `id` and source attributes are preserved. Reusing the original way ID as every segment's feature ID would make thematic matching ambiguous.
 3. Average monthly measurements within **200 m** of each segment's centroid. After all monthly joins succeed, delete the temporary `shadows` measurement layer so its points are not rendered. Joined values remain on the road segments for map, plot, and compute use. Month/day-of-year/label configuration is defined once in `utils.ts`.
 4. `map.ts`: render the layers and emit building selections. Building layers enable `loadConfig.buildingsZeroHeight` so buildings without height metadata remain visible. The original unsegmented roads are not rendered.
-5. `compute.ts` / `shadow.wgsl`: send segment coordinates, monthly baseline, footprint and height to `ComputeGpgpu`; output shadow minutes and percentage contribution.
+5. `compute.ts` / `shadow.wgsl`: bind each road feature's geometry, monthly baseline, footprint, and height to `ComputeGpgpu`. Each hourly sample counts once if any road edge intersects the shadow; edges never bridge separate lines. The shader outputs shadow minutes and percentage contribution.
 6. `app.ts`: merge results into `properties.compute` only if they belong to the current building/month. Deselecting or selecting invalid geometry clears previous results.
 7. `plot.ts`: show the **monthly baseline**, independent of the chosen analytical display mode; brushing highlights road segments.
 

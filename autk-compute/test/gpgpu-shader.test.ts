@@ -74,6 +74,28 @@ describe('global storage arrays and matrices (#105)', () => {
     });
 });
 
+describe('inferred geometry bindings', () => {
+    it('binds compact integer topology and positions alongside numeric inputs', async () => {
+        const { inputs, shader } = await dispatched({ variableMapping: { road: 'geometry', h: 'properties.h' } });
+        expect(Object.keys(inputs)).toEqual(['h', 'road_topology', 'road_points']);
+        expect(inputs.road_topology.data).toEqual(new Uint32Array([2, 0, 1, 1, 0, 1, 1, 1, 1, 2, 2]));
+        expect(inputs.road_points.data).toEqual(new Float32Array([0, 0, 0, 2, 0, 0, 0, 2]));
+        expect(shader).toContain('fn compute_value(h: f32, road: AutkGeometryNode)');
+    });
+
+    it('requires legacy coordinate matrices to migrate to a geometry binding', async () => {
+        await expect(dispatched({ variableMapping: { road: 'geometry.coordinates' },
+            attributeMatrices: { road: { rows: 'auto', cols: 2 } } })).rejects.toThrow(/map "road" to "geometry"/);
+        await expect(dispatched({ variableMapping: { road: 'geometry' }, attributeArrays: { road: 2 } }))
+            .rejects.toThrow(/inferred and cannot be configured/);
+    });
+
+    it('rejects collisions with geometry accessors', async () => {
+        await expect(dispatched({ variableMapping: { road: 'geometry' }, uniforms: { road_node: 1 } }))
+            .rejects.toThrow(/symbol collision for "road_node"/);
+    });
+});
+
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
 type FakeDevice = ReturnType<typeof fakeDevice>;
 const STORAGE = 128;

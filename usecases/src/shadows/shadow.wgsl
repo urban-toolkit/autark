@@ -3,7 +3,7 @@
 // out[1] — contribution %: (accumulated / sjoin_avg) * 100.
 // Interpretation assumes the baseline CSV's units are also minutes (see README).
 // bld_height, doy, ring are global variables (same for all road segments).
-// seg and sjoin_avg are per-feature attributes.
+// road and sjoin_avg are per-feature inputs.
 let pi      = 3.14159265359;
 let lat_rad = 0.73027;    // 41.85° N
 let lon_ref = -75.0;      // reference meridian (CDT, UTC-5)
@@ -23,10 +23,6 @@ for (var hour = 5i; hour <= 21i; hour++) {
         last_valid = hour;
     }
 }
-
-// Segment endpoints (constant across all hourly samples)
-let ax = seg[0u]; let ay = seg[1u];
-let bx = seg[2u]; let by = seg[3u];
 
 var accumulated: f32 = 0.0;
 
@@ -74,34 +70,32 @@ for (var hour = 5i; hour <= 21i; hour++) {
 
     let v_hi_shadow = v_hi + shadow_len;
 
-    // ── Segment-OBB intersection test ─────────────────────────────────────────
-    let au = ax * perp_x + ay * perp_y; let av = ax * sdx + ay * sdy;
-    let bu = bx * perp_x + by * perp_y; let bv = bx * sdx + by * sdy;
-
+    // Check edges within each LineString, never between separate parts.
+    let u_axis = vec2f(perp_x, perp_y);
+    let v_axis = vec2f(sdx, sdy);
     var hit = false;
-
-    if au >= u_lo && au <= u_hi && av >= v_lo && av <= v_hi_shadow {
-        hit = true;
-    } else if bu >= u_lo && bu <= u_hi && bv >= v_lo && bv <= v_hi_shadow {
-        hit = true;
-    } else if !(max(au, bu) < u_lo || min(au, bu) > u_hi) &&
-              !(max(av, bv) < v_lo || min(av, bv) > v_hi_shadow) {
-        let du = bu - au;
-        let dv = bv - av;
-        if abs(du) > 0.001 {
-            let t0      = (u_lo - au) / du;
-            let t1      = (u_hi - au) / du;
-            let t_enter = max(min(t0, t1), 0.0);
-            let t_exit  = min(max(t0, t1), 1.0);
-            if t_enter <= t_exit {
-                let v_enter = av + t_enter * dv;
-                let v_exit  = av + t_exit  * dv;
-                if max(v_enter, v_exit) >= v_lo && min(v_enter, v_exit) <= v_hi_shadow {
-                    hit = true;
-                }
+    for (var n = road.index; n < road.next && !hit; n++) {
+        let line = road_node(n);
+        if line.kind != 3u { continue; } // LineString
+        for (var i = line.pointStart; i + 1u < line.pointEnd && !hit; i++) {
+            let a = road_points[i].xy;
+            let b = road_points[i + 1u].xy;
+            let au = dot(a, u_axis); let av = dot(a, v_axis);
+            let bu = dot(b, u_axis); let bv = dot(b, v_axis);
+            if max(au, bu) < u_lo || min(au, bu) > u_hi ||
+               max(av, bv) < v_lo || min(av, bv) > v_hi_shadow { continue; }
+            let du = bu - au;
+            if abs(du) > 0.001 {
+                let t0 = (u_lo - au) / du;
+                let t1 = (u_hi - au) / du;
+                let t_enter = max(min(t0, t1), 0.0);
+                let t_exit = min(max(t0, t1), 1.0);
+                let v_enter = mix(av, bv, t_enter);
+                let v_exit = mix(av, bv, t_exit);
+                hit = t_enter <= t_exit && max(v_enter, v_exit) >= v_lo && min(v_enter, v_exit) <= v_hi_shadow;
+            } else {
+                hit = true;
             }
-        } else {
-            if max(av, bv) >= v_lo && min(av, bv) <= v_hi_shadow { hit = true; }
         }
     }
 

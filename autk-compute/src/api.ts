@@ -6,7 +6,7 @@
  * and GPGPU pipelines.
  */
 
-import { FeatureCollection } from 'geojson';
+import { FeatureCollection, Geometry } from 'geojson';
 
 import { LayerType } from '@urban-toolkit/autk-core';
 
@@ -129,11 +129,11 @@ export interface RenderPipelineParams {
 /**
  * Parameters for the GPGPU pipeline.
  */
-export interface GpgpuPipelineParams {
+export interface GpgpuPipelineParams<G extends Geometry | null = Geometry> {
     /** GeoJSON FeatureCollection to process. */
-    collection: FeatureCollection;
+    collection: FeatureCollection<G>;
 
-    /** Maps WGSL variable names to feature property dot-paths. */
+    /** Maps WGSL names to feature paths. Use `geometry` to bind GeoJSON positions and topology automatically. */
     variableMapping: Record<string, string>;
 
     /** Per-feature fixed-length arrays keyed by WGSL variable name. */

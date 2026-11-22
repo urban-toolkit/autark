@@ -1,5 +1,6 @@
 import { CAMERA_TOUR_ROUTE } from './src/autk-map/camera-tour-route';
 import { CORINE_CLASSES } from './src/autk-map/corine-palette';
+import { ROAD_LENGTH_WGSL } from './src/autk-map/road-length';
 
 /**
  * Minimal runnable programs shown under "View full source".
@@ -535,9 +536,9 @@ await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableNa
 
 const result = await new ComputeGpgpu().run({
   collection: await db.getLayer('neighborhoods'),
-  variableMapping: ${variant === 'roads' ? "{ x: 'lanes' }" : "{ x: 'shape_area', y: 'shape_leng' }"},
+  variableMapping: ${variant === 'roads' ? "{ road: 'geometry' }" : "{ x: 'shape_area', y: 'shape_leng' }"},
   resultField: 'result',
-  wgslBody: '${variant === 'roads' ? 'return x;' : 'return (4 * 3.1415927 * x) / (y * y);'}',
+  wgslBody: ${variant === 'roads' ? `\`\n${ROAD_LENGTH_WGSL}\n\`` : "'return (4 * 3.1415927 * x) / (y * y);'"},
 });
 
 map.loadCollection('neighborhoods', { collection: result });

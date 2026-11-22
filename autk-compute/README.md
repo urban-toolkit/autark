@@ -54,7 +54,34 @@ If the GPU rejects the pass, `gpgpuPipeline` (and `ComputeGpgpu.run`) rejects wi
 
 `uniforms` contains scalar constants in uniform buffers. Despite their historical names, `uniformArrays` and `uniformMatrices` are **global read-only storage buffers**, shared by every feature. Large globals are read in place rather than copied into function-local arrays or passed by value. This avoids the uniform-buffer size limit and large-array compiler stack issues; it is not a promise of faster computation.
 
-Inside `wgslBody`, access an array as `weights[index]`, with `weights_length: u32`. Matrices are flattened row-major: `matrix[row * matrix_cols + col]`, with `matrix_rows` and `matrix_cols` of type `u32`. Empty globals report zero logical length/rows; avoid indexing outside the logical dimensions. Per-feature `attributeArrays`/`attributeMatrices` keep their existing behavior.
+Inside `wgslBody`, access an array as `weights[index]`, with `weights_length: u32`. Matrices are flattened row-major: `matrix[row * matrix_cols + col]`, with `matrix_rows` and `matrix_cols` of type `u32`. Empty globals report zero logical length/rows; avoid indexing outside the logical dimensions. Per-feature `attributeArrays` and `attributeMatrices` are for numeric data.
+
+### GeoJSON geometry in WGSL
+
+Bind `variableMapping: { road: 'geometry' }` to access each feature's geometry. Autark infers this binding for all GeoJSON geometry types; do not add `road` to `attributeArrays` or `attributeMatrices`. **Migration:** replace a `geometry.coordinates` mapping with `geometry`, remove its array/matrix configuration, and read positions and boundaries as shown below. A `properties.geometry` mapping still reads a property, not the feature geometry.
+
+```ts
+const result = await new ComputeGpgpu().run({
+  collection,
+  variableMapping: { road: 'geometry' },
+  resultField: 'length',
+  wgslBody: `
+    var lengthSum = 0.0;
+    for (var n = road.index; n < road.next; n++) {
+      let line = road_node(n);
+      if line.kind != 3u { continue; } // LineString
+      for (var p = line.pointStart; p + 1u < line.pointEnd; p++) {
+        lengthSum += distance(road_points[p].xy, road_points[p + 1u].xy);
+      }
+    }
+    return lengthSum;
+  `,
+});
+```
+
+- `road` is the current feature's root `AutkGeometryNode`. `road_node(index)` reads another node in preorder. The subtree spans `[node.index, node.next)`. If the node has children, the first is at `node.index + 1u`, and each child's `next` points to the next sibling or the parent's end.
+- A node's `kind` is a `u32`: null `0`, Point `1`, MultiPoint `2`, LineString `3`, MultiLineString `4`, Polygon `5`, MultiPolygon `6`, GeometryCollection `7`, and polygon ring `8`. MultiPoint stores positions directly. MultiLineString has LineString children; MultiPolygon has Polygon children; a Polygon's first ring is its exterior and the rest are holes. GeometryCollection preserves child types and nesting.
+- `road_points` is shared across features. Each node's `[pointStart, pointEnd)` range covers its positions and its descendants' positions. Each element is a `vec4f`: X, Y, Z (zero when missing), and coordinate dimension (2 or 3). Positions remain in source order and CRS, with polygon closing positions retained. Empty or null geometries have an empty point range. Iterate inside each line or ring rather than connecting points across child boundaries. The example sums distances in the input coordinate units, not geodesic distances.
 
 ```ts
 const result = await compute.gpgpuPipeline({

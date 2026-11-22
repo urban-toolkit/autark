@@ -6,7 +6,7 @@
  * render pipelines over shared GeoJSON feature collections.
  */
 
-import { FeatureCollection } from 'geojson';
+import { FeatureCollection, Geometry } from 'geojson';
 
 import { ComputeGpgpu } from './compute-gpgpu';
 import { ComputeRender } from './compute-render';
@@ -60,7 +60,7 @@ export class AutkComputeEngine {
      *   resultField: 'scaledPop',
      * });
      */
-    async gpgpuPipeline(params: GpgpuPipelineParams): Promise<FeatureCollection> {
+    async gpgpuPipeline<G extends Geometry | null>(params: GpgpuPipelineParams<G>): Promise<FeatureCollection<G>> {
         return this._gpgpu.run(params);
     }
 

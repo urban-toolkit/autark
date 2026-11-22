@@ -2,11 +2,12 @@ import { runExample, exampleVariant } from '../example';
 import { AutkDb } from '@urban-toolkit/autk-db';
 import { ComputeGpgpu } from '@urban-toolkit/autk-compute';
 import { AutkMap } from '@urban-toolkit/autk-map';
+import { ROAD_LENGTH_WGSL } from './road-length';
 
 const BASE_URL = (import.meta as any).env.BASE_URL;
 
 async function main(): Promise<void> {
-    const input = exampleVariant('Input', { polygons: 'Neighborhood compactness', roads: 'Road lane counts' });
+    const input = exampleVariant('Input', { polygons: 'Neighborhood compactness', roads: 'Road lengths' });
     const db = new AutkDb();
     await db.init();
 
@@ -27,9 +28,9 @@ async function main(): Promise<void> {
 
     const result = await new ComputeGpgpu().run({
         collection,
-        variableMapping: input === 'roads' ? { x: 'lanes' } : { x: 'shape_area', y: 'shape_leng' },
+        variableMapping: input === 'roads' ? { road: 'geometry' } : { x: 'shape_area', y: 'shape_leng' },
         resultField: 'result',
-        wgslBody: input === 'roads' ? 'return x <= 0 ? 1 : x;' : 'return (4 * 3.1415927 * x) / (y * y);',
+        wgslBody: input === 'roads' ? ROAD_LENGTH_WGSL : 'return (4 * 3.1415927 * x) / (y * y);',
     });
 
     const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);

@@ -1,6 +1,9 @@
 import { ComputeGpgpu } from '../src/compute-gpgpu';
 import { getSharedGpuDevice } from '../src/device-manager';
+import type { Geometry } from 'geojson';
 import type { GpgpuPipelineParams } from '../src/api';
+import { ROAD_LENGTH_WGSL } from '../../gallery/src/autk-map/road-length';
+import shadowWgsl from '../../usecases/src/shadows/shadow.wgsl?raw';
 
 /** Actual GPU checks; run with node autk-compute/test/run-webgpu.mjs (not Vitest's Node mocks). */
 export async function runWebGpuCases() {
@@ -64,6 +67,58 @@ export async function runWebGpuCases() {
         if (!(error instanceof Error) || !error.message.includes('GPU validation error') || !error.message.includes('undefined_gpu_symbol')) throw error;
         passed.push('gpu-validation-error-rejected');
     }
+    const geometryCollection: GpgpuPipelineParams<Geometry | null>['collection'] = {
+        type: 'FeatureCollection', features: [
+            { type: 'Feature', properties: {}, geometry: {
+                type: 'MultiLineString', coordinates: [[[10000, 0], [10003, 0]], [[0, 0], [0, 4]]],
+            } },
+            { type: 'Feature', properties: {}, geometry: null },
+        ],
+    };
+    const roadResult = await new ComputeGpgpu().run({
+        collection: geometryCollection, variableMapping: { road: 'geometry' },
+        wgslBody: ROAD_LENGTH_WGSL, resultField: 'out',
+    });
+    const lengths = roadResult.features.map(feature => feature.properties?.compute.out);
+    if (lengths[0] !== 7 || lengths[1] !== 0) throw new Error(`Unexpected multipart lengths: ${lengths}`);
+    passed.push('multipart-road-length');
+
+    const shadowResult = await new ComputeGpgpu().run({
+        collection: geometryCollection, variableMapping: { road: 'geometry' },
+        uniforms: { bld_height: 20, doy: 172, sjoin_avg: 600 },
+        uniformMatrices: { ring: { cols: 2, data: [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]] } },
+        wgslBody: shadowWgsl, outputColumns: ['minutes', 'contribution'],
+    });
+    const minutes = shadowResult.features.map(feature => feature.properties?.compute.minutes);
+    if (!(minutes[0] > 0) || minutes[1] !== 0) throw new Error(`Unexpected multipart shadow minutes: ${minutes}`);
+    passed.push('shadow-on-second-road-part');
+
+    const absentResult = await new ComputeGpgpu().run({
+        collection: { type: 'FeatureCollection', features: [geometryCollection.features[1]] },
+        variableMapping: { road: 'geometry' }, wgslBody: 'return f32(road.kind + road.pointEnd - road.pointStart);', resultField: 'out',
+    });
+    if (absentResult.features[0].properties?.compute.out !== 0) throw new Error('Unexpected null geometry data');
+    passed.push('null-only-geometry-buffer');
+
+    const ring = [[0, 0], [10, 0], [0, 10], [0, 0]];
+    const hole = [[1, 1], [1, 2], [2, 1], [1, 1]];
+    const otherRing = ring.map(([x, y]) => [x + 20, y]);
+    const polygonResult = await new ComputeGpgpu().run({
+        collection: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: {
+            type: 'MultiPolygon', coordinates: [[ring, hole], [otherRing]],
+        } }] },
+        variableMapping: { area: 'geometry' }, resultField: 'holes', wgslBody: `
+            var holes = 0u;
+            for (var p = area.index + 1u; p < area.next; p = area_node(p).next) {
+                let polygon = area_node(p);
+                for (var r = p + 2u; r < polygon.next; r = area_node(r).next) {
+                    holes += 1u;
+                }
+            }
+            return f32(holes);`,
+    });
+    if (polygonResult.features[0].properties?.compute.holes !== 1) throw new Error('Unexpected polygon hole count');
+    passed.push('multipolygon-ring-ownership');
     await device.queue.onSubmittedWorkDone();
     if (uncaptured.length) throw new Error(`Uncaptured GPU errors: ${uncaptured.join('; ')}`);
     const info = device.adapterInfo;
