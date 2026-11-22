@@ -288,9 +288,9 @@ export class MouseEvents {
         event.preventDefault();
         event.stopPropagation();
 
-        const rect = this._map.renderer.canvas.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / this._map.renderer.cssWidth;
-        const y = 1.0 - (event.clientY - rect.top) / this._map.renderer.cssHeight;
+        const [px, py] = this._canvasPoint(event.clientX, event.clientY);
+        const x = px / this._map.renderer.cssWidth;
+        const y = 1.0 - py / this._map.renderer.cssHeight;
 
         this._map.camera.zoom(event.deltaY * 0.01, x, y);
     }
@@ -310,10 +310,7 @@ export class MouseEvents {
         event.preventDefault();
         event.stopPropagation();
 
-        const rect = this._map.renderer.canvas.getBoundingClientRect();
-
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const [mouseX, mouseY] = this._canvasPoint(event.clientX, event.clientY);
 
         const activePickingLayer = this._map.activePickingLayer;
         if (activePickingLayer?.layerRenderInfo.isPick) {
@@ -398,17 +395,32 @@ export class MouseEvents {
      * Computes pointer coordinates in canvas-local CSS pixels.
      *
      * The returned coordinates are measured from the top-left corner of the
-     * renderer canvas using the canvas's current client bounding box.
+     * renderer canvas, in its untransformed CSS pixels (see `_canvasPoint`).
      *
      * @param event Pointer or mouse event containing viewport coordinates.
-     * @returns Two-element array `[x, y]` relative to the canvas bounds in CSS pixels.
+     * @returns Two-element array `[x, y]` relative to the canvas in CSS pixels.
      */
     private _getPoint(event: PointerEvent | MouseEvent): number[] {
-        const canvas = this._map.renderer.canvas;
-        const rect = canvas.getBoundingClientRect();
-        return [
-            event.clientX - rect.left,
-            event.clientY - rect.top,
-        ];
+        return this._canvasPoint(event.clientX, event.clientY);
+    }
+
+    /**
+     * Converts a viewport position to the canvas's own CSS pixels.
+     *
+     * The bounding box is measured on screen, so it includes any CSS transform on the canvas or its
+     * ancestors (an app that zooms a panel with `transform: scale()` draws the canvas smaller or
+     * larger than its CSS size). Offsets are scaled back to the canvas's CSS size, the space the
+     * camera, picking and the tooltip work in; without a transform the scale is 1.
+     *
+     * @param clientX Viewport x in CSS pixels.
+     * @param clientY Viewport y in CSS pixels.
+     * @returns `[x, y]` from the canvas's top-left corner, in the canvas's untransformed CSS pixels.
+     */
+    private _canvasPoint(clientX: number, clientY: number): [number, number] {
+        const renderer = this._map.renderer;
+        const rect = renderer.canvas.getBoundingClientRect();
+        const sx = rect.width && renderer.cssWidth ? renderer.cssWidth / rect.width : 1;
+        const sy = rect.height && renderer.cssHeight ? renderer.cssHeight / rect.height : 1;
+        return [(clientX - rect.left) * sx, (clientY - rect.top) * sy];
     }
 }
