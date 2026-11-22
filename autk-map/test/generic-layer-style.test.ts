@@ -38,7 +38,7 @@ describe('subdued generic layer defaults', () => {
 
   it('keeps generic and road widths in render state, not centerline geometry', () => {
     const map = Object.create(AutkMap.prototype) as any;
-    map._layerManager = { origin: [0, 0], computeZindex: () => 1 };
+    map._layerManager = { origin: [0, 0] };
     map.defaultColorMap = vi.fn(() => ({}));
     map.createLayer = vi.fn();
     const collection: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature',
@@ -57,7 +57,7 @@ describe('subdued generic layer defaults', () => {
 
   it('toggles polygon borders through updateRenderInfo without rebuilding geometry or skipping the fill', () => {
     const map = Object.create(AutkMap.prototype) as any;
-    map._layerManager = { origin: [0, 0], hasOrigin: true, computeZindex: () => 1 };
+    map._layerManager = { origin: [0, 0], hasOrigin: true };
     map._ui = { refreshLayerList: vi.fn() };
     map.defaultColorMap = vi.fn(() => ({}));
     map.createLayer = vi.fn();
@@ -95,7 +95,7 @@ describe('subdued generic layer defaults', () => {
 
   it('loads only positions for points, leaving radius to the renderer', () => {
     const map = Object.create(AutkMap.prototype) as any;
-    map._layerManager = { origin: [0, 0], computeZindex: () => 1 };
+    map._layerManager = { origin: [0, 0] };
     map.defaultColorMap = vi.fn(() => ({}));
     map.createLayer = vi.fn();
     const collection: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature',

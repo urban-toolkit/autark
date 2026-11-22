@@ -39,6 +39,7 @@ export async function runWebGpuCases() {
         const readback = device.createBuffer({ size: 128 * 512, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
         resources.push(readback);
         const layer = (id: string) => map.layerManager.searchByLayerId(id)!;
+        const orderedLayers = () => map.getLayerOrder().map(layer);
         const camera = new Camera();
         camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 13.036753]);
         camera.resize(128, 128);
@@ -86,8 +87,11 @@ export async function runWebGpuCases() {
         map.loadCollection('upper', { collection: square(5), type: 'polygons' });
         map.updateRenderInfo('lower', { color: { r: 255, g: 0, b: 0, alpha: 1 }, showBorders: true, strokeColor: { r: 255, g: 0, b: 0, alpha: 1 } });
         map.updateRenderInfo('upper', { color: { r: 0, g: 0, b: 255, alpha: 1 }, showBorders: false, opacity: 0.5 });
-        near(rgba(await pixels([layer('lower'), layer('upper')]), 64, 64), [127, 0, 128, 255], 'Translucent upper layer');
-        near(rgba(await pixels([layer('upper'), layer('lower')]), 64, 64), [255, 0, 0, 255], 'Reversed draw order');
+        near(rgba(await pixels(orderedLayers()), 64, 64), [127, 0, 128, 255], 'Translucent upper layer');
+        map.setLayerOrder(['upper', 'lower']);
+        near(rgba(await pixels(orderedLayers()), 64, 64), [255, 0, 0, 255], 'Reversed draw order');
+        map.setLayerOrder([]);
+        near(rgba(await pixels(orderedLayers()), 64, 64), [127, 0, 128, 255], 'Restored default draw order');
         checks.push('2D draw order and premultiplied transparency');
 
         map.updateRenderInfo('upper', { opacity: 1 });
@@ -100,13 +104,13 @@ export async function runWebGpuCases() {
 
         const visible = await pixels([layer('upper')]);
         const picked = await pixels([layer('upper')], layer('upper'));
-        layer('upper').updateLayerInfo({ zIndex: 1000000 });
+        map.setLayerOrder(['upper', 'lower']);
         identical(visible, await pixels([layer('upper')]), 'Layer order changed visible coordinates');
         identical(picked, await pixels([layer('upper')], layer('upper')), 'Layer order changed picking coordinates');
         const pitched = new Camera({ eye: [0, -12, 15], lookAt: [0, 0, 0], up: [0, 1, 0] });
         pitched.resize(128, 128);
         const tilted = await pixels([layer('upper')], layer('upper'), [], pitched);
-        layer('upper').updateLayerInfo({ zIndex: -1000000 });
+        map.setLayerOrder([]);
         identical(tilted, await pixels([layer('upper')], layer('upper'), [], pitched), 'Layer order changed pitched geometry');
         checks.push('visible/picking invariance under order changes and pitch');
 
@@ -120,7 +124,7 @@ export async function runWebGpuCases() {
             const target = layer(id);
             const before = await pixels([target], target);
             assert(before[(64 * 128 + 64) * 4] === 1, `${id} picking missed the feature`);
-            target.updateLayerInfo({ zIndex: 1000000 });
+            map.setLayerOrder([id, 'lower']);
             identical(before, await pixels([target], target), `${id} picking moved with layer order`);
             near(rgba(await pixels([target]), 64, 64), [0, 255, 0, 255], `${id} visible location`);
         }
@@ -132,7 +136,9 @@ export async function runWebGpuCases() {
         map.loadCollection('raster', { collection: raster, type: 'raster', property: 'band' });
         const rasterPixels = await pixels([layer('raster')]);
         assert(rasterPixels[(64 * 128 + 64) * 4 + 3] > 0, 'Raster did not render');
-        layer('raster').updateLayerInfo({ zIndex: 1000000 });
+        map.setLayerOrder(['raster', 'line']);
+        near(rgba(await pixels(orderedLayers().filter(target => target === layer('raster') || target === layer('line'))), 64, 64),
+            [0, 255, 0, 255], 'Line renders over raster after reordering');
         identical(rasterPixels, await pixels([layer('raster')]), 'Raster moved with layer order');
         checks.push('raster ground-plane rendering');
 
@@ -148,7 +154,7 @@ export async function runWebGpuCases() {
         const composite = await pixels([layer('upper')], undefined, [building]);
         const center = rgba(composite, 64, 64);
         assert(center[1] > 80 && center[2] < 5, 'Building composite did not cover the 2D stack');
-        building.updateLayerInfo({ zIndex: 1000000 });
+        map.setLayerOrder(['buildings', 'upper']);
         identical(roofs, await pixels([], building, [building]), 'Building picking adds artificial height');
         identical(composite, await pixels([layer('upper')], undefined, [building]), 'Building geometry adds artificial height');
         checks.push('physical building depth, picking alignment, and composite precedence');
@@ -162,7 +168,7 @@ export async function runWebGpuCases() {
         const raised = await pixels([], building, [building]);
         assert(raised[(64 * 128 + 64) * 4] === 1, 'Terrain-relative building picking missed the nearest roof');
         assert(raised.some((value, i) => value !== roofs[i]), 'Terrain height did not move building geometry');
-        building.updateLayerInfo({ zIndex: -1000000 });
+        map.setLayerOrder(['upper', 'buildings']);
         identical(raised, await pixels([], building, [building]), 'Terrain-relative picking moved with layer order');
         building.clearTerrainHeightSource();
         checks.push('physical terrain height in building geometry and picking');
@@ -170,7 +176,11 @@ export async function runWebGpuCases() {
         // Exercise the same orthographic overlay pass used for terrain draping.
         const overlay = new Camera();
         overlay.setOrthographicBounds(-6, 6, -6, 6);
-        near(rgba(await pixels([layer('lower'), layer('upper')], undefined, [], overlay), 64, 64), [0, 0, 255, 255], 'Terrain overlay order');
+        const terrainOverlays = () => orderedLayers().filter(target => target === layer('lower') || target === layer('upper'));
+        map.setLayerOrder(['upper', 'lower']);
+        near(rgba(await pixels(terrainOverlays(), undefined, [], overlay), 64, 64), [255, 0, 0, 255], 'Custom terrain overlay order');
+        map.setLayerOrder([]);
+        near(rgba(await pixels(terrainOverlays(), undefined, [], overlay), 64, 64), [0, 0, 255, 255], 'Default terrain overlay order');
         checks.push('terrain overlay plane and ordering');
 
         map.loadCollection('regional', { collection: square(200000), type: 'polygons' });

@@ -94,6 +94,7 @@ import { TileLayer } from './layer-tiles';
 import type { TileLayerStats } from './layer-tiles';
 import { VectorLayer } from './layer-vector';
 import { RasterLayer } from './layer-raster';
+import { Triangles3DLayer } from './layer-triangles3D';
 import { composeRgbRaster, isRgbBands, toFloat32Band } from './raster-rgb';
 import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
 import { SpriteLayer } from './layer-sprite';
@@ -391,7 +392,6 @@ export class AutkMap {
                 this.createBuildingsLayer(
                     id,
                     collection as FeatureCollection,
-                    sType,
                     typeof property === 'string' ? property : undefined,
                     loadConfig?.buildingsZeroHeight,
                 );
@@ -440,7 +440,6 @@ export class AutkMap {
 
         const layerInfo: LayerInfo = {
             id,
-            zIndex: this._layerManager.computeZindex(type),
             typeLayer: type,
         };
         const layerRenderInfo: LayerRenderInfo = {
@@ -464,7 +463,7 @@ export class AutkMap {
      * Loads a tile basemap: satellite imagery or a street map fetched as the
      * camera moves.
      *
-     * Tiles use the Web Mercator grid. They are drawn below every other layer,
+     * Tiles use the Web Mercator grid. By default, they draw below every other layer,
      * so load vector layers normally and the basemap shows underneath; a
      * `surface` layer would cover it. Drawing needs the map origin, which the
      * first loaded data layer defines, or `center` can establish it for a
@@ -482,7 +481,6 @@ export class AutkMap {
     loadTiles(id: string, { source, crs, center, zoom, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
         const layerInfo: LayerInfo = {
             id,
-            zIndex: this._layerManager.computeZindex('tiles'),
             typeLayer: 'tiles',
         };
         const layerRenderInfo: LayerRenderInfo = {
@@ -1030,6 +1028,53 @@ export class AutkMap {
         if (removed) {
             this.requestRender();
         }
+    }
+
+    /**
+     * Sets the order the map draws its layers in, bottom first.
+     *
+     * Without one, the map draws its layers in the order by type: tile layers
+     * first, then surface, parks, water and roads layers, then every other
+     * layer in the order it was loaded, so a raster loaded before the roads
+     * still covers them. With an order set:
+     *
+     * - the layers listed are drawn in the order given;
+     * - the layers not listed keep their order among themselves;
+     * - a layer moves past another only when the order requires it: of the
+     *   stacks that meet both rules, the map draws the one that reverses the
+     *   fewest pairs of layers compared with the order by type, and of those,
+     *   the one where each listed layer is as low as it can be.
+     *
+     * A layer loaded later takes its place by the same rule. Buildings are
+     * drawn with depth over the other layers wherever they are, so the order
+     * leaves them out: listing them changes nothing. An empty list returns to
+     * the order by type.
+     *
+     * @param ids Layer ids, bottom first.
+     * @returns Nothing. The layer list and the credits, which follow the order,
+     * are refreshed and a frame is requested.
+     * @throws Never throws.
+     * @example
+     * map.setLayerOrder(['surface', 'heat', 'roads']); // the heat raster under the roads
+     * @example
+     * // With surface, roads, heat and stops drawn in that order by type:
+     * map.setLayerOrder(['stops', 'surface']);
+     * // Drawn: stops, surface, roads, heat. Moving the surface up over the
+     * // stops instead would reverse as many pairs, and it would draw the surface
+     * // over the roads and the heat; the map keeps the listed layers lower.
+     */
+    setLayerOrder(ids: string[]): void {
+        this._layerManager.setLayerOrder(ids);
+        this._ui.refreshLayerList();
+        this.refreshAttribution();
+        this.requestRender();
+    }
+
+    /** Returns the visible 2D layer IDs in draw order, bottom first. */
+    getLayerOrder(): string[] {
+        return this._layerManager.layers
+            .filter(layer => !layer.layerRenderInfo.isSkip && !(layer instanceof Triangles3DLayer))
+            .map(layer => layer.layerInfo.id);
     }
 
     /**
@@ -1633,7 +1678,6 @@ export class AutkMap {
     private createPolygonsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
-            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
@@ -1698,7 +1742,6 @@ export class AutkMap {
     private createPolylinesLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
-            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
@@ -1754,7 +1797,6 @@ export class AutkMap {
     private createPointsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
-            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: typeLayer,
         };
 
@@ -1797,14 +1839,12 @@ export class AutkMap {
      *
      * @param layerName Target layer id.
      * @param geojson Source feature collection.
-     * @param typeLayer Layer type.
      * @param property Optional value extractor used to initialize thematic data.
      * @returns Nothing. The layer is created when triangulation succeeds.
-      */
-    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, typeLayer: LayerType, property?: string, buildingsZeroHeight?: boolean) {
+     */
+    private createBuildingsLayer(layerName: string, geojson: FeatureCollection, property?: string, buildingsZeroHeight?: boolean) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
-            zIndex: this._layerManager.computeZindex(typeLayer),
             typeLayer: 'buildings',
         };
 
@@ -1857,7 +1897,6 @@ export class AutkMap {
     ) {
         const layerInfo: LayerInfo = {
             id: `${layerName}`,
-            zIndex: this._layerManager.computeZindex('raster'),
             typeLayer: 'raster',
         };
 

@@ -225,7 +225,7 @@ export interface UpdateRasterParams {
  * Parameters for loading a tile basemap with {@link AutkMap.loadTiles}.
  *
  * Tiles are web map tiles in the Web Mercator (EPSG:3857) grid, fetched as the
- * camera moves and drawn below every other layer.
+ * camera moves and drawn below other layers by default.
  */
 export interface LoadTilesParams {
     /**

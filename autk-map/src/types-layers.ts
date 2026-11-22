@@ -30,8 +30,6 @@ export const DEFAULT_LINE_WIDTH = 12;
 export interface LayerInfo {
     /** Stable layer identifier used for lookup and updates. */
     id: string;
-    /** CPU drawing order relative to other layers; does not change geometry elevation. */
-    zIndex: number;
     /** Semantic layer type and geometry family handled by the layer. */
     typeLayer: LayerType;
 }

@@ -36,14 +36,10 @@ import { PolylineLayer } from './layer-polyline';
  * Manages all map layers as a single ordered list.
  *
  * `LayerManager` stores every registered layer in render order, computes the
- * shared local origin from the first loaded collection, and assigns z-indices
- * according to the map's layering rules. Base OSM layers occupy fixed slots,
- * dynamic layers are ordered by insertion, and buildings are always rendered
- * last.
+ * shared local origin from the first loaded collection, and maintains the
+ * default order by type and insertion. A custom order rearranges 2D layers;
+ * buildings still render in a separate 3D pass.
  */
-/** CPU draw-order slot for tile layers. Never used as physical height. */
-export const TILE_LAYER_Z_INDEX = -1;
-
 export class LayerManager {
     /** Registered layers sorted by render order. */
     protected _layers: Layer[] = [];
@@ -52,10 +48,13 @@ export class LayerManager {
     /** World-space bounds of the collection that set the origin. */
     protected _bounds?: MapBounds;
 
-    /** Layer ids of non-OSM, non-buildings layers in insertion order. */
-    private _dynamicOrder: string[] = [];
+    /** Registered layers in the order they were added. */
+    private _added: Layer[] = [];
 
-    /** Registered layers sorted by render z-index. */
+    /** Layer ids in the order a caller set, bottom first; empty for the order by type. */
+    private _order: string[] = [];
+
+    /** Registered layers in the order they are drawn, bottom first. */
     get layers(): Layer[] { return this._layers; }
 
     /** World-space origin derived from the current bounding box center. */
@@ -116,8 +115,7 @@ export class LayerManager {
     /**
      * Adds a tile layer.
      *
-     * Tile layers sit below every other layer, in load order, so a basemap
-     * never covers what is drawn on it.
+     * By default, tile layers sit below every other layer, in load order.
      *
      * @param layerInfo Layer identity; `typeLayer` must be `'tiles'`.
      * @param layerRender Initial render configuration.
@@ -139,19 +137,32 @@ export class LayerManager {
     }
 
     private _register<L extends Layer>(layer: L): L {
-        const { typeLayer, id } = layer.layerInfo;
-        if (!OSM_BASE_LAYER_ORDER.includes(typeLayer) && typeLayer !== 'buildings' && typeLayer !== 'tiles') {
-            this._dynamicOrder.push(id);
-        }
-        this._layers.push(layer);
-        this._recomputeZIndices();
-        this._layers.sort((a, b) => a.layerInfo.zIndex - b.layerInfo.zIndex);
+        this._added.push(layer);
+        this._rebuildLayerOrder();
 
         return layer;
     }
 
     /**
-     * Removes the layer matching `layerId` and recomputes dynamic z-order.
+     * Sets the order the layers are drawn in, bottom first.
+     *
+     * The layers listed are drawn in this order, and the others keep their
+     * order, with as few layers moved past others as can be: the rule is in
+     * `applyLayerOrder`. Buildings are drawn with depth wherever they are, so
+     * the order leaves them out. An id whose layer is not registered yet takes
+     * its place when it is. An empty list returns to the order by type.
+     *
+     * @param ids Layer ids, bottom first.
+     * @returns Nothing. Updates {@link layers}.
+     * @throws Never throws.
+     */
+    setLayerOrder(ids: string[]): void {
+        this._order = [...new Set(ids)];
+        this._rebuildLayerOrder();
+    }
+
+    /**
+     * Removes the layer matching `layerId` and rebuilds the stack.
      *
      * @param layerId Layer identifier to remove.
      * @returns Nothing. Unknown ids are silently ignored.
@@ -165,9 +176,8 @@ export class LayerManager {
 
         layer.setChangeListener(null);
         layer.destroy();
-        this._layers = this._layers.filter((candidate) => candidate.layerInfo.id !== layerId);
-        this._dynamicOrder = this._dynamicOrder.filter((id) => id !== layerId);
-        this._recomputeZIndices();
+        this._added = this._added.filter((candidate) => candidate.layerInfo.id !== layerId);
+        this._rebuildLayerOrder();
     }
 
     /**
@@ -195,44 +205,72 @@ export class LayerManager {
         );
     }
 
-    /**
-     * Returns a preliminary z-index placeholder for a layer type.
-     *
-     * @param layerType Layer type to place in the render stack.
-     * @returns The fixed OSM base-slot index, or `0` as a placeholder.
-     * @throws Never throws.
-     */
-    computeZindex(layerType: LayerType): number {
-        const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(layerType);
-        return osmIdx !== -1 ? osmIdx : 0;
+    /** Rebuilds the default stack, keeping insertion order within each type slot. */
+    private _rebuildLayerOrder(): void {
+        const priority = (type: LayerType) => {
+            if (type === 'tiles') return -1;
+            const index = OSM_BASE_LAYER_ORDER.indexOf(type);
+            return index < 0 ? OSM_BASE_LAYER_ORDER.length : index;
+        };
+        const byType = [...this._added].sort((a, b) => priority(a.layerInfo.typeLayer) - priority(b.layerInfo.typeLayer));
+        this._layers = this._order.length === 0 ? byType : applyLayerOrder(byType, this._order);
     }
+}
 
-    /**
-     * Reassigns z-indices across all registered layers:
-     *
-     * - OSM base types: fixed slots 0…N-1 (by `OSM_BASE` order)
-     * - Dynamic layers: slots N, N+1, … in load-insertion order
-     * - Buildings: always last (N + dynamic count)
-     *
-     * @returns Nothing. Updates each registered layer's `layerInfo.zIndex` in
-     * place.
-     */
-    private _recomputeZIndices(): void {
-        const buildingsZ = 0; // OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.length;
+/**
+ * Rearranges a stack in the order by type so the layers an order lists are drawn in that order.
+ *
+ * The layers the order does not list keep their order among themselves. Of the stacks that keep
+ * both orders, this is the one that reverses the fewest pairs of layers compared with the order
+ * by type, and of those, the one where each listed layer is as low as it can be. Buildings are
+ * drawn with depth wherever they are, so the order leaves them out and they keep their places.
+ *
+ * @param byType Layers in the order by type, bottom first.
+ * @param order Distinct layer ids, bottom first. Ids of layers not in the stack are ignored.
+ * @returns The layers in the order they are drawn, bottom first.
+ */
+function applyLayerOrder(byType: Layer[], order: readonly string[]): Layer[] {
+    const flat = byType.filter((layer) => !(layer instanceof Triangles3DLayer));
+    const listed = order.map((id) => flat.find((layer) => layer.layerInfo.id === id)).filter((layer) => layer !== undefined);
+    const others = flat.filter((layer) => !listed.includes(layer));
+    // Pairs of listed layers follow the order and the others keep theirs, so the fewest pairs are
+    // reversed when the listed layers move past the fewest of the others.
+    const overByType = listed.map((layer) => others.filter((other) => flat.indexOf(other) < flat.indexOf(layer)).length);
+    const over = fewestPasses(overByType, others.length);
+    const drawn = others.flatMap((other, k) => [...listed.filter((_, n) => over[n] === k), other]);
+    drawn.push(...listed.filter((_, n) => over[n] === others.length));
+    let next = 0;
+    return byType.map((layer) => (layer instanceof Triangles3DLayer ? layer : drawn[next++]));
+}
 
-        for (const layer of this._layers) {
-            const { typeLayer, id } = layer.layerInfo;
-            const osmIdx = OSM_BASE_LAYER_ORDER.indexOf(typeLayer);
-
-            if (osmIdx !== -1) {
-                layer.layerInfo.zIndex = osmIdx;
-            } else if (typeLayer === 'tiles') {
-                layer.layerInfo.zIndex = TILE_LAYER_Z_INDEX;
-            } else if (typeLayer === 'buildings') {
-                layer.layerInfo.zIndex = buildingsZ;
-            } else {
-                layer.layerInfo.zIndex = OSM_BASE_LAYER_ORDER.length + this._dynamicOrder.indexOf(id);
-            }
-        }
+/**
+ * Places listed layers among the other layers, keeping them in their order and moving them past
+ * as few of the others as it can.
+ *
+ * @param overByType For each listed layer, in the order, how many of the others it is drawn
+ * over by type.
+ * @param others How many other layers there are.
+ * @returns For each listed layer, how many of the others it is drawn over: never fewer than the
+ * layer before it, with the fewest passes in all, and each as low as it can be.
+ */
+function fewestPasses(overByType: readonly number[], others: number): number[] {
+    // passes[n][k]: the fewest passes of listed layers 0 to n with layer n drawn over k others;
+    // `before` holds the fewest passes of the layers before it, none of them over more than k.
+    const passes: number[][] = [];
+    overByType.forEach((from, n) => {
+        let before = n === 0 ? 0 : Infinity;
+        passes.push(Array.from({ length: others + 1 }, (_, k) => {
+            if (n > 0) { before = Math.min(before, passes[n - 1][k]); }
+            return Math.abs(k - from) + before;
+        }));
+    });
+    // From the top listed layer down: the lowest choice with the fewest passes, no higher than the layer above.
+    const over = new Array<number>(overByType.length);
+    let limit = others;
+    for (let n = overByType.length - 1; n >= 0; n--) {
+        const row = passes[n].slice(0, limit + 1);
+        limit = row.indexOf(Math.min(...row));
+        over[n] = limit;
     }
+    return over;
 }

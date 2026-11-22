@@ -203,7 +203,7 @@ map.loadTiles('imagery', {
 * **Sources.** Presets are `esriWorldImagery`, `openStreetMap`, `osmLight`, and `osmDark`. The OSM themes use the standard OSM raster endpoint and apply muted colors on the client. `osmLight` has a pale background and `osmDark` reverses luminance onto a dark background. Roads and labels baked into the images remain; this does not add vector tile styling. Custom raster sources can also set `theme: 'light' | 'dark' | 'original'`. Colors are processed once when a tile is loaded and cached with the texture; overlays and other render pipelines are unchanged. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown beside the Autark link at the bottom left of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
 * **Provider terms.** Presets are conveniences, not licences. OpenStreetMap's public servers forbid heavy use and bulk downloading; use your own server or a commercial provider in production. Esri imagery needs its attribution to stay visible.
 * **Coordinate system.** `crs` is the workspace coordinate system, defaulting to `'EPSG:3395'` as in `AutkDb`. Any horizontal CRS understood by Proj4js can be supplied as a name, PROJ string, or WKT definition. Tiles remain Web Mercator and are reprojected into a two-dimensional CPU mesh. Unknown definitions are rejected before creating a layer; choose a projection and view within their valid geographic domain.
-* **Order and origin.** Tile layers sit under every other layer, so a `surface` layer would cover them. An explicit geographic `center` initializes tile-only maps; otherwise the first data layer establishes the origin. `zoom` requires a center and defaults to 12. Centers are WGS84 coordinates regardless of the output CRS.
+* **Order and origin.** By default, tile layers sit under other layers, so a `surface` layer would cover them. An explicit geographic `center` initializes tile-only maps; otherwise the first data layer establishes the origin. `zoom` requires a center and defaults to 12. Centers are WGS84 coordinates regardless of the output CRS.
 * **Loading.** At most 8 requests run at once; tiles that leave the view are cancelled, the soft cache limit is 256 tiles (`maxCachedTiles`), and the browser HTTP cache applies as usual. While a tile loads, the nearest loaded ancestor is drawn in its place. Tiles that fail for a transient reason are retried by the layer itself after a delay that doubles with each failure, up to a minute, for as long as they are in view; a definitive error such as 404 is not retried.
 * **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps selected tiles; ancestor preloads add requests: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
 * **Hiding.** Hiding a tile layer (`updateRenderInfo(id, { isSkip: true })`) cancels its queued, in-flight and retrying requests and keeps the textures already loaded, so showing it again draws at once and loads only what is missing.
@@ -235,6 +235,7 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
+* `setLayerOrder(ids)`, `getLayerOrder()`: Set the 2D stacking order and read the visible 2D layer IDs, bottom first.
 * `setSkippedIds(id, selection)`: Replaces the hidden vector components, like `setHighlightedIds` replaces highlights. Pass the full set of IDs to hide, not just the IDs that changed. Pass `[]` or call `clearSkippedIds(id)` to show all components. Unlike earlier versions, repeating a call does not toggle visibility.
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
 * `fitBounds(bounds?)`: Moves the camera, looking straight down, so a rectangle (by default the first loaded collection) fits the viewport. A flat map otherwise starts at a fixed height over the middle of the first layer. Opt-in: loading layers does not call it.
@@ -250,8 +251,19 @@ base colors. Explicit legend choices survive data refreshes and picking changes.
 
 ## Layer order and elevation
 
-`LayerInfo.zIndex` controls CPU layer ordering only. Polygons, borders, rasters,
-points, and polylines use a common ground plane and blend in layer order; each
+By default, tiles draw first, then surface, parks, water, and roads, then any other 2D layers in load order. Use `setLayerOrder(ids)` to change the stack without reloading:
+
+```ts
+map.setLayerOrder(['surface', 'heatmap', 'roads']); // bottom to top
+console.log(map.getLayerOrder()); // visible 2D layer IDs, bottom to top
+map.setLayerOrder([]); // restore the default order
+```
+
+The list can be partial. Listed layers follow the requested order; unlisted layers keep their relative order. The map chooses the result that reverses the fewest layer pairs compared with the default order. If several stacks tie, it keeps the listed layers as low as possible. An ID that is not yet loaded takes its place when it loads. For example, `setLayerOrder(['stops', 'surface'])` changes `surface → roads → heatmap → stops` to `stops → surface → roads → heatmap`.
+
+Buildings render separately in 3D, so listing them in `setLayerOrder` has no effect. `getLayerOrder()` excludes buildings and hidden layers. **Migration:** `LayerInfo.zIndex` was removed. Use `getLayerOrder()` to inspect the visible 2D stack and `setLayerOrder()` to change it.
+
+Polygons, borders, rasters, points, and polylines use a common ground plane and blend in layer order; each
 polygon fill is followed by its border before the next layer is drawn. Adding
 or reordering layers does not raise geometry or change its apparent size.
 

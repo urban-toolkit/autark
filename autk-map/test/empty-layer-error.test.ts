@@ -5,7 +5,7 @@ import { AutkMap } from '../src/map';
 // Invoke the real layer-creation boundary without initializing DOM/WebGPU state.
 function mapWithoutGpu() {
     const map = Object.create(AutkMap.prototype) as any;
-    map._layerManager = { origin: [0, 0], computeZindex: () => 1 };
+    map._layerManager = { origin: [0, 0] };
     map.defaultColorMap = vi.fn(() => ({}));
     map.createLayer = vi.fn();
     return map;

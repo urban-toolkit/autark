@@ -67,7 +67,7 @@ export class Triangles3DLayer extends VectorLayer {
      * The layer is initialized with a fixed coordinate dimension of `3` and
      * immediately derives normals from the initial geometry payload, if any.
      *
-     * @param {LayerInfo} layerInfo Layer metadata such as id, type, and z-index.
+     * @param {LayerInfo} layerInfo Layer metadata such as id and type.
      * @param {LayerRenderInfo} layerRenderInfo Initial render configuration for color, opacity, and picking.
      * @param {LayerData} layerData Initial geometry, component metadata, and thematic data.
      * @returns {Triangles3DLayer} A new 3D triangles layer instance.

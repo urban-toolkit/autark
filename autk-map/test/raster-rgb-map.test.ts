@@ -13,7 +13,7 @@ const raster = (bands: Record<string, ArrayLike<number>>): FeatureCollection => 
 
 /** An AutkMap holding one raster layer, without DOM or WebGPU state. */
 function mapWithRasterLayer() {
-  const layer = new RasterLayer({ id: 'image', typeLayer: 'raster', zIndex: 0 }, {
+  const layer = new RasterLayer({ id: 'image', typeLayer: 'raster' }, {
     opacity: 0.5, isColorMap: true,
     colormap: { config: { interpolator: ColorMapInterpolator.SEQ_REDS, domainSpec: { type: ColorMapDomainStrategy.MIN_MAX } } },
   }, { geometry: [], components: [], rasterResX: 2, rasterResY: 1 });

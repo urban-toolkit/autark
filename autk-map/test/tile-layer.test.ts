@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Camera, ColorMap } from '@urban-toolkit/autk-core';
 import { TileLayer } from '../src/layer-tiles';
-import { LayerManager, TILE_LAYER_Z_INDEX } from '../src/layer-manager';
+import { LayerManager } from '../src/layer-manager';
 import { MapStyle } from '../src/map-style';
 import { lonLatToCrs } from '../src/tile-projection';
 import type { LayerInfo, LayerRenderInfo } from '../src/types-layers';
@@ -90,7 +90,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const INFO: LayerInfo = { id: 'imagery', zIndex: -1, typeLayer: 'tiles' };
+const INFO: LayerInfo = { id: 'imagery', typeLayer: 'tiles' };
 const RENDER: LayerRenderInfo = { opacity: 1, colormap: { config: { interpolator: 'seq-reds' } as never }, isSkip: false };
 const ORIGIN = lonLatToCrs('EPSG:3395', -43.2, -22.9);
 const SOURCE = { urlTemplate: 'https://t.example/{z}/{x}/{y}.png', attribution: '© Example', maxZoom: 19 };
@@ -531,37 +531,26 @@ describe('hiding a tile layer', () => {
 });
 
 describe('tile layers in the LayerManager', () => {
-  const polygon = (id: string, typeLayer: 'surface' | 'polygons'): [LayerInfo, LayerRenderInfo] => [
-    { id, zIndex: 0, typeLayer },
-    { ...RENDER },
-  ];
-
-  it('places tile layers below surface, in load order, without taking a dynamic slot', () => {
+  it('keeps tile layers in load order by default', () => {
     const manager = new LayerManager();
     manager.initializeOrigin({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [1, 1] } }] });
-    const tiles = (id: string) => manager.addTileLayer({ id, zIndex: 0, typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE });
-
-    const a = tiles('a')!;
-    const b = tiles('b')!;
-    expect(a.layerInfo.zIndex).toBe(TILE_LAYER_Z_INDEX);
-    expect(b.layerInfo.zIndex).toBe(TILE_LAYER_Z_INDEX);
-    expect(TILE_LAYER_Z_INDEX).toBeLessThan(0);
+    manager.addTileLayer({ id: 'a', typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE });
+    manager.addTileLayer({ id: 'b', typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE });
     expect(manager.layers.map((l) => l.layerInfo.id)).toEqual(['a', 'b']);
   });
 
   it('refuses a duplicate id', () => {
     const manager = new LayerManager();
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(manager.addTileLayer({ id: 'a', zIndex: 0, typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE })).not.toBeNull();
-    expect(manager.addTileLayer({ id: 'a', zIndex: 0, typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE })).toBeNull();
+    expect(manager.addTileLayer({ id: 'a', typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE })).not.toBeNull();
+    expect(manager.addTileLayer({ id: 'a', typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE })).toBeNull();
     expect(error).toHaveBeenCalled();
-    void polygon;
   });
 
   it('sorts a tile layer under layers loaded before it', () => {
     const manager = new LayerManager();
     manager.initializeOrigin({ type: 'FeatureCollection', features: [] });
-    const tiles = manager.addTileLayer({ id: 'basemap', zIndex: 0, typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE })!;
+    const tiles = manager.addTileLayer({ id: 'basemap', typeLayer: 'tiles' }, { ...RENDER }, { source: SOURCE })!;
     expect(manager.layers[0]).toBe(tiles);
     expect(manager.searchByLayerId('basemap')).toBe(tiles);
     manager.removeLayerById('basemap');
@@ -571,7 +560,7 @@ describe('tile layers in the LayerManager', () => {
 
 describe('attribution of tile layers in the LayerManager', () => {
   const add = (manager: LayerManager, id: string, attribution: TileSource['attribution']) =>
-    manager.addTileLayer({ id, zIndex: 0, typeLayer: 'tiles' }, { ...RENDER }, { source: { ...SOURCE, attribution } })!;
+    manager.addTileLayer({ id, typeLayer: 'tiles' }, { ...RENDER }, { source: { ...SOURCE, attribution } })!;
 
   it('credits each visible layer once, in layer order', () => {
     const manager = new LayerManager();

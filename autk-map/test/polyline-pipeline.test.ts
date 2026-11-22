@@ -18,7 +18,7 @@ function fixture() {
         { type: 'Feature', id: 'b', geometry: { type: 'LineString', coordinates: [[0, 10], [10, 10]] }, properties: {} },
     ] };
     const data = PolylineBuilder.build(source, [0, 0]);
-    const layer = new PolylineLayer({ id: 'roads', typeLayer: 'roads', zIndex: 1 }, {
+    const layer = new PolylineLayer({ id: 'roads', typeLayer: 'roads' }, {
         opacity: 1, polylinesWidthByComponent: new Float32Array([20, 7]),
         colormap: { config: { interpolator: ColorMapInterpolator.SEQ_REDS, domainSpec: { type: ColorMapDomainStrategy.MIN_MAX } } },
     }, { geometry: data.geometry, components: data.components, polylineAttributes: data.attributes,

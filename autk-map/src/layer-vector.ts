@@ -83,7 +83,7 @@ export abstract class VectorLayer extends Layer {
      * metadata into layer-local buffers and resets any interaction state. The
      * optional thematic payload is loaded only when entries are present.
      *
-     * @param layerInfo Static layer metadata such as id, type, and z-index.
+     * @param layerInfo Static layer metadata such as id and type.
      * @param layerRenderInfo Render configuration used by shared layer pipelines.
      * @param layerData Initial geometry, component, and optional thematic data.
      * @param dimension Number of coordinates stored per vertex. Use `2` for planar layers and `3` for layers with explicit elevation.

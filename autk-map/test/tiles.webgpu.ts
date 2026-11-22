@@ -83,7 +83,6 @@ export async function runWebGpuCases() {
             map.loadTiles('tiles', { source: { urlTemplate: 'https://autark-tiles.test/{z}/{x}/{y}.png', attribution: 'Synthetic tiles',
                 minZoom: 3, maxZoom: 4 }, ...(crs === 'EPSG:3395' ? {} : { crs }), zoomBias: 1 });
             let tiles = map.layerManager.searchByLayerId('tiles') as TileLayer;
-            const overlay = map.layerManager.searchByLayerId('overlay')!;
             const texture = (format: GPUTextureFormat, samples: number, copy = false) => {
                 const result = device.createTexture({ size: [128, 128], format, sampleCount: samples,
                     usage: GPUTextureUsage.RENDER_ATTACHMENT | (copy ? GPUTextureUsage.COPY_SRC : 0) });
@@ -140,15 +139,18 @@ export async function runWebGpuCases() {
             near(ready, 32, 96, [0, 0, 255, 255], 'southwest');
             near(ready, 96, 96, [0, 0, 0, 0], 'transparent southeast');
             checks.push(`${crs}: native texture upload, orientation, parent UV crop, and transparency (3395 uses default CRS)`);
-            tiles.updateLayerInfo({ zIndex: 1000000 });
+            map.setLayerOrder(['overlay', 'tiles']);
             const reordered = await pixels();
-            assert(ready.every((n, i) => n === reordered[i]), `${crs}: order metadata changed geometry`);
+            assert(ready.every((n, i) => n === reordered[i]), `${crs}: reordering moved tile geometry`);
             map.updateRenderInfo('tiles', { opacity: 0.5 });
             near(await pixels(), 32, 32, [128, 0, 0, 128], 'premultiplied opacity');
             map.updateRenderInfo('tiles', { opacity: 1 });
             map.updateRenderInfo('overlay', { color: { r: 255, g: 255, b: 0, alpha: 1 } });
-            near(await pixels([tiles, overlay]), 32, 32, [255, 255, 0, 255], 'vector overlay ordering');
-            checks.push(`${crs}: no physical z-index, opacity, and vector overlay order`);
+            const ordered = () => map.getLayerOrder().map(id => map.layerManager.searchByLayerId(id)!);
+            near(await pixels(ordered()), 32, 32, [255, 0, 0, 255], 'tile above vector overlay');
+            map.setLayerOrder([]);
+            near(await pixels(ordered()), 32, 32, [255, 255, 0, 255], 'default vector overlay order');
+            checks.push(`${crs}: opacity and tile/vector overlay order`);
             if (crs === 'EPSG:3857') {
                 map.camera.resetCamera([0, 1, 0], [cx, cy, 0], [cx, cy, distance * 2], Math.max(500000, distance * 4));
                 map.camera.resize(128, 128);

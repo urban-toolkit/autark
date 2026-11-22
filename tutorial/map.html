@@ -118,16 +118,14 @@
     <tr><td><code>s</code></td><td>Cycle through the built-in base styles</td></tr>
     <tr><td><code>r</code></td><td>Reset the camera</td></tr>
   </table></div>
-  <p>The button in the top-left corner of the map opens the built-in layer menu. Each layer has three toggles: visibility, thematic coloring and picking. Everything the menu does is also available from code, which is what the rest of the page is about. The map object is a plain value, so any later cell can inspect it, for example the layers it holds:</p>
+  <p>The button in the top-left corner of the map opens the built-in layer menu. Each layer has three toggles: visibility, thematic coloring and picking. Everything the menu does is also available from code, which is what the rest of the page is about. The map object is a plain value, so any later cell can inspect it, for example its visible 2D layers in draw order, bottom first:</p>
   <figure class="example" data-title="1.2 · Inspect the layers" data-needs="1.1">
   <script type="text/plain">
     if (!ctx.firstMap) throw new Error("Run the previous cell first.");
-    return ctx.firstMap.layerManager.layers.map(layer => ({
-      id: layer.layerInfo.id,
-      type: layer.layerInfo.typeLayer,
-      zIndex: layer.layerInfo.zIndex,
-      opacity: layer.layerRenderInfo.opacity,
-    }));
+    return ctx.firstMap.getLayerOrder().map((id, index) => {
+      const layer = ctx.firstMap.layerManager.searchByLayerId(id);
+      return { drawOrder: index + 1, id, type: layer.layerInfo.typeLayer, opacity: layer.layerRenderInfo.opacity };
+    });
   </script>
   </figure>
 </section>

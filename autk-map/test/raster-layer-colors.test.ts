@@ -78,7 +78,7 @@ function loadedLayer(
   transferFunction?: TransferFunction,
 ): RasterLayer {
   const layer = new RasterLayer(
-    { id: 'raster', zIndex: 0, typeLayer: 'raster' },
+    { id: 'raster', typeLayer: 'raster' },
     {
       opacity: 1,
       colormap: {
@@ -126,7 +126,7 @@ describe('raster layer colors', () => {
 
   it('maps numeric class codes through the configured domain and recolors without reloading', () => {
     const values = new Float32Array([30, 0, 10, 99, NaN, Infinity]);
-    const layer = new RasterLayer({ id: 'cover', zIndex: 0, typeLayer: 'raster' }, {
+    const layer = new RasterLayer({ id: 'cover', typeLayer: 'raster' }, {
       opacity: 1,
       colormap: { config: { interpolator: ColorMapInterpolator.SEQ_REDS, domainSpec: { type: ColorMapDomainStrategy.MIN_MAX } } },
     }, { geometry: [], components: [], rasterResX: 6, rasterResY: 1, raster: values });

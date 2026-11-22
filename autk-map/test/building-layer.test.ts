@@ -32,7 +32,7 @@ describe('multipart building mesh integration', () => {
 
   it('creates one thematic component per building, not per part', () => {
     const map = Object.create(AutkMap.prototype) as any;
-    map._layerManager = { origin: [0, 0], computeZindex: () => 1 };
+    map._layerManager = { origin: [0, 0] };
     map.defaultColorMap = vi.fn(() => ({}));
     map.createLayer = vi.fn();
     map.updateThematic = vi.fn();
@@ -45,7 +45,7 @@ describe('multipart building mesh integration', () => {
         ] }, properties: { height: 12, parts: [{ geometryIndex: 1, height: 25 }] },
       }],
     };
-    map.createBuildingsLayer('buildings', collection, 'buildings', 'properties.sjoin.count.points');
+    map.createBuildingsLayer('buildings', collection, 'properties.sjoin.count.points');
     expect(map.createLayer).toHaveBeenCalledOnce();
     const data = map.createLayer.mock.calls[0][2] as LayerData;
     expect(data.components).toHaveLength(1);

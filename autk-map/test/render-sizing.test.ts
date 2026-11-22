@@ -19,14 +19,14 @@ const renderInfo = (): LayerRenderInfo => ({ opacity: 1, colormap: { config: {} 
 
 function pointLayer(info: Partial<LayerRenderInfo> = {}) {
     const data = TriangulatorPoints.buildInstances(points, [0, 0]);
-    return new SpriteLayer({ id: 'points', typeLayer: 'points', zIndex: 1 }, { ...renderInfo(), ...info }, {
+    return new SpriteLayer({ id: 'points', typeLayer: 'points' }, { ...renderInfo(), ...info }, {
         geometry: [], components: data.components, pointInstances: data.instances,
     });
 }
 
 function lineLayer(typeLayer: 'polylines' | 'roads' = 'polylines') {
     const data = PolylineBuilder.build(lines, [0, 0]);
-    return new PolylineLayer({ id: 'lines', typeLayer, zIndex: 1 }, {
+    return new PolylineLayer({ id: 'lines', typeLayer }, {
         ...renderInfo(), ...(typeLayer === 'roads' ? { polylinesWidthByComponent: new Float32Array([20, 7]) } : {}),
     }, { geometry: data.geometry, components: data.components, polylineAttributes: data.attributes, thematic: [{ value: 4, valid: 1 }, { value: 8, valid: 1 }] });
 }
@@ -128,7 +128,7 @@ describe('per-layer render sizing', () => {
 
     it('preserves OSM category defaults and permits a uniform road override', () => {
         const map = Object.create(AutkMap.prototype) as any;
-        map._layerManager = { origin: [0, 0], hasOrigin: true, computeZindex: () => 1 };
+        map._layerManager = { origin: [0, 0], hasOrigin: true };
         map._ui = { refreshLayerList: vi.fn() };
         map.defaultColorMap = vi.fn(() => ({}));
         map.createLayer = vi.fn();
@@ -146,17 +146,17 @@ describe('per-layer render sizing', () => {
     it('routes centerlines to the new renderer but preserves prebuilt triangle meshes', () => {
         const manager = new LayerManager();
         const data = PolylineBuilder.build(lines, [0, 0]);
-        expect(manager.addLayer({ id: 'centerlines', typeLayer: 'polylines', zIndex: 1 }, renderInfo(), {
+        expect(manager.addLayer({ id: 'centerlines', typeLayer: 'polylines' }, renderInfo(), {
             geometry: data.geometry, components: data.components, polylineAttributes: data.attributes,
         })).toBeInstanceOf(PolylineLayer);
-        expect(manager.addLayer({ id: 'mesh', typeLayer: 'roads', zIndex: 1 }, renderInfo(), {
+        expect(manager.addLayer({ id: 'mesh', typeLayer: 'roads' }, renderInfo(), {
             geometry: [{ position: new Float32Array([0, 0, 1, 0, 1, 1]), indices: new Uint32Array([0, 1, 2]) }],
             components: [{ nPoints: 3, nTriangles: 1, featureIndex: 0 }],
         })).toBeInstanceOf(Triangles2DLayer);
     });
 
     it('rejects missing adjacency instead of treating a mesh as a centerline', () => {
-        expect(() => new PolylineLayer({ id: 'lines', typeLayer: 'polylines', zIndex: 1 }, renderInfo(), {
+        expect(() => new PolylineLayer({ id: 'lines', typeLayer: 'polylines' }, renderInfo(), {
             geometry: [], components: [],
         } as LayerData)).toThrow('adjacency');
     });

@@ -57,7 +57,7 @@ export class Triangles2DLayer extends VectorLayer {
      * because field initializers reset the border arrays after the polymorphic
      * `loadLayerData` call made by the parent class.
      *
-     * @param layerInfo Static layer metadata such as id, type, and z-index.
+     * @param layerInfo Static layer metadata such as id and type.
      * @param layerRenderInfo Mutable rendering configuration for visibility,
      * color mapping, opacity, and picking.
      * @param layerData Geometry, thematic values, and optional border data used

@@ -97,7 +97,7 @@ describe('a layer built from a real collection', () => {
     // class's fields exist, and the flags must still end up sized to the border.
     function realLayer() {
         const map = Object.create(AutkMap.prototype) as any;
-        map._layerManager = { origin: [0, 0], hasOrigin: true, computeZindex: () => 1 };
+        map._layerManager = { origin: [0, 0], hasOrigin: true };
         map._ui = { refreshLayerList: vi.fn() };
         map.defaultColorMap = vi.fn(() => ({}));
         map.createLayer = vi.fn();
