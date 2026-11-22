@@ -235,7 +235,7 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
 * `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
-* `setSkippedIds(id, selection)`, `clearSkippedIds(id)`: Hides or restores selected vector components.
+* `setSkippedIds(id, selection)`: Replaces the hidden vector components, like `setHighlightedIds` replaces highlights. Pass the full set of IDs to hide, not just the IDs that changed. Pass `[]` or call `clearSkippedIds(id)` to show all components. Unlike earlier versions, repeating a call does not toggle visibility.
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
 * `fitBounds(bounds?)`: Moves the camera, looking straight down, so a rectangle (by default the first loaded collection) fits the viewport. A flat map otherwise starts at a fixed height over the middle of the first layer. Opt-in: loading layers does not call it.
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.

@@ -428,8 +428,16 @@
         ? "Picked: " + selection.map(i => collection.features[i].properties.ntaname).join(", ")
         : "Nothing picked.";
     });
-    hide.onclick = () => { map.setSkippedIds("neighborhoods", picked); };
-    showBtn.onclick = () => { map.clearSkippedIds("neighborhoods"); map.clearHighlightedIds("neighborhoods"); };
+    const hidden = new Set();
+    hide.onclick = () => {
+      for (const id of picked) hidden.add(id);
+      map.setSkippedIds("neighborhoods", [...hidden]);
+    };
+    showBtn.onclick = () => {
+      hidden.clear();
+      map.clearSkippedIds("neighborhoods");
+      map.clearHighlightedIds("neighborhoods");
+    };
     map.draw();
   </script>
   </figure>

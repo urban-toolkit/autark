@@ -168,8 +168,9 @@ map.fitBounds();
 
 const hidden = new Set<number>();
 map.events.on(MapEvent.PICKING, ({ selection }) => {
-  // Hide the clicked building; restore everything with clearSkippedIds.
-  for (const id of selection) if (!hidden.has(id)) { hidden.add(id); map.setSkippedIds('table_osm_buildings', [id]); }
+  // Keep previously hidden buildings hidden; restore everything with clearSkippedIds.
+  for (const id of selection) hidden.add(id);
+  map.setSkippedIds('table_osm_buildings', [...hidden]);
 });
 map.draw();`;
         case 'I03': return `import { AutkDb } from '@urban-toolkit/autk-db';

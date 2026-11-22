@@ -1066,10 +1066,10 @@ export class AutkMap {
     }
 
     /**
-     * Toggles skipped rendering for the provided component ids of a vector layer.
+     * Replaces the hidden components of a vector layer.
      *
      * @param id Layer identifier.
-     * @param selection Component ids to skip/unskip.
+     * @param selection All component ids to hide. Pass an empty array to show all components.
      * @returns Nothing. Non-vector layers are ignored.
      * @throws Never throws.
      */

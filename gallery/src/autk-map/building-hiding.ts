@@ -47,8 +47,8 @@ async function main(): Promise<void> {
 
     hideButton.addEventListener('click', () => {
         if (selected === null || hidden.has(selected)) return;
-        map.setSkippedIds(LAYER, [selected]);
         hidden.add(selected);
+        map.setSkippedIds(LAYER, [...hidden]);
         selected = null;
         map.setHighlightedIds(LAYER, []);
         refresh();

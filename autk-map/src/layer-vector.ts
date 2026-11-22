@@ -393,27 +393,16 @@ export abstract class VectorLayer extends Layer {
     }    
 
     /**
-     * Toggles skip state for the specified component ids.
+     * Replaces the skipped components and rebuilds the per-vertex skip mask.
      *
-     * Each id is toggled independently, and the per-vertex skip mask is updated
-     * once per unique vertex referenced by the affected components. This method
-     * does not clear previously skipped ids before applying the toggle.
-     *
-     * @param ids Component ids to toggle in the skip set.
+     * @param ids Component ids that should remain hidden. An empty list shows all components.
      * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
     setSkippedIds(ids: number[]): void {
-        ids.forEach(id => {
-            if (this._skippedIds.has(id)) {
-                this._skippedIds.delete(id);
-            }
-            else {
-                this._skippedIds.add(id);
-            }
-        });
-
-        this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
-            this._skippedVertices[vertexIndex] = 1 - this._skippedVertices[vertexIndex];
+        this._skippedIds = new Set(ids);
+        this._skippedVertices.fill(0);
+        this._forEachUniqueVertexInComponents([...this._skippedIds], (vertexIndex) => {
+            this._skippedVertices[vertexIndex] = 1;
         });
 
         this.makeLayerRenderInfoDirty();

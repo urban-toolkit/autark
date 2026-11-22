@@ -36,21 +36,25 @@ describe('the border of a skipped feature', () => {
         expect(hiddenBorder()).toEqual([0, 1, 2, 3, 9, 10, 11]);
     });
 
-    it('follows the toggle: skipping again shows the border again', () => {
+    it('keeps the same fill and border hidden when IDs are repeated', () => {
         const { layer: l, hiddenBorder } = layer();
         l.setSkippedIds([1]);
-        l.setSkippedIds([1]);
-        expect(hiddenBorder()).toEqual([]);
+        l.setSkippedIds([1, 1]);
+        expect(l.skippedIds).toEqual([1]);
+        expect([...l.skippedVertices]).toEqual([0, 1, 0]);
+        expect(hiddenBorder()).toEqual([4, 5, 6, 7, 8]);
     });
 
-    it('follows the toggle of a second call, and clearSkippedIds', () => {
+    it('replaces the hidden fill and border, and restores all with an empty set', () => {
         const { layer: l, hiddenBorder } = layer();
         l.setSkippedIds([0, 1]);
-        l.setSkippedIds([0]);                       // feature 0 is toggled back on: only feature 1 stays hidden
-        expect(hiddenBorder()).toEqual([4, 5, 6, 7, 8]);
-        l.setSkippedIds([2]);
+        l.setSkippedIds([1, 2]);
+        expect(l.skippedIds).toEqual([1, 2]);
+        expect([...l.skippedVertices]).toEqual([0, 1, 1]);
         expect(hiddenBorder()).toEqual([4, 5, 6, 7, 8, 9, 10, 11]);
-        l.clearSkippedIds();
+        l.setSkippedIds([]);
+        expect(l.skippedIds).toEqual([]);
+        expect([...l.skippedVertices]).toEqual([0, 0, 0]);
         expect(hiddenBorder()).toEqual([]);
     });
 

@@ -98,7 +98,6 @@ export class ComputeRenderOsmViewScore {
             return;
         }
 
-        this.map.clearSkippedIds('table_osm_buildings');
         this.map.setSkippedIds('table_osm_buildings', [pickedId]);
         this.map.removeLayer(GENERATED_LAYER_ID);
 
