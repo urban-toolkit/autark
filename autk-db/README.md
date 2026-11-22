@@ -205,6 +205,10 @@ console.log(parcels.type); // 'polygons'
 * `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs.
 * `removeLayer(tableName)`: Drops a table from the current workspace.
 
+Omit `groupBy` or pass `[]` to get one band counting nearby rows. Each explicit `groupBy` entry must include `aggregateFn`, such as `groupBy: [{ column: 'temperature', aggregateFn: 'avg' }]`.
+
+`count` with `column: '*'` counts matched rows; `count` with a named column counts only non-null values in that column. A single count in a spatial join keeps the result at `properties.sjoin.count[tableName]`. When counting multiple distinct columns, named counts use `properties.sjoin.count[tableName + '.' + column]`, and `'*'` still uses the table name. Heatmaps read each count into its own band.
+
 Heatmap bands keep positional IDs (`band_1`, `band_2`, and so on) in `groupBy` order. A band with `normalize: true` is scaled independently to 0–1 across the grid and has `_norm` in its label. When bands of the same aggregate would share a label, the label includes the source column where applicable; any remaining duplicates receive a band-ID suffix. Use the returned `bands` metadata when selecting by label.
 
 ## Spatial joins with compact rasters

@@ -9,8 +9,8 @@ export type HeatmapAggregateFunction = Exclude<AggregateFunction, 'collect'>;
 export interface HeatmapGroupBy {
     /** Column name to aggregate. Use `'*'` for row-level aggregations like `count`. */
     column: string;
-    /** Aggregation function to apply on the grouped values. */
-    aggregateFn?: HeatmapAggregateFunction;
+    /** Required aggregation function for the cell's value. */
+    aggregateFn: HeatmapAggregateFunction;
     /** When `true`, normalizes the aggregated value between 0 and 1. */
     normalize?: boolean;
 }
@@ -27,7 +27,7 @@ export interface BuildHeatmapParams {
     near: NearConfig;
     /** Name of the output table that will hold the heatmap result. */
     outputTableName: string;
-    /** Optional group-by columns to aggregate into separate raster bands. */
+    /** Columns to aggregate into separate bands. Omit or pass an empty list to count nearby rows. */
     groupBy?: HeatmapGroupBy[];
     /** Grid dimensions for the heatmap overlay. */
     grid: {

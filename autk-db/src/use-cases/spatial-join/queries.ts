@@ -31,6 +31,12 @@ interface Params {
 /** CTE alias used when the NEAR predicate pre-filters join candidates. */
 const NEAR_CTE_ALIAS = 'csv_candidates';
 
+/** Keep the table key for a single count or a row count, and qualify multiple named counts. */
+export function countResultKeys(table: string, columns: string[]): Map<string, string> {
+  const distinct = new Set(columns);
+  return new Map([...distinct].map(column => [column, distinct.size === 1 || column === '*' ? table : `${table}.${column}`]));
+}
+
 /**
  * Qualifies a table name with its workspace namespace.
  *
@@ -117,7 +123,8 @@ export const SPATIAL_JOIN_QUERY = (params: Params) => {
 
   if (normalizedColumns.length > 0) {
     const cteParts = [rootCte, ...(nearCtePart ? [nearCtePart] : []), `sjoin_base AS (${innerQuery})`];
-    const normPatch = buildNormalizationMergePatch(normalizedColumns, params.tableJoin.name);
+    const countColumns = params.groupBy?.filter(col => col.aggregateFn?.toLowerCase() === 'count').map(col => col.column) ?? [];
+    const normPatch = buildNormalizationMergePatch(normalizedColumns, params.tableJoin.name, countResultKeys(params.tableJoin.name, countColumns));
     return `
       WITH ${cteParts.join(',\n')}
       SELECT * REPLACE (${normPatch} AS properties)
@@ -235,11 +242,14 @@ function buildSjoinObject(
 
   Object.entries(aggregatesByFunction).forEach(([funcName, columns]) => {
     if (funcName === 'count') {
-      const column = columns[0].column;
-      const reference = column === '*'
-        ? `${geomContext.tableJoin.name}.${quoteIdentifier(geomContext.geometricColumnJoin)}`
-        : buildColumnValueExpression(geomContext.tableJoin, column);
-      sjoinParts.push(`'count', json_object('${escapeSqlString(geomContext.tableJoinNameForKeys)}', COUNT(${reference}))`);
+      const keys = countResultKeys(geomContext.tableJoinNameForKeys, columns.map(({ column }) => column));
+      const counts = [...keys].map(([column, key]) => {
+        const reference = column === '*'
+          ? `${geomContext.tableJoin.name}.${quoteIdentifier(geomContext.geometricColumnJoin)}`
+          : buildColumnValueExpression(geomContext.tableJoin, column);
+        return `'${escapeSqlString(key)}', COUNT(${reference})`;
+      });
+      sjoinParts.push(`'count', json_object(${counts.join(', ')})`);
     } else if (funcName === 'weighted') {
       sjoinParts.push(buildWeightedExpression(columns[0], geomContext));
     } else if (funcName === 'collect') {
@@ -445,18 +455,18 @@ function buildJsonExtract(tableName: string, columnPath: string): string {
  *
  * @param normalizedColumns - columns marked with `normalize: true`.
  * @param tableJoinName - original join table name used for JSON path derivation.
+ * @param countKeys - keys for all count columns, including those not being normalized.
  * @returns SQL expression for the `REPLACE(...)` clause.
  * @throws No runtime errors.
  */
-function buildNormalizationMergePatch(normalizedColumns: Array<InternalColumn>, tableJoinName: string): string {
+function buildNormalizationMergePatch(normalizedColumns: Array<InternalColumn>, tableJoinName: string, countKeys: Map<string, string>): string {
   const byAggFn: Record<string, Array<{ colKey: string; jsonPath: string }>> = {};
 
   for (const col of normalizedColumns) {
     const funcName = col.aggregateFn?.toLowerCase() ?? 'value';
-    const colKey =
-      funcName === 'count' || funcName === 'weighted' || funcName === 'collect'
-        ? tableJoinName
-        : `${tableJoinName}.${col.column}`;
+    const colKey = funcName === 'count' ? countKeys.get(col.column)!
+      : funcName === 'weighted' || funcName === 'collect' ? tableJoinName
+      : `${tableJoinName}.${col.column}`;
     const jsonPath = `$.sjoin.${funcName}.${quoteJsonPathKey(colKey)}`;
 
     if (!byAggFn[funcName]) byAggFn[funcName] = [];

@@ -1,8 +1,9 @@
 import { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
-import { BuildHeatmapParams, HeatmapGroupBy } from './interfaces';
+import { BuildHeatmapParams, HeatmapAggregateFunction, HeatmapGroupBy } from './interfaces';
 import type { BoundingBox } from '@urban-toolkit/autk-core';
 import { RasterBandMetadata, Table, UserTable } from '../../interfaces';
 import { SpatialJoinUseCase } from '../spatial-join/use-case';
+import { countResultKeys } from '../spatial-join/queries';
 import { getColumnsFromDuckDbTableDescribe, quoteJsonPathKey, toPlain } from '../../utils';
 import { setRasterPayload } from '../../raster-store';
 import { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
@@ -46,6 +47,18 @@ export class BuildHeatmapUseCase {
             throw new Error(`Table ${params.tableJoinName} not found.`);
         }
 
+        const groupBy: HeatmapGroupBy[] = params.groupBy?.length
+            ? params.groupBy
+            : [{ column: '*', aggregateFn: 'count' }];
+        const supportedAggregates = {
+            count: true, weighted: true, sum: true, avg: true, min: true, max: true,
+        } satisfies Record<HeatmapAggregateFunction, true>;
+        for (const { column, aggregateFn } of groupBy) {
+            if (typeof aggregateFn !== 'string' || !Object.prototype.hasOwnProperty.call(supportedAggregates, aggregateFn)) {
+                throw new Error(`Heatmap "${params.outputTableName}": "${column}" requires a valid aggregateFn (${Object.keys(supportedAggregates).join(', ')}).`);
+            }
+        }
+
         const gridTableName = params.outputTableName;
         const gridTable = await this.createGridTable({
             boundingBox,
@@ -61,14 +74,14 @@ export class BuildHeatmapUseCase {
                 tableJoinName: params.tableJoinName,
                 near: params.near,
                 // Normalize each output band separately, without adding keys to the joined properties.
-                groupBy: params.groupBy?.map(({ column, aggregateFn }) => ({ column, aggregateFn })),
+                groupBy: groupBy.map(({ column, aggregateFn }) => ({ column, aggregateFn })),
             },
             [...tables, gridTable],
             workspace,
             { coordinateFormat: workspaceCoordinateFormat },
         );
 
-        const rasterBands = this.getRasterBands(params);
+        const rasterBands = this.getRasterBands(params, groupBy);
         await this.transformToRasterFormat(gridTableName, rasterBands, workspace);
         await this.materializeCompactRaster(
             gridTableName,
@@ -271,15 +284,12 @@ ${bandAssignments}
      * `<aggregateFn>_<table>_<column>` with the column's dots as underscores. Any remaining duplicates
      * receive a band-ID suffix without taking another band's preferred label.
      */
-    private getRasterBands(params: BuildHeatmapParams): HeatmapBand[] {
-        const groupBy: HeatmapGroupBy[] = params.groupBy && params.groupBy.length > 0
-            ? params.groupBy
-            : [{ column: '*', aggregateFn: 'count' }];
-
+    private getRasterBands(params: BuildHeatmapParams, groupBy: HeatmapGroupBy[]): HeatmapBand[] {
+        const countKeys = countResultKeys(params.tableJoinName, groupBy.filter(col => col.aggregateFn === 'count').map(col => col.column));
         const bands = groupBy.map((column, index) => {
-            const aggregateFn = (column.aggregateFn ?? 'value').toLowerCase();
-            const sourceKey = aggregateFn === 'count' || aggregateFn === 'weighted'
-                ? params.tableJoinName
+            const aggregateFn = column.aggregateFn;
+            const sourceKey = aggregateFn === 'count' ? countKeys.get(column.column)!
+                : aggregateFn === 'weighted' ? params.tableJoinName
                 : `${params.tableJoinName}.${column.column}`;
             const norm = column.normalize ? '_norm' : '';
 

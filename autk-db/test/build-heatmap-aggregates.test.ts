@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Feature } from 'geojson';
 import { loadDb } from '../src/duckdb-node';
 import { getRasterPayload } from '../src/raster-store';
+import type { BuildHeatmapParams } from '../src/use-cases/build-heatmap';
 
 const native = vi.hoisted(() => ({ db: undefined as AsyncDuckDB | undefined }));
 vi.mock('../src/duckdb', () => ({ loadDb: async () => native.db }));
@@ -75,6 +76,49 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     // 1 / (distance + 1) for each reading near the center.
     const weighted = [1, 1 + 1 / 1.1, 0, 1 + 2 / 1.1, 1, 1 + 1 / 1.1];
     bands.weighted_readings.forEach((cell, index) => expect(cell).toBeCloseTo(weighted[index], 5));
+  });
+
+  it.each<[string, Pick<BuildHeatmapParams, 'groupBy'>]>([
+    ['without groupBy', {}],
+    ['with an empty groupBy', { groupBy: [] }],
+  ])('counts the rows near each center in a heatmap %s', async (_label, fields) => {
+    await loadReadings(readings);
+    const table = await db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'counted', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      ...fields,
+    });
+    expect(table.bands).toEqual([{ id: 'band_1', label: 'count_readings' }]);
+    expect(bandsOf('counted')).toEqual({ count_readings: [1, 2, 0, 3, 1, 2] });
+  });
+
+  it('counts each requested column separately, including nulls, zero values, and row counts', async () => {
+    await loadReadings(readings.map((feature, index) => ({
+      ...feature, properties: { ...feature.properties, ...(index === 5 ? { humidity: 0 } : index === 6 ? { humidity: null } : {}) },
+    })));
+    await db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'counts', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      groupBy: [
+        { column: 'humidity', aggregateFn: 'count' },
+        { column: 'value', aggregateFn: 'count' },
+        { column: '*', aggregateFn: 'count' },
+      ],
+    });
+    expect(bandsOf('counts')).toEqual({
+      count_readings_humidity: [0, 0, 0, 1, 0, 0],
+      count_readings_value: [1, 2, 0, 3, 1, 2],
+      count_readings: [1, 2, 0, 3, 1, 2],
+    });
+  });
+
+  it.each([undefined, 'collect', 'median', 42])('rejects an untyped aggregateFn of %s before creating the grid', async (aggregateFn) => {
+    await loadReadings(readings);
+    await expect(db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'invalid_heatmap', near: { distance: 0.6 }, grid: { rows: 2, columns: 3 },
+      groupBy: [{ column: 'value', aggregateFn }] as BuildHeatmapParams['groupBy'],
+    })).rejects.toThrow(/Heatmap "invalid_heatmap".*"value".*aggregateFn/);
+    const tables = await (db as any).conn.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = '${db.getCurrentWorkspace()}'`);
+    expect(tables.toArray().map((row: { table_name: string }) => row.table_name)).not.toContain('invalid_heatmap');
   });
 
   it('builds a normalized band from the values the join rescales from 0 to 1 across the cells', async () => {

@@ -57,6 +57,21 @@ describe('spatial matches are pairs of whole features', () => {
     }
   });
 
+  it('normalizes the selected count column independently of other counts', async () => {
+    await conn.query(`INSERT INTO autk.root VALUES ('{}', ST_Point(0,0)), ('{}', ST_Point(1,0));
+      INSERT INTO autk.other VALUES ('{"temperature":20,"humidity":60}', ST_Point(0,0)),
+        ('{"temperature":21}', ST_Point(0,0)), ('{"temperature":22}', ST_Point(1,0));`);
+    const result = await join([
+      { column: 'temperature', aggregateFn: 'count' },
+      { column: 'humidity', aggregateFn: 'count', normalize: true },
+    ]);
+    const counts = result.features.map(feature => feature.properties?.sjoin.count);
+    expect(counts).toEqual(expect.arrayContaining([
+      { 'other.temperature': 2, 'other.humidity': 1, 'other.humidity_norm': 1 },
+      { 'other.temperature': 1, 'other.humidity': 0, 'other.humidity_norm': 0 },
+    ]));
+  });
+
   it('preserves distinct features even with identical geometry and properties', async () => {
     await conn.query(`INSERT INTO autk.root VALUES ('{}',ST_Point(0,0)), ('{}',ST_Point(0,0));
       INSERT INTO autk.other VALUES ('{"value":2}',ST_Point(0,0)), ('{"value":2}',ST_Point(0,0));`);
