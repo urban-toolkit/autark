@@ -276,8 +276,8 @@ or reordering layers does not raise geometry or change its apparent size.
 Buildings retain their actual geometry heights and depth testing, and their
 shared SSAO result is composited over the 2D map. In terrain mode, ordered 2D
 layers are draped through the terrain overlay, and buildings retain terrain
-occlusion. When terrain comes from a fixed raster, tiled imagery stays visible
-on the flat map beyond the terrain mesh. The flat and draped views share the tile
+occlusion. Tiled imagery stays visible on the flat map beyond the terrain mesh,
+whether elevation comes from a fixed raster or streamed tiles. The flat and draped views share the tile
 cache and use the usual tile selection limit for each view. Picking uses the
 same positions as visible geometry and continues to target the active pick-enabled layer.
 

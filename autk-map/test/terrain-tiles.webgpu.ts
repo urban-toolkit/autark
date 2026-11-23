@@ -193,8 +193,19 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
                 assert(hiddenEdge[2]! > hiddenEdge[1]!, `${projection}: hidden imagery remained outside the DEM: ${hiddenEdge}`);
                 map.updateRenderInfo('imagery', { isSkip: false });
                 map.removeTerrain();
+
+                map.setView({ center: { latitude: 0, longitude: 0 }, zoom: 8, projection });
+                map.loadTerrain({ ...options, levels: 1 });
+                await wait(() => !!map.getTerrainTileStats()?.complete && map.getTileStats('imagery')?.missingTiles === 0);
+                const streamedEdge = await capture(16, 64);
+                assert(streamedEdge.every((channel, index) => Math.abs(channel - reference[index]!) <= 2),
+                    `${projection}: streamed terrain cut off imagery outside the active mesh: ${streamedEdge}; flat: ${reference}`);
+                const streamedCenter = await capture();
+                assert(streamedCenter[1]! > streamedCenter[0]! + 15 && streamedCenter[1]! < reference[1]! - 2,
+                    `${projection}: streamed terrain did not shade the draped imagery: ${streamedCenter}`);
+                map.removeTerrain();
             }
-            checks.push('fixed terrain preserves imagery coverage outside the DEM in both projections');
+            checks.push('fixed and streamed terrain preserve imagery coverage beyond the mesh in both projections');
         }
         const error = await device.popErrorScope(); if (error) errors.push(error.message);
         assert(errors.length === 0, errors.join('\n'));

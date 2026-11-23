@@ -263,7 +263,7 @@ export class TileLayer extends Layer {
         this._store?.endFrame();
     }
 
-    override prepareRender(camera: Camera, targetViewport?: readonly [number, number], terrain?: TerrainImageryDetail, coverOutsideTerrain = false): void {
+    override prepareRender(camera: Camera, targetViewport?: readonly [number, number], terrain?: TerrainImageryDetail): void {
         this._frame = this._underlayFrame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
         const store = this._store;
@@ -281,7 +281,7 @@ export class TileLayer extends Layer {
             ? selectAdaptiveTiles(view, this._source, this._options, this._previousAdaptiveTiles, terrain)
             : selectTiles(view, this._source, this._options);
         this._previousAdaptiveTiles = adaptive ? selection?.tiles ?? [] : [];
-        const underlay = coverOutsideTerrain && terrain
+        const underlay = terrain
             ? selectAdaptiveTiles({ ...view, camera: terrain.camera, viewport: terrain.viewport },
                 this._source, this._options, this._previousUnderlayTiles)
             : null;
@@ -334,7 +334,7 @@ export class TileLayer extends Layer {
         pipeline.renderFrame(camera, passEncoder, this._frame);
     }
 
-    /** Paints the flat imagery behind finite terrain with independent per-draw GPU buffers. */
+    /** Paints the flat imagery behind the terrain mesh with independent per-draw GPU buffers. */
     renderTerrainUnderlay(camera: Camera, passEncoder: GPURenderPassEncoder): void {
         if (!this._renderer || !this._underlayFrame.draws.length) return;
         if (!this._underlayPipeline) {
