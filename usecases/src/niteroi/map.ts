@@ -48,7 +48,7 @@ export class NiteroiMap {
     }
 
     public onSelection(onSelection: (ids: number[]) => void): void {
-        this.map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+        this.map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
             if (layerId === ROADS_LAYER) onSelection(selection);
         });
     }

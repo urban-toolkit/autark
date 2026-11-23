@@ -84,7 +84,7 @@ export abstract class Pipeline {
     /** Cached fixed-color uniform payload (rgba). */
     private _colorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
     /** Cached highlight-color uniform payload (rgba). */
-    private _highlightColorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
+    private _highlightColorData: Float32Array<ArrayBuffer> = new Float32Array(8);
     /** Cached invalid-value-color uniform payload (rgba). */
     private _invalidValueColorData: Float32Array<ArrayBuffer> = new Float32Array(new ArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT));
     /** Cached use-colormap flag uniform payload. */
@@ -182,7 +182,7 @@ export abstract class Pipeline {
 
         this._highlightColorBuffer = this._renderer.device.createBuffer({
             label: 'Highlight color buffer',
-            size: 4 * 4,
+            size: 8 * 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
@@ -380,6 +380,8 @@ export abstract class Pipeline {
         this._highlightColorData[1] = colors.highlightColor.g;
         this._highlightColorData[2] = colors.highlightColor.b;
         this._highlightColorData[3] = 1.0;
+        const hover = this._renderer.style.getHoverColor();
+        this._highlightColorData.set([hover.r, hover.g, hover.b, 1], 4);
 
         this._invalidValueColorData[0] = colors.invalidValueColor.r;
         this._invalidValueColorData[1] = colors.invalidValueColor.g;

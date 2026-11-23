@@ -48,7 +48,7 @@ export class UrbaneMap {
     }
 
     public onSelection(onSelection: (level: string, ids: number[]) => void): void {
-        this.map.events.on(MapEvent.PICKING, ({ layerId, selection }) => onSelection(layerId, selection));
+        this.map.events.on(MapEvent.CLICK, ({ layerId, selection }) => onSelection(layerId, selection));
     }
 
     public highlight(level: UrbaneLevel, ids: number[]): void {

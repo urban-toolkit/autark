@@ -383,7 +383,7 @@ try {
   });
   reloadPlots();
   // map → plots
-  map.events.on(MapEvent.PICKING, ({selection, layerId}) => {
+  map.events.on(MapEvent.CLICK, ({selection, layerId}) => {
     if (layerId !== state.level) return;
     table?.setSelection(selection); parallel?.setSelection(selection); onSelect(selection);
   });

@@ -75,7 +75,7 @@ export class ComputeRenderOsmVisibility {
     }
 
     protected updateMapListeners(): void {
-        this.map.events.on(MapEvent.PICKING, async ({ selection, layerId }) => {
+        this.map.events.on(MapEvent.CLICK, async ({ selection, layerId }) => {
             if (layerId !== 'table_osm_buildings') return;
 
             if (selection.length === 0) {

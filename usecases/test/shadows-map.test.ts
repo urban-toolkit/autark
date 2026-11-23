@@ -8,7 +8,7 @@ vi.mock('@urban-toolkit/autk-map', () => ({
         loadCollection = map.loadCollection;
         updateRenderInfo = map.updateRenderInfo;
     },
-    MapEvent: { PICKING: 'picking' },
+    MapEvent: { CLICK: 'click' },
 }));
 vi.mock('@urban-toolkit/autk-db', () => ({ AutkDb: class {} }));
 import { ShadowsMap } from '../src/shadows/map';

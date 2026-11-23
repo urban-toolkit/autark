@@ -392,7 +392,7 @@
     <li><strong>Programmatic highlight and skip</strong>: direct control over which components stand out (<code>setHighlightedIds()</code>) or are hidden (<code>setSkippedIds()</code>).</li>
     <li><strong>Layer visibility</strong>: show, hide or fully remove a layer (<code>isSkip</code> in <code>updateRenderInfo()</code>, <code>removeLayer()</code>).</li>
   </ul>
-  <p>Enable picking on a layer with <code>isPick: true</code>, then double-click a neighborhood. <code>MapEvent.PICKING</code> delivers <code>{layerId, selection}</code>, where <code>selection</code> holds indices into the original collection. The cell highlights the picked features and lists their names; use the buttons to hide or restore the picked ones. The same selection arrays are what <code>autk-plot</code> emits and consumes, which is how maps and charts are linked.</p>
+  <p>Enable picking on a layer with <code>isPick: true</code>, then double-click a neighborhood. <code>MapEvent.CLICK</code> delivers <code>{layerId, selection}</code>, where <code>selection</code> holds indices into the original collection. The cell highlights the picked features and lists their names; use the buttons to hide or restore the picked ones. The same selection arrays are what <code>autk-plot</code> emits and consumes, which is how maps and charts are linked.</p>
   <figure class="example" data-title="6.1 · Picking, highlight and skip" data-needs="0.2">
   <script type="text/plain">
     if (!ctx.neighborhoods) throw new Error("Run the data cell first.");
@@ -419,7 +419,7 @@
     map.updateRenderInfo("neighborhoods", {isPick: true});
 
     let picked = [];
-    map.events.on(MapEvent.PICKING, ({layerId, selection}) => {
+    map.events.on(MapEvent.CLICK, ({layerId, selection}) => {
       picked = selection;
       map.setHighlightedIds(layerId, selection);
       info.textContent = selection.length

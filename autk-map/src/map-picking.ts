@@ -18,7 +18,7 @@ import { MapEvent } from './types-events';
 import type { MapEventRecord } from './types-events';
 
 /** Layer families that can toggle highlighted feature ids after picking. */
-type PickableLayer = VectorLayer | SpriteLayer;
+export type PickableLayer = VectorLayer | SpriteLayer;
 
 /**
  * Pending picking request captured from the active layer.
@@ -34,6 +34,8 @@ export type PendingPick = {
     x: number;
     /** Y coordinate to read from the picking texture. */
     y: number;
+    /** Hover samples report a hit without touching selection state. */
+    onHover?: (id: number | null) => void;
 };
 
 /**
@@ -43,6 +45,12 @@ export type PendingPick = {
  * common state transition from requested pick to emitted selection.
  */
 export class MapPickingController {
+    private hoverRequest: PendingPick | null = null;
+
+    queueHover(request: PendingPick | null): void {
+        this.hoverRequest = request;
+        if (request) this.requestRender();
+    }
     /**
      * Creates a picking controller bound to a renderer and event bus.
      *
@@ -60,6 +68,7 @@ export class MapPickingController {
         private readonly layerManager: LayerManager,
         /** Event emitter notified when picking resolves a selection. */
         private readonly mapEvents: EventEmitter<MapEventRecord>,
+        private readonly requestRender: () => void = () => {},
     ) {}
 
     /**
@@ -77,9 +86,12 @@ export class MapPickingController {
     consumePendingPick(): PendingPick | null {
         const activePickingLayer = this.layerManager.layers.find((layer) => layer.layerRenderInfo.isPick) ?? null;
         if (!activePickingLayer || activePickingLayer.layerRenderInfo.isSkip || !activePickingLayer.layerRenderInfo.pickedComps) {
-            return null;
+            const hover = this.hoverRequest;
+            this.hoverRequest = null;
+            return hover;
         }
 
+        if (this.hoverRequest) this.requestRender();
         const [x, y] = activePickingLayer.layerRenderInfo.pickedComps;
         activePickingLayer.layerRenderInfo.pickedComps = undefined;
 
@@ -103,7 +115,7 @@ export class MapPickingController {
     enqueuePickingReadback(pendingPick: PendingPick): number | null {
         const pickReadbackSlot = this.renderer.reservePickingReadbackSlot(1);
         if (pickReadbackSlot === null) {
-            console.warn('Picking readback buffers are still busy; skipping this picking frame.');
+            if (!pendingPick.onHover) console.warn('Picking readback buffers are still busy; skipping this picking frame.');
             return null;
         }
 
@@ -131,15 +143,16 @@ export class MapPickingController {
 
         this.renderer.readPickingResults(pickReadbackSlot, 1).then((ids) => {
             const id = ids[0] ?? -1;
-            const { layer, pickableLayer } = pendingPick;
-
-            if (id >= 0) {
-                pickableLayer.toggleHighlightedIds([id]);
-                this.mapEvents.emit(MapEvent.PICKING, { selection: pickableLayer.highlightedIds, layerId: layer.layerInfo.id });
-            } else {
-                layer.clearHighlightedIds();
-                this.mapEvents.emit(MapEvent.PICKING, { selection: [], layerId: layer.layerInfo.id });
+            const { layer, pickableLayer, onHover } = pendingPick;
+            if (onHover) {
+                onHover(id >= 0 ? id : null);
+                return;
             }
+
+            if (id >= 0) pickableLayer.toggleHighlightedIds([id]);
+            else layer.clearHighlightedIds();
+            const payload = { selection: pickableLayer.highlightedIds, layerId: layer.layerInfo.id };
+            this.mapEvents.emit(MapEvent.CLICK, payload);
         });
     }
 }

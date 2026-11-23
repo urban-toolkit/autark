@@ -53,7 +53,7 @@ import {
 } from '@urban-toolkit/autk-core';
 
 import type { ElevationValidationStats } from '@urban-toolkit/autk-core';
-import type { MapEventRecord } from './types-events';
+import { MapEvent, type MapEventRecord } from './types-events';
 
 import {
     LayerData,
@@ -103,7 +103,8 @@ import { MapStyle } from './map-style';
 import { MapCamera } from './map-camera';
 import { FlatMapRenderPath } from './map-flat';
 import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
-import { MapPickingController } from './map-picking';
+import { MapPickingController, type PickableLayer } from './map-picking';
+import type { TooltipProvider } from './api';
 import { TerrainMapRenderPath } from './map-terrain';
 import { TileHeightSource } from './height-source-tiles';
 import type { TerrainTileStats } from './height-source-tiles';
@@ -148,6 +149,12 @@ export class AutkMap {
     protected _resizeEvents!: ResizeEvents;
     /** Public event bus for map events. */
     protected _mapEvents!: EventEmitter<MapEventRecord>;
+    private hoverEnabled = false;
+    private hoverLayerId?: string;
+    private hoverVersion = 0;
+    private hovered: { layer: PickableLayer; id: number } | null = null;
+    private tooltip: { layerId: string; provider: TooltipProvider } | null = null;
+    private tooltipElement: HTMLDivElement | null = null;
 
     /** Map UI controller. */
     protected _ui!: AutkMapUi;
@@ -213,14 +220,17 @@ export class AutkMap {
         });
         this._renderer = new Renderer(canvas, this._style);
 
-        this._camera = new MapCamera(() => this.requestRender(), () => this._terrainRenderPath?.maxHeight ?? 0);
+        this._camera = new MapCamera(() => {
+            this.clearHover();
+            this.requestRender();
+        }, () => this._terrainRenderPath?.maxHeight ?? 0);
         this._layerManager = new LayerManager();
 
         this._keyEvents = new KeyEvents(this);
         this._mouseEvents = new MouseEvents(this);
         this._resizeEvents = new ResizeEvents(this);
         this._mapEvents = new EventEmitter<MapEventRecord>();
-        this._picking = new MapPickingController(this._renderer, this._layerManager, this._mapEvents);
+        this._picking = new MapPickingController(this._renderer, this._layerManager, this._mapEvents, () => this.requestRender());
         this._flatRenderPath = new FlatMapRenderPath(this._renderer, this._camera, this._layerManager, this._picking);
 
         this._ui = new AutkMapUi(this);
@@ -967,6 +977,112 @@ export class AutkMap {
         this._ui.refreshLegend(layer);
     }
 
+    /** Enables hover events and a transient highlight, on the pick layer unless a layer is named. */
+    setHover(enabled: boolean, layerId?: string): void {
+        if (this.hoverEnabled === enabled && this.hoverLayerId === layerId) return;
+        this.clearHover();
+        this.hoverEnabled = enabled;
+        this.hoverLayerId = enabled ? layerId : undefined;
+        this._ui.refreshLayerList();
+    }
+
+    /** The layer currently targeted for hover highlighting and events. */
+    get activeHoverLayer(): Layer | null {
+        if (!this.hoverEnabled) return null;
+        return this.hoverLayerId === undefined ? this.activePickingLayer : this._layerManager.searchByLayerId(this.hoverLayerId);
+    }
+
+    /** Sets or removes a tooltip for a layer. It only appears while that layer is hovered. */
+    setTooltip(layerId: string, provider: TooltipProvider | null): void {
+        if (provider === null) {
+            if (this.tooltip?.layerId !== layerId) return;
+        } else {
+            const layer = this._layerManager.searchByLayerId(layerId);
+            if (!(layer instanceof VectorLayer) && !(layer instanceof SpriteLayer)) return;
+        }
+        this.tooltip = provider ? { layerId, provider } : null;
+        this.tooltipElement?.remove();
+        this.tooltipElement = null;
+    }
+
+    /** @internal Whether pointer motion is needed for hover. */
+    get tracksHover(): boolean { return this.hoverEnabled; }
+
+    /** @internal Queues a GPU read for the active hover layer. */
+    queueHover(x: number, y: number, clientX: number, clientY: number): void {
+        const layer = this.activeHoverLayer;
+        if (!(layer instanceof VectorLayer) && !(layer instanceof SpriteLayer) || layer.layerRenderInfo.isSkip) return;
+        const layerId = layer.layerInfo.id;
+        const components = layer.components;
+        const version = this.hoverVersion;
+        this._picking.queueHover({ layer, pickableLayer: layer, x, y, onHover: id => {
+            if (version !== this.hoverVersion || this._isDestroyed || this.activeHoverLayer !== layer
+                || layer.layerRenderInfo.isSkip || this._layerManager.searchByLayerId(layerId) !== layer
+                || layer.components !== components) return;
+            if (this.hovered?.layer !== layer || this.hovered?.id !== id) {
+                if (this.hovered && this.hovered.layer !== layer) this.hovered.layer.setHoveredId(null);
+                layer.setHoveredId(id);
+                const hadHover = this.hovered !== null;
+                this.hovered = id === null ? null : { layer, id };
+                if (id !== null || hadHover) this._mapEvents.emit(MapEvent.HOVER, { layerId, selection: id === null ? [] : [id] });
+            }
+            if (version === this.hoverVersion && this.tooltip?.layerId === layerId) {
+                this.showTooltip(this.tooltip.provider, id, clientX, clientY);
+            }
+        } });
+    }
+
+    /** @internal Clears transient hover state and invalidates queued and in-flight reads. */
+    clearHover(): void {
+        if (!this.tracksHover && !this.hovered && !this.tooltipElement) return;
+        this.hoverVersion++;
+        this._picking?.queueHover(null);
+        this.tooltipElement?.remove();
+        this.tooltipElement = null;
+        const hovered = this.hovered;
+        this.hovered = null;
+        if (hovered) {
+            hovered.layer.setHoveredId(null);
+            this._mapEvents.emit(MapEvent.HOVER, { layerId: hovered.layer.layerInfo.id, selection: [] });
+        }
+    }
+
+    private showTooltip(provider: TooltipProvider, id: number | null, x: number, y: number): void {
+        let content: string | HTMLElement | null = null;
+        try { if (id !== null) content = provider(id); }
+        catch (error) { console.error('Map tooltip provider failed:', error); }
+        if (!content) {
+            this.tooltipElement?.remove();
+            this.tooltipElement = null;
+            return;
+        }
+        const rect = this.canvas.getBoundingClientRect();
+        const owner = this.canvas.ownerDocument;
+        const tooltip = this.tooltipElement ?? owner.createElement('div');
+        if (!this.tooltipElement) {
+            tooltip.setAttribute('role', 'tooltip');
+            Object.assign(tooltip.style, { position: 'fixed', pointerEvents: 'none', zIndex: '1000',
+                boxSizing: 'border-box', overflow: 'hidden', overflowWrap: 'anywhere', padding: '8px 12px',
+                background: '#fff', color: '#18243a', border: '1px solid #dbe2ea', borderRadius: '8px',
+                boxShadow: '0 4px 16px rgba(15, 23, 42, 0.16)', font: '13px/1.4 system-ui, sans-serif' });
+            owner.body.append(tooltip);
+            this.tooltipElement = tooltip;
+        }
+        const plainText = typeof content === 'string';
+        // Preserve line breaks in string tooltips without interpreting them as HTML.
+        tooltip.style.whiteSpace = plainText ? 'pre-line' : 'normal';
+        tooltip.style.fontWeight = plainText ? '500' : '400';
+        tooltip.style.borderInlineStart = plainText ? '3px solid #4269ad' : '';
+        if (typeof content === 'string') tooltip.textContent = content;
+        else if (tooltip.firstChild !== content || tooltip.childNodes.length !== 1) tooltip.replaceChildren(content);
+        tooltip.style.maxWidth = `${Math.max(0, rect.width)}px`;
+        tooltip.style.maxHeight = `${Math.max(0, rect.height)}px`;
+        const { width, height } = tooltip.getBoundingClientRect();
+        const gap = 10;
+        tooltip.style.left = `${Math.max(rect.left, Math.min(rect.right - width, x + gap + width > rect.right ? x - gap - width : x + gap))}px`;
+        tooltip.style.top = `${Math.max(rect.top, Math.min(rect.bottom - height, y + gap + height > rect.bottom ? y - gap - height : y + gap))}px`;
+    }
+
     /**
      * Updates one or more render properties of a layer.
      *
@@ -1009,6 +1125,7 @@ export class AutkMap {
             }
             needsLayerList = true;
         }
+        if (this.tracksHover && (nextInfo.isSkip !== undefined || nextInfo.isPick !== undefined)) this.clearHover();
         layer.updateLayerRenderInfo(nextInfo);
 
         if (needsLegend) { this._ui.refreshLegend(layer); }
@@ -1025,6 +1142,9 @@ export class AutkMap {
      */
     removeLayer(id: string): void {
         const removed = this._layerManager.searchByLayerId(id) !== null;
+        if (removed && this.tracksHover) this.clearHover();
+        if (this.hoverLayerId === id) this.setHover(false);
+        if (this.tooltip?.layerId === id) this.tooltip = null;
         this._layerManager.removeLayerById(id);
         this._ui.handleLayerRemoved(id);
         this._ui.refreshLayerList();
@@ -1129,6 +1249,7 @@ export class AutkMap {
             return;
         }
 
+        if (this.tracksHover) this.clearHover();
         layer.setSkippedIds(selection);
     }
 
@@ -1145,6 +1266,7 @@ export class AutkMap {
             return;
         }
 
+        if (this.tracksHover) this.clearHover();
         layer.clearSkippedIds();
     }
 
@@ -1551,6 +1673,7 @@ export class AutkMap {
 
         this._keyEvents.destroyEvents();
         this._mouseEvents.destroyEvents();
+        this.clearHover();
         this._resizeEvents.destroyEvents();
         this._terrainRenderPath?.destroy();
         this._terrainRenderPath = null;

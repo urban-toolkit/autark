@@ -42,6 +42,9 @@ export interface MapOptions {
     showUi?: boolean;
 }
 
+/** Returns optional pointer tooltip content for a feature index in the target layer. */
+export type TooltipProvider = (id: number) => string | HTMLElement | null;
+
 /** Geographic navigation independent of imagery, vectors, and elevation sources. */
 export interface SetViewParams {
     /** WGS84 center in named latitude/longitude degrees, regardless of workspace CRS. */

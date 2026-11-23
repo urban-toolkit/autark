@@ -143,7 +143,8 @@ map.updateRenderInfo('table_osm_buildings', { isPick: true });
 map.fitBounds();
 
 // Picking toggles ids, so repeated clicks accumulate a selection.
-map.events.on(MapEvent.PICKING, ({ selection }) => {
+map.setHover(true);
+map.events.on(MapEvent.CLICK, ({ selection }) => {
   const picked = selection.map(id => buildings.features[id]);
   console.log(picked.length, 'selected');
 });
@@ -168,7 +169,7 @@ map.updateRenderInfo('table_osm_buildings', { isPick: true });
 map.fitBounds();
 
 const hidden = new Set<number>();
-map.events.on(MapEvent.PICKING, ({ selection }) => {
+map.events.on(MapEvent.CLICK, ({ selection }) => {
   // Keep previously hidden buildings hidden; restore everything with clearSkippedIds.
   for (const id of selection) hidden.add(id);
   map.setSkippedIds('table_osm_buildings', [...hidden]);
@@ -632,6 +633,6 @@ const plot = new AutkPlot(document.querySelector('#plotBody')!, {
   events: [PlotEvent.${event}],
 });
 
-map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
+map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
 plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));`;
 }

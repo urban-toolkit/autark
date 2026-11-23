@@ -75,16 +75,26 @@ async function main(): Promise<void> {
         stage.style.transformOrigin = 'top left';
         stage.style.transform = 'translate(12px, 8px) scale(0.8)';
     }
-    const map = new AutkMap(canvas, { showUi: false });
+    const map = new AutkMap(canvas, { showUi: true });
     await map.init();
     for (const layer of db.getLayersMetadata()) {
         map.loadCollection(layer.name, { collection: layer.name === LAYER ? buildings : await db.getLayer(layer.name), type: layer.type });
     }
     map.updateRenderInfo(LAYER, { isPick: true });
+    map.setHover(true);
+    map.setTooltip(LAYER, id => {
+        const feature = buildings.features[id];
+        if (!feature) return null;
+        const name = feature.properties?.name;
+        const height = heightOf(feature);
+        const title = typeof name === 'string' && name.trim() ? name.trim() : `Building ${id + 1}`;
+        const metric = `${Math.round(height?.metres ?? DEFAULT_HEIGHT)} m`;
+        return `${title}\n${metric} · ${height ? 'From OpenStreetMap tags' : 'Display height (no height tags)'}`;
+    });
     map.fitBounds();
 
     // Picking toggles ids, so repeated clicks accumulate a selection.
-    map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+    map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
         if (layerId === LAYER) summarize(buildings, selection);
     });
     document.querySelector('#clear-selection')!.addEventListener('click', () => {

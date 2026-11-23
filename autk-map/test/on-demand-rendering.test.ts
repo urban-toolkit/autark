@@ -412,7 +412,7 @@ describe('on-demand rendering', () => {
         map.updateRenderInfo('parks', { isPick: true });
         frames.run(3);
         const picked = vi.fn();
-        map.events.on(MapEvent.PICKING, picked);
+        map.events.on(MapEvent.CLICK, picked);
         const before = renders();
 
         canvas.fire('dblclick', { clientX: 50, clientY: 50 });
@@ -426,6 +426,56 @@ describe('on-demand rendering', () => {
         expect(picked).toHaveBeenCalledWith({ selection: [0], layerId: 'parks' });
         expect(renders() - before).toBe(2);
         expect(frames.pending).toBe(0);
+    });
+
+    it('hovers a different layer without mutating click selection or exposing pointer positions', async () => {
+        const { map, canvas } = await idleOnDemandMap();
+        map.loadCollection('water', { collection: square, type: 'water' });
+        map.updateRenderInfo('parks', { isPick: true });
+        map.setHighlightedIds('parks', [0]);
+        const clicked = vi.fn();
+        const hovered = vi.fn();
+        const tooltip = vi.fn(() => null);
+        map.events.on(MapEvent.CLICK, clicked);
+        map.events.on(MapEvent.HOVER, hovered);
+        map.setTooltip('water', tooltip);
+        pointer('pointermove', canvas, { clientX: 150, clientY: 120, pointerType: 'mouse' });
+        frames.run(3);
+        await flushPromises();
+        expect(tooltip).not.toHaveBeenCalled();
+        expect(hovered).not.toHaveBeenCalled();
+
+        map.setHover(true, 'water');
+        pointer('pointermove', canvas, { clientX: 150, clientY: 120, pointerType: 'mouse' });
+        frames.run(3);
+        await flushPromises();
+        expect(hovered).toHaveBeenCalledExactlyOnceWith({ layerId: 'water', selection: [0] });
+        expect(tooltip).toHaveBeenCalledExactlyOnceWith(0);
+        expect(clicked).not.toHaveBeenCalled();
+        expect(map.activePickingLayer?.layerInfo.id).toBe('parks');
+        expect(map.activePickingLayer).toMatchObject({ highlightedIds: [0] });
+
+        const press = { buttons: 1, clientX: 150, clientY: 120, pointerType: 'mouse' };
+        pointer('pointerdown', canvas, press);
+        pointer('pointermove', canvas, press);
+        pointer('pointerup', canvas, { ...press, buttons: 0 });
+        expect(hovered).toHaveBeenCalledTimes(1);
+        expect(clicked).not.toHaveBeenCalled();
+
+        map.setTooltip('water', null);
+        expect(map.activeHoverLayer?.layerInfo.id).toBe('water');
+        canvas.fire('pointerleave');
+        expect(hovered).toHaveBeenLastCalledWith({ layerId: 'water', selection: [] });
+        expect(map.activePickingLayer).toMatchObject({ highlightedIds: [0] });
+
+        // The readback is still in flight when the hovered layer is hidden.
+        pointer('pointermove', canvas, { clientX: 150, clientY: 120, pointerType: 'mouse' });
+        frames.run(3);
+        hovered.mockClear();
+        map.updateRenderInfo('water', { isSkip: true });
+        await flushPromises();
+        expect(hovered).not.toHaveBeenCalled();
+        expect(map.activePickingLayer).toMatchObject({ highlightedIds: [0] });
     });
 
     it('renders every step of a CameraMotion animation and stops once it settles', async () => {

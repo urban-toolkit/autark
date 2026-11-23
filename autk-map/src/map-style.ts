@@ -78,6 +78,8 @@ export class MapStyle {
     protected _invalidValue: ColorHEX = '#FFFFFF';
     /** Highlight color used for interactive selections. */
     protected _highlight: ColorHEX = '#5dade2';
+    /** Highlight color reserved for the feature under the pointer. */
+    protected _hover: ColorHEX = '#f4a261';
     /** Currently active semantic map style. */
     protected _current: MapStyleShape;
     /** Identifier of the currently active style or `custom`. */
@@ -212,6 +214,17 @@ export class MapStyle {
      */
     setHighlightColor(color: ColorHEX): void {
         this._highlight = color;
+        this._onChange?.();
+    }
+
+    /** Returns the hovered-feature color as RGB. */
+    getHoverColor(): ColorRGB {
+        return ColorMap.hexToRgb(this._hover);
+    }
+
+    /** Sets the hovered-feature color independently of the selection highlight. */
+    setHoverColor(color: ColorHEX): void {
+        this._hover = color;
         this._onChange?.();
     }
 

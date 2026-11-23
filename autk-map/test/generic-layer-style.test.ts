@@ -13,6 +13,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it('sets hover and selection colors independently and reports each change', () => {
+  const style = new MapStyle();
+  const onChange = vi.fn();
+  style.setChangeListener(onChange);
+  expect(style.getHighlightColor()).toEqual(ColorMap.hexToRgb('#5dade2'));
+  expect(style.getHoverColor()).toEqual(ColorMap.hexToRgb('#f4a261'));
+  style.setHoverColor('#ffcc00');
+  style.setHighlightColor('#4466cc');
+  expect(style.getHoverColor()).toEqual(ColorMap.hexToRgb('#ffcc00'));
+  expect(style.getHighlightColor()).toEqual(ColorMap.hexToRgb('#4466cc'));
+  expect(onChange).toHaveBeenCalledTimes(2);
+});
+
 describe('subdued generic layer defaults', () => {
   it.each([
     ['apple', '#ababa9', '#c3c3c2', '#dcdcda', '#c3cdd4'],

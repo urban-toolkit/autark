@@ -1,5 +1,5 @@
 @group(0) @binding(0) var<uniform> color : vec4f;
-@group(0) @binding(1) var<uniform> highlightColor : vec4f;
+@group(0) @binding(1) var<uniform> interactionColors : array<vec4f, 2>;
 @group(0) @binding(2) var<uniform> showThematic : f32;
 @group(0) @binding(3) var<uniform> showHighlight : f32;
 @group(0) @binding(4) var cMapTex : texture_2d<f32>;
@@ -42,8 +42,9 @@ fn main(
 
     // A highlighted feature is drawn opaque: at the layer's opacity it would fade with the layer, and could vanish.
     var drawOpacity = opacity;
-    if (showHighlight > 0.0 && inHighlighted > 0.0) {
-        outColor = vec4f(highlightColor.r / 255.0, highlightColor.g / 255.0, highlightColor.b / 255.0, highlightColor.a);
+    if (inHighlighted > 1.5 || (showHighlight > 0.0 && inHighlighted > 0.0)) {
+        let interaction = interactionColors[select(0, 1, inHighlighted > 1.5)];
+        outColor = vec4f(interaction.rgb / 255.0, interaction.a);
         drawOpacity = 1.0;
     } else if (showThematic > 0.0 && inThematicValid < 0.5) {
         outColor = vec4f(invalidValueColor.r / 255.0, invalidValueColor.g / 255.0, invalidValueColor.b / 255.0, invalidValueColor.a);

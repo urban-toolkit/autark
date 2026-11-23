@@ -58,6 +58,10 @@ export class MouseEvents {
     private _previousTouchAction: string = '';
     /** Previous inline iOS touch callout value restored during teardown. */
     private _previousWebkitTouchCallout: string = '';
+    private hoverTimer: ReturnType<typeof setTimeout> | null = null;
+    private lastHoverAt = -Infinity;
+    private hoverPoint: [number, number, number, number] | null = null;
+    private readonly onHoverLeave = () => this.endHover();
 
     /**
      * Creates a mouse and pointer interaction controller for a map instance.
@@ -105,6 +109,7 @@ export class MouseEvents {
         canvas.addEventListener('wheel', this._onWheel, { passive: false });
         canvas.addEventListener('contextmenu', this._onContextMenu as any, false);
         canvas.addEventListener('dblclick', this._onDblClick, false);
+        canvas.addEventListener('pointerleave', this.onHoverLeave);
         document.addEventListener('pointerdown', this._onPointerDown, { capture: true });
         document.addEventListener('pointermove', this._onPointerMove, { capture: true });
         document.addEventListener('pointerup',   this._onPointerUp,   { capture: true });
@@ -130,6 +135,8 @@ export class MouseEvents {
         canvas.removeEventListener('wheel', this._onWheel);
         canvas.removeEventListener('contextmenu', this._onContextMenu as any);
         canvas.removeEventListener('dblclick', this._onDblClick);
+        canvas.removeEventListener('pointerleave', this.onHoverLeave);
+        this.endHover();
         document.removeEventListener('pointerdown', this._onPointerDown, { capture: true });
         document.removeEventListener('pointermove', this._onPointerMove, { capture: true });
         document.removeEventListener('pointerup',   this._onPointerUp,   { capture: true });
@@ -166,6 +173,7 @@ export class MouseEvents {
         this._map.canvas.focus({ preventScroll: true });
 
         if (event.button === 0 || event.button === 1) {
+            if (event.pointerType === 'touch') this.endHover();
             event.preventDefault();
             event.stopPropagation();
 
@@ -212,7 +220,25 @@ export class MouseEvents {
             this._status = MouseStatus.DRAG;
         }
 
-        if (this._status !== MouseStatus.DRAG) return;
+        if (this._status !== MouseStatus.DRAG) {
+            if (this._map.tracksHover && event.pointerType !== 'touch' && event.target === this._map.renderer.canvas) {
+                this.hoverPoint = [...this._getPoint(event), event.clientX, event.clientY];
+                if (this.hoverTimer === null) {
+                    const read = () => {
+                        this.hoverTimer = null;
+                        if (!this.hoverPoint || !this._map.tracksHover) return;
+                        this.lastHoverAt = performance.now();
+                        this._map.queueHover(...this.hoverPoint);
+                    };
+                    const wait = this.lastHoverAt + 100 - performance.now();
+                    if (wait <= 0) read();
+                    else this.hoverTimer = setTimeout(read, wait);
+                }
+            } else {
+                this.endHover();
+            }
+            return;
+        }
 
         const cssWidth = this._map.renderer.cssWidth;
         const cssHeight = this._map.renderer.cssHeight;
@@ -222,6 +248,8 @@ export class MouseEvents {
         const point = this._getPoint(event);
         const dx = -point[0] + this._lastPoint[0];
         const dy =  point[1] - this._lastPoint[1];
+        if (dx === 0 && dy === 0) return;
+        this.endHover();
 
         if ((event.buttons & 1) === 1 && event.shiftKey) {
             this._map.camera.yaw(dx / cssWidth);
@@ -285,6 +313,7 @@ export class MouseEvents {
      * @returns Updates the camera zoom and suppresses the browser's default scroll handling.
      */
     mouseWheel(event: WheelEvent) {
+        this.endHover();
         event.preventDefault();
         event.stopPropagation();
 
@@ -389,6 +418,14 @@ export class MouseEvents {
             center: [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5],
             distance: Math.hypot(dx, dy),
         };
+    }
+
+    private endHover(): void {
+        if (this.hoverTimer !== null) clearTimeout(this.hoverTimer);
+        this.hoverTimer = null;
+        if (this.hoverPoint) this._map.clearHover();
+        this.hoverPoint = null;
+        this.lastHoverAt = -Infinity;
     }
 
     /**

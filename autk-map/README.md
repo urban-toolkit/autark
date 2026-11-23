@@ -49,12 +49,23 @@ map.updateRenderInfo('buildings', {
   renderInfo: { isColorMap: true, isPick: true },
 });
 
-map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
   console.log(layerId, selection);
 });
 
 map.draw();
 ```
+
+`MapEvent.CLICK` replaces the former selection event without changing the double-click
+gesture. `MapEvent.HOVER` uses the same `{ layerId, selection }` payload: one feature
+index on a hit or `[]` on clear. Hover leaves the click selection intact. Configure
+its target with `map.setHover(true, layerId)` (omit the layer ID to follow the click
+layer). Optional `map.setTooltip(layerId, id => 'Feature ' + id)` tooltips appear
+only when that layer is hovered. Pass `null` to remove the tooltip without
+turning off hover. Strings display as text.
+Use `map.style.setHighlightColor()` and `map.style.setHoverColor()` to configure the
+selection and hover colors. Hover temporarily takes precedence on the hovered feature.
+The layer menu cycles through Interaction only, Hover, Picking, and Hover + Picking.
 
 Pointer interactions work when the canvas or an ancestor is translated or
 uniformly scaled with CSS (positive scale). Rotation, skew, mirroring, and 3D

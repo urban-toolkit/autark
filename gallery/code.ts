@@ -45,7 +45,7 @@ await db.loadCsv({
   queryArea: ${variant === 'place' || variant === 'tags' ? "{ geocodeArea: 'Monaco', areas: ['Monaco'] }" : '{ bbox: [7.405, 43.720, 7.445, 43.7525] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
-        case 'I01': return `const map = new AutkMap(canvas, { showUi: false });\nmap.updateRenderInfo('buildings', { isPick: true });\nmap.events.on(MapEvent.PICKING, ({ selection }) => {\n  // Each click toggles one id, so the selection keeps growing.\n  summarize(selection.map(id => buildings.features[id]));\n});`;
+        case 'I01': return `const map = new AutkMap(canvas, { showUi: false });\nmap.updateRenderInfo('buildings', { isPick: true });\nmap.events.on(MapEvent.CLICK, ({ selection }) => {\n  // Each click toggles one id, so the selection keeps growing.\n  summarize(selection.map(id => buildings.features[id]));\n});`;
         case 'I02': return "map.setSkippedIds('buildings', [id]);\nmap.clearSkippedIds('buildings');";
         case 'I03': return `// Update the eye and look-at target on each animation frame.
 map.camera.resetCamera([0, 0, 1], lookAt, eye);
@@ -83,5 +83,5 @@ map.requestRender();`;
 }
 
 function plot(type: string, attributes: string, event: string, transform?: string): string {
-    return `const plot = new AutkPlot(document.querySelector('#plot')!, {\n  type: '${type}',\n  collection,\n  attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}\n  events: [${event}],\n});\n\nmap.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));\nplot.events.on(${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));`;
+    return `const plot = new AutkPlot(document.querySelector('#plot')!, {\n  type: '${type}',\n  collection,\n  attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}\n  events: [${event}],\n});\n\nmap.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));\nplot.events.on(${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));`;
 }

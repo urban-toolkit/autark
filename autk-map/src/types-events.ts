@@ -12,8 +12,10 @@
  * Event names emitted by the map interaction bus.
  */
 export enum MapEvent {
-  /** Selection payload emitted when features are picked from a layer. */
-  PICKING = 'picking',
+  /** Selection after a double-click on the active pick layer. */
+  CLICK = 'click',
+  /** One hovered feature index, or an empty selection when hover clears. */
+  HOVER = 'hover',
 }
 
 /**
@@ -29,7 +31,7 @@ export enum MouseStatus {
 import type { SelectionData } from '@urban-toolkit/autk-core';
 
 /**
- * Payload emitted for feature-picking events.
+ * Payload emitted for feature picking and hover events.
  *
  * The payload extends the shared selection data shape with the identifier of
  * the layer that produced the hit results.

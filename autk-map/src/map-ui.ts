@@ -21,7 +21,14 @@ import * as d3 from 'd3';
 
 const EYE_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><path d="M8 3C4.134 3 1 8 1 8s3.134 5 7 5 7-5 7-5-3.134-5-7-5zm0 8.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>`;
 const RAMP_SVG  = `<svg viewBox="0 0 16 16" width="20" height="20"><rect x="1"   y="6" width="3.5" height="5" rx="1" fill="#4169e1"/><rect x="4.5" y="6" width="3"   height="5"        fill="#44cccc"/><rect x="7.5" y="6" width="3"   height="5"        fill="#fdd34d"/><rect x="10.5" y="6" width="3.5" height="5" rx="1" fill="#e04444"/></svg>`;
-const CURSOR_SVG = `<svg viewBox="0 0 16 16" width="20" height="20" fill="#555"><path d="M2 1l4.5 13 2.1-5.1L14 6.8z"/></svg>`;
+const HOVER_ICON = '<path d="m5 4 4 15 3-6 7-2Z" fill="currentColor"/>';
+const CLICK_ICON = '<circle cx="12" cy="12" r="6"/><path d="M12 3v5m0 8v5M3 12h5m8 0h5"/>';
+const INTERACTION_MODES = [
+    { label: 'Interaction only', icon: '<circle cx="12" cy="12" r="8"/><path d="m6.35 6.35 11.3 11.3"/>' },
+    { label: 'Hover', icon: HOVER_ICON },
+    { label: 'Picking', icon: CLICK_ICON },
+    { label: 'Hover + Picking', icon: '<path d="m3 3 4 14 3-6 7-2Z" fill="currentColor"/><circle cx="17" cy="17" r="3"/><path d="M17 12v3m0 4v3m-5-5h3m4 0h3"/>' },
+] as const;
 
 const DEBUG_FPS = false;
 
@@ -677,12 +684,26 @@ export class AutkMapUi {
                 return button;
             })();
 
-        const isRaster = layer.layerInfo.typeLayer === 'raster' || layer.layerInfo.typeLayer === 'tiles';
-        const cursorBtn = isRaster
-            ? makeButtonSpacer()
-            : this.makeIconButton(CURSOR_SVG, layer.layerRenderInfo.isPick ?? false, () => {
-                this.changeActiveLayer(this.map.layerManager.searchByLayerId(layer.layerInfo.id));
+        const hovered = this.map.activeHoverLayer === layer;
+        const picked = Boolean(layer.layerRenderInfo.isPick);
+        const mode = Number(hovered) + 2 * Number(picked);
+        const next = (mode + 1) % INTERACTION_MODES.length;
+        const { label, icon } = INTERACTION_MODES[mode];
+        const modeBtn = !layer.supportsHighlight ? makeButtonSpacer() : this.makeIconButton(
+            `<svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`, true, () => {
+                const id = layer.layerInfo.id;
+                if (this.map.layerManager.searchByLayerId(id) !== layer) return;
+                if (next & 1) this.map.setHover(true, id);
+                else if (hovered) this.map.setHover(false);
+                if ((next & 2) && !picked) this.changeActiveLayer(layer);
+                else if (!(next & 2) && picked) this.map.updateRenderInfo(id, { isPick: false });
             });
+        if (layer.supportsHighlight) {
+            const nextLabel = INTERACTION_MODES[next].label;
+            modeBtn.style.color = '#25334a';
+            modeBtn.title = `${label} → ${nextLabel}`;
+            modeBtn.setAttribute('aria-label', `${layer.layerInfo.id}: ${label}. Switch to ${nextLabel}`);
+        }
 
         const nameEl = document.createElement('span');
         nameEl.textContent = layer.layerInfo.id;
@@ -693,7 +714,7 @@ export class AutkMapUi {
 
         row.appendChild(eyeBtn);
         row.appendChild(paletteBtn);
-        row.appendChild(cursorBtn);
+        row.appendChild(modeBtn);
         row.appendChild(nameEl);
         return row;
     }

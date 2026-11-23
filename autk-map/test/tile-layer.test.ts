@@ -41,6 +41,7 @@ function fakeRenderer() {
   const style = {
     getColor: () => ({ r: 1, g: 1, b: 1 }),
     getHighlightColor: () => ({ r: 1, g: 0, b: 0 }),
+    getHoverColor: () => ({ r: 0, g: 1, b: 0 }),
     getInvalidValueColor: () => ({ r: 0, g: 0, b: 0 }),
   };
   const renderer = { device, canvasFormat: 'bgra8unorm', sampleCount: 4, style } as unknown as Renderer;

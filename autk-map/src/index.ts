@@ -32,6 +32,7 @@ export type {
     MapBounds,
     MapOptions,
     SetViewParams,
+    TooltipProvider,
     LoadTerrainParams,
     TerrainRasterSource,
     /** Parameters for loading a GeoJSON feature collection as a map layer. */

@@ -38,7 +38,7 @@ async function main(): Promise<void> {
             : `${hidden.size} ${hidden.size === 1 ? 'building' : 'buildings'} hidden`);
     };
 
-    map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+    map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
         if (layerId !== LAYER) return;
         selected = selection.length === 0 ? null : selection[selection.length - 1]!;
         map.setHighlightedIds(LAYER, selected === null ? [] : [selected]);

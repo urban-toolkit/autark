@@ -31,7 +31,7 @@ export class ShadowsMap {
     }
 
     public onBuildingSelection(onSelection: (id: number | null) => void): void {
-        this.map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
+        this.map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
             if (layerId === BUILDINGS_LAYER) onSelection(selection[0] ?? null);
         });
     }

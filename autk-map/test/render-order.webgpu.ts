@@ -1,4 +1,5 @@
 import { AutkMap } from '../src/map';
+import { MapEvent } from '../src/types-events';
 import { Camera, heightfieldFromRaster } from '@urban-toolkit/autk-core';
 import { PipelineBuildingSSAO } from '../src/pipeline-triangle-ssao';
 import type { Layer } from '../src/layer';
@@ -9,7 +10,10 @@ import type { FeatureCollection, Geometry } from 'geojson';
 export async function runWebGpuCases() {
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:128px;height:128px';
-    document.body.append(canvas);
+    const host = document.createElement('div');
+    host.style.cssText = 'width:128px;height:128px';
+    host.append(canvas);
+    document.body.append(host);
     const map = new AutkMap(canvas, { showUi: false });
     const resources: Array<{ destroy(): void }> = [];
     const checks: string[] = [];
@@ -158,6 +162,83 @@ export async function runWebGpuCases() {
         identical(roofs, await pixels([], building, [building]), 'Building picking adds artificial height');
         identical(composite, await pixels([layer('upper')], undefined, [building]), 'Building geometry adds artificial height');
         checks.push('physical building depth, picking alignment, and composite precedence');
+        map.style.setHighlightColor('#0000ff');
+        map.style.setHoverColor('#ff0000');
+        map.updateRenderInfo('buildings', { isPick: true });
+        building.setHighlightedIds([0, 1]);
+        building.setHoveredId(0);
+        const hoverColor = rgba(await pixels([], undefined, [building]), 64, 64);
+        assert(hoverColor[0] > 80 && hoverColor[2] < 5, `Hover did not override selection color: ${hoverColor}`);
+        assert(building.highlightedIds.join(',') === '0,1', 'Hover changed the selection');
+        building.setHoveredId(null);
+        const selectionColor = rgba(await pixels([], undefined, [building]), 64, 64);
+        assert(selectionColor[2] > 80 && selectionColor[0] < 5, `Clearing hover did not restore selection: ${selectionColor}`);
+        map.updateRenderInfo('buildings', { isPick: false });
+        checks.push('hover color overrides and restores a building selection without mutating IDs');
+
+        const ui = map.ui as unknown as { makeLayerRow(layer: Layer): HTMLDivElement };
+        const labels: string[] = [];
+        const icons = new Set<string>();
+        for (let i = 0; i < 4; i++) {
+            const button = ui.makeLayerRow(building).querySelector<HTMLButtonElement>('button[aria-label^="buildings:"]')!;
+            labels.push(button.getAttribute('aria-label')!);
+            const icon = button.querySelector('svg');
+            assert(icon?.getAttribute('aria-hidden') === 'true', 'Interaction icon must not replace the accessible label');
+            icons.add(icon!.innerHTML);
+            button.click();
+        }
+        assert(['Interaction only', 'Hover', 'Picking', 'Hover + Picking'].every((label, i) =>
+            labels[i].startsWith(`buildings: ${label}.`)), `Wrong interaction mode cycle: ${labels.join('; ')}`);
+        assert(icons.size === 4, 'Each interaction mode must have a distinct icon');
+        assert(!map.activeHoverLayer && !map.activePickingLayer, 'Interaction-only mode still picks or hovers');
+        checks.push('layer interaction button cycles through all four modes');
+
+        host.style.transformOrigin = 'top left';
+        host.style.transform = 'translate(24px, 16px) scale(0.5)';
+        map.camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 13]);
+        map.camera.update();
+        map.updateRenderInfo('lower', { isPick: true });
+        map.setHighlightedIds('lower', [0]);
+        map.setTooltip('buildings', id => `<Building ${id}>`);
+        const hovered: number[][] = [];
+        map.events.on(MapEvent.HOVER, ({ selection }) => hovered.push(selection));
+        const rect = canvas.getBoundingClientRect();
+        const x = rect.left + rect.width * 0.55;
+        const y = rect.top + rect.height * 0.55;
+        const move = () => canvas.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse', clientX: x, clientY: y }));
+        const flatPath = (map as unknown as { _flatRenderPath: { renderFrame(): void } })._flatRenderPath;
+        move();
+        flatPath.renderFrame();
+        await device.queue.onSubmittedWorkDone();
+        assert(!document.querySelector('[role="tooltip"]') && hovered.length === 0, 'A configured tooltip enabled hover');
+        map.setHover(true, 'buildings');
+        move();
+        flatPath.renderFrame();
+        let tooltip: HTMLElement | null = null;
+        for (let attempt = 0; attempt < 120 && !tooltip; attempt++) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            tooltip = document.querySelector('[role="tooltip"]');
+        }
+        assert(hovered.length === 1 && hovered[0].join() === '0', `Wrong hover pick on scaled canvas: ${JSON.stringify(hovered)}`);
+        assert(tooltip?.textContent === '<Building 0>' && !tooltip.children.length, 'Tooltip was not rendered as plain text');
+        const tooltipRect = tooltip!.getBoundingClientRect();
+        assert(tooltipRect.left >= rect.left && tooltipRect.right <= rect.right + 1
+            && tooltipRect.top >= rect.top && tooltipRect.bottom <= rect.bottom + 1, 'Tooltip escaped the scaled canvas');
+        for (const type of ['pointerdown', 'pointerup']) {
+            canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'mouse', clientX: x, clientY: y,
+                button: 0, buttons: type === 'pointerdown' ? 1 : 0 }));
+        }
+        assert(hovered.length === 1 && tooltip?.isConnected, 'A stationary single click cleared hover or its tooltip');
+        map.setTooltip('buildings', null);
+        assert(!document.querySelector('[role="tooltip"]') && map.activeHoverLayer === building, 'Removing the tooltip disabled hover');
+        canvas.dispatchEvent(new PointerEvent('pointerleave'));
+        assert(hovered.length === 2 && hovered[1].length === 0, 'Pointer leave did not clear hover');
+        assert(map.activePickingLayer === layer('lower') && (layer('lower') as unknown as { highlightedIds: number[] }).highlightedIds.join() === '0',
+            'Hover or tooltip changed click selection');
+        map.setHover(false);
+        map.updateRenderInfo('lower', { isPick: false });
+        host.style.transform = '';
+        checks.push('independent hover and tooltip position on a translated and scaled canvas');
 
         const heightfield = heightfieldFromRaster(raster, 'band', [0, 0]);
         const heights = device.createTexture({ size: [2, 2], format: 'r32float',
@@ -198,6 +279,6 @@ export async function runWebGpuCases() {
     } finally {
         for (const resource of resources) resource.destroy();
         map.destroy();
-        canvas.remove();
+        host.remove();
     }
 }

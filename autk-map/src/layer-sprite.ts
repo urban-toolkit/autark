@@ -11,6 +11,8 @@ export class SpriteLayer extends Layer {
     protected _thematic: Float32Array = new Float32Array(0);
     protected _thematicValidity: Float32Array = new Float32Array(0);
     protected _highlightedVertices: Float32Array = new Float32Array(0);
+    private hoveredId: number | null = null;
+    private hoverRenderMask: Float32Array | null = null;
     protected _skippedVertices: Float32Array = new Float32Array(0);
     protected _pipeline!: PipelineSprite;
     protected _pipelinePicking!: PipelineSpritePicking;
@@ -50,7 +52,21 @@ export class SpriteLayer extends Layer {
     }
 
     get highlightedVertices(): Float32Array {
-        return this._highlightedVertices;
+        const id = this.hoveredId;
+        if (id === null || !this._components[id]) return this._highlightedVertices;
+        if (this.hoverRenderMask?.length !== this._highlightedVertices.length) {
+            this.hoverRenderMask = new Float32Array(this._highlightedVertices.length);
+        }
+        this.hoverRenderMask.set(this._highlightedVertices);
+        this.hoverRenderMask.fill(2, id > 0 ? this._components[id - 1].nPoints : 0, this._components[id].nPoints);
+        return this.hoverRenderMask;
+    }
+
+    /** Changes the transient render highlight without modifying selected IDs. */
+    setHoveredId(id: number | null): void {
+        if (this.hoveredId === id) return;
+        this.hoveredId = id;
+        this.makeLayerDataDirty();
     }
 
     get skippedVertices(): Float32Array {
@@ -212,6 +228,8 @@ export class SpriteLayer extends Layer {
     }
 
     private _resetInteractionState(): void {
+        this.hoveredId = null;
+        this.hoverRenderMask = null;
         this._highlightedIds = new Set();
         this._skippedIds = new Set();
         this._highlightedVertices = new Float32Array(this.instanceCount);

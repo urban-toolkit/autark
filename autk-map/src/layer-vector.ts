@@ -58,6 +58,8 @@ export abstract class VectorLayer extends Layer {
 
     /** Per-vertex highlight mask. */
     protected _highlightedVertices!: Float32Array;
+    private hoveredId: number | null = null;
+    private hoverRenderMask: Float32Array | null = null;
 
     /** Component ids currently marked as skipped. */
     protected _skippedIds!: Set<number>;
@@ -133,7 +135,20 @@ export abstract class VectorLayer extends Layer {
 
     /** Per-vertex highlight mask uploaded to rendering pipelines. */
     get highlightedVertices(): Float32Array {
-        return this._highlightedVertices;
+        if (this.hoveredId === null) return this._highlightedVertices;
+        if (this.hoverRenderMask?.length !== this._highlightedVertices.length) {
+            this.hoverRenderMask = new Float32Array(this._highlightedVertices.length);
+        }
+        this.hoverRenderMask.set(this._highlightedVertices);
+        this._forEachUniqueVertexInComponents([this.hoveredId], index => { this.hoverRenderMask![index] = 2; });
+        return this.hoverRenderMask;
+    }
+
+    /** Changes the transient render highlight without modifying selected IDs. */
+    setHoveredId(id: number | null): void {
+        if (this.hoveredId === id) return;
+        this.hoveredId = id;
+        this.makeLayerDataDirty();
     }
 
     /** Skipped component ids as an array snapshot. */
@@ -476,6 +491,8 @@ export abstract class VectorLayer extends Layer {
      * both highlight and skip id sets are cleared.
      */
     private _resetInteractionState(): void {
+        this.hoveredId = null;
+        this.hoverRenderMask = null;
         this._highlightedVertices = new Float32Array(this._vertexCount).fill(0);
         this._highlightedIds = new Set<number>();
         this._skippedVertices = new Float32Array(this._vertexCount).fill(0);

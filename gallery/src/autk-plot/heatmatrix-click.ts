@@ -25,7 +25,7 @@ async function main(): Promise<void> {
         events: [PlotEvent.CLICK],
     });
 
-    map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
+    map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
 }
 void runExample(main);
