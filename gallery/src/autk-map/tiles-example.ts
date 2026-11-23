@@ -23,8 +23,8 @@ export class TilesBasemap {
         this.map.setView({ center: this.center, zoom: this.zoom });
         this.changeSource();
         await this.initializeView();
-        this.overview = { target: [...this.map.camera.getLookAt()], eye: [...this.map.camera.getEye()],
-            near: this.map.camera.getNear(), far: this.map.camera.getFar() };
+        const { lookAt: target, eye, near, far } = this.map.camera.saveState();
+        this.overview = { target, eye, near, far };
         this.map.draw();
         document.querySelector('#source-select')!.addEventListener('change', () => this.changeSource());
         document.querySelector('#view-overview')!.addEventListener('click', () => {

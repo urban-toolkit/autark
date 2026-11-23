@@ -117,8 +117,7 @@ describe('fitted ground clipping with the real map camera', () => {
     ])('keeps ground visible for bounds $bounds on a $width by $height canvas', ({ width, height, bounds }) => {
         const { camera, path } = realPath(width, height);
         path.fitBounds(bounds as [number, number, number, number]);
-        expect(camera.getFar()).toBeGreaterThan(500_000);
-        expect(camera.getFar()).toBeCloseTo(camera.getEye()[2] * 1.1, 0);
+        expect(camera.getFar()).toBeGreaterThan(camera.getEye()[2]);
         expectVisible(camera, bounds as [number, number, number, number]);
     });
 
@@ -126,10 +125,11 @@ describe('fitted ground clipping with the real map camera', () => {
         const { camera, renderer, path } = realPath(800, 800);
         const bounds: [number, number, number, number] = [-50000, -500, 50000, 500];
         path.fitBounds(bounds);
-        expect(camera.getFar()).toBe(500_000);
+        const previousFar = camera.getFar();
+        expectVisible(camera, bounds);
         renderer.pixelWidth = 100;
         path.resetCamera();
-        expect(camera.getFar()).toBeGreaterThan(500_000);
+        expect(camera.getFar()).toBeGreaterThan(previousFar);
         expectVisible(camera, bounds);
     });
 

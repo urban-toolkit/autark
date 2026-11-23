@@ -97,8 +97,8 @@ export class Camera {
     /** Far clipping plane distance. */
     protected wFar: number = 0;
     /**
-     * Distance from the eye to the point it looks at, between the near and far
-     * distances, which sizes an orthographic view and places the point
+     * Distance from the eye to the point it looks at, which sizes an
+     * orthographic view independently of depth clipping and places the point
      * {@link getLookAt} gives in one. {@link resetCamera} sets it, a zoom
      * changes it, and a pan or a tilt keeps it, though those moves leave
      * `wLookAt` one unit ahead of the eye.
@@ -145,7 +145,7 @@ export class Camera {
      * @param wUp - World-space up vector.
      * @param wLookAt - Point to look at in world space.
      * @param wEye - Eye position in world space.
-     * @param far - Far clipping distance; defaults to 500,000 world units.
+     * @param far - Minimum far clipping distance for navigable views; defaults to 500,000 world units.
      * @param near - Near clipping distance; defaults to 1 world unit. Explicit small-unit views may use a smaller value.
      * @throws Never throws.
      * @example
@@ -212,8 +212,24 @@ export class Camera {
         return this.wNear;
     }
 
+    /** Returns the active far distance for navigation, or the configured minimum in fixed-bounds mode. */
     public getFar(): number {
-        return this.wFar;
+        if (this.orthographic) return this.wFar;
+        const height = Math.abs(this.wEye[2]);
+        const { forward, right, up } = this.viewBasis();
+        const vertical = Math.abs(forward[2]);
+        const aspect = this.viewportHeight > 0 ? this.viewportWidth / this.viewportHeight : 1;
+        const verticalSpread = (Math.abs(up[2]) + aspect * Math.abs(right[2])) * Math.tan(this.fovy / 2);
+        if (this.projection === 'orthographic') {
+            const extent = this.wLookAtDistance;
+            // Parallel rays start at different heights across the view. Bound the search near the horizon.
+            const groundDepth = (height + extent * verticalSpread) / Math.max(vertical, 1 / 32);
+            return Math.max(this.wFar, 4 * height, 2 * extent, 1.1 * groundDepth);
+        }
+        // At the far edge the ground can be much deeper than at the center. If the view
+        // crosses the horizon, keep a finite fallback that covers the default tile footprint.
+        const groundDepth = height / Math.max(vertical - verticalSpread, 1 / 32);
+        return Math.max(this.wFar, 4 * height, 1.1 * groundDepth);
     }
 
     public getViewportHeight(): number {
@@ -501,7 +517,7 @@ export class Camera {
         }
         vec3.scaleAndAdd(this.wEye, this.wEye, dir, delta);
         // The distance to the point looked at changes by as much as the eye moves along the view.
-        this.wLookAtDistance = Math.min(Math.max(this.wLookAtDistance - delta * vec3.dot(dir, this.wEyeDir), this.wNear), this.wFar);
+        this.wLookAtDistance = Math.max(this.wLookAtDistance - delta * vec3.dot(dir, this.wEyeDir), this.wNear);
         vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
     }
 
@@ -589,18 +605,22 @@ export class Camera {
     public update(): void {
         if (this.orthographic) return;
         const aspect = this.viewportWidth / this.viewportHeight;
-        mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
+        const far = this.getFar();
+        // Build orientation from the stored direction: at large eye coordinates,
+        // a look-at point one unit ahead can round back to the eye in float32.
+        mat4.lookAt(this.mViewMatrix, [0, 0, 0], this.wEyeDir, this.wUp);
+        mat4.translate(this.mViewMatrix, this.mViewMatrix, [-this.wEye[0], -this.wEye[1], -this.wEye[2]]);
         if (this.projection === 'orthographic') {
             const [halfWidth, halfHeight] = this.orthographicHalfSize();
             // Reversed-Z as below, over everything within the far distance in front of the eye or behind it.
-            mat4.orthoZO(this.mProjectionMatrix, -halfWidth, halfWidth, -halfHeight, halfHeight, this.wFar, -this.wFar);
+            mat4.orthoZO(this.mProjectionMatrix, -halfWidth, halfWidth, -halfHeight, halfHeight, far, -far);
             return;
         }
         // Reversed-Z: swap near/far so near→1 and far→0 in NDC.
         // Combined with depthClearValue=0 and depthCompare='greater-equal' this
         // distributes float32 precision logarithmically, eliminating z-fighting
         // at distance without requiring an absurdly large far plane.
-        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, this.wFar, this.wNear);
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, far, this.wNear);
     }
 
     /**
@@ -701,7 +721,7 @@ export class Camera {
     protected updateEyeDirAndLen(): void {
         this.wEyeDir = vec3.create();
         vec3.sub(this.wEyeDir, this.wLookAt, this.wEye);
-        this.wLookAtDistance = Math.min(Math.max(vec3.length(this.wEyeDir), this.wNear), this.wFar);
+        this.wLookAtDistance = Math.max(vec3.length(this.wEyeDir), this.wNear);
         vec3.normalize(this.wEyeDir, this.wEyeDir);
     }
 }

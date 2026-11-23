@@ -141,9 +141,15 @@ not guarantee high-accuracy conversion. Geocentric inputs require a separate 3D 
 
 `camera.setProjection('orthographic')` draws with parallel rays until `camera.setProjection('perspective')`, and `camera.getProjection()` reports which one the camera draws with. At the point the camera looks at, the orthographic view shows what the perspective view shows there, and zoom, pan, tilt and `resetCamera` keep working. `CameraMotion`'s pitch, yaw and roll keep the orthographic scale. `camera.setOrthographicBounds(left, right, bottom, top)` is a separate view: it looks straight down at a fixed rectangle of ground until `resetCamera` or `setProjection('perspective')`.
 
+For navigable cameras, the far distance can grow with camera height and tilt to
+cover the distant ground in the view. `getFar()` reports the distance used for projection; the `far` argument to
+`resetCamera()` sets its minimum. Orthographic framing is not capped by that
+distance. Fixed orthographic bounds keep their existing depth range. Views
+looking nearly parallel to the ground can still clip very distant geometry.
+
 To persist a view, serialize `camera.saveState()` and pass the parsed `CameraState`
 to `camera.restoreState(state)`. The snapshot restores the projection, pose,
-framing scale, clipping range, and any fixed orthographic bounds together. The
+framing scale, near distance, minimum far distance, and any fixed orthographic bounds together. The
 receiving camera keeps its current viewport and uses its aspect ratio. Restore
 into the same map origin and coordinate system; those are not camera state.
 Use snapshots created by `saveState()`, not hand-built or unvalidated data.
