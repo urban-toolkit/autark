@@ -48,6 +48,13 @@ export interface ViewProjectionParams {
 }
 
 /**
+ * How a camera projects the scene: `'perspective'`, where farther things look
+ * smaller, or `'orthographic'`, where parallel rays draw every distance at one
+ * scale.
+ */
+export type CameraProjection = 'perspective' | 'orthographic';
+
+/**
  * Interactive 3-DOF camera for orbit-style navigation.
  *
  * The camera tracks world-space eye, look-at, and up vectors together with the
@@ -74,6 +81,14 @@ export class Camera {
     protected wNear: number = 0;
     /** Far clipping plane distance. */
     protected wFar: number = 0;
+    /**
+     * Distance from the eye to the point it looks at, between the near and far
+     * distances, which sizes an orthographic view and places the point
+     * {@link getLookAt} gives in one. {@link resetCamera} sets it, a zoom
+     * changes it, and a pan or a tilt keeps it, though those moves leave
+     * `wLookAt` one unit ahead of the eye.
+     */
+    private wLookAtDistance: number = 1;
     /** Vertical field of view in radians. */
     protected fovy = (45 * Math.PI) / 180.0;
     /** Current projection matrix. */
@@ -82,8 +97,10 @@ export class Camera {
     protected mViewMatrix: mat4 = mat4.create();
     private viewportWidth: number = 0;
     private viewportHeight: number = 0;
-    /** Bounds of an orthographic projection, or `null` for the perspective camera. */
+    /** Ground bounds of a top-down orthographic projection set by {@link setOrthographicBounds}, or `null`. */
     private orthographic: { left: number; right: number; bottom: number; top: number } | null = null;
+    /** Projection kept through {@link update} and {@link resetCamera}, set by {@link setProjection}. */
+    private projection: CameraProjection = 'perspective';
 
     private static defaultParams: CameraData = {
         up: [0, 1, 0],
@@ -106,6 +123,9 @@ export class Camera {
 
     /**
      * Resets the camera to a new position, orientation, and default projection.
+     *
+     * The projection set by {@link setProjection} is kept; the bounds set by
+     * {@link setOrthographicBounds} end.
      *
      * @param wUp - World-space up vector.
      * @param wLookAt - Point to look at in world space.
@@ -147,7 +167,21 @@ export class Camera {
         return [this.wEye[0], this.wEye[1], this.wEye[2]];
     }
 
+    /**
+     * Returns the point the camera looks at.
+     *
+     * `resetCamera(getUp(), getLookAt(), getEye())` keeps the view, in
+     * perspective and in an orthographic view set with {@link setProjection}.
+     *
+     * @returns The point `[x, y, z]` in world space.
+     * @throws Never throws.
+     */
     public getLookAt(): [number, number, number] {
+        if (this.projection === 'orthographic' && !this.orthographic) {
+            // Zoom, pan and tilt leave wLookAt one unit ahead of the eye, nearer than the point the view is sized at.
+            const distance = this.wLookAtDistance;
+            return [0, 1, 2].map((i) => this.wEye[i] + this.wEyeDir[i] * distance) as [number, number, number];
+        }
         return [this.wLookAt[0], this.wLookAt[1], this.wLookAt[2]];
     }
 
@@ -179,6 +213,21 @@ export class Camera {
         return new Float32Array(mat4.mul(mat4.create(), this.mProjectionMatrix, this.mViewMatrix));
     }
 
+    /**
+     * Returns the direction of the ray through a screen position, in world space.
+     *
+     * In perspective, the ray starts at the eye ({@link getEye}). In an
+     * orthographic view, every ray has the view direction, and the ray through
+     * a screen position starts at that position on the plane of the eye, not at
+     * the eye: unproject the position with the inverse of
+     * {@link getViewProjectionMatrix} to find a point on it, or use
+     * {@link getGroundPoint} for where it meets the ground.
+     *
+     * @param x - Normalized screen X, from 0 at the left to 1 at the right.
+     * @param y - Normalized screen Y, from 0 at the bottom to 1 at the top.
+     * @returns The unit direction `[x, y, z]`.
+     * @throws Never throws.
+     */
     public getWorldRayDirection(x: number, y: number): [number, number, number] {
         const direction = this.screenCoordToWorldDir(x, y);
         return [direction[0], direction[1], direction[2]];
@@ -189,7 +238,9 @@ export class Camera {
      *
      * A ray that points away from the ground, or is parallel to it, has no hit;
      * a hit farther than `maxDistance` is too far to be useful. In both cases the
-     * point `maxDistance` along the ray is returned instead.
+     * point `maxDistance` along the ray is returned instead. An orthographic
+     * ray starts on the plane of the eye, and its hit may lie behind that plane;
+     * a hit more than `maxDistance` behind it gives the point `maxDistance` behind it.
      *
      * @param x - Normalized screen X (0–1, left to right).
      * @param y - Normalized screen Y (0–1, bottom to top).
@@ -203,6 +254,13 @@ export class Camera {
         const bounds = this.orthographic;
         if (bounds) {
             return [bounds.left + (bounds.right - bounds.left) * x, bounds.bottom + (bounds.top - bounds.bottom) * y];
+        }
+        if (this.projection === 'orthographic') {
+            // The camera also draws the ground behind the plane of the eye, so a hit past maxDistance keeps its side.
+            const [origin, direction] = this.orthographicRay(x, y);
+            const groundDistance = Math.abs(direction[2]) > 1e-6 ? -origin[2] / direction[2] : Number.POSITIVE_INFINITY;
+            const distance = Math.min(Math.max(groundDistance, -maxDistance), maxDistance);
+            return [origin[0] + direction[0] * distance, origin[1] + direction[1] * distance];
         }
         const eye = this.wEye;
         const direction = this.screenCoordToWorldDir(x, y);
@@ -219,7 +277,8 @@ export class Camera {
      * around the point below the eye, cut by those four half-planes. Unlike the
      * ground hits of the four corner rays, this also covers what the interior
      * of the screen sees near the horizon, where a corner ray points above the
-     * ground.
+     * ground. An orthographic view sees a parallelogram of ground, between the
+     * ground points of its corners.
      *
      * @param reach - Farthest ground distance from the point below the eye, in world units.
      * @returns Polygon vertices `[x, y]`, or an empty array when no ground is visible.
@@ -237,6 +296,9 @@ export class Camera {
                 [bounds.right, bounds.top],
                 [bounds.left, bounds.top],
             ];
+        }
+        if (this.projection === 'orthographic') {
+            return ([[0, 0], [1, 0], [1, 1], [0, 1]] as const).map(([x, y]) => this.getGroundPoint(x, y, reach));
         }
         const eye = this.wEye;
         const corners = ([[0, 0], [1, 0], [1, 1], [0, 1]] as const).map(([x, y]) => this.screenCoordToWorldDir(x, y));
@@ -263,10 +325,12 @@ export class Camera {
     /**
      * Switches the camera to a top-down orthographic projection over a rectangle of ground.
      *
-     * The camera stays orthographic until {@link resetCamera} is called:
-     * {@link resize} and {@link update} keep the projection, and the ground and
-     * ray helpers follow the bounds. World `z` from -10 to 90 is inside the depth range.
-     * Ordinary 2D layers remain on the common ground plane and use drawing order.
+     * The camera keeps these bounds until {@link resetCamera} or
+     * `setProjection('perspective')` is called: {@link resize} and {@link update} keep the
+     * projection, and the ground and ray helpers follow the bounds. World `z`
+     * from -10 to 90 is inside the depth range. Ordinary 2D layers remain on the
+     * common ground plane and use drawing order. For a view that follows the
+     * eye, use {@link setProjection}.
      *
      * @param left - World X at the left edge.
      * @param right - World X at the right edge.
@@ -292,6 +356,46 @@ export class Camera {
         this.wLookAt = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 0);
         this.wUp = vec3.fromValues(0, 1, 0);
         this.updateEyeDirAndLen();
+    }
+
+    /**
+     * Sets the projection the camera keeps until it is set again.
+     *
+     * An orthographic camera looks along the same line as the perspective one,
+     * with parallel rays, and at the point it looks at it shows what the
+     * perspective camera shows there. So switching keeps the scale there, and
+     * zoom, pan, tilt and {@link resetCamera} work as in perspective. It draws
+     * everything within the far distance, in front of the eye or behind it.
+     *
+     * Setting the projection {@link getProjection} already reports changes
+     * nothing that is drawn. While the bounds of {@link setOrthographicBounds}
+     * hold, the camera is orthographic: `setProjection('orthographic')` keeps
+     * them, and the camera stays orthographic after {@link resetCamera} ends
+     * them; `setProjection('perspective')` ends them.
+     *
+     * @param projection - `'perspective'`, the default, or `'orthographic'`.
+     * @throws Never throws.
+     * @example
+     * camera.setProjection('orthographic');
+     */
+    public setProjection(projection: CameraProjection): void {
+        const unchanged = projection === this.getProjection();
+        // Recorded also while fixed bounds already draw orthographically, so that it outlasts them.
+        this.projection = projection;
+        if (unchanged) return;
+        this.orthographic = null;
+        this.update();
+    }
+
+    /**
+     * Returns the current projection.
+     *
+     * @returns `'orthographic'` once {@link setProjection} chose it, or while the
+     * bounds of {@link setOrthographicBounds} hold; otherwise `'perspective'`.
+     * @throws Never throws.
+     */
+    public getProjection(): CameraProjection {
+        return this.orthographic ? 'orthographic' : this.projection;
     }
 
     /**
@@ -338,8 +442,15 @@ export class Camera {
     public zoom(delta: number, x: number, y: number): void {
         const zoomScale = Math.max(Math.abs(this.wEye[2]), 1) * 0.2;
         delta = -delta * zoomScale;
-        const dir = this.screenCoordToWorldDir(x, y);
+        let dir = this.screenCoordToWorldDir(x, y);
+        if (this.projection === 'orthographic' && !this.orthographic) {
+            // Orthographic rays are parallel, so the eye moves toward the point under the cursor at the look-at distance.
+            const [origin, forward] = this.orthographicRay(x, y);
+            dir = vec3.normalize(vec3.create(), [0, 1, 2].map((i) => origin[i] + forward[i] * this.wLookAtDistance - this.wEye[i]));
+        }
         vec3.scaleAndAdd(this.wEye, this.wEye, dir, delta);
+        // The distance to the point looked at changes by as much as the eye moves along the view.
+        this.wLookAtDistance = Math.min(Math.max(this.wLookAtDistance - delta * vec3.dot(dir, this.wEyeDir), this.wNear), this.wFar);
         vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
     }
 
@@ -428,6 +539,12 @@ export class Camera {
         if (this.orthographic) return;
         const aspect = this.viewportWidth / this.viewportHeight;
         mat4.lookAt(this.mViewMatrix, this.wEye, this.wLookAt, this.wUp);
+        if (this.projection === 'orthographic') {
+            const [halfWidth, halfHeight] = this.orthographicHalfSize();
+            // Reversed-Z as below, over everything within the far distance in front of the eye or behind it.
+            mat4.orthoZO(this.mProjectionMatrix, -halfWidth, halfWidth, -halfHeight, halfHeight, this.wFar, -this.wFar);
+            return;
+        }
         // Reversed-Z: swap near/far so near→1 and far→0 in NDC.
         // Combined with depthClearValue=0 and depthCompare='greater-equal' this
         // distributes float32 precision logarithmically, eliminating z-fighting
@@ -464,15 +581,9 @@ export class Camera {
     protected screenCoordToWorldDir(x: number, y: number): vec3 {
         // Orthographic rays are parallel and look straight down.
         if (this.orthographic) return vec3.fromValues(0, 0, -1);
-        // The same orthonormal basis `mat4.lookAt` builds for rendering, so a ray
-        // through a screen position matches what is drawn there even when the
-        // supplied up vector is not perpendicular to the view direction or not unit
-        // length. The stored view direction is used for the forward axis: the
-        // look-at point can sit only one unit from the eye, which float32 loses at
-        // large heights.
-        const forward = vec3.normalize(vec3.create(), this.wEyeDir);
-        const right = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), forward, this.wUp));
-        const up = vec3.cross(vec3.create(), right, forward);
+        const { forward, right, up } = this.viewBasis();
+        // Orthographic rays are parallel to the view direction.
+        if (this.projection === 'orthographic') return forward;
         const halfHeight = Math.tan(this.fovy / 2);
         const aspect = this.viewportWidth / this.viewportHeight;
         const dir = vec3.clone(forward);
@@ -483,13 +594,63 @@ export class Camera {
     }
 
     /**
-     * Recomputes the normalized eye direction from current eye and look-at.
+     * Returns the view direction and the screen's right and up axes in world space.
+     *
+     * This is the orthonormal basis `mat4.lookAt` builds for rendering, so a ray
+     * through a screen position matches what is drawn there even when the
+     * supplied up vector is not perpendicular to the view direction or not unit
+     * length. The stored view direction is used for the forward axis: the
+     * look-at point can sit only one unit from the eye, which float32 loses at
+     * large heights.
+     *
+     * @returns Unit `forward`, `right` and `up` vectors.
+     */
+    private viewBasis(): { forward: vec3; right: vec3; up: vec3 } {
+        const forward = vec3.normalize(vec3.create(), this.wEyeDir);
+        const right = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), forward, this.wUp));
+        const up = vec3.cross(vec3.create(), right, forward);
+        return { forward, right, up };
+    }
+
+    /**
+     * Returns half the width and height of the view that {@link setProjection} makes orthographic.
+     *
+     * They are those of the perspective view at the point the camera looks at,
+     * from the eye's distance to that point, which a zoom changes and a pan or a
+     * tilt keeps.
+     *
+     * @returns `[halfWidth, halfHeight]` in world units.
+     */
+    private orthographicHalfSize(): [number, number] {
+        const halfHeight = this.wLookAtDistance * Math.tan(this.fovy / 2);
+        return [halfHeight * (this.viewportWidth / this.viewportHeight), halfHeight];
+    }
+
+    /**
+     * Returns the parallel ray of the orthographic view through a screen position.
+     *
+     * @param x - Normalized screen X, from 0 at the left to 1 at the right.
+     * @param y - Normalized screen Y, from 0 at the bottom to 1 at the top.
+     * @returns The ray's start on the plane of the eye, and its unit direction, the view direction.
+     */
+    private orthographicRay(x: number, y: number): [number[], vec3] {
+        const [halfWidth, halfHeight] = this.orthographicHalfSize();
+        const { forward, right, up } = this.viewBasis();
+        const across = (x * 2 - 1) * halfWidth;
+        const along = (y * 2 - 1) * halfHeight;
+        return [[0, 1, 2].map((i) => this.wEye[i] + right[i] * across + up[i] * along), forward];
+    }
+
+    /**
+     * Recomputes the normalized eye direction, and the distance to the look-at
+     * point, from current eye and look-at.
      *
      * @throws Never throws.
      */
     protected updateEyeDirAndLen(): void {
         this.wEyeDir = vec3.create();
         vec3.sub(this.wEyeDir, this.wLookAt, this.wEye);
+        this.wLookAtDistance = Math.min(Math.max(vec3.length(this.wEyeDir), this.wNear), this.wFar);
         vec3.normalize(this.wEyeDir, this.wEyeDir);
     }
 }

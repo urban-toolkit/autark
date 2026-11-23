@@ -75,7 +75,7 @@ console.log(origin, geometry.length, components.length, camera.eye, colormap.len
 
 - **Color mapping**: `ColorMap`, `ColorMapDomainStrategy`, `ColorMapInterpolator`, `ColorMapConfig`, `ResolvedDomain`
 - **Transfer functions**: `DEFAULT_TRANSFER_FUNCTION`, `buildTransferContext`, `computeAlphaByte`
-- **Camera utilities**: `Camera`, `CameraMotion`, `CameraData`, `ViewProjectionParams`
+- **Camera utilities**: `Camera`, `CameraMotion`, `CameraData`, `CameraProjection`, `ViewProjectionParams`
 - **Events**: `EventEmitter`, `EventListener`, `SelectionData`
 - **Mesh types**: `LayerGeometry`, `LayerComponent`, `LayerBorder`, `LayerBorderComponent`
 - **Layer and buffer types**: `LayerType`, `BoundingBox`, `TypedArray`, `TypedArrayConstructor`
@@ -136,6 +136,12 @@ a whitelist. `lonLatToCrs()` and `crsToLonLat()` also accept registered/custom d
 Unknown definitions, unsupported transformations, and non-finite coordinates throw. Additional EPSG definitions must be registered explicitly. Datum
 transformations requiring external grids need those resources; an EPSG name alone does
 not guarantee high-accuracy conversion. Geocentric inputs require a separate 3D workflow.
+
+## Camera projection
+
+`camera.setProjection('orthographic')` draws with parallel rays until `camera.setProjection('perspective')`, and `camera.getProjection()` reports which one the camera draws with. At the point the camera looks at, the orthographic view shows what the perspective view shows there, and zoom, pan, tilt and `resetCamera` keep working. `resetCamera(getUp(), getLookAt(), getEye())` puts the view back as it was, and `CameraMotion`'s pitch, yaw and roll keep its scale. `camera.setOrthographicBounds(left, right, bottom, top)` is a separate view: it looks straight down at a fixed rectangle of ground until `resetCamera` or `setProjection('perspective')`.
+
+In an orthographic view, `getWorldRayDirection` gives every screen position the view direction, and the ray through a position starts at that position on the plane of the eye, not at `getEye()`. `getGroundPoint` gives where that ray meets the ground.
 
 ## Resources
 

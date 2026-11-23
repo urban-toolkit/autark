@@ -137,6 +137,8 @@ export { Camera } from './camera';
 export type {
     /** Initial camera position and orientation parameters. */
     CameraData,
+    /** Perspective or orthographic projection of a camera. */
+    CameraProjection,
     /** One-shot parameters for constructing a view-projection matrix. */
     ViewProjectionParams,
 } from './camera';

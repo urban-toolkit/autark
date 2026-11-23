@@ -50,6 +50,8 @@ interface CameraState {
  * the intersection of the camera's forward ray with the ground plane at `z = 0`.
  * Roll keeps the eye position and look-at target fixed while rotating the up
  * vector around the forward axis. All steps use ease-in-out interpolation.
+ * A camera set orthographic with `setProjection` keeps its scale through
+ * pitch, yaw and roll, and a zoom scales it by its factor.
  *
  * @example
  * await new CameraMotion()
@@ -195,6 +197,24 @@ export class CameraMotion {
     }
 
     /**
+     * Returns the point an orthographic camera looks at, at its own distance from the eye along the view of `state`.
+     *
+     * @param camera Orthographic camera about to move.
+     * @param state Its state, from its view matrix.
+     * @returns The point in world space.
+     */
+    private lookAtAhead(camera: Camera, state: CameraState): [number, number, number] {
+        const eye = camera.getEye();
+        const target = camera.getLookAt();
+        const distance = Math.hypot(target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]);
+        return [
+            state.eye[0] + state.forward[0] * distance,
+            state.eye[1] + state.forward[1] * distance,
+            state.eye[2] + state.forward[2] * distance,
+        ];
+    }
+
+    /**
      * Rotates vector `v` around unit `axis` by `angle` radians.
      *
      * This helper uses Rodrigues' rotation formula and is shared by pitch,
@@ -260,6 +280,19 @@ export class CameraMotion {
                 startState.eye[2] - sceneCenter[2],
             ];
 
+            // An orthographic view's scale comes from the eye's distance to the point it looks at, so the steps move
+            // that point with the eye. A perspective camera looks at the scene center, or ahead of the eye in a roll.
+            const lookAt = camera.getProjection() === 'orthographic' ? this.lookAtAhead(camera, startState) : null;
+            /** Where a step puts that point: `center`, plus its offset from the scene center moved by `move`. */
+            const lookAtFor = (
+                center: [number, number, number],
+                move: (offset: [number, number, number]) => [number, number, number],
+            ): [number, number, number] => {
+                if (!lookAt) return center;
+                const offset = move([lookAt[0] - sceneCenter[0], lookAt[1] - sceneCenter[1], lookAt[2] - sceneCenter[2]]);
+                return [center[0] + offset[0], center[1] + offset[1], center[2] + offset[2]];
+            };
+
             // Zoom: log-linear scale of the eye-to-sceneCenter distance, preserving orientation.
             const sign = step.amount > 0 ? 1 : -1;
             const zoomLogEnd = sign * Math.log(Math.abs(step.amount));
@@ -290,7 +323,9 @@ export class CameraMotion {
                         center[1] + newEyeOff[1],
                         center[2] + newEyeOff[2],
                     ];
-                    camera.resetCamera(newUp, center, newEye);
+                    const newLookAt = lookAtFor(center, (offset) =>
+                        this.rotateAround(offset, startState.right, -step.amount * currEased));
+                    camera.resetCamera(newUp, newLookAt, newEye);
                     camera.update();
 
                 } else if (step.type === 'yaw') {
@@ -301,7 +336,9 @@ export class CameraMotion {
                         sceneCenter[1] + newEyeOff[1],
                         sceneCenter[2] + newEyeOff[2],
                     ];
-                    camera.resetCamera(newUp, sceneCenter, newEye);
+                    const newLookAt = lookAtFor(sceneCenter, (offset) =>
+                        this.rotateAround(offset, [0, 0, 1], step.amount * currEased));
+                    camera.resetCamera(newUp, newLookAt, newEye);
                     camera.update();
 
                 } else if (step.type === 'zoom') {
@@ -311,12 +348,14 @@ export class CameraMotion {
                         sceneCenter[1] + eyeOffset[1] * scale,
                         sceneCenter[2] + eyeOffset[2] * scale,
                     ];
-                    camera.resetCamera(startState.up, sceneCenter, newEye);
+                    const newLookAt = lookAtFor(sceneCenter, (offset) =>
+                        [offset[0] * scale, offset[1] * scale, offset[2] * scale]);
+                    camera.resetCamera(startState.up, newLookAt, newEye);
                     camera.update();
 
                 } else if (step.type === 'roll') {
                     const newUp = this.rotateAround(startState.up, startState.forward, step.amount * currEased);
-                    camera.resetCamera(newUp, startState.lookAt, startState.eye);
+                    camera.resetCamera(newUp, lookAt ?? startState.lookAt, startState.eye);
                     camera.update();
                 }
 

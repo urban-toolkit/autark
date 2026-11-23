@@ -954,6 +954,9 @@ export class TerrainRenderer {
         const planes = extractFrustumPlanes(viewProjection);
         const viewportHeight = Math.max(camera.getViewportHeight(), 1);
         const projectionScale = viewportHeight / (2 * Math.tan(camera.getFovyRadians() / 2));
+        // An orthographic view draws every block at one scale: a perspective view's at the distance this one frames.
+        const orthographicDistance = camera.getProjection() === 'orthographic'
+            ? 1 / (camera.getProjectionMatrix()[5] * Math.tan(camera.getFovyRadians() / 2)) : null;
         const [minX, minY, maxX, maxY] = this.bounds;
         const terrainSize = Math.max(maxX - minX, maxY - minY);
         const rootSize = nextPowerOfTwo(terrainSize);
@@ -988,7 +991,7 @@ export class TerrainRenderer {
             // With several levels, a block stops splitting once its vertex spacing is no finer than the
             // finest data anywhere under it, not only at its centre.
             wantsSplit: (block) => {
-                if (!shouldSplitBlock(block, camera, projectionScale, this.finestCell)) return false;
+                if (!shouldSplitBlock(block, camera, projectionScale, this.finestCell, orthographicDistance)) return false;
                 if (!streaming) return true;
                 return block.size / PATCH_CELLS > finestCellOver(this._source, block.x, block.y, block.x + block.size, block.y + block.size);
             },
@@ -1102,18 +1105,19 @@ function createBlock(x: number, y: number, size: number, level: number): BlockCa
  * @param camera Camera used to estimate screen-space cell size.
  * @param projectionScale Scale factor from world units to projected pixels.
  * @param baseCellSize Heightfield cell size at the finest level.
+ * @param fixedDistance Distance that sets the scale of every block, for an orthographic view; `null` for a perspective one.
  * @returns `true` when the block should use a finer LOD.
  * @throws Never throws.
  * @example
- * const split = shouldSplitBlock(block, camera, projectionScale, cellSize);
+ * const split = shouldSplitBlock(block, camera, projectionScale, cellSize, null);
  */
-function shouldSplitBlock(block: BlockCandidate, camera: Camera, projectionScale: number, baseCellSize: number): boolean {
+function shouldSplitBlock(block: BlockCandidate, camera: Camera, projectionScale: number, baseCellSize: number, fixedDistance: number | null): boolean {
     if (block.level === 0) {
         return false;
     }
     const eye = camera.getEye();
     const lookAt = camera.getLookAt();
-    const distance = Math.max(1, Math.min(distanceToBlock3d(eye[0], eye[1], eye[2], block), distanceToBlock3d(lookAt[0], lookAt[1], lookAt[2], block)));
+    const distance = fixedDistance ?? Math.max(1, Math.min(distanceToBlock3d(eye[0], eye[1], eye[2], block), distanceToBlock3d(lookAt[0], lookAt[1], lookAt[2], block)));
     const cellSize = baseCellSize * 2 ** block.level;
     return (cellSize * projectionScale) / distance > TARGET_CELL_PIXELS;
 }
