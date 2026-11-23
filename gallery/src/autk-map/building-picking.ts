@@ -69,7 +69,13 @@ async function main(): Promise<void> {
     });
     const buildings: FeatureCollection = await db.getLayer(LAYER);
 
-    const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!, { showUi: false });
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+    if (new URLSearchParams(window.location.search).has('transform')) {
+        const stage = canvas.parentElement!;
+        stage.style.transformOrigin = 'top left';
+        stage.style.transform = 'translate(12px, 8px) scale(0.8)';
+    }
+    const map = new AutkMap(canvas, { showUi: false });
     await map.init();
     for (const layer of db.getLayersMetadata()) {
         map.loadCollection(layer.name, { collection: layer.name === LAYER ? buildings : await db.getLayer(layer.name), type: layer.type });

@@ -288,9 +288,9 @@ export class MouseEvents {
         event.preventDefault();
         event.stopPropagation();
 
-        const rect = this._map.renderer.canvas.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / this._map.renderer.cssWidth;
-        const y = 1.0 - (event.clientY - rect.top) / this._map.renderer.cssHeight;
+        const [px, py] = this._getPoint(event);
+        const x = px / this._map.renderer.cssWidth;
+        const y = 1.0 - py / this._map.renderer.cssHeight;
 
         this._map.camera.zoom(event.deltaY * 0.01, x, y);
     }
@@ -310,10 +310,7 @@ export class MouseEvents {
         event.preventDefault();
         event.stopPropagation();
 
-        const rect = this._map.renderer.canvas.getBoundingClientRect();
-
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const [mouseX, mouseY] = this._getPoint(event);
 
         const activePickingLayer = this._map.activePickingLayer;
         if (activePickingLayer?.layerRenderInfo.isPick) {
@@ -397,18 +394,18 @@ export class MouseEvents {
     /**
      * Computes pointer coordinates in canvas-local CSS pixels.
      *
-     * The returned coordinates are measured from the top-left corner of the
-     * renderer canvas using the canvas's current client bounding box.
+     * The bounding box includes CSS translation and scaling applied to the canvas or
+     * its ancestors. Subtract its origin and undo the scale to recover local CSS
+     * pixels. This does not invert rotation, skew, or perspective.
      *
      * @param event Pointer or mouse event containing viewport coordinates.
-     * @returns Two-element array `[x, y]` relative to the canvas bounds in CSS pixels.
+     * @returns `[x, y]` relative to the canvas's top-left corner in local CSS pixels.
      */
-    private _getPoint(event: PointerEvent | MouseEvent): number[] {
-        const canvas = this._map.renderer.canvas;
+    private _getPoint(event: MouseEvent): [number, number] {
+        const { canvas, cssWidth, cssHeight } = this._map.renderer;
         const rect = canvas.getBoundingClientRect();
-        return [
-            event.clientX - rect.left,
-            event.clientY - rect.top,
-        ];
+        const sx = rect.width > 0 ? cssWidth / rect.width : 1;
+        const sy = rect.height > 0 ? cssHeight / rect.height : 1;
+        return [(event.clientX - rect.left) * sx, (event.clientY - rect.top) * sy];
     }
 }

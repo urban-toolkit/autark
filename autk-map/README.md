@@ -56,6 +56,10 @@ map.events.on(MapEvent.PICKING, ({ selection, layerId }) => {
 map.draw();
 ```
 
+Pointer interactions work when the canvas or an ancestor is translated or
+uniformly scaled with CSS (positive scale). Rotation, skew, mirroring, and 3D
+transforms are outside this support.
+
 ### Workspace CRS, input CRS, and view
 
 The map and `AutkDb` share the default workspace CRS, **EPSG:3395**. Existing collections
