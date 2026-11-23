@@ -828,6 +828,16 @@ function near(actual: unknown, expected: unknown): unknown {
  * `fill` on rows, which draws nothing on an HTML element.
  */
 function accepted(name: string, snapshots: Snapshot[], actual: Snapshot[]): Snapshot[] {
+    // Numeric range edges now display their full values. Keep historical ticks and
+    // their order, expanding only the SI notation used by the old bin formatter.
+    if (name === 'barchart: sum reducer' || name.startsWith('heatmatrix:')) {
+        for (const snapshot of snapshots) {
+            for (const axis of snapshot.axes) {
+                axis.ticks = axis.ticks.map(tick => /^\d+(?:\.\d+)?M-\d+(?:\.\d+)?M$/.test(tick)
+                    ? tick.replace(/(\d+(?:\.\d+)?)M/g, (_, edge: string) => String(Number(edge) * 1_000_000)) : tick);
+            }
+        }
+    }
     // In these cases every part shows a statistic (avg, min, max).
     const STATISTIC_OUTLINE = `${rgb(autkPlot.PlotStyle.provenanceStroke)} 1`;
     const outline = (rewrite: (stroke: string | null | undefined) => string | null | undefined) =>

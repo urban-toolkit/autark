@@ -28,7 +28,14 @@ const RANGE = /^(-?[\d.]+[kMGT]?)-(-?[\d.]+[kMGT]?)$/;
 const numberOf = (text: string): number => Number.parseFloat(text) * ({ k: 1e3, M: 1e6, G: 1e9, T: 1e12 }[text.slice(-1)] ?? 1);
 
 /** Rows without the labels of numeric bins, which are checked on their own. */
-const withoutRangeLabels = (rows: { label?: unknown }[]) => rows.map(row => (typeof row.label === 'string' && RANGE.test(row.label) ? { ...row, label: 'range' } : row));
+const withoutRangeLabels = (rows: { label?: unknown; x?: unknown; y?: unknown }[]) => rows.map(row => {
+    const normalized = { ...row };
+    for (const field of ['label', 'x', 'y'] as const) {
+        const value = row[field];
+        if (typeof value === 'string' && RANGE.test(value)) normalized[field] = 'range';
+    }
+    return normalized;
+});
 
 describe('autk-plot transforms match the original autk-plot 4.1.1', () => {
     test.each(TRANSFORM_CASES)('$name', ({ name, collection, config, columns }) => {

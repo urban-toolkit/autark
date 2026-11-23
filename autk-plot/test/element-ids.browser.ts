@@ -50,6 +50,19 @@ describe('Plots in one page', () => {
         }
     });
 
+    it('preserves classes added by the host on redraw', () => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        const plot = new AutkPlot(div, plots[0][1]);
+        const svg = div.querySelector('svg')!;
+        svg.classList.add('dashboard-chart');
+        plot.draw();
+        expect(div.querySelector('svg')).toBe(svg);
+        expect(svg.classList.contains('dashboard-chart')).toBe(true);
+        plot.destroy();
+        div.remove();
+    });
+
     it('gives no element an id another element has', () => {
         const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
         expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([]);

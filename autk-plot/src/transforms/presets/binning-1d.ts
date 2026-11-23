@@ -14,7 +14,6 @@ import type { Binning1dTransformConfig } from '../../api';
 import type { TransformDefinition } from '../registry';
 import type { TransformProvenance } from '../../types-provenance';
 
-import { formatSiOrDecimal } from '../../number-format';
 import { collectBuckets } from '../kernel';
 import { binnedProvenance, indexedBins } from '../provenance';
 
@@ -32,7 +31,7 @@ export type ExecutedBinning1dTransform = {
 
 /** A single bin row ready for plot rendering. */
 export type Binning1dBinRow = {
-    /** Bin label — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label — category string or formatted numeric range such as `"1000-2000"`. */
     label: string;
     /** Numeric sort key for this bin (bin index for quantitative, insertion order for categorical). */
     order: number;
@@ -111,11 +110,14 @@ export function runBinning1d(
 
 // ---- Bin mapper ---------------------------------------------------------
 
+const UNKNOWN = 'unknown';
+const ROUNDING_TOLERANCE = 4 * Number.EPSILON;
+
 /** Maps the values of one attribute to bins: the key rows are grouped by, and each bin's label and order. */
 export type BinMapper = {
     /** Key of the bin a value falls in: its category, or the index of its numeric range. */
     key: (value: unknown) => string;
-    /** Label of a bin: its category, or its numeric range such as `"1.0k-2.0k"`. */
+    /** Label of a bin: its category, or its numeric range such as `"1000-2000"`. */
     label: (key: string) => string;
     /** Sort key of a bin: the category's first-seen rank, or the numeric range's index. */
     order: (key: string) => number;
@@ -148,7 +150,6 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     };
 
     const isCategorical = sampleValues.some(v =>
-        (typeof v === 'number' && !Number.isFinite(v)) ||
         (typeof v === 'string' && !isNumericLike(v)) ||
         (typeof v !== 'number' && typeof v !== 'string')
     );
@@ -173,7 +174,7 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
 
     const nums = sampleValues.map(Number).filter(Number.isFinite);
     if (nums.length === 0) {
-        return { key: (v: unknown) => String(v ?? ''), label: (key: string) => key, order: () => 0, keys: () => [], ranges: () => [] };
+        return { key: () => UNKNOWN, label: key => key, order: () => numBins, keys: () => [], ranges: () => [] };
     }
 
     // A loop instead of Math.min(...nums): spreading a million values overflows the call stack.
@@ -189,7 +190,12 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     // A single value is one bin, labeled by that value; otherwise each bin is labeled by its edges.
     const edges = span === 0
         ? [minValue]
-        : Array.from({ length: numBins + 1 }, (_, i) => (i === numBins ? maxValue : minValue + i * binWidth));
+        : Array.from({ length: numBins + 1 }, (_, i) => {
+            if (i === 0) return minValue;
+            if (i === numBins) return maxValue;
+            const edge = minValue + i * binWidth;
+            return Math.abs(edge) < binWidth * ROUNDING_TOLERANCE ? 0 : edge;
+        });
     const texts = formatBinEdges(edges, binWidth);
     const labels = span === 0 ? texts : texts.slice(0, -1).map((text, i) => `${text}-${texts[i + 1]}`);
     const keys = labels.map((_label, i) => String(i));
@@ -197,13 +203,14 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     // Rows are grouped by bin index, so two bins never merge, even if their labels read alike.
     return {
         key: (v: unknown) => {
-            const n = Number(v);
-            if (!Number.isFinite(n)) return 'unknown';
-            const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
-            return String(Math.max(0, Math.min(Math.floor(normalized), numBins - 1)));
+            if (!isNumericLike(v)) return UNKNOWN;
+            // Decimal arithmetic can place an exact boundary just below its integer bin index.
+            const normalized = span === 0 ? 0 : (Number(v) - minValue) / binWidth;
+            const tolerance = ROUNDING_TOLERANCE * Math.max(1, Math.abs(normalized));
+            return String(Math.max(0, Math.min(Math.floor(normalized + tolerance), numBins - 1)));
         },
         label: (key: string) => labels[Number(key)] ?? key,
-        order: (key: string) => (key === 'unknown' ? 0 : Number(key)),
+        order: (key: string) => (key === UNKNOWN ? numBins : Number(key)),
         keys: () => keys,
         // The ranges of the column, empty ones included; one value has a single label, no range.
         ranges: () => (span === 0 ? [] : keys),
@@ -212,9 +219,8 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
 
 /**
  * Formats bin edges at the fewest significant digits, two or more, that tell each edge from the
- * next and print every edge within a tenth of a bin width of its value. Values of a thousand and
- * more keep their SI prefix ("1.5k"); values under one read as decimals ("0.25", where the SI
- * format gives "250m").
+ * next and print every edge within a tenth of a bin width of its value. Edges
+ * use plain decimals rather than SI prefixes.
  *
  * @param edges Bin edges in ascending order.
  * @param binWidth Width of a bin.
@@ -223,7 +229,8 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
 function formatBinEdges(edges: number[], binWidth: number): string[] {
     let texts: string[] = [];
     for (let digits = 2; digits <= 17; digits++) {
-        texts = edges.map(edge => formatSiOrDecimal(edge, d3.format(`.${digits}s`), d3.format(`.${digits}r`)));
+        const decimal = d3.format(`.${digits}r`);
+        texts = edges.map(edge => edge === 0 ? edge.toPrecision(digits) : decimal(edge));
         const apart = texts.every((text, i) => i === 0 || text !== texts[i - 1]);
         // The value each text prints: the edge rounded to `digits` significant digits, as d3 rounds it.
         const close = edges.every(edge => Math.abs(Number(edge.toPrecision(digits)) - edge) <= binWidth / 10);

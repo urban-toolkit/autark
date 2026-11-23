@@ -1,10 +1,3 @@
-/**
- * Bins labeled by their true edges and grouped by bin, so two bins never merge.
- *
- * From autark #134 (Fabio Miranda), the fixes of the original autk-plot carried into this one; the
- * tests run on this package as written there.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import { run } from '../src/transforms';
@@ -63,14 +56,113 @@ describe('1D binning labels', () => {
     });
 
     it('keeps the labels of ranges whose edges are whole', () => {
-        // 0 to 780 in 13 bins of 60, and 0 to 5000 in 5 bins of 1000: the labels main gave.
+        // 0 to 780 in 13 bins of 60: the labels main gave.
         expect(bars([0, 30, 90, 150, 210, 270, 330, 390, 450, 510, 570, 630, 690, 750, 780], 13).map(([label]) => label)).toEqual([
             '0.0-60', '60-120', '120-180', '180-240', '240-300', '300-360', '360-420',
             '420-480', '480-540', '540-600', '600-660', '660-720', '720-780',
         ]);
-        expect(bars([0, 500, 1500, 2500, 3500, 4500, 5000], 5).map(([label]) => label)).toEqual([
-            '0.0-1.0k', '1.0k-2.0k', '2.0k-3.0k', '3.0k-4.0k', '4.0k-5.0k',
+    });
+
+    it('writes a bin edge at zero as 0.0, in one and two dimensions', () => {
+        // The edges are -0.3 + i * 0.1, and -0.3 + 3 * 0.1 is 5.6e-17, not 0. d3 writes a minus sign, U+2212.
+        const minus = String.fromCharCode(0x2212);
+        const values = [-0.3, -0.25, -0.15, -0.05, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.7];
+        const labels = [
+            `${minus}0.30-${minus}0.20`, `${minus}0.20-${minus}0.10`, `${minus}0.10-0.0`, '0.0-0.10', '0.10-0.20',
+            '0.20-0.30', '0.30-0.40', '0.40-0.50', '0.50-0.60', '0.60-0.70',
+        ];
+
+        expect(bars(values).map(([label]) => label)).toEqual(labels);
+        expect(bars([-0.1, -0.05, 0.05, 0.15, 0.2], 3).map(([label]) => label)).toEqual([`${minus}0.10-0.0`, '0.0-0.10', '0.10-0.20']);
+
+        const cells = (run(rowsOf(values), { preset: 'binning-2d' }, ['v', 'kind']).rows as Binning2dCellRow[])
+            .sort((a, b) => a.xOrder - b.xOrder)
+            .map((cell) => cell.x);
+        expect(cells).toEqual(labels);
+    });
+
+    it('counts a value on a bin edge in the bin that edge opens', () => {
+        // 0.3 / 0.1 is 2.9999999999999996, and 0.6 and 0.7 fall short of their edges the same way. The maximum, 1, stays in the last bin.
+        expect(bars([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])).toEqual([
+            ['0.0-0.10', 1], ['0.10-0.20', 1], ['0.20-0.30', 1], ['0.30-0.40', 1], ['0.40-0.50', 1],
+            ['0.50-0.60', 1], ['0.60-0.70', 1], ['0.70-0.80', 1], ['0.80-0.90', 1], ['0.90-1.0', 2],
         ]);
+    });
+
+    it('retains the source IDs of decimal boundaries and missing values in both dimensions', () => {
+        const rows = [0, 0.3, 1, null, NaN].map((v, id) => ({ v, autkIds: [id] }));
+        const bars = run(rows, { preset: 'binning-1d' }, ['v']).rows as Binning1dBinRow[];
+        expect(bars[2].autkIds).toEqual([]);
+        expect(bars[3].autkIds).toEqual([1]);
+        expect(bars[9].autkIds).toEqual([2]);
+        expect(bars[10].autkIds).toEqual([3, 4]);
+        const cells = run(rows, { preset: 'binning-2d' }, ['v', 'v']).rows as Binning2dCellRow[];
+        expect(cells.find(cell => cell.xOrder === 3 && cell.yOrder === 3)?.autkIds).toEqual([1]);
+        expect(cells.find(cell => cell.x === 'unknown' && cell.y === 'unknown')?.autkIds).toEqual([3, 4]);
+    });
+
+    it('writes bin edges of a thousand and more without an SI prefix', () => {
+        // Heights from 3 to 450, all under a thousand, keep their labels.
+        expect(bars([3, 25, 70, 115, 160, 205, 250, 295, 340, 385, 430, 450]).map(([label]) => label)).toEqual([
+            '3.00-47.7', '47.7-92.4', '92.4-137', '137-182', '182-227',
+            '227-271', '271-316', '316-361', '361-405', '405-450',
+        ]);
+        // Years read as years, not 1.990k-1.993k.
+        expect(bars(Array.from({ length: 31 }, (_, i) => 1990 + i)).map(([label]) => label)).toEqual([
+            '1990-1993', '1993-1996', '1996-1999', '1999-2002', '2002-2005',
+            '2005-2008', '2008-2011', '2011-2014', '2014-2017', '2017-2020',
+        ]);
+        // 0 to 5000 in 5 bins of 1000, which main labeled 0.0-1.0k to 4.0k-5.0k.
+        expect(bars([0, 500, 1500, 2500, 3500, 4500, 5000], 5).map(([label]) => label)).toEqual([
+            '0.0-1000', '1000-2000', '2000-3000', '3000-4000', '4000-5000',
+        ]);
+    });
+});
+
+describe('Binning rows whose value holds no number', () => {
+    // Values from 0 to 1 in four bins, as Curio's histogram of heights reads its building parts.
+    const numbers = [0, 0.25, 0.5, 0.75, 1].map((v, i) => ({ v, kind: 'a', autkIds: [i] }));
+    const ranges: [string, number][] = [['0.0-0.25', 1], ['0.25-0.50', 1], ['0.50-0.75', 1], ['0.75-1.0', 2]];
+
+    /** `numbers` with a row that holds no number before them and one after, each made by `none`. */
+    function withNone(none: (id: number) => Record<string, unknown>) {
+        return [none(5), ...numbers, none(6)];
+    }
+
+    /** The ways a row holds no number, each made from the row's id: no value, a null value and a NaN value. */
+    const noNumber: [string, (id: number) => Record<string, unknown>][] = [
+        ['no value', (id) => ({ kind: 'a', autkIds: [id] })],
+        ['a null value', (id) => ({ v: null, kind: 'a', autkIds: [id] })],
+        ['a NaN value', (id) => ({ v: NaN, kind: 'a', autkIds: [id] })],
+    ];
+
+    it.each(noNumber)('puts the rows with %s in an unknown bin after every numeric bin, the bins in order', (_label, none) => {
+        const rows = run(withNone(none), { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
+
+        expect(rows.map((row) => [row.label, row.count])).toEqual([...ranges, ['unknown', 2]]);
+        expect(rows.slice(0, 4).map((row) => row.order)).toEqual([0, 1, 2, 3]);
+        expect(rows[4].order).toBeGreaterThan(3);
+    });
+
+    it('makes no unknown bin where every value holds a number', () => {
+        const rows = run(numbers, { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
+
+        expect(rows.map((row) => [row.label, row.count])).toEqual(ranges);
+    });
+
+    it('puts a heat matrix\'s unknown column after every numeric column', () => {
+        const rows = withNone((id) => ({ kind: 'a', autkIds: [id] }));
+        const cells = (run(rows, { preset: 'binning-2d', options: { binsX: 4 } }, ['v', 'kind']).rows as Binning2dCellRow[])
+            .sort((a, b) => a.xOrder - b.xOrder)
+            .map((cell) => [cell.x, cell.count]);
+
+        expect(cells).toEqual([...ranges, ['unknown', 2]]);
+    });
+
+    it.each(noNumber)('puts every row in an unknown bin where each has %s', (_label, none) => {
+        const rows = run([0, 1, 2].map(none), { preset: 'binning-1d', options: { bins: 4 } }, ['v']).rows as Binning1dBinRow[];
+
+        expect(rows.map((row) => [row.label, row.count])).toEqual([['unknown', 3]]);
     });
 });
 

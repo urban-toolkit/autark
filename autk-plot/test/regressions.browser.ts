@@ -32,6 +32,26 @@ function mount(config: UnifiedPlotConfig) {
 const num = (node: Element | null | undefined, attr: string) => Number(node?.getAttribute(attr));
 
 describe('regressions', () => {
+    test('selects the source features of corrected histogram and heat matrix bins', () => {
+        const collection = collectionOf([0, 0.3 - 1e-12, 0.3, 1, null, NaN].map(v => ({ v, group: 'a' })));
+        for (const config of [
+            { type: 'barchart', attributes: { axis: ['v', '@transform'] }, transform: { preset: 'binning-1d' } },
+            { type: 'heatmatrix', attributes: { axis: ['v', 'group'], color: '@transform' }, transform: { preset: 'binning-2d' } },
+        ] as const) {
+            const { div, plot, click, emitted } = mount({ ...config, attributes: { ...config.attributes, axis: [...config.attributes.axis] },
+                collection, events: [autkPlot.PlotEvent.CLICK] });
+            const mark = (range: string) => Array.from(div.querySelectorAll('.autkMark')).find(element => {
+                const row = (element as Element & { __data__: { label?: string; x?: string } }).__data__;
+                return (row.label ?? row.x) === range;
+            });
+            click(mark('0.30-0.40'));
+            expect(emitted.at(-1)?.selection).toEqual([2]);
+            plot.setSelection([]);
+            click(mark('unknown'));
+            expect(emitted.at(-1)?.selection).toEqual([4, 5]);
+            plot.destroy();
+        }
+    });
     test('1 · linechart with negative sums keeps every point inside the plot', () => {
         const height = 400;
         const margins = { left: 40, right: 20, top: 20, bottom: 40 };

@@ -626,7 +626,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         const svg = d3.select(this._div).selectChildren<SVGSVGElement, number>('svg')
             .data([0]).join('svg')
             // A class, not an id: a page holds many plots, and an id would repeat.
-            .attr('class', 'autk-plot')
+            .classed('autk-plot', true)
             .attr('width', this._width).attr('height', this._height)
             .style('width', `${this._width}px`).style('height', `${this._height}px`)
             // Pages may hide the host until a plot draws (the Autark gallery does).

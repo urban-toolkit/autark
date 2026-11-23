@@ -49,12 +49,29 @@ export const barchart: PlotDefinition = {
         const beyond = partRange && !partRange.additive ? partRange.extent[1] : 0;
         const y = d3.scaleLinear([0, Math.max(d3.max(rows, amount) ?? 0, 1, beyond)], [height, 0]);
 
-        // A label is written as it is ("2020", a bin "0.25-0.50"), or with the x format the
-        // configuration gives, when it reads as a number.
+        // Keep band keys intact. Shorten floating-point artifacts only on raw numeric labels,
+        // and keep the original text if shortening would make two categories look identical.
+        const labels = new Map<string, string>();
+        const displayCounts = new Map<string, number>();
+        if (!hasFormat(0)) {
+            for (const row of rows) {
+                const raw = value(row, 0);
+                const key = String(raw);
+                if (labels.has(key)) continue;
+                const rounded = typeof raw === 'number' && Number.isFinite(raw) && !Number.isInteger(raw)
+                    ? Number(raw.toPrecision(15)) : raw;
+                const text = typeof raw === 'number' && typeof rounded === 'number'
+                    && Math.abs(raw - rounded) <= Math.abs(raw) * Number.EPSILON ? String(rounded) : key;
+                labels.set(key, text);
+                displayCounts.set(text, (displayCounts.get(text) ?? 0) + 1);
+            }
+        }
         const tick = format(0, '~s');
         axisX(d3.axisBottom(x).tickSizeOuter(0).tickFormat(d => {
             const text = String(d);
-            return hasFormat(0) && text.trim() !== '' && Number.isFinite(Number(text)) ? tick(Number(text)) : text;
+            if (hasFormat(0) && text.trim() !== '' && Number.isFinite(Number(text))) return tick(Number(text));
+            const display = labels.get(text) ?? text;
+            return displayCounts.get(display) === 1 ? display : text;
         }))
             .selectAll('.tick text')
             .style('text-anchor', 'end')

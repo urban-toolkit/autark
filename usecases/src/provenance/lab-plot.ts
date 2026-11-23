@@ -301,20 +301,23 @@ export function setupPlotLab(collection: Collection, draw: (config: LabPlotConfi
             return fail(`The code does not run: ${(error as Error).message}`);
         }
         // With no rows the contract holds trivially and nothing is drawn: say so instead.
-        if (config.transform && rowsOf(collection, config).length === 0) {
+        if (config.transform) {
             const given = (config.transform as { options?: Record<string, unknown> }).options ?? {};
             // Names that are not region properties are the likely cause: say which.
             const properties = regionProperties(collection);
             const named = [...(config.attributes?.axis ?? []).filter(field => field !== '@transform'), ...(typeof given.value === 'string' ? [given.value] : [])];
             const unknown = named.filter(field => !properties.includes(field));
-            const hint = unknown.length > 0
-                ? ` ${unknown.map(field => `"${field}"`).join(', ')} ${unknown.length === 1 ? 'is not a region property' : 'are not region properties'}. Region properties: ${properties.join(', ')}.`
-                : given.reducer && given.reducer !== 'count' && !given.value
+            if (unknown.length > 0) {
+                return fail(`${unknown.map(field => `"${field}"`).join(', ')} ${unknown.length === 1 ? 'is not a region property' : 'are not region properties'}. Region properties: ${properties.join(', ')}.`);
+            }
+            const hint = given.reducer && given.reducer !== 'count' && !given.value
                     ? ` A reducer other than count needs the property to reduce, such as {"reducer": "${String(given.reducer)}", "value": "shape_leng"}.`
                     : config.transform && ['binning-events', 'reduce-series'].includes(config.transform.preset)
                         ? ' This transform reads a list of events (or a series) per region: name it first in Fields, such as sjoin.collect.noise.'
                         : '';
-            return fail(`With these fields and options the transform gives no rows: nothing to draw.${hint}`);
+            if (rowsOf(collection, config).length === 0) {
+                return fail(`With these fields and options the transform gives no rows: nothing to draw.${hint}`);
+            }
         }
 
         // Check on a drawing off screen, at the size the chart will be drawn: the width of its box.

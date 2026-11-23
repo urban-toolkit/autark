@@ -403,7 +403,7 @@ describe('contracts, axes, and data of the page', () => {
         const rows = regions().features.map((feature, index) => ({ ...feature.properties, autkIds: [index] }));
         const ranges = autkPlot.run(rows, { preset: 'binning-1d', options: { bins: 10 } }, ['shape_area']).rows as { label: string; value: number; autkIds: number[] }[];
         expect(ranges).toHaveLength(10);
-        expect(ranges.filter(row => row.autkIds.length === 0)).toEqual([expect.objectContaining({ label: '30.9M-34.6M', value: 0, count: 0 })]);
+        expect(ranges.filter(row => row.autkIds.length === 0)).toEqual([expect.objectContaining({ label: '30900000-34600000', value: 0, count: 0 })]);
         const categories = autkPlot.run(rows, { preset: 'binning-1d' }, ['landuse']).rows as { autkIds: number[] }[];
         expect(categories.every(row => row.autkIds.length > 0)).toBe(true);
     });

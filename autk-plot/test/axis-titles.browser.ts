@@ -87,6 +87,25 @@ suite('Axis titles clear of their tick labels', () => {
         }
     });
 
+    it('restores the configured bottom margin when a redraw no longer needs extra room', () => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        const plot = new AutkPlot(div, {
+            type: 'barchart', collection: collectionOf([
+                { landuse: 'A', area: 10 },
+                { landuse: 'Residential and institutional mixed-use development', area: 20 },
+                { landuse: 'C', area: 30 },
+            ]), attributes: { axis: ['landuse', 'area'] },
+            width: 300, height: 300, margins: { left: 50, right: 20, top: 40, bottom: 48 },
+        });
+        const axisOffset = () => div.querySelector('.x.axis')?.getAttribute('transform');
+        const first = axisOffset();
+        plot.updateCollection(collectionOf([{ landuse: 'A', area: 10 }, { landuse: 'B', area: 20 }]));
+        expect(first).not.toBe('translate(50, 252)');
+        expect(axisOffset()).toBe('translate(50, 252)');
+        plot.destroy();
+    });
+
     it('keeps the titles of a scatterplot clear', () => {
         const config = { type: 'scatterplot', collection: collectionOf([{ a: 1, b: 1 }, { a: 2, b: 2 }, { a: 3, b: 3 }]), attributes: { axis: ['a', 'b'] } };
         expect(measure(config as UnifiedPlotConfig)).toEqual([clear('x'), clear('y')]);

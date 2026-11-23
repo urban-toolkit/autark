@@ -91,7 +91,7 @@ A plot is interactive only with `events`: with none, it selects nothing, sorts n
 
 * `run(rows, config, channels)`: Runs a built-in transform preset.
 * `reduceBuckets(params)`: Applies low-level bucket aggregation.
-* Transform presets: `binning-1d`, `binning-2d`, `binning-events`, `reduce-series`, `sort`, `box-stats`, `flows`, `binning-hex`, `hierarchy`, `cumulative`, `fold`, and `density`. `binning-1d` keeps the empty ranges of a numeric column (value 0, no `autkIds`), so a histogram does not skip them.
+* Transform presets: `binning-1d`, `binning-2d`, `binning-events`, `reduce-series`, `sort`, `box-stats`, `flows`, `binning-hex`, `hierarchy`, `cumulative`, `fold`, and `density`. `binning-1d` keeps the empty ranges of a numeric column (value 0, no `autkIds`), so a histogram does not skip them. In 1D and 2D, an internal edge belongs to the bin it opens, and the maximum belongs to the final bin. Quantitative axes place missing and non-finite values in an `unknown` bin after the numeric ranges. Numeric bin edges are labeled without SI prefixes.
 * In `attributes.axis`, an optional `'@transform'` after the input columns marks where the value the transform computes goes (in `attributes.color` when that value is drawn as a color); it is never an axis label.
 * Reducers: `count`, `sum`, `avg`, `min`, and `max`.
 * Time resolutions: `hour`, `day`, `weekday`, `monthday`, `month`, and `year`.
