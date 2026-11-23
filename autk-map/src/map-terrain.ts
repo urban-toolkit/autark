@@ -97,6 +97,9 @@ export class TerrainMapRenderPath {
         if (fitInitialView) this.fitCameraToTerrainBounds();
     }
 
+    /** Highest elevation in the active terrain source, in workspace units. */
+    get maxHeight(): number { return this.heightSource.maxHeight; }
+
     /**
      * Renders one terrain-mode frame.
      *

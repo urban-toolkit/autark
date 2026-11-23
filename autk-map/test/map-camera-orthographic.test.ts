@@ -25,6 +25,41 @@ function expectOrthographicFrame(camera: MapCamera, [minX, minY, maxX, maxY]: [n
     }
 }
 
+describe('map camera zoom clearance', () => {
+    it.each(['perspective', 'orthographic'] as const)('stops an off-center %s zoom above the loaded peak', projection => {
+        let maxHeight = 300;
+        const camera = new MapCamera(vi.fn(), () => maxHeight);
+        camera.resize(800, 600);
+        camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 1000]);
+        camera.setProjection(projection);
+        camera.zoom(-10, 0.75, 0.5);
+        camera.update();
+        expect(camera.getEye()[2]).toBeCloseTo(301, 4);
+        expect(camera.getEye()[0]).toBeGreaterThan(0);
+        const stopped = camera.getEye();
+        camera.zoom(-1, 0.75, 0.5);
+        expect(camera.getEye()).toEqual(stopped);
+        camera.zoom(2, 0.75, 0.5);
+        expect(camera.getEye()[2]).toBeGreaterThan(301);
+        maxHeight = 0;
+        camera.zoom(-10, 0.5, 0.5);
+        expect(camera.getEye()[2]).toBeCloseTo(1, 4);
+    });
+
+    it('keeps the peak visible with the perspective near plane at the zoom floor', () => {
+        const camera = new MapCamera(vi.fn(), () => 300);
+        camera.resize(800, 600);
+        camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 1000]);
+        camera.zoom(-10, 0.5, 0.5);
+        camera.update();
+        const clip = vec4.transformMat4(vec4.create(), [0, 0, 300, 1], camera.getViewProjectionMatrix());
+        expect(clip[2] / clip[3]).toBeGreaterThan(0);
+        expect(clip[2] / clip[3]).toBeLessThan(1);
+        expect(camera.getNear()).toBeLessThan(1);
+        expect(camera.saveState().near).toBe(1);
+    });
+});
+
 describe('an orthographic map camera', () => {
     it('reports the switch, so a map drawn on demand draws it', () => {
         const { camera, onChange } = flatPath();

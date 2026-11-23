@@ -19,6 +19,7 @@ import type { CameraProjection, CameraState } from '@urban-toolkit/autk-core';
  * callback observes every camera change.
  */
 export class MapCamera extends Camera {
+    private static readonly ZOOM_CLEARANCE = 1;
     /** Callback run after each change. Unset while the base constructor resets the camera. */
     private _onChange?: () => void;
 
@@ -26,9 +27,10 @@ export class MapCamera extends Camera {
      * Creates a camera at the default map view.
      *
      * @param onChange Callback run after each change to the camera's view or viewport.
+     * @param getMaxSurfaceHeight Maximum loaded elevation in workspace units; defaults to flat ground.
      * @throws Never throws.
      */
-    constructor(onChange: () => void) {
+    constructor(onChange: () => void, private readonly getMaxSurfaceHeight: () => number = () => 0) {
         super();
         this._onChange = onChange;
     }
@@ -43,6 +45,18 @@ export class MapCamera extends Camera {
     override resize(width: number, height: number): void {
         super.resize(width, height);
         this._onChange?.();
+    }
+
+    protected override getZoomFloor(): number {
+        return this.getMaxSurfaceHeight() + MapCamera.ZOOM_CLEARANCE;
+    }
+
+    /** Move the perspective near plane inward as the eye approaches the highest surface. */
+    override getNear(): number {
+        if (this.getProjection() !== 'perspective') return super.getNear();
+        const near = super.getNear();
+        const clearance = this.wEye[2] - this.getMaxSurfaceHeight();
+        return Math.min(near, Math.max(near / 1024, clearance / 4));
     }
 
     /** Zooms at the cursor, then reports the change. */

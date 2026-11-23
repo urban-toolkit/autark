@@ -515,10 +515,19 @@ export class Camera {
             const [origin, forward] = this.orthographicRay(x, y);
             dir = vec3.normalize(vec3.create(), [0, 1, 2].map((i) => origin[i] + forward[i] * this.wLookAtDistance - this.wEye[i]));
         }
+        if (delta > 0 && dir[2] < 0 && !this.orthographic) {
+            const height = Math.max(0, this.wEye[2] - this.getZoomFloor());
+            delta = Math.min(delta, height / -dir[2]);
+        }
         vec3.scaleAndAdd(this.wEye, this.wEye, dir, delta);
         // The distance to the point looked at changes by as much as the eye moves along the view.
         this.wLookAtDistance = Math.max(this.wLookAtDistance - delta * vec3.dot(dir, this.wEyeDir), this.wNear);
         vec3.scaleAndAdd(this.wLookAt, this.wEye, this.wEyeDir, vec3.length(this.wEyeDir));
+    }
+
+    /** Minimum eye height for downward zoom-in. Standalone cameras have no surface constraint. */
+    protected getZoomFloor(): number {
+        return -Infinity;
     }
 
     /**
@@ -620,7 +629,7 @@ export class Camera {
         // Combined with depthClearValue=0 and depthCompare='greater-equal' this
         // distributes float32 precision logarithmically, eliminating z-fighting
         // at distance without requiring an absurdly large far plane.
-        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, far, this.wNear);
+        mat4.perspectiveZO(this.mProjectionMatrix, this.fovy, aspect, far, this.getNear());
     }
 
     /**

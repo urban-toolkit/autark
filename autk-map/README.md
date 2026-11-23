@@ -74,6 +74,10 @@ with named latitude/longitude fields, and zoom uses a 256-pixel Web Mercator ref
 On an empty map it establishes the projected origin. Subsequent calls preserve that origin.
 Pass `projection: 'orthographic'` or `projection: 'perspective'` to select a mode.
 Omitting `projection` preserves the current navigable mode (initially perspective).
+Wheel and pinch zoom-in stop downward camera movement one workspace unit above
+the highest loaded terrain elevation, or above `z = 0` on a flat map. A distant
+peak can therefore limit close-ups in lower areas. The perspective near plane
+moves inward near this floor; zoom-out, pan, and scripted camera moves are not constrained by it.
 Alternatively, load finite datasets and call `fitBounds()` before `draw()`.
 
 ```ts

@@ -213,7 +213,7 @@ export class AutkMap {
         });
         this._renderer = new Renderer(canvas, this._style);
 
-        this._camera = new MapCamera(() => this.requestRender());
+        this._camera = new MapCamera(() => this.requestRender(), () => this._terrainRenderPath?.maxHeight ?? 0);
         this._layerManager = new LayerManager();
 
         this._keyEvents = new KeyEvents(this);
