@@ -232,9 +232,13 @@ export class AutkMap {
     /**
      * Sets a geographic center and zoom without loading data or changing an existing origin.
      * On an empty map the projected center establishes the shared origin and locks the workspace CRS.
-     * @throws If the center, zoom, or viewport is invalid.
+     * Omitting the projection keeps the camera's persistent projection.
+     * @throws If the center, zoom, projection, or viewport is invalid.
      */
-    setView({ center, zoom = 12 }: SetViewParams): void {
+    setView({ center, zoom = 12, projection }: SetViewParams): void {
+        if (projection !== undefined && projection !== 'perspective' && projection !== 'orthographic') {
+            throw new Error('Unsupported camera projection.');
+        }
         const view = initialTileView(center, zoom, this._workspaceCrs,
             this.canvas.clientHeight, this._camera.getFovyRadians(), 256);
         if (!this._layerManager.hasOrigin) {
@@ -244,6 +248,7 @@ export class AutkMap {
         const origin = this._layerManager.origin;
         const target = [view.point[0] - origin[0], view.point[1] - origin[1], 0];
         this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
+        if (projection !== undefined) this._camera.setProjection(projection);
         this._workspaceCrsEstablished = true;
         this.requestRender();
     }

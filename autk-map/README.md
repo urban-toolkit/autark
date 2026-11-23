@@ -72,6 +72,8 @@ rather than angular degrees; elevation meters are converted to the workspace's l
 `setView()` positions the camera independently of loading data. Its center is always WGS84,
 with named latitude/longitude fields, and zoom uses a 256-pixel Web Mercator reference tile.
 On an empty map it establishes the projected origin. Subsequent calls preserve that origin.
+Pass `projection: 'orthographic'` or `projection: 'perspective'` to select a mode.
+Omitting `projection` preserves the current navigable mode (initially perspective).
 Alternatively, load finite datasets and call `fitBounds()` before `draw()`.
 
 ```ts

@@ -75,7 +75,7 @@ console.log(origin, geometry.length, components.length, camera.eye, colormap.len
 
 - **Color mapping**: `ColorMap`, `ColorMapDomainStrategy`, `ColorMapInterpolator`, `ColorMapConfig`, `ResolvedDomain`
 - **Transfer functions**: `DEFAULT_TRANSFER_FUNCTION`, `buildTransferContext`, `computeAlphaByte`
-- **Camera utilities**: `Camera`, `CameraMotion`, `CameraData`, `CameraProjection`, `ViewProjectionParams`
+- **Camera utilities**: `Camera`, `CameraMotion`, `CameraData`, `CameraProjection`, `CameraState`, `ViewProjectionParams`
 - **Events**: `EventEmitter`, `EventListener`, `SelectionData`
 - **Mesh types**: `LayerGeometry`, `LayerComponent`, `LayerBorder`, `LayerBorderComponent`
 - **Layer and buffer types**: `LayerType`, `BoundingBox`, `TypedArray`, `TypedArrayConstructor`
@@ -139,7 +139,14 @@ not guarantee high-accuracy conversion. Geocentric inputs require a separate 3D 
 
 ## Camera projection
 
-`camera.setProjection('orthographic')` draws with parallel rays until `camera.setProjection('perspective')`, and `camera.getProjection()` reports which one the camera draws with. At the point the camera looks at, the orthographic view shows what the perspective view shows there, and zoom, pan, tilt and `resetCamera` keep working. `resetCamera(getUp(), getLookAt(), getEye())` puts the view back as it was, and `CameraMotion`'s pitch, yaw and roll keep its scale. `camera.setOrthographicBounds(left, right, bottom, top)` is a separate view: it looks straight down at a fixed rectangle of ground until `resetCamera` or `setProjection('perspective')`.
+`camera.setProjection('orthographic')` draws with parallel rays until `camera.setProjection('perspective')`, and `camera.getProjection()` reports which one the camera draws with. At the point the camera looks at, the orthographic view shows what the perspective view shows there, and zoom, pan, tilt and `resetCamera` keep working. `CameraMotion`'s pitch, yaw and roll keep the orthographic scale. `camera.setOrthographicBounds(left, right, bottom, top)` is a separate view: it looks straight down at a fixed rectangle of ground until `resetCamera` or `setProjection('perspective')`.
+
+To persist a view, serialize `camera.saveState()` and pass the parsed `CameraState`
+to `camera.restoreState(state)`. The snapshot restores the projection, pose,
+framing scale, clipping range, and any fixed orthographic bounds together. The
+receiving camera keeps its current viewport and uses its aspect ratio. Restore
+into the same map origin and coordinate system; those are not camera state.
+Use snapshots created by `saveState()`, not hand-built or unvalidated data.
 
 In an orthographic view, `getWorldRayDirection` gives every screen position the view direction, and the ray through a position starts at that position on the plane of the eye, not at `getEye()`. `getGroundPoint` gives where that ray meets the ground.
 

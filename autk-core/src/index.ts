@@ -139,6 +139,8 @@ export type {
     CameraData,
     /** Perspective or orthographic projection of a camera. */
     CameraProjection,
+    /** Serializable camera pose, projection, and framing. */
+    CameraState,
     /** One-shot parameters for constructing a view-projection matrix. */
     ViewProjectionParams,
 } from './camera';

@@ -33,6 +33,21 @@ describe('an orthographic map camera', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
     });
 
+    it('reports a restored view once for on-demand rendering', () => {
+        const { camera, onChange } = flatPath();
+        camera.resize(800, 600);
+        camera.setProjection('orthographic');
+        camera.setOrthographicBounds(-10, 900, -200, 300);
+        const state = camera.saveState();
+        camera.setProjection('perspective');
+        onChange.mockClear();
+
+        camera.restoreState(state);
+
+        expect(camera.getProjection()).toBe('orthographic');
+        expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
     it('stays orthographic when a host fits the map and when the map resets its camera, as its R key does', () => {
         const { camera, path } = flatPath();
         camera.setProjection('orthographic');

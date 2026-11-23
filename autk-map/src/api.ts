@@ -19,6 +19,7 @@ import {
 
 import type {
     ElevationValidationOptions,
+    CameraProjection,
     ColorMapPatch,
     TransferFunction,
     LayerComponent,
@@ -47,6 +48,8 @@ export interface SetViewParams {
     center: { latitude: number; longitude: number };
     /** Web Mercator zoom using a 256-pixel reference tile; defaults to 12. */
     zoom?: number;
+    /** Projection for the new view. Omit to keep the persistent projection. */
+    projection?: CameraProjection;
 }
 
 /** A normalized raster elevation collection, including its band property. */

@@ -906,6 +906,25 @@ describe('unified terrain loading', () => {
         map.destroy();
     });
 
+    it('sets or preserves the projection during geographic navigation', async () => {
+        const { map } = await createMap();
+        map.setView({ center, zoom: 14 });
+        expect(map.camera.getProjection()).toBe('perspective');
+
+        map.setView({ center, zoom: 14, projection: 'orthographic' });
+        const origin = [...map.layerManager.origin];
+        map.setView({ center, zoom: 15 });
+        map.camera.update();
+        expect(map.camera.getProjection()).toBe('orthographic');
+        expect(map.camera.getProjectionMatrix()[15]).toBe(1);
+        expect(map.layerManager.origin).toEqual(origin);
+
+        map.setView({ center, zoom: 15, projection: 'perspective' });
+        expect(map.camera.getProjection()).toBe('perspective');
+        expect(map.camera.getProjectionMatrix()[15]).toBe(0);
+        map.destroy();
+    });
+
     it('uses a UTM workspace for setView, mixed-CRS collections, imagery, and terrain', async () => {
         vi.spyOn(SpriteLayer.prototype, 'createPipeline').mockImplementation(() => {});
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs: 'EPSG:32618' });

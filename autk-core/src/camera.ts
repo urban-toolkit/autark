@@ -54,6 +54,21 @@ export interface ViewProjectionParams {
  */
 export type CameraProjection = 'perspective' | 'orthographic';
 
+/** Serializable camera snapshot. Viewport dimensions and the map origin are not part of the snapshot. */
+export interface CameraState extends CameraData {
+    /** Persistent projection; fixed bounds override it until the next reset. */
+    projection: CameraProjection;
+    /** World-space forward vector, retained separately from the rounded look-at point. */
+    direction: [number, number, number];
+    /** View scale as the framing distance, independent of the stored look-at point. */
+    framingDistance: number;
+    fovyRadians: number;
+    near: number;
+    far: number;
+    /** Optional override for a fixed top-down orthographic view. */
+    orthographicBounds: { left: number; right: number; bottom: number; top: number } | null;
+}
+
 /**
  * Interactive 3-DOF camera for orbit-style navigation.
  *
@@ -342,6 +357,14 @@ export class Camera {
      */
     public setOrthographicBounds(left: number, right: number, bottom: number, top: number): void {
         this.orthographic = { left, right, bottom, top };
+        this.wEye = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 100);
+        this.wLookAt = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 0);
+        this.wUp = vec3.fromValues(0, 1, 0);
+        this.updateEyeDirAndLen();
+        this.updateFixedProjection(this.orthographic);
+    }
+
+    private updateFixedProjection({ left, right, bottom, top }: NonNullable<CameraState['orthographicBounds']>): void {
         mat4.identity(this.mViewMatrix);
         mat4.orthoZO(
             this.mProjectionMatrix,
@@ -352,10 +375,6 @@ export class Camera {
             ORTHOGRAPHIC_DEPTH_BELOW,
             ORTHOGRAPHIC_DEPTH_BELOW - ORTHOGRAPHIC_DEPTH_RANGE,
         );
-        this.wEye = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 100);
-        this.wLookAt = vec3.fromValues((left + right) * 0.5, (bottom + top) * 0.5, 0);
-        this.wUp = vec3.fromValues(0, 1, 0);
-        this.updateEyeDirAndLen();
     }
 
     /**
@@ -396,6 +415,38 @@ export class Camera {
      */
     public getProjection(): CameraProjection {
         return this.orthographic ? 'orthographic' : this.projection;
+    }
+
+    /** Captures the pose, projection, framing, and clipping range as JSON-serializable data. */
+    public saveState(): CameraState {
+        return {
+            projection: this.projection,
+            eye: this.getEye(),
+            lookAt: Array.from(this.wLookAt),
+            up: this.getUp(),
+            direction: [this.wEyeDir[0], this.wEyeDir[1], this.wEyeDir[2]],
+            framingDistance: this.wLookAtDistance,
+            fovyRadians: this.fovy,
+            near: this.wNear,
+            far: this.wFar,
+            orthographicBounds: this.orthographic && { ...this.orthographic },
+        };
+    }
+
+    /** Restores a snapshot from {@link saveState}, using the receiving camera's viewport. */
+    public restoreState(state: CameraState): void {
+        this.projection = state.projection;
+        vec3.set(this.wEye, state.eye[0], state.eye[1], state.eye[2]);
+        vec3.set(this.wLookAt, state.lookAt[0], state.lookAt[1], state.lookAt[2]);
+        vec3.set(this.wUp, state.up[0], state.up[1], state.up[2]);
+        vec3.set(this.wEyeDir, ...state.direction);
+        this.wLookAtDistance = state.framingDistance;
+        this.fovy = state.fovyRadians;
+        this.wNear = state.near;
+        this.wFar = state.far;
+        this.orthographic = state.orthographicBounds && { ...state.orthographicBounds };
+        if (this.orthographic) this.updateFixedProjection(this.orthographic);
+        else if (this.viewportWidth > 0 && this.viewportHeight > 0) this.update();
     }
 
     /**
