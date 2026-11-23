@@ -214,7 +214,7 @@ map.loadTiles('imagery', {
 * **Sharpness.** The zoom is chosen so a tile pixel is about one screen pixel, counted in device pixels. `zoomBias: 1` gives sharper tiles with roughly four times the requests; `maxTiles` (64) caps selected tiles; ancestor preloads add requests: the zoom drops to fit, and if the source's lowest zoom still needs more, only the tiles nearest the view centre are used.
 * **Hiding.** Hiding a tile layer (`updateRenderInfo(id, { isSkip: true })`) cancels its queued, in-flight and retrying requests and keeps the textures already loaded, so showing it again draws at once and loads only what is missing.
 * **Statistics.** `map.getTileStats(id)` returns a read-only snapshot: the zoom (and the zoom the view wanted, when the tile cap lowered it), how many selected tiles are drawn with their own image, with an ancestor's or not at all, the request queue, cached textures with an estimated size in bytes, and cumulative counts of requests (retries included, not network transfers), cache reuses and pressure evictions. `map.renderStats` gives the number of frames rendered, the CPU time of the last frame and the average, and the frame rate while rendering. Time is CPU time around preparing and submitting a frame, not GPU time, and the rate is 0 while the map is idle. Reading either does not trigger rendering, so a page can poll them on a timer; a frame count that stops increasing means the map is idle.
-* **Limits.** Camera fitting retains automatic far-plane expansion; planet-scale views remain outside the tile feature's scope. Terrain draping is also not supported yet. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
+* **Limits.** Camera fitting retains automatic far-plane expansion; planet-scale views remain outside the tile feature's scope. Tiles beyond 20 camera heights from the ground point under the camera are not requested, so a nearly level camera shows imagery only up to that distance.
 
 ### Render sizing verification
 
@@ -276,8 +276,10 @@ or reordering layers does not raise geometry or change its apparent size.
 Buildings retain their actual geometry heights and depth testing, and their
 shared SSAO result is composited over the 2D map. In terrain mode, ordered 2D
 layers are draped through the terrain overlay, and buildings retain terrain
-occlusion. Picking uses the same positions as visible geometry and continues
-to target the active pick-enabled layer.
+occlusion. When terrain comes from a fixed raster, tiled imagery stays visible
+on the flat map beyond the terrain mesh. The flat and draped views share the tile
+cache and use the usual tile selection limit for each view. Picking uses the
+same positions as visible geometry and continues to target the active pick-enabled layer.
 
 Run the rendering regression in a WebGPU-enabled Chrome installation:
 

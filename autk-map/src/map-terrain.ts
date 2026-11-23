@@ -163,6 +163,7 @@ export class TerrainMapRenderPath {
         // is the pixel rectangle the overlay is drawn into.
         this.terrainOverlayCamera.resize(overlayPixelRect.width, overlayPixelRect.height);
 
+        const coverOutsideTerrain = !isStreamingHeightSource(this.heightSource);
         const overlayViewport = [overlayPixelRect.width, overlayPixelRect.height] as const;
         const imageryDetail: TerrainImageryDetail = {
             camera: this.camera,
@@ -171,7 +172,7 @@ export class TerrainMapRenderPath {
         };
         this.layerManager.layers.forEach((layer) => {
             if (!layer.layerRenderInfo.isSkip && !(layer instanceof Triangles3DLayer)) {
-                if (layer instanceof TileLayer) layer.prepareRender(this.terrainOverlayCamera, overlayViewport, imageryDetail);
+                if (layer instanceof TileLayer) layer.prepareRender(this.terrainOverlayCamera, overlayViewport, imageryDetail, coverOutsideTerrain);
                 else layer.prepareRender(this.terrainOverlayCamera, overlayViewport);
             }
         });
@@ -191,6 +192,14 @@ export class TerrainMapRenderPath {
 
         activeTerrain.updateOverlay(overlayBounds, overlayUvRect);
         const terrainPass = this.renderer.beginMainRenderPass();
+        if (coverOutsideTerrain) {
+            // Tiles do not write depth: terrain covers the underlay even where its elevation is negative.
+            for (const layer of this.layerManager.layers) {
+                if (layer instanceof TileLayer && !layer.layerRenderInfo.isSkip) {
+                    layer.renderTerrainUnderlay(this.camera, terrainPass);
+                }
+            }
+        }
         activeTerrain.render(terrainPass, this.terrainDebug.showMesh);
         if (this.frozenTerrainOverlayBounds) {
             activeTerrain.renderOverlayBounds(

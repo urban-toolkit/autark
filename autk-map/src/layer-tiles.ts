@@ -24,7 +24,7 @@ import { fetchTileImage } from './tile-loader';
 import { applyTileTheme } from './tile-theme';
 import { isTileCrs, type TileCrs } from './tile-projection';
 import { selectAdaptiveTiles, selectTiles } from './tile-selection';
-import type { TileIndex } from './tile-index';
+import { tileKey, type TileIndex } from './tile-index';
 import type { TerrainImageryDetail, TileSelectionOptions } from './tile-selection';
 import { resolveTileSource } from './tile-source';
 import type { ResolvedTileSource, TileSource } from './tile-source';
@@ -114,6 +114,9 @@ export class TileLayer extends Layer {
     private _renderer: Renderer | null = null;
     private _store: TileStore<TileTexture> | null = null;
     private _frame: TileFrame<TileTexture> = EMPTY_FRAME;
+    private _underlayFrame: TileFrame<TileTexture> = EMPTY_FRAME;
+    private _underlayPipeline: PipelineTiles | null = null;
+    private _previousUnderlayTiles: readonly TileIndex[] = [];
     private _reportedErrors = 0;
     private _selection: SelectionSummary = NO_SELECTION;
     private _previousAdaptiveTiles: readonly TileIndex[] = [];
@@ -253,15 +256,15 @@ export class TileLayer extends Layer {
 
     /** Cancels queued, in-flight and waiting requests and retry timers, keeping what has loaded. */
     private suspend(): void {
-        this._frame = EMPTY_FRAME;
+        this._frame = this._underlayFrame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
-        this._previousAdaptiveTiles = [];
+        this._previousAdaptiveTiles = this._previousUnderlayTiles = [];
         this._store?.update([]);
         this._store?.endFrame();
     }
 
-    override prepareRender(camera: Camera, targetViewport?: readonly [number, number], terrain?: TerrainImageryDetail): void {
-        this._frame = EMPTY_FRAME;
+    override prepareRender(camera: Camera, targetViewport?: readonly [number, number], terrain?: TerrainImageryDetail, coverOutsideTerrain = false): void {
+        this._frame = this._underlayFrame = EMPTY_FRAME;
         this._selection = NO_SELECTION;
         const store = this._store;
         const origin = this._getOrigin();
@@ -278,40 +281,43 @@ export class TileLayer extends Layer {
             ? selectAdaptiveTiles(view, this._source, this._options, this._previousAdaptiveTiles, terrain)
             : selectTiles(view, this._source, this._options);
         this._previousAdaptiveTiles = adaptive ? selection?.tiles ?? [] : [];
-        if (!selection) {
-            store.update([]);
-            store.endFrame();
-            return;
-        }
+        const underlay = coverOutsideTerrain && terrain
+            ? selectAdaptiveTiles({ ...view, camera: terrain.camera, viewport: terrain.viewport },
+                this._source, this._options, this._previousUnderlayTiles)
+            : null;
+        this._previousUnderlayTiles = underlay?.tiles ?? [];
+        const wanted = new Map([
+            ...(selection?.tiles ?? []), ...(underlay?.tiles ?? []),
+        ].map(tile => [tileKey('', tile), tile]));
+        store.update([...wanted.values()]);
 
-        store.update(selection.tiles);
-
-        const items: Array<FrameTile<TileTexture>> = [];
+        const items = new Map<string, FrameTile<TileTexture>>();
         let ready = 0;
         let fallbackCount = 0;
-        for (const tile of selection.tiles) {
+        for (const [key, tile] of wanted) {
             const entry = store.get(tile);
             if (entry?.state === 'ready' && entry.value) {
-                items.push({ tile, ref: entry.value });
+                items.set(key, { tile, ref: entry.value });
                 ready++;
                 continue;
             }
             const fallback = store.fallbackFor(tile);
             if (fallback?.entry.value) {
-                items.push({ tile, ref: fallback.entry.value, levels: fallback.levels });
+                items.set(key, { tile, ref: fallback.entry.value, levels: fallback.levels });
                 fallbackCount++;
             }
         }
         this._selection = {
-            zoom: selection.z,
-            wantedZoom: selection.wantedZoom,
-            selected: selection.tiles.length,
-            truncated: selection.truncated,
+            zoom: selection && underlay ? Math.max(selection.z, underlay.z) : (selection ?? underlay)?.z ?? null,
+            wantedZoom: selection && underlay ? Math.max(selection.wantedZoom, underlay.wantedZoom) : (selection ?? underlay)?.wantedZoom ?? null,
+            selected: wanted.size,
+            truncated: !!(selection?.truncated || underlay?.truncated),
             ready,
             fallback: fallbackCount,
-            missing: selection.tiles.length - ready - fallbackCount,
+            missing: wanted.size - ready - fallbackCount,
         };
-        this._frame = buildTileFrame(items, this._crs, view.origin);
+        if (selection) this._frame = buildTileFrame(selection.tiles.flatMap(tile => items.get(tileKey('', tile)) ?? []), this._crs, view.origin);
+        if (underlay) this._underlayFrame = buildTileFrame(underlay.tiles.flatMap(tile => items.get(tileKey('', tile)) ?? []), this._crs, view.origin);
         store.endFrame();
     }
 
@@ -322,15 +328,30 @@ export class TileLayer extends Layer {
         this._dataIsDirty = false;
         if (this._renderInfoIsDirty) {
             pipeline.updateColorUniforms(this);
+            this._underlayPipeline?.updateColorUniforms(this);
             this._renderInfoIsDirty = false;
         }
         pipeline.renderFrame(camera, passEncoder, this._frame);
     }
 
+    /** Paints the flat imagery behind finite terrain with independent per-draw GPU buffers. */
+    renderTerrainUnderlay(camera: Camera, passEncoder: GPURenderPassEncoder): void {
+        if (!this._renderer || !this._underlayFrame.draws.length) return;
+        if (!this._underlayPipeline) {
+            const pipeline = new PipelineTiles(this._renderer);
+            try { pipeline.build(this); }
+            catch (error) { pipeline.destroy(); throw error; }
+            this._underlayPipeline = pipeline;
+        }
+        this._underlayPipeline.renderFrame(camera, passEncoder, this._underlayFrame);
+    }
+
     override destroy(): void {
         this._store?.destroy();
         this._store = null;
-        this._frame = EMPTY_FRAME;
+        this._frame = this._underlayFrame = EMPTY_FRAME;
+        this._underlayPipeline?.destroy();
+        this._underlayPipeline = null;
         this._pipeline?.destroy();
         this._pipeline = null;
         this._renderer = null;

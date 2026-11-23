@@ -103,17 +103,17 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
         // Capture actual terrain pixels before presentation, including terrain without imagery.
         const pixels = device.createBuffer({ size: 128 * 512, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
         owned.push(pixels);
-        const capture = async () => {
+        const capture = async (x = 64, y = 64, draw = () => path().renderFrame()) => {
             const finish = map.renderer.finish.bind(map.renderer);
             map.renderer.finish = () => {
                 map.renderer.commandEncoder.copyTextureToBuffer({ texture: canvas.getContext('webgpu')!.getCurrentTexture() }, { buffer: pixels, bytesPerRow: 512 }, [128, 128]);
                 finish();
             };
             map.camera.update();
-            try { path().renderFrame(); } finally { map.renderer.finish = finish; }
+            try { draw(); } finally { map.renderer.finish = finish; }
             await pixels.mapAsync(GPUMapMode.READ);
             const bytes = new Uint8Array(pixels.getMappedRange()).slice(); pixels.unmap();
-            const centre = (64 * 128 + 64) * 4;
+            const centre = (y * 128 + x) * 4;
             const offset = map.renderer.canvasFormat.startsWith('bgra') ? 2 : 0;
             return [bytes[centre + offset]!, bytes[centre + 1]!, bytes[centre + 2 - offset]!];
         };
@@ -166,6 +166,36 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
         assert(map.getTerrainTileStats() === null, 'GeoTIFF terrain must not expose streaming statistics');
         map.removeTerrain();
         checks.push('existing GeoTIFF terrain and nonzero grid origin through the complete GPU path');
+
+        if (pixelRatio === 1 && crs === 'EPSG:3395') {
+            map.removeLayer('roof');
+            const flat = (map as unknown as { _flatRenderPath: { renderFrame(): void } })._flatRenderPath;
+            for (const projection of ['perspective', 'orthographic'] as const) {
+                map.setView({ center: { latitude: 0, longitude: 0 }, zoom: 15, projection });
+                let reference: number[] = [];
+                for (let attempt = 0; attempt < 100; attempt++) {
+                    reference = await capture(16, 64, () => flat.renderFrame());
+                    if (reference[1]! > reference[0]! + 20 && reference[1]! > reference[2]! + 20) break;
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                assert(reference[1]! > reference[2]! + 20, `Flat imagery did not load: ${reference}`);
+                map.enableTerrainMode({ type: 'FeatureCollection', bbox: [-80, -80, 80, 80], features: [{
+                    type: 'Feature', geometry: null, properties: { rasterResX: 2, rasterResY: 2, band: [-40, -40, -40, -40] },
+                }] }, 'band');
+                const edge = await capture(16, 64);
+                assert(edge.every((channel, index) => Math.abs(channel - reference[index]!) <= 2),
+                    `${projection}: fixed terrain cut off imagery outside the DEM: ${edge}; flat: ${reference}`);
+                const draped = await capture();
+                assert(draped[1]! > draped[0]! + 15 && draped[1]! < reference[1]! - 2,
+                    `${projection}: shaded imagery below sea level did not cover the flat imagery: ${draped}`);
+                map.updateRenderInfo('imagery', { isSkip: true });
+                const hiddenEdge = await capture(16, 64);
+                assert(hiddenEdge[2]! > hiddenEdge[1]!, `${projection}: hidden imagery remained outside the DEM: ${hiddenEdge}`);
+                map.updateRenderInfo('imagery', { isSkip: false });
+                map.removeTerrain();
+            }
+            checks.push('fixed terrain preserves imagery coverage outside the DEM in both projections');
+        }
         const error = await device.popErrorScope(); if (error) errors.push(error.message);
         assert(errors.length === 0, errors.join('\n'));
         return { status: 'passed', checks: checks.map(check => `${crs}, DPR ${pixelRatio}: ${check}`) };
