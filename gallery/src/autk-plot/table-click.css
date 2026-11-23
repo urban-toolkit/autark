@@ -1,0 +1,32 @@
+.linked-table-example #plotBody {
+    height: clamp(360px, 58vh, 640px);
+    padding: 12px;
+}
+
+.linked-table-example #plotBody .plot-title { display: none; }
+
+.linked-table-example .autk-table-container {
+    border-color: var(--border) !important;
+    border-radius: 8px !important;
+}
+
+.linked-table-example .autk-table :is(th, td) {
+    padding: 9px 10px !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.linked-table-example .autk-table :is(th, td):first-child {
+    text-align: left !important;
+    overflow-wrap: anywhere;
+}
+
+.linked-table-example .autk-table th {
+    color: var(--accent) !important;
+    background: var(--surface) !important;
+    border-bottom: 1px solid var(--border) !important;
+    z-index: 1;
+}
+
+.linked-table-example .autk-table td:not(:first-child) { white-space: nowrap; }
+.linked-table-example .autk-table tbody tr:hover td { box-shadow: inset 0 0 0 100vmax rgb(20 45 80 / 5%); }

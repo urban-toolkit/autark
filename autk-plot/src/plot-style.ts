@@ -16,12 +16,12 @@ export class PlotStyle {
     protected static _default: ColorHEX = '#bfbfbf';
     /** Highlight color used for selected marks. */
     protected static _highlight: ColorHEX = '#5dade2';
-    /** Highlight color used by plots with the segregated provenance view (aqua green). */
-    protected static _provenance: ColorHEX = '#63d8c0';
+    /** Highlight color used by provenance marks; defaults to the map selection color. */
+    protected static _provenance: ColorHEX = PlotStyle._highlight;
     /** Darker shade of the provenance color, used for outlines of provenance marks. */
-    protected static _provenanceStroke: ColorHEX = '#2fae95';
+    protected static _provenanceStroke: ColorHEX = '#4887b0';
     /** Text color drawn over the provenance highlight color. */
-    protected static _provenanceText: ColorHEX = '#073b2c';
+    protected static _provenanceText: ColorHEX = '#203b4e';
 
     /**
      * Gets the default mark color.

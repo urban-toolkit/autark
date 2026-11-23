@@ -6,9 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Autark — Table selection</title>
     <link rel="stylesheet" href="../../example.css" />
+    <link rel="stylesheet" href="./table-click.css" />
 </head>
 
-<body class="gallery-example gallery-chart">
+<body class="gallery-example gallery-chart linked-table-example">
     <a class="skip-link" href="#main">Skip to example</a>
     <header class="site-header">
         <nav class="navigation" aria-label="Main navigation">
@@ -26,14 +27,14 @@
     <div id="app" class="example-workspace chart-workspace">
 
         <section class="map-panel" aria-label="Table selection map area">
-            <div class="panel-header"><h2>Table selection</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
+            <div class="panel-header"><h2>Manhattan neighborhoods</h2><p id="map-status" class="map-status" role="status" data-example-status>Loading map…</p></div>
             <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Table selection map"> </canvas></div>
             <div class="panel-footer" id="map-help"><span>Drag to pan · Scroll to zoom</span></div>
         </section>
         <aside id="plot" class="details-panel" aria-labelledby="plot-title">
-            <div class="panel-header"><h2 id="plot-title">Linked chart</h2></div>
+            <div class="panel-header"><h2 id="plot-title">Neighborhood records</h2></div>
             <div id="plotBody"></div>
-            <p class="data-note">Click to select · Linked to map</p>
+            <p class="data-note">Select a row to highlight it on the map. Click a column header to sort.</p>
         </aside>
     </div>
         <footer class="page-footer">Made with Autark · Rendered in your browser</footer>

@@ -11,7 +11,7 @@ import * as autkPlot from '../src';
 import type { UnifiedPlotConfig } from '../src';
 
 /** Colors as the package starts, restored after each test (they are process-wide). */
-const DEFAULTS = { _highlight: '#5dade2', _provenance: '#63d8c0', _provenanceStroke: '#2fae95', _provenanceText: '#073b2c' };
+const DEFAULTS = { _highlight: '#5dade2', _provenance: '#5dade2', _provenanceStroke: '#4887b0', _provenanceText: '#203b4e' };
 afterEach(() => {
     Object.assign(autkPlot.PlotStyle as unknown as Record<string, string>, DEFAULTS);
     document.body.innerHTML = '';

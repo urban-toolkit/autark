@@ -19,9 +19,10 @@ async function main(): Promise<void> {
         type: 'table',
         collection,
         attributes: { axis: ['ntaname', 'shape_area', 'shape_leng'] },
-        labels: { title: 'Neighborhoods table' },
+        labels: { axis: ['Neighborhood', 'Area', 'Perimeter'] },
+        tickFormats: ['', ',.0f', ',.0f'],
         transform: { preset: 'sort', options: { direction: 'asc' } },
-        width: Math.max(280, body.clientWidth - 40),
+        width: 'auto',
         events: [PlotEvent.CLICK],
     });
 

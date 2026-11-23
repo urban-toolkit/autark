@@ -754,7 +754,12 @@ function replay(testCase: Case): Snapshot[] {
 describe('built-in plots reproduce their recorded snapshots', () => {
     beforeAll(() => installSvgBBox());
 
-    const recorded = JSON.parse(recordedText) as Record<string, Snapshot[]>;
+    // The historical snapshots used a teal provenance palette. Migrate only its
+    // colors in comparisons, keeping the original geometry and selections intact.
+    const recorded = JSON.parse(RECORD ? recordedText : recordedText
+        .replaceAll('rgb(99, 216, 192)', 'rgb(93, 173, 226)')
+        .replaceAll('rgb(47, 174, 149)', 'rgb(72, 135, 176)')
+        .replaceAll('rgb(7, 59, 44)', 'rgb(32, 59, 78)')) as Record<string, Snapshot[]>;
 
     if (RECORD) {
         // Only cases not recorded yet: a recording is made once, before its plot is rewritten.
@@ -941,7 +946,7 @@ function accepted(name: string, snapshots: Snapshot[], actual: Snapshot[]): Snap
 
 /** Style of the subset series of each plot: the series' own style in the highlight color. */
 const SERIES_STYLE: Record<string, (index: number, count: number) => { fill: string | null; stroke: string | null }> = (() => {
-    const highlight = 'rgb(99, 216, 192)';
+    const highlight = 'rgb(93, 173, 226)';
     const line = () => ({ fill: null, stroke: `${highlight} 1.5` });
     return {
         linechart: line,

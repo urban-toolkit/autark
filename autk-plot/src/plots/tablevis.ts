@@ -29,7 +29,7 @@ export const tablevis: PlotDefinition = {
     // Sorted by the first column unless configured.
     defaults: config => ({ transform: { preset: 'sort', options: { column: config.attributes?.axis?.[0] ?? '', direction: 'asc' } } }),
 
-    draw({ html, rows, fields, value, axisLabels, options, setOptions, interactive }) {
+    draw({ html, rows, fields, value, axisLabels, options, setOptions, interactive, format, hasFormat }) {
         const sorted = (options.column as string | undefined) ?? fields[0];
         const direction = options.direction === 'desc' ? 'desc' : 'asc';
 
@@ -72,6 +72,7 @@ export const tablevis: PlotDefinition = {
         }
 
         const number = d3.format('');
+        const formats = fields.map((_, index) => hasFormat(index) ? format(index) : number);
         table.append('tbody')
             .selectAll('tr')
             .data(rows)
@@ -83,7 +84,7 @@ export const tablevis: PlotDefinition = {
             .join('td')
             .style('padding', '6px 8px')
             .style('text-align', 'center')
-            .text(cell => (typeof cell === 'number' ? number(cell) : String(cell)));
+            .text((cell, index) => typeof cell === 'number' ? formats[index](cell) : String(cell));
     },
 
     // Selected rows, here or in another view, are kept on top, in sorted order.
