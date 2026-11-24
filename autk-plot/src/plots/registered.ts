@@ -72,12 +72,12 @@ export type PlotDrawContext = {
     /** Draws a left axis beside the drawing area; `label` as in `axisX`, defaulting to the second field. */
     axisY: <Domain extends d3.AxisDomain>(axis: d3.Axis<Domain>, label?: number | string) => d3.Selection<SVGGElement, unknown, null, undefined>;
     /**
-     * Number format of axis `index`: the d3 format `tickFormats` give it, or, when they give it none
-     * (no `tickFormats`, or a missing entry), SI prefixes from one up ("1.5k") and decimals under one
+     * Number format of axis `index`: the D3 format from `ticks` or legacy `tickFormats`,
+     * or, when neither sets it, SI prefixes from one up ("1.5k") and decimals under one
      * ("0.5", not "500m"). `fallback` stands in for an empty format (`''`) the configuration gives.
      */
     format: (index: number, fallback?: string) => (value: d3.NumberValue) => string;
-    /** Whether `tickFormats` give axis `index` a format: a category or bucket that reads as a number is then written with it, otherwise as it is. */
+    /** Whether axis `index` has an explicit format, which can also format numeric categories and buckets. */
     hasFormat: (index: number) => boolean;
     /** Tick count of a value axis up to `top`: `count`, or one tick per unit when the values are whole (counts) and `top` is smaller. */
     tickCount: (top: number, values: number[], count: number) => number;
@@ -550,6 +550,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         super(config);
         definition.validate?.(config);
         this.definition = definition;
+        this._ticks = config.ticks;
         this._colorProperty = definition.color ?? 'fill';
         const configured: unknown = config.provenance?.highlight;
         if (configured !== undefined && configured !== 'boolean') {
@@ -678,8 +679,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
             height,
             axisX: (axis, label) => this.drawAxis(svg, 'x', axis, width, height, label),
             axisY: (axis, label) => this.drawAxis(svg, 'y', axis, width, height, label),
-            format: (index, fallback) => (this.hasTickFormat(index) ? d3.format(this._tickFormats?.[index] || fallback || '') : defaultTickFormat),
-            hasFormat: index => this.hasTickFormat(index),
+            format: (index, fallback) => {
+                const specifier = this.tickFormatSpecifier(index);
+                return specifier == null ? defaultTickFormat : d3.format(specifier || fallback || '');
+            },
+            hasFormat: index => this.tickFormatSpecifier(index) != null,
             tickCount: (top, values, count) => (top < count && values.every(Number.isInteger) ? Math.max(1, Math.ceil(top)) : count),
             legend: (keys, color, direction) => drawLegend(d3.select(groupNode), keys, color, direction, width),
             partRange: !reducer ? undefined
@@ -790,6 +794,23 @@ export class RegisteredPlot extends PlotBaseInteractive {
         const g = svg.insert('g', '.autkMarksGroup')
             .attr('class', `${side} axis`)
             .attr('transform', side === 'x' ? `translate(${left}, ${top + height})` : `translate(${left}, ${top})`);
+        const scale = axis.scale();
+        const args = axis.tickArguments();
+        const fallback = args[0] ?? 10;
+        // Leave band scales, explicit positions, and axes that hide their ticks alone.
+        if (axis.tickValues() === null && typeof fallback === 'number' && fallback > 0
+            && 'ticks' in scale && typeof scale.ticks === 'function'
+            && scale.domain().every(value => typeof value === 'number')) {
+            const configured = this._ticks?.[side]?.count;
+            if (configured !== undefined && Number.isFinite(configured) && configured > 0) {
+                axis.tickArguments([configured, ...args.slice(1)]);
+            } else if (this.definition.name === 'scatterplot'
+                || (side === 'y' && ['barchart', 'linechart'].includes(this.definition.name))) {
+                const spacing = side === 'x' ? width / 45 : height / 30;
+                const count = Math.min(fallback, Math.max(2, Math.round(spacing)));
+                if (count < fallback) axis.tickArguments([count, ...args.slice(1)]);
+            }
+        }
         g.call(axis);
         if (axis.tickSizeInner() < 0) g.selectAll('.tick line').style('stroke', PlotStyle.grid);
         const title = g.append('text')
@@ -910,6 +931,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
 
     /** Margins of the configuration: each render starts from them. */
     private _configuredMargins: PlotMargins | undefined;
+    private readonly _ticks: PlotConfig['ticks'];
     /** Whether this render is the second one, with margins grown for the axis titles. */
     private _growingMargins = false;
     /** Margins with room for the axis titles, which the last render found it lacked. */
@@ -934,10 +956,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
         }
     }
 
-    /** Whether `tickFormats` give axis `index` a format of its own (a missing, undefined or null entry does not). */
-    private hasTickFormat(index: number): boolean {
-        const format = this._tickFormats?.[index];
-        return format !== undefined && format !== null;
+    /** Resolves the configured axis format, preferring `ticks` over the legacy array. */
+    private tickFormatSpecifier(index: number): string | undefined {
+        // Parallel coordinates has multiple vertical axes, not an X/Y pair.
+        const side = this.definition.name === 'parallel-coordinates' ? undefined : (['x', 'y'] as const)[index];
+        return (side ? this._ticks?.[side]?.format : undefined) ?? this._tickFormats?.[index];
     }
 
     /** Smallest and largest value a unit contributes to a row (`[0, 0]` with no unit). */

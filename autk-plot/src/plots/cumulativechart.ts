@@ -39,7 +39,7 @@ const orderOf = (kind: 'ecdf' | 'pareto', options: Record<string, unknown> | und
 
 /** Draws the bars (Pareto), the line, and the points of a cumulative transform. */
 function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { highlight: Partial<Record<MarkKind, HighlightRule>>; series: PlotSeries[] } {
-    const { group, rows, width, height, axisX, axisY, format, transform, tickCount } = context;
+    const { group, rows, width, height, axisX, axisY, format, hasFormat, transform, tickCount } = context;
     const cumulative = shapeOutput(transform, 'cumulative');
     if (!cumulative) return { highlight: {}, series: [] };
     if (kind === 'ecdf' && !cumulative.numeric && rows.length > 0) throw new Error('ECDF requires a numeric column.');
@@ -57,7 +57,7 @@ function drawCumulative(context: PlotDrawContext, kind: 'ecdf' | 'pareto'): { hi
         const x = d3.scaleLinear([lo ?? 0, hi ?? 1], [0, width]);
         xOf = row => x(rowOf(row).upper ?? 0);
         axisX(d3.axisBottom(x).ticks(6).tickFormat(format(0, '~s')));
-        axisY(d3.axisLeft(share).ticks(5).tickSizeInner(-width).tickFormat(percent));
+        axisY(d3.axisLeft(share).ticks(5).tickSizeInner(-width).tickFormat(hasFormat(1) ? format(1, '.0%') : percent));
     } else {
         band = d3.scaleBand(bars.map(row => rowOf(row).label), [0, width]).padding(0.25);
         count = d3.scaleLinear([0, Math.max(1, d3.max(bars, row => rowOf(row).value) ?? 0)], [height, 0]).nice();

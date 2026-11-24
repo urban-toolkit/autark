@@ -70,6 +70,18 @@ Besides the attributes, labels and styling options, the config accepts:
 * `topK`: Keeps the `k` largest rows, optionally gathering the rest in an "Others" row.
 * `provenance: { path: true }`: Shows, under the plot, how many entities the selection reaches at each stage. Off by default.
 
+### Numeric axis ticks
+
+Set `ticks: { x: { count: 4 }, y: { count: 6, format: ',d' } }` to request about four X ticks and six Y ticks, formatting Y labels as comma-separated integers. Both axes and both settings are optional. D3 may choose a different count to keep tick values round. Missing, nonpositive, or nonfinite counts use the axis default. An explicit `ticks.x.format` or `ticks.y.format` takes precedence over the corresponding legacy `tickFormats` entry.
+
+The option applies to numeric axes that generate their tick positions:
+
+- **X and Y:** scatter, bubble, hexbin, and ECDF.
+- **Y only:** bar, line, area, box, violin, stacked bar, and Pareto (the primary count axis, not the secondary share axis).
+- **X only:** density; its relative Y axis has no numeric labels.
+
+Compact scatterplots, bar charts, and line charts request fewer numeric ticks by default. Other plots keep their existing defaults unless you supply a count. Category and bucket axes, fixed tick positions, and plots without standard X/Y axes (such as parallel coordinates) are unchanged. Registered plots using the `axisX` and `axisY` helpers also honor count overrides on eligible numeric axes; use the drawing context's `format` helper to read the configured format.
+
 ### Supported plot types
 
 * `scatterplot`, `barchart`, `parallel-coordinates`, `table`, `linechart`, `heatmatrix`
@@ -134,7 +146,7 @@ new AutkPlot(container, {
 });
 ```
 
-`width` and `height` are the drawing area inside the margins (`margins` in the config). Besides `group` and `rows`, the context gives `html` (a container for HTML marks), `fields`, `format(i)` (the axis's `tickFormats`, or by default SI prefixes from one up and decimals under one: `0.5`, not `500m`), `hasFormat(i)` (whether `tickFormats` give that axis a format: a numeric category is otherwise written as it is), `axisLabels`, `legend`, `tickCount` and `interactive` (whether the configuration asks for any `events`). `axisX` and `axisY` label an axis with the field it shows: by default the first and second fields, or `axisX(axis, 1)` for the field of index 1 (a horizontal bar chart), or a text. Autark colors the marks (gray, and the selection color) and gives them the pointer cursor when clicks select; style anything else by state with `markStyle`. Optional fields declare the transforms and reducers the chart reads (`transforms`, `requiresTransform`, `reducers`), the highlight (`highlight`: a word such as `'boolean'`, `'subset'`, `'glyph'` or `'trace'`, a rule per mark family such as `{ rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } }`, or a function that draws the parts), and defaults and checks of the config (`defaults`, `validate`).
+`width` and `height` are the drawing area inside the margins (`margins` in the config). Besides `group` and `rows`, the context gives `html` (a container for HTML marks), `fields`, `format(i)` (the axis's configured format, or by default SI prefixes from one up and decimals under one: `0.5`, not `500m`), `hasFormat(i)` (whether that axis has a configured format: a numeric category is otherwise written as it is), `axisLabels`, `legend`, `tickCount` and `interactive` (whether the configuration asks for any `events`). `axisX` and `axisY` label an axis with the field it shows: by default the first and second fields, or `axisX(axis, 1)` for the field of index 1 (a horizontal bar chart), or a text. Autark colors the marks (gray, and the selection color) and gives them the pointer cursor when clicks select; style anything else by state with `markStyle`. Optional fields declare the transforms and reducers the chart reads (`transforms`, `requiresTransform`, `reducers`), the highlight (`highlight`: a word such as `'boolean'`, `'subset'`, `'glyph'` or `'trace'`, a rule per mark family such as `{ rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } }`, or a function that draws the parts), and defaults and checks of the config (`defaults`, `validate`).
 
 ### Writing a transform
 

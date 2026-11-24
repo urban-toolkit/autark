@@ -84,8 +84,15 @@ export type PlotConfig = {
     plot?: string;
     /** Optional data transform applied before rendering. */
     transform?: PlotTransformConfig;
-    /** D3 format strings for each axis tick. */
+    /** Legacy D3 format strings for each axis; `ticks` takes precedence for X and Y. */
     tickFormats?: string[];
+    /** Tick options for the X and Y axes. */
+    ticks?: Partial<Record<'x' | 'y', {
+        /** Approximate count for numeric axes with automatic tick positions. */
+        count?: number;
+        /** D3 format string for numeric tick labels. */
+        format?: string;
+    }>>;
     /** Domain specification controlling how the colormap range is derived. */
     domainSpec?: ColorMapDomainSpec;
     /** Color interpolator used for continuous (numeric) color encoding. */
