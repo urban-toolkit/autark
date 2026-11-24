@@ -51,7 +51,7 @@ afterEach(() => {
     document.body.replaceChildren();
 });
 
-describe('Tick labels of a plot given no tickFormats', () => {
+describe('Tick labels without custom formats', () => {
     it('writes a bar chart\'s ticks under one as decimals', () => {
         const bars: UnifiedPlotConfig = { type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] } };
 
@@ -93,7 +93,7 @@ describe('Tick labels of a plot given no tickFormats', () => {
     });
 });
 
-describe('Category and bucket labels of a plot given no tickFormats', () => {
+describe('Category and bucket labels without custom tick formats', () => {
     it('writes a bar chart\'s categories as they are, years and zip codes too', () => {
         expect(ticks({ type: 'barchart', collection: years, attributes: { axis: ['year', 'count'] } }, '.x.axis .tick text'))
             .toEqual(['2020', '2021', '2022']);
@@ -106,17 +106,17 @@ describe('Category and bucket labels of a plot given no tickFormats', () => {
     });
 });
 
-describe('Tick labels of a plot given tickFormats', () => {
+describe('Tick labels of a plot given custom tick formats', () => {
     it('writes numeric categories and buckets with the format a caller gives', () => {
-        expect(ticks({ type: 'barchart', collection: zips, attributes: { axis: ['zip', 'count'] }, tickFormats: [',', ','] }, '.x.axis .tick text'))
+        expect(ticks({ type: 'barchart', collection: zips, attributes: { axis: ['zip', 'count'] }, ticks: { x: { format: ',' }, y: { format: ',' } } }, '.x.axis .tick text'))
             .toEqual(['10,001', '10,002', '10,003']);
-        expect(ticks({ type: 'linechart', collection: years, ...series, tickFormats: ['.1f', '.1f'] }, '.x.axis .tick text'))
+        expect(ticks({ type: 'linechart', collection: years, ...series, ticks: { x: { format: '.1f' }, y: { format: '.1f' } } }, '.x.axis .tick text'))
             .toEqual(['2020.0', '2021.0', '2022.0']);
     });
 
     it('keeps the SI format a caller gives, under one too', () => {
         const bars: UnifiedPlotConfig = {
-            type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, tickFormats: ['~s', '~s'],
+            type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, ticks: { x: { format: '~s' }, y: { format: '~s' } },
         };
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['250m', '500m', '750m']);
@@ -126,7 +126,7 @@ describe('Tick labels of a plot given tickFormats', () => {
 
     it('keeps any other format a caller gives', () => {
         const bars: UnifiedPlotConfig = {
-            type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, tickFormats: ['.2f', '.2f'],
+            type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, ticks: { x: { format: '.2f' }, y: { format: '.2f' } },
         };
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['0.25', '0.50', '0.75']);
@@ -135,10 +135,24 @@ describe('Tick labels of a plot given tickFormats', () => {
     });
 });
 
-describe('tickFormats with fewer entries than the plot has axes', () => {
-    // An axis with a missing or undefined entry gets its default, as with no tickFormats at all.
+describe('Formats by field', () => {
+    it('formats only the named parallel-coordinate dimension', () => {
+        const config = { type: 'parallel-coordinates', collection: fractions, attributes: { axis: ['share', 'rate'] },
+            ticks: { dimensions: { rate: { format: '.2f' } } } } satisfies UnifiedPlotConfig;
+        expect(ticks(config, '[autkBrushId="share"] .tick text')).toEqual(['0.3', '0.4', '0.5', '0.6', '0.7']);
+        expect(ticks(config, '[autkBrushId="rate"] .tick text')).toEqual(['0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80']);
+    });
+
+    it('formats table cells by column name', () => {
+        const config = { type: 'table', collection: thousands, attributes: { axis: ['share', 'rate'] },
+            style: { columnFormats: { rate: ',.0f' } } } satisfies UnifiedPlotConfig;
+        expect(ticks(config, 'tr.autkMark:first-child td')).toEqual(['1', '1,000']);
+    });
+});
+
+describe('Formats omitted for some or all axes', () => {
     it('gives a bar chart\'s y axis its default when the formats name only the x axis', () => {
-        const bars: UnifiedPlotConfig = { type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, tickFormats: ['.2f'] };
+        const bars: UnifiedPlotConfig = { type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, ticks: { x: { format: '.2f' } } };
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['0.25', '0.50', '0.75']);
         expect(ticks(bars, '.y.axis .tick text')).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1']);
@@ -147,7 +161,7 @@ describe('tickFormats with fewer entries than the plot has axes', () => {
     it('gives a scatterplot\'s x axis its default when its entry is undefined', () => {
         // The type asks for strings, but a JavaScript caller or a spec that was not type checked can leave a hole.
         const points: UnifiedPlotConfig = {
-            type: 'scatterplot', collection: fractions, attributes: { axis: ['share', 'rate'] }, tickFormats: [undefined as unknown as string, '.2f'],
+            type: 'scatterplot', collection: fractions, attributes: { axis: ['share', 'rate'] }, ticks: { y: { format: '.2f' } },
         };
 
         expect(ticks(points, '.x.axis .tick text'))
@@ -157,11 +171,11 @@ describe('tickFormats with fewer entries than the plot has axes', () => {
     });
 
     it('gives every axis its default when the formats are empty', () => {
-        const lines: UnifiedPlotConfig = { type: 'linechart', collection: years, ...series, tickFormats: [] };
+        const lines: UnifiedPlotConfig = { type: 'linechart', collection: years, ...series, ticks: {} };
 
         expect(ticks(lines, '.x.axis .tick text')).toEqual(['2020', '2021', '2022']);
         expect(ticks(lines, '.y.axis .tick text')).toEqual(['1', '1.5', '2', '2.5', '3']);
-        expect(ticks({ type: 'parallel-coordinates', collection: fractions, attributes: { axis: ['share', 'rate'] }, tickFormats: [] }, '.autkBrush .tick text'))
+        expect(ticks({ type: 'parallel-coordinates', collection: fractions, attributes: { axis: ['share', 'rate'] }, ticks: {} }, '.autkBrush .tick text'))
             .toEqual(['0.3', '0.4', '0.5', '0.6', '0.7', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8']);
     });
 });

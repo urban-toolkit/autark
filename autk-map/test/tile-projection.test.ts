@@ -5,11 +5,11 @@ import {
   WEB_MERCATOR_MAX_LAT,
   clampLatitude,
   crsToLonLat,
-  isTileCrs,
+  isSupportedCrs,
   latToMercatorY,
   lonLatToCrs,
   mercatorYToLat,
-} from '../src/tile-projection';
+} from '@urban-toolkit/autk-core';
 
 /** [lon, lat, x3395, y3395, y3857] computed by PROJ through `gdaltransform`; x is the same in both systems. */
 const REFERENCE: Array<[number, number, number, number, number]> = [
@@ -77,11 +77,11 @@ describe('Mercator helpers', () => {
   });
 
   it('recognizes the supported coordinate systems', () => {
-    expect(isTileCrs('EPSG:3395')).toBe(true);
-    expect(isTileCrs('EPSG:3857')).toBe(true);
-    expect(isTileCrs('EPSG:4326')).toBe(true);
-    expect(isTileCrs('EPSG:32631')).toBe(true);
-    expect(isTileCrs('EPSG:NOT_REGISTERED')).toBe(false);
-    expect(isTileCrs(undefined)).toBe(false);
+    expect(isSupportedCrs('EPSG:3395')).toBe(true);
+    expect(isSupportedCrs('EPSG:3857')).toBe(true);
+    expect(isSupportedCrs('EPSG:4326')).toBe(true);
+    expect(isSupportedCrs('EPSG:32631')).toBe(true);
+    expect(isSupportedCrs('EPSG:NOT_REGISTERED')).toBe(false);
+    expect(isSupportedCrs(undefined)).toBe(false);
   });
 });

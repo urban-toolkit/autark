@@ -92,11 +92,10 @@ describe('Plot style options', () => {
         expect(fills(div)).toEqual(['#001122', hex(PlotStyle.provenance), hex('tomato')]);
     });
 
-    it('uses a named categorical interpolator on bar marks, overriding the legacy scheme', () => {
+    it('uses a named categorical interpolator on bar marks', () => {
         const div = host();
         new AutkPlot(div, {
             type: 'barchart', collection, attributes: { axis: ['kind', 'v'], color: 'kind' },
-            categoricalColorMapInterpolator: ColorMapInterpolator.CAT_SET1,
             style: { colorMap: { interpolator: ColorMapInterpolator.CAT_SET2 } },
         });
         expect(fills(div)).toEqual(d3.schemeSet2.slice(0, 3).map(hex));
@@ -113,7 +112,6 @@ describe('Plot style options', () => {
         const diverging = host();
         new AutkPlot(diverging, {
             type: 'scatterplot', collection, attributes: { axis: ['x', 'y'], color: 'v' },
-            domainSpec: { type: ColorMapDomainStrategy.USER, params: [0, 30] },
             style: { colorMap: {
                 type: 'diverging', colors: ['#000000', '#ffffff', '#ff0000'],
                 domainSpec: { type: ColorMapDomainStrategy.USER, params: [10, 20, 50] },

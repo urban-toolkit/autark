@@ -40,8 +40,8 @@ describe('Numeric axis tick counts', () => {
         expect(ticks({ ...line, height: 2000 }, 'y')).toEqual(ticks(line, 'y'));
     });
 
-    it('sets counts and formats together, with nested formats overriding legacy ones per axis', () => {
-        const plot = { ...points, ticks: { x: { count: 2, format: '.2f' }, y: { count: 2 } }, tickFormats: ['.0f', '.1f'] };
+    it('sets counts and formats together per axis', () => {
+        const plot = { ...points, ticks: { x: { count: 2, format: '.2f' }, y: { count: 2, format: '.1f' } } };
         expect(ticks(plot, 'x')).toEqual(['0.00', '0.50', '1.00']);
         expect(ticks(plot, 'y')).toEqual(['0.0', '500.0', '1000.0']);
         expect(ticks({ ...points, ticks: { y: { count: 20 } }, width: 200, height: 160 }, 'y')).toHaveLength(21);

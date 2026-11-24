@@ -21,8 +21,7 @@
 import type { Camera } from '@urban-toolkit/autk-core';
 import type { LonLatBounds, TileIndex, TileRange } from './tile-index';
 import { ancestorTile, lonLatToTileCoord, metresPerPixel, tileLonLatBounds, tileRangeCount, tileRangeInBounds, tilesInRange } from './tile-index';
-import type { TileCrs } from './tile-projection';
-import { EARTH_RADIUS, crsToLonLat, lonLatToCrs } from './tile-projection';
+import { EARTH_RADIUS, crsToLonLat, lonLatToCrs } from '@urban-toolkit/autk-core';
 import type { ResolvedTileSource } from './tile-source';
 
 /** The part of a camera that selection uses. `Camera` from `autk-core` provides it. */
@@ -53,7 +52,7 @@ export interface TileView {
     /** Map origin, in the map CRS. */
     origin: readonly [number, number];
     /** Coordinate system of the map. */
-    crs: TileCrs;
+    crs: string;
     /** Backing-store dimensions for tile resolution; camera coordinates remain unchanged. */
     viewport?: readonly [number, number];
 }

@@ -9,7 +9,6 @@
  * consistently.
  */
 
-import type { TileCrs } from './tile-projection';
 import type { TileSource } from './tile-source';
 import type { TerrainTileSource } from './terrain-tile-source';
 import {
@@ -37,7 +36,7 @@ import type { RasterRgbBands, RasterRgbRange } from './raster-rgb';
 /** Construction options for a map instance. */
 export interface MapOptions {
     /** Workspace CRS understood by Proj4js; defaults to the same EPSG:3395 CRS as AutkDb. */
-    crs?: TileCrs;
+    crs?: string;
     /** Whether floating UI controls are drawn. Defaults to `true`; the credit strip always remains. */
     showUi?: boolean;
 }
@@ -59,19 +58,6 @@ export interface SetViewParams {
 export interface TerrainRasterSource {
     collection: FeatureCollection<Geometry | null>;
     property: string;
-}
-
-/** One terrain-loading API for elevation tiles and normalized raster data. */
-export interface LoadTerrainParams extends Omit<EnableTerrainTilesParams, 'source'> {
-    /** Elevation tile descriptor or normalized raster collection and band property. */
-    source: TerrainTileSource | TerrainRasterSource;
-    /**
-     * Optional initial WGS84 view.
-     * @deprecated Use setView() before loading terrain.
-     */
-    center?: { latitude: number; longitude: number };
-    /** Initial zoom; requires center and defaults to 12. @deprecated Use setView(). */
-    zoom?: number;
 }
 
 /**
@@ -248,21 +234,7 @@ export interface LoadTilesParams {
      * The first geographic load may declare a custom workspace CRS when the map constructor
      * did not specify one. Subsequent conflicting settings are rejected before allocation.
      */
-    crs?: TileCrs;
-    /**
-     * Optional WGS84 center for the initial view, using named latitude/longitude in degrees.
-     * Initializes a tile-only scene without another data layer. An existing shared origin is preserved.
-     * The point is projected into `crs`; supplying a center explicitly positions the camera.
-     * @deprecated Use setView() before loading tiles.
-     */
-    center?: { latitude: number; longitude: number };
-    /**
-     * Initial Web Mercator zoom (0–30, fractional values allowed); requires `center`.
-     * Defaults to 12 when `center` is supplied. Uses the source tile size and CSS pixels;
-     * device pixel ratio independently controls imagery resolution.
-     * @deprecated Use setView() before loading tiles.
-     */
-    zoom?: number;
+    crs?: string;
     /** Layer opacity from 0 to 1. Defaults to 1. */
     opacity?: number;
     /** Positive safe integer soft cache limit. Defaults to 256. Invalid values are rejected. */
@@ -281,24 +253,20 @@ export interface LoadTilesParams {
     maxTiles?: number;
 }
 
-/**
- * Parameters for `AutkMap.enableTerrainTiles`, which streams terrain elevation
- * from a web tile service.
- */
-export interface EnableTerrainTilesParams {
+/** Parameters for loading elevation tiles or a normalized terrain raster. */
+export interface LoadTerrainParams {
     /** Conservative, region-independent elevation validation. Enabled by default; false preserves raw heights. */
     validation?: false | ElevationValidationOptions;
     /**
-     * Where the elevation tiles come from: a preset from `TERRAIN_TILE_SOURCES`
-     * or a custom source with its `encoding`. The attribution is required and is
-     * shown on the map; the caller is responsible for following the provider's terms.
+     * Elevation tile descriptor or normalized raster and band property. Tile attribution
+     * is shown on the map; the caller is responsible for following the provider's terms.
      */
-    source: TerrainTileSource;
+    source: TerrainTileSource | TerrainRasterSource;
     /**
      * Coordinate system of the map's data. Inherited from the map; defaults to `'EPSG:3395'`, the workspace default of `AutkDb`.
      * Only metre-based systems are accepted: heights are metres, so a map plane in degrees would give a distorted scene.
      */
-    crs?: TileCrs;
+    crs?: string;
     /**
      * Nested windows of height samples around the view, finest first; each covers
      * twice the area of the one before. Fewer are used when the source has too few

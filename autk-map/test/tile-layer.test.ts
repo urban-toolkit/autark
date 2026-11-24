@@ -3,7 +3,7 @@ import { Camera, ColorMap } from '@urban-toolkit/autk-core';
 import { TileLayer } from '../src/layer-tiles';
 import { LayerManager } from '../src/layer-manager';
 import { MapStyle } from '../src/map-style';
-import { lonLatToCrs } from '../src/tile-projection';
+import { lonLatToCrs } from '@urban-toolkit/autk-core';
 import type { LayerInfo, LayerRenderInfo } from '../src/types-layers';
 import type { Renderer } from '../src/renderer';
 import type { TileSource } from '../src/tile-source';

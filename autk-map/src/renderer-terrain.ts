@@ -9,12 +9,12 @@
 
 import { assignSeams } from './terrain-seams';
 import { traverseQuadtree } from './terrain-quadtree';
-import type { Camera, Heightfield } from '@urban-toolkit/autk-core';
+import type { Camera } from '@urban-toolkit/autk-core';
 import terrainFragmentSource from './shaders/terrain.frag.wgsl';
 import terrainPickingFragmentSource from './shaders/terrain-picking.frag.wgsl';
 import terrainVertexSource from './shaders/terrain.vert.wgsl';
 import terrainBoundsReduceSource from './shaders/terrain-bounds-reduce.comp.wgsl';
-import { StaticHeightSource, HEIGHT_UNIFORM_BYTES, finestCellOver, packHeightUniform, isStreamingHeightSource } from './height-source';
+import { HEIGHT_UNIFORM_BYTES, finestCellOver, packHeightUniform, isStreamingHeightSource } from './height-source';
 import type { HeightSource } from './height-source';
 import { nextPowerOfTwo } from '@urban-toolkit/autk-core';
 import { buildTerrainSurface } from './terrain-surface';
@@ -233,11 +233,11 @@ export class TerrainRenderer {
         colorFormat: GPUTextureFormat,
         depthFormat: GPUTextureFormat,
         sampleCount: number,
-        source: HeightSource | Heightfield,
+        source: HeightSource,
         overlayTextureView: GPUTextureView,
         overlayPickingTextureView: GPUTextureView,
     ) {
-        this._source = 'levels' in source ? source : new StaticHeightSource(source);
+        this._source = source;
         try {
             this.heightUniformBuffer = this.own(device.createBuffer({
                 label: 'Terrain height level table',
@@ -582,12 +582,6 @@ export class TerrainRenderer {
      * @example
      * const source = terrain.heightSource;
      */
-    /** Fixed GeoTIFF metadata retained for callers of the original renderer API. */
-    get heightfield(): Heightfield {
-        if (!(this._source instanceof StaticHeightSource)) throw new Error('Streamed terrain exposes heightSource instead of a fixed heightfield.');
-        return this._source.heightfield;
-    }
-
     get heightSource(): HeightSource {
         return this._source;
     }

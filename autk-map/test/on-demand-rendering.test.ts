@@ -13,7 +13,7 @@ import { Renderer } from '../src/renderer';
 import { PipelineBuildingSSAO } from '../src/pipeline-triangle-ssao';
 import { AutkMapUi } from '../src/map-ui';
 import { TERRAIN_TILE_SOURCES } from '../src/terrain-tile-source';
-import { isStreamingHeightSource } from '../src/height-source';
+import { isStreamingHeightSource, type StaticHeightSource } from '../src/height-source';
 import { TerrainRenderer } from '../src/renderer-terrain';
 import { MapEvent } from '../src/types-events';
 
@@ -777,7 +777,7 @@ describe('continuous rendering and teardown', () => {
 describe('terrain tiles', () => {
     it.each([NaN, Infinity, -1, 63, 4097, 128.5])('rejects an invalid overlay size before creating terrain: %s', async overlaySize => {
         const { map } = await createMap();
-        expect(() => map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, overlaySize })).toThrow(/overlaySize/);
+        expect(() => map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium, overlaySize })).toThrow(/overlaySize/);
         expect(terrainPaths).toHaveLength(0);
         expect(map.getTerrainTileStats()).toBeNull();
     });
@@ -794,12 +794,12 @@ describe('terrain tiles', () => {
     it('needs the map origin, which the first data layer defines', async () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
-        expect(() => map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium })).toThrow(/origin/);
+        expect(() => map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium })).toThrow(/origin/);
     });
 
     it('rejects an invalid source before creating anything', async () => {
         const { map } = await createMap();
-        expect(() => map.enableTerrainTiles({ source: { ...TERRAIN_TILE_SOURCES.awsTerrarium, encoding: 'rgb' } as never })).toThrow(/encoding/);
+        expect(() => map.loadTerrain({ source: { ...TERRAIN_TILE_SOURCES.awsTerrarium, encoding: 'rgb' } as never })).toThrow(/encoding/);
         expect(terrainPaths).toHaveLength(0);
         expect(map.getTerrainTileStats()).toBeNull();
     });
@@ -809,7 +809,7 @@ describe('terrain tiles', () => {
         const credits = vi.spyOn(AutkMapUi.prototype, 'setAttribution');
         const { map } = await idleOnDemandMap();
 
-        map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
+        map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
         expect(terrainPaths).toHaveLength(1);
         const heights = terrainPaths[0].args[5] as Parameters<typeof isStreamingHeightSource>[0];
         expect(isStreamingHeightSource(heights)).toBe(true);
@@ -829,7 +829,7 @@ describe('terrain tiles', () => {
     it('renders once more when a tile arrives, through the map', async () => {
         stubTileNetwork();
         const { map } = await idleOnDemandMap();
-        map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
+        map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
         frames.run(3);
         const requestFrame = (terrainPaths[0].args[6] as () => void);
         expect(requestFrame).toBeTypeOf('function');
@@ -845,16 +845,16 @@ describe('terrain tiles', () => {
         const credits = vi.spyOn(AutkMapUi.prototype, 'setAttribution');
         const { map } = await idleOnDemandMap();
 
-        map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
+        map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium, windowSize: 64 });
         const first = terrainPaths[0].args[5] as any;
         expect(map.getTerrainTileStats()).not.toBeNull();
 
-        map.enableTerrainMode(raster([10, 20, 30, 40]), 'band');
+        map.loadTerrain({ source: { collection: raster([10, 20, 30, 40]), property: 'band' } });
         expect(terrainPaths[0].destroy).toHaveBeenCalledOnce();
         expect(map.getTerrainTileStats()).toBeNull();
         expect(credits.mock.calls.at(-1)![0]).toEqual([]);
 
-        map.disableTerrainMode();
+        map.removeTerrain();
         expect(map.getTerrainTileStats()).toBeNull();
         first.destroy();
     });
@@ -894,7 +894,8 @@ describe('unified terrain loading', () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         expect(() => map.loadTerrain({ source })).toThrow(/origin|center/);
-        map.loadTerrain({ source, center, zoom: 14, windowSize: 16 });
+        map.setView({ center, zoom: 14 });
+        map.loadTerrain({ source, windowSize: 16 });
         expect(map.layerManager.layers).toHaveLength(0);
         expect(map.layerManager.hasOrigin).toBe(true);
         const origin = [...map.layerManager.origin], eye = [...map.camera.getEye()];
@@ -1065,14 +1066,14 @@ describe('unified terrain loading', () => {
         const collection: FeatureCollection<Geometry | null> = { type: 'FeatureCollection', bbox: [0, 0, 100, 100],
             features: [{ type: 'Feature', geometry: null, properties: { rasterResX: 9, rasterResY: 9, band: data } }] };
         map.loadTerrain({ source: { collection, property: 'band' } });
-        expect((terrainPaths.at(-1)!.args[5] as { data: Float32Array }).data[40]).toBe(-430);
+        expect((terrainPaths.at(-1)!.args[5] as StaticHeightSource).heightfield.data[40]).toBe(-430);
         expect(data[40]).toBe(-3000);
         expect(map.getTerrainValidationStats()).toMatchObject({ rejected: 1, corrected: 1 });
         const count = terrainPaths.length;
         expect(() => map.loadTerrain({ source: { collection, property: 'band' }, validation: { minDeviation: NaN } })).toThrow(/finite and positive/);
         expect(terrainPaths).toHaveLength(count);
         map.loadTerrain({ source: { collection, property: 'band' }, validation: false });
-        expect((terrainPaths.at(-1)!.args[5] as { data: Float32Array }).data[40]).toBe(-3000);
+        expect((terrainPaths.at(-1)!.args[5] as StaticHeightSource).heightfield.data[40]).toBe(-3000);
         expect(map.getTerrainValidationStats()).toBeNull();
         map.removeTerrain();
         expect(map.getTerrainValidationStats()).toBeNull();
@@ -1082,10 +1083,10 @@ describe('unified terrain loading', () => {
     it('loads raster terrain through the same lifecycle and preserves active terrain on invalid input', async () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
-        expect(() => map.loadTerrain({ source, center, zoom: NaN })).toThrow(/zoom/);
+        expect(() => map.setView({ center, zoom: NaN })).toThrow(/zoom/);
         expect(map.layerManager.hasOrigin).toBe(false);
         map.loadTerrain({ source: { collection: raster([10, 20, 30, 40]), property: 'band' }, verticalScale: 2 });
-        expect((terrainPaths[0].args[5] as { data: Float32Array }).data[0]).toBe(20);
+        expect((terrainPaths[0].args[5] as StaticHeightSource).heightfield.data[0]).toBe(20);
         expect(map.layerManager.origin).toEqual([50, 50]);
         expect(map.layerManager.layers).toHaveLength(0);
         expect(map.getTerrainTileStats()).toBeNull();
@@ -1104,7 +1105,7 @@ describe('terrain mode on demand', () => {
         const { map, canvas } = await idleOnDemandMap();
         let before = renders();
 
-        map.enableTerrainMode(raster([10, 20, 30, 40]), 'band');
+        map.loadTerrain({ source: { collection: raster([10, 20, 30, 40]), property: 'band' } });
         frames.run(3);
         expect(renders() - before).toBe(1);
         expect(terrainPaths[0].renderFrame).toHaveBeenCalledOnce();
@@ -1112,7 +1113,7 @@ describe('terrain mode on demand', () => {
         const terrainChanges = [
             () => map.updateTerrainDebug({ showMesh: true }),
             () => canvas.fire('keyup', { key: 'b' }),
-            () => map.disableTerrainMode(),
+            () => map.removeTerrain(),
         ];
         for (const change of terrainChanges) {
             before = renders();
@@ -1125,7 +1126,7 @@ describe('terrain mode on demand', () => {
 
     it('gives the terrain path a way to request a frame for GPU work that lands after a frame', async () => {
         const { map } = await idleOnDemandMap();
-        map.enableTerrainMode(raster([10, 20, 30, 40]), 'band');
+        map.loadTerrain({ source: { collection: raster([10, 20, 30, 40]), property: 'band' } });
         frames.run(3);
         const requestFrame = terrainPaths[0].args.find((arg) => typeof arg === 'function') as (() => void) | undefined;
         expect(requestFrame).toBeTypeOf('function');
@@ -1243,7 +1244,8 @@ describe('tile-only geographic views', () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
-        map.loadTiles('imagery', { source, center, zoom: 12 });
+        map.setView({ center, zoom: 12 });
+        map.loadTiles('imagery', { source });
         expect(map.layerManager.layers.map(layer => layer.layerInfo.typeLayer)).toEqual(['tiles']);
         expect(map.layerManager.origin[0]).toBeCloseTo(0, 6);
         expect(map.layerManager.origin[1]).toBeCloseTo(0, 6);
@@ -1251,24 +1253,29 @@ describe('tile-only geographic views', () => {
         const distance = map.camera.getEye()[2];
         const origin = [...map.layerManager.origin];
         map.loadCollection('parks', { collection: square, type: 'polygons' });
-        map.loadTiles('second', { source, center, zoom: 13 });
+        map.setView({ center, zoom: 13 });
+        map.loadTiles('second', { source });
         expect(map.layerManager.origin).toEqual(origin);
         expect(map.camera.getEye()[2]).toBeCloseTo(distance / 2, 3);
         map.destroy();
     });
 
-    it('does not initialize an origin on invalid geographic views or failed GPU setup', async () => {
+    it('rejects invalid views and rolls back tile allocation on failed GPU setup', async () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => { throw new Error('GPU failure'); });
-        for (const config of [{ zoom: 12 }, { center, zoom: NaN }, { center, zoom: -1 },
+        for (const config of [{ center, zoom: NaN }, { center, zoom: -1 },
             { center: { latitude: 90, longitude: 0 } }, { center: { latitude: 0, longitude: 181 } }]) {
-            map.loadTiles('invalid', { source, ...config });
+            expect(() => map.setView(config)).toThrow();
         }
+        map.loadTiles('invalid', { source });
         expect(create).not.toHaveBeenCalled();
-        map.loadTiles('failed', { source, center, zoom: 12 });
         expect(map.layerManager.hasOrigin).toBe(false);
+        map.setView({ center, zoom: 12 });
+        map.loadTiles('failed', { source });
+        expect(create).toHaveBeenCalledOnce();
+        expect(map.layerManager.hasOrigin).toBe(true);
         expect(map.layerManager.layers).toHaveLength(0);
         map.destroy();
     });
@@ -1277,14 +1284,17 @@ describe('tile-only geographic views', () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false });
         await map.init();
         vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
-        map.loadTiles('imagery', { source, center });
+        map.setView({ center });
+        map.loadTiles('imagery', { source });
         const defaultDistance = map.camera.getEye()[2];
-        map.loadTiles('explicit', { source, center, zoom: 12 });
+        map.setView({ center, zoom: 12 });
+        map.loadTiles('explicit', { source });
         expect(map.camera.getEye()[2]).toBe(defaultDistance);
         map.destroy();
         const degrees = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs: 'EPSG:4326' });
         await degrees.init();
-        degrees.loadTiles('degrees', { source, center, zoom: 12 });
+        degrees.setView({ center, zoom: 12 });
+        degrees.loadTiles('degrees', { source });
         expect(degrees.layerManager.searchByLayerId('degrees')).toBeInstanceOf(TileLayer);
         expect(degrees.camera.getNear()).toBeLessThan(degrees.camera.getEye()[2]);
         expect(degrees.camera.getNear()).toBeGreaterThan(0);

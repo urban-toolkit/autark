@@ -44,7 +44,7 @@ describe('Shadows geometry and results', () => {
         const feature: Feature = {
             type: 'Feature', geometry: { type: 'GeometryCollection', geometries: [
                 { type: 'Polygon', coordinates: [small] }, { type: 'MultiPolygon', coordinates: [[large]] },
-            ] }, properties: { parts: [{ height: '10' }, { 'building:levels': '8' }] },
+            ] }, properties: { parts: [{ geometryIndex: 0, height: '10' }, { geometryIndex: 1, 'building:levels': '8' }] },
         };
         expect(resolveBuildingFootprint(feature)).toEqual(large);
         expect(resolveBuildingHeight(feature)).toBe(24);

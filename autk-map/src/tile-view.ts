@@ -1,11 +1,11 @@
 import type { SetViewParams } from './api';
 import { crsScaleAt } from '@urban-toolkit/autk-core';
-import { EARTH_RADIUS, WEB_MERCATOR_MAX_LAT, lonLatToCrs, type TileCrs } from './tile-projection';
+import { EARTH_RADIUS, WEB_MERCATOR_MAX_LAT, lonLatToCrs } from '@urban-toolkit/autk-core';
 import { MAX_TILE_ZOOM } from './tile-index';
 
 /** Convert a named geographic center and Web Mercator zoom into a projected perspective view. */
 export function initialTileView(
-    center: SetViewParams['center'], zoom: number, crs: TileCrs,
+    center: SetViewParams['center'], zoom: number, crs: string,
     cssHeight: number, fovy: number, tileSize: number,
 ) {
     if (!center || !Number.isFinite(center.longitude) || !Number.isFinite(center.latitude)

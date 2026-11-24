@@ -23,7 +23,7 @@ afterAll(async () => {
 const collection: FeatureCollection = {
   type: 'FeatureCollection',
   features: [
-    { type: 'Feature', id: 'building-a', properties: { height: 12, parts: [{ height: 25 }] },
+    { type: 'Feature', id: 'building-a', properties: { height: 12, parts: [{ geometryIndex: 0, height: 25 }] },
       geometry: { type: 'GeometryCollection', geometries: [{ type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] }] } },
     { type: 'Feature', id: 42, properties: { height: 15 },
       geometry: { type: 'Polygon', coordinates: [[[5, 0], [15, 0], [15, 10], [5, 10], [5, 0]]] } },

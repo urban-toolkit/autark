@@ -45,9 +45,9 @@ describe('building parts share one feature identity', () => {
     expect(Math.min(...heights[1])).toBe(5);
   });
 
-  it('retains positional metadata compatibility', () => {
-    const [meshes] = TriangulatorBuildings.buildMesh(buildings([square(0)], { parts: [{ height: 10 }] }), [0, 0]);
-    expect(meshes.length).toBeGreaterThan(0);
+  it('rejects building parts without explicit indices', () => {
+    expect(() => TriangulatorBuildings.buildMesh(buildings([square(0)], { parts: [{ height: 10 }] }), [0, 0]))
+      .toThrow(/geometryIndex/);
   });
 
   it('allows part levels to override a building height, without treating zero as missing', () => {

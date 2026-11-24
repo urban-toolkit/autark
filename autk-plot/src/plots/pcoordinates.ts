@@ -70,12 +70,12 @@ export const parallelCoordinates: PlotDefinition = {
             .attr('class', 'autk-pcoords-axis autkBrush')
             .attr('autkBrushId', field => field)
             .attr('transform', field => `translate(${margins.left + (x(field) ?? 0)}, ${margins.top})`);
-        axes.each(function (field) {
+        axes.each(function (field, index) {
             const axis = scales.get(field)!;
             const g = d3.select<SVGGElement, string>(this);
             if (axis.numeric) {
                 setBrushScale?.('y', axis.scale, field);
-                g.call(d3.axisLeft(axis.scale).ticks(5).tickFormat(v => format(0, '~s')(Number(v))));
+                g.call(d3.axisLeft(axis.scale).ticks(5).tickFormat(v => format(index, '~s')(Number(v))));
             } else {
                 setBrushScale?.('y', axis.scale, field);
                 g.call(d3.axisLeft(axis.scale));

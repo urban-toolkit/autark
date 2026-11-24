@@ -9,7 +9,7 @@ import { AutkMap } from '../dist/autk-map.js';
 
 // Serve the repository root on localhost after make build. This test requires real WebGPU.
 window.renderSizingResult = (async () => {
-    const map = new AutkMap(document.querySelector('canvas'), false);
+    const map = new AutkMap(document.querySelector('canvas'), { showUi: false });
     let readback;
     let numericReadback;
     let numericOutput;

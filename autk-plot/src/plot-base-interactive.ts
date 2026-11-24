@@ -10,6 +10,7 @@ import type { PlotConfig, PlotTransformConfig } from './api';
 
 import {
     ColorMap,
+    ColorMapInterpolator,
     EventEmitter,
     valueAtPath,
 } from '@urban-toolkit/autk-core';
@@ -498,7 +499,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             }
 
             const t = categories.length <= 1 ? 0 : idx / (categories.length - 1);
-            const scale = ColorMap.isCategorical(this._colorScale) ? this._colorScale : this._categoricalColorMapInterpolator;
+            const scale = ColorMap.isCategorical(this._colorScale) ? this._colorScale : ColorMapInterpolator.CAT_OBSERVABLE10;
             const { r, g, b } = ColorMap.getColor(t, scale, categories);
             return `rgb(${r},${g},${b})`;
         }

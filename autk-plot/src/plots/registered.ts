@@ -14,6 +14,7 @@
 import * as d3 from 'd3';
 
 import { valueAtPath } from '@urban-toolkit/autk-core';
+import type { ColorMapInterpolator } from '@urban-toolkit/autk-core';
 
 import type { PlotConfig, PlotMargins, PlotTransformConfig, TransformReducer } from '../api';
 import type { ResolvedPlotTransform } from '../plot-base-data';
@@ -79,7 +80,7 @@ export type PlotDrawContext = {
     /** Draws a left axis beside the drawing area; `label` as in `axisX`, defaulting to the second field. */
     axisY: <Domain extends d3.AxisDomain>(axis: d3.Axis<Domain>, label?: number | string) => d3.Selection<SVGGElement, unknown, null, undefined>;
     /**
-     * Number format of axis `index`: the D3 format from `ticks` or legacy `tickFormats`,
+     * Number format of axis `index`: the D3 format from `ticks`,
      * or, when neither sets it, SI prefixes from one up ("1.5k") and decimals under one
      * ("0.5", not "500m"). `fallback` stands in for an empty format (`''`) the configuration gives.
      */
@@ -261,6 +262,8 @@ export type PlotDefinition = {
     topK?: boolean;
     /** Defaults for options the configuration leaves unset (labels are merged field by field). */
     defaults?: Partial<PlotConfig> | ((config: PlotConfig) => Partial<PlotConfig>);
+    /** Numeric colormap used when none is configured. */
+    defaultNumericInterpolator?: ColorMapInterpolator;
     /** Checks the configuration before drawing; throws to refuse it. */
     validate?: (config: PlotConfig) => void;
 };
@@ -558,6 +561,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         definition.validate?.(config);
         this.definition = definition;
         this._ticks = config.ticks;
+        this._defaultNumericInterpolator = definition.defaultNumericInterpolator ?? this._defaultNumericInterpolator;
         this._colorProperty = definition.color ?? 'fill';
         const configured: unknown = config.provenance?.highlight;
         if (configured !== undefined && configured !== 'boolean') {
@@ -603,7 +607,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         super.computeColorDomain();
         const adjust = this.definition.colorDomain;
         const domain = this._resolvedDomain;
-        if (!adjust || this._style?.colorMap || this._domainSpec || !domain || domain.length !== 2 || typeof domain[0] !== 'number') return;
+        if (!adjust || this._style?.colorMap || !domain || domain.length !== 2 || typeof domain[0] !== 'number') return;
         this._resolvedDomain = adjust([domain[0], domain[domain.length - 1] as number]);
     }
 
@@ -1000,11 +1004,13 @@ export class RegisteredPlot extends PlotBaseInteractive {
         }
     }
 
-    /** Resolves the configured axis format, preferring `ticks` over the legacy array. */
+    /** Resolves the format for a Cartesian axis or a named parallel-coordinate dimension. */
     private tickFormatSpecifier(index: number): string | undefined {
-        // Parallel coordinates has multiple vertical axes, not an X/Y pair.
-        const side = this.definition.name === 'parallel-coordinates' ? undefined : (['x', 'y'] as const)[index];
-        return (side ? this._ticks?.[side]?.format : undefined) ?? this._tickFormats?.[index];
+        if (this.definition.name === 'parallel-coordinates') {
+            return this._ticks?.dimensions?.[this.renderAxisAttributes[index]]?.format;
+        }
+        const side = index === 0 ? 'x' : index === 1 ? 'y' : undefined;
+        return side === undefined ? undefined : this._ticks?.[side]?.format;
     }
 
     /** Smallest and largest value a unit contributes to a row (`[0, 0]` with no unit). */

@@ -121,10 +121,7 @@ Normalized raster collections and prebuilt local-space meshes must already use t
 coordinate system. Use `AutkDb` to prepare raster inputs.
 
 The first collection, `setView()`, imagery, or terrain establishes the workspace context;
-subsequent layers cannot reinterpret it in another CRS. **Migration:** `center`/`zoom` in
-`loadTiles()` and `loadTerrain()` remain supported, but are deprecated in favor of `setView()`.
-Applications that previously selected a different workspace CRS through the first imagery
-load after loading vectors should configure the CRS in the map constructor instead.
+subsequent layers cannot reinterpret it in another CRS. Use `setView({ center, zoom })` before loading imagery or streamed terrain on an empty map. Configure a custom workspace CRS in the map constructor before calling `setView()`.
 
 Gallery: `gallery/src/autk-map/standalone-geographic-geojson-vis.html` loads the existing
 longitude/latitude Manhattan neighborhood dataset without `AutkDb` or manual reprojection.
@@ -214,11 +211,8 @@ canvas resizing and is removed by `destroy()`; only the strip intercepts pointer
 ```ts
 import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
 
-map.loadTiles('imagery', {
-    source: TILE_SOURCES.esriWorldImagery,
-    center: { latitude: 40.7831, longitude: -73.9712 },
-    zoom: 12,
-});
+map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
+map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
 ```
 
 * **Sources.** Presets are `esriWorldImagery`, `openStreetMap`, `osmLight`, and `osmDark`. The OSM themes use the standard OSM raster endpoint and apply muted colors on the client. `osmLight` has a pale background and `osmDark` reverses luminance onto a dark background. Roads and labels baked into the images remain; this does not add vector tile styling. Custom raster sources can also set `theme: 'light' | 'dark' | 'original'`. Colors are processed once when a tile is loaded and cached with the texture; overlays and other render pipelines are unchanged. Anything else works through a URL template with `{z}`, `{x}`, `{y}`, optional `{s}` (with `subdomains`) and `{reverseY}` for TMS-style servers. `attribution` is required and is shown beside the Autark link at the bottom left of the map. It is a string, a `{ text, url }` entry that links to the provider's page, or a list of either; links must be `http(s)` URLs. The OpenStreetMap-based presets link to `openstreetmap.org/copyright`.
@@ -377,11 +371,8 @@ map.removeTerrain();
 An existing map needs no center or zoom. For a standalone terrain map, supply the initial view:
 
 ```ts
-map.loadTerrain({
-    source: TERRAIN_TILE_SOURCES.awsTerrarium,
-    center: { latitude: -22.96, longitude: -43.2075 },
-    zoom: 14,
-});
+map.setView({ center: { latitude: -22.96, longitude: -43.2075 }, zoom: 14 });
+map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
 // Optional: add imagery without changing terrain or the camera.
 map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });
 ```
@@ -394,7 +385,7 @@ Normalized raster elevation uses the same API:
 map.loadTerrain({ source: { collection: elevation, property: 'band_1' } });
 ```
 
-The raster is already in the workspace CRS and can initialize an empty map from its bounds. Tile source descriptors need no additional `type` argument. `enableTerrainMode()`, `enableTerrainTiles()`, and `disableTerrainMode()` remain compatibility wrappers.
+The raster is already in the workspace CRS and can initialize an empty map from its bounds. Tile source descriptors need no additional `type` argument. Use `removeTerrain()` to return to flat rendering.
 
 The shared workspace CRS defaults to the same EPSG:3395 constant as AutkDb. For normalized data from a custom workspace, construct the map with `new AutkMap(canvas, { crs: 'EPSG:3857' })`. The existing `crs` parameter on the first imagery or terrain load can also declare a custom workspace CRS when the constructor did not specify one. Imagery and elevation then inherit this CRS and the same origin; subsequent conflicting settings are rejected. GeoJSON does not reliably carry workspace CRS metadata, so a custom database CRS must be declared on the map. Explicit center/zoom repositions the camera without changing an existing origin. Terrain zoom uses a 256-pixel Web Mercator reference independent of DEM tile resolution.
 

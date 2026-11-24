@@ -53,8 +53,6 @@ export type {
     UpdateRenderInfoParams,
     /** Options for continuous or on-demand rendering with `draw()`. */
     MapDrawOptions,
-    /** Parameters for streaming terrain elevation with `enableTerrainTiles()`. */
-    EnableTerrainTilesParams,
 } from './api';
 
 /** Ready-made tile sources for `AutkMap.loadTiles`. Each provider sets its own terms of use. */
@@ -75,7 +73,6 @@ export type { TileCredit, TileAttribution } from './attribution';
 /** Statistics types returned by `AutkMap.getTileStats` and `AutkMap.renderStats`. */
 export type { TileLayerStats } from './layer-tiles';
 export type { FrameStatsSnapshot } from './frame-stats';
-export type { TileCrs } from './tile-projection';
 
 /** Layer state and configuration types exposed by the map API. */
 export type {

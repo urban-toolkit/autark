@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTileGrid, tileRowCount } from '../src/tile-geometry';
 import { tilesPerAxis } from '../src/tile-index';
-import { WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from '../src/tile-projection';
-import type { TileCrs } from '../src/tile-projection';
+import { WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from '@urban-toolkit/autk-core';
 
 const LEGACY_TILE_PROJECTIONS = ['EPSG:3395', 'EPSG:3857', 'EPSG:4326'] as const;
 
@@ -165,7 +164,7 @@ describe('tileRowCount', () => {
    */
   const SAMPLES_PER_SUBDIVISION = 16; // includes the midpoint, where linear interpolation is worst
 
-  function worstErrorPixels(crs: TileCrs, z: number, rows = tileRowCount(crs, z)): number {
+  function worstErrorPixels(crs: string, z: number, rows = tileRowCount(crs, z)): number {
     const n = tilesPerAxis(z);
     const size = (2 * WEB_MERCATOR_EXTENT) / n;
     const step = Math.max(1, Math.floor(n / 256));

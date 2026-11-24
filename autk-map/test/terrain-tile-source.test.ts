@@ -6,7 +6,7 @@ import { isStreamingHeightSource } from '../src/height-source';
 import { TERRAIN_TILE_SOURCES, resolveTerrainTileSource } from '../src/terrain-tile-source';
 import type { TerrainTileSource } from '../src/terrain-tile-source';
 import type { TileIndex } from '../src/tile-index';
-import { WEB_MERCATOR_EXTENT, crsToLonLat, lonLatToCrs } from '../src/tile-projection';
+import { WEB_MERCATOR_EXTENT, crsToLonLat, lonLatToCrs } from '@urban-toolkit/autk-core';
 import { TileLoadError } from '../src/tile-loader';
 
 const SIZE = 256;

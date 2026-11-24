@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTileFrame } from '../src/tile-frame';
 import { buildTileGrid } from '../src/tile-geometry';
-import { lonLatToCrs } from '../src/tile-projection';
+import { lonLatToCrs } from '@urban-toolkit/autk-core';
 
 const ORIGIN = lonLatToCrs('EPSG:3395', 10, 45);
 

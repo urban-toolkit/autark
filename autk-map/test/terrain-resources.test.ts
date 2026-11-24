@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { StaticHeightSource } from '../src/height-source';
 import { TerrainRenderer } from '../src/renderer-terrain';
 import type { Heightfield } from '@urban-toolkit/autk-core';
 
@@ -15,7 +16,7 @@ it('releases every terrain buffer allocated before constructor failure', () => {
     } as unknown as GPUDevice;
     const field = { originX: 0, originY: 0, width: 2, height: 2, cellSizeX: 1, cellSizeY: 1,
         data: new Float32Array(4), bounds: [0, 0, 1, 1], minHeight: 0, maxHeight: 0 } as Heightfield;
-    expect(() => new TerrainRenderer(device, 'bgra8unorm', 'depth32float', 4, field, {} as GPUTextureView, {} as GPUTextureView)).toThrow('allocation failed');
+    expect(() => new TerrainRenderer(device, 'bgra8unorm', 'depth32float', 4, new StaticHeightSource(field), {} as GPUTextureView, {} as GPUTextureView)).toThrow('allocation failed');
     expect(buffers.length).toBeGreaterThan(4);
     expect(buffers.every(buffer => buffer.destroy.mock.calls.length === 1)).toBe(true);
 });

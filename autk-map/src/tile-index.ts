@@ -8,7 +8,7 @@
  * other providers.
  */
 
-import { EARTH_RADIUS, WEB_MERCATOR_EXTENT, clampLatitude, latToMercatorY, mercatorYToLat } from './tile-projection';
+import { EARTH_RADIUS, WEB_MERCATOR_EXTENT, clampLatitude, latToMercatorY, mercatorYToLat } from '@urban-toolkit/autk-core';
 
 /** Address of one tile in the XYZ scheme. */
 export interface TileIndex {

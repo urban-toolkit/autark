@@ -22,9 +22,8 @@ import { PipelineBuildingSSAO } from './pipeline-triangle-ssao';
 import { Renderer } from './renderer';
 import { TerrainRenderer } from './renderer-terrain';
 import type { TerrainDebugOptions } from './renderer-terrain';
-import { StaticHeightSource, heightAt, isStreamingHeightSource } from './height-source';
+import { heightAt, isStreamingHeightSource } from './height-source';
 import type { HeightSource } from './height-source';
-import type { Heightfield } from '@urban-toolkit/autk-core';
 
 /** Maximum requested overlay texture dimension before clamping to device limits. */
 const TERRAIN_OVERLAY_TEXTURE_SIZE = 4096;
@@ -65,11 +64,11 @@ export class TerrainMapRenderPath {
      * @param layerManager Ordered layer source used for overlays and buildings.
      * @param picking Shared picking helper for readback and event emission.
      * @param style Instance-specific style used for terrain water and overlay colors.
-     * @param heightfield Fixed heightfield, or a height source (possibly streaming), sampled by terrain and buildings.
+     * @param heightSource Height source sampled by terrain and buildings.
      * @param requestRender Schedules another frame when GPU work that lands after a frame changes what the next one draws.
      * @throws If renderer overlay texture views cannot be created by the renderer.
      * @example
-     * const terrainPath = new TerrainMapRenderPath(renderer, camera, layers, picking, style, heightfield, () => map.requestRender());
+     * const terrainPath = new TerrainMapRenderPath(renderer, camera, layers, picking, style, heightSource, () => map.requestRender());
      */
     constructor(
         /** Shared renderer used to create render passes and submit commands. */
@@ -82,15 +81,14 @@ export class TerrainMapRenderPath {
         private readonly picking: MapPickingController,
         /** Instance-specific style used for terrain water and overlay colors. */
         private readonly style: MapStyle,
-        /** Local-space height samples, or a height source; a heightfield is wrapped in a one-level source. */
-        heightfield: Heightfield | HeightSource,
+        heightSource: HeightSource,
         /** Schedules another frame when a GPU readback changes what the next frame draws. */
         private readonly requestRender: () => void,
         /** Maximum imagery-overlay edge; fixed GeoTIFF terrain retains its previous default. */
         private readonly maximumOverlaySize = TERRAIN_OVERLAY_TEXTURE_SIZE,
         fitInitialView = true,
     ) {
-        this.heightSource = 'levels' in heightfield ? heightfield : new StaticHeightSource(heightfield);
+        this.heightSource = heightSource;
         const overlaySize = this.getTerrainOverlayTextureSize();
         this.renderer.configureOverlayTexture(overlaySize, overlaySize);
         this.rebuildTerrainRenderer();

@@ -4,7 +4,7 @@ import type {
     GeoJsonProperties,
 } from 'geojson';
 
-import type { ColorMapDomainSpec, ColorMapInterpolator, ColorMapOptions } from '@urban-toolkit/autk-core';
+import type { ColorMapOptions } from '@urban-toolkit/autk-core';
 
 import type { PlotEvent } from './types-events';
 
@@ -90,28 +90,24 @@ export type PlotConfig = {
     plot?: string;
     /** Optional data transform applied before rendering. */
     transform?: PlotTransformConfig;
-    /** Legacy D3 format strings for each axis; `ticks` takes precedence for X and Y. */
-    tickFormats?: string[];
-    /** Tick options for the X and Y axes. */
+    /** Tick options for Cartesian axes and parallel-coordinate dimensions. */
     ticks?: {
         x?: AxisTickOptions & {
             /** Custom label for a bar, line, or area chart's raw category or bucket key. Return an empty string to skip the label. */
             label?: (key: string) => string;
         };
         y?: AxisTickOptions;
+        /** D3 tick formats keyed by field name for parallel coordinates. */
+        dimensions?: Record<string, { format?: string }>;
     };
-    /** Domain specification controlling how the colormap range is derived. */
-    domainSpec?: ColorMapDomainSpec;
-    /** Color interpolator used for continuous (numeric) color encoding. */
-    colorMapInterpolator?: ColorMapInterpolator;
-    /** Color interpolator used when the color attribute contains categorical (string) values. Defaults to `OBSERVABLE10`. */
-    categoricalColorMapInterpolator?: ColorMapInterpolator;
     /** Appearance overrides for this plot. */
     style?: {
         /** Fixed scatterplot point radius in pixels; defaults to 5. */
         radius?: number;
         /** Bar chart band padding from 0 to 1; defaults to 0.25. */
         barPadding?: number;
+        /** D3 number formats keyed by table column field. */
+        columnFormats?: Record<string, string>;
         /** Colormap and optional domain, using the same configuration as `AutkMap.updateColorMap`. */
         colorMap?: ColorMapOptions;
     };

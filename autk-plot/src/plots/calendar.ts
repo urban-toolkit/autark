@@ -45,7 +45,7 @@ export const calendar: PlotDefinition = {
     requiresTransform: true,
     topK: false,
     // Gray by value, so the highlight stands out over any day.
-    defaults: { colorMapInterpolator: ColorMapInterpolator.SEQ_GREYS },
+    defaultNumericInterpolator: ColorMapInterpolator.SEQ_GREYS,
     colorAttribute: 'value',
     colorDomain: PlotStyle.softSequentialDomain,
     validate: config => {

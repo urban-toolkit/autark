@@ -29,7 +29,7 @@ export const tablevis: PlotDefinition = {
     // Sorted by the first column unless configured.
     defaults: config => ({ transform: { preset: 'sort', options: { column: config.attributes?.axis?.[0] ?? '', direction: 'asc' } } }),
 
-    draw({ html, rows, fields, value, axisLabels, options, setOptions, interactive, format, hasFormat }) {
+    draw({ html, rows, fields, value, axisLabels, options, setOptions, interactive, style }) {
         const sorted = (options.column as string | undefined) ?? fields[0];
         const direction = options.direction === 'desc' ? 'desc' : 'asc';
 
@@ -71,8 +71,7 @@ export const tablevis: PlotDefinition = {
             headers.on('click', (_event, field) => setOptions({ column: field, direction: field === sorted && direction === 'asc' ? 'desc' : 'asc' }));
         }
 
-        const number = d3.format('');
-        const formats = fields.map((_, index) => hasFormat(index) ? format(index) : number);
+        const formats = fields.map(field => d3.format(style?.columnFormats?.[field] ?? ''));
         table.append('tbody')
             .selectAll('tr')
             .data(rows)

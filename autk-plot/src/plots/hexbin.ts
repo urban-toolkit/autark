@@ -44,7 +44,7 @@ export const hexbin: PlotDefinition = {
     transforms: ['binning-hex'],
     requiresTransform: true,
     topK: false,
-    defaults: { colorMapInterpolator: ColorMapInterpolator.SEQ_GREYS },
+    defaultNumericInterpolator: ColorMapInterpolator.SEQ_GREYS,
     transformOptions: area => area,
     // Light to medium tones of the scheme, under the provenance color.
     colorDomain: PlotStyle.softSequentialDomain,

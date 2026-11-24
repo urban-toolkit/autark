@@ -3,7 +3,7 @@ import { AutkMap } from '../src/map';
 import type { TileLayer } from '../src/layer-tiles';
 import type { Layer } from '../src/layer';
 import { tileLonLatBounds } from '../src/tile-index';
-import { lonLatToCrs, type TileCrs } from '../src/tile-projection';
+import { lonLatToCrs } from '@urban-toolkit/autk-core';
 import { PipelineBuildingSSAO } from '../src/pipeline-triangle-ssao';
 import type { Triangles3DLayer } from '../src/layer-triangles3D';
 
@@ -33,7 +33,7 @@ export async function runWebGpuCases() {
     const fineTiltImage = await solidTile('#00ff00');
     const nativeFetch = window.fetch;
     const target = { z: 4, x: 8, y: 8 };
-    for (const crs of ['EPSG:3857', 'EPSG:3395', 'EPSG:4326'] as TileCrs[]) {
+    for (const crs of ['EPSG:3857', 'EPSG:3395', 'EPSG:4326'] as string[]) {
         let allowChildren = false;
         let requests = 0;
         const waiting: Array<() => void> = [];

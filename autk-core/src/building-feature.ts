@@ -9,7 +9,7 @@ export interface BuildingPartProperties {
 /**
  * Normalizes one building to its original component geometries and explicit part indices.
  * Does not union, repair, clone coordinates, or group independent features.
- * Legacy positional `parts` metadata is accepted, but cannot be mixed with indexed metadata.
+ * Every `parts` entry must specify its component's `geometryIndex`.
  *
  * @param feature A building feature with polygonal or ring geometry.
  * @returns A new feature/properties object; component geometries retain their original references.
@@ -29,13 +29,12 @@ export function normalizeBuildingFeature(feature: Feature<Geometry | null>): Fea
 
     const metadata = feature.properties?.parts ?? [];
     if (!Array.isArray(metadata)) throw new Error(`${context}: parts must be an array`);
-    const indexed = metadata.some(part => part && typeof part === 'object' && 'geometryIndex' in part);
     const seen = new Set<number>();
     const parts: BuildingPartProperties[] = metadata.map((part, i) => {
         if (!part || typeof part !== 'object' || Array.isArray(part)) {
             throw new Error(`${context}: invalid part metadata at index ${i}`);
         }
-        const index = indexed ? part.geometryIndex : i;
+        const index = part.geometryIndex;
         if (!Number.isInteger(index) || index < 0 || index >= geometries.length || seen.has(index)) {
             throw new Error(`${context}: invalid or duplicate geometryIndex ${String(index)}`);
         }

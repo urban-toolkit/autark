@@ -1,5 +1,6 @@
 import { AutkMap } from '../src/map';
 import { MapEvent } from '../src/types-events';
+import { StaticHeightSource } from '../src/height-source';
 import { Camera, heightfieldFromRaster } from '@urban-toolkit/autk-core';
 import { PipelineBuildingSSAO } from '../src/pipeline-triangle-ssao';
 import type { Layer } from '../src/layer';
@@ -241,11 +242,11 @@ export async function runWebGpuCases() {
         checks.push('independent hover and tooltip position on a translated and scaled canvas');
 
         const heightfield = heightfieldFromRaster(raster, 'band', [0, 0]);
-        const heights = device.createTexture({ size: [2, 2], format: 'r32float',
+        const heights = device.createTexture({ size: [2, 2, 1], format: 'r32float',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
         resources.push(heights);
         device.queue.writeTexture({ texture: heights }, heightfield.data, { bytesPerRow: 8 }, [2, 2]);
-        building.setTerrainHeightSource(heightfield, heights.createView());
+        building.setTerrainHeightSource(new StaticHeightSource(heightfield), heights.createView({ dimension: '2d-array' }));
         const raised = await pixels([], building, [building]);
         assert(raised[(64 * 128 + 64) * 4] === 1, 'Terrain-relative building picking missed the nearest roof');
         assert(raised.some((value, i) => value !== roofs[i]), 'Terrain height did not move building geometry');

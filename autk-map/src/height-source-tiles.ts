@@ -29,7 +29,6 @@ import { DEFAULT_MAX_CONCURRENT } from './tile-loader';
 import { TileStore } from './tile-store';
 import type { TileStoreStats } from './tile-store';
 import type { ResolvedTerrainTileSource } from './terrain-tile-source';
-import type { TileCrs } from './tile-projection';
 
 /** Levels when none is given. */
 export const DEFAULT_TERRAIN_LEVELS = 6;
@@ -48,7 +47,7 @@ export interface TileHeightSourceOptions {
     /** Elevation source. */
     source: ResolvedTerrainTileSource;
     /** Coordinate system of the map plane. */
-    crs: TileCrs;
+    crs: string;
     /** Map origin in `crs` units. */
     origin: readonly [number, number];
     /** Local-space point the windows start centred on. */

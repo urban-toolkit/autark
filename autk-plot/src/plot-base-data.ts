@@ -21,7 +21,7 @@ import {
     ColorMap,
     valueAtPath,
 } from '@urban-toolkit/autk-core';
-import type { ColorMapConfig, ColorMapDomainSpec, CustomColorPalette, ResolvedDomain } from '@urban-toolkit/autk-core';
+import type { ColorMapConfig, CustomColorPalette, ResolvedDomain } from '@urban-toolkit/autk-core';
 
 import { run } from './transforms';
 import { shapeBinding, transformOf } from './transforms/registry';
@@ -84,8 +84,6 @@ export abstract class PlotBaseData {
 
     /** Plot title text. */
     protected _title!: string;
-    /** D3 tick-format specifiers used by axis renderers. */
-    protected _tickFormats: string[] | undefined;
 
     /** Outer plot width in pixels. */
     protected _width: number = DEFAULT_WIDTH;
@@ -115,12 +113,8 @@ export abstract class PlotBaseData {
     /** Top-k cut applied to rendered rows after the transform, if any. */
     protected _topK: TopKConfig | undefined = undefined;
 
-    /** Domain specification for color encoding (from config). */
-    protected _domainSpec: ColorMapDomainSpec | undefined = undefined;
-    /** Color interpolator used for continuous (numeric) color encoding. */
-    protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQ_REDS;
-    /** Color interpolator used when the color attribute contains categorical (string) values. */
-    protected _categoricalColorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.CAT_OBSERVABLE10;
+    /** Default interpolator for numeric color encoding when the caller does not supply a scale. */
+    protected _defaultNumericInterpolator = ColorMapInterpolator.SEQ_REDS;
     /** Appearance overrides from the plot configuration. */
     protected _style: PlotConfig['style'];
     /** Scale selected for the current rendered color domain. */
@@ -173,19 +167,15 @@ export abstract class PlotBaseData {
         this._sourceColorAttribute = config.attributes?.color;
 
         this._title = config.labels?.title || 'Autk Plot';
-        this._tickFormats = config.tickFormats;
 
         this._autoWidth = config.width === 'auto';
         this._width = (config.width === 'auto' ? undefined : config.width) || DEFAULT_WIDTH;
         this._height = config.height || 500;
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
 
-        this._domainSpec = config.style?.colorMap?.domainSpec ?? config.domainSpec;
-        const palette = config.style?.colorMap;
-        if (palette?.type !== undefined) ColorMap.validatePalette(palette);
-        this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
-        this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
         this._style = config.style;
+        const palette = this._style?.colorMap;
+        if (palette?.type !== undefined) ColorMap.validatePalette(palette);
 
         this._transformConfig = config.transform;
 
@@ -544,9 +534,9 @@ export abstract class PlotBaseData {
 
         const isCategorical = values.some(v => typeof v === 'string' && isNaN(Number(v as string)));
         const configured = this._style?.colorMap;
-        const domainSpec = this._domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX };
+        const domainSpec = configured?.domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX };
         const interpolator = configured?.interpolator
-            ?? (isCategorical ? this._categoricalColorMapInterpolator : this._colorMapInterpolator);
+            ?? (isCategorical ? ColorMapInterpolator.CAT_OBSERVABLE10 : this._defaultNumericInterpolator);
         const colorMap: ColorMapConfig = configured?.type === undefined
             ? { interpolator, domainSpec }
             : { type: configured.type, colors: configured.colors, domainSpec };

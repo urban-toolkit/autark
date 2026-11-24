@@ -47,7 +47,8 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
         const errors: string[] = [];
         device.addEventListener('uncapturederror', event => errors.push(event.error.message));
         device.pushErrorScope('validation');
-        map.loadTerrain({ ...options, center: { latitude: 0, longitude: 0 }, zoom: 15 });
+        map.setView({ center: { latitude: 0, longitude: 0 }, zoom: 15 });
+        map.loadTerrain(options);
         assert(map.layerManager.layers.length === 0, 'Terrain-only initialization created an imagery layer');
         const path = () => (map as unknown as { _terrainRenderPath: TerrainMapRenderPath })._terrainRenderPath;
         const heights = () => (path() as unknown as { heightSource: TileHeightSource }).heightSource;
@@ -158,9 +159,9 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
         map.removeTerrain();
         assert(map.getTerrainTileStats() === null, 'Terrain disable retained the streaming source');
         checks.push('failed replacement rollback, successful replacement, and terrain disable');
-        map.enableTerrainMode({ type: 'FeatureCollection', bbox: [-700.5, -600.25, 700.5, 600.25], features: [{
+        map.loadTerrain({ source: { collection: { type: 'FeatureCollection', bbox: [-700.5, -600.25, 700.5, 600.25], features: [{
             type: 'Feature', geometry: null, properties: { rasterResX: 2, rasterResY: 2, band: [80, 80, 80, 80] },
-        }] }, 'band');
+        }] }, property: 'band' } });
         await render();
         assert(Math.abs(await uploadedHeight() - 80) < 0.01, 'Existing fixed-heightfield terrain did not reach the shared GPU path');
         assert(map.getTerrainTileStats() === null, 'GeoTIFF terrain must not expose streaming statistics');
@@ -179,9 +180,9 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
                     await new Promise(resolve => setTimeout(resolve, 10));
                 }
                 assert(reference[1]! > reference[2]! + 20, `Flat imagery did not load: ${reference}`);
-                map.enableTerrainMode({ type: 'FeatureCollection', bbox: [-80, -80, 80, 80], features: [{
+                map.loadTerrain({ source: { collection: { type: 'FeatureCollection', bbox: [-80, -80, 80, 80], features: [{
                     type: 'Feature', geometry: null, properties: { rasterResX: 2, rasterResY: 2, band: [-40, -40, -40, -40] },
-                }] }, 'band');
+                }] }, property: 'band' } });
                 const edge = await capture(16, 64);
                 assert(edge.every((channel, index) => Math.abs(channel - reference[index]!) <= 2),
                     `${projection}: fixed terrain cut off imagery outside the DEM: ${edge}; flat: ${reference}`);

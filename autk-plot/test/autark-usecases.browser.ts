@@ -72,7 +72,7 @@ describe('Niteroi', () => {
             type: 'linechart', collection: { type: 'FeatureCollection', features: [] },
             attributes: { axis: ['lst_timeseries', '@transform'] },
             transform: { preset: 'reduce-series', options: { timestamp: 'timestamp', value: 'value' } },
-            tickFormats: ['.0f', '.1f'], width: 600, height: 280,
+            ticks: { x: { format: '.0f' }, y: { format: '.1f' } }, width: 600, height: 280,
         } as UnifiedPlotConfig);
         expect(div.querySelectorAll('.autkMark')).toHaveLength(0);
 

@@ -92,7 +92,7 @@ The complete export list lives in [`src/index.ts`](./src/index.ts).
 
 ## Building parts
 
-`normalizeBuildingFeature(feature)` wraps original geometry in a GeometryCollection and validates `properties.parts[].geometryIndex`; it does not union, repair or clone coordinates. Legacy positional metadata is supported. General height/base attributes are inherited unless a part supplies its own tags, including explicit zero.
+`normalizeBuildingFeature(feature)` wraps original geometry in a GeometryCollection and validates `properties.parts[].geometryIndex`; it does not union, repair or clone coordinates. Every part must include its `geometryIndex`. General height/base attributes are inherited unless a part supplies its own tags, including explicit zero.
 
 `TriangulatorBuildings` preserves building identity across its original parts. Window triangulation uses original roofs/rings and component-aware window IDs, not a convex hull.
 

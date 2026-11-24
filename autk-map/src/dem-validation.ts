@@ -2,7 +2,7 @@
 import { assessElevationSample, isPotentialElevationOutlier, replaceElevationOutlier, replaceElevationDiscontinuity } from '@urban-toolkit/autk-core';
 import type { ElevationValidationStats, ResolvedElevationValidation } from '@urban-toolkit/autk-core';
 import type { DemTile } from './dem-decode';
-import { EARTH_RADIUS, WEB_MERCATOR_EXTENT } from './tile-projection';
+import { EARTH_RADIUS, WEB_MERCATOR_EXTENT } from '@urban-toolkit/autk-core';
 
 interface ValidationBlock { tile?: DemTile; flags: Uint8Array; spacing: Float64Array; replacements?: Float32Array; reference?: number }
 

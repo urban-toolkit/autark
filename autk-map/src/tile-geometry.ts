@@ -18,8 +18,7 @@
 
 import type { TileIndex } from './tile-index';
 import { tileLonLatBounds, tilesPerAxis } from './tile-index';
-import type { TileCrs } from './tile-projection';
-import { WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from './tile-projection';
+import { WEB_MERCATOR_EXTENT, lonLatToCrs, mercatorYToLat } from '@urban-toolkit/autk-core';
 
 /** Vertex and index data for one tile. */
 export interface TileGrid {
@@ -38,7 +37,7 @@ export interface TileGrid {
  * a pixel of the true projection for tiles up to 512 pixels. Zooms beyond the
  * table use one row.
  */
-const ROWS_BY_ZOOM: Record<TileCrs, readonly number[]> = {
+const ROWS_BY_ZOOM: Record<string, readonly number[]> = {
     'EPSG:3857': [],
     'EPSG:3395': [4, 4, 2, 2, 2],
     'EPSG:4326': [64, 64, 64, 32, 16, 16, 8, 8, 4, 4, 2, 2],
@@ -51,7 +50,7 @@ const ROWS_BY_ZOOM: Record<TileCrs, readonly number[]> = {
  * @param z - Zoom level.
  * @returns A positive integer.
  */
-export function tileRowCount(crs: TileCrs, z: number): number {
+export function tileRowCount(crs: string, z: number): number {
     return ROWS_BY_ZOOM[crs]?.[z] ?? (ROWS_BY_ZOOM[crs] ? 1 : 16);
 }
 
@@ -69,7 +68,7 @@ export function tileRowCount(crs: TileCrs, z: number): number {
  * @example
  * const grid = buildTileGrid({ z: 3, x: 4, y: 2 }, 'EPSG:3395', [0, 0]);
  */
-export function buildTileGrid(tile: TileIndex, crs: TileCrs, origin: readonly [number, number]): TileGrid {
+export function buildTileGrid(tile: TileIndex, crs: string, origin: readonly [number, number]): TileGrid {
     const rows = tileRowCount(crs, tile.z);
     const columns = ROWS_BY_ZOOM[crs] ? 1 : rows;
     const n = tilesPerAxis(tile.z);

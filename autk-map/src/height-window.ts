@@ -22,8 +22,7 @@ import type { DemTileLookup } from './dem-sample';
 import type { HeightLevel } from './height-source';
 import { lonLatToTileCoord, tileKey, tileRangeInBounds, tileRangeCount, tilesInRange, tilesPerAxis } from './tile-index';
 import type { TileIndex } from './tile-index';
-import { WEB_MERCATOR_EXTENT, crsToLonLat } from './tile-projection';
-import type { TileCrs } from './tile-projection';
+import { WEB_MERCATOR_EXTENT, crsToLonLat } from '@urban-toolkit/autk-core';
 
 /** How far the map plane stretches, per 3857 metre, at the map origin. */
 export interface CrsScale {
@@ -34,7 +33,7 @@ export interface CrsScale {
 }
 
 /** Geographic footprint of a map-plane rectangle, with scalar fast paths where applicable. */
-function windowBounds(crs: TileCrs, minX: number, minY: number, maxX: number, maxY: number): [number, number, number, number] {
+function windowBounds(crs: string, minX: number, minY: number, maxX: number, maxY: number): [number, number, number, number] {
     // Scalar fast paths only; other projections require a two-dimensional footprint.
     if (crs === 'EPSG:3395' || crs === 'EPSG:3857' || crs === 'EPSG:4326') return [
         crsToLonLat(crs, minX, 0)[0], crsToLonLat(crs, 0, minY)[1],
@@ -46,7 +45,7 @@ function windowBounds(crs: TileCrs, minX: number, minY: number, maxX: number, ma
 /** What a window needs to be placed. */
 export interface WindowParams {
     /** Coordinate system of the map plane. */
-    crs: TileCrs;
+    crs: string;
     /** Map origin in `crs` units. */
     origin: readonly [number, number];
     /** Scale from {@link crsScaleAt}. */
@@ -70,7 +69,7 @@ export interface WindowPlan {
     /** Pixels per tile edge. */
     readonly tileSize: number;
     /** Coordinate system of the map plane. */
-    readonly crs: TileCrs;
+    readonly crs: string;
     /** Map origin in `crs` units. */
     readonly origin: readonly [number, number];
     /** Samples per edge. */

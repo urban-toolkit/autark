@@ -28,7 +28,7 @@ import { getBuildingParts } from './building-feature';
  * Builds extruded mesh geometry for OSM-style buildings.
  *
  * Each feature contains original component geometries associated with
- * `properties.parts[].geometryIndex` (legacy positional metadata is accepted).
+ * `properties.parts[].geometryIndex`.
  * Parts inherit building attributes and override them individually. For every supported part
  * geometry, the triangulator converts world coordinates into local XY space,
  * resolves wall heights from part metadata, and emits mesh chunks with feature

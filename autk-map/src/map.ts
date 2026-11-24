@@ -73,7 +73,6 @@ import {
     UpdateRasterParams,
     UpdateThematicParams,
     LoadTilesParams,
-    EnableTerrainTilesParams,
     LoadTerrainParams,
     MapOptions,
 } from './api';
@@ -87,7 +86,7 @@ import { Renderer } from './renderer';
 import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
 import { initialTileView } from './tile-view';
-import { crsToLonLat, isTileCrs, type TileCrs } from './tile-projection';
+import { crsToLonLat, isSupportedCrs } from '@urban-toolkit/autk-core';
 import { FrameStats } from './frame-stats';
 import type { FrameStatsSnapshot } from './frame-stats';
 import { TileLayer } from './layer-tiles';
@@ -107,6 +106,7 @@ import { MapPickingController, type PickableLayer } from './map-picking';
 import type { TooltipProvider } from './api';
 import { TerrainMapRenderPath } from './map-terrain';
 import { TileHeightSource } from './height-source-tiles';
+import { StaticHeightSource } from './height-source';
 import type { TerrainTileStats } from './height-source-tiles';
 import { resolveTerrainTileSource } from './terrain-tile-source';
 import { mergeCredits } from './attribution';
@@ -184,7 +184,7 @@ export class AutkMap {
     private _reportedTerrainErrors = 0;
     private _terrainValidation: ElevationValidationStats | null = null;
     /** Shared workspace CRS for normalized data, imagery, and terrain. */
-    private _workspaceCrs: TileCrs = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+    private _workspaceCrs: string = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
     /** Locked by explicit map configuration, setView(), or the first successfully loaded collection/source. */
     private _workspaceCrsEstablished = false;
     /** Shared picking coordinator used by both render paths. */
@@ -201,16 +201,12 @@ export class AutkMap {
      * @example
      * new AutkMap(canvas, { crs: 'EPSG:3857', showUi: false });
      */
-    constructor(canvas: HTMLCanvasElement, options?: MapOptions);
-    /** @deprecated Pass `showUi` inside the options object. */
-    constructor(canvas: HTMLCanvasElement, showUi: boolean, options?: MapOptions);
-    constructor(canvas: HTMLCanvasElement, optionsOrShowUi: MapOptions | boolean = {}, legacyOptions: MapOptions = {}) {
-        const options = typeof optionsOrShowUi === 'boolean' ? legacyOptions : optionsOrShowUi;
-        if (options.crs !== undefined && !isTileCrs(options.crs)) throw new Error("Unsupported workspace CRS.");
+    constructor(canvas: HTMLCanvasElement, options: MapOptions = {}) {
+        if (options.crs !== undefined && !isSupportedCrs(options.crs)) throw new Error("Unsupported workspace CRS.");
         this._workspaceCrs = options.crs ?? DEFAULT_WORKSPACE_COORDINATE_FORMAT;
         this._workspaceCrsEstablished = options.crs !== undefined;
         this._canvas = canvas;
-        this._showUi = typeof optionsOrShowUi === 'boolean' ? optionsOrShowUi : options.showUi ?? true;
+        this._showUi = options.showUi ?? true;
         this._style = new MapStyle();
         this._style.setChangeListener(() => {
             for (const layer of this._layerManager.layers) {
@@ -237,7 +233,7 @@ export class AutkMap {
     }
 
     /** Coordinate system shared by normalized data, imagery, and terrain. */
-    get workspaceCrs(): TileCrs { return this._workspaceCrs; }
+    get workspaceCrs(): string { return this._workspaceCrs; }
 
     /**
      * Sets a geographic center and zoom without loading data or changing an existing origin.
@@ -264,9 +260,9 @@ export class AutkMap {
     }
 
     /** Reject a layer that would interpret the established workspace in a different CRS. */
-    private resolveWorkspaceCrs(crs?: TileCrs): TileCrs {
+    private resolveWorkspaceCrs(crs?: string): string {
         const resolved = crs ?? this._workspaceCrs;
-        if (!isTileCrs(resolved)) throw new Error('Unsupported workspace CRS.');
+        if (!isSupportedCrs(resolved)) throw new Error('Unsupported workspace CRS.');
         if (resolved !== this._workspaceCrs && this._workspaceCrsEstablished) {
             throw new Error(`Workspace CRS is ${this._workspaceCrs}; cannot load a layer using ${resolved}.`);
         }
@@ -481,7 +477,7 @@ export class AutkMap {
      * Tiles use the Web Mercator grid. By default, they draw below every other layer,
      * so load vector layers normally and the basemap shows underneath; a
      * `surface` layer would cover it. Drawing needs the map origin, which the
-     * first loaded data layer defines, or `center` can establish it for a
+     * first loaded data layer defines, or `setView()` can establish it for a
      * tile-only map. The source attribution is shown on the map.
      *
      * Opacity and visibility change through {@link AutkMap.updateRenderInfo}.
@@ -490,10 +486,10 @@ export class AutkMap {
      * @param params Tile source and options.
      * @throws Never throws. Errors, such as an invalid source, are logged to the console.
      * @example
-     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery,
-     *     center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
+     * map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
+     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
      */
-    loadTiles(id: string, { source, crs, center, zoom, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
+    loadTiles(id: string, { source, crs, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
         const layerInfo: LayerInfo = {
             id,
             typeLayer: 'tiles',
@@ -509,23 +505,10 @@ export class AutkMap {
         let layer: TileLayer | null = null;
         try {
             crs = this.resolveWorkspaceCrs(crs);
-            if (zoom !== undefined && center === undefined) throw new Error('Tile zoom requires a geographic center.');
-            if (!this._layerManager.hasOrigin && center === undefined) throw new Error('An empty map requires a geographic center and optional zoom.');
+            if (!this._layerManager.hasOrigin) throw new Error('Set the view before loading tiles on an empty map.');
             layer = this._layerManager.addTileLayer(layerInfo, layerRenderInfo, { source, crs, maxCachedTiles, zoomBias, maxTiles });
             if (!layer) { return; }
-            const view = center !== undefined
-                ? initialTileView(center, zoom ?? 12, crs ?? DEFAULT_WORKSPACE_COORDINATE_FORMAT,
-                    this.canvas.clientHeight, this._camera.getFovyRadians(), layer.source.tileSize) : undefined;
             layer.createPipeline(this._renderer);
-            if (view) {
-                const [x, y] = view.point;
-                if (!this._layerManager.hasOrigin) {
-                    this._layerManager.initializeOrigin({ type: 'FeatureCollection', features: [], bbox: [x, y, x, y] });
-                }
-                const origin = this._layerManager.origin;
-                const target = [x - origin[0], y - origin[1], 0];
-                this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
-            }
             this._workspaceCrs = crs;
             this._workspaceCrsEstablished = true;
             layer.setChangeListener(() => this.requestRender());
@@ -1270,35 +1253,6 @@ export class AutkMap {
         layer.clearSkippedIds();
     }
 
-    /**
-     * Enables terrain rendering from a raster feature collection.
-     *
-     * The collection is converted to a local-space heightfield and used to
-     * replace the flat render path with the terrain render path.
-     *
-     * @param collection Raster feature collection containing bbox, resolution, and height values.
-     * @param property Dot-path to the raster band used as terrain height.
-     * @returns Nothing. Terrain resources are initialized immediately.
-     * @deprecated Use loadTerrain({ source: { collection, property } }).
-     * @throws {Error} If the heightfield input or workspace CRS is invalid.
-     * @example
-     * map.enableTerrainMode(elevationCollection, 'bands.elevation');
-     */
-    enableTerrainMode(collection: FeatureCollection<Geometry | null>, property: string): void {
-        this.loadTerrain({ source: { collection, property } });
-    }
-
-    /**
-     * Disables terrain rendering and returns the map to the flat render path.
-     *
-     * @returns Nothing. Terrain GPU resources are released when present.
-     * @throws Never throws.
-     * @deprecated Use removeTerrain().
-     * @example
-     * map.disableTerrainMode();
-     */
-    disableTerrainMode(): void { this.removeTerrain(); }
-
     /** Removes elevation while preserving imagery, data layers, origin, and camera. */
     removeTerrain(): void {
         if (!this._terrainRenderPath) return;
@@ -1309,48 +1263,23 @@ export class AutkMap {
     }
 
     /**
-     * Enables terrain rendering with elevation streamed from a web tile service.
-     *
-     * Heights come from a stack of nested windows around the view: the finest
-     * covers a few kilometres, each further one twice the area at half the
-     * detail, so the terrain reaches far while staying sharp near the camera.
-     * Tiles are fetched as the camera moves, coarse ones first, so a surface
-     * appears quickly and sharpens. Layers, buildings and picking work as in
-     * {@link AutkMap.enableTerrainMode}; load a tile layer to drape imagery.
-     *
-     * Reuses the map origin, which the first loaded data layer defines. Replaces
-     * any terrain already enabled. The source attribution is shown on the map.
-     *
-     * @deprecated Use loadTerrain(params).
-     * @param params Elevation source and options.
-     * @returns Nothing. Terrain resources are initialized immediately and tiles load in the background.
-     * @throws {Error} If the map origin is not initialized, or the source or an option is invalid.
-     * @example
-     * map.loadCollection('neighborhoods', { collection, type: 'polylines' });
-     * map.enableTerrainTiles({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
-     * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
-     */
-    enableTerrainTiles(params: EnableTerrainTilesParams): void { this.loadTerrain(params); }
-
-    /**
      * Loads elevation tiles or a normalized raster into the shared terrain renderer.
      * Imagery is optional and is loaded independently with loadTiles(). An existing
-     * workspace origin and camera are reused. An empty tile-terrain map needs center;
+     * workspace origin and camera are reused. On an empty map, set the view before loading elevation tiles;
      * a raster can initialize its own origin and view from its bounds.
      * Without visible imagery, loaded surface layers supply the terrain geometry,
      * preserving their boundaries and holes. Visible tiles or RGB rasters retain
      * the larger elevation mesh. Maps without surface layers also retain that mesh.
-     * @param params Elevation source, optional initial view, and terrain options.
+     * @param params Elevation source and terrain options.
      * @throws If coordinates, source, or options are invalid, or GPU setup fails.
      * @example
      * map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
      */
-    loadTerrain({ source, crs, center, zoom, validation, levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, overlaySize }: LoadTerrainParams): void {
+    loadTerrain({ source, crs, validation, levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, overlaySize }: LoadTerrainParams): void {
         const qualityOptions = resolveElevationValidation(validation);
         const workspaceCrs = this.resolveWorkspaceCrs(crs);
         const metresPerUnit = crsMetresPerUnit(workspaceCrs);
         if (!(metresPerUnit && metresPerUnit > 0)) throw new Error('Terrain requires projected linear units (a metre-based or other linear workspace CRS).');
-        if (zoom !== undefined && center === undefined) throw new Error('Terrain zoom requires a geographic center.');
         if (!source || typeof source !== 'object') throw new Error('Terrain requires an elevation source.');
         if (verticalScale !== undefined && (!Number.isFinite(verticalScale) || verticalScale <= 0)) {
             throw new Error('Terrain verticalScale must be finite and positive.');
@@ -1361,20 +1290,12 @@ export class AutkMap {
         if (!Number.isSafeInteger(size) || size < 64 || size > 4096) {
             throw new Error('Terrain overlaySize must be an integer from 64 to 4096.');
         }
-        const view = center === undefined ? undefined : initialTileView(center, zoom ?? 12, workspaceCrs,
-            this.canvas.clientHeight, this._camera.getFovyRadians(), 256);
         const hadOrigin = this.layerManager.hasOrigin;
-        if (!hadOrigin && !view && !raster) {
-            throw new Error('Terrain requires an existing map origin or a geographic center and optional zoom.');
-        }
-        let origin: number[];
-        if (hadOrigin) origin = this.layerManager.origin;
-        else if (view) origin = [view.point[0], view.point[1]];
-        else if (raster) origin = computeOrigin(source.collection as FeatureCollection);
-        else throw new Error('Terrain requires a geographic center.');
+        const origin = hadOrigin ? this.layerManager.origin : raster ? computeOrigin(source.collection as FeatureCollection) : null;
+        if (!origin) throw new Error('Terrain tiles require an existing map origin; set the view first.');
         const heights = raster ? heightfieldFromRaster(source.collection, source.property, origin, !!qualityOptions) : new TileHeightSource({
             source: resolved!, crs: workspaceCrs, origin: [origin[0]!, origin[1]!],
-            centre: view ? [view.point[0] - origin[0]!, view.point[1] - origin[1]!] : [this._camera.getLookAt()[0], this._camera.getLookAt()[1]],
+            centre: [this._camera.getLookAt()[0], this._camera.getLookAt()[1]],
             levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, validation,
             onChange: () => this.requestRender(),
             onError: (tile, error, permanent) => {
@@ -1409,17 +1330,15 @@ export class AutkMap {
         let path: TerrainMapRenderPath;
         try {
             path = new TerrainMapRenderPath(this._renderer, this._camera, this._layerManager, this._picking,
-                this._style, heights, () => this.requestRender(), size, !hadOrigin && !view);
+                this._style, heights instanceof TileHeightSource ? heights : new StaticHeightSource(heights),
+                () => this.requestRender(), size, !hadOrigin);
         } catch (error) {
             if (heights instanceof TileHeightSource) heights.destroy();
             throw error;
         }
         this._terrainRenderPath?.destroy();
         this.clearTerrainTiles();
-        if (!hadOrigin) {
-            this.layerManager.initializeOrigin(raster && !view ? source.collection
-                : { type: 'FeatureCollection', features: [], bbox: [origin[0]!, origin[1]!, origin[0]!, origin[1]!] });
-        }
+        if (!hadOrigin && raster) this.layerManager.initializeOrigin(source.collection);
         this._workspaceCrs = workspaceCrs;
         this._workspaceCrsEstablished = true;
         this._terrainRenderPath = path;
@@ -1427,10 +1346,6 @@ export class AutkMap {
         this._terrainTiles = heights instanceof TileHeightSource ? heights : null;
         this._terrainCredits = resolved?.attribution ?? [];
         this._reportedTerrainErrors = 0;
-        if (view) {
-            const target = [view.point[0] - origin[0]!, view.point[1] - origin[1]!, 0];
-            this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
-        }
         this.refreshAttribution();
         this.requestRender();
     }

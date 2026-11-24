@@ -22,7 +22,7 @@ import { buildTileFrame } from './tile-frame';
 import type { FrameTile, TileFrame } from './tile-frame';
 import { fetchTileImage } from './tile-loader';
 import { applyTileTheme } from './tile-theme';
-import { isTileCrs, type TileCrs } from './tile-projection';
+import { isSupportedCrs } from '@urban-toolkit/autk-core';
 import { selectAdaptiveTiles, selectTiles } from './tile-selection';
 import { tileKey, type TileIndex } from './tile-index';
 import type { TerrainImageryDetail, TileSelectionOptions } from './tile-selection';
@@ -35,7 +35,7 @@ export interface TileLayerOptions extends TileSelectionOptions {
     /** Where the tiles come from. */
     source: TileSource;
     /** Coordinate system of the map. Defaults to `'EPSG:3395'`. */
-    crs?: TileCrs;
+    crs?: string;
     /** Tiles kept in memory. Defaults to 256. */
     maxCachedTiles?: number;
 }
@@ -80,7 +80,7 @@ export interface TileLayerStats {
     idle: boolean;
 }
 
-const DEFAULT_CRS: TileCrs = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+const DEFAULT_CRS: string = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
 const MAX_REPORTED_ERRORS = 3;
 
 /** What the last selection holds, kept for {@link TileLayerStats}. */
@@ -106,7 +106,7 @@ const EMPTY_FRAME: TileFrame<TileTexture> = {
 /** Layer that draws tiles from a {@link TileSource}. */
 export class TileLayer extends Layer {
     private readonly _source: ResolvedTileSource;
-    private readonly _crs: TileCrs;
+    private readonly _crs: string;
     private readonly _options: TileLayerOptions;
     private readonly _getOrigin: () => readonly number[] | undefined;
 
@@ -139,7 +139,7 @@ export class TileLayer extends Layer {
         super(layerInfo, layerRenderInfo);
         this._source = resolveTileSource(options.source);
         this._crs = options.crs ?? DEFAULT_CRS;
-        if (!isTileCrs(this._crs)) throw new Error(`Unsupported tile CRS: ${this._crs}.`);
+        if (!isSupportedCrs(this._crs)) throw new Error(`Unsupported tile CRS: ${this._crs}.`);
         for (const name of ['maxCachedTiles', 'maxTiles'] as const) {
             const value = options[name];
             if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) {

@@ -20,7 +20,7 @@ async function main(): Promise<void> {
         collection,
         attributes: { axis: ['ntaname', 'shape_area', 'shape_leng'] },
         labels: { axis: ['Neighborhood', 'Area', 'Perimeter'] },
-        tickFormats: ['', ',.0f', ',.0f'],
+        style: { columnFormats: { shape_area: ',.0f', shape_leng: ',.0f' } },
         transform: { preset: 'sort', options: { direction: 'asc' } },
         width: 'auto',
         events: [PlotEvent.CLICK, PlotEvent.HOVER],

@@ -8,8 +8,7 @@ import { heightAt } from '../src/height-source';
 import type { TileIndex } from '../src/tile-index';
 import { tileKey } from '../src/tile-index';
 import { TileLoadError } from '../src/tile-loader';
-import { WEB_MERCATOR_EXTENT, crsToLonLat, lonLatToCrs } from '../src/tile-projection';
-import type { TileCrs } from '../src/tile-projection';
+import { WEB_MERCATOR_EXTENT, crsToLonLat, lonLatToCrs } from '@urban-toolkit/autk-core';
 
 const SIZE = 256;
 const A = 0.0001;
@@ -48,7 +47,7 @@ function demLookup(allow: (tile: TileIndex) => boolean = () => true, surface: Su
 }
 
 const ORIGIN_LONLAT: [number, number] = [-43.1, -22.9];
-const originFor = (crs: TileCrs) => lonLatToCrs(crs, ORIGIN_LONLAT[0], ORIGIN_LONLAT[1]);
+const originFor = (crs: string) => lonLatToCrs(crs, ORIGIN_LONLAT[0], ORIGIN_LONLAT[1]);
 
 /**
  * A steep surface measured from the map origin, so heights stay small (a few hundred metres) and float32
@@ -230,7 +229,7 @@ describe('crsScaleAt', () => {
 });
 
 describe('planWindow', () => {
-  const crs: TileCrs = 'EPSG:3395';
+  const crs: string = 'EPSG:3395';
   const origin = originFor(crs) as [number, number];
   const scale = crsScaleAt(crs, origin);
   const base = { crs, origin, scale, zoom: 12, tileSize: SIZE, size: 512 };
@@ -308,7 +307,7 @@ describe('tile demand bound', () => {
   });
 
   it('rejects windows beyond the largest size', () => {
-    const crs: TileCrs = 'EPSG:3395';
+    const crs: string = 'EPSG:3395';
     const origin = originFor(crs) as [number, number];
     expect(() => planWindow({ crs, origin, scale: crsScaleAt(crs, origin), zoom: 12, tileSize: SIZE, size: MAX_WINDOW_SIZE + 2, centre: [0, 0] })).toThrow(/at most/);
   });
@@ -363,7 +362,7 @@ describe('mixed-resolution continuity', () => {
 
 describe('composeWindow', () => {
   /** Surface height at a texel, from its map position converted to spherical Mercator. */
-  function expectedAt(crs: TileCrs, absX: number, absY: number): number {
+  function expectedAt(crs: string, absX: number, absY: number): number {
     const [lon, lat] = crsToLonLat(crs, absX, absY);
     const [x, y] = lonLatToCrs('EPSG:3857', lon, lat);
     return steep(x, y);
@@ -397,7 +396,7 @@ describe('composeWindow', () => {
     });
   }
 
-  const crs: TileCrs = 'EPSG:3395';
+  const crs: string = 'EPSG:3395';
   const origin = originFor(crs) as [number, number];
   const scale = crsScaleAt(crs, origin);
   const plan = planWindow({ crs, origin, scale, zoom: 12, tileSize: SIZE, size: 64, centre: [0, 0] });

@@ -72,7 +72,7 @@ Besides the attributes, labels and styling options, the config accepts:
 
 ### Numeric axis ticks
 
-Set `ticks: { x: { count: 4 }, y: { count: 6, format: ',d' } }` to request about four X ticks and six Y ticks, formatting Y labels as comma-separated integers. Both axes and both settings are optional. D3 may choose a different count to keep tick values round. Missing, nonpositive, or nonfinite counts use the axis default. An explicit `ticks.x.format` or `ticks.y.format` takes precedence over the corresponding legacy `tickFormats` entry.
+Set `ticks: { x: { count: 4 }, y: { count: 6, format: ',d' } }` to request about four X ticks and six Y ticks, formatting Y labels as comma-separated integers. Both axes and both settings are optional. D3 may choose a different count to keep tick values round. Missing, nonpositive, or nonfinite counts use the axis default. Set the D3 number format with `ticks.x.format` or `ticks.y.format`. For parallel coordinates, set a format by field with `ticks.dimensions`, such as `{ population: { format: ',d' } }`.
 
 The option applies to numeric axes that generate their tick positions:
 
@@ -86,7 +86,7 @@ For bar, line, and area charts, `ticks.x.label` receives the raw category or buc
 
 ### Plot appearance
 
-Use `style` for per-plot appearance overrides. `style.radius` sets a fixed scatterplot point radius in pixels. Omit it or pass a nonpositive or nonfinite value to keep the 5 px default. It does not affect bubble sizes. `style.barPadding` controls bar-chart band spacing from `0` (no padding) to `1` (full padding); the default is `0.25` and invalid values fall back to it.
+Use `style` for per-plot appearance overrides. `style.radius` sets a fixed scatterplot point radius in pixels. Omit it or pass a nonpositive or nonfinite value to keep the 5 px default. It does not affect bubble sizes. Use `style.columnFormats` on tables to set D3 number formats by column field. `style.barPadding` controls bar-chart band spacing from `0` (no padding) to `1` (full padding); the default is `0.25` and invalid values fall back to it.
 
 `style.colorMap` accepts the same object as `map.updateColorMap(layerId, { colorMap })`. Keep the data field in `attributes.color`:
 
@@ -104,7 +104,7 @@ new AutkPlot(container, {
 });
 ```
 
-Import `ColorMapDomainStrategy` and the `ColorMapOptions` type from `@urban-toolkit/autk-core`. Use `{ interpolator: ColorMapInterpolator.SEQ_VIRIDIS }` for a named scale, or `{ type, colors }` for a custom hex palette. Categorical colors follow domain order and reuse the last color if the palette is short. Sequential palettes are ramps, and diverging palettes use three colors with the middle color at the domain midpoint. Selection highlights are unchanged. The legacy `colorMapInterpolator`, `categoricalColorMapInterpolator`, and `domainSpec` remain fallbacks.
+Import `ColorMapDomainStrategy` and the `ColorMapOptions` type from `@urban-toolkit/autk-core`. Use `{ interpolator: ColorMapInterpolator.SEQ_VIRIDIS }` for a named scale, or `{ type, colors }` for a custom hex palette. Categorical colors follow domain order and reuse the last color if the palette is short. Sequential palettes are ramps, and diverging palettes use three colors with the middle color at the domain midpoint. Selection highlights are unchanged. Set the domain strategy inside `style.colorMap`.
 
 ### Supported plot types
 

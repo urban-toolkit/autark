@@ -29,10 +29,6 @@ export interface LoadGeoTiffParams {
    */
   maxRasterCells?: number;
   /**
-   * Deprecated alias for `maxRasterCells`.
-   */
-  maxPixels?: number;
-  /**
    * Resampling method used when downsampling large rasters.
    * Defaults to `'bilinear'`. Categorical RGB imports always use nearest-neighbor.
    */

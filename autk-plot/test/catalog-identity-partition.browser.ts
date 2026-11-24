@@ -294,7 +294,7 @@ describe('hexbin and calendar colors', () => {
             collection: withEvents(),
             attributes: { axis: ['sjoin.collect.noise', '@transform'] },
             transform: { preset: 'binning-events', options: { timestamp: 'date' } },
-            colorMapInterpolator: ColorMapInterpolator.SEQ_REDS,
+            style: { colorMap: { interpolator: ColorMapInterpolator.SEQ_REDS } },
         });
         expect(fills(div).some(fill => { const [r, g] = channels(fill); return r !== g; })).toBe(true);
     });

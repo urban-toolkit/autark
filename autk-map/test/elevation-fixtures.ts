@@ -1,6 +1,6 @@
 import fixture from './fixtures/elevation-regions.json';
 import { composeWindow, crsScaleAt, planWindow } from '../src/height-window';
-import { lonLatToCrs } from '../src/tile-projection';
+import { lonLatToCrs } from '@urban-toolkit/autk-core';
 import type { DemTile } from '../src/dem-decode';
 import type { TileIndex } from '../src/tile-index';
 import type { HeightSource } from '../src/height-source';

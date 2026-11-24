@@ -3,7 +3,7 @@ import { mat4, vec4 } from 'gl-matrix';
 import { Camera } from '@urban-toolkit/autk-core';
 import { selectAdaptiveTiles } from '../src/tile-selection';
 import type { TileSelection } from '../src/tile-selection';
-import { crsToLonLat, lonLatToCrs } from '../src/tile-projection';
+import { crsToLonLat, lonLatToCrs } from '@urban-toolkit/autk-core';
 import { lonLatToTileCoord, tileLonLatBounds } from '../src/tile-index';
 import { resolveTileSource } from '../src/tile-source';
 

@@ -13,7 +13,6 @@
 import type { TileIndex } from './tile-index';
 import { uvInAncestor } from './tile-index';
 import { buildTileGrid } from './tile-geometry';
-import type { TileCrs } from './tile-projection';
 
 /** One tile to draw and the image to draw it with. */
 export interface FrameTile<R> {
@@ -59,7 +58,7 @@ export interface TileFrame<R> {
  */
 export function buildTileFrame<R>(
     items: readonly FrameTile<R>[],
-    crs: TileCrs,
+    crs: string,
     origin: readonly [number, number],
 ): TileFrame<R> {
     const grids = items.map((item) => buildTileGrid(item.tile, crs, origin));

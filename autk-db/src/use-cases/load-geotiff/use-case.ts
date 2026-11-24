@@ -30,7 +30,6 @@ export class LoadGeoTiffUseCase {
       workspace = DEFAULT_WORKSPACE_NAME,
       workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
       maxRasterCells,
-      maxPixels,
       resampleMethod = 'bilinear',
       categoricalRgb,
     } = params;
@@ -66,7 +65,7 @@ export class LoadGeoTiffUseCase {
     const sourceCrs = coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
     const targetCrs = workspaceCoordinateFormat;
     const qualifiedTableName = `${workspace}.${outputTableName}`;
-    const cellLimit = Math.max(1, Math.floor(maxRasterCells ?? maxPixels ?? DEFAULT_MAX_RASTER_CELLS));
+    const cellLimit = Math.max(1, Math.floor(maxRasterCells ?? DEFAULT_MAX_RASTER_CELLS));
 
     let buffer: ArrayBuffer;
     if (geotiffFileUrl) {

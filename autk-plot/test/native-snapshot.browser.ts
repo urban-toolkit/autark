@@ -181,7 +181,7 @@ export const NATIVE_CASES: Case[] = [
         config: {
             type: 'scatterplot', attributes: { axis: ['shape_area', 'shape_leng'], color: 'landuse' },
             filter: { attribute: 'landuse', op: '!=', value: 'Mixed' }, provenance: { path: 'open' },
-            tickFormats: ['.2s', '.1s'],
+            ticks: { x: { format: '.2s' }, y: { format: '.1s' } },
         },
         steps: [{ kind: 'select', ids: 'half', shares: 'third' }, { kind: 'select', ids: [0, 1, 2] }, { kind: 'select', ids: [] }],
     },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialTileView } from '../src/tile-view';
-import { EARTH_RADIUS } from '../src/tile-projection';
+import { EARTH_RADIUS } from '@urban-toolkit/autk-core';
 
 const center = { latitude: 40, longitude: -74 };
 const fovy = Math.PI / 4;

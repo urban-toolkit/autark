@@ -15,7 +15,7 @@ import {
   tilesPerAxis,
   uvInAncestor,
 } from '../src/tile-index';
-import { WEB_MERCATOR_EXTENT, WEB_MERCATOR_MAX_LAT } from '../src/tile-projection';
+import { WEB_MERCATOR_EXTENT, WEB_MERCATOR_MAX_LAT } from '@urban-toolkit/autk-core';
 
 /** A real Esri z17 tile whose corner GDAL reported as lon 2.647705078125, lat 6.465421906280472. */
 const LAGOS = { z: 17, x: 66500, y: 63177 };

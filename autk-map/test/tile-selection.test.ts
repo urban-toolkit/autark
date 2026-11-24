@@ -3,7 +3,7 @@ import { Camera } from '@urban-toolkit/autk-core';
 import { selectAdaptiveTiles, selectTiles } from '../src/tile-selection';
 import { initialTileView } from '../src/tile-view';
 import type { TileView } from '../src/tile-selection';
-import { lonLatToCrs, crsToLonLat, EARTH_RADIUS } from '../src/tile-projection';
+import { lonLatToCrs, crsToLonLat, EARTH_RADIUS } from '@urban-toolkit/autk-core';
 import { ancestorTile, lonLatToTileCoord } from '../src/tile-index';
 import { resolveTileSource } from '../src/tile-source';
 

@@ -1,12 +1,11 @@
 import { AutkMap, TILE_SOURCES } from '@urban-toolkit/autk-map';
-import type { TileCrs } from '@urban-toolkit/autk-map';
 import { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '@urban-toolkit/autk-core';
 
 export interface TilePanelStatus { text: string; state: 'loading' | 'error' | 'ready'; busy: boolean }
 
 /** Provider controls shared by imagery-only and imagery-with-terrain examples. */
 export class TilesBasemap {
-    static readonly coordinateFormat: TileCrs = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+    static readonly coordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
     protected map!: AutkMap;
     protected center = { latitude: -22.9, longitude: -43.1 };
     protected zoom = 13;
