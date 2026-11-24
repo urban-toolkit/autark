@@ -21,10 +21,12 @@ async function main(): Promise<void> {
         attributes: { axis: ['shape_area', 'shape_leng'] },
         labels: { title: 'Scatterplot' },
         width: Math.max(280, body.clientWidth - 40),
-        events: [PlotEvent.BRUSH],
+        events: [PlotEvent.BRUSH, PlotEvent.HOVER],
     });
 
     map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.BRUSH, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
 }
 void runExample(main);

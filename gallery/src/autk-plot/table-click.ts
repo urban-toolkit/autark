@@ -23,10 +23,12 @@ async function main(): Promise<void> {
         tickFormats: ['', ',.0f', ',.0f'],
         transform: { preset: 'sort', options: { direction: 'asc' } },
         width: 'auto',
-        events: [PlotEvent.CLICK],
+        events: [PlotEvent.CLICK, PlotEvent.HOVER],
     });
 
     map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
 }
 void runExample(main);

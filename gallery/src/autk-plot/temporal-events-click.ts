@@ -49,12 +49,14 @@ async function main(): Promise<void> {
             axis: ['Date', roads ? 'Road–report matches' : 'Neighborhood–report matches'] },
         transform: { preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } },
         width: 'auto',
-        events: [PlotEvent.BRUSH_X],
+        events: [PlotEvent.BRUSH_X, PlotEvent.HOVER],
     });
     onExampleDispose(() => plot.destroy());
 
     map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => map.setHighlightedIds(layer, selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds(layer, [...new Set([...plot.selection, ...selection])]));
     document.querySelector('#join-description')!.textContent = roads
         ? 'Reports match every road within 200 m, so one report can count toward several roads.'
         : 'Reports match neighborhood boundaries by location.';

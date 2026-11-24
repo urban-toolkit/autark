@@ -631,9 +631,11 @@ const plot = new AutkPlot(document.querySelector('#plotBody')!, {
   collection,
   attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}
   width: Math.max(280, document.querySelector('#plotBody')!.clientWidth - 40),
-  events: [PlotEvent.${event}],
+  events: [PlotEvent.${event}, PlotEvent.HOVER],
 });
 
 map.events.on(MapEvent.PICKING, ({ selection }) => plot.setSelection(selection));
-plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));`;
+plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+  map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));`;
 }
