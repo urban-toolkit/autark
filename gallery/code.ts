@@ -1,17 +1,23 @@
 import { ROAD_LENGTH_WGSL } from './src/autk-map/road-length';
 
-/** The core API calls for each task; the full runnable program is under "View full source". */
+/** The exact API calls for each feature; the runnable program is under "Minimal runnable example". */
 export function exampleCode(id: string, state: Record<string, string>): string {
     const provider = state['source-select'] || 'osmLight';
     const variant = state.variant;
     switch (id) {
         case 'D01': {
-            const [layer, type, tune] = variant === 'lines' ? ['neighborhood-boundaries', ", type: 'polylines'", "map.updateRenderInfo('neighborhood-boundaries', { polylinesWidth: 120 });\n"]
-                : variant === 'points' ? ['neighborhood-centers', ", type: 'points'", "map.updateRenderInfo('neighborhood-centers', { pointSize: 160 });\n"]
+            const [layer, type, style] = variant === 'lines'
+                ? ['neighborhood-boundaries', ", type: 'polylines'", "map.updateRenderInfo('neighborhood-boundaries', { polylinesWidth: 120 });\n"]
+                : variant === 'points'
+                    ? ['neighborhood-centers', ", type: 'points'", "map.updateRenderInfo('neighborhood-centers', { pointSize: 160 });\n"]
                     : ['neighborhoods', '', ''];
-            return `new AutkMap(canvas, { showUi: false });\nmap.loadCollection('${layer}', { collection${type} });\n${tune}map.fitBounds();\nmap.draw();`;
+            return `map.loadCollection('${layer}', { collection${type} });\n${style}`;
         }
-        case 'D02': return `new AutkMap(canvas, { crs: '${state.crs || 'EPSG:3395'}', showUi: false });\nmap.loadCollection('community-areas', { collection, sourceCrs: 'EPSG:4326' });`;
+        case 'D02': return `const map = new AutkMap(canvas, { crs: '${state.crs || 'EPSG:3395'}' });
+map.loadCollection('community-areas', {
+  collection,              // longitude/latitude
+  sourceCrs: 'EPSG:4326',  // projected into the workspace CRS
+});`;
         case 'D03': {
             const city = state.workspace || 'paris';
             const [workspace, load, layer] = city === 'new_york'
@@ -19,69 +25,189 @@ export function exampleCode(id: string, state: Record<string, string>): string {
                 : city === 'chicago'
                     ? ['chicago', "geojsonObject: collection", 'community_areas']
                     : ['paris', "geojsonFileUrl: '/data/paris-arrondissements.geojson'", 'arrondissements'];
-            return `await db.setWorkspace('${workspace}');\nawait db.loadGeojson({ ${load}, outputTableName: '${layer}' });\nmap.loadCollection('${layer}', { collection: await db.getLayer('${layer}'), type: 'polygons' });`;
+            return `await db.setWorkspace('${workspace}');
+await db.loadGeojson({ ${load}, outputTableName: '${layer}' });
+map.loadCollection('${layer}', { collection: await db.getLayer('${layer}') });`;
         }
-        case 'D04': return `await db.loadCsv({
-  csvFileUrl: '/data/london-boroughs.csv',
-  outputTableName: 'boroughs',
-  geometryColumns: { wktColumnName: 'wkt' },
-});
-await db.loadJson({
-  jsonFileUrl: '/data/london-tube-lines.json',
-  outputTableName: 'tube_lines',
-  geometryColumns: { wktColumnName: 'wkt' },
-});
-await db.loadCsv({
-  csvFileUrl: '/data/london-tube-entrances.csv',
+        case 'D04': return `const wkt = { wktColumnName: 'wkt' };
+await db.loadCsv({ csvFileUrl: '/data/london-boroughs.csv',
+  outputTableName: 'boroughs', geometryColumns: wkt });
+await db.loadJson({ jsonFileUrl: '/data/london-tube-lines.json',
+  outputTableName: 'tube_lines', geometryColumns: wkt });
+await db.loadCsv({ csvFileUrl: '/data/london-tube-entrances.csv',
   outputTableName: 'tube_entrances',
-  geometryColumns: { latColumnName: 'lat', longColumnName: 'lon' },
-});`;
+  geometryColumns: { latColumnName: 'lat', longColumnName: 'lon' } });`;
         case 'D05': return `await db.loadOsm({
-  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Comunidad de Madrid', areas: ['Sol'] }" : '{ bbox: [-3.7089, 40.4135, -3.6992, 40.4204] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Comunidad de Madrid', areas: ['Sol'] }" : '{ bbox: [-3.7089, 40.4135, -3.6992, 40.4204] }'},${variant === 'tags' ? "\n  tagSets: [{ name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] }]," : ''}
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
-});${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
+});`;
         case 'D06': return `await db.loadOsm({
   pbfFileUrl: '/data/monaco.osm.pbf',
-  queryArea: ${variant === 'place' || variant === 'tags' ? "{ geocodeArea: 'Monaco', areas: ['Monaco'] }" : '{ bbox: [7.405, 43.720, 7.445, 43.7525] }'},${variant === 'tags' ? "\n  tagSets: [\n    { name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] },\n  ]," : ''}
+  queryArea: ${variant === 'place' || variant === 'tags' ? "{ geocodeArea: 'Monaco', areas: ['Monaco'] }" : '{ bbox: [7.405, 43.720, 7.445, 43.7525] }'},${variant === 'tags' ? "\n  tagSets: [{ name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] }]," : ''}
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
-});${variant === 'tags' ? "\nmap.updateRenderInfo('table_osm_cafes_points', { pointSize: 20 });" : ''}`;
-        case 'I01': return `const map = new AutkMap(canvas, { showUi: false });\nmap.updateRenderInfo('buildings', { isPick: true });\nmap.events.on(MapEvent.CLICK, ({ selection }) => {\n  // Each click toggles one id, so the selection keeps growing.\n  summarize(selection.map(id => buildings.features[id]));\n});`;
-        case 'I02': return "map.setSkippedIds('buildings', [id]);\nmap.clearSkippedIds('buildings');";
-        case 'I03': return `// Update the eye and look-at target on each animation frame.
-map.camera.resetCamera([0, 0, 1], lookAt, eye);
-map.requestRender();`;
+});`;
+        case 'I01': return `map.updateRenderInfo('table_osm_buildings', { isPick: true });
+map.events.on(MapEvent.CLICK, ({ selection }) => {
+  const picked = selection.map(id => buildings.features[id]);
+  console.log(picked.length, 'buildings selected');
+});`;
+        case 'I02': return `const hidden = new Set<number>();
+map.events.on(MapEvent.CLICK, ({ selection }) => {
+  for (const id of selection) hidden.add(id);
+  map.setSkippedIds('table_osm_buildings', [...hidden]);
+});
+map.clearSkippedIds('table_osm_buildings'); // restore all`;
+        case 'I03': return `// Reset the camera on every frame; eye and lookAt move along the path.
+const step = () => {
+  map.camera.resetCamera([0, 0, 1], lookAt, eye);
+  map.requestRender();
+  requestAnimationFrame(step);
+};
+requestAnimationFrame(step);`;
         case 'S01': return variant === 'category'
-            ? `map.updateColorMap('ortsteile', { colorMap: {\n  interpolator: ColorMapInterpolator.CAT_PAIRED,\n  domainSpec: { type: ColorMapDomainStrategy.USER, params: BERLIN_BEZIRKE },\n} });\nmap.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.bezirk' });\nmap.updateRenderInfo('ortsteile', { isColorMap: true });`
-            : `map.updateColorMap('ortsteile', { colorMap: {\n  interpolator: ColorMapInterpolator.${variant === 'diverging' ? 'DIV_RED_BLUE' : 'SEQ_BLUES'},\n  domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },\n} });\nmap.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.area_km2' });\nmap.updateRenderInfo('ortsteile', { isColorMap: true });`;
-        case 'S03': return `map.style.setPredefinedStyle('${variant || 'google'}');`;
-        case 'S04': return `map.updateRenderInfo('table_osm_buildings', { opacity: ${state.opacity || '0.75'} });\nmap.updateRenderInfo('salzburg-districts', { opacity: ${state['district-opacity'] || '0.30'}, showBorders: ${state['show-borders'] !== 'false'} });`;
-        case 'B01': return `map.loadTiles('imagery', { source: TILE_SOURCES.${provider} });\nmap.updateRenderInfo('imagery', { isSkip: ${state['show-tiles'] === 'false'} });`;
-        case 'B02': return "map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });\n// An opaque surface would cover the imagery beneath the vectors.\nmap.updateRenderInfo('table_osm_surface', { isSkip: true });";
+            ? `// Explicit color per category, in domain order.
+map.updateColorMap('ortsteile', { colorMap: {
+  interpolator: ColorMapInterpolator.CAT_PAIRED,
+  domainSpec: { type: ColorMapDomainStrategy.USER, params: bezirke },
+} });
+map.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.bezirk' });
+map.updateRenderInfo('ortsteile', { isColorMap: true });`
+            : `map.updateColorMap('ortsteile', { colorMap: {
+  interpolator: ColorMapInterpolator.${variant === 'diverging' ? 'DIV_RED_BLUE' : 'SEQ_BLUES'},
+  domainSpec: { type: ColorMapDomainStrategy.PERCENTILE },
+} });
+map.updateThematic('ortsteile', { collection: ortsteile, property: 'properties.area_km2' });
+map.updateRenderInfo('ortsteile', { isColorMap: true });`;
+        case 'S03': return `// Before init(): the style applies to every layer loaded after it.
+map.style.setPredefinedStyle('${variant || 'google'}');`;
+        case 'S04': return `map.updateRenderInfo('table_osm_buildings', { opacity: ${state.opacity || '0.75'} });
+map.updateRenderInfo('salzburg-districts', {
+  opacity: ${state['district-opacity'] || '0.30'},
+  showBorders: ${state['show-borders'] !== 'false'},
+});`;
+        case 'B01': return `map.loadTiles('imagery', { source: TILE_SOURCES.${provider} });
+map.updateRenderInfo('imagery', { isSkip: ${state['show-tiles'] === 'false'} });`;
+        case 'B02': return `map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });
+map.loadCollection('table_osm_surface', { collection, type: 'polygons' });
+// An opaque surface would cover the imagery beneath the vectors.
+map.updateRenderInfo('table_osm_surface', { isSkip: true });`;
         case 'B03': return variant === 'rgb'
-            ? `await db.loadGeoTiff({ geotiffFileUrl: '/data/lisbon-corine-2018-rgb.tif', coordinateFormat: 'EPSG:4326', outputTableName: 'land_cover', resampleMethod: 'nearest' });\nmap.loadCollection('land_cover', { collection: await db.getRaster('land_cover'), type: 'raster', property: ['band_1', 'band_2', 'band_3'] });\nmap.updateColorMap('land_cover', { colorMap: CORINE_PALETTE });\nmap.updateRenderInfo('land_cover', { isColorMap: true, opacity: ${state['raster-opacity'] ?? '0.78'} });`
-            : "await db.loadGeoTiff({ geotiffFileUrl: '/data/lisbon-population-2020.tif', coordinateFormat: 'EPSG:4326', outputTableName: 'population' });\nmap.loadCollection('population', { collection: await db.getRaster('population'), type: 'raster', property: 'band_1' });\nmap.updateRenderInfo('population', { opacity: " + (state['raster-opacity'] ?? '0.78') + " });";
-        case 'T01': return "map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });";
-        case 'T02': return `map.loadTiles('imagery', { source: TILE_SOURCES.${provider} });\nmap.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });`;
-        case 'T03': return "map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });\nmap.updateRenderInfo('table_osm_surface', { isSkip: true });\nmap.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });";
-        case 'T04': return "await db.loadGeoTiff({ geotiffFileUrl: '/data/niteroi-elevation.tif', coordinateFormat: 'EPSG:3395', outputTableName: 'elevation' });\nmap.loadTerrain({ source: { collection: await db.getRaster('elevation'), property: 'band_1' } });";
-        case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'PlotEvent.CLICK');
-        case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'PlotEvent.BRUSH');
-        case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'PlotEvent.BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");
-        case 'P04': return plot('heatmatrix', "{ axis: ['shape_area', 'shape_leng'], color: '@transform' }", 'PlotEvent.CLICK', "{ preset: 'binning-2d' }");
-        case 'P05': return plot('table', "{ axis: ['ntaname', 'shape_area', 'shape_leng'] }", 'PlotEvent.CLICK', "{ preset: 'sort', options: { direction: 'asc' } }");
-        case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'cdta2020'] }", 'PlotEvent.BRUSH_Y');
-        case 'P07': return plot('linechart', "{ axis: ['sjoin.collect.noise', '@transform'] }", 'PlotEvent.BRUSH_X',
+            ? `await db.loadGeoTiff({ geotiffFileUrl: '/data/lisbon-corine-2018-rgb.tif',
+  sourceCrs: 'EPSG:4326', outputTableName: 'land_cover', resampleMethod: 'nearest' });
+map.loadCollection('land_cover', {
+  collection: await db.getRaster('land_cover'),
+  type: 'raster',
+  property: ['band_1', 'band_2', 'band_3'], // RGB bands
+});`
+            : `await db.loadGeoTiff({ geotiffFileUrl: '/data/lisbon-population-2020.tif',
+  sourceCrs: 'EPSG:4326', outputTableName: 'population' });
+map.loadCollection('population', {
+  collection: await db.getRaster('population'),
+  type: 'raster',
+  property: 'band_1',
+});`;
+        case 'T01': return `map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });`;
+        case 'T02': return `map.setView({ center: { latitude: -22.9, longitude: -43.1 }, zoom: 13 });
+map.loadTiles('imagery', { source: TILE_SOURCES.${provider} });
+map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });`;
+        case 'T03': return `map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });
+map.updateRenderInfo('table_osm_surface', { isSkip: true });
+map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });`;
+        case 'T04': return `await db.loadGeoTiff({ geotiffFileUrl: '/data/niteroi-elevation.tif',
+  sourceCrs: 'EPSG:3395', outputTableName: 'elevation' });
+map.loadTerrain({ source: { collection: await db.getRaster('elevation'), property: 'band_1' } });`;
+        case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'CLICK');
+        case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'BRUSH');
+        case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");
+        case 'P04': return plot('heatmatrix', "{ axis: ['shape_area', 'shape_leng'], color: '@transform' }", 'CLICK', "{ preset: 'binning-2d' }");
+        case 'P05': return plot('table', "{ axis: ['ntaname', 'shape_area', 'shape_leng'] }", 'CLICK', "{ preset: 'sort', options: { direction: 'asc' } }");
+        case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'cdta2020'] }", 'BRUSH_Y');
+        case 'P07': return plot('linechart', "{ axis: ['sjoin.collect.noise', '@transform'] }", 'BRUSH_X',
             "{ preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } }", variant === 'roads' ? 'roads' : 'neighborhoods');
-        case 'A01': return "await db.spatialQuery({\n  tableRootName: 'neighborhoods', tableJoinName: 'noise',\n  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],\n});\nmap.updateThematic('neighborhoods', { collection, property: 'properties.sjoin.count.noise' });";
-        case 'A02': return "for (const table of ['noise', 'parking']) {\n  await db.spatialQuery({ tableRootName: 'neighborhoods', tableJoinName: table, groupBy });\n}";
-        case 'A03': return `await db.spatialQuery({\n  tableRootName: ${variant === 'buildings' ? "'table_osm_buildings'" : "'table_osm_roads'"},\n  tableJoinName: 'noise', near: { distance: 1000 }, groupBy,\n});`;
-        case 'A04': return `await db.buildHeatmap({\n  tableJoinName: 'noise', near: { distance: 1000 }, outputTableName: 'heatmap',\n  grid: { rows: ${variant === 'fine' ? 60 : 30}, columns: ${variant === 'fine' ? 60 : 30} },\n  groupBy,\n});\nmap.loadCollection('heatmap', { collection: await db.getRaster('heatmap'), type: 'raster', property: 'band_1' });`;
-        case 'A05': return `const result = await new ComputeGpgpu().run({\n  collection,\n  variableMapping: ${variant === 'roads' ? "{ road: 'geometry' }" : "{ x: 'shape_area', y: 'shape_leng' }"},\n  resultField: 'result',\n  wgslBody: ${variant === 'roads' ? `\`\n${ROAD_LENGTH_WGSL}\n\`` : "'return (4 * 3.1415927 * x) / (y * y);'"},\n});`;
-        case 'A06': case 'A07': case 'A08': return "const result = await new ComputeRender().run({\n  layers: [{ id, collection, type }],\n  viewpoints: { collection: roads, sampling: { directions: 1 } },\n  aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },\n});";
+        case 'A01': return `await db.spatialQuery({
+  tableRootName: 'neighborhoods',
+  tableJoinName: 'noise',
+  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+});
+map.updateThematic('neighborhoods', {
+  collection: await db.getLayer('neighborhoods'),
+  property: 'properties.sjoin.count.noise',
+});`;
+        case 'A02': return `const groupBy = [{ column: 'Unique Key', aggregateFn: 'count' }];
+for (const table of ['noise', 'parking']) {
+  await db.spatialQuery({ tableRootName: 'neighborhoods', tableJoinName: table, groupBy });
+}
+// Both joins write into properties.sjoin.count.
+map.updateThematic('neighborhoods', {
+  collection: await db.getLayer('neighborhoods'),
+  property: 'properties.sjoin.count.noise',
+});`;
+        case 'A03': return `await db.spatialQuery({
+  tableRootName: ${variant === 'buildings' ? "'table_osm_buildings'" : "'table_osm_roads'"},
+  tableJoinName: 'noise',
+  near: { distance: 1000 },
+  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+});`;
+        case 'A04': return `await db.buildHeatmap({
+  tableJoinName: 'noise',
+  near: { distance: 1000 },
+  outputTableName: 'heatmap',
+  grid: { rows: ${variant === 'fine' ? 60 : 30}, columns: ${variant === 'fine' ? 60 : 30} },
+  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+});
+map.loadCollection('heatmap', {
+  collection: await db.getRaster('heatmap'), type: 'raster', property: 'band_1',
+});`;
+        case 'A05': return `const result = await new ComputeGpgpu().run({
+  collection: await db.getLayer('neighborhoods'),
+  variableMapping: ${variant === 'roads' ? "{ road: 'geometry' }" : "{ x: 'shape_area', y: 'shape_leng' }"},
+  resultField: 'result',
+  wgslBody: ${variant === 'roads' ? `\`\n${ROAD_LENGTH_WGSL}\n\`` : "'return (4 * 3.1415927 * x) / (y * y);'"},
+});`;
+        case 'A06': return `const result = await new ComputeRender().run({
+  layers: [{ id: 'table_osm_buildings', collection: buildings, type: 'buildings' }],
+  viewpoints: { collection: roads, sampling: { directions: 1 } },
+  aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
+});
+// Each road viewpoint gets a share of sky in properties.compute.render.classes.sky.
+map.updateThematic('table_osm_roads', {
+  collection: result, property: 'properties.compute.render.classes.sky',
+});`;
+        case 'A07': return `const result = await new ComputeRender().run({
+  layers: [
+    { id: 'table_osm_parks', collection: parks, type: 'parks' },
+    { id: 'table_osm_water', collection: water, type: 'water' },
+  ],
+  // One viewpoint per window of the picked building.
+  viewpoints: { collection: picked, strategy: { type: 'building-windows', floors: 3 } },
+  aggregation: { type: 'classes', includeBackground: true, backgroundLayerType: 'sky' },
+  tileSize: 32,
+});`;
+        case 'A08': return `const result = await new ComputeRender().run({
+  layers: [{
+    id: 'table_osm_buildings',
+    collection: scene,
+    type: 'buildings',
+    objectIdProperty: '_renderObjectId',
+  }],
+  viewpoints: { collection: picked, sampling: { directions: 36 } },
+  aggregation: { type: 'objects' },
+  tileSize: 64,
+});
+// Each viewpoint reports every sampled building under compute.render.objects.
+const objects = result.features[0].properties?.compute?.render?.objects ?? {};`;
         default: throw new Error(`Missing code excerpt for ${id}`);
     }
 }
 
 function plot(type: string, attributes: string, event: string, transform?: string, layer = 'neighborhoods'): string {
-    return `const plot = new AutkPlot(document.querySelector('#plotBody')!, {\n  type: '${type}',\n  collection,\n  attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}\n  events: [${event}, PlotEvent.HOVER],\n});\n\nmap.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));\nplot.events.on(${event}, ({ selection }) => map.setHighlightedIds('${layer}', selection));\nplot.events.on(PlotEvent.HOVER, ({ selection }) =>\n  map.setHighlightedIds('${layer}', [...new Set([...plot.selection, ...selection])]));`;
+    return `const plot = new AutkPlot(document.querySelector('#plotBody')!, {
+  type: '${type}',
+  collection,
+  attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}
+  events: [PlotEvent.${event}],
+});
+
+map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
+plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('${layer}', selection));`;
 }

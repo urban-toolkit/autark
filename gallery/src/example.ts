@@ -45,12 +45,12 @@ if (example) {
         introduction?.append(notice);
     }
     const learning = document.createElement('section'); learning.className = 'example-learning';
-    const title = document.createElement('h2'); title.textContent = 'Code';
-    const context = document.createElement('p'); context.textContent = 'The core API calls for this task. The full source below is a minimal runnable program for a page with a canvas.';
+    const title = document.createElement('h2'); title.textContent = 'API in focus';
+    const context = document.createElement('p'); context.textContent = 'The exact calls for this feature. The minimal runnable example below is a self-contained page and may simplify the live demo.';
     const pre = document.createElement('pre'); pre.className = 'task-code';
     const code = document.createElement('code'); pre.append(code);
     const details = document.createElement('details'); details.className = 'example-source';
-    const summary = document.createElement('summary'); summary.textContent = 'View full source';
+    const summary = document.createElement('summary'); summary.textContent = 'Minimal runnable example';
     const full = document.createElement('pre'); const content = document.createElement('code');
     full.append(content); details.append(summary, full);
     const currentState = () => {
