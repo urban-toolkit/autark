@@ -6,7 +6,7 @@ import { SpatialJoinUseCase } from '../spatial-join/use-case';
 import { countResultKeys } from '../spatial-join/queries';
 import { getColumnsFromDuckDbTableDescribe, quoteJsonPathKey, toPlain } from '../../utils';
 import { setRasterPayload } from '../../raster-store';
-import { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+import { DEFAULT_WORKSPACE_CRS } from '../../consts';
 
 type HeatmapBand = RasterBandMetadata & { jsonPath: string; normalize: boolean };
 
@@ -36,7 +36,7 @@ export class BuildHeatmapUseCase {
         tables: Array<Table>,
         boundingBox: BoundingBox | undefined,
         workspace: string,
-        workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+        workspaceCrs = DEFAULT_WORKSPACE_CRS,
     ): Promise<Table> {
         if (!boundingBox) {
             throw new Error('Bounding box is required to build a heatmap.');
@@ -78,7 +78,7 @@ export class BuildHeatmapUseCase {
             },
             [...tables, gridTable],
             workspace,
-            { coordinateFormat: workspaceCoordinateFormat },
+            { crs: workspaceCrs },
         );
 
         const rasterBands = this.getRasterBands(params, groupBy);
@@ -90,7 +90,7 @@ export class BuildHeatmapUseCase {
             params.grid.rows,
             params.grid.columns,
             workspace,
-            workspaceCoordinateFormat,
+            workspaceCrs,
         );
 
         const describeTableResponse = await this.conn.query(`DESCRIBE ${workspace}.${gridTableName}`);
@@ -201,7 +201,7 @@ ${bandAssignments}
         rows: number,
         columns: number,
         workspace: string,
-        workspaceCoordinateFormat: string,
+        workspaceCrs: string,
     ): Promise<void> {
         const qualifiedTableName = `${workspace}.${tableName}`;
         const bandSelect = bands.map((band) => `properties.${band.id} AS ${band.id}`).join(',\n          ');
@@ -250,8 +250,8 @@ ${bandAssignments}
             sourceMinY: minLat,
             resX,
             resY,
-            sourceCrs: workspaceCoordinateFormat,
-            targetCrs: workspaceCoordinateFormat,
+            sourceCrs: workspaceCrs,
+            targetCrs: workspaceCrs,
             bands: bands.map(({ id, label }) => ({ id, label })),
             values,
         });
@@ -271,8 +271,8 @@ ${bandAssignments}
             ${maxLat}::DOUBLE AS origin_y,
             ${resX}::DOUBLE AS res_x,
             ${resY}::DOUBLE AS res_y,
-            '${workspaceCoordinateFormat}'::VARCHAR AS source_crs,
-            '${workspaceCoordinateFormat}'::VARCHAR AS target_crs;
+            '${workspaceCrs}'::VARCHAR AS source_crs,
+            '${workspaceCrs}'::VARCHAR AS target_crs;
         `);
     }
 

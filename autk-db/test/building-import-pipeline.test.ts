@@ -240,7 +240,7 @@ describe('building relations preserve original way ownership', () => {
       workspace: 'stages', sourceCrs: 'EPSG:4326', targetCrs: 'EPSG:4326' }));
     const original = (await conn.query('SELECT id, ST_AsWKB(geometry) AS bytes FROM stages.original_members ORDER BY id')).toArray();
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'related', layer: 'buildings',
-      outputTableName: 'related_buildings', workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      outputTableName: 'related_buildings', workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(output.features).toHaveLength(1);
     expect(output.features[0].id).toBe(10);
@@ -265,7 +265,7 @@ describe('building relations preserve original way ownership', () => {
       { type: 'relation', id: 601, tags: { type: 'building', name: 'B' }, members: [{ type: 'way', ref: 20, role: 'part' }] });
     await pipeline.insertOsmDataUsingJson('separate', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'separate', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     const related = output.features.filter(feature => feature.properties?.osmRelation);
     expect(related.map(feature => [feature.id, feature.properties?.name, feature.properties?.parts.length]).sort())
@@ -279,7 +279,7 @@ describe('building relations preserve original way ownership', () => {
     { type: 'node', id: 10, lon: 99, lat: 40 });
     await pipeline.insertOsmDataUsingJson('namespaces', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'namespaces', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     const related = output.features.find(feature => feature.properties?.osmRelation)!;
     expect(related.properties?.osmRelation).toMatchObject({ id: '10', members: [{ id: '10', role: 'part' }] });
@@ -296,7 +296,7 @@ describe('building relations preserve original way ownership', () => {
       { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 10, role: 'part' }] });
     await pipeline.insertOsmDataUsingJson('ambiguous', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'ambiguous', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(output.features.map(feature => feature.id).sort()).toEqual([20, 30, 40, 50]);
     expect(output.features.some(feature => feature.properties?.osmRelation)).toBe(false);
@@ -310,7 +310,7 @@ describe('building relations preserve original way ownership', () => {
       members: [{ type: 'way', ref: 10, role: 'part' }, { type: 'way', ref: 999, role: 'part' }] });
     await pipeline.insertOsmDataUsingJson('missing', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'missing', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(output.features.map(feature => feature.id)).not.toContain(10);
     expect(output.features.some(feature => feature.properties?.osmRelation)).toBe(false);
@@ -324,7 +324,7 @@ describe('building relations preserve original way ownership', () => {
     elements.push({ type: 'relation', id: 600, tags: { type: 'building' }, members: [{ type: 'way', ref: 10, role: 'part' }] });
     await pipeline.insertOsmDataUsingJson('open_member', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'open_member', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     expect((await new GetLayerUseCase(conn).exec(table, 'stages')).features.some(feature => feature.properties?.osmRelation)).toBe(false);
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Skipping OSM building part 10.*non-polygonal geometry/));
   });
@@ -341,7 +341,7 @@ describe('building relations preserve original way ownership', () => {
       { type: 'relation', id: 601, tags: { type: 'building' }, members: [{ type: 'way', ref: 30, role: 'part' }] });
     await pipeline.insertOsmDataUsingJson('unsupported', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'unsupported', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(error));
     expect(output.features.some(feature => feature.properties?.osmRelation?.id === '600')).toBe(false);
@@ -460,7 +460,7 @@ describe('building relations preserve original way ownership', () => {
     });
 
     it.each(['api', 'pbf'])('public %s import leaves an ordinary building beside 3D building relations unchanged', async source => {
-      await client.setWorkspace(`ordinary_${source}_${workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+      await client.setWorkspace(`ordinary_${source}_${workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const elements = structuredClone(syntheticElements);
       elements.push(...ring(91, 910, [[0.2, 8], [0.8, 8], [0.8, 9], [0.2, 9]], { building: 'yes', height: '7' }),
@@ -485,7 +485,7 @@ describe('building relations preserve original way ownership', () => {
       members: [{ type: 'way', ref: 10, role: 'outer' }, { type: 'way', ref: 20, role: 'inner' }] });
     await pipeline.insertOsmDataUsingJson('multipolygon', { elements }, 'stages');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'multipolygon', layer: 'buildings',
-      workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(output.features).toHaveLength(1);
     expect(output.features[0].id).toBe(600);
@@ -653,7 +653,7 @@ describe('building import pipeline — stages', () => {
     await pipeline.insertOsmDataUsingJson('real', { elements }, 'stages');
     const process = vi.spyOn(ProcessOsmBuildingsUseCase.prototype, 'exec');
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'real', layer: 'buildings',
-      outputTableName: 'filtered', workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      outputTableName: 'filtered', workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     expect(process).toHaveBeenCalledOnce();
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(output.features.map(feature => feature.id).sort()).toEqual([30, 40, 50]);
@@ -664,7 +664,7 @@ describe('building import pipeline — stages', () => {
 
   it('10. consolidates valid ways to one feature with original indexed parts and distinct heights', async () => {
     const table = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'raw', layer: 'buildings',
-      outputTableName: 'collected', workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      outputTableName: 'collected', workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const output = await new GetLayerUseCase(conn).exec(table, 'stages');
     expect(output.features.map(feature => feature.id).sort()).toEqual([10, 30, 40, 50]);
     const building = output.features.find(feature => feature.id === 10)!;
@@ -680,7 +680,7 @@ describe('building import pipeline — stages', () => {
     const boundaries = pipeline.splitCombinedResponse({ elements: structuredClone(syntheticElements) }, { geocodeArea: 'Fixture', areas: ['Test District'] });
     await pipeline.insertOsmDataUsingJson('raw_boundaries', boundaries.boundariesData, 'stages', true);
     const surface = await new LoadOsmLayerUseCase(native.db!, conn).exec({ osmInputTableName: 'raw', layer: 'surface',
-      outputTableName: 'surface', workspace: 'stages', workspaceCoordinateFormat: 'EPSG:4326' });
+      outputTableName: 'surface', workspace: 'stages', workspaceCrs: 'EPSG:4326' });
     const updated = await new PolygonizeOsmSurfaceUseCase(native.db!, conn).exec({ surfaceTableName: 'surface', workspace: 'stages' }, surface);
     expect(updated.type).toBe('surface');
     const row = (await conn.query('SELECT ST_GeometryType(geometry) AS kind, ST_Contains(geometry,ST_Point(1,1)) AS inside, ST_Contains(geometry,ST_Point(8,8)) AS outside FROM stages.surface')).toArray()[0];

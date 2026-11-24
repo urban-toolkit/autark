@@ -4,7 +4,7 @@ import { JsonGeometryLayerType, LoadJsonParams } from './interfaces';
 import { JsonTable } from '../../interfaces';
 import { LOAD_JSON_ON_TABLE_QUERY, LOAD_JSON_ON_TABLE_WITH_COORDINATES_QUERY, LOAD_JSON_ON_TABLE_WITH_WKT_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { DEFAULT_GEO_COLUMN_NAME, DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+import { DEFAULT_GEO_COLUMN_NAME, DEFAULT_WORKSPACE_NAME, DEFAULT_SOURCE_CRS, DEFAULT_WORKSPACE_CRS } from '../../consts';
 
 /**
  * Loads JSON data into a DuckDB table, optionally creating a spatial geometry column.
@@ -43,7 +43,7 @@ export class LoadJsonUseCase {
    * const table = await useCase.exec({ jsonObject: data, outputTableName: 'stops', geometryColumns: true });
    * console.log(table.type); // 'points'
    */
-  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = DEFAULT_WORKSPACE_NAME, workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT }: LoadJsonParams & { workspaceCoordinateFormat?: string }): Promise<JsonTable> {
+  async exec({ jsonFileUrl, jsonObject, outputTableName, geometryColumns, workspace = DEFAULT_WORKSPACE_NAME, sourceCrs = DEFAULT_SOURCE_CRS, workspaceCrs = DEFAULT_WORKSPACE_CRS }: LoadJsonParams & { workspaceCrs?: string }): Promise<JsonTable> {
     if (!jsonFileUrl && !jsonObject) {
       throw new Error('Either jsonFileUrl or jsonObject must be provided');
     }
@@ -69,20 +69,20 @@ export class LoadJsonUseCase {
           mode: 'lat-lng' as const,
           latColumnName: 'Latitude',
           longColumnName: 'Longitude',
-          coordinateFormat: DEFAULT_INPUT_COORDINATE_FORMAT,
+          sourceCrs,
         }
       : geometryColumns && 'wktColumnName' in geometryColumns
         ? {
             mode: 'wkt' as const,
             wktColumnName: geometryColumns.wktColumnName,
-            coordinateFormat: geometryColumns.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT,
+            sourceCrs,
           }
         : geometryColumns
           ? {
               mode: 'lat-lng' as const,
               latColumnName: geometryColumns.latColumnName,
               longColumnName: geometryColumns.longColumnName,
-              coordinateFormat: geometryColumns.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT,
+              sourceCrs,
             }
           : null;
 
@@ -102,8 +102,8 @@ export class LoadJsonUseCase {
         tableName: outputTableName,
         latColumnName: normalizedGeometryColumns.latColumnName,
         longColumnName: normalizedGeometryColumns.longColumnName,
-        sourceCrs: normalizedGeometryColumns.coordinateFormat,
-        targetCrs: workspaceCoordinateFormat,
+        sourceCrs: normalizedGeometryColumns.sourceCrs,
+        targetCrs: workspaceCrs,
         workspace,
       });
       tableType = 'points';
@@ -112,8 +112,8 @@ export class LoadJsonUseCase {
         jsonFileUrl: jsonPath,
         tableName: outputTableName,
         wktColumnName: normalizedGeometryColumns.wktColumnName,
-        sourceCrs: normalizedGeometryColumns.coordinateFormat,
-        targetCrs: workspaceCoordinateFormat,
+        sourceCrs: normalizedGeometryColumns.sourceCrs,
+        targetCrs: workspaceCrs,
         workspace,
       });
     } else {

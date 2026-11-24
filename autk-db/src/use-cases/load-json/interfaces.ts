@@ -21,8 +21,6 @@ export interface JsonLatLngGeometryColumns {
   latColumnName: string;
   /** Name of the field that stores longitude values used to create point geometries. */
   longColumnName: string;
-  /** CRS of the source coordinate fields before they are transformed into the workspace CRS. */
-  coordinateFormat?: string;
 }
 
 /**
@@ -34,8 +32,6 @@ export interface JsonLatLngGeometryColumns {
 export interface JsonWktGeometryColumns {
   /** Name of the field that stores WKT geometry text such as `POINT(...)` or `POLYGON(...)`. */
   wktColumnName: string;
-  /** CRS of the source WKT geometry before it is transformed into the workspace CRS. */
-  coordinateFormat?: string;
 }
 
 /**
@@ -77,6 +73,8 @@ export interface LoadJsonParams {
   outputTableName: string;
   /** Optional geometry strategy used to create a spatial column while loading. */
   geometryColumns?: JsonGeometryColumns;
+  /** CRS of the source coordinates or WKT. Defaults to `EPSG:4326`. */
+  sourceCrs?: string;
   /** Optional workspace override used by higher-level callers when qualifying the table name. */
   workspace?: string;
 }

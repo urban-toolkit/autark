@@ -8,7 +8,7 @@ import type { OsmTagSet } from '../load-osm-overpass/interfaces';
 import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
 import { OsmLayerTable } from '../../interfaces';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_SOURCE_CRS, DEFAULT_WORKSPACE_CRS, OSM_ELEMENT_METADATA_COLUMN } from '../../consts';
 import { ProcessOsmBuildingsUseCase } from '../../internal/process-osm-buildings/use-case';
 import type { OsmBuildingRelation } from '../../internal/process-osm-buildings/interfaces';
 import { getOsmProcessingConfig } from './osm-processing-config';
@@ -74,9 +74,9 @@ export class LoadOsmLayerUseCase {
    * const useCase = new LoadOsmLayerUseCase(db, conn);
    * const table = await useCase.exec({ osmInputTableName: 'osm_data', layer: 'buildings', outputTableName: 'buildings' });
    */
-  async exec(params: LoadOsmLayerParams & { workspaceCoordinateFormat?: string }): Promise<OsmLayerTable> {
-    const sourceCrs = params.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
-    const targetCrs = params.workspaceCoordinateFormat || DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+  async exec(params: LoadOsmLayerParams & { workspaceCrs?: string }): Promise<OsmLayerTable> {
+    const sourceCrs = params.sourceCrs || DEFAULT_SOURCE_CRS;
+    const targetCrs = params.workspaceCrs || DEFAULT_WORKSPACE_CRS;
     const workspace = params.workspace || DEFAULT_WORKSPACE_NAME;
 
     const layerOutputTableName = params.outputTableName || `${params.osmInputTableName}_${params.layer}`;
@@ -137,8 +137,8 @@ export class LoadOsmLayerUseCase {
   async execTagSet(params: {
     osmInputTableName: string;
     tagSet: OsmTagSet;
-    coordinateFormat: string;
-    workspaceCoordinateFormat: string;
+    sourceCrs: string;
+    workspaceCrs: string;
     workspace: string;
   }): Promise<OsmLayerTable> {
     const { tagSet, workspace } = params;
@@ -146,12 +146,12 @@ export class LoadOsmLayerUseCase {
     const qualifiedOutput = `${workspace}.${outputTableName}`;
     await this.conn.query(TAG_SET_TABLE_QUERY({
       inputTable: `${workspace}.${params.osmInputTableName}`, outputTable: qualifiedOutput,
-      tagSet, sourceCrs: params.coordinateFormat, targetCrs: params.workspaceCoordinateFormat,
+      tagSet, sourceCrs: params.sourceCrs, targetCrs: params.workspaceCrs,
     }));
     if (tagSet.type === 'polygons') {
       await this.appendRelationAreaGeometries({
         inputTableName: params.osmInputTableName, outputTableName, layer: tagSet.type,
-        sourceCrs: params.coordinateFormat, targetCrs: params.workspaceCoordinateFormat, workspace,
+        sourceCrs: params.sourceCrs, targetCrs: params.workspaceCrs, workspace,
         relationWhere: `map_extract(tags, 'type')[1] = 'multipolygon' AND ${TAG_SET_MATCH(tagSet.tags)}`,
       });
     }

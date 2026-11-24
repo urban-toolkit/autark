@@ -13,7 +13,7 @@ async function main(): Promise<void> {
         queryArea: { bbox: [-43.14, -22.97, -43.03, -22.85] },
         autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads', 'buildings'] },
     });
-    await db.loadGeoTiff({ geotiffFileUrl: `${BASE_URL}data/niteroi-elevation.tif`, coordinateFormat: 'EPSG:3395', outputTableName: ELEVATION });
+    await db.loadGeoTiff({ geotiffFileUrl: `${BASE_URL}data/niteroi-elevation.tif`, sourceCrs: 'EPSG:3395', outputTableName: ELEVATION });
 
     const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
     await map.init();

@@ -27,7 +27,7 @@ it('loads administrative Manhattan without region fallback or layers from neighb
         });
         expect(warn.mock.calls.some(([message]) => String(message).includes('falling back to exact area names'))).toBe(false);
         expect(warn.mock.calls.some(([message]) => /Cannot reconstruct coastline|No coastline available/.test(String(message)))).toBe(false);
-        const { coordinateFormat, precisionGrid } = db.getWorkspaceConfiguration();
+        const { crs, precisionGrid } = db.getWorkspaceConfiguration();
         const geometry = JSON.stringify(boundary.geometry).replace(/'/g, "''");
         for (const layer of ['surface', 'parks', 'water', 'roads', 'buildings']) {
             const collection = await db.getLayer(`table_osm_${layer}`);
@@ -43,7 +43,7 @@ it('loads administrative Manhattan without region fallback or layers from neighb
             const rows = await db.rawQuery<Array<{ outside: number }>>({
                 query: `WITH scope AS (
                     SELECT ST_Buffer(ST_Transform(ST_GeomFromGeoJSON('${geometry}'),
-                        'EPSG:4326', '${coordinateFormat}', always_xy := true), ${precisionGrid * 3}) AS geometry
+                        'EPSG:4326', '${crs}', always_xy := true), ${precisionGrid * 3}) AS geometry
                 ) SELECT COUNT(*) AS outside FROM table_osm_${layer}, scope
                   WHERE NOT ${predicate}(table_osm_${layer}.geometry, scope.geometry)
                     AND COALESCE(CAST(table_osm_${layer}.properties AS JSON)->>'generated', '') <> 'coastline'`,
@@ -59,7 +59,7 @@ it('loads administrative Manhattan without region fallback or layers from neighb
                 SELECT probes.name, EXISTS (
                     SELECT 1 FROM table_osm_water
                     WHERE ST_Covers(geometry, ST_Transform(ST_Point(lon, lat),
-                        'EPSG:4326', '${coordinateFormat}', always_xy := true))
+                        'EPSG:4326', '${crs}', always_xy := true))
                 ) AS covered FROM probes`,
             output: { type: 'RETURN_OBJECT' },
         });
@@ -72,7 +72,7 @@ it('loads administrative Manhattan without region fallback or layers from neighb
             query: `SELECT EXISTS (
                 SELECT 1 FROM table_osm_water
                 WHERE ST_Covers(geometry, ST_Transform(ST_Point(-74.014, 40.745),
-                    'EPSG:4326', '${coordinateFormat}', always_xy := true))
+                    'EPSG:4326', '${crs}', always_xy := true))
             ) AS covered`,
             output: { type: 'RETURN_OBJECT' },
         });
@@ -85,7 +85,7 @@ it('loads administrative Manhattan without region fallback or layers from neighb
                     SELECT 1 FROM table_osm_water
                     WHERE CAST(properties AS JSON)->>'generated' = 'coastline'
                       AND ST_Covers(geometry, ST_Transform(ST_Point(lon, lat),
-                        'EPSG:4326', '${coordinateFormat}', always_xy := true))
+                        'EPSG:4326', '${crs}', always_xy := true))
                 ) AS covered FROM probes`,
             output: { type: 'RETURN_OBJECT' },
         });
@@ -95,7 +95,7 @@ it('loads administrative Manhattan without region fallback or layers from neighb
         const bounds = await db.rawQuery<Array<{ outside: number }>>({
             query: `WITH extent AS (
                 SELECT ST_Buffer(ST_Envelope(ST_Transform(ST_GeomFromGeoJSON('${geometry}'),
-                    'EPSG:4326', '${coordinateFormat}', always_xy := true)), ${precisionGrid * 3}) AS geometry
+                    'EPSG:4326', '${crs}', always_xy := true)), ${precisionGrid * 3}) AS geometry
             ) SELECT COUNT(*) AS outside FROM table_osm_water, extent
               WHERE NOT ST_CoveredBy(table_osm_water.geometry, extent.geometry)`,
             output: { type: 'RETURN_OBJECT' },

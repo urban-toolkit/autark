@@ -59,7 +59,7 @@ const schools = (type: OsmTagSet['type']): OsmTagSet => ({ name: 'schools', type
 
 describe('typed OSM tag sets', () => {
   it('loads one points layer, keeps explicit node tags and does not turn areas into centroids', async () => {
-    await db.setWorkspace(`tag_points_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_points_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const { requests, timings } = await load([schools('points')]);
     expect(timings.layers.map(layer => [layer.layerName, layer.layerType, layer.tagSet, layer.featureCount]))
       .toEqual([['table_osm_schools_points', 'points', 'schools', 1]]);
@@ -77,7 +77,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('clips complete multipolygons and removes tagged auxiliary members outside the surface', async () => {
-    await db.setWorkspace(`tag_polygons_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_polygons_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const { requests } = await load([schools('polygons')]);
     const query = requests.find(query => query.includes('->.tagHits'))!;
     expect(query).not.toContain('node["amenity"');
@@ -94,7 +94,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('keeps only the requested geometry family and clips crossing lines without changing standard roads', async () => {
-    await db.setWorkspace(`tag_lines_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_lines_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const { requests, timings } = await load([
       { name: 'paths', type: 'polylines', tags: [{ key: 'highway' }, { key: 'landuse' }] },
       { name: 'plazas', type: 'polygons', tags: [{ key: 'highway' }] },
@@ -109,7 +109,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('clips bbox-selected standard roads to the land surface', async () => {
-    await db.setWorkspace(`bbox_roads_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`bbox_roads_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const clipToSurface = vi.spyOn(db as any, 'clipLayerToLayer');
     const clipToBbox = vi.spyOn(db as any, 'clipLayerToBoundingBox');
 
@@ -120,7 +120,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('uses the coastal surface even for tag-only loads and cleans layers emptied by a reload', async () => {
-    await db.setWorkspace(`tag_coast_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_coast_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     await load([schools('points')]);
     expect(db.getLayersMetadata()).toHaveLength(1);
     const api = (db as any).loadOsmFromOverpassApiUseCase;
@@ -136,14 +136,14 @@ describe('typed OSM tag sets', () => {
   });
 
   it('removes boundary-only intersections instead of storing lines in a polygons layer', async () => {
-    await db.setWorkspace(`tag_touch_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_touch_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const touching = way(9, [[10, 1], [11, 1], [11, 2], [10, 2]], { amenity: 'school' });
     expect((await load([schools('polygons')], [touching])).timings.layers).toEqual([]);
     expect(db.getLayersMetadata()).toEqual([]);
   });
 
   it('clips polygons to the administrative surface, not just its bbox', async () => {
-    await db.setWorkspace(`tag_named_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_named_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const api = (db as any).loadOsmFromOverpassApiUseCase;
     const crossing = way(10, [[3, 3], [8, 3], [8, 8], [3, 8]], { amenity: 'school' });
     const boundaries: OsmElement[] = [
@@ -182,7 +182,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('warns/skips invalid or incomplete elements without losing valid polygons', async () => {
-    await db.setWorkspace(`tag_invalid_geometry_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_invalid_geometry_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const incomplete = way(11, [[3, 1], [4, 1], [4, 2], [3, 2]], { amenity: 'school' });
     // A referenced node with no inline coordinate cannot be resolved.
     incomplete.geometry![2] = undefined as any;
@@ -196,7 +196,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('retains only the new geometry type when a set is reloaded with another type', async () => {
-    await db.setWorkspace(`tag_change_type_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_change_type_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     await load([schools('points')]);
     await load([schools('polygons')]);
     expect(db.getLayersMetadata().map(table => table.name)).toEqual(['table_osm_schools_polygons']);
@@ -204,7 +204,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('reads relations after many nodes with fixed JSON column types', async () => {
-    await db.setWorkspace(`tag_sample_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_sample_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const nodes: OsmElement[] = Array.from({ length: 21000 }, (_, i) => ({ type: 'node', id: 100000 + i,
       lon: 1, lat: 1, tags: { amenity: 'bench' } }));
     await load([schools('polygons')], [...nodes, relation, inside, outside]);
@@ -238,7 +238,7 @@ describe('typed OSM tag sets', () => {
   });
 
   it('matches quoted tag values exactly in SQL as well as in the Overpass query', async () => {
-    await db.setWorkspace(`tag_quotes_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace(`tag_quotes_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     const { requests } = await load([{ name: 'named', type: 'points', tags: [{ key: 'name', value: oddName }] }]);
     expect(requests.find(query => query.includes('->.tagHits'))).toContain('node["name"="Joe\'s \\"Pizza\\" \\\\ 1"]');
     expect((await db.getLayer('table_osm_named_points', { osmElements: true })).features.map(feature => feature.id)).toEqual(['node/100']);

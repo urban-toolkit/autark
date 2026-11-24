@@ -48,13 +48,13 @@ console.log(db.tables, buildings);
 
 ### Workspace CRS and precision
 
-Every workspace defaults to `{ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 }`; the grid is one centimetre because the default CRS is metric. Inspect it with `db.getWorkspaceConfiguration()`.
+Every workspace defaults to `{ crs: 'EPSG:3395', precisionGrid: 0.01 }`; the grid is one centimetre because the default CRS is metric. Inspect it with `db.getWorkspaceConfiguration()`.
 
 To use another CRS, configure **both** values atomically when creating or selecting an empty workspace. Autark refuses a CRS/grid change after the workspace has tables, because existing geometries cannot be silently reprojected.
 
 ```ts
 await db.setWorkspace('geographic', {
-  coordinateFormat: 'EPSG:4326',
+  crs: 'EPSG:4326',
   precisionGrid: 1e-7,
 });
 ```
@@ -171,8 +171,10 @@ Overpass and PBF imports retain source identity/tags/component indices in the in
 `loadJson` can import plain JSON records or materialize geometry during load using the same geometry options supported by `loadCsv`:
 
 - `geometryColumns: true` → reads default `Latitude` / `Longitude` fields as points
-- `{ latColumnName, longColumnName, coordinateFormat? }` → reads explicit coordinate fields as points
-- `{ wktColumnName, coordinateFormat? }` → parses WKT geometry and infers the returned layer family
+- `{ latColumnName, longColumnName }` → reads explicit coordinate fields as points
+- `{ wktColumnName }` → parses WKT geometry and infers the returned layer family
+
+Every loader also accepts `sourceCrs` for the input coordinates or WKT, at the top level of the call. It defaults to `EPSG:4326`; pass the real CRS for projected files, as in the GeoTIFF examples below.
 
 ```ts
 const parcels = await db.loadJson({
@@ -181,6 +183,7 @@ const parcels = await db.loadJson({
     { id: 1, wkt: 'POLYGON((-43.3 -22.9, -43.2 -22.9, -43.2 -22.8, -43.3 -22.8, -43.3 -22.9))' },
   ],
   geometryColumns: { wktColumnName: 'wkt' },
+  sourceCrs: 'EPSG:4326',
 });
 
 console.log(parcels.type); // 'polygons'

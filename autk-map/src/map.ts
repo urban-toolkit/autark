@@ -26,7 +26,7 @@ import {
 
 import {
     Camera,
-    DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+    DEFAULT_WORKSPACE_CRS,
     ColorMapDomainStrategy,
     ColorMapConfig,
     ColorMap,
@@ -184,9 +184,7 @@ export class AutkMap {
     private _reportedTerrainErrors = 0;
     private _terrainValidation: ElevationValidationStats | null = null;
     /** Shared workspace CRS for normalized data, imagery, and terrain. */
-    private _workspaceCrs: string = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
-    /** Locked by explicit map configuration, setView(), or the first successfully loaded collection/source. */
-    private _workspaceCrsEstablished = false;
+    private _workspaceCrs: string = DEFAULT_WORKSPACE_CRS;
     /** Shared picking coordinator used by both render paths. */
     private _picking!: MapPickingController;
     /** Thematic source used to re-encode vector values when a colormap's domain or kind changes. */
@@ -203,8 +201,7 @@ export class AutkMap {
      */
     constructor(canvas: HTMLCanvasElement, options: MapOptions = {}) {
         if (options.crs !== undefined && !isSupportedCrs(options.crs)) throw new Error("Unsupported workspace CRS.");
-        this._workspaceCrs = options.crs ?? DEFAULT_WORKSPACE_COORDINATE_FORMAT;
-        this._workspaceCrsEstablished = options.crs !== undefined;
+        this._workspaceCrs = options.crs ?? DEFAULT_WORKSPACE_CRS;
         this._canvas = canvas;
         this._showUi = options.showUi ?? true;
         this._style = new MapStyle();
@@ -237,7 +234,7 @@ export class AutkMap {
 
     /**
      * Sets a geographic center and zoom without loading data or changing an existing origin.
-     * On an empty map the projected center establishes the shared origin and locks the workspace CRS.
+     * On an empty map the projected center establishes the shared origin.
      * Omitting the projection keeps the camera's persistent projection.
      * @throws If the center, zoom, projection, or viewport is invalid.
      */
@@ -255,18 +252,7 @@ export class AutkMap {
         const target = [view.point[0] - origin[0], view.point[1] - origin[1], 0];
         this._camera.resetCamera([0, 1, 0], target, [target[0], target[1], view.distance], view.far, view.near);
         if (projection !== undefined) this._camera.setProjection(projection);
-        this._workspaceCrsEstablished = true;
         this.requestRender();
-    }
-
-    /** Reject a layer that would interpret the established workspace in a different CRS. */
-    private resolveWorkspaceCrs(crs?: string): string {
-        const resolved = crs ?? this._workspaceCrs;
-        if (!isSupportedCrs(resolved)) throw new Error('Unsupported workspace CRS.');
-        if (resolved !== this._workspaceCrs && this._workspaceCrsEstablished) {
-            throw new Error(`Workspace CRS is ${this._workspaceCrs}; cannot load a layer using ${resolved}.`);
-        }
-        return resolved;
     }
 
     /** View and projection camera. */
@@ -425,7 +411,6 @@ export class AutkMap {
                 break;
         }
 
-        this._workspaceCrsEstablished = true;
         this._ui.refreshLayerList();
     }
 
@@ -489,7 +474,7 @@ export class AutkMap {
      * map.setView({ center: { latitude: 40.7831, longitude: -73.9712 }, zoom: 12 });
      * map.loadTiles('imagery', { source: TILE_SOURCES.esriWorldImagery });
      */
-    loadTiles(id: string, { source, crs, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
+    loadTiles(id: string, { source, opacity = 1, maxCachedTiles, zoomBias, maxTiles }: LoadTilesParams): void {
         const layerInfo: LayerInfo = {
             id,
             typeLayer: 'tiles',
@@ -504,14 +489,12 @@ export class AutkMap {
 
         let layer: TileLayer | null = null;
         try {
-            crs = this.resolveWorkspaceCrs(crs);
+            const crs = this._workspaceCrs;
             if (!this._layerManager.hasOrigin) throw new Error('Set the view before loading tiles on an empty map.');
             layer = this._layerManager.addTileLayer(layerInfo, layerRenderInfo, { source, crs, maxCachedTiles, zoomBias, maxTiles });
             if (!layer) { return; }
             layer.createPipeline(this._renderer);
-            this._workspaceCrs = crs;
-            this._workspaceCrsEstablished = true;
-            layer.setChangeListener(() => this.requestRender());
+                layer.setChangeListener(() => this.requestRender());
         } catch (error) {
             if (layer) this._layerManager.removeLayerById(id);
             console.error(`Layer "${id}": ${(error as Error).message}`);
@@ -1275,9 +1258,9 @@ export class AutkMap {
      * @example
      * map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });
      */
-    loadTerrain({ source, crs, validation, levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, overlaySize }: LoadTerrainParams): void {
+    loadTerrain({ source, validation, levels, windowSize, zoomBias, maxCachedTiles, verticalScale, composeBudgetMs, overlaySize }: LoadTerrainParams): void {
         const qualityOptions = resolveElevationValidation(validation);
-        const workspaceCrs = this.resolveWorkspaceCrs(crs);
+        const workspaceCrs = this._workspaceCrs;
         const metresPerUnit = crsMetresPerUnit(workspaceCrs);
         if (!(metresPerUnit && metresPerUnit > 0)) throw new Error('Terrain requires projected linear units (a metre-based or other linear workspace CRS).');
         if (!source || typeof source !== 'object') throw new Error('Terrain requires an elevation source.');
@@ -1339,8 +1322,6 @@ export class AutkMap {
         this._terrainRenderPath?.destroy();
         this.clearTerrainTiles();
         if (!hadOrigin && raster) this.layerManager.initializeOrigin(source.collection);
-        this._workspaceCrs = workspaceCrs;
-        this._workspaceCrsEstablished = true;
         this._terrainRenderPath = path;
         this._terrainValidation = qualityStats;
         this._terrainTiles = heights instanceof TileHeightSource ? heights : null;

@@ -23,7 +23,7 @@ describe('a layer update keyed by a property', () => {
   it('updates the row whose property matches, and only that row', async () => {
     // A workspace of its own, loaded in its CRS (EPSG:3395) on whole metres, so its centimetre grid moves no point.
     await db.setWorkspace('update_by_property');
-    await db.loadGeojson({ outputTableName: 'zones', coordinateFormat: 'EPSG:3395', geojsonObject: {
+    await db.loadGeojson({ outputTableName: 'zones', sourceCrs: 'EPSG:3395', geojsonObject: {
       type: 'FeatureCollection', features: [zone(11, 10, [0, 0]), zone(12, 20, [100, 100]), zone(13, 30, [200, 200])],
     } });
     // The property ids are not the rows' own numbers (1, 2, 3), and the update's one feature gets the GeoJSON id of
@@ -47,7 +47,7 @@ describe('a layer update keyed by a property', () => {
   it('updates by a property whose name holds quotes, and only the row it names', async () => {
     const key = `it's "loud"`;
     await db.setWorkspace('update_by_quoted_property');
-    await db.loadGeojson({ outputTableName: 'zones', coordinateFormat: 'EPSG:3395', geojsonObject: {
+    await db.loadGeojson({ outputTableName: 'zones', sourceCrs: 'EPSG:3395', geojsonObject: {
       type: 'FeatureCollection',
       features: [zone(11, 10, [0, 0], key), zone(12, 20, [100, 100], key), zone(13, 30, [200, 200], key)],
     } });
@@ -75,7 +75,7 @@ describe('a layer update keyed by a property', () => {
     // A bare `$id` is a JSONPath to DuckDB and `/p` a JSON pointer, which reads the key `p`. Inside a quoted key DuckDB
     // decodes only `\"` and `\\`, so a key holding a tab has to reach it as it is.
     await db.setWorkspace(workspace);
-    await db.loadGeojson({ outputTableName: 'zones', coordinateFormat: 'EPSG:3395', geojsonObject: {
+    await db.loadGeojson({ outputTableName: 'zones', sourceCrs: 'EPSG:3395', geojsonObject: {
       type: 'FeatureCollection',
       features: [zone(11, 10, [0, 0], key), zone(12, 20, [100, 100], key), zone(13, 30, [200, 200], key)],
     } });

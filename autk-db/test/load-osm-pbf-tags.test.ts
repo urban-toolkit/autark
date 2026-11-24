@@ -41,7 +41,7 @@ afterEach(() => vi.restoreAllMocks());
 afterAll(async () => { for (const engine of engines) await engine.terminate(); vi.unstubAllGlobals(); });
 
 async function load(source: 'pbf' | 'api', tagSets: OsmTagSet[], queryArea: OsmQueryArea = { bbox }, elements = fixture, layers: Array<'roads'> = ['roads']) {
-  await db.setWorkspace(`pbf_tags_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+  await db.setWorkspace(`pbf_tags_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
   const inline = structuredClone(elements);
   resolveWayGeometries(inline);
   const api = vi.spyOn((db as any).loadOsmFromOverpassApiUseCase, 'fetchCombinedOsmData').mockResolvedValue({ elements: inline }).mockClear();
@@ -114,7 +114,7 @@ describe('PBF tag-set acquisition', () => {
     });
     const api = vi.spyOn((db as any).loadOsmFromOverpassApiUseCase, 'fetchCombinedOsmData').mockRejectedValue(new Error('Unexpected Overpass call'));
     for (const mode of ['bbox', 'place', 'tags']) {
-      await db.setWorkspace(`monaco_asset_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+      await db.setWorkspace(`monaco_asset_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-7 });
       await db.loadOsm({
         pbfFileUrl: '/monaco.osm.pbf',
         queryArea: mode === 'bbox' ? { bbox: [7.405, 43.720, 7.445, 43.7525] }

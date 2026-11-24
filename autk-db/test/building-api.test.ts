@@ -13,7 +13,7 @@ vi.mock('../src/duckdb', () => ({
 }));
 
 import { AutkDb } from '../src/db';
-import { DEFAULT_WORKSPACE_COORDINATE_FORMAT, DEFAULT_WORKSPACE_PRECISION_GRID } from '../src/consts';
+import { DEFAULT_WORKSPACE_CRS, DEFAULT_WORKSPACE_PRECISION_GRID } from '../src/consts';
 
 let db: AutkDb;
 
@@ -42,29 +42,29 @@ const buildings: FeatureCollection = { type: 'FeatureCollection', features: [{
 describe('public building feature API', () => {
   it('uses a paired CRS and precision-grid workspace configuration', async () => {
     expect(db.getWorkspaceConfiguration()).toEqual({
-      coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+      crs: DEFAULT_WORKSPACE_CRS,
       precisionGrid: DEFAULT_WORKSPACE_PRECISION_GRID,
     });
-    await db.setWorkspace('precision_grid', { coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
-    expect(db.getWorkspaceConfiguration()).toEqual({ coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
-    await db.loadGeojson({ outputTableName: 'point', layerType: 'points', coordinateFormat: 'EPSG:3395',
+    await db.setWorkspace('precision_grid', { crs: 'EPSG:3395', precisionGrid: 0.01 });
+    expect(db.getWorkspaceConfiguration()).toEqual({ crs: 'EPSG:3395', precisionGrid: 0.01 });
+    await db.loadGeojson({ outputTableName: 'point', layerType: 'points', sourceCrs: 'EPSG:3395',
       geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {},
         geometry: { type: 'Point', coordinates: [1.234, 5.678] } }] } });
-    await expect(db.setWorkspace('precision_grid', { coordinateFormat: 'EPSG:4326' } as any))
-      .rejects.toThrow(/coordinateFormat and precisionGrid/);
-    await expect(db.setWorkspace('precision_grid', { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 }))
+    await expect(db.setWorkspace('precision_grid', { crs: 'EPSG:4326' } as any))
+      .rejects.toThrow(/crs and precisionGrid/);
+    await expect(db.setWorkspace('precision_grid', { crs: 'EPSG:4326', precisionGrid: 1e-7 }))
       .rejects.toThrow(/non-empty workspace/);
   });
 
   it('keeps one stored/exported building and reports counts 8 and 1 in opposite directions', async () => {
     await db.setWorkspace('matches');
     await db.loadGeojson({ geojsonObject: buildings, outputTableName: 'buildings', layerType: 'buildings',
-      coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT });
+      sourceCrs: DEFAULT_WORKSPACE_CRS });
     const points: FeatureCollection = { type: 'FeatureCollection', features: Array.from({ length: 8 }, (_, i) => ({
       type: 'Feature', id: `point-${i}`, geometry: { type: 'Point', coordinates: [i < 3 ? 2 : 12, 5] }, properties: {},
     })) };
     await db.loadGeojson({ geojsonObject: points, outputTableName: 'points', layerType: 'points',
-      coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT });
+      sourceCrs: DEFAULT_WORKSPACE_CRS });
     await db.spatialQuery({ tableRootName: 'buildings', tableJoinName: 'points', groupBy: [{ column: '*', aggregateFn: 'count' }] });
     const output = await db.getLayer('buildings');
     expect(output.features).toHaveLength(1);
@@ -76,7 +76,7 @@ describe('public building feature API', () => {
     expect(await db.getTable('buildings')).toHaveLength(1);
     expect(db.getTablesMetadata().find(table => table.name === 'buildings')?.columns.some(column => column.name === 'agg_geometry')).toBe(false);
 
-    await db.loadGeojson({ outputTableName: 'overlap', layerType: 'points', coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+    await db.loadGeojson({ outputTableName: 'overlap', layerType: 'points', sourceCrs: DEFAULT_WORKSPACE_CRS,
       geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', id: 'overlap-point',
         geometry: { type: 'Point', coordinates: [7, 5] }, properties: {} }] } });
     await db.spatialQuery({ tableRootName: 'overlap', tableJoinName: 'buildings', groupBy: [{ column: '*', aggregateFn: 'count' }] });
@@ -86,18 +86,18 @@ describe('public building feature API', () => {
   it('accepts an empty filtered building layer without making it the workspace crop mask', async () => {
     await db.setWorkspace('empty');
     const empty = await db.loadGeojson({
-      outputTableName: 'empty', geojsonObject: buildings, coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+      outputTableName: 'empty', geojsonObject: buildings, sourceCrs: DEFAULT_WORKSPACE_CRS,
       layerType: 'buildings', boundingBox: { minLon: 100, minLat: 100, maxLon: 101, maxLat: 101 },
     });
     expect(empty.boundingBox).toBeUndefined();
     expect((await db.getLayer('empty')).features).toEqual([]);
     await db.loadGeojson({
-      outputTableName: 'first_nonempty', coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+      outputTableName: 'first_nonempty', sourceCrs: DEFAULT_WORKSPACE_CRS,
       geojsonObject: { type: 'FeatureCollection', features: [{
         type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [4, 5] },
       }] },
     });
-    await db.loadGeojson({ outputTableName: 'buildings', geojsonObject: buildings, coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT, layerType: 'buildings' });
+    await db.loadGeojson({ outputTableName: 'buildings', geojsonObject: buildings, sourceCrs: DEFAULT_WORKSPACE_CRS, layerType: 'buildings' });
     expect((await db.getLayer('buildings')).features).toHaveLength(1);
     expect((await (db as any).conn.query(`SELECT ST_Equals(geometry,
       ST_GeomFromGeoJSON('${JSON.stringify(buildings.features[0].geometry)}')) same_geometry FROM empty.buildings`)).toArray()[0].same_geometry).toBe(true);
@@ -106,7 +106,7 @@ describe('public building feature API', () => {
   it('updates by public ID, preserves indexed attributes and does not multiply features after repeated joins', async () => {
     await db.setWorkspace('updates');
     await db.loadGeojson({ geojsonObject: buildings, outputTableName: 'buildings', layerType: 'buildings',
-      coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT });
+      sourceCrs: DEFAULT_WORKSPACE_CRS });
     const input = structuredClone(buildings);
     input.features[0].properties = { height: 20, parts: [{ geometryIndex: 1, height: 35 }] };
     await db.updateTable({ tableName: 'buildings', strategy: 'update', idColumn: 'geojson_id', data: input });
@@ -116,7 +116,7 @@ describe('public building feature API', () => {
     expect((await (db as any).conn.query(`SELECT ST_Equals(geometry,
       ST_GeomFromGeoJSON('${JSON.stringify(buildings.features[0].geometry)}')) same_geometry FROM updates.buildings`)).toArray()[0].same_geometry).toBe(true);
 
-    await db.loadGeojson({ outputTableName: 'points', layerType: 'points', coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+    await db.loadGeojson({ outputTableName: 'points', layerType: 'points', sourceCrs: DEFAULT_WORKSPACE_CRS,
       geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', id: 42,
         geometry: { type: 'Point', coordinates: [7, 5] }, properties: { value: 3 } }] } });
     for (let i = 0; i < 2; i++) await db.spatialQuery({ tableRootName: 'buildings', tableJoinName: 'points' });

@@ -35,15 +35,15 @@ describe('workspace vector precision', () => {
 
   it('loads and reimports the #106 surface and park without retry, preserving identity and grid', async () => {
     await db.setWorkspace('precision_source');
-    await db.loadGeojson({ geojsonObject: surface, outputTableName: 'surface', layerType: 'surface', coordinateFormat: 'EPSG:3395' });
-    await db.loadGeojson({ geojsonObject: park, outputTableName: 'parks', layerType: 'parks', coordinateFormat: 'EPSG:3395' });
+    await db.loadGeojson({ geojsonObject: surface, outputTableName: 'surface', layerType: 'surface', sourceCrs: 'EPSG:3395' });
+    await db.loadGeojson({ geojsonObject: park, outputTableName: 'parks', layerType: 'parks', sourceCrs: 'EPSG:3395' });
     const outputSurface = await db.getLayer('surface');
     const outputPark = await db.getLayer('parks');
     expect(outputPark.features).toHaveLength(1);
     expect(outputPark.features[0].id).toBe(165358914);
     await db.setWorkspace('precision_target');
-    await db.loadGeojson({ geojsonObject: outputSurface, outputTableName: 'surface', layerType: 'surface', coordinateFormat: 'EPSG:3395' });
-    await db.loadGeojson({ geojsonObject: outputPark, outputTableName: 'parks', layerType: 'parks', coordinateFormat: 'EPSG:3395' });
+    await db.loadGeojson({ geojsonObject: outputSurface, outputTableName: 'surface', layerType: 'surface', sourceCrs: 'EPSG:3395' });
+    await db.loadGeojson({ geojsonObject: outputPark, outputTableName: 'parks', layerType: 'parks', sourceCrs: 'EPSG:3395' });
     const reimported = (await db.getLayer('parks')).features;
     expect(reimported).toHaveLength(1);
     expect(reimported[0].id).toBe(outputPark.features[0].id);
@@ -70,7 +70,7 @@ describe('workspace vector precision', () => {
 
   it('normalizes updated vectors and SQL-created vector layers in workspace coordinates', async () => {
     await db.setWorkspace('precision_updates');
-    await db.loadGeojson({ outputTableName: 'points', coordinateFormat: 'EPSG:3395', geojsonObject: {
+    await db.loadGeojson({ outputTableName: 'points', sourceCrs: 'EPSG:3395', geojsonObject: {
       type: 'FeatureCollection', features: [{ type: 'Feature', id: 'point', properties: {}, geometry: { type: 'Point', coordinates: [1.234, 5.678] } }],
     } });
     await db.updateTable({ tableName: 'points', strategy: 'update', idColumn: 'geojson_id', data: {
@@ -86,19 +86,19 @@ describe('workspace vector precision', () => {
     await db.setWorkspace(`precision_empty_${source}`);
     const wkt = 'POLYGON((0 0,0.003 0,0.003 0.003,0 0.003,0 0))';
     const load = source === 'geojson'
-      ? db.loadGeojson({ outputTableName: 'tiny', coordinateFormat: 'EPSG:3395', geojsonObject: { type: 'FeatureCollection', features: [
+      ? db.loadGeojson({ outputTableName: 'tiny', sourceCrs: 'EPSG:3395', geojsonObject: { type: 'FeatureCollection', features: [
         { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [0.003, 0], [0.003, 0.003], [0, 0.003], [0, 0]]] } },
       ] } })
       : source === 'json'
-        ? db.loadJson({ outputTableName: 'tiny', jsonObject: [{ wkt }], geometryColumns: { wktColumnName: 'wkt', coordinateFormat: 'EPSG:3395' } })
-        : db.loadCsv({ outputTableName: 'tiny', csvObject: [['wkt'], [wkt]], geometryColumns: { wktColumnName: 'wkt', coordinateFormat: 'EPSG:3395' } });
+        ? db.loadJson({ outputTableName: 'tiny', jsonObject: [{ wkt }], geometryColumns: { wktColumnName: 'wkt' }, sourceCrs: 'EPSG:3395' })
+        : db.loadCsv({ outputTableName: 'tiny', csvObject: [['wkt'], [wkt]], geometryColumns: { wktColumnName: 'wkt' }, sourceCrs: 'EPSG:3395' });
     await expect(load).rejects.toThrow(/precisionGrid.*collapses/);
     expect(db.getTablesMetadata()).toEqual([]);
     expect((await (db as any).conn.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='precision_empty_${source}' AND table_name='tiny'`)).numRows).toBe(0);
   });
 
   it('uses the explicit degree grid for geographic workspaces', async () => {
-    await db.setWorkspace('precision_degrees', { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-7 });
+    await db.setWorkspace('precision_degrees', { crs: 'EPSG:4326', precisionGrid: 1e-7 });
     await db.loadGeojson({ outputTableName: 'points', geojsonObject: { type: 'FeatureCollection', features: [
       { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [-74.00123456, 40.70123456] } },
     ] } });
@@ -118,7 +118,7 @@ describe('workspace vector precision', () => {
         { type: 'Polygon', coordinates: [[[5.004, 0.004], [15.004, 0.004], [15.004, 10.004], [5.004, 10.004], [5.004, 0.004]]] },
       ] },
     }] };
-    await db.loadGeojson({ geojsonObject: collection, outputTableName: 'buildings', layerType: 'buildings', coordinateFormat: 'EPSG:3395' });
+    await db.loadGeojson({ geojsonObject: collection, outputTableName: 'buildings', layerType: 'buildings', sourceCrs: 'EPSG:3395' });
     const feature = (await db.getLayer('buildings')).features[0];
     expect(feature.id).toBe('building');
     expect(feature.properties?.parts).toEqual(collection.features[0].properties?.parts);
@@ -136,12 +136,12 @@ describe('workspace vector precision', () => {
 
   it('rejects a collapsed indexed part and restores the previous table and metadata', async () => {
     await db.setWorkspace('precision_collapse');
-    await db.loadGeojson({ outputTableName: 'buildings', layerType: 'buildings', coordinateFormat: 'EPSG:3395', geojsonObject: {
+    await db.loadGeojson({ outputTableName: 'buildings', layerType: 'buildings', sourceCrs: 'EPSG:3395', geojsonObject: {
       type: 'FeatureCollection', features: [{ type: 'Feature', id: 'original', properties: {},
         geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] } }],
     } });
     const metadata = structuredClone(db.getTablesMetadata());
-    await expect(db.loadGeojson({ outputTableName: 'buildings', layerType: 'buildings', coordinateFormat: 'EPSG:3395', geojsonObject: {
+    await expect(db.loadGeojson({ outputTableName: 'buildings', layerType: 'buildings', sourceCrs: 'EPSG:3395', geojsonObject: {
       type: 'FeatureCollection', features: [{ type: 'Feature', id: 'tiny', properties: {},
         geometry: { type: 'Polygon', coordinates: [[[0, 0], [0.003, 0], [0.003, 0.003], [0, 0.003], [0, 0]]] } }],
     } })).rejects.toThrow(/precisionGrid.*building part/);
@@ -151,7 +151,7 @@ describe('workspace vector precision', () => {
 
   it('rolls back a failed GeoJSON load and does not retry or register a partial layer', async () => {
     await db.setWorkspace('precision_load_failure');
-    await db.loadGeojson({ geojsonObject: surface, outputTableName: 'surface', layerType: 'surface', coordinateFormat: 'EPSG:3395' });
+    await db.loadGeojson({ geojsonObject: surface, outputTableName: 'surface', layerType: 'surface', sourceCrs: 'EPSG:3395' });
     const metadata = structuredClone(db.getTablesMetadata());
     const conn = (db as any).conn;
     const query = conn.query.bind(conn);
@@ -161,7 +161,7 @@ describe('workspace vector precision', () => {
       if (sql.includes('SET geometry =') && sql.includes('ST_Intersection')) { attempts++; throw new Error('Injected crop failure'); }
       return result;
     });
-    await expect(db.loadGeojson({ geojsonObject: park, outputTableName: 'parks', layerType: 'parks', coordinateFormat: 'EPSG:3395' }))
+    await expect(db.loadGeojson({ geojsonObject: park, outputTableName: 'parks', layerType: 'parks', sourceCrs: 'EPSG:3395' }))
       .rejects.toThrow('Injected crop failure');
     expect(attempts).toBe(1);
     expect(db.getTablesMetadata()).toEqual(metadata);

@@ -33,7 +33,7 @@ const collection: FeatureCollection = {
 async function load(geojsonObject: FeatureCollection, name = 'buildings') {
   return new LoadGeojsonUseCase(db, conn).exec({
     geojsonObject, outputTableName: name, layerType: 'buildings',
-    coordinateFormat: 'EPSG:4326', workspaceCoordinateFormat: 'EPSG:4326',
+    sourceCrs: 'EPSG:4326', workspaceCrs: 'EPSG:4326',
   });
 }
 
@@ -93,7 +93,7 @@ describe('building feature round-trip', () => {
   it('filters whole buildings by bbox without clipping/reordering their parts', async () => {
     const table = await new LoadGeojsonUseCase(db, conn).exec({
       geojsonObject: collection, outputTableName: 'bbox', layerType: 'buildings',
-      coordinateFormat: 'EPSG:4326', workspaceCoordinateFormat: 'EPSG:4326',
+      sourceCrs: 'EPSG:4326', workspaceCrs: 'EPSG:4326',
       boundingBox: { minLon: 0, minLat: 0, maxLon: 1, maxLat: 1 },
     });
     const output = await new GetLayerUseCase(conn).exec(table);

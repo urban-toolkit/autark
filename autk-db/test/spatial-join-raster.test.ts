@@ -19,15 +19,15 @@ beforeAll(async () => {
 afterEach(() => vi.restoreAllMocks());
 afterAll(async () => { await (db as any)?.conn?.close(); await native.db?.terminate(); vi.unstubAllGlobals(); });
 
-async function setup(features: FeatureCollection['features'], coordinateFormat = 'EPSG:4326', precisionGrid = 1e-10) {
-  await db.setWorkspace(`raster_join_${++serial}`, { coordinateFormat, precisionGrid });
-  await db.loadGeojson({ outputTableName: 'roots', coordinateFormat, geojsonObject: { type: 'FeatureCollection', features } });
+async function setup(features: FeatureCollection['features'], crs = 'EPSG:4326', precisionGrid = 1e-10) {
+  await db.setWorkspace(`raster_join_${++serial}`, { crs, precisionGrid });
+  await db.loadGeojson({ outputTableName: 'roots', sourceCrs: crs, geojsonObject: { type: 'FeatureCollection', features } });
   await db.rawQuery({ query: `SELECT 2 width, 2 height, 0.0 min_x, 0.0 min_y, 2.0 max_x, 2.0 max_y`,
     output: { type: 'CREATE_TABLE', tableName: 'cells', tableType: 'raster' } });
   setRasterPayload(db.getCurrentWorkspace(), 'cells', {
     width: 2, height: 2, originalWidth: 2, originalHeight: 2,
     minX: 0, minY: 0, maxX: 2, maxY: 2, originX: 0, originY: 2, sourceMinX: 0, sourceMinY: 0, resX: 1, resY: 1,
-    sourceCrs: coordinateFormat, targetCrs: coordinateFormat,
+    sourceCrs: crs, targetCrs: crs,
     bands: [{ id: 'band_1', label: 'first' }, { id: 'band_2', label: 'second' }],
     values: { band_1: new Float32Array([0, 2, 4, NaN]), band_2: new Float32Array([10, 20, 30, 40]) },
   });

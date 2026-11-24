@@ -155,7 +155,7 @@ export type Table = OsmTable | OsmLayerTable | CsvTable | JsonTable | GeojsonTab
 /** Paired target CRS and coordinate precision for a workspace's vector geometries. */
 export interface WorkspaceConfiguration {
   /** Target coordinate reference system used for stored geometries. */
-  coordinateFormat: string;
+  crs: string;
   /** Coordinate grid in workspace CRS units for stored vectors and spatial operation results. */
   precisionGrid: number;
 }

@@ -1,7 +1,7 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 import { GeojsonTable } from '../../interfaces';
 import { LoadGeojsonParams } from './interfaces';
-import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_SOURCE_CRS, DEFAULT_WORKSPACE_CRS } from '../../consts';
 import { FIND_INVALID_BUILDING_GEOMETRY_QUERY, LOAD_FEATURE_COLLECTION_QUERY, LOAD_LAYER_FROM_FEATURE_COLLECTION_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { FeatureCollection } from 'geojson';
@@ -43,12 +43,12 @@ export class LoadGeojsonUseCase {
     geojsonFileUrl,
     geojsonObject,
     outputTableName,
-    coordinateFormat,
+    sourceCrs = DEFAULT_SOURCE_CRS,
     boundingBox,
     workspace = DEFAULT_WORKSPACE_NAME,
     layerType,
-    workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
-  }: LoadGeojsonParams & { workspaceCoordinateFormat?: string }): Promise<GeojsonTable> {
+    workspaceCrs = DEFAULT_WORKSPACE_CRS,
+  }: LoadGeojsonParams & { workspaceCrs?: string }): Promise<GeojsonTable> {
     if (!geojsonFileUrl && !geojsonObject) {
       throw new Error('Either geojsonFileUrl or geojsonObject must be provided');
     }
@@ -99,13 +99,12 @@ export class LoadGeojsonUseCase {
       return geometryType === 'buildings' ? normalizeBuildingFeature(identified) : identified;
     });
     geojson = { ...geojson, features };
-    const sourceCrs = coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
 
     const describeTableResponse = await this.createTableFromFeatureCollection(
       geojson,
       outputTableName,
       sourceCrs,
-      workspaceCoordinateFormat,
+      workspaceCrs,
       workspace,
       boundingBox,
       geometryType !== 'buildings',

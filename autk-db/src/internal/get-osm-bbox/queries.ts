@@ -3,7 +3,7 @@
  *
  * @param osmTableName Name of the OSM boundaries table.
  * @param workspace The database workspace where the table resides.
- * @param coordinateFormat Optional target CRS for spatial transformation.
+ * @param targetCrs Optional target CRS for spatial transformation.
  * @returns A SQL string that selects the min/max longitude and latitude.
  * @example
  * const query = GET_OSM_BBOX_QUERY('osm_ways', 'autk');
@@ -12,11 +12,11 @@
 export const GET_OSM_BBOX_QUERY = (
   osmTableName: string,
   workspace: string,
-  coordinateFormat?: string,
+  targetCrs?: string,
 ) => {
   const qualifiedTableName = `${workspace}.${osmTableName}`;
 
-  if (!coordinateFormat || coordinateFormat === 'EPSG:4326') {
+  if (!targetCrs || targetCrs === 'EPSG:4326') {
     return `
       SELECT
         CAST(MIN(lon) AS DOUBLE) as minLon,
@@ -38,8 +38,8 @@ export const GET_OSM_BBOX_QUERY = (
     ),
     transformed_bounds AS (
       SELECT
-        ST_Transform(min_point, 'EPSG:4326', '${coordinateFormat}', always_xy := true) as min_point,
-        ST_Transform(max_point, 'EPSG:4326', '${coordinateFormat}', always_xy := true) as max_point
+        ST_Transform(min_point, 'EPSG:4326', '${targetCrs}', always_xy := true) as min_point,
+        ST_Transform(max_point, 'EPSG:4326', '${targetCrs}', always_xy := true) as max_point
       FROM raw_bounds
     )
     SELECT

@@ -66,7 +66,7 @@ async function provide(elements: OsmElement[], source: string) {
 
 describe('geocode-wide coastlines, shared by Overpass and PBF', () => {
   it.each(['api', 'pbf'])('classifies coasts outside areas, protects neighboring islands, and bounds %s water', async source => {
-    await db.setWorkspace(`coastal_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await db.setWorkspace(`coastal_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([...boundary, ...coastline], source);
     const result = await db.loadOsm({ queryArea: area, ...(source === 'pbf' ? { pbfFileUrl: '/region.pbf' } : {}),
       autoLoadLayers: { layers: ['water'] } });
@@ -83,7 +83,7 @@ describe('geocode-wide coastlines, shared by Overpass and PBF', () => {
   });
 
   it.each(['api', 'pbf'])('generates no coastal water for an inland %s area but preserves explicit lakes', async source => {
-    await db.setWorkspace(`inland_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await db.setWorkspace(`inland_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     const mainland = structuredClone(coastline.slice(0, 3));
     mainland.filter(element => element.type === 'node').forEach(element => { element.lon = 16; });
     await provide([...boundary, ...mainland, ...lake], source);

@@ -128,7 +128,7 @@ properties, handles nested geometries, and recomputes declared bounds from trans
 vertices. Inputs are not mutated; identical CRS names return the original collection.
 Geometry is not densified and raster bands are not resampled.
 
-The shared DB/map workspace default remains `DEFAULT_WORKSPACE_COORDINATE_FORMAT`
+The shared DB/map workspace default remains `DEFAULT_WORKSPACE_CRS`
 (EPSG:3395). There is no fixed supported-CRS list: both source and target definitions are
 resolved by Proj4js, including geographic-to-projected, projected-to-geographic, and
 projected-to-projected conversions. `isSupportedCrs()` validates through Proj4js rather than

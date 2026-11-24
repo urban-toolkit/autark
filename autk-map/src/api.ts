@@ -227,14 +227,6 @@ export interface LoadTilesParams {
      * responsible for following the provider's terms of use.
      */
     source: TileSource;
-    /**
-     * Workspace/output coordinate system of the map's data, not the source CRS
-     * of an imported file. Inherits the map workspace CRS, whose default is the shared
-     * `DEFAULT_WORKSPACE_COORDINATE_FORMAT` (`'EPSG:3395'`), also used by AutkDb.
-     * The first geographic load may declare a custom workspace CRS when the map constructor
-     * did not specify one. Subsequent conflicting settings are rejected before allocation.
-     */
-    crs?: string;
     /** Layer opacity from 0 to 1. Defaults to 1. */
     opacity?: number;
     /** Positive safe integer soft cache limit. Defaults to 256. Invalid values are rejected. */
@@ -253,7 +245,10 @@ export interface LoadTilesParams {
     maxTiles?: number;
 }
 
-/** Parameters for loading elevation tiles or a normalized terrain raster. */
+/**
+ * Parameters for loading elevation tiles or a normalized terrain raster.
+ * The workspace CRS comes from the map constructor and must be metre-based.
+ */
 export interface LoadTerrainParams {
     /** Conservative, region-independent elevation validation. Enabled by default; false preserves raw heights. */
     validation?: false | ElevationValidationOptions;
@@ -262,11 +257,6 @@ export interface LoadTerrainParams {
      * is shown on the map; the caller is responsible for following the provider's terms.
      */
     source: TerrainTileSource | TerrainRasterSource;
-    /**
-     * Coordinate system of the map's data. Inherited from the map; defaults to `'EPSG:3395'`, the workspace default of `AutkDb`.
-     * Only metre-based systems are accepted: heights are metres, so a map plane in degrees would give a distorted scene.
-     */
-    crs?: string;
     /**
      * Nested windows of height samples around the view, finest first; each covers
      * twice the area of the one before. Fewer are used when the source has too few

@@ -10,14 +10,14 @@ export const DEFAULT_WORKSPACE_NAME = 'autk';
  *
  * Assumes incoming data is expressed as WGS84 longitude and latitude coordinates.
  */
-export const DEFAULT_INPUT_COORDINATE_FORMAT = 'EPSG:4326';
+export const DEFAULT_SOURCE_CRS = 'EPSG:4326';
 
 /**
  * Default workspace coordinate reference system for stored geometries.
  *
  * Uses World Mercator so spatial operations can work against a consistent projected CRS.
  */
-export { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '@urban-toolkit/autk-core';
+export { DEFAULT_WORKSPACE_CRS } from '@urban-toolkit/autk-core';
 
 /**
  * Default coordinate grid in workspace units for stored vectors and spatial operation results.

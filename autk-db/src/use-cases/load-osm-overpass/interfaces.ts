@@ -121,11 +121,11 @@ export function checkTagSets(sets: unknown): OsmTagSet[] {
 export type LoadOsmParams = {
   outputTableName?: string;
   autoLoadLayers: {
-    /** CRS of the OSM input data (source). Defaults to EPSG:4326. */
-    coordinateFormat?: string;
     /** Public layers to retain; may be empty for tag-only loads. Surface is always constructed as a workspace mask, hidden unless requested. */
     layers: Array<LayerType>;
   };
+  /** CRS of the OSM input data. Defaults to EPSG:4326. */
+  sourceCrs?: string;
   /** Named boundaries or a WGS84 bbox. Named coastline collection/classification uses the geocode bbox,
    * including neighboring coasts regardless of jurisdiction. Water adds bbox(areas) minus classified land;
    * generated context has properties.generated = 'coastline'. Missing/invalid coastlines never imply sea.

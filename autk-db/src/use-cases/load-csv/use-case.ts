@@ -4,7 +4,7 @@ import { CsvGeometryLayerType, LoadCsvParams } from './interfaces';
 import { CsvTable } from '../../interfaces';
 import { LOAD_CSV_ON_TABLE_QUERY, LOAD_CSV_ON_TABLE_WITH_COORDINATES_QUERY, LOAD_CSV_ON_TABLE_WITH_WKT_QUERY } from './queries';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
-import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT, DEFAULT_GEO_COLUMN_NAME } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_SOURCE_CRS, DEFAULT_WORKSPACE_CRS, DEFAULT_GEO_COLUMN_NAME } from '../../consts';
 
 /**
  * Loads CSV content into DuckDB and optionally materializes a geometry column.
@@ -66,7 +66,7 @@ export class LoadCsvUseCase {
    * });
    * console.log(table.name); // 'cities'
    */
-  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = DEFAULT_WORKSPACE_NAME, workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT }: LoadCsvParams & { workspaceCoordinateFormat?: string }): Promise<CsvTable> {
+  async exec({ csvFileUrl, csvObject, outputTableName, geometryColumns, delimiter = ',', workspace = DEFAULT_WORKSPACE_NAME, sourceCrs = DEFAULT_SOURCE_CRS, workspaceCrs = DEFAULT_WORKSPACE_CRS }: LoadCsvParams & { workspaceCrs?: string }): Promise<CsvTable> {
     if (!csvFileUrl && !csvObject) {
       throw new Error('Either csvFileUrl or csvObject must be provided');
     }
@@ -92,20 +92,20 @@ export class LoadCsvUseCase {
           mode: 'lat-lng' as const,
           latColumnName: 'Latitude',
           longColumnName: 'Longitude',
-          coordinateFormat: DEFAULT_INPUT_COORDINATE_FORMAT,
+          sourceCrs,
         }
       : geometryColumns && 'wktColumnName' in geometryColumns
         ? {
             mode: 'wkt' as const,
             wktColumnName: geometryColumns.wktColumnName,
-            coordinateFormat: geometryColumns.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT,
+            sourceCrs,
           }
         : geometryColumns
           ? {
               mode: 'lat-lng' as const,
               latColumnName: geometryColumns.latColumnName,
               longColumnName: geometryColumns.longColumnName,
-              coordinateFormat: geometryColumns.coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT,
+              sourceCrs,
             }
           : null;
 
@@ -126,8 +126,8 @@ export class LoadCsvUseCase {
         delimiter,
         latColumnName: normalizedGeometryColumns.latColumnName,
         longColumnName: normalizedGeometryColumns.longColumnName,
-        sourceCrs: normalizedGeometryColumns.coordinateFormat,
-        targetCrs: workspaceCoordinateFormat,
+        sourceCrs: normalizedGeometryColumns.sourceCrs,
+        targetCrs: workspaceCrs,
         workspace,
       });
       tableType = 'points';
@@ -137,8 +137,8 @@ export class LoadCsvUseCase {
         tableName: outputTableName,
         delimiter,
         wktColumnName: normalizedGeometryColumns.wktColumnName,
-        sourceCrs: normalizedGeometryColumns.coordinateFormat,
-        targetCrs: workspaceCoordinateFormat,
+        sourceCrs: normalizedGeometryColumns.sourceCrs,
+        targetCrs: workspaceCrs,
         workspace,
       });
     } else {

@@ -31,7 +31,7 @@ async function main(): Promise<void> {
     });
     await db.loadGeoTiff({
         geotiffFileUrl: `${BASE_URL}data/${corine ? 'lisbon-corine-2018-rgb.tif' : 'lisbon-population-2020.tif'}`,
-        coordinateFormat: 'EPSG:4326',
+        sourceCrs: 'EPSG:4326',
         outputTableName: layerId,
         ...(corine ? { resampleMethod: 'nearest' } : {}),
     });

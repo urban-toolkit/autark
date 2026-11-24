@@ -44,7 +44,7 @@ afterAll(async () => { for (const engine of engines) await engine.terminate(); v
 
 describe('OSM element export (#108)', () => {
   it.each(['api', 'pbf'])('exports typed elements with own tags and indexed normalized geometry through %s', async source => {
-    await db.setWorkspace(`osm_elements_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await db.setWorkspace(`osm_elements_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     if (source === 'pbf') {
       const bytes = await encodeBuildingPbf(fixture);
@@ -101,7 +101,7 @@ describe('OSM element export (#108)', () => {
   });
 
   it('does not treat an unrelated multipolygon as a missing way with the same number', async () => {
-    await db.setWorkspace(`osm_missing_way_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await db.setWorkspace(`osm_missing_way_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     const elements = structuredClone(fixture).filter(element => !(element.type === 'way' && element.id === 301));
     elements.push({ type: 'relation', id: 901, tags: { type: 'building', name: 'Missing way' }, members: [{ type: 'way', ref: 301, role: 'part' }] });
     resolveWayGeometries(elements);

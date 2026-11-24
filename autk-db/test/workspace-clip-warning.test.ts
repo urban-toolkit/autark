@@ -29,7 +29,7 @@ async function rows(table: string): Promise<number> {
 }
 
 async function load(name: string, collection: FeatureCollection) {
-  await db.loadGeojson({ geojsonObject: collection, outputTableName: name, layerType: 'parks', coordinateFormat: 'EPSG:4326' });
+  await db.loadGeojson({ geojsonObject: collection, outputTableName: name, layerType: 'parks', sourceCrs: 'EPSG:4326' });
 }
 
 describe('a table clipped to the workspace extent', () => {

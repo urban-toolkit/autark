@@ -10,7 +10,7 @@
  */
 
 /** Default projected coordinate system shared by database workspaces and map layers. */
-export { DEFAULT_WORKSPACE_COORDINATE_FORMAT } from './defaults';
+export { DEFAULT_WORKSPACE_CRS } from './defaults';
 
 /** Coordinate conversions shared by data ingestion, map navigation, imagery, and terrain. */
 export {

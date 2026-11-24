@@ -4,7 +4,7 @@ import { ColorMap, ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
 
 import { GeotiffTable, RasterBandMetadata } from '../../interfaces';
 import { LoadGeoTiffParams } from './interfaces';
-import { DEFAULT_WORKSPACE_NAME, DEFAULT_INPUT_COORDINATE_FORMAT, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '../../consts';
+import { DEFAULT_WORKSPACE_NAME, DEFAULT_SOURCE_CRS, DEFAULT_WORKSPACE_CRS } from '../../consts';
 import { getColumnsFromDuckDbTableDescribe } from '../../utils';
 import { setRasterPayload } from '../../raster-store';
 
@@ -21,14 +21,14 @@ export class LoadGeoTiffUseCase {
     this.conn = conn;
   }
 
-  async exec(params: LoadGeoTiffParams & { workspaceCoordinateFormat?: string }): Promise<GeotiffTable> {
+  async exec(params: LoadGeoTiffParams & { workspaceCrs?: string }): Promise<GeotiffTable> {
     const {
       geotiffFileUrl,
       geotiffArrayBuffer,
       outputTableName,
-      coordinateFormat,
+      sourceCrs = DEFAULT_SOURCE_CRS,
       workspace = DEFAULT_WORKSPACE_NAME,
-      workspaceCoordinateFormat = DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+      workspaceCrs = DEFAULT_WORKSPACE_CRS,
       maxRasterCells,
       resampleMethod = 'bilinear',
       categoricalRgb,
@@ -62,8 +62,7 @@ export class LoadGeoTiffUseCase {
       throw new Error('Cannot provide both geotiffFileUrl and geotiffArrayBuffer.');
     }
 
-    const sourceCrs = coordinateFormat || DEFAULT_INPUT_COORDINATE_FORMAT;
-    const targetCrs = workspaceCoordinateFormat;
+    const targetCrs = workspaceCrs;
     const qualifiedTableName = `${workspace}.${outputTableName}`;
     const cellLimit = Math.max(1, Math.floor(maxRasterCells ?? DEFAULT_MAX_RASTER_CELLS));
 
@@ -277,8 +276,8 @@ export class LoadGeoTiffUseCase {
 
     throw new Error(
       `Failed to transform GeoTIFF bounds from ${sourceCrs} to ${targetCrs}. ` +
-      `The loader assumes EPSG:4326 (lat/lng) when coordinateFormat is not provided. ` +
-      `If the raster is not in EPSG:4326, pass the correct coordinateFormat explicitly.`
+      `The loader assumes EPSG:4326 (lat/lng) when sourceCrs is not provided. ` +
+      `If the raster is not in EPSG:4326, pass the correct sourceCrs explicitly.`
     );
   }
 }

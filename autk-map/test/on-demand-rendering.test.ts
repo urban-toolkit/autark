@@ -1,7 +1,7 @@
 import type { FeatureCollection, Geometry } from 'geojson';
 import type { Mock, MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CameraMotion, ColorMapInterpolator, DEFAULT_WORKSPACE_COORDINATE_FORMAT, lonLatToCrs, reprojectPosition } from '@urban-toolkit/autk-core';
+import { CameraMotion, ColorMapInterpolator, DEFAULT_WORKSPACE_CRS, lonLatToCrs, reprojectPosition } from '@urban-toolkit/autk-core';
 import { AutkMap } from '../src/map';
 import { FlatMapRenderPath } from '../src/map-flat';
 import { TileLayer } from '../src/layer-tiles';
@@ -905,32 +905,25 @@ describe('unified terrain loading', () => {
         map.destroy();
     });
 
-    it('inherits a custom workspace CRS and rejects a conflicting layer', async () => {
+    it('uses the constructor workspace CRS for vectors, terrain, and tiles', async () => {
         const map = new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { showUi: false, crs: 'EPSG:3857' });
         await map.init();
         map.loadCollection('parks', { collection: square, type: 'parks' });
         map.loadTerrain({ source, windowSize: 16 });
         map.loadTiles('imagery', { source: imagery });
         expect(map.workspaceCrs).toBe('EPSG:3857');
-        const path = terrainPaths[0];
-        expect(() => map.loadTerrain({ source, crs: 'EPSG:3395' })).toThrow(/Workspace CRS/);
-        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-        map.loadTiles('wrong', { source: imagery, crs: 'EPSG:3395' });
-        expect(log).toHaveBeenCalledWith(expect.stringContaining('Workspace CRS'));
-        expect(map.layerManager.searchByLayerId('wrong')).toBeNull();
-        expect(terrainPaths).toEqual([path]);
+        expect(terrainPaths).toHaveLength(1);
+        expect(map.layerManager.searchByLayerId('imagery')).toBeInstanceOf(TileLayer);
         map.destroy();
     });
 
-    it('locks the shared database default CRS after loading projected vector data', async () => {
+    it('uses the default workspace CRS when the constructor gives none', async () => {
         const { map } = await createMap();
-        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-        map.loadTiles('imagery', { source: imagery, crs: 'EPSG:3857' });
-        expect(log).toHaveBeenCalledWith(expect.stringContaining('Workspace CRS'));
-        expect(map.layerManager.searchByLayerId('imagery')).toBeNull();
-        expect(map.workspaceCrs).toBe(DEFAULT_WORKSPACE_COORDINATE_FORMAT);
+        map.loadTiles('imagery', { source: imagery });
+        expect(map.workspaceCrs).toBe(DEFAULT_WORKSPACE_CRS);
         map.loadTerrain({ source, windowSize: 16 });
         expect(map.getTerrainTileStats()).not.toBeNull();
+        expect(map.layerManager.searchByLayerId('imagery')).toBeInstanceOf(TileLayer);
         map.destroy();
     });
 
@@ -1033,7 +1026,7 @@ describe('unified terrain loading', () => {
         const [x, y] = lonLatToCrs('EPSG:3395', -74, 40.7);
         expect(map.layerManager.origin[0]).toBeCloseTo(x, 6);
         expect(map.layerManager.origin[1]).toBeCloseTo(y, 6);
-        expect(map.workspaceCrs).toBe(DEFAULT_WORKSPACE_COORDINATE_FORMAT);
+        expect(map.workspaceCrs).toBe(DEFAULT_WORKSPACE_CRS);
         expect(collection).toEqual(original);
         // Omitted sourceCrs must not interpret these already-projected coordinates as degrees.
         map.loadCollection('projected', { collection: { ...collection, features: [{ ...collection.features[0],
@@ -1225,7 +1218,8 @@ describe('transactional tile integration', () => {
         const { map } = await createMap();
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const create = vi.spyOn(TileLayer.prototype, 'createPipeline').mockImplementation(() => {});
-        map.loadTiles('invalid', { source, crs: 'EPSG:9999' as never });
+        expect(() => new AutkMap(new FakeCanvas() as unknown as HTMLCanvasElement, { crs: 'EPSG:9999' }))
+            .toThrow(/Unsupported workspace CRS/);
         map.loadTiles('bad-limit', { source, maxCachedTiles: NaN });
         expect(create).not.toHaveBeenCalled();
         const parks = map.layerManager.searchByLayerId('parks');

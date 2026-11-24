@@ -81,7 +81,7 @@ export async function runWebGpuCases() {
             map.camera.resetCamera([0, 1, 0], [cx, cy, 0], [cx, cy, distance], Math.max(500000, distance * 2));
             map.camera.resize(128, 128);
             map.loadTiles('tiles', { source: { urlTemplate: 'https://autark-tiles.test/{z}/{x}/{y}.png', attribution: 'Synthetic tiles',
-                minZoom: 3, maxZoom: 4 }, ...(crs === 'EPSG:3395' ? {} : { crs }), zoomBias: 1 });
+                minZoom: 3, maxZoom: 4 }, zoomBias: 1 });
             let tiles = map.layerManager.searchByLayerId('tiles') as TileLayer;
             const texture = (format: GPUTextureFormat, samples: number, copy = false) => {
                 const result = device.createTexture({ size: [128, 128], format, sampleCount: samples,

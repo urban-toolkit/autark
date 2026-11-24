@@ -19,7 +19,6 @@ export type CsvDefaultLatLngGeometryColumns = true;
  * const geometryColumns: CsvLatLngGeometryColumns = {
  *   latColumnName: 'lat',
  *   longColumnName: 'lng',
- *   coordinateFormat: 'EPSG:4326',
  * };
  */
 export interface CsvLatLngGeometryColumns {
@@ -27,8 +26,6 @@ export interface CsvLatLngGeometryColumns {
   latColumnName: string;
   /** Name of the column that stores longitude values used to create point geometries. */
   longColumnName: string;
-  /** CRS of the source coordinate columns before they are transformed into the workspace CRS. */
-  coordinateFormat?: string;
 }
 
 /**
@@ -39,14 +36,11 @@ export interface CsvLatLngGeometryColumns {
  * @example
  * const geometryColumns: CsvWktGeometryColumns = {
  *   wktColumnName: 'geometry_wkt',
- *   coordinateFormat: 'EPSG:3857',
  * };
  */
 export interface CsvWktGeometryColumns {
   /** Name of the column that stores WKT geometry text such as `POINT(...)` or `POLYGON(...)`. */
   wktColumnName: string;
-  /** CRS of the source WKT geometry before it is transformed into the workspace CRS. */
-  coordinateFormat?: string;
 }
 
 /**
@@ -75,6 +69,7 @@ export type CsvGeometryColumns =
  *   csvFileUrl: 'https://example.com/parcels.csv',
  *   outputTableName: 'parcels',
  *   geometryColumns: { wktColumnName: 'wkt' },
+ *   sourceCrs: 'EPSG:4326',
  * };
  */
 export interface LoadCsvParams {
@@ -88,6 +83,8 @@ export interface LoadCsvParams {
   delimiter?: string;
   /** Optional geometry strategy used to create a spatial column while loading. */
   geometryColumns?: CsvGeometryColumns;
+  /** CRS of the source coordinates or WKT. Defaults to `EPSG:4326`. */
+  sourceCrs?: string;
   /** Optional workspace override used by higher-level callers when qualifying the table name. */
   workspace?: string;
 }

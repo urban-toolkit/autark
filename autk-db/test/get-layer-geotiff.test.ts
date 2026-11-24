@@ -26,7 +26,7 @@ function geotiff() {
 }
 
 async function workspace() {
-  await db.setWorkspace(`geotiff_layer_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+  await db.setWorkspace(`geotiff_layer_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
 }
 
 describe('getLayer on a GeoTIFF table', () => {
@@ -42,7 +42,7 @@ describe('getLayer on a GeoTIFF table', () => {
 
   it('keeps the raster extent instead of the workspace bounding box', async () => {
     await workspace();
-    await db.loadGeojson({ outputTableName: 'points', coordinateFormat: 'EPSG:4326', geojsonObject: {
+    await db.loadGeojson({ outputTableName: 'points', sourceCrs: 'EPSG:4326', geojsonObject: {
       type: 'FeatureCollection',
       features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } }],
     } });

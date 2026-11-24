@@ -23,8 +23,8 @@ const point = (x: number, y: number, properties: Record<string, unknown>): Featu
 
 /** Loads `readings` into a workspace of its own, which takes its extent from them. */
 async function loadReadings(features: Feature[]) {
-  await db.setWorkspace(`heatmap_${++serial}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
-  await db.loadGeojson({ outputTableName: 'readings', coordinateFormat: 'EPSG:4326',
+  await db.setWorkspace(`heatmap_${++serial}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
+  await db.loadGeojson({ outputTableName: 'readings', sourceCrs: 'EPSG:4326',
     geojsonObject: { type: 'FeatureCollection', features } });
 }
 

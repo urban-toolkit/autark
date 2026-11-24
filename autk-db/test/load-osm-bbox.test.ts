@@ -61,7 +61,7 @@ async function provide(elements: OsmElement[], source: string): Promise<void> {
 
 describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   it.each(['api', 'pbf'])('loads bbox with %s, discards partially contained buildings and retains an internal mask for later imports', async source => {
-    await client.setWorkspace(`bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await client.setWorkspace(`bbox_${++workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([...structuredClone(syntheticElements), ...extra], source);
     const result = await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/bbox.pbf' } : {}),
       autoLoadLayers: { layers: ['buildings', 'roads', 'water'] } });
@@ -82,14 +82,14 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
     const road = await client.getLayer('table_osm_roads');
     expect(road.features[0].geometry).toMatchObject({ type: 'LineString', coordinates: [[0, 3], [5, 3]] });
     expect((await client.getLayer('table_osm_water')).features).toHaveLength(2); // explicit lake + inferred coastal water
-    await client.loadGeojson({ outputTableName: 'later', layerType: 'points', coordinateFormat: 'EPSG:4326',
+    await client.loadGeojson({ outputTableName: 'later', layerType: 'points', sourceCrs: 'EPSG:4326',
       geojsonObject: { type: 'FeatureCollection', features: [2, 8].map(x => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [x, 8] }, properties: {} })) } });
     expect((await client.getLayer('later')).features).toHaveLength(1);
     expect(client.getTablesMetadata().some(table => ['table_osm', 'table_osm_boundaries'].includes(table.name))).toBe(false);
   });
 
   it.each(['api', 'pbf'])('reindexes surviving grouped building parts and OSM element export through %s', async source => {
-    await client.setWorkspace(`reindexed_bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await client.setWorkspace(`reindexed_bbox_${++workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     const elements = structuredClone(syntheticElements);
     for (const element of elements) {
       if (element.type !== 'node') continue;
@@ -115,7 +115,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('keeps only fully contained bbox buildings without cutting them through %s', async source => {
-    await client.setWorkspace(`contained_bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await client.setWorkspace(`contained_bbox_${++workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide(structuredClone(syntheticElements), source);
     await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/contained.pbf' } : {}),
       autoLoadLayers: { layers: ['buildings'] } });
@@ -126,7 +126,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('intersects administrative geometry with coastline for %s and exposes requested surface', async source => {
-    await client.setWorkspace(`named_coast_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await client.setWorkspace(`named_coast_${++workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([...structuredClone(syntheticElements), ...extra], source);
     await client.loadOsm({ queryArea: { geocodeArea: 'Fixture', areas: ['Test District'] },
       ...(source === 'pbf' ? { pbfFileUrl: '/named.pbf' } : {}), autoLoadLayers: { layers: ['surface', 'buildings'] } });
@@ -138,7 +138,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('warns and uses the full bbox for empty %s data', async source => {
-    await client.setWorkspace(`empty_bbox_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await client.setWorkspace(`empty_bbox_${++workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     await provide([], source);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await client.loadOsm({ queryArea: { bbox }, ...(source === 'pbf' ? { pbfFileUrl: '/empty.pbf' } : {}),
@@ -177,7 +177,7 @@ describe('OSM surface is mandatory, coastal and shared by both sources', () => {
   });
 
   it.each(['api', 'pbf'])('warns and falls back on incomplete %s coastline', async source => {
-    await client.setWorkspace(`invalid_coast_${++workspace}`, { coordinateFormat: 'EPSG:4326', precisionGrid: 1e-10 });
+    await client.setWorkspace(`invalid_coast_${++workspace}`, { crs: 'EPSG:4326', precisionGrid: 1e-10 });
     const elements = structuredClone(extra).filter(element => element.id !== 600);
     elements.find(element => element.id === 810)!.lat = 1;
     elements.find(element => element.id === 812)!.lat = 9;

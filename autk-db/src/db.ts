@@ -19,8 +19,8 @@ import type { BoundingBox, LayerType } from '@urban-toolkit/autk-core';
 
 import {
     DEFAULT_WORKSPACE_NAME,
-    DEFAULT_INPUT_COORDINATE_FORMAT,
-    DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+    DEFAULT_SOURCE_CRS,
+    DEFAULT_WORKSPACE_CRS,
     DEFAULT_WORKSPACE_PRECISION_GRID,
     OSM_ELEMENT_METADATA_COLUMN,
 } from './consts';
@@ -168,7 +168,7 @@ export class AutkDb {
 
         this.workspaces.set(DEFAULT_WORKSPACE_NAME, {
             tables: [],
-            coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+            crs: DEFAULT_WORKSPACE_CRS,
             precisionGrid: DEFAULT_WORKSPACE_PRECISION_GRID,
             workspaceBoundingBox: undefined,
             workspaceCropLayer: null,
@@ -211,7 +211,7 @@ export class AutkDb {
      * @returns Resolves when the workspace has been created if necessary and set as active.
      * @throws If the database has not been initialized, configuration is invalid, or existing tables would change CRS.
      * @example
-     * await db.setWorkspace('my-analysis', { coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
+     * await db.setWorkspace('my-analysis', { crs: 'EPSG:3395', precisionGrid: 0.01 });
      * await db.loadCsv({ csvFileUrl: '/data.csv', outputTableName: 'points' });
      */
     async setWorkspace(name: string, configuration?: WorkspaceConfiguration): Promise<void> {
@@ -226,17 +226,17 @@ export class AutkDb {
             this.workspaces.set(name, {
                 tables: [],
                 ...(configuration ?? {
-                    coordinateFormat: DEFAULT_WORKSPACE_COORDINATE_FORMAT,
+                    crs: DEFAULT_WORKSPACE_CRS,
                     precisionGrid: DEFAULT_WORKSPACE_PRECISION_GRID,
                 }),
                 workspaceBoundingBox: undefined,
                 workspaceCropLayer: null,
             });
-        } else if (configuration && (configuration.coordinateFormat !== existing.coordinateFormat || configuration.precisionGrid !== existing.precisionGrid)) {
+        } else if (configuration && (configuration.crs !== existing.crs || configuration.precisionGrid !== existing.precisionGrid)) {
             if (existing.tables.length > 0) {
                 throw new Error(`Cannot change the CRS or precision grid of non-empty workspace '${name}'. Create a new workspace or reload its layers.`);
             }
-            existing.coordinateFormat = configuration.coordinateFormat;
+            existing.crs = configuration.crs;
             existing.precisionGrid = configuration.precisionGrid;
             existing.workspaceBoundingBox = undefined;
             existing.workspaceCropLayer = null;
@@ -281,8 +281,8 @@ export class AutkDb {
      * @returns A copy of the active workspace configuration.
      */
     getWorkspaceConfiguration(): WorkspaceConfiguration {
-        const { coordinateFormat, precisionGrid } = this.getCurrentWorkspaceData();
-        return { coordinateFormat, precisionGrid };
+        const { crs, precisionGrid } = this.getCurrentWorkspaceData();
+        return { crs, precisionGrid };
     }
 
     /**
@@ -330,8 +330,8 @@ export class AutkDb {
             throw new Error(message);
         }
 
-        const targetCrs = workspaceData.coordinateFormat;
-        const sourceCrs = params.autoLoadLayers.coordinateFormat ?? DEFAULT_INPUT_COORDINATE_FORMAT;
+        const targetCrs = workspaceData.crs;
+        const sourceCrs = params.sourceCrs ?? DEFAULT_SOURCE_CRS;
         const outputTableName = params.outputTableName ?? 'table_osm';
 
         const loadParams = { ...params, tagSets, outputTableName, workspace: this.currentWorkspace };
@@ -355,7 +355,7 @@ export class AutkDb {
             const osmBoundingBox = await this.getOsmBboxUseCase.exec({
                 osmTableName: boundaryTableName,
                 workspace: this.currentWorkspace,
-                coordinateFormat: targetCrs,
+                targetCrs,
             });
             if (!workspaceData.workspaceBoundingBox) {
                 workspaceData.workspaceBoundingBox = osmBoundingBox;
@@ -372,14 +372,14 @@ export class AutkDb {
 
                 const layerParams: LoadOsmLayerParams = {
                     osmInputTableName: outputTableName,
-                    coordinateFormat: sourceCrs,
+                    sourceCrs,
                     layer,
                 };
 
                 layerParams.boundingBox = shouldCropToBbox ? osmBoundingBox : undefined;
 
                 const t0 = performance.now();
-                const layerTable = await this.loadOsmLayer({ ...layerParams, workspaceCoordinateFormat: targetCrs });
+                const layerTable = await this.loadOsmLayer({ ...layerParams, workspaceCrs: targetCrs });
                 const loadMs = performance.now() - t0;
 
                 const countResult = await this.conn.query(
@@ -479,8 +479,8 @@ export class AutkDb {
                 await this.conn.query('BEGIN TRANSACTION');
                 try {
                     const table = await this.loadOsmLayerUseCase.execTagSet({
-                        osmInputTableName: outputTableName, tagSet, coordinateFormat: sourceCrs,
-                        workspaceCoordinateFormat: targetCrs, workspace: this.currentWorkspace,
+                        osmInputTableName: outputTableName, tagSet, sourceCrs,
+                        workspaceCrs: targetCrs, workspace: this.currentWorkspace,
                     });
                     this.registerTable(table);
                     await this.normalizeGeometryPrecision(table);
@@ -548,7 +548,7 @@ export class AutkDb {
         return this.loadVectorTable(() => this.loadCsvUseCase!.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: this.getCurrentWorkspaceData().coordinateFormat,
+            workspaceCrs: this.getCurrentWorkspaceData().crs,
         }));
     }
 
@@ -574,7 +574,7 @@ export class AutkDb {
         return this.loadVectorTable(() => this.loadJsonUseCase!.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: this.getCurrentWorkspaceData().coordinateFormat,
+            workspaceCrs: this.getCurrentWorkspaceData().crs,
         }));
     }
 
@@ -587,7 +587,7 @@ export class AutkDb {
      * @returns The created layer table metadata.
      * @throws If the database is not initialized, the OSM table is missing, or the table is not a raw OSM table.
      */
-    private async loadOsmLayer(params: LoadOsmLayerParams & { workspaceCoordinateFormat?: string }): Promise<OsmLayerTable> {
+    private async loadOsmLayer(params: LoadOsmLayerParams & { workspaceCrs?: string }): Promise<OsmLayerTable> {
         if (!this.db || !this.conn || !this.loadOsmLayerUseCase)
             throw new Error('Database not initialized. Please call init() first.');
 
@@ -600,7 +600,7 @@ export class AutkDb {
         const table = await this.loadOsmLayerUseCase.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: params.workspaceCoordinateFormat ?? workspaceData.coordinateFormat,
+            workspaceCrs: params.workspaceCrs ?? workspaceData.crs,
         });
         this.registerTable(table);
         // Surface linework is normalized once it has been polygonized by loadOsm.
@@ -637,7 +637,7 @@ export class AutkDb {
         return this.loadVectorTable(() => this.loadGeojsonUseCase!.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: this.getCurrentWorkspaceData().coordinateFormat,
+            workspaceCrs: this.getCurrentWorkspaceData().crs,
         }));
     }
 
@@ -664,7 +664,7 @@ export class AutkDb {
         const table = await this.loadGeoTiffUseCase.exec({
             ...params,
             workspace: this.currentWorkspace,
-            workspaceCoordinateFormat: workspaceData.coordinateFormat,
+            workspaceCrs: workspaceData.crs,
         });
         this.registerTable(table);
         if (hasWorkspaceContext) {
@@ -984,7 +984,7 @@ export class AutkDb {
             throw new Error('Database not initialized. Please call init() first.');
 
         const workspaceData = this.getCurrentWorkspaceData();
-        const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox, this.currentWorkspace, workspaceData.coordinateFormat);
+        const table = await this.buildHeatmapUseCase.exec(params, workspaceData.tables, workspaceData.workspaceBoundingBox, this.currentWorkspace, workspaceData.crs);
         this.registerTable(table);
 
         return this.refreshStoredBoundingBox(table.name);
@@ -1001,7 +1001,7 @@ export class AutkDb {
      * @throws If the current workspace does not exist in the internal map.
      * @example
      * const data = this.getCurrentWorkspaceData();
-     * console.log(data.coordinateFormat);
+     * console.log(data.crs);
      */
     private getCurrentWorkspaceData(): WorkspaceData {
         const data = this.workspaces.get(this.currentWorkspace);
@@ -1013,8 +1013,8 @@ export class AutkDb {
 
     /** Validates the paired CRS and precision-grid workspace contract. */
     private validateWorkspaceConfiguration(configuration: WorkspaceConfiguration): void {
-        if (!configuration.coordinateFormat?.trim() || !Number.isFinite(configuration.precisionGrid) || configuration.precisionGrid <= 0) {
-            throw new Error('Workspace coordinateFormat and precisionGrid must be provided together; precisionGrid must be a finite number greater than zero.');
+        if (!configuration.crs?.trim() || !Number.isFinite(configuration.precisionGrid) || configuration.precisionGrid <= 0) {
+            throw new Error('Workspace crs and precisionGrid must be provided together; precisionGrid must be a finite number greater than zero.');
         }
     }
 

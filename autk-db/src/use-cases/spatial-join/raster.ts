@@ -46,7 +46,7 @@ export class RasterSpatialJoinUseCase {
     const qualifiedScratch = `"${workspace.replace(/"/g, '""')}"."${scratch}"`;
     try {
       await this.conn.insertArrowFromIPCStream(tableToIPC(arrays, 'stream'), { name: scratch, schema: workspace, create: true });
-      const targetCrs = configuration.coordinateFormat ?? payload.targetCrs;
+      const targetCrs = configuration.crs ?? payload.targetCrs;
       const precision = configuration.precisionGrid ?? 0;
       const rootColumn = root.columns.find(col => col.type === 'GEOMETRY')!.name;
       const rootGeometry = `autk_root_feature."${rootColumn.replace(/"/g, '""')}"`;

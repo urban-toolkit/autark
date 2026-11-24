@@ -10,7 +10,7 @@
  * map camera and the GPU.
  */
 
-import { Camera, DEFAULT_WORKSPACE_COORDINATE_FORMAT } from '@urban-toolkit/autk-core';
+import { Camera, DEFAULT_WORKSPACE_CRS } from '@urban-toolkit/autk-core';
 
 import type { TileCredit } from './attribution';
 import { Layer } from './layer';
@@ -80,7 +80,7 @@ export interface TileLayerStats {
     idle: boolean;
 }
 
-const DEFAULT_CRS: string = DEFAULT_WORKSPACE_COORDINATE_FORMAT;
+const DEFAULT_CRS: string = DEFAULT_WORKSPACE_CRS;
 const MAX_REPORTED_ERRORS = 3;
 
 /** What the last selection holds, kept for {@link TileLayerStats}. */

@@ -25,7 +25,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-    await data.db.setWorkspace(`urbane_drilldown_${++workspace}`, { coordinateFormat: 'EPSG:3395', precisionGrid: 0.01 });
+    await data.db.setWorkspace(`urbane_drilldown_${++workspace}`, { crs: 'EPSG:3395', precisionGrid: 0.01 });
     const neighborhoods: FeatureCollection = { type: 'FeatureCollection', features: ['Chelsea', "Hell's Kitchen", 'Midtown'].map((name, index) => {
         const x = index * 1000;
         return { type: 'Feature', id: index, properties: { ntaname: name },
@@ -37,19 +37,19 @@ beforeEach(async () => {
     ].map(({ name, x }, index) => ({ type: 'Feature', id: index + 100,
         properties: { name, height: 12, parts: [{ id: index + 100, geometryIndex: 0, height: 12 }] },
         geometry: { type: 'Polygon', coordinates: [[[x, 100], [x + 100, 100], [x + 100, 200], [x, 200], [x, 100]]] } })) };
-    await data.db.loadGeojson({ outputTableName: 'surface', layerType: 'surface', coordinateFormat: 'EPSG:3395',
+    await data.db.loadGeojson({ outputTableName: 'surface', layerType: 'surface', sourceCrs: 'EPSG:3395',
         geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {},
             geometry: { type: 'Polygon', coordinates: [[[0, 0], [4000, 0], [4000, 1000], [0, 1000], [0, 0]]] } }] } });
-    await data.db.loadGeojson({ outputTableName: 'neighborhoods', geojsonObject: neighborhoods, coordinateFormat: 'EPSG:3395' });
+    await data.db.loadGeojson({ outputTableName: 'neighborhoods', geojsonObject: neighborhoods, sourceCrs: 'EPSG:3395' });
     await data.db.loadGeojson({ outputTableName: 'table_osm_buildings', geojsonObject: buildings,
-        layerType: 'buildings', coordinateFormat: 'EPSG:3395' });
+        layerType: 'buildings', sourceCrs: 'EPSG:3395' });
     await data.db.rawQuery({ query: 'SELECT *, id AS building_id FROM table_osm_buildings',
         output: { type: 'CREATE_TABLE', tableName: 'table_osm_buildings', source: 'osm', tableType: 'buildings' } });
     await data.db.spatialQuery({ tableRootName: 'table_osm_buildings', tableJoinName: 'neighborhoods' });
-    await data.db.loadGeojson({ outputTableName: 'school', coordinateFormat: 'EPSG:3395', layerType: 'points',
+    await data.db.loadGeojson({ outputTableName: 'school', sourceCrs: 'EPSG:3395', layerType: 'points',
         geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { key: 1 },
             geometry: { type: 'Point', coordinates: [150, 150] } }] } });
-    await data.db.loadGeojson({ outputTableName: 'table_osm_roads', coordinateFormat: 'EPSG:3395', layerType: 'roads',
+    await data.db.loadGeojson({ outputTableName: 'table_osm_roads', sourceCrs: 'EPSG:3395', layerType: 'roads',
         geojsonObject: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { compute: { skyViewFactor: 0.8 } },
             geometry: { type: 'LineString', coordinates: [[100, 150], [200, 150]] } }] } });
 });

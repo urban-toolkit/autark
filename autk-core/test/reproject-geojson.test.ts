@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureCollection, Geometry } from 'geojson';
-import { DEFAULT_WORKSPACE_COORDINATE_FORMAT, registerCrs, reprojectFeatureCollection, reprojectPosition, isSupportedCrs, lonLatToCrs, crsToLonLat } from '../src/index';
+import { DEFAULT_WORKSPACE_CRS, registerCrs, reprojectFeatureCollection, reprojectPosition, isSupportedCrs, lonLatToCrs, crsToLonLat } from '../src/index';
 
 const collection: FeatureCollection<Geometry | null> = {
     type: 'FeatureCollection', bbox: [-74, 40.7, 15, -73.9, 40.8, 15],
@@ -40,7 +40,7 @@ describe('shared CRS transformations', () => {
 
     it('transforms every vector geometry, nested collections, holes, and declared bounds without mutation', () => {
         const original = structuredClone(collection);
-        const projected = reprojectFeatureCollection(collection, 'EPSG:4326', DEFAULT_WORKSPACE_COORDINATE_FORMAT);
+        const projected = reprojectFeatureCollection(collection, 'EPSG:4326', DEFAULT_WORKSPACE_CRS);
         expect(projected).not.toBe(collection);
         expect(collection).toEqual(original);
         expect(projected.features[0].id).toBe('area');

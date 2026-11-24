@@ -11,8 +11,8 @@ export interface LoadGeojsonParams {
   geojsonObject?: FeatureCollection;
   /** Desired output table name to create in DuckDB. */
   outputTableName: string;
-  /** CRS of the input GeoJSON data (source). Defaults to EPSG:4326. */
-  coordinateFormat?: string;
+  /** CRS of the input GeoJSON data. Defaults to EPSG:4326. */
+  sourceCrs?: string;
   /** Optional bounding box to clip or intersect geometries during import. */
   boundingBox?: BoundingBox;
   /** Optional workspace (schema) name. Defaults to `autk` when omitted. */

@@ -21,7 +21,7 @@ export interface LoadGeoTiffParams {
    * The raster extent metadata will be transformed from this CRS to the workspace CRS.
    * If the raster is not in `EPSG:4326`, pass the correct CRS explicitly.
    */
-  coordinateFormat?: string;
+  sourceCrs?: string;
   /**
    * Maximum number of raster cells to decode into memory.
    * Larger rasters are downsampled to fit this limit.

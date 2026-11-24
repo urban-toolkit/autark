@@ -14,12 +14,12 @@ async function main(): Promise<void> {
     if (!noiseLoaded) {
         await db.init();
         await db.loadCsv({ csvFileUrl: `${BASE_URL}data/noise_manhattan_clean.csv`, outputTableName: 'noise',
-            geometryColumns: { latColumnName: 'latitude', longColumnName: 'longitude', coordinateFormat: 'EPSG:4326' } });
+            geometryColumns: { latColumnName: 'latitude', longColumnName: 'longitude' }, sourceCrs: 'EPSG:4326' });
         noiseLoaded = true;
     }
     if (!joined.has(layer)) {
         await db.loadGeojson({ geojsonFileUrl: `${BASE_URL}data/${roads ? 'mnt_roads' : 'mnt_neighs'}.geojson`,
-            outputTableName: layer, coordinateFormat: 'EPSG:4326' });
+            outputTableName: layer, sourceCrs: 'EPSG:4326' });
         // Counts color the map; the matched dates feed the chart.
         await db.spatialQuery({
             tableRootName: layer, tableJoinName: 'noise',
