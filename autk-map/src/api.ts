@@ -20,7 +20,7 @@ import {
 import type {
     ElevationValidationOptions,
     CameraProjection,
-    ColorMapPatch,
+    ColorMapOptions,
     TransferFunction,
     LayerComponent,
     LayerGeometry,
@@ -359,7 +359,7 @@ export interface UpdateColorMapParams {
     /**
      * Partial color-map patch merged with the existing layer color-map state.
      */
-    colorMap: ColorMapPatch;
+    colorMap: ColorMapOptions;
 }
 
 /**

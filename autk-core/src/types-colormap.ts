@@ -168,8 +168,8 @@ export type CustomColorPalette = {
   colors: readonly ColorHEX[];
 };
 
-/** A map patch can replace the scale or update its domain without replacing it. */
-export type ColorMapPatch = { domainSpec?: ColorMapDomainSpec } & (
+/** Optional colormap settings for choosing a scale, configuring its domain, or both. */
+export type ColorMapOptions = { domainSpec?: ColorMapDomainSpec } & (
   | { interpolator: ColorMapInterpolator; type?: never; colors?: never }
   | (CustomColorPalette & { interpolator?: never })
   | { interpolator?: never; type?: never; colors?: never }
