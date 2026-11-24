@@ -10,6 +10,8 @@ import * as d3 from 'd3';
 import type { Feature, FeatureCollection } from 'geojson';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { ColorMapDomainStrategy, ColorMapInterpolator } from '@urban-toolkit/autk-core';
+
 import { AutkPlot, PlotStyle } from '../src';
 
 // Three features, with numbers and categories to color by and a one-point series for the line chart.
@@ -68,6 +70,75 @@ describe('Scatterplot colors at its first draw', () => {
         new AutkPlot(div, { type: 'scatterplot', collection, attributes: { axis: ['x', 'y'] } });
 
         expect(fills(div)).toEqual([PlotStyle.default, PlotStyle.default, PlotStyle.default].map(hex));
+    });
+});
+
+describe('Plot style options', () => {
+    it('uses a fixed scatter radius and an explicit palette in domain order without replacing highlights', () => {
+        const div = host();
+        const plot = new AutkPlot(div, {
+            type: 'scatterplot', collection, attributes: { axis: ['x', 'y'], color: 'kind' },
+            style: { radius: 2.5, colorMap: {
+                type: 'categorical', colors: ['#ff6347', '#001122'],
+                domainSpec: { type: ColorMapDomainStrategy.USER, params: ['c', 'a', 'b'] },
+            } },
+        });
+        const radii = () => Array.from(div.querySelectorAll('circle.autkMark'), mark => mark.getAttribute('r'));
+        expect(radii()).toEqual(['2.5', '2.5', '2.5']);
+        expect(fills(div)).toEqual(['#001122', '#001122', hex('tomato')]);
+        plot.setSelection([1]);
+        plot.draw();
+        expect(radii()).toEqual(['2.5', '2.5', '2.5']);
+        expect(fills(div)).toEqual(['#001122', hex(PlotStyle.provenance), hex('tomato')]);
+    });
+
+    it('uses a named categorical interpolator on bar marks, overriding the legacy scheme', () => {
+        const div = host();
+        new AutkPlot(div, {
+            type: 'barchart', collection, attributes: { axis: ['kind', 'v'], color: 'kind' },
+            categoricalColorMapInterpolator: ColorMapInterpolator.CAT_SET1,
+            style: { colorMap: { interpolator: ColorMapInterpolator.CAT_SET2 } },
+        });
+        expect(fills(div)).toEqual(d3.schemeSet2.slice(0, 3).map(hex));
+    });
+
+    it('uses custom sequential and diverging palettes with map-style domains', () => {
+        const sequential = host();
+        new AutkPlot(sequential, {
+            type: 'scatterplot', collection, attributes: { axis: ['x', 'y'], color: 'v' },
+            style: { colorMap: { type: 'sequential', colors: ['#000000', '#ffffff'] } },
+        });
+        expect(fills(sequential)).toEqual(['#000000', '#808080', '#ffffff']);
+
+        const diverging = host();
+        new AutkPlot(diverging, {
+            type: 'scatterplot', collection, attributes: { axis: ['x', 'y'], color: 'v' },
+            domainSpec: { type: ColorMapDomainStrategy.USER, params: [0, 30] },
+            style: { colorMap: {
+                type: 'diverging', colors: ['#000000', '#ffffff', '#ff0000'],
+                domainSpec: { type: ColorMapDomainStrategy.USER, params: [10, 20, 50] },
+            } },
+        });
+        expect(fills(diverging)).toEqual(['#000000', '#ffffff', '#ffaaaa']);
+    });
+
+    it('rejects an invalid custom palette using the shared map validation', () => {
+        expect(() => new AutkPlot(host(), {
+            type: 'scatterplot', collection, attributes: { axis: ['x', 'y'], color: 'v' },
+            style: { colorMap: { type: 'diverging', colors: ['#000000', '#ffffff'] } },
+        })).toThrow('Invalid custom colormap');
+    });
+
+    it('keeps the default radius for invalid values', () => {
+        for (const radius of [undefined, -1, 0, NaN, Infinity]) {
+            const div = host();
+            new AutkPlot(div, {
+                type: 'scatterplot', collection, attributes: { axis: ['x', 'y'], color: 'v' },
+                style: { radius },
+            });
+            expect(div.querySelector('circle.autkMark')?.getAttribute('r')).toBe('5');
+            expect(fills(div)).toEqual([0, 0.5, 1].map(t => hex(d3.interpolateReds(t))));
+        }
     });
 });
 

@@ -52,6 +52,8 @@ export type PlotDrawContext = {
      * clicked column. Marks get the pointer cursor from the plot, only when clicks select.
      */
     interactive: boolean;
+    /** Appearance overrides for this plot. */
+    style?: PlotConfig['style'];
     /** Value of a row on axis `index` (default 0). */
     value: (row: AutkDatum, index?: number) => unknown;
     /** Current color of a row's mark. */
@@ -596,7 +598,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         super.computeColorDomain();
         const adjust = this.definition.colorDomain;
         const domain = this._resolvedDomain;
-        if (!adjust || this._domainSpec || !domain || typeof domain[0] !== 'number') return;
+        if (!adjust || this._style?.colorMap || this._domainSpec || !domain || domain.length !== 2 || typeof domain[0] !== 'number') return;
         this._resolvedDomain = adjust([domain[0], domain[domain.length - 1] as number]);
     }
 
@@ -673,6 +675,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             rows: this._data,
             fields,
             interactive: this._enabledEvents.length > 0,
+            style: this._style,
             value: (row, index = 0) => valueAtPath(row, fields[index]),
             color: row => this.getMarkColor(row),
             width,

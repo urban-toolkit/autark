@@ -82,6 +82,28 @@ The option applies to numeric axes that generate their tick positions:
 
 Compact scatterplots, bar charts, and line charts request fewer numeric ticks by default. Other plots keep their existing defaults unless you supply a count. Category and bucket axes, fixed tick positions, and plots without standard X/Y axes (such as parallel coordinates) are unchanged. Registered plots using the `axisX` and `axisY` helpers also honor count overrides on eligible numeric axes; use the drawing context's `format` helper to read the configured format.
 
+### Plot appearance
+
+Use `style` for per-plot appearance overrides. `style.radius` sets a fixed scatterplot point radius in pixels. Omit it or pass a nonpositive or nonfinite value to keep the 5 px default. It does not affect bubble sizes.
+
+`style.colorMap` accepts the same object as `map.updateColorMap(layerId, { colorMap })`. Keep the data field in `attributes.color`:
+
+```ts
+const colorMap = {
+    type: 'diverging',
+    colors: ['#b2182b', '#f7f7f7', '#2166ac'],
+    domainSpec: { type: ColorMapDomainStrategy.USER, params: [-20, 0, 50] },
+} as const satisfies ColorMapPatch;
+
+new AutkPlot(container, {
+    type: 'scatterplot', collection,
+    attributes: { axis: ['income', 'rent'], color: 'change' },
+    style: { radius: 3, colorMap },
+});
+```
+
+Import `ColorMapDomainStrategy` and the `ColorMapPatch` type from `@urban-toolkit/autk-core`. Use `{ interpolator: ColorMapInterpolator.SEQ_VIRIDIS }` for a named scale, or `{ type, colors }` for a custom hex palette. Categorical colors follow domain order and reuse the last color if the palette is short. Sequential palettes are ramps, and diverging palettes use three colors with the middle color at the domain midpoint. Selection highlights are unchanged. The legacy `colorMapInterpolator`, `categoricalColorMapInterpolator`, and `domainSpec` remain fallbacks.
+
 ### Supported plot types
 
 * `scatterplot`, `barchart`, `parallel-coordinates`, `table`, `linechart`, `heatmatrix`

@@ -4,8 +4,7 @@ import type {
     GeoJsonProperties,
 } from 'geojson';
 
-import type { ColorMapDomainSpec } from '@urban-toolkit/autk-core';
-import type { ColorMapInterpolator } from '@urban-toolkit/autk-core';
+import type { ColorMapDomainSpec, ColorMapInterpolator, ColorMapPatch } from '@urban-toolkit/autk-core';
 
 import type { PlotEvent } from './types-events';
 
@@ -99,6 +98,13 @@ export type PlotConfig = {
     colorMapInterpolator?: ColorMapInterpolator;
     /** Color interpolator used when the color attribute contains categorical (string) values. Defaults to `OBSERVABLE10`. */
     categoricalColorMapInterpolator?: ColorMapInterpolator;
+    /** Appearance overrides for this plot. */
+    style?: {
+        /** Fixed scatterplot point radius in pixels; defaults to 5. */
+        radius?: number;
+        /** Colormap and optional domain, using the same configuration as `AutkMap.updateColorMap`. */
+        colorMap?: ColorMapPatch;
+    };
     /** Provenance options. */
     provenance?: PlotProvenanceConfig;
     /**

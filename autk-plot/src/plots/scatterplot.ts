@@ -35,8 +35,9 @@ export const scatterplot: PlotDefinition = {
     highlight: { point: { mode: 'custom', preset: 'glyph' } },
 
     draw(context) {
-        const { group, rows, value } = context;
+        const { group, rows, value, style } = context;
         const [x, y] = gridAxes(context);
+        const radius = style?.radius ?? POINT_RADIUS;
 
         group.selectAll('circle.autkMark')
             .data(rows)
@@ -44,7 +45,7 @@ export const scatterplot: PlotDefinition = {
             .attr('class', 'autkMark')
             .attr('cx', row => x(Number(value(row, 0)) || 0))
             .attr('cy', row => y(Number(value(row, 1)) || 0))
-            .attr('r', POINT_RADIUS)
+            .attr('r', Number.isFinite(radius) && radius > 0 ? radius : POINT_RADIUS)
             .append('title')
             .text(pointTitle(context, 2));
     },

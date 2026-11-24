@@ -9,7 +9,6 @@ import type { AutkDatum } from './types-plot';
 import type { PlotConfig, PlotTransformConfig } from './api';
 
 import {
-    ColorMapInterpolator,
     ColorMap,
     EventEmitter,
     valueAtPath,
@@ -495,9 +494,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                 return PlotStyle.default;
             }
 
-            const t = categories.length <= 1 ? 0.5 : Math.max(0, idx) / (categories.length - 1);
-            const interpolator = this._categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
-            const { r, g, b } = ColorMap.getColor(t, interpolator, categories);
+            const t = categories.length <= 1 ? 0 : idx / (categories.length - 1);
+            const scale = ColorMap.isCategorical(this._colorScale) ? this._colorScale : this._categoricalColorMapInterpolator;
+            const { r, g, b } = ColorMap.getColor(t, scale, categories);
             return `rgb(${r},${g},${b})`;
         }
 
@@ -508,8 +507,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         }
 
         const numDomain = this._resolvedDomain as [number, number] | [number, number, number];
-        const interpolator = this._colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
-        const { r, g, b } = ColorMap.getColor(rawVal, interpolator, numDomain);
+        const { r, g, b } = ColorMap.getColor(rawVal, this._colorScale, numDomain);
         return `rgb(${r},${g},${b})`;
     }
 

@@ -21,7 +21,7 @@ import {
     ColorMap,
     valueAtPath,
 } from '@urban-toolkit/autk-core';
-import type { ColorMapDomainSpec, ResolvedDomain } from '@urban-toolkit/autk-core';
+import type { ColorMapConfig, ColorMapDomainSpec, CustomColorPalette, ResolvedDomain } from '@urban-toolkit/autk-core';
 
 import { run } from './transforms';
 import { shapeBinding, transformOf } from './transforms/registry';
@@ -121,6 +121,10 @@ export abstract class PlotBaseData {
     protected _colorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.SEQ_REDS;
     /** Color interpolator used when the color attribute contains categorical (string) values. */
     protected _categoricalColorMapInterpolator: ColorMapInterpolator = ColorMapInterpolator.CAT_OBSERVABLE10;
+    /** Appearance overrides from the plot configuration. */
+    protected _style: PlotConfig['style'];
+    /** Scale selected for the current rendered color domain. */
+    protected _colorScale: ColorMapInterpolator | CustomColorPalette = ColorMapInterpolator.SEQ_REDS;
 
     /**
      * Initializes shared plot data state from a plot configuration.
@@ -176,9 +180,12 @@ export abstract class PlotBaseData {
         this._height = config.height || 500;
         this._margins = config.margins || { left: 40, right: 20, top: 80, bottom: 50 };
 
-        this._domainSpec = config.domainSpec;
+        this._domainSpec = config.style?.colorMap?.domainSpec ?? config.domainSpec;
+        const palette = config.style?.colorMap;
+        if (palette?.type !== undefined) ColorMap.validatePalette(palette);
         this._colorMapInterpolator = config.colorMapInterpolator ?? ColorMapInterpolator.SEQ_REDS;
         this._categoricalColorMapInterpolator = config.categoricalColorMapInterpolator ?? ColorMapInterpolator.CAT_OBSERVABLE10;
+        this._style = config.style;
 
         this._transformConfig = config.transform;
 
@@ -536,14 +543,14 @@ export abstract class PlotBaseData {
         if (values.length === 0) return;
 
         const isCategorical = values.some(v => typeof v === 'string' && isNaN(Number(v as string)));
-        const interpolator = isCategorical ? this._categoricalColorMapInterpolator : this._colorMapInterpolator;
-
-        this._resolvedDomain = ColorMap.resolveDomainFromData(
-            values as number[] | string[],
-            {
-                interpolator,
-                domainSpec: this._domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX },
-            },
-        );
+        const configured = this._style?.colorMap;
+        const domainSpec = this._domainSpec ?? { type: ColorMapDomainStrategy.MIN_MAX };
+        const interpolator = configured?.interpolator
+            ?? (isCategorical ? this._categoricalColorMapInterpolator : this._colorMapInterpolator);
+        const colorMap: ColorMapConfig = configured?.type === undefined
+            ? { interpolator, domainSpec }
+            : { type: configured.type, colors: configured.colors, domainSpec };
+        this._colorScale = colorMap.interpolator ?? colorMap;
+        this._resolvedDomain = ColorMap.resolveDomainFromData(values as number[] | string[], colorMap);
     }
 }
