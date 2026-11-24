@@ -53,8 +53,11 @@ it('resolves joined month attributes for plot binning, map and compute without c
         for (const feature of roads.features) {
             expect(valueAtPath(feature, `properties.${attribute}`)).toBe(feature.properties?.sjoin.avg[`shadows.${code}`]);
         }
-        const binned = runBinning1d(rows, { preset: 'binning-1d', options: { bins: 13 } }, [attribute]);
-        expect(binned.rows).toHaveLength(2);
+        const binned = runBinning1d(rows, { bins: 13 }, [attribute]);
+        // Two ranges hold the six segments; the ranges between them are empty (value 0, no segment).
+        const filled = binned.rows.filter(bin => bin.autkIds.length > 0);
+        expect(filled).toHaveLength(2);
+        expect(binned.rows.filter(bin => bin.autkIds.length === 0).every(bin => bin.value === 0)).toBe(true);
         expect(binned.rows.reduce((count, bin) => count + bin.value, 0)).toBe(6);
         expect(binned.rows.flatMap(bin => bin.autkIds).sort()).toEqual([0, 1, 2, 3, 4, 5]);
     }

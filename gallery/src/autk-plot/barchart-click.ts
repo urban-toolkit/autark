@@ -21,10 +21,12 @@ async function main(): Promise<void> {
         attributes: { axis: ['ntaname', 'shape_area'] },
         labels: { title: 'Barchart' },
         width: Math.max(280, body.clientWidth - 40),
-        events: [PlotEvent.CLICK],
+        events: [PlotEvent.CLICK, PlotEvent.HOVER],
     });
 
     map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
 }
 void runExample(main);

@@ -22,10 +22,12 @@ async function main(): Promise<void> {
         labels: { title: 'Distribution' },
         transform: { preset: 'binning-1d', options: { bins: 10 } },
         width: Math.max(280, body.clientWidth - 40),
-        events: [PlotEvent.BRUSH_X],
+        events: [PlotEvent.BRUSH_X, PlotEvent.HOVER],
     });
 
     map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
 }
 void runExample(main);

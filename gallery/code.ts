@@ -65,13 +65,13 @@ map.requestRender();`;
         case 'T03': return "map.loadTiles('imagery', { source: TILE_SOURCES.osmLight });\nmap.updateRenderInfo('table_osm_surface', { isSkip: true });\nmap.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });";
         case 'T04': return "await db.loadGeoTiff({ geotiffFileUrl: '/data/niteroi-elevation.tif', coordinateFormat: 'EPSG:3395', outputTableName: 'elevation' });\nmap.loadTerrain({ source: { collection: await db.getRaster('elevation'), property: 'band_1' } });";
         case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'PlotEvent.CLICK');
-        case 'P02': return plot('scatterplot', "{ x: 'shape_area', y: 'shape_leng' }", 'PlotEvent.BRUSH');
+        case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'PlotEvent.BRUSH');
         case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'PlotEvent.BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");
-        case 'P04': return plot('heatmatrix', "{ x: 'boroname', y: 'ntatype' }", 'PlotEvent.CLICK');
-        case 'P05': return plot('table', "{ columns: ['ntaname', 'shape_area'] }", 'PlotEvent.CLICK');
-        case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'borocode'] }", 'PlotEvent.CLICK');
-        case 'P07': return plot('temporal-events', "{ axis: ['timestamp'] }", 'PlotEvent.CLICK');
-        case 'P08': return plot('timeseries', "{ axis: ['timestamp', 'value'] }", 'PlotEvent.CLICK');
+        case 'P04': return plot('heatmatrix', "{ axis: ['shape_area', 'shape_leng'], color: '@transform' }", 'PlotEvent.CLICK', "{ preset: 'binning-2d' }");
+        case 'P05': return plot('table', "{ axis: ['ntaname', 'shape_area', 'shape_leng'] }", 'PlotEvent.CLICK', "{ preset: 'sort', options: { direction: 'asc' } }");
+        case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'cdta2020'] }", 'PlotEvent.BRUSH_Y');
+        case 'P07': return plot('linechart', "{ axis: ['sjoin.collect.noise', '@transform'] }", 'PlotEvent.BRUSH_X',
+            "{ preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } }", variant === 'roads' ? 'roads' : 'neighborhoods');
         case 'A01': return "await db.spatialQuery({\n  tableRootName: 'neighborhoods', tableJoinName: 'noise',\n  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],\n});\nmap.updateThematic('neighborhoods', { collection, property: 'properties.sjoin.count.noise' });";
         case 'A02': return "for (const table of ['noise', 'parking']) {\n  await db.spatialQuery({ tableRootName: 'neighborhoods', tableJoinName: table, groupBy });\n}";
         case 'A03': return `await db.spatialQuery({\n  tableRootName: ${variant === 'buildings' ? "'table_osm_buildings'" : "'table_osm_roads'"},\n  tableJoinName: 'noise', near: { distance: 1000 }, groupBy,\n});`;
@@ -82,6 +82,6 @@ map.requestRender();`;
     }
 }
 
-function plot(type: string, attributes: string, event: string, transform?: string): string {
-    return `const plot = new AutkPlot(document.querySelector('#plot')!, {\n  type: '${type}',\n  collection,\n  attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}\n  events: [${event}],\n});\n\nmap.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));\nplot.events.on(${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));`;
+function plot(type: string, attributes: string, event: string, transform?: string, layer = 'neighborhoods'): string {
+    return `const plot = new AutkPlot(document.querySelector('#plotBody')!, {\n  type: '${type}',\n  collection,\n  attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}\n  events: [${event}, PlotEvent.HOVER],\n});\n\nmap.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));\nplot.events.on(${event}, ({ selection }) => map.setHighlightedIds('${layer}', selection));\nplot.events.on(PlotEvent.HOVER, ({ selection }) =>\n  map.setHighlightedIds('${layer}', [...new Set([...plot.selection, ...selection])]));`;
 }

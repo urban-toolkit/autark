@@ -1,8 +1,8 @@
 /**
  * Binning-1d transform preset.
  *
- * Aggregates a single numeric or categorical column into fixed-width bins,
- * preserving source feature provenance (`autkIds`) on every output row.
+ * Groups rows by one column, by category or by equal-width numeric range, and reduces each bin,
+ * keeping the source features (`autkIds`) of every bin.
  */
 
 import * as d3 from 'd3';
@@ -11,32 +11,27 @@ import { valueAtPath } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from '../../types-plot';
 import type { Binning1dTransformConfig } from '../../api';
+import type { TransformDefinition } from '../registry';
+import type { TransformProvenance } from '../../types-provenance';
 
-import { reduceBuckets } from '../kernel';
+import { collectBuckets } from '../kernel';
+import { binnedProvenance, indexedBins } from '../provenance';
 
 // ---- Executed transform -------------------------------------------------
 
-/**
- * Result produced by `runBinning1d`.
- *
- * Carries the fixed attribute tuple `['label', 'value']` and the binned rows
- * ready for bar-plot rendering.
- */
+/** Result produced by `runBinning1d`. */
 export type ExecutedBinning1dTransform = {
     /** Preset discriminator identifying the executed transform. */
     preset: 'binning-1d';
     /** Binned rows ready for downstream plot rendering. */
     rows: Binning1dBinRow[];
+    /** Provenance `D0 features → D1 bins → D2 aggregates`, aligned with `rows`. */
+    provenance: TransformProvenance;
 };
 
-/**
- * A single bin row ready for plot rendering.
- *
- * `label` is either a category string or a formatted numeric range such as `"1k-2k"`.
- * `order` is the numeric sort key for the bin (bin index for quantitative, insertion order for categorical).
- */
+/** A single bin row ready for plot rendering. */
 export type Binning1dBinRow = {
-    /** Bin label — category string or formatted numeric range such as `"1k-2k"`. */
+    /** Bin label — category string or formatted numeric range such as `"1000-2000"`. */
     label: string;
     /** Numeric sort key for this bin (bin index for quantitative, insertion order for categorical). */
     order: number;
@@ -53,59 +48,98 @@ export type Binning1dBinRow = {
 /**
  * Runs a binning-1d transform and returns plot-ready rows.
  *
- * Detects whether the value attribute is categorical or quantitative, builds a
- * bin-label mapper, then groups rows by bin label and reduces using the specified reducer.
+ * Detects whether the attribute is categorical or quantitative, builds a bin mapper, then groups
+ * rows by bin (never by label, so two bins never merge) and reduces them with the configured reducer.
  *
- * @param rows - Input feature data to bin.
- * @param config - Transform configuration, including reducer, bin count, and optional value column.
- * @param columns - Ordered attribute names; `columns[0]` is the value axis attribute.
+ * @param rows Input feature rows.
+ * @param options Transform options (`transform.options`): reducer, bin count, and value column.
+ * @param columns `columns[0]` is the column to bin.
+ * @returns Rows of the `category-value` shape and their provenance.
  */
-export function runBinning1d(rows: AutkDatum[], config: Binning1dTransformConfig, columns: string[]): ExecutedBinning1dTransform {
+export function runBinning1d(
+    rows: AutkDatum[],
+    options: NonNullable<Binning1dTransformConfig['options']>,
+    columns: string[],
+): Omit<ExecutedBinning1dTransform, 'preset'> {
     const valueAttr = columns[0] ?? '';
-    const reducer = config.options?.reducer ?? 'count';
-    const numBins = config.options?.bins ?? 10;
+    const reducer = options.reducer ?? 'count';
+    const numBins = options.bins ?? 10;
 
     const mapper = buildBinMapper(rows, valueAttr, numBins);
 
-    const reduced = reduceBuckets({
+    const reduced = collectBuckets({
         rows,
-        bucketOf: (row) => mapper.label(valueAtPath(row, valueAttr)),
+        bucketOf: (row) => mapper.key(valueAtPath(row, valueAttr)),
         valueOf: reducer === 'count' ? undefined : (row) => {
-            const col = config.options?.value ?? valueAttr;
+            const col = options.value ?? valueAttr;
             const v = Number(valueAtPath(row, col));
             return Number.isFinite(v) ? v : null;
         },
         reducer,
     });
+    // A range of a numeric column with no row is still a bin: its row has value 0 and no
+    // regions, so the axis does not skip it (categories only exist where rows are).
+    const present = new Set(reduced.map(bucket => bucket.key));
+    for (const key of mapper.ranges()) {
+        if (!present.has(key)) reduced.push({ key, value: 0, count: 0, autkIds: [], members: [] });
+    }
+
+    const binRows = reduced
+        .map(bucket => ({
+            label: mapper.label(bucket.key),
+            order: mapper.order(bucket.key),
+            key: bucket.key,
+            value: bucket.value,
+            count: bucket.count,
+            autkIds: bucket.autkIds,
+        }))
+        .sort((a, b) => a.order - b.order);
 
     return {
-        preset: 'binning-1d',
-        rows: reduced
-            .map(bucket => ({
-                label: bucket.key,
-                order: mapper.order(bucket.key),
-                value: bucket.value,
-                count: bucket.count,
-                autkIds: bucket.autkIds,
-            }))
-            .sort((a, b) => a.order - b.order),
+        rows: binRows.map(({ key: _key, ...row }) => row),
+        provenance: binnedProvenance({
+            rows,
+            buckets: reduced,
+            bins: indexedBins(mapper.keys(), reduced.map(bucket => bucket.key), 'bin'),
+            binLabel: 'bins',
+            rowKeys: binRows.map(row => row.key),
+            reducer,
+        }),
     };
 }
 
 // ---- Bin mapper ---------------------------------------------------------
 
+const UNKNOWN = 'unknown';
+const ROUNDING_TOLERANCE = 4 * Number.EPSILON;
+
+/** Maps the values of one attribute to bins: the key rows are grouped by, and each bin's label and order. */
+export type BinMapper = {
+    /** Key of the bin a value falls in: its category, or the index of its numeric range. */
+    key: (value: unknown) => string;
+    /** Label of a bin: its category, or its numeric range such as `"1000-2000"`. */
+    label: (key: string) => string;
+    /** Sort key of a bin: the category's first-seen rank, or the numeric range's index. */
+    order: (key: string) => number;
+    /** Every key, in order: the categories seen, or every numeric range. */
+    keys: () => string[];
+    /** The keys of the numeric ranges, empty ones included (none for categories or one value). */
+    ranges: () => string[];
+};
+
 /**
- * Builds label and order mappers for a single axis attribute.
+ * Builds the bin mapper of a single axis attribute.
  *
- * Detects whether the attribute is categorical or quantitative. Categorical
- * attributes map to their string representation; quantitative attributes are
- * divided into `numBins` fixed-width ranges with SI-formatted boundaries.
+ * Detects whether the attribute is categorical or quantitative. Categorical attributes map to
+ * their string representation; quantitative attributes are divided into `numBins` fixed-width
+ * ranges, keyed by their index and labeled by their true edges.
  *
- * @param rows - Input data used to infer the attribute's type and numeric range.
- * @param attr - Dot-path attribute name to map.
- * @param numBins - Number of equal-width bins for quantitative attributes.
+ * @param rows Input rows used to infer the attribute's type and numeric range.
+ * @param attr Dot-path attribute name to map.
+ * @param numBins Number of equal-width bins for quantitative attributes.
+ * @returns The key, label and order of a bin, every key, and the keys of the numeric ranges.
  */
-export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number) {
+export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number): BinMapper {
     const sampleValues = rows.map(r => r ? valueAtPath(r, attr) : null).filter(v => v != null);
     const isNumericLike = (value: unknown): boolean => {
         if (typeof value === 'number') return Number.isFinite(value);
@@ -116,56 +150,101 @@ export function buildBinMapper(rows: AutkDatum[], attr: string, numBins: number)
     };
 
     const isCategorical = sampleValues.some(v =>
-        (typeof v === 'number' && !Number.isFinite(v)) ||
         (typeof v === 'string' && !isNumericLike(v)) ||
         (typeof v !== 'number' && typeof v !== 'string')
     );
 
     if (isCategorical) {
         const insertionOrder = new Map<string, number>();
-        const rank = (label: string): number => {
-            if (!insertionOrder.has(label)) insertionOrder.set(label, insertionOrder.size);
-            return insertionOrder.get(label)!;
+        const rank = (key: string): number => {
+            const seen = insertionOrder.get(key);
+            if (seen !== undefined) return seen;
+            insertionOrder.set(key, insertionOrder.size);
+            return insertionOrder.size - 1;
         };
 
         return {
-            label: (v: unknown) => { const s = String(v ?? ''); rank(s); return s; },
-            order: (label: string) => rank(label),
+            key: (v: unknown) => { const s = String(v ?? ''); rank(s); return s; },
+            label: (key: string) => key,
+            order: (key: string) => rank(key),
+            keys: () => Array.from(insertionOrder.keys()),
+            ranges: () => [],
         };
     }
 
     const nums = sampleValues.map(Number).filter(Number.isFinite);
     if (nums.length === 0) {
-        return { label: (v: unknown) => String(v ?? ''), order: () => 0 };
+        return { key: () => UNKNOWN, label: key => key, order: () => numBins, keys: () => [], ranges: () => [] };
     }
 
-    const minValue = Math.min(...nums);
-    const maxValue = Math.max(...nums);
+    // A loop instead of Math.min(...nums): spreading a million values overflows the call stack.
+    let minValue = Infinity;
+    let maxValue = -Infinity;
+    for (const n of nums) {
+        minValue = Math.min(minValue, n);
+        maxValue = Math.max(maxValue, n);
+    }
     const span = maxValue - minValue;
     const binWidth = span === 0 ? 1 : span / numBins;
 
-    const roundedMin = Math.round(minValue);
-    const roundedMax = Math.max(roundedMin + 1, Math.round(maxValue));
-    const roundedBinWidth = (roundedMax - roundedMin) / numBins;
-    const fmt = d3.format('.2s');
+    // A single value is one bin, labeled by that value; otherwise each bin is labeled by its edges.
+    const edges = span === 0
+        ? [minValue]
+        : Array.from({ length: numBins + 1 }, (_, i) => {
+            if (i === 0) return minValue;
+            if (i === numBins) return maxValue;
+            const edge = minValue + i * binWidth;
+            return Math.abs(edge) < binWidth * ROUNDING_TOLERANCE ? 0 : edge;
+        });
+    const texts = formatBinEdges(edges, binWidth);
+    const labels = span === 0 ? texts : texts.slice(0, -1).map((text, i) => `${text}-${texts[i + 1]}`);
+    const keys = labels.map((_label, i) => String(i));
 
-    const labelToOrder = new Map<string, number>();
-    for (let bin = 0; bin < numBins; bin++) {
-        const label = `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
-        if (!labelToOrder.has(label)) labelToOrder.set(label, bin);
-    }
-    if (span === 0) labelToOrder.set(fmt(roundedMin), 0);
-
+    // Rows are grouped by bin index, so two bins never merge, even if their labels read alike.
     return {
-        label: (v: unknown) => {
-            const n = Number(v);
-            if (!Number.isFinite(n)) return 'unknown';
-            const normalized = span === 0 ? 0 : (n - minValue) / binWidth;
-            const bin = Math.max(0, Math.min(Math.floor(normalized), numBins - 1));
-            return span === 0
-                ? fmt(roundedMin)
-                : `${fmt(roundedMin + Math.round(bin * roundedBinWidth))}-${fmt(roundedMin + Math.round((bin + 1) * roundedBinWidth))}`;
+        key: (v: unknown) => {
+            if (!isNumericLike(v)) return UNKNOWN;
+            // Decimal arithmetic can place an exact boundary just below its integer bin index.
+            const normalized = span === 0 ? 0 : (Number(v) - minValue) / binWidth;
+            const tolerance = ROUNDING_TOLERANCE * Math.max(1, Math.abs(normalized));
+            return String(Math.max(0, Math.min(Math.floor(normalized + tolerance), numBins - 1)));
         },
-        order: (label: string) => labelToOrder.get(label) ?? 0,
+        label: (key: string) => labels[Number(key)] ?? key,
+        order: (key: string) => (key === UNKNOWN ? numBins : Number(key)),
+        keys: () => keys,
+        // The ranges of the column, empty ones included; one value has a single label, no range.
+        ranges: () => (span === 0 ? [] : keys),
     };
 }
+
+/**
+ * Formats bin edges at the fewest significant digits, two or more, that tell each edge from the
+ * next and print every edge within a tenth of a bin width of its value. Edges
+ * use plain decimals rather than SI prefixes.
+ *
+ * @param edges Bin edges in ascending order.
+ * @param binWidth Width of a bin.
+ * @returns The text of each edge.
+ */
+function formatBinEdges(edges: number[], binWidth: number): string[] {
+    let texts: string[] = [];
+    for (let digits = 2; digits <= 17; digits++) {
+        const decimal = d3.format(`.${digits}r`);
+        texts = edges.map(edge => edge === 0 ? edge.toPrecision(digits) : decimal(edge));
+        const apart = texts.every((text, i) => i === 0 || text !== texts[i - 1]);
+        // The value each text prints: the edge rounded to `digits` significant digits, as d3 rounds it.
+        const close = edges.every(edge => Math.abs(Number(edge.toPrecision(digits)) - edge) <= binWidth / 10);
+        if (apart && close) break;
+    }
+    return texts;
+}
+
+// ---- Definition ---------------------------------------------------------
+
+/** Rows binned by one column (categories, or equal-width ranges of numbers): one row per bin. */
+export const binning1d: TransformDefinition = {
+    name: 'binning-1d',
+    label: 'Bins of one column',
+    shape: 'category-value',
+    run: runBinning1d,
+};

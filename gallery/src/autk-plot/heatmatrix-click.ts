@@ -18,14 +18,16 @@ async function main(): Promise<void> {
     const plot = new AutkPlot(body, {
         type: 'heatmatrix',
         collection,
-        attributes: { axis: ['shape_area', 'landuse'], color: '@transform' },
-        labels: { title: 'Heat matrix' },
+        attributes: { axis: ['shape_area', 'shape_leng'], color: '@transform' },
+        labels: { title: 'Neighborhood area and perimeter', axis: ['Area', 'Perimeter'] },
         transform: { preset: 'binning-2d' },
         width: Math.max(280, body.clientWidth - 40),
-        events: [PlotEvent.CLICK],
+        events: [PlotEvent.CLICK, PlotEvent.HOVER],
     });
 
     map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
 }
 void runExample(main);

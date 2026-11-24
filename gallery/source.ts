@@ -1,6 +1,7 @@
 import { CAMERA_TOUR_ROUTE } from './src/autk-map/camera-tour-route';
 import { CORINE_CLASSES } from './src/autk-map/corine-palette';
 import { ROAD_LENGTH_WGSL } from './src/autk-map/road-length';
+import temporalEventsSource from './src/autk-plot/temporal-events-click.ts?raw';
 
 /**
  * Minimal runnable programs shown under "View full source".
@@ -453,13 +454,16 @@ map.draw();`;
         case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'CLICK');
         case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'BRUSH');
         case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");
-        case 'P04': return plot('heatmatrix', "{ axis: ['shape_area', 'landuse'], color: '@transform' }", 'CLICK', "{ preset: 'binning-2d' }");
+        case 'P04': return plot('heatmatrix', "{ axis: ['shape_area', 'shape_leng'], color: '@transform' }", 'CLICK', "{ preset: 'binning-2d' }");
         case 'P05': return plot('table', "{ axis: ['ntaname', 'shape_area', 'shape_leng'] }", 'CLICK', "{ preset: 'sort', options: { direction: 'asc' } }");
         case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'cdta2020'] }", 'BRUSH_Y');
-        case 'P07': return plot('linechart', "{ axis: ['sjoin.collect.noise', '@transform'] }", 'BRUSH_X',
-            "{ preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } }");
-        case 'P08': return plot('barchart', "{ axis: ['series', '@transform'] }", 'CLICK',
-            "{ preset: 'reduce-series', options: { timestamp: 'timestamp', value: 'value', reducer: 'avg' } }");
+        case 'P07': return temporalEventsSource
+            .replace("import { exampleVariant, onExampleDispose, runExample } from '../example';\n", '')
+            .replace("exampleVariant('Group noise reports by', { neighborhoods: 'Neighborhoods', roads: 'Roads' })", JSON.stringify(variant === 'roads' ? 'roads' : 'neighborhoods'))
+            .replace(/^ {4}onExampleDispose\(.*\);\n/gm, '')
+            .replace(/^ {4}document\.querySelector\('#join-description'\)![\s\S]*?(?=^})/m, '')
+            .replace('const BASE_URL = (import.meta as any).env.BASE_URL;', "const BASE_URL = '/';")
+            .replace('void runExample(main);', 'await main();');
         case 'A01': return `${DB_MAP}
 await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });
 await db.loadCsv({ csvFileUrl: '/data/noise.csv', outputTableName: 'noise', geometryColumns: true });
@@ -630,9 +634,11 @@ const plot = new AutkPlot(document.querySelector('#plotBody')!, {
   collection,
   attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}
   width: Math.max(280, document.querySelector('#plotBody')!.clientWidth - 40),
-  events: [PlotEvent.${event}],
+  events: [PlotEvent.${event}, PlotEvent.HOVER],
 });
 
 map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
-plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));`;
+plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+  map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));`;
 }

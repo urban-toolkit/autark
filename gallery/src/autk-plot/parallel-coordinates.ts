@@ -21,10 +21,12 @@ async function main(): Promise<void> {
         attributes: { axis: ['shape_area', 'shape_leng', 'cdta2020'] },
         labels: { title: 'Parallel coordinates' },
         width: Math.max(280, body.clientWidth - 40),
-        events: [PlotEvent.BRUSH_Y],
+        events: [PlotEvent.BRUSH_Y, PlotEvent.HOVER],
     });
 
     map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
     plot.events.on(PlotEvent.BRUSH_Y, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
+        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
 }
 void runExample(main);
