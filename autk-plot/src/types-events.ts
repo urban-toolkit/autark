@@ -1,5 +1,6 @@
 import type { SelectionData } from '@urban-toolkit/autk-core';
 
+import type { AutkDatum } from './types-plot';
 import type { FeatureShare } from './types-provenance';
 
 /**
@@ -13,6 +14,8 @@ export enum PlotEvent {
      * Emitted after click-based selection updates.
      */
     CLICK = 'click',
+    /** Emitted when the mouse enters or leaves a mark. */
+    HOVER = 'hover',
     /**
      * Emitted after 2D rectangular brush interactions.
      */
@@ -40,6 +43,23 @@ export type PlotEventData = SelectionData & {
      * that part of each feature's mark.
      */
     shares?: FeatureShare[];
+    /** Present on brush events; `null` means the emitting brush was cleared. */
+    extent?: BrushExtent | null;
+};
+
+/** The data interval or ordered keys covered on one axis. */
+export type BrushAxisExtent =
+    | { kind: 'numeric'; range: [number, number] }
+    | { kind: 'categorical'; keys: string[] };
+
+/** Bounds of the brush that emitted an event, separate from the combined selection. */
+export type BrushExtent = {
+    /** Bounds in the brush group's local SVG coordinates, on the brushed axes only. */
+    pixels: Partial<Record<'x' | 'y', [number, number]>>;
+    /** Data bounds on axes whose scales are available. */
+    data?: Partial<Record<'x' | 'y', BrushAxisExtent>>;
+    /** The named dimension for brushes on their own axes (e.g. parallel coordinates). */
+    dimension?: string;
 };
 
 /**
@@ -47,4 +67,10 @@ export type PlotEventData = SelectionData & {
  *
  * Each plot interaction event resolves to a `PlotEventData` payload.
  */
-export type PlotEventRecord = Record<PlotEvent, PlotEventData>;
+export type PlotEventRecord = {
+    [PlotEvent.CLICK]: PlotEventData;
+    [PlotEvent.HOVER]: PlotHoverEventData;
+} & Record<PlotEvent.BRUSH | PlotEvent.BRUSH_X | PlotEvent.BRUSH_Y, PlotEventData & { extent: BrushExtent | null }>;
+
+/** Hovered source IDs and rendered mark data; an empty selection and `null` clear hover. */
+export type PlotHoverEventData = SelectionData & { datum: AutkDatum | null };

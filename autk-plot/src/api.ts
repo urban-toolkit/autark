@@ -38,6 +38,13 @@ export type PlotMargins = {
     bottom: number;
 };
 
+type AxisTickOptions = {
+    /** Approximate count for numeric axes with automatic tick positions. */
+    count?: number;
+    /** D3 format string for numeric tick labels. */
+    format?: string;
+};
+
 /**
  * Base configuration accepted by every plot.
  */
@@ -86,12 +93,13 @@ export type PlotConfig = {
     /** Legacy D3 format strings for each axis; `ticks` takes precedence for X and Y. */
     tickFormats?: string[];
     /** Tick options for the X and Y axes. */
-    ticks?: Partial<Record<'x' | 'y', {
-        /** Approximate count for numeric axes with automatic tick positions. */
-        count?: number;
-        /** D3 format string for numeric tick labels. */
-        format?: string;
-    }>>;
+    ticks?: {
+        x?: AxisTickOptions & {
+            /** Custom label for a bar, line, or area chart's raw category or bucket key. Return an empty string to skip the label. */
+            label?: (key: string) => string;
+        };
+        y?: AxisTickOptions;
+    };
     /** Domain specification controlling how the colormap range is derived. */
     domainSpec?: ColorMapDomainSpec;
     /** Color interpolator used for continuous (numeric) color encoding. */
@@ -102,6 +110,8 @@ export type PlotConfig = {
     style?: {
         /** Fixed scatterplot point radius in pixels; defaults to 5. */
         radius?: number;
+        /** Bar chart band padding from 0 to 1; defaults to 0.25. */
+        barPadding?: number;
         /** Colormap and optional domain, using the same configuration as `AutkMap.updateColorMap`. */
         colorMap?: ColorMapPatch;
     };

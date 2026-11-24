@@ -33,7 +33,7 @@ export const parallelCoordinates: PlotDefinition = {
     markStyle: (_row, highlighted) => ({ opacity: highlighted ? 1 : 0.7, 'stroke-width': highlighted ? 3 : 2 }),
     highlight: { stroke: { mode: 'custom', preset: 'trace' } },
 
-    draw({ svg, group, rows, fields, value, width, height, margins, format, axisLabels, colorAttribute, colorBy, interactive }) {
+    draw({ svg, group, rows, fields, value, width, height, margins, format, axisLabels, colorAttribute, colorBy, interactive, setBrushScale }) {
         // A scale per axis: linear when every value is a number, points otherwise.
         const scales = new Map<string, AxisScale>(fields.map((field, index): [string, AxisScale] => {
             const values = rows.map(row => value(row, index)).filter(v => v !== null && v !== undefined);
@@ -73,8 +73,13 @@ export const parallelCoordinates: PlotDefinition = {
         axes.each(function (field) {
             const axis = scales.get(field)!;
             const g = d3.select<SVGGElement, string>(this);
-            if (axis.numeric) g.call(d3.axisLeft(axis.scale).ticks(5).tickFormat(v => format(0, '~s')(Number(v))));
-            else g.call(d3.axisLeft(axis.scale));
+            if (axis.numeric) {
+                setBrushScale?.('y', axis.scale, field);
+                g.call(d3.axisLeft(axis.scale).ticks(5).tickFormat(v => format(0, '~s')(Number(v))));
+            } else {
+                setBrushScale?.('y', axis.scale, field);
+                g.call(d3.axisLeft(axis.scale));
+            }
         });
 
         // Axis names over the brush areas; a click colors the lines by that attribute,

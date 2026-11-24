@@ -28,6 +28,7 @@ import { PlotStyle } from '../plot-style';
 import { defaultTickFormat } from '../number-format';
 import { featureId } from '../provenance';
 import { PlotEvent } from '../types-events';
+import type { BrushAxisExtent, BrushExtent } from '../types-events';
 
 import { freezeDefinition, registeredTransform, transformOf } from '../transforms/registry';
 
@@ -54,6 +55,10 @@ export type PlotDrawContext = {
     interactive: boolean;
     /** Appearance overrides for this plot. */
     style?: PlotConfig['style'];
+    /** Optional custom label for a category or bucket on the X axis. */
+    xTickLabel?: (key: string) => string;
+    /** Supplies a brush scale for an axis drawn manually or positioned by bucket rank. */
+    setBrushScale?: <Domain extends d3.AxisDomain>(side: 'x' | 'y', scale: d3.AxisScale<Domain>, dimension?: string) => void;
     /** Value of a row on axis `index` (default 0). */
     value: (row: AutkDatum, index?: number) => unknown;
     /** Current color of a row's mark. */
@@ -621,6 +626,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * @throws If `draw` throws, or, while enforcing, if the drawing breaks the contract.
      */
     public render(): void {
+        this._brushAxes.clear();
         // Each render starts from the configured margins; a second one keeps the room it was given.
         if (!this._growingMargins && this._configuredMargins) this._margins = { ...this._configuredMargins };
         const width = this._width - this._margins.left - this._margins.right;
@@ -676,6 +682,8 @@ export class RegisteredPlot extends PlotBaseInteractive {
             fields,
             interactive: this._enabledEvents.length > 0,
             style: this._style,
+            xTickLabel: this._ticks?.x?.label,
+            setBrushScale: (side, scale, dimension) => this.setBrushScale(side, scale, dimension),
             value: (row, index = 0) => valueAtPath(row, fields[index]),
             color: row => this.getMarkColor(row),
             width,
@@ -798,6 +806,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             .attr('class', `${side} axis`)
             .attr('transform', side === 'x' ? `translate(${left}, ${top + height})` : `translate(${left}, ${top})`);
         const scale = axis.scale();
+        this.setBrushScale(side, scale);
         const args = axis.tickArguments();
         const fallback = args[0] ?? 10;
         // Leave band scales, explicit positions, and axes that hide their ticks alone.
@@ -935,6 +944,38 @@ export class RegisteredPlot extends PlotBaseInteractive {
     /** Margins of the configuration: each render starts from them. */
     private _configuredMargins: PlotMargins | undefined;
     private readonly _ticks: PlotConfig['ticks'];
+    private readonly _brushAxes = new Map<string, (range: [number, number]) => BrushAxisExtent | undefined>();
+
+    private setBrushScale<Domain extends d3.AxisDomain>(side: 'x' | 'y', scale: d3.AxisScale<Domain>, dimension?: string): void {
+        this._brushAxes.set(`${side}:${dimension ?? ''}`, ([low, high]) => {
+            if ('invert' in scale && typeof scale.invert === 'function') {
+                const a: unknown = scale.invert(low);
+                const b: unknown = scale.invert(high);
+                if (typeof a === 'number' && typeof b === 'number' && Number.isFinite(a) && Number.isFinite(b)) {
+                    return { kind: 'numeric', range: [Math.min(a, b), Math.max(a, b)] };
+                }
+            } else if (typeof scale.bandwidth === 'function') {
+                const width = scale.bandwidth();
+                const keys = scale.domain().filter(key => {
+                    const position = scale(key);
+                    return position !== undefined && position <= high && position + width >= low;
+                }).map(String);
+                return { kind: 'categorical', keys };
+            }
+            return undefined;
+        });
+    }
+
+    protected override brushExtent(pixels: BrushExtent['pixels'], dimension?: string): BrushExtent {
+        const extent = super.brushExtent(pixels, dimension);
+        for (const side of ['x', 'y'] as const) {
+            const range = pixels[side];
+            if (!range) continue;
+            const data = this._brushAxes.get(`${side}:${dimension ?? ''}`)?.(range);
+            if (data) (extent.data ??= {})[side] = data;
+        }
+        return extent;
+    }
     /** Whether this render is the second one, with margins grown for the axis titles. */
     private _growingMargins = false;
     /** Margins with room for the axis titles, which the last render found it lacked. */
@@ -1287,7 +1328,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         };
         const group = this.marksGroup.node();
         const html = this._html;
-        const brushes = this._enabledEvents.some(event => event !== PlotEvent.CLICK);
+        const brushes = this._enabledEvents.some(event => event === PlotEvent.BRUSH || event === PlotEvent.BRUSH_X || event === PlotEvent.BRUSH_Y);
         const rows = new Set<object>(this._data);
         const marked = new Set<object>();
 
@@ -1308,7 +1349,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             } else if (!(this instanceof HTMLElement)) {
                 report(4, `${tag} is neither an SVG shape nor an HTML element`);
             } else if (brushes) {
-                report(4, `${tag} is HTML: HTML marks support click, not brush`);
+                report(4, `${tag} is HTML: HTML marks support click and hover, not brush`);
             }
             const highlight = this.getAttribute('data-autk-highlight');
             if (highlight !== null && !MARK_HIGHLIGHTS.includes(highlight)) {

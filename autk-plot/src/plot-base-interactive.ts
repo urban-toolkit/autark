@@ -19,7 +19,7 @@ import { PlotStyle } from './plot-style';
 import { PlotEvent } from './types-events';
 import { PlotBaseData } from './plot-base-data';
 
-import type { PlotEventData } from './types-events';
+import type { BrushExtent, PlotEventData } from './types-events';
 import type { FeatureShare, MarkContribution, ProvenanceId, ProvenancePath } from './types-provenance';
 import { markId } from './provenance';
 import { renderProvenancePathView } from './provenance/path-view';
@@ -77,6 +77,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     private _brushBehaviors: Map<string, d3.BrushBehavior<unknown>> = new Map();
     /** Suppresses brush handlers during programmatic brush clearing. */
     private _suppressBrushEvents: boolean = false;
+    private _hoveredMark: HTMLElement | SVGElement | null = null;
     /** Feature shares received with the last external selection, keyed by feature index. */
     private _selectionShares: Map<number, FeatureShare> | null = null;
     /** Whether the provenance path widget was requested (`provenance.path`). */
@@ -441,6 +442,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         for (const event of this._enabledEvents) {
             if (event === PlotEvent.CLICK) {
                 this.clickEvent();
+            } else if (event === PlotEvent.HOVER) {
+                this.hoverEvent();
             } else if (event === PlotEvent.BRUSH) {
                 this.brushEvent();
             } else if (event === PlotEvent.BRUSH_X) {
@@ -578,6 +581,39 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         });
     }
 
+    /** Binds mouse hover to the rendered marks without changing their selection. */
+    private hoverEvent(): void {
+        const marks = d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark');
+        const plot = this;
+        marks.on('mouseenter.autkHover', function (_event, datum) {
+            if ((!(this instanceof SVGElement) && !(this instanceof HTMLElement))
+                || !datum || typeof datum !== 'object' || plot._hoveredMark === this) return;
+            plot._hoveredMark = this;
+            plot.paintHover();
+            const row = datum as AutkDatum;
+            plot.events.emit(PlotEvent.HOVER, { selection: [...(row.autkIds ?? [])], datum: row });
+        }).on('mouseleave.autkHover', function () {
+            if (plot._hoveredMark !== this) return;
+            plot._hoveredMark = null;
+            plot.applyMarkStyles(marks.filter((_datum, i, nodes) => nodes[i] === this));
+            plot.events.emit(PlotEvent.HOVER, { selection: [], datum: null });
+        });
+        if (this._hoveredMark && !this._div.contains(this._hoveredMark)) {
+            this._hoveredMark = null;
+            this.events.emit(PlotEvent.HOVER, { selection: [], datum: null });
+        }
+    }
+
+    private paintHover(): void {
+        const mark = this._hoveredMark;
+        if (mark) mark.style.setProperty(mark instanceof SVGElement ? this._colorProperty : 'background-color', PlotStyle.hover);
+    }
+
+    /** Adds axis data bounds to brush-local SVG bounds when the renderer knows the scales. */
+    protected brushExtent(pixels: BrushExtent['pixels'], dimension?: string): BrushExtent {
+        return dimension === undefined ? { pixels } : { pixels, dimension };
+    }
+
     /**
      * Enables 2D rectangular brushing interactions.
      */
@@ -601,7 +637,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH, plot.selectionEventData());
+                            const extent = plot.brushExtent({ x: [x0, x1], y: [y0, y1] }, dim || undefined);
+                            plot.events.emit(PlotEvent.BRUSH, { ...plot.selectionEventData(), extent });
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH, plot._activeBrushes);
@@ -643,7 +680,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH_X, plot.selectionEventData());
+                            const extent = plot.brushExtent({ x: [x0, x1] }, dim || undefined);
+                            plot.events.emit(PlotEvent.BRUSH_X, { ...plot.selectionEventData(), extent });
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH_X, plot._activeBrushes);
@@ -699,7 +737,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
                             plot._activeBrushes.set(brushKey, [x0, y0, x1, y1]);
                             plot.resolveSelectionFromRects(plot._activeBrushes);
                             plot.renderSelection();
-                            plot.events.emit(PlotEvent.BRUSH_Y, plot.selectionEventData());
+                            const extent = plot.brushExtent({ y: [event.selection[0], event.selection[1]] }, dim || undefined);
+                            plot.events.emit(PlotEvent.BRUSH_Y, { ...plot.selectionEventData(), extent });
                         } else {
                             plot._activeBrushes.delete(brushKey);
                             plot.commitBrushSelection(PlotEvent.BRUSH_Y, plot._activeBrushes);
@@ -719,6 +758,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         this.renderSegregatedMarks();
         this.renderProvenancePath();
         this.onSelectionUpdated();
+        this.paintHover();
     }
 
     /**
@@ -1055,7 +1095,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * @param event Interaction event emitted after the brush commit.
      * @param activeBrushes Currently active brush rectangles.
      */
-    private commitBrushSelection(event: PlotEvent, activeBrushes: Map<string, [number, number, number, number]>): void {
+    private commitBrushSelection(event: PlotEvent.BRUSH | PlotEvent.BRUSH_X | PlotEvent.BRUSH_Y, activeBrushes: Map<string, [number, number, number, number]>): void {
         if (activeBrushes.size === 0) {
             this._selectedMarkDatums = new Set();
             this._selectedFeatureIds = new Set();
@@ -1064,7 +1104,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             this.resolveSelectionFromRects(activeBrushes);
         }
         this.renderSelection();
-        this.events.emit(event, this.selectionEventData());
+        this.events.emit(event, { ...this.selectionEventData(), extent: null });
     }
 
     /**

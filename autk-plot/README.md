@@ -82,9 +82,11 @@ The option applies to numeric axes that generate their tick positions:
 
 Compact scatterplots, bar charts, and line charts request fewer numeric ticks by default. Other plots keep their existing defaults unless you supply a count. Category and bucket axes, fixed tick positions, and plots without standard X/Y axes (such as parallel coordinates) are unchanged. Registered plots using the `axisX` and `axisY` helpers also honor count overrides on eligible numeric axes; use the drawing context's `format` helper to read the configured format.
 
+For bar, line, and area charts, `ticks.x.label` receives the raw category or bucket key and overrides the default label and numeric format. Return `''` to leave a bar tick unlabeled or to omit a line or area tick. For example, `ticks: { x: { label: key => key === '2024-03-02' ? 'Launch day' : '' } }` labels only the launch bucket. Without a callback, date and timestamp buckets use short UTC labels such as `Mar 2`; timestamp spans of four days or less also show the hour, such as `Mar 2 06h`. Month and year buckets retain their keys. Labels do not change the data or selection keys.
+
 ### Plot appearance
 
-Use `style` for per-plot appearance overrides. `style.radius` sets a fixed scatterplot point radius in pixels. Omit it or pass a nonpositive or nonfinite value to keep the 5 px default. It does not affect bubble sizes.
+Use `style` for per-plot appearance overrides. `style.radius` sets a fixed scatterplot point radius in pixels. Omit it or pass a nonpositive or nonfinite value to keep the 5 px default. It does not affect bubble sizes. `style.barPadding` controls bar-chart band spacing from `0` (no padding) to `1` (full padding); the default is `0.25` and invalid values fall back to it.
 
 `style.colorMap` accepts the same object as `map.updateColorMap(layerId, { colorMap })`. Keep the data field in `attributes.color`:
 
@@ -118,6 +120,26 @@ Every transform records weighted relations between its inputs and outputs, from 
 A mark shows a selection from another view in one of three highlight modes: `boolean` (the whole mark), `subset` (the default: the mark drawn again with the value of the selected subset, through the plot's own encoding) or custom (a preset: `glyph`, `trace`, `members`, or a function of the plot). For a plain D3 chart, the channel of the subset render is inferred from the geometry of its marks (a least-squares fit, R² ≥ 0.99 over at least three distinct values); when no channel is proven, a preset stands in. `provenance: { highlight: 'boolean' }` in a configuration gives any plot the whole-mark highlight.
 
 A plot is interactive only with `events`: with none, it selects nothing, sorts no table and recolors no axis on click, but still shows the selections of other views and its tooltips.
+
+### Hovering marks
+
+Enable `PlotEvent.HOVER` in `events` to temporarily color hovered marks with the map's default hover color (`#f4a261`). Hover does not change the plot's selection. Leaving the mark restores its normal or selected color.
+
+```ts
+plot.events.on(PlotEvent.HOVER, ({ selection, datum }) => {
+    // selection contains source feature IDs for the hovered mark.
+    // datum is the rendered row (an aggregate for an aggregated mark).
+    if (datum) console.log(selection, datum);
+});
+```
+
+When hover clears, the event carries `selection: []` and `datum: null`.
+
+### Brush bounds
+
+`PlotEvent.BRUSH`, `BRUSH_X`, and `BRUSH_Y` include `extent` alongside `selection` and optional provenance `shares`. An active brush always reports `extent.pixels` in the brush group's local SVG coordinates. A cleared brush reports `extent: null`, even if another brush still contributes to the selection.
+
+Where axis scales are available, `extent.data` provides numeric `range` values (low to high) or categorical `keys` in axis order. Bar brushes report overlapping category bands; line and area brushes report raw bucket keys at positions inside the interval, independent of the displayed tick labels. A gap can return `keys: []`. Parallel coordinates also report the axis field in `extent.dimension`. Plots without a matching axis still report pixels. Registered plots get data bounds from `axisX` and `axisY` and can override a brush scale with `setBrushScale` after drawing the axis.
 
 ### Transform API summary
 

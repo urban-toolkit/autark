@@ -12,6 +12,8 @@ import type { ColorHEX } from '@urban-toolkit/autk-core';
  * affects all plots that read style values after the update.
  */
 export class PlotStyle {
+    /** Default hover color, matching the map. */
+    public static readonly hover: ColorHEX = '#f4a261';
     /** Default fill/stroke color used for non-selected marks. */
     protected static _default: ColorHEX = '#bfbfbf';
     /** Highlight color used for selected marks. */

@@ -39,11 +39,12 @@ export const barchart: PlotDefinition = {
     // even when there are too few bars for the geometry to prove it.
     highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } },
 
-    draw({ group, rows, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount }) {
+    draw({ group, rows, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount, style, xTickLabel }) {
         const label = (row: AutkDatum) => String(value(row, 0));
         const amount = (row: AutkDatum) => Number(value(row, 1)) || 0;
 
-        const x = d3.scaleBand(rows.map(label), [0, width]).padding(0.25);
+        const padding = style?.barPadding ?? 0.25;
+        const x = d3.scaleBand(rows.map(label), [0, width]).padding(padding >= 0 && padding <= 1 ? padding : 0.25);
         // An empty result (e.g. everything filtered out) keeps a finite [0, 1] axis.
         // A subset statistic (avg, min, max) may exceed every bar.
         const beyond = partRange && !partRange.additive ? partRange.extent[1] : 0;
@@ -53,7 +54,7 @@ export const barchart: PlotDefinition = {
         // and keep the original text if shortening would make two categories look identical.
         const labels = new Map<string, string>();
         const displayCounts = new Map<string, number>();
-        if (!hasFormat(0)) {
+        if (!xTickLabel && !hasFormat(0)) {
             for (const row of rows) {
                 const raw = value(row, 0);
                 const key = String(raw);
@@ -66,18 +67,20 @@ export const barchart: PlotDefinition = {
                 displayCounts.set(text, (displayCounts.get(text) ?? 0) + 1);
             }
         }
-        const tick = format(0, '~s');
-        axisX(d3.axisBottom(x).tickSizeOuter(0).tickFormat(d => {
-            const text = String(d);
-            if (hasFormat(0) && text.trim() !== '' && Number.isFinite(Number(text))) return tick(Number(text));
-            const display = labels.get(text) ?? text;
-            return displayCounts.get(display) === 1 ? display : text;
-        }))
-            .selectAll('.tick text')
-            .style('text-anchor', 'end')
-            .attr('dx', '-.8em')
-            .attr('dy', '-.40em')
-            .attr('transform', 'rotate(-90)');
+        const tick = xTickLabel ? undefined : format(0, '~s');
+        const xAxis = axisX(d3.axisBottom(x).tickSizeOuter(0).tickFormat(key => {
+            if (xTickLabel) return xTickLabel(key);
+            if (tick && hasFormat(0) && key.trim() !== '' && Number.isFinite(Number(key))) return tick(Number(key));
+            const display = labels.get(key) ?? key;
+            return displayCounts.get(display) === 1 ? display : key;
+        }));
+        if (!xTickLabel) {
+            xAxis.selectAll('.tick text')
+                .style('text-anchor', 'end')
+                .attr('dx', '-.8em')
+                .attr('dy', '-.40em')
+                .attr('transform', 'rotate(-90)');
+        }
         // A few counts get whole ticks, never "500m" of a feature.
         axisY(d3.axisLeft(y).ticks(tickCount(y.domain()[1], rows.map(amount), 10)).tickSizeInner(-width).tickFormat(format(1)));
 

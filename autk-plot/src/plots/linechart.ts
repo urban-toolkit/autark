@@ -25,9 +25,16 @@ import type { AutkDatum } from '../types-plot';
 import type { HighlightRule, MarkKind } from './partial-design';
 import type { PlotDefinition, PlotDrawContext, PlotSeries } from './registered';
 
+/** Parses ISO-style buckets with no explicit time zone as UTC. */
+function bucketTime(key: string): number {
+    const iso = key.replace(' ', 'T');
+    const unzoned = /^\d{4}-\d{2}-\d{2}T/.test(iso) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+    return Date.parse(unzoned ? `${iso}Z` : iso);
+}
+
 /** Orders buckets as dates, then as numbers, then as text. */
 function compareBuckets(a: string, b: string): number {
-    const [dateA, dateB] = [new Date(a).getTime(), new Date(b).getTime()];
+    const [dateA, dateB] = [bucketTime(a), bucketTime(b)];
     if (Number.isFinite(dateA) && Number.isFinite(dateB)) return dateA - dateB;
     const [numA, numB] = [Number(a), Number(b)];
     if (Number.isFinite(numA) && Number.isFinite(numB)) return numA - numB;
@@ -42,7 +49,7 @@ function seriesLabels(config: PlotConfig): Partial<PlotConfig> {
 
 /** Draws the points and the line, and under them the area when `filled`. */
 function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Partial<Record<MarkKind, HighlightRule>>; series: PlotSeries[] } {
-    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange } = context;
+    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange, xTickLabel } = context;
     const bucket = (row: AutkDatum) => String(value(row, 0));
     const amount = (row: AutkDatum) => Number(value(row, 1));
     const rows = context.rows.slice().sort((a, b) => compareBuckets(bucket(a), bucket(b)));
@@ -62,15 +69,30 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
     const x = d3.scaleLinear([0, Math.max(rows.length, 1) - 1], [0, width]);
     const y = d3.scaleLinear([partRange?.additive && low >= 0 ? 0 : low - pad, high + pad], [height, 0]);
 
-    // Ticks at buckets only: with two or three, d3 places some halfway between them.
-    const buckets = x.ticks(Math.min(Math.max(rows.length, 1), 12)).filter(Number.isInteger);
-    axisX(d3.axisBottom(x).tickValues(buckets).tickFormat(i => (rows[+i] ? label(rows[+i]) : String(i))))
+    // Format labels without changing bucket keys or point positions.
+    const keys = rows.map(bucket);
+    const times = xTickLabel ? [] : keys.map(key => /^\d{4}-\d{2}-\d{2}(?:[T ]|$)/.test(key) ? bucketTime(key) : NaN);
+    const isTemporal = times.length > 0 && times.every(Number.isFinite);
+    const shortSpan = isTemporal && times[times.length - 1] - times[0] <= 4 * 86_400_000;
+    const dateLabel = d3.utcFormat('%b %-d');
+    const hourLabel = d3.utcFormat('%b %-d %Hh');
+    const labels = keys.map((key, i) => {
+        if (xTickLabel) return xTickLabel(key);
+        if (!isTemporal) return label(rows[i]);
+        return (shortSpan && key.length > 10 ? hourLabel : dateLabel)(new Date(times[i]));
+    });
+    // Custom labels choose positions explicitly; otherwise sample only real bucket ranks.
+    const buckets = xTickLabel ? keys.map((_, i) => i).filter(i => labels[i] !== '')
+        : x.ticks(Math.min(Math.max(rows.length, 1), 12)).filter(Number.isInteger);
+    axisX(d3.axisBottom(x).tickValues(buckets).tickFormat(i => labels[+i] ?? String(i)))
         .selectAll('.tick text')
         .style('font-size', '11px')
         .attr('transform', 'rotate(-45)')
         .attr('text-anchor', 'end')
         .attr('dx', '-0.4em')
         .attr('dy', '0.4em');
+    // The rank scale positions the marks, but the brush exposes the original keys.
+    context.setBrushScale?.('x', d3.scalePoint(keys, [0, width]));
     axisY(d3.axisLeft(y).ticks(5).tickSizeInner(-width).tickFormat(format(1)));
 
     const series: PlotSeries[] = [];
