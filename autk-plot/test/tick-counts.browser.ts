@@ -68,6 +68,22 @@ describe('Numeric axis tick counts', () => {
         expect(ticks({ ...bars, transform: { preset: 'binning-1d' }, height: 160 }, 'y')).toEqual(['0', '1']);
     });
 
+    it('fits a bar axis to values below 1 instead of reaching 1', () => {
+        const shares = { ...bars, attributes: { axis: ['name', 'share'] } } satisfies UnifiedPlotConfig;
+        const tall = (config: UnifiedPlotConfig) => {
+            const div = document.createElement('div');
+            document.body.appendChild(div);
+            new AutkPlot(div, config);
+            return Math.max(...Array.from(div.querySelectorAll<SVGRectElement>('rect.autkMark'), rect => Number(rect.getAttribute('height'))));
+        };
+        const small = { ...shares, collection: { ...collection, features: collection.features.map(f =>
+            ({ ...f, properties: { ...f.properties, share: f.properties!.share * 0.4 } })) } };
+        expect(ticks(small, 'y').at(-1)).toBe('0.4');
+        // The tallest bar fills the plot either way.
+        expect(tall(small)).toBeCloseTo(tall(shares), 5);
+        expect(ticks({ ...shares, collection: { ...collection, features: [] } }, 'y').at(-1)).toBe('1');
+    });
+
     it('accepts overrides on additional numeric axes without changing their compact defaults', () => {
         for (const plot of [bubble, ecdf]) {
             for (const axis of ['x', 'y'] as const) {

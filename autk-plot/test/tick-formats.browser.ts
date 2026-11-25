@@ -56,7 +56,7 @@ describe('Tick labels without custom formats', () => {
         const bars: UnifiedPlotConfig = { type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] } };
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['0.25', '0.5', '0.75']);
-        expect(ticks(bars, '.y.axis .tick text')).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1']);
+        expect(ticks(bars, '.y.axis .tick text')).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8']);
     });
 
     it('writes a line chart\'s y ticks under one as decimals', () => {
@@ -121,7 +121,7 @@ describe('Tick labels of a plot given custom tick formats', () => {
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['250m', '500m', '750m']);
         expect(ticks(bars, '.y.axis .tick text'))
-            .toEqual(['0', '100m', '200m', '300m', '400m', '500m', '600m', '700m', '800m', '900m', '1']);
+            .toEqual(['0', '100m', '200m', '300m', '400m', '500m', '600m', '700m', '800m']);
     });
 
     it('keeps any other format a caller gives', () => {
@@ -131,7 +131,7 @@ describe('Tick labels of a plot given custom tick formats', () => {
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['0.25', '0.50', '0.75']);
         expect(ticks(bars, '.y.axis .tick text'))
-            .toEqual(['0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']);
+            .toEqual(['0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80']);
     });
 });
 
@@ -155,7 +155,7 @@ describe('Formats omitted for some or all axes', () => {
         const bars: UnifiedPlotConfig = { type: 'barchart', collection: fractions, attributes: { axis: ['share', 'rate'] }, ticks: { x: { format: '.2f' } } };
 
         expect(ticks(bars, '.x.axis .tick text')).toEqual(['0.25', '0.50', '0.75']);
-        expect(ticks(bars, '.y.axis .tick text')).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1']);
+        expect(ticks(bars, '.y.axis .tick text')).toEqual(['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8']);
     });
 
     it('gives a scatterplot\'s x axis its default when its entry is undefined', () => {

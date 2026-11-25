@@ -45,10 +45,12 @@ export const barchart: PlotDefinition = {
 
         const padding = style?.barPadding ?? 0.25;
         const x = d3.scaleBand(rows.map(label), [0, width]).padding(padding >= 0 && padding <= 1 ? padding : 0.25);
-        // An empty result (e.g. everything filtered out) keeps a finite [0, 1] axis.
         // A subset statistic (avg, min, max) may exceed every bar.
         const beyond = partRange && !partRange.additive ? partRange.extent[1] : 0;
-        const y = d3.scaleLinear([0, Math.max(d3.max(rows, amount) ?? 0, 1, beyond)], [height, 0]);
+        // The axis fits the data, shares below 1 included; only an empty or all-zero result
+        // (e.g. everything filtered out) falls back to a finite [0, 1] axis.
+        const top = Math.max(d3.max(rows, amount) ?? 0, beyond);
+        const y = d3.scaleLinear([0, top > 0 ? top : 1], [height, 0]);
 
         // Keep band keys intact. Shorten floating-point artifacts only on raw numeric labels,
         // and keep the original text if shortening would make two categories look identical.
