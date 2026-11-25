@@ -166,38 +166,49 @@ map.events.on(MapEvent.HOVER, ({ selection, source }) => {
 map.updateThematic('neighborhoods', {
   collection: await db.getLayer('neighborhoods'),
   property: 'properties.sjoin.count.noise',
-});`;
+});
+map.updateRenderInfo('neighborhoods', { isColorMap: true });`;
         case 'A02': return `const groupBy = [{ column: 'Unique Key', aggregateFn: 'count' }];
 for (const table of ['noise', 'parking']) {
   await db.spatialQuery({ tableRootName: 'neighborhoods', tableJoinName: table, groupBy });
 }
-// Both joins write into properties.sjoin.count.
-map.updateThematic('neighborhoods', {
-  collection: await db.getLayer('neighborhoods'),
-  property: 'properties.sjoin.count.noise',
-});`;
+// Both counts are available on the same neighborhood collection.
+const neighborhoods = await db.getLayer('neighborhoods');
+const complaint = document.querySelector<HTMLSelectElement>('#select')!;
+const updateThematic = () => map.updateThematic('neighborhoods', {
+  collection: neighborhoods,
+  property: \`properties.sjoin.count.\${complaint.value}\`,
+});
+updateThematic();
+map.updateRenderInfo('neighborhoods', { isColorMap: true });
+complaint.addEventListener('change', updateThematic);`;
         case 'A03': return `await db.spatialQuery({
   tableRootName: ${variant === 'buildings' ? "'table_osm_buildings'" : "'table_osm_roads'"},
   tableJoinName: 'noise',
-  near: { distance: 1000 },
-  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+  near: { distance: 200 },
+  groupBy: [{ column: 'key', aggregateFn: 'count' }],
 });`;
         case 'A04': return `await db.buildHeatmap({
   tableJoinName: 'noise',
-  near: { distance: 1000 },
+  near: { distance: 200 },
   outputTableName: 'heatmap',
-  grid: { rows: ${variant === 'fine' ? 60 : 30}, columns: ${variant === 'fine' ? 60 : 30} },
-  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+  grid: { rows: ${variant === 'fine' ? 120 : 60}, columns: ${variant === 'fine' ? 120 : 60} },
+  smoothingSigma: ${variant === 'fine' ? 3 : 1.5},
+  groupBy: [{ column: 'key', aggregateFn: 'count' }],
 });
 map.loadCollection('heatmap', {
   collection: await db.getRaster('heatmap'), type: 'raster', property: 'band_1',
-});`;
-        case 'A05': return `const result = await new ComputeGpgpu().run({
-  collection: await db.getLayer('neighborhoods'),
+});
+map.updateRenderInfo('heatmap', { opacity: 0.5, isColorMap: true });`;
+        case 'A05': return `const layer = ${variant === 'roads' ? "'table_osm_roads'" : "'neighborhoods'"};
+const result = await new ComputeGpgpu().run({
+  collection: await db.getLayer(layer),
   variableMapping: ${variant === 'roads' ? "{ road: 'geometry' }" : "{ x: 'shape_area', y: 'shape_leng' }"},
   resultField: 'result',
   wgslBody: ${variant === 'roads' ? `\`\n${ROAD_LENGTH_WGSL}\n\`` : "'return (4 * 3.1415927 * x) / (y * y);'"},
-});`;
+});
+map.updateThematic(layer, { collection: result, property: 'properties.compute.result' });
+map.updateRenderInfo(layer, { isColorMap: true });`;
         case 'A06': return `const result = await new ComputeRender().run({
   layers: [{ id: 'table_osm_buildings', collection: buildings, type: 'buildings' }],
   viewpoints: { collection: roads, sampling: { directions: 1 } },

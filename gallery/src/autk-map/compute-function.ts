@@ -39,6 +39,7 @@ async function main(): Promise<void> {
         map.loadCollection(data.name, { collection: data.name === layer ? result : await db.getLayer(data.name), type: data.type });
     }
     map.updateThematic(layer, { collection: result, property: 'properties.compute.result' });
+    map.updateRenderInfo(layer, { isColorMap: true });
     map.fitBounds();
     map.draw();
 }

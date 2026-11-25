@@ -21,8 +21,16 @@
         <section class="introduction" aria-labelledby="example-title">
             <p class="eyebrow">autk-map <span aria-hidden="true">/</span> Spatial joins</p>
             <h1 id="example-title">Multiple spatial joins</h1>
-            <p class="description">Combine results from multiple spatial joins.</p>
+            <p class="description">Count noise and parking complaints by neighborhood, then switch between the two results.</p>
         </section>
+        <div class="controls">
+            <label>Complaint type
+                <select id="select">
+                    <option value="noise">Noise Complaint</option>
+                    <option value="parking">Illegal Parking</option>
+                </select>
+            </label>
+        </div>
     <div id="app">
 
         <section class="map-panel" aria-label="Multiple spatial joins map area">
@@ -30,10 +38,6 @@
             <div class="map-stage" aria-busy="true"><canvas aria-describedby="map-help" aria-label="Multiple spatial joins map"> </canvas></div>
             <div class="panel-footer" id="map-help"><span>Choose complaint type · Scroll to zoom</span></div>
         </section>
-        <select style="margin: 10px;" id="select">
-            <option value="noise">Noise Complaint</option>
-            <option value="parking">Illegal Parking</option>
-        </select>
     </div>
         <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
     </main>

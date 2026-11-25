@@ -379,6 +379,7 @@ map.updateThematic('neighborhoods', {
   collection: neighborhoods,
   property: 'properties.sjoin.count.noise',
 });
+map.updateRenderInfo('neighborhoods', { isColorMap: true });
 map.fitBounds();
 map.draw();`;
         case 'A02': return `${DB_MAP}
@@ -394,10 +395,14 @@ for (const table of ['noise', 'parking']) {
 
 const neighborhoods = await db.getLayer('neighborhoods');
 map.loadCollection('neighborhoods', { collection: neighborhoods });
-map.updateThematic('neighborhoods', {
+const complaint = document.querySelector<HTMLSelectElement>('#select')!;
+const updateThematic = () => map.updateThematic('neighborhoods', {
   collection: neighborhoods,
-  property: 'properties.sjoin.count.noise',
+  property: \`properties.sjoin.count.\${complaint.value}\`,
 });
+updateThematic();
+map.updateRenderInfo('neighborhoods', { isColorMap: true });
+complaint.addEventListener('change', updateThematic);
 map.fitBounds();
 map.draw();`;
         case 'A03': return `${DB_MAP}
@@ -406,19 +411,27 @@ await db.loadOsm({
   queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
   autoLoadLayers: { layers: ['surface', 'roads', 'buildings'] },
 });
-await db.loadCsv({ csvFileUrl: '/data/noise.csv', outputTableName: 'noise', geometryColumns: true });
+await db.loadCsv({
+  csvFileUrl: '/data/noise_manhattan_clean.csv',
+  outputTableName: 'noise',
+  geometryColumns: { latColumnName: 'latitude', longColumnName: 'longitude' },
+  sourceCrs: 'EPSG:4326',
+});
 
 const target = ${variant === 'buildings' ? "'table_osm_buildings'" : "'table_osm_roads'"};
 await db.spatialQuery({
   tableRootName: target,
   tableJoinName: 'noise',
-  near: { distance: 1000 },
-  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+  near: { distance: 200 },
+  groupBy: [{ column: 'key', aggregateFn: 'count' }],
 });
 
 const nearby = await db.getLayer(target);
 map.loadCollection(target, { collection: nearby, type: ${variant === 'buildings' ? "'buildings'" : "'roads'"} });
 map.updateThematic(target, { collection: nearby, property: 'properties.sjoin.count.noise' });
+map.updateRenderInfo(target, { isColorMap: true });
+map.loadCollection('noise', { collection: await db.getLayer('noise'), type: 'points' });
+map.updateRenderInfo('noise', { pointSize: 12, color: { r: 46, g: 65, b: 116, alpha: 1 } });
 map.fitBounds();
 map.draw();`;
         case 'A04': return `${DB_MAP}
@@ -427,33 +440,48 @@ await db.loadOsm({
   queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
   autoLoadLayers: { layers: ['surface', 'parks', 'water', 'roads'] },
 });
-await db.loadCsv({ csvFileUrl: '/data/noise.csv', outputTableName: 'noise', geometryColumns: true });
+await db.loadCsv({
+  csvFileUrl: '/data/noise_manhattan_clean.csv',
+  outputTableName: 'noise',
+  geometryColumns: { latColumnName: 'latitude', longColumnName: 'longitude' },
+  sourceCrs: 'EPSG:4326',
+});
 
 await db.buildHeatmap({
   tableJoinName: 'noise',
-  near: { distance: 1000 },
+  near: { distance: 200 },
   outputTableName: 'heatmap',
-  grid: { rows: ${variant === 'fine' ? 60 : 30}, columns: ${variant === 'fine' ? 60 : 30} },
-  groupBy: [{ column: 'Unique Key', aggregateFn: 'count' }],
+  grid: { rows: ${variant === 'fine' ? 120 : 60}, columns: ${variant === 'fine' ? 120 : 60} },
+  smoothingSigma: ${variant === 'fine' ? 3 : 1.5},
+  groupBy: [{ column: 'key', aggregateFn: 'count' }],
 });
+map.loadCollection('noise', { collection: await db.getLayer('noise'), type: 'points' });
+map.updateRenderInfo('noise', { pointSize: 12, color: { r: 46, g: 65, b: 116, alpha: 1 } });
 map.loadCollection('heatmap', {
   collection: await db.getRaster('heatmap'), type: 'raster', property: 'band_1',
 });
+map.updateRenderInfo('heatmap', { opacity: 0.5, isColorMap: true });
 map.fitBounds();
 map.draw();`;
         case 'A05': return `${DB_MAP.replace("import { AutkMap }", "import { ComputeGpgpu } from '@urban-toolkit/autk-compute';\nimport { AutkMap }")}
-await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });
-const neighborhoods = await db.getLayer('neighborhoods');
+${variant === 'roads' ? `await db.loadOsm({
+  pbfFileUrl: '/data/lower_mnt.osm.pbf',
+  queryArea: { bbox: [-74.019, 40.700, -74.003, 40.714] },
+  autoLoadLayers: { layers: ['roads'] },
+});
+const layer = 'table_osm_roads';` : `await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });
+const layer = 'neighborhoods';`}
 
 const result = await new ComputeGpgpu().run({
-  collection: neighborhoods,
+  collection: await db.getLayer(layer),
   variableMapping: ${variant === 'roads' ? "{ road: 'geometry' }" : "{ x: 'shape_area', y: 'shape_leng' }"},
   resultField: 'result',
   wgslBody: ${variant === 'roads' ? `\`\n${ROAD_LENGTH_WGSL}\n\`` : "'return (4 * 3.1415927 * x) / (y * y);'"},
 });
 
-map.loadCollection('neighborhoods', { collection: result });
-map.updateThematic('neighborhoods', { collection: result, property: 'properties.compute.result' });
+map.loadCollection(layer, { collection: result${variant === 'roads' ? ", type: 'roads'" : ''} });
+map.updateThematic(layer, { collection: result, property: 'properties.compute.result' });
+map.updateRenderInfo(layer, { isColorMap: true });
 map.fitBounds();
 map.draw();`;
         case 'A06': return `${DB_MAP.replace("import { AutkMap }", "import { ComputeRender } from '@urban-toolkit/autk-compute';\nimport { AutkMap }")}

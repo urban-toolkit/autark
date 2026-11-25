@@ -20,11 +20,22 @@ async function main(): Promise<void> {
 
     const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
     await map.init();
+    const neighborhoods = await db.getLayer('neighborhoods');
     for (const layer of db.getLayersMetadata()) {
-        map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
+        const collection = layer.name === 'neighborhoods' ? neighborhoods : await db.getLayer(layer.name);
+        map.loadCollection(layer.name, { collection, type: layer.type });
     }
     map.updateRenderInfo('noise', { isSkip: true });
     map.updateRenderInfo('parking', { isSkip: true });
+
+    const complaint = document.querySelector<HTMLSelectElement>('#select')!;
+    const updateThematic = () => map.updateThematic('neighborhoods', {
+        collection: neighborhoods,
+        property: `properties.sjoin.count.${complaint.value}`,
+    });
+    updateThematic();
+    map.updateRenderInfo('neighborhoods', { isColorMap: true });
+    complaint.addEventListener('change', updateThematic);
     map.fitBounds();
     map.draw();
 }

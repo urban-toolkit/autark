@@ -21,6 +21,7 @@ async function main(): Promise<void> {
     const neighborhoods = await db.getLayer('neighborhoods');
     map.loadCollection('neighborhoods', { collection: neighborhoods });
     map.updateThematic('neighborhoods', { collection: neighborhoods, property: 'properties.sjoin.count.noise' });
+    map.updateRenderInfo('neighborhoods', { isColorMap: true });
     map.fitBounds();
     map.draw();
 }

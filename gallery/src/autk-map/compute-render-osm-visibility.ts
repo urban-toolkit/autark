@@ -18,6 +18,7 @@ export class ComputeRenderOsmVisibility {
         await this.loadDb();
         await this.loadMap(canvas);
         this.updateMapListeners();
+        this.map.fitBounds();
         this.map.draw();
     }
 

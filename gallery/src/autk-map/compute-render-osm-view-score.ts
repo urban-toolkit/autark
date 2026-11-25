@@ -55,6 +55,7 @@ export class ComputeRenderOsmViewScore {
 
         this.map.updateRenderInfo('table_osm_buildings', { isClick: true, opacity: 0.94 });
         this.renderSummary();
+        this.map.fitBounds();
         this.map.draw();
     }
 
