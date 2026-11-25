@@ -125,6 +125,17 @@ export class AutkPlot {
     }
 
     /**
+     * Temporarily highlights marks for these source features without changing the selection.
+     *
+     * @param selection Source feature ids to hover; an empty list clears the hover.
+     * @example
+     * map.events.on(MapEvent.HOVER, ({ selection }) => plot.setHover(selection));
+     */
+    public setHover(selection: number[]): void {
+        this._plot.setHover(selection);
+    }
+
+    /**
      * Replaces the plot's data collection and redraws in place.
      *
      * @param collection New GeoJSON feature collection to render.

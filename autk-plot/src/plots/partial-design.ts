@@ -735,6 +735,8 @@ export type AutoPartContext = {
     outline: string;
     /** Selected features, for the `units` rule. */
     selected: Set<number>;
+    /** Class of the part elements (defaults to `autkPartial`). */
+    className?: string;
     /** Selected features of a part with their values, for the `members` rule. */
     membersOf: (part: SegregatedPart) => { feature: number; value: number }[];
 };

@@ -67,7 +67,7 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     /** Source feature ids derived from mark selection or provided externally. */
     private _selectedFeatureIds: Set<number> = new Set();
     /** Tracks whether the current selection came from local or external input. */
-    private _selectionOrigin: 'local' | 'external' | null = null;
+    protected _selectionOrigin: 'local' | 'external' | null = null;
     /** Controls how source ids map back onto rendered marks. */
     private _selectionProjection: 'bijective' | 'aggregated' = 'bijective';
     /** Typed event emitter exposed to plot consumers. */
@@ -79,6 +79,10 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     /** Suppresses brush handlers during programmatic brush clearing. */
     private _suppressBrushEvents: boolean = false;
     private _hoveredMark: HTMLElement | SVGElement | null = null;
+    /** Source feature ids hovered from another view. */
+    protected _hoverFeatureIds: Set<number> = new Set();
+    /** Marks currently painted with the hover color, restored when the hover moves. */
+    private _hoverPainted: Set<HTMLElement | SVGElement> = new Set();
     /** Feature shares received with the last external selection, keyed by feature index. */
     private _selectionShares: Map<number, FeatureShare> | null = null;
     /** Whether the provenance path widget was requested (`provenance.path`). */
@@ -391,6 +395,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      */
     protected renderSegregatedMarks(): void {}
 
+    /** Draws or clears the partial marks of a hover from another view. */
+    protected renderHoverParts(): void {}
+
     /**
      * Part of each rendered row produced by the current external selection.
      *
@@ -400,6 +407,23 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * @returns One entry per row that receives at least one selected unit, or
      * an empty list when the segregated view is inactive.
      */
+    /** Parts of the marks produced by the hovered features, for an aggregated plot. */
+    protected hoverParts(): SegregatedPart[] {
+        if (this._hoverFeatureIds.size === 0 || this._selectionProjection !== 'aggregated') return [];
+        const parts: SegregatedPart[] = [];
+        for (const datum of this._data) {
+            const rowId = this.rowIdOf(datum);
+            if (!rowId) continue;
+            const part = this._provenance.contribution(rowId, this._hoverFeatureIds);
+            if (part.value === null) continue;
+            const ratio = part.additive && part.totalValue
+                ? (part.value ?? 0) / part.totalValue
+                : part.selectedUnits / part.totalUnits;
+            parts.push({ datum, mark: markId(rowId), part, fraction: Math.min(1, Math.max(0, ratio)) });
+        }
+        return parts;
+    }
+
     protected segregatedParts(): SegregatedPart[] {
         if (!this.segregatedActive) return [];
 
@@ -557,19 +581,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         const plot = this;
 
         svgs.each(function (d) {
-            d3.select(this).on('click', function () {
-                if (d == null || typeof d !== 'object') return;
-                // A click adds the mark to the current selection, or takes it out, also when that
-                // selection came from another view (the map).
-                if (plot._selectedMarkDatums.has(d as object)) {
-                    plot._selectedMarkDatums.delete(d as object);
-                } else {
-                    plot._selectedMarkDatums.add(d as object);
-                }
-                plot.syncSelectedFeaturesFromMarks();
-                plot._selectionOrigin = plot._selectedFeatureIds.size > 0 ? 'local' : null;
-                plot.renderSelection();
-                plot.events.emit(PlotEvent.CLICK, plot.selectionEventData());
+            d3.select(this).on('click', function (event) {
+                event.stopPropagation();
+                plot.toggleMarkSelection(d);
             });
         });
 
@@ -580,6 +594,58 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             plot.renderSelection();
             plot.events.emit(PlotEvent.CLICK, { selection: [] });
         });
+
+        // A brush overlay sits above the marks, so marks never receive pointer events there.
+        // Hit-test through it instead, and ignore the click that ends a drag.
+        if (this.hasBrushEvent()) {
+            let down: [number, number] | null = null;
+            d3.select(this._div).selectAll('.autkBrush')
+                .on('pointerdown.autkBrushClick', function (event: PointerEvent) {
+                    down = [event.clientX, event.clientY];
+                })
+                .on('click.autkBrushClick', function (event: MouseEvent) {
+                    const moved = down ? Math.hypot(event.clientX - down[0], event.clientY - down[1]) : Infinity;
+                    down = null;
+                    if (moved > 4) return;
+                    const hit = plot.markAt(event.clientX, event.clientY);
+                    if (hit) plot.toggleMarkSelection(hit.datum);
+                });
+        }
+    }
+
+    /** Adds or removes a row from the local selection and emits CLICK. */
+    private toggleMarkSelection(d: unknown): void {
+        if (d == null || typeof d !== 'object') return;
+        // A click adds the mark to the current selection, or takes it out, also when that
+        // selection came from another view (the map).
+        if (this._selectedMarkDatums.has(d as object)) {
+            this._selectedMarkDatums.delete(d as object);
+        } else {
+            this._selectedMarkDatums.add(d as object);
+        }
+        this.syncSelectedFeaturesFromMarks();
+        this._selectionOrigin = this._selectedFeatureIds.size > 0 ? 'local' : null;
+        this.renderSelection();
+        this.events.emit(PlotEvent.CLICK, this.selectionEventData());
+    }
+
+    /** Whether the plot binds any rectangular brush. */
+    private hasBrushEvent(): boolean {
+        return this._enabledEvents.some(event => event === PlotEvent.BRUSH || event === PlotEvent.BRUSH_X || event === PlotEvent.BRUSH_Y);
+    }
+
+    /** The first `.autkMark` under a client point, also when a brush overlay covers it. */
+    private markAt(clientX: number, clientY: number): { element: HTMLElement | SVGElement; datum: AutkDatum } | null {
+        const elements = typeof document.elementsFromPoint === 'function'
+            ? document.elementsFromPoint(clientX, clientY)
+            : [];
+        for (const element of elements) {
+            if ((!(element instanceof SVGElement) && !(element instanceof HTMLElement))
+                || !element.classList.contains('autkMark') || !this._div.contains(element)) continue;
+            const datum = d3.select(element).datum();
+            if (datum && typeof datum === 'object') return { element, datum: datum as AutkDatum };
+        }
+        return null;
     }
 
     /** Binds mouse hover to the rendered marks without changing their selection. */
@@ -587,27 +653,88 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         const marks = d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark');
         const plot = this;
         marks.on('mouseenter.autkHover', function (_event, datum) {
-            if ((!(this instanceof SVGElement) && !(this instanceof HTMLElement))
-                || !datum || typeof datum !== 'object' || plot._hoveredMark === this) return;
-            plot._hoveredMark = this;
-            plot.paintHover();
-            const row = datum as AutkDatum;
-            plot.events.emit(PlotEvent.HOVER, { selection: [...(row.autkIds ?? [])], datum: row });
+            if ((!(this instanceof SVGElement) && !(this instanceof HTMLElement))) return;
+            plot.setPointerHover(this, datum);
         }).on('mouseleave.autkHover', function () {
-            if (plot._hoveredMark !== this) return;
-            plot._hoveredMark = null;
-            plot.applyMarkStyles(marks.filter((_datum, i, nodes) => nodes[i] === this));
-            plot.events.emit(PlotEvent.HOVER, { selection: [], datum: null });
+            plot.setPointerHover(null);
         });
+
+        d3.select(this._div)
+            .on('pointerleave.autkHoverClear', () => this.setPointerHover(null))
+            .on('pointercancel.autkHoverClear', () => this.setPointerHover(null));
+
+        // A brush overlay covers the marks; hit-test through it while the pointer moves.
+        if (this.hasBrushEvent()) {
+            d3.select(this._div).selectAll('.autkBrush')
+                .on('pointermove.autkBrushHover', function (event: PointerEvent) {
+                    const hit = plot.markAt(event.clientX, event.clientY);
+                    plot.setPointerHover(hit?.element ?? null, hit?.datum);
+                })
+                .on('pointerleave.autkBrushHover', function () {
+                    plot.setPointerHover(null);
+                });
+        }
+
         if (this._hoveredMark && !this._div.contains(this._hoveredMark)) {
-            this._hoveredMark = null;
-            this.events.emit(PlotEvent.HOVER, { selection: [], datum: null });
+            this.setPointerHover(null);
         }
     }
 
+    /** Sets or clears the mark under the pointer and emits HOVER when it changes. */
+    private setPointerHover(node: HTMLElement | SVGElement | null, datum?: unknown): void {
+        if (!datum || typeof datum !== 'object') {
+            if (!this._hoveredMark) return;
+            this._hoveredMark = null;
+            this.paintHover();
+            // A hover from another view stays until that view clears it.
+            if (this._hoverFeatureIds.size === 0) this.events.emit(PlotEvent.HOVER, { selection: [], datum: null });
+            return;
+        }
+        if (this._hoveredMark === node) return;
+        this._hoveredMark = node;
+        this.paintHover();
+        const row = datum as AutkDatum;
+        this.events.emit(PlotEvent.HOVER, { selection: [...(row.autkIds ?? [])], datum: row });
+    }
+
+    /**
+     * Highlights the marks of these source features with the hover color, without changing selection.
+     *
+     * @param selection Source feature ids to hover; an empty list clears the external hover.
+     */
+    public setHover(selection: number[]): void {
+        this._hoverFeatureIds = new Set(selection);
+        this.paintHover();
+    }
+
+    /** Repaints hovered marks and restores the marks that stopped being hovered. */
     private paintHover(): void {
-        const mark = this._hoveredMark;
-        if (mark) mark.style.setProperty(mark instanceof SVGElement ? this._colorProperty : 'background-color', PlotStyle.hover);
+        const next = new Set<HTMLElement | SVGElement>();
+        // An aggregated plot shows the hovered feature as a part, not as a recolored whole mark.
+        const parts = this._hoverFeatureIds.size > 0 && this._selectionProjection === 'aggregated';
+        d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark').each((datum, i, nodes) => {
+            const node = nodes[i];
+            if ((! (node instanceof SVGElement) && !(node instanceof HTMLElement)) || !this.isHoverTarget(datum, node)) return;
+            if (parts && this._hoveredMark !== node) return;
+            next.add(node);
+            node.style.setProperty(node instanceof SVGElement ? this._colorProperty : 'background-color', PlotStyle.hover);
+            // Line-like marks thicken as well as recolor while hovered.
+            if (node instanceof SVGElement && this._colorProperty === 'stroke') node.style.setProperty('stroke-width', '4');
+        });
+        for (const node of this._hoverPainted) {
+            if (!next.has(node) && node.isConnected) {
+                this.applyMarkStyles(d3.select(node) as unknown as d3.Selection<d3.BaseType, unknown, HTMLElement, unknown>);
+            }
+        }
+        this._hoverPainted = next;
+        this.renderHoverParts();
+    }
+
+    /** Whether a mark is hovered by the pointer or by a selection from another view. */
+    private isHoverTarget(datum: unknown, node: HTMLElement | SVGElement): boolean {
+        if (this._hoveredMark === node) return true;
+        if (this._hoverFeatureIds.size === 0 || !datum || typeof datum !== 'object') return false;
+        return ((datum as AutkDatum).autkIds ?? []).some(id => this._hoverFeatureIds.has(id));
     }
 
     /** Adds axis data bounds to brush-local SVG bounds when the renderer knows the scales. */
@@ -753,6 +880,11 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     /**
      * Refreshes rendered marks to reflect the current selection state.
      */
+    public override draw(): void {
+        super.draw();
+        this.paintHover();
+    }
+
     protected renderSelection(): void {
         const svgs = d3.select(this._div).selectAll<d3.BaseType, unknown>('.autkMark');
         this.applyMarkStyles(svgs);

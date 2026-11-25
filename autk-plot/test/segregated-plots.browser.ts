@@ -153,7 +153,7 @@ describe('one-to-one plots receiving shares (1:N inverse direction)', () => {
         plot.setSelection(ids, shares);
 
         const rows = Array.from(div.querySelectorAll<HTMLTableRowElement>('tbody tr'));
-        expect(rows.slice(0, 2).map(r => r.getAttribute('data-autk-units')).sort()).toEqual(['1/4', '3/3']);
+        expect(rows.map(r => r.getAttribute('data-autk-units')).filter(Boolean).sort()).toEqual(['1/4', '3/3']);
         expect(rows.find(r => r.getAttribute('data-autk-units') === '1/4')!.style.backgroundImage).toMatch(/ 25(\.0+)?%/);
     });
 

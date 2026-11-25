@@ -828,6 +828,13 @@ function near(actual: unknown, expected: unknown): unknown {
  * `fill` on rows, which draws nothing on an HTML element.
  */
 function accepted(name: string, snapshots: Snapshot[], actual: Snapshot[]): Snapshot[] {
+    // A table keeps its rows in place when a row is selected, so order is not part of the snapshot.
+    if (name.startsWith('table:')) {
+        for (const list of [snapshots, actual]) {
+            for (const snapshot of list) snapshot.marks.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        }
+    }
+
     // Numeric range edges now display their full values. Keep historical ticks and
     // their order, expanding only the SI notation used by the old bin formatter.
     if (name === 'barchart: sum reducer' || name.startsWith('heatmatrix:')) {

@@ -420,10 +420,10 @@ describe('HTML marks, mark styles, and brush areas are open to user plots too', 
         expect(areas()).toEqual(areas().slice().sort((a, b) => a - b));
         div.querySelectorAll('th')[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(areas()).toEqual(areas().slice().sort((a, b) => b - a));
-        // A clicked row goes on top (arrange), with readable text on the highlight.
+        // A clicked row stays in place, with readable text on the highlight.
         const row = div.querySelectorAll<HTMLElement>('tbody tr')[7];
         row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        expect(div.querySelector('tbody tr')).toBe(row);
+        expect(div.querySelectorAll('tbody tr')[7]).toBe(row);
         expect(row.style.color).not.toBe('');
     });
 

@@ -131,6 +131,8 @@ export type PlotArrangeContext = {
     highlighted: (row: AutkDatum) => boolean;
     /** Rows with a selected part (a selection from another view). */
     parts: SegregatedPart[];
+    /** Whether the current selection came from another view (the map, a linked plot). */
+    external: boolean;
 };
 
 /**
@@ -1064,12 +1066,45 @@ export class RegisteredPlot extends PlotBaseInteractive {
         this.drawAutoParts(group, parts, marks);
     }
 
+    /** Draws the hovered features as parts of their aggregated marks, in the hover color. */
+    protected override renderHoverParts(): void {
+        const group = this.marksGroup;
+        if (group.empty()) return;
+        group.selectAll('.autkHoverPart').remove();
+        const parts = this.hoverParts();
+        if (parts.length === 0) return;
+        const marks = new Map<object, SVGGraphicsElement[]>();
+        d3.select(this._div).selectAll<SVGGraphicsElement, unknown>('.autkMark').each(function (d) {
+            if (d == null || typeof d !== 'object') return;
+            const own = marks.get(d) ?? [];
+            own.push(this);
+            marks.set(d, own);
+        });
+        this.drawAutoParts(group, parts, marks, {
+            color: PlotStyle.hover,
+            outline: PlotStyle.hover,
+            selected: new Set(this._hoverFeatureIds),
+            className: 'autkHoverPart',
+            series: false,
+        });
+        group.selectAll('.autkHoverPart').style('pointer-events', 'none');
+    }
+
     /** Draws the part of every mark with the highlight of its family (or its own `data-autk-highlight`). */
     private drawAutoParts(
         group: d3.Selection<SVGGElement, unknown, null, undefined>,
         parts: SegregatedPart[],
         marks: Map<object, SVGGraphicsElement[]>,
+        options: {
+            color?: string;
+            outline?: string;
+            selected?: Set<number>;
+            className?: string;
+            series?: boolean;
+        } = {},
     ): void {
+        const color = options.color ?? this.highlightColor;
+        const selected = options.selected ?? new Set(this.selection);
         const designs = new Map(this.highlightDesigns.map(design => [design.kind, design]));
         // Every part is measured first and inserted afterwards: measuring a mark
         // (getBBox) after a DOM insertion forces a new layout, which made one
@@ -1077,14 +1112,15 @@ export class RegisteredPlot extends PlotBaseInteractive {
         const writes: (() => void)[] = [];
         let membersByRow: Map<ProvenanceId, ProvenanceContribution[]> | undefined;
         const context: AutoPartContext = {
-            color: this.highlightColor,
-            outline: PlotStyle.provenanceStroke,
-            selected: new Set(this.selection),
+            color,
+            outline: options.outline ?? PlotStyle.provenanceStroke,
+            selected,
+            className: options.className,
             membersOf: part => {
                 // Selected contributions by mark, indexed once per render, on the first part that asks.
                 if (!membersByRow) {
-                    const selected = new Set(this.selection.map(featureId));
-                    membersByRow = d3.group(this._provenance.contributions.filter(unit => selected.has(unit.source)), unit => unit.target);
+                    const features = new Set(Array.from(selected).map(featureId));
+                    membersByRow = d3.group(this._provenance.contributions.filter(unit => features.has(unit.source)), unit => unit.target);
                 }
                 const rowId = this.rowIdOf(part.datum);
                 return (rowId === undefined ? [] : membersByRow.get(rowId) ?? [])
@@ -1096,6 +1132,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             for (const mark of marks.get(part.datum) ?? []) this.copyPart(mark, part, designs, context, writes);
         }
         for (const write of writes) write();
+        if (options.series === false) return;
         const partOf = new Map(parts.map(part => [part.datum as object, part]));
         if (this._series.length > 0) this.drawPlotSeries(partOf);
         else this.drawSeries(group, marks, partOf, designs);
@@ -1113,6 +1150,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             rows: this._data,
             highlighted: row => this.isMarkHighlighted(row),
             parts: this.segregatedParts(),
+            external: this._selectionOrigin === 'external',
         });
     }
 
@@ -1239,7 +1277,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         // An HTML mark is filled to its part, from the anchor of the rule.
         if (kind === 'html') {
             const host = mark as unknown as HTMLElement;
-            const fill = htmlFill(design, ratioOf(part, rule), this.highlightColor);
+            const fill = htmlFill(design, ratioOf(part, rule), context.color);
             writes.push(() => {
                 host.style.setProperty('background-image', fill);
                 host.setAttribute('data-autk-filled', String(part.fraction));
@@ -1251,7 +1289,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         const copy = mark.cloneNode(true) as SVGGraphicsElement;
         copy.querySelectorAll('title').forEach(title => title.remove());
         copy.removeAttribute('id');
-        copy.setAttribute('class', 'autkPartial');
+        copy.setAttribute('class', context.className ?? 'autkPartial');
         copy.setAttribute('data-autk-provenance', part.mark);
         copy.setAttribute('data-autk-units', `${part.part.selectedUnits}/${part.part.totalUnits}`);
         copy.style.setProperty('pointer-events', 'none');
@@ -1261,7 +1299,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         // Stroke-only marks show their part in the stroke.
         const property = kind === 'stroke' ? 'stroke' : this._colorProperty;
         for (const element of [copy, ...Array.from(copy.querySelectorAll<SVGElement>('*'))]) {
-            element.style.setProperty(property, this.highlightColor);
+            element.style.setProperty(property, context.color);
         }
 
         // A subset statistic drawn inside a mark whose color encodes the value

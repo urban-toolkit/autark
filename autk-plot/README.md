@@ -135,6 +135,15 @@ plot.events.on(PlotEvent.HOVER, ({ selection, datum }) => {
 
 When hover clears, the event carries `selection: []` and `datum: null`.
 
+Hover can also come from another view. `plot.setHover(selection)` highlights those source features without changing the selection, and `plot.setHover([])` clears it. In an aggregated plot the hovered feature is drawn as a part of its mark, in the hover color; stroke-only marks such as parallel-coordinate lines also thicken while hovered. This is how a map hover can highlight plot marks:
+
+```ts
+map.updateRenderInfo('neighborhoods', { isHover: true });
+map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+  if (source === 'pointer') plot.setHover(selection);
+});
+```
+
 ### Brush bounds
 
 `PlotEvent.BRUSH`, `BRUSH_X`, and `BRUSH_Y` include `extent` alongside `selection` and optional provenance `shares`. An active brush always reports `extent.pixels` in the brush group's local SVG coordinates. A cleared brush reports `extent: null`, even if another brush still contributes to the selection.

@@ -18,6 +18,7 @@ import * as d3 from 'd3';
 
 import type { AutkDatum } from '../types-plot';
 
+
 import type { PlotDefinition } from './registered';
 
 /** Rows of a `sort` transform, one per feature. */
@@ -86,12 +87,15 @@ export const tablevis: PlotDefinition = {
             .text((cell, index) => typeof cell === 'number' ? formats[index](cell) : String(cell));
     },
 
-    // Selected rows, here or in another view, are kept on top, in sorted order.
-    arrange({ html, rows, highlighted, parts }) {
+    // A selection from another view keeps its rows on top, in sorted order. A local click
+    // leaves the row where it is, so clicking it again deselects it.
+    arrange({ html, rows, highlighted, parts, external }) {
+        if (!external) return;
         const order = new Map(rows.map((row, index) => [row, index]));
         const withPart = new Set(parts.map(part => part.datum));
         const pinned = (row: AutkDatum) => highlighted(row) || withPart.has(row);
         html.selectAll<HTMLTableRowElement, AutkDatum>('tbody tr')
             .sort((a, b) => Number(pinned(b)) - Number(pinned(a)) || order.get(a)! - order.get(b)!);
     },
+
 };
