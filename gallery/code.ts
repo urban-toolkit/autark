@@ -123,40 +123,17 @@ map.loadTerrain({ source: { collection: await db.getRaster('elevation'), propert
         case 'P08': return plot('boxplot', "{ axis: ['cdta2020', 'shape_area', '@transform'] }", 'CLICK', "{ preset: 'box-stats' }");
         case 'P09': return `const scatter = new AutkPlot(document.querySelector('#plotScatter')!, {
   type: 'scatterplot', collection, attributes: { axis: ['shape_area', 'shape_leng'] },
-  events: [PlotEvent.CLICK, PlotEvent.HOVER],
+  events: [PlotEvent.BRUSH],
 });
 const histogram = new AutkPlot(document.querySelector('#plotHistogram')!, {
   type: 'barchart', collection, attributes: { axis: ['shape_area', '@transform'] },
   transform: { preset: 'binning-1d', options: { bins: 10 } },
-  events: [PlotEvent.CLICK, PlotEvent.HOVER],
+  events: [PlotEvent.CLICK],
 });
 
-scatter.events.on(PlotEvent.CLICK, ({ selection }) => {
+scatter.events.on(PlotEvent.BRUSH, ({ selection }) => {
   map.setSelection('neighborhoods', selection);
   histogram.setSelection(selection);
-});
-scatter.events.on(PlotEvent.HOVER, ({ selection }) => {
-  map.setHover('neighborhoods', selection);
-  histogram.setHover(selection);
-});
-histogram.events.on(PlotEvent.CLICK, ({ selection }) => {
-  map.setSelection('neighborhoods', selection);
-  scatter.setSelection(selection);
-});
-histogram.events.on(PlotEvent.HOVER, ({ selection }) => {
-  map.setHover('neighborhoods', selection);
-  scatter.setHover(selection);
-});
-
-map.updateRenderInfo('neighborhoods', { isHover: true });
-map.events.on(MapEvent.CLICK, ({ selection }) => {
-  scatter.setSelection(selection);
-  histogram.setSelection(selection);
-});
-map.events.on(MapEvent.HOVER, ({ selection, source }) => {
-  if (source !== 'pointer') return;
-  scatter.setHover(selection);
-  histogram.setHover(selection);
 });`;
         case 'A01': return `await db.spatialQuery({
   tableRootName: 'neighborhoods',

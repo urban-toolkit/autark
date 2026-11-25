@@ -22,7 +22,7 @@ async function main(): Promise<void> {
         labels: { title: 'Area and perimeter', axis: ['Area', 'Perimeter'] },
         width: 'auto',
         height: 280,
-        events: [PlotEvent.CLICK, PlotEvent.HOVER],
+        events: [PlotEvent.BRUSH, PlotEvent.HOVER],
     });
     const histogram = new AutkPlot(document.querySelector<HTMLElement>('#plotHistogram')!, {
         type: 'barchart',
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
         histogram.setHover(selection);
     });
 
-    scatter.events.on(PlotEvent.CLICK, ({ selection }) => {
+    scatter.events.on(PlotEvent.BRUSH, ({ selection }) => {
         highlight(selection);
         histogram.setSelection(selection);
     });
